@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # --- Identity Service (SPIRE) ---
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.10.1
+    container_name: spire-server
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./config/spire:/etc/spire/server
+    command: [ "-config", "/etc/spire/server/server.conf" ]
+    networks:
+      - swarm_net
+
+  # --- Agent Memory (PostgreSQL) ---
+  db:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: agno
+      POSTGRES_PASSWORD: agno_password
+      POSTGRES_DB: agno_memory
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - swarm_net
+  # --- AgentOS (Agno Control Plane) ---
+  # Temporarily disabled - requires custom build
+  # agno-control:
+  #   image: phidata/agno:latest
+  #   container_name: agno_control
+  #   environment:
+  #     - AGNO_DB_URL=postgresql://agno:agno_password@postgres:5432/agno_memory
+  #     - SPIRE_SERVER_URL=spire-server:8081
+  #   depends_on:
+  #     - db
+  #     - spire-server
+  #   networks:
+  #     - swarm_net
+
+networks:
+  swarm_net:
+    driver: bridge
+
+volumes:
+  pg_data:

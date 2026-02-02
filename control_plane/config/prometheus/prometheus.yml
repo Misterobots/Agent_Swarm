@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'execution_plane_cadvisor'
+    static_configs:
+      # RECOMMENDED: Use your Main PC's Tailscale IP (e.g., 100.x.y.z)
+      # This ensures stable monitoring even if your router assigns new LAN IPs.
+      - targets: ['YOUR_MAIN_PC_TAILSCALE_IP:8080']
+
+  - job_name: 'agent_runtime'
+    static_configs:
+      - targets: ['YOUR_MAIN_PC_TAILSCALE_IP:8000']

@@ -1,0 +1,188 @@
+version: '3.8'
+
+services:
+  # OLLAMA SERVICE - GPU Accelerated Inference
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_gpu
+    # Enable GPU Support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: always
+    networks:
+      - execution_net
+
+  # OPENHANDS - Sandboxed Execution Environment
+  openhands:
+    build:
+      context: .
+      dockerfile: Dockerfile.openhands
+    image: custom-openhands:latest
+    container_name: openhands_sandbox
+    privileged: true # Required for Docker-in-Docker sandboxing
+    environment:
+      - SANDBOX_USER_ID=1000
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../workspace:/workspace
+    networks:
+      - execution_net
+
+  # AGENT RUNTIME - Custom Python Environment for Agno Agents
+  agent-runtime:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile
+    image: home-ai-lab/agent-runtime:latest
+    container_name: agent_runtime
+    depends_on:
+      - ollama
+      - openhands
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - OPENHANDS_URL=http://openhands:3000
+      - AGNO_DB_URL=postgresql://agno:agno_password@192.168.1.211:5432/agno_memory
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/output:/app/comfy_io/output
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/input:/app/comfy_io/input
+    command: [ "python", "-u", "/app/agents/main.py" ]
+    ports:
+      - "8000:8000" # Expose metrics
+    networks:
+      - execution_net
+
+  # AGENT UI - Streamlit Interface
+  agent-ui:
+    image: home-ai-lab/agent-runtime:latest
+    container_name: agent_ui
+    depends_on:
+      - ollama
+      - agent-runtime
+    environment:
+      - AGNO_DB_URL=postgresql://agno:agno_password@192.168.1.211:5432/agno_memory
+      - OLLAMA_HOST=http://ollama:11434
+      - STREAMLIT_THEME_BASE=dark
+      - STREAMLIT_THEME_PRIMARY_COLOR=#00ffff
+      - STREAMLIT_THEME_BACKGROUND_COLOR=#0e1117
+      - STREAMLIT_THEME_SECONDARY_BACKGROUND_COLOR=#1c1c2e
+      - STREAMLIT_THEME_TEXT_COLOR=#e0e0e0
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/output:/app/comfy_io/output
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/input:/app/comfy_io/input
+    working_dir: /workspace
+    # Streamlit runs on port 8501 by default
+    command: [ "streamlit", "run", "agents/ui.py", "--server.port=8501", "--server.address=0.0.0.0" ]
+    ports:
+      - "8501:8501"
+      - "8001:8001"
+    networks:
+      - execution_net
+
+  # MONITORING - Container Stats
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    networks:
+      - execution_net
+
+  # MONITORING - Metrics Database
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./config/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - execution_net
+
+  # MONITORING - Dashboard UI
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "80:3000" # Standard HTTP Port for easy access
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_PANELS_DISABLE_SANITIZE_HTML=true # Required for Glassmorphism CSS hack
+      - GF_LOG_LEVEL=debug # Enable Debug Logging for Provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning # Provisioning Config
+      - ./config/grafana/dashboards:/etc/grafana/dashboards # Dashboard JSONs
+    networks:
+      - execution_net
+
+  # LOGGING - Aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    user: "root"
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki:/etc/loki
+      - loki_data:/tmp/loki
+    command: -config.file=/etc/loki/loki.yml
+    networks:
+      - execution_net
+
+  # LOGGING - Agent (Ships logs to Loki)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./config/promtail:/etc/promtail
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/promtail.yml
+    networks:
+      - execution_net
+
+  # TRAFFIC CONTROL - Persistent Queuing
+  redis:
+    image: redis:alpine
+    container_name: redis_queue
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - execution_net
+
+networks:
+  execution_net:
+    driver: bridge
+
+volumes:
+  ollama_models:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  redis_data:
