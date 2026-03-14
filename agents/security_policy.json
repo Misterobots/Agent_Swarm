@@ -1,0 +1,32 @@
+{
+  "policy_version": "1.0",
+  "command_blocklist": [
+    "rm\\s+-[rRf]+",
+    "mkfs",
+    "dd\\s+if=",
+    "wget\\s+http",
+    "curl\\s+.*\\|\\s*sh",
+    "chmod\\s+777",
+    "chown\\s+root",
+    ">\\s+/etc/",
+    "nc\\s+-e"
+  ],
+  "package_blocklist": [
+    "os", 
+    "sys", 
+    "subprocess", 
+    "shutil", 
+    "pickle", 
+    "base64", 
+    "eval", 
+    "exec",
+    "telnetlib",
+    "pty"
+  ],
+  "approved_domains": [
+    "huggingface.co",
+    "civitai.com",
+    "github.com",
+    "pypi.org"
+  ]
+}

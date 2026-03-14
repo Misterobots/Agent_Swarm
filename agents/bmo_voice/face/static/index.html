@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>BMO</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <canvas id="bmo-face"></canvas>
+
+    <!-- Touch-to-wake overlay -->
+    <div id="touch-overlay" class="hidden">
+      <div class="touch-ring"></div>
+      <span class="touch-text">Listening...</span>
+    </div>
+
+    <!-- Text display area (for subtitles / chat) -->
+    <div id="text-display"></div>
+
+    <!-- Chat Input for Testing -->
+    <div id="input-container">
+      <input
+        type="text"
+        id="chat-input"
+        placeholder="Type to BMO..."
+        autocomplete="off"
+      />
+    </div>
+
+    <!-- Scripts -->
+    <!-- Error Handling & Debugging -->
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        const el = document.getElementById("text-display");
+        if (el) {
+          el.classList.remove("hidden");
+          el.innerText = `ERROR: ${msg}\nLine: ${line}`;
+          el.style.color = "red";
+          el.style.backgroundColor = "black";
+        }
+      };
+    </script>
+    
+    <script src="static/expressions.js?v=7"></script>
+    <script src="static/face.js?v=7"></script>
+  </body>
+</html>

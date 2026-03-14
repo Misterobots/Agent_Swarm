@@ -1,0 +1,457 @@
+{
+  "version": "1.0.0",
+  "category": "accessibility",
+  "patterns": [
+    {
+      "id": "8a412936d06ceacf",
+      "subcategory": "alt-text",
+      "name": "Alt Text Detector",
+      "description": "Learns alt text patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/alt-text",
+          "patternId": "accessibility/alt-text/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.27,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 9
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 103,
+          "column": 29
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 28
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 47,
+          "column": 34
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 40,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 9
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 76,
+          "column": 52
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 123,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 197,
+          "column": 38
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 274,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 285,
+          "column": 16
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 367,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 28
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 37,
+          "column": 27
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 272,
+          "column": 12
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 277,
+          "column": 16
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 277,
+          "column": 36
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 383,
+          "column": 35
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 385,
+          "column": 46
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 391,
+          "column": 57
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 398,
+          "column": 51
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 265,
+          "column": 22
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 272,
+          "column": 55
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 312,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 77,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 513,
+          "column": 16
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 837,
+          "column": 34
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:07.069Z",
+        "approvedAt": "2026-02-02T02:57:07.069Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f942ec1f177f350d",
+      "subcategory": "aria-roles",
+      "name": "ARIA Roles Detector",
+      "description": "Learns ARIA roles patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/aria-roles",
+          "patternId": "accessibility/aria-roles/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.32,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 37,
+          "column": 17
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 38,
+          "column": 17
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 39,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 36,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 68,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 69,
+          "column": 20
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 87,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 92,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 96,
+          "column": 28
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 100,
+          "column": 24
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 119,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 126,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 170,
+          "column": 34
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 180,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 185,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 211,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 212,
+          "column": 28
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 221,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 232,
+          "column": 29
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 243,
+          "column": 33
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 249,
+          "column": 33
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 262,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 266,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 276,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 344,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 346,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 347,
+          "column": 28
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 386,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 462,
+          "column": 28
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 463,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 470,
+          "column": 24
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 472,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:07.302Z",
+        "approvedAt": "2026-02-02T02:57:07.302Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "962801827279f738",
+      "subcategory": "semantic-html",
+      "name": "Semantic HTML Detector",
+      "description": "Learns semantic HTML patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/semantic-html",
+          "patternId": "accessibility/semantic-html/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.935,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 164,
+          "column": 44
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:07.415Z",
+        "approvedAt": "2026-02-02T02:57:07.415Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "65a16f693ecff7c1",
+      "subcategory": "focus-management",
+      "name": "Focus Management Detector",
+      "description": "Learns focus management patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/focus-management",
+          "patternId": "accessibility/focus-management/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.05,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 209,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 232,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 238,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 256,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 276,
+          "column": 30
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:07.545Z",
+        "approvedAt": "2026-02-02T02:57:07.545Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:08.101Z",
+  "checksum": "e1e2c43a6ac26f59"
+}

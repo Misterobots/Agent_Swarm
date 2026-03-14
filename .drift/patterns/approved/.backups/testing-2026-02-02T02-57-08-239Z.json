@@ -1,0 +1,1261 @@
+{
+  "version": "1.0.0",
+  "category": "testing",
+  "patterns": [
+    {
+      "id": "d042caad96dd8829",
+      "subcategory": "test-structure",
+      "name": "Test Structure Detector",
+      "description": "Learns test structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-structure",
+          "patternId": "testing/test-structure/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.14,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 7,
+        "score": 0.8533333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 52,
+          "column": 26
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 121,
+          "column": 50
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 10,
+          "column": 26
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 13,
+          "column": 26
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 9,
+          "column": 63
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 223,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 245,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 278,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 14,
+          "column": 26
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 123,
+          "column": 82
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 337,
+          "column": 50
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 7,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 409,
+          "column": 82
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 10,
+          "column": 26
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:49.325Z",
+        "approvedAt": "2026-02-02T02:56:49.325Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "5eea2ad6d41e1ba7",
+      "subcategory": "test-structure",
+      "name": "Test Structure Detector",
+      "description": "Learns test structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-structure",
+          "patternId": "testing/test-structure/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.1,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 8,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 53,
+          "column": 10
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 114,
+          "column": 52
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 13,
+          "column": 10
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 15,
+          "column": 10
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 73,
+          "column": 47
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 16,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 75,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 135,
+          "column": 53
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 10,
+          "column": 10
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 13,
+          "column": 10
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:49.452Z",
+        "approvedAt": "2026-02-02T02:56:49.452Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "128c05d6465f0605",
+      "subcategory": "test-structure",
+      "name": "Test Structure Detector",
+      "description": "Learns test structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-structure",
+          "patternId": "testing/test-structure/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.13,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 24,
+          "column": 37
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 128,
+          "column": 20
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 10,
+          "column": 64
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 10,
+          "column": 77
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 148,
+          "column": 39
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 148,
+          "column": 69
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 70,
+          "column": 57
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 124,
+          "column": 57
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 325,
+          "column": 50
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 70,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 667,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 719,
+          "column": 75
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 751,
+          "column": 187
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:49.590Z",
+        "approvedAt": "2026-02-02T02:56:49.590Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "355790199e58ccac",
+      "subcategory": "fixture-patterns",
+      "name": "Fixture Patterns Detector",
+      "description": "Learns test fixture patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/fixture-patterns",
+          "patternId": "testing/fixture-patterns/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.19,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.8533333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 12,
+          "column": 9
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 30,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 39,
+          "column": 9
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 129,
+          "column": 24
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 33,
+          "column": 28
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 47,
+          "column": 9
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 67,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 71,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 93,
+          "column": 39
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 93,
+          "column": 46
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 215,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 216,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 216,
+          "column": 39
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 70,
+          "column": 14
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 433,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:49.694Z",
+        "approvedAt": "2026-02-02T02:56:49.694Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "08e99aa0167b9bbc",
+      "subcategory": "describe-naming",
+      "name": "Describe Naming Detector",
+      "description": "Learns test describe/it naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/describe-naming",
+          "patternId": "testing/describe-naming/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.24,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 24,
+          "column": 37
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 128,
+          "column": 20
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 10,
+          "column": 64
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 10,
+          "column": 77
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 148,
+          "column": 39
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 148,
+          "column": 69
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 70,
+          "column": 57
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 124,
+          "column": 57
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 325,
+          "column": 50
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 719,
+          "column": 75
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 751,
+          "column": 187
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 667,
+          "column": 37
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:49.817Z",
+        "approvedAt": "2026-02-02T02:56:49.817Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "9de3af967c514eeb",
+      "subcategory": "test-file-naming",
+      "name": "Test File Naming Detector",
+      "description": "Learns test file naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-file-naming",
+          "patternId": "testing/test-file-naming/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.1,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 121,
+          "column": 50
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 9,
+          "column": 63
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 223,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 245,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 278,
+          "column": 18
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:49.934Z",
+        "approvedAt": "2026-02-02T02:56:49.934Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "a3bf981f8603ebdf",
+      "subcategory": "test-co-location",
+      "name": "Test Co-Location Detector",
+      "description": "Learns test co-location patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-co-location",
+          "patternId": "testing/test-co-location/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 121,
+          "column": 50
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 9,
+          "column": 63
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 223,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 245,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 278,
+          "column": 18
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:50.039Z",
+        "approvedAt": "2026-02-02T02:56:50.039Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "fd6d059442fa4f96",
+      "subcategory": "describe-naming",
+      "name": "Describe Naming Detector",
+      "description": "Learns test describe/it naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/describe-naming",
+          "patternId": "testing/describe-naming/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 114,
+          "column": 52
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 73,
+          "column": 47
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 75,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 135,
+          "column": 53
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:50.142Z",
+        "approvedAt": "2026-02-02T02:56:50.142Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "b8c88caecd1e5090",
+      "subcategory": "describe-naming",
+      "name": "Describe Naming Detector",
+      "description": "Learns test describe/it naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/describe-naming",
+          "patternId": "testing/describe-naming/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.36,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.87,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 126,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 291,
+          "column": 44
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 39,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 189,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 206,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 206,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 214,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 215,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 216,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 217,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 218,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 219,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 220,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 221,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 236,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 49
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 273,
+          "column": 18
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:50.266Z",
+        "approvedAt": "2026-02-02T02:56:50.266Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "610b5bc66f543b40",
+      "subcategory": "test-structure",
+      "name": "Test Structure Detector",
+      "description": "Learns test structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-structure",
+          "patternId": "testing/test-structure/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 13,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:50.425Z",
+        "approvedAt": "2026-02-02T02:56:50.425Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "133122825070bd3e",
+      "subcategory": "setup-teardown",
+      "name": "Setup/Teardown Detector",
+      "description": "Learns test setup/teardown patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/setup-teardown",
+          "patternId": "testing/setup-teardown/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 13,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:50.574Z",
+        "approvedAt": "2026-02-02T02:56:50.574Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8541f85171848b21",
+      "subcategory": "describe-naming",
+      "name": "Describe Naming Detector",
+      "description": "Learns test describe/it naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/describe-naming",
+          "patternId": "testing/describe-naming/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.87,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 9,
+          "column": 63
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 123,
+          "column": 82
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 337,
+          "column": 50
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 409,
+          "column": 82
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:50.702Z",
+        "approvedAt": "2026-02-02T02:56:50.702Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "a0614d768dd63e23",
+      "subcategory": "mock-patterns",
+      "name": "Mock Patterns Detector",
+      "description": "Learns mocking patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/mock-patterns",
+          "patternId": "testing/mock-patterns/class_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8866666666666666,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 10,
+          "column": 7
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:50.823Z",
+        "approvedAt": "2026-02-02T02:56:50.823Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "cd1d59d102d81f16",
+      "subcategory": "fixture-patterns",
+      "name": "Fixture Patterns Detector",
+      "description": "Learns test fixture patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/fixture-patterns",
+          "patternId": "testing/fixture-patterns/class_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.92,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 10,
+          "column": 7
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:50.917Z",
+        "approvedAt": "2026-02-02T02:56:50.917Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "ffd28d17905d9223",
+      "subcategory": "test-file-naming",
+      "name": "Test File Naming Detector",
+      "description": "Learns test file naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-file-naming",
+          "patternId": "testing/test-file-naming/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 70,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 667,
+          "column": 37
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:51.028Z",
+        "approvedAt": "2026-02-02T02:56:51.028Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "c1de98027285db84",
+      "subcategory": "test-co-location",
+      "name": "Test Co-Location Detector",
+      "description": "Learns test co-location patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-co-location",
+          "patternId": "testing/test-co-location/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 70,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 667,
+          "column": 37
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:51.212Z",
+        "approvedAt": "2026-02-02T02:56:51.212Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "c1ec362fe25ee1b7",
+      "subcategory": "test-file-naming",
+      "name": "Test File Naming Detector",
+      "description": "Learns test file naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-file-naming",
+          "patternId": "testing/test-file-naming/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.3,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.948125,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 189,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 206,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 206,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 214,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 215,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 216,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 217,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 218,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 219,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 220,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 221,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 236,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 49
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 273,
+          "column": 18
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:51.334Z",
+        "approvedAt": "2026-02-02T02:56:51.334Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d33277fe20e6795b",
+      "subcategory": "test-co-location",
+      "name": "Test Co-Location Detector",
+      "description": "Learns test co-location patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-co-location",
+          "patternId": "testing/test-co-location/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.3,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.948125,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 189,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 206,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 206,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 214,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 215,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 216,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 217,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 218,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 219,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 220,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 221,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 236,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 49
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 273,
+          "column": 18
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:51.439Z",
+        "approvedAt": "2026-02-02T02:56:51.439Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:08.069Z",
+  "checksum": "5a8189c0adf7a8ba"
+}

@@ -1,0 +1,21 @@
+- [/] Integrating VS Code IDE <!-- id: 0 -->
+  - [/] Debugging Continue Extension Configuration <!-- id: 1 -->
+    - [x] Verify `config.json` content and permissions <!-- id: 2 -->
+    - [x] Identify source of default configuration (CodeLlama-7b-Instruct) <!-- id: 3 -->
+    - [x] Restore `Continue` extension on new containers <!-- id: 3.1 -->
+    - [x] Successfully load custom `Home AI Swarm` model config <!-- id: 4 -->
+    - [/] Implementing Workspace Separation <!-- id: 5 -->
+      - [x] Create `agent_ide_coding` service (Restricted to `user_projects`) <!-- id: 6 -->
+      - [x] Create `agent_ide_devops` service (Full Access) <!-- id: 7 -->
+      - [x] Update `launch_swarm.bat` to handle both IDEs <!-- id: 8 -->
+      - [x] Update `ui.py` to link to correct ports <!-- id: 9 -->
+    - [x] Implementing Governance & Request System <!-- id: 10 -->
+      - [x] Create Request API/CLI (`swarm-request`) <!-- id: 11 -->
+      - [x] Implement Security Agent Assessment Logic <!-- id: 12 -->
+      - [x] Implement Architect Agent Compatibility Logic <!-- id: 13 -->
+      - [x] Build Admin Approval Dashboard <!-- id: 14 -->
+      - [x] Enforce Token-Based Identity (MAESTRO L7) <!-- id: 14.1 -->
+    - [x] Containerize ComfyUI (Creature Forge) <!-- id: 15 -->
+      - [x] Add `comfyui` service to `docker-compose.yml` (GPU Enabled) <!-- id: 16 -->
+      - [x] Mount existing Creature Forge directory <!-- id: 17 -->
+      - [x] Update `agent-runtime` and `ui` to talk to containerized ComfyUI <!-- id: 18 -->

@@ -1,0 +1,12 @@
+# Drift ignore patterns
+node_modules/
+dist/
+build/
+.git/
+coverage/
+vendor/
+__pycache__/
+.venv/
+target/
+bin/
+obj/

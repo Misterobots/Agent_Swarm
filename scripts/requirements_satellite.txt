@@ -1,0 +1,7 @@
+openwakeword
+pyaudio
+numpy
+requests
+sounddevice
+soundfile
+scipy

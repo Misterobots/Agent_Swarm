@@ -1,0 +1,632 @@
+{
+  "version": "1.0.0",
+  "category": "performance",
+  "patterns": [
+    {
+      "id": "69d4a02b1589cf7c",
+      "subcategory": "code-splitting",
+      "name": "Code Splitting Detector",
+      "description": "Learns code splitting patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/code-splitting",
+          "patternId": "performance/code-splitting/import"
+        }
+      },
+      "confidence": {
+        "frequency": 1,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 13,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 2,
+          "column": 23
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 5,
+          "column": 21
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 6,
+          "column": 21
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 8,
+          "column": 29
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 9,
+          "column": 28
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 11,
+          "column": 32
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 52,
+          "column": 19
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 1,
+          "column": 22
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 2,
+          "column": 21
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 7,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 10,
+          "column": 19
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 3,
+          "column": 14
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 4,
+          "column": 15
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 6,
+          "column": 17
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 7,
+          "column": 14
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 8,
+          "column": 24
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 9,
+          "column": 17
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 10,
+          "column": 13
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 13,
+          "column": 19
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 4,
+          "column": 13
+        },
+        {
+          "file": "agents\\metrics.py",
+          "line": 1,
+          "column": 24
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 2,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 3,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 5,
+          "column": 14
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 13,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 14,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 72,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 103,
+          "column": 30
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 128,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 152,
+          "column": 37
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 187,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 223,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 245,
+          "column": 50
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 278,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 354,
+          "column": 32
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 390,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 484,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 485,
+          "column": 21
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 2,
+          "column": 23
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 8,
+          "column": 16
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 9,
+          "column": 23
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 7,
+          "column": 19
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 1,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 6,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 9,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 10,
+          "column": 19
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 17,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 574,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 882,
+          "column": 33
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 926,
+          "column": 33
+        },
+        {
+          "file": "core_tools\\__init__.py",
+          "line": 2,
+          "column": 15
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:04.985Z",
+        "approvedAt": "2026-02-02T02:57:04.985Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "3e8317f893cc2465",
+      "subcategory": "code-splitting",
+      "name": "Code Splitting Detector",
+      "description": "Learns code splitting patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/code-splitting",
+          "patternId": "performance/code-splitting/class_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 8,
+          "column": 11
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:05.217Z",
+        "approvedAt": "2026-02-02T02:57:05.217Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "da60a2da44c68c94",
+      "subcategory": "code-splitting",
+      "name": "Code Splitting Detector",
+      "description": "Learns code splitting patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/code-splitting",
+          "patternId": "performance/code-splitting/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.8999999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 10,
+          "column": 8
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 300,
+          "column": 40
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:05.477Z",
+        "approvedAt": "2026-02-02T02:57:05.477Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "cf33a40d6a62ce80",
+      "subcategory": "lazy-loading",
+      "name": "Lazy Loading Detector",
+      "description": "Learns lazy loading patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/lazy-loading",
+          "patternId": "performance/lazy-loading/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.87,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 6,
+          "column": 24
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:05.722Z",
+        "approvedAt": "2026-02-02T02:57:05.722Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "85686439bd25362d",
+      "subcategory": "lazy-loading",
+      "name": "Lazy Loading Detector",
+      "description": "Learns lazy loading patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/lazy-loading",
+          "patternId": "performance/lazy-loading/decorator"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 28,
+          "column": 2
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:05.988Z",
+        "approvedAt": "2026-02-02T02:57:05.988Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "4a25589d6a23c812",
+      "subcategory": "memoization",
+      "name": "Memoization Detector",
+      "description": "Learns memoization patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/memoization",
+          "patternId": "performance/memoization/class_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.92,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\memory_system.py",
+          "line": 10,
+          "column": 7
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:06.216Z",
+        "approvedAt": "2026-02-02T02:57:06.216Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "fa2de35a8678f088",
+      "subcategory": "code-splitting",
+      "name": "Code Splitting Detector",
+      "description": "Learns code splitting patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/code-splitting",
+          "patternId": "performance/code-splitting/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.8848648648648649,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 379,
+          "column": 35
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 379,
+          "column": 65
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 491,
+          "column": 75
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 25,
+          "column": 59
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:06.365Z",
+        "approvedAt": "2026-02-02T02:57:06.365Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "88818fda4edd7648",
+      "subcategory": "debounce-throttle",
+      "name": "Debounce Throttle Detector",
+      "description": "Learns debounce and throttle patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/debounce-throttle",
+          "patternId": "performance/debounce-throttle/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 619,
+          "column": 70
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:06.580Z",
+        "approvedAt": "2026-02-02T02:57:06.580Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "997d0535619a9b32",
+      "subcategory": "bundle-size",
+      "name": "Bundle Size Detector",
+      "description": "Learns bundle size optimization patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/bundle-size",
+          "patternId": "performance/bundle-size/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 720,
+          "column": 38
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 721,
+          "column": 70
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 734,
+          "column": 26
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:06.805Z",
+        "approvedAt": "2026-02-02T02:57:06.805Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:07.956Z",
+  "checksum": "c73b817386c3584f"
+}

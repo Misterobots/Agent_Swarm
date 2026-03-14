@@ -1,0 +1,1 @@
+import logging, logging_loki; handler = logging_loki.LokiHandler(url='http://loki:3100/loki/api/v1/push', tags={'container_name': 'agent_runtime', 'job': 'agent_runtime'}, version='1'); logger = logging.getLogger('Test'); logger.addHandler(handler); logger.setLevel(logging.INFO); logger.info('--- TEST LOG FROM SHELL ---'); print('Log sent')

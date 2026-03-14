@@ -1,0 +1,18 @@
+{
+  "modules": {},
+  "edges": [],
+  "cycles": [],
+  "metrics": {
+    "totalModules": 0,
+    "totalEdges": 0,
+    "cycleCount": 0,
+    "avgInstability": 0,
+    "avgDistance": 0,
+    "zoneOfPain": [],
+    "zoneOfUselessness": [],
+    "hotspots": [],
+    "isolatedModules": []
+  },
+  "generatedAt": "2026-02-02T02:57:09.687Z",
+  "projectRoot": "C:\\Users\\panca\\Documents\\GitHub\\Home_AI_Lab"
+}

@@ -1,0 +1,72 @@
+/* @theme home-ai-lab */
+
+@import "default";
+
+section {
+  background-color: #0d1117;
+  color: #c9d1d9;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 30px;
+  padding: 40px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #58a6ff;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: 2.5em;
+  border-bottom: 2px solid #238636;
+  padding-bottom: 0.2em;
+}
+
+h2 {
+  font-size: 1.8em;
+}
+
+strong {
+  color: #238636;
+}
+
+code {
+  background-color: #161b22;
+  color: #a5d6ff;
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+}
+
+pre {
+  background-color: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 1em;
+}
+
+blockquote {
+  background: #161b22;
+  border-left: 10px solid #238636;
+  margin: 1.5em 10px;
+  padding: 0.5em 10px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th {
+  background-color: #21262d;
+  color: #58a6ff;
+  border-bottom: 2px solid #30363d;
+}
+
+td {
+  border-bottom: 1px solid #30363d;
+}

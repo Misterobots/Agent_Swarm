@@ -1,0 +1,2064 @@
+{
+  "version": "1.0.0",
+  "category": "data-access",
+  "patterns": [
+    {
+      "id": "6e406a37f5d5d0d5",
+      "subcategory": "query-patterns",
+      "name": "Query Patterns Detector",
+      "description": "Learns query patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/query-patterns",
+          "patternId": "data-access/query-patterns/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.4,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 12,
+        "score": 0.8999999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 16,
+          "column": 13
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 58,
+          "column": 13
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 66,
+          "column": 13
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 7,
+          "column": 18
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 15,
+          "column": 34
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 6,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 130,
+          "column": 35
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 16,
+          "column": 17
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 17,
+          "column": 21
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 18,
+          "column": 22
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 34,
+          "column": 17
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 8,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 495,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 499,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 73,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 86,
+          "column": 20
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 153,
+          "column": 41
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 298,
+          "column": 48
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 385,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 391,
+          "column": 37
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 417,
+          "column": 32
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 43,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 134,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 12,
+          "column": 18
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 198,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 292,
+          "column": 27
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 134,
+          "column": 14
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 426,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 141,
+          "column": 16
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 481,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 489,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 650,
+          "column": 12
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 656,
+          "column": 12
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 898,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 898,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 511,
+          "column": 43
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 894,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 897,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 916,
+          "column": 21
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 12,
+          "column": 20
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:46.887Z",
+        "approvedAt": "2026-02-02T02:56:46.887Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "73d9d573e7a151f2",
+      "subcategory": "query-patterns",
+      "name": "Query Patterns Detector",
+      "description": "Learns query patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/query-patterns",
+          "patternId": "data-access/query-patterns/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.14,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 8,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 18,
+          "column": 5
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 23,
+          "column": 5
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 38,
+          "column": 9
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 63,
+          "column": 9
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 84,
+          "column": 9
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 36,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 186,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 17,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 46,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 414,
+          "column": 5
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 20,
+          "column": 5
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 23,
+          "column": 5
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 35,
+          "column": 5
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 44,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:46.993Z",
+        "approvedAt": "2026-02-02T02:56:46.993Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "bb34643e9f98b4b9",
+      "subcategory": "connection-pooling",
+      "name": "Connection Pooling Detector",
+      "description": "Learns connection pooling patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/connection-pooling",
+          "patternId": "data-access/connection-pooling/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 16,
+          "column": 1
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 32,
+          "column": 17
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 32,
+          "column": 24
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 133,
+          "column": 26
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 63,
+          "column": 72
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 203,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:47.093Z",
+        "approvedAt": "2026-02-02T02:56:47.093Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0b23c6808580b617",
+      "subcategory": "orm-model",
+      "name": "ORM Model Detector",
+      "description": "Detects ORM model/entity definitions to extract table mappings",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/boundaries/orm-model",
+          "patternId": "data-access/boundaries/orm-model/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.53,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.9199999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 31,
+          "column": 17
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 15,
+          "column": 1
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 38,
+          "column": 9
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 130,
+          "column": 14
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 135,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 135,
+          "column": 34
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 188,
+          "column": 13
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 193,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 193,
+          "column": 33
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 8,
+          "column": 14
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 13,
+          "column": 13
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 13,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 17,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 153,
+          "column": 68
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 189,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 189,
+          "column": 25
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 15,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 15,
+          "column": 42
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 61,
+          "column": 41
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 85,
+          "column": 32
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 133,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 417,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 417,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 481,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 481,
+          "column": 36
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 548,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 548,
+          "column": 63
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:47.200Z",
+        "approvedAt": "2026-02-02T02:56:47.200Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "635e74b650b9e335",
+      "subcategory": "orm-model",
+      "name": "ORM Model Detector",
+      "description": "Detects ORM model/entity definitions to extract table mappings",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/boundaries/orm-model",
+          "patternId": "data-access/boundaries/orm-model/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.05,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.9199999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 2,
+          "column": 10
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 128,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 187,
+          "column": 22
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 2,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 9,
+          "column": 10
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:47.299Z",
+        "approvedAt": "2026-02-02T02:56:47.299Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "bfd1c808da354767",
+      "subcategory": "query-patterns",
+      "name": "Query Patterns Detector",
+      "description": "Learns query patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/query-patterns",
+          "patternId": "data-access/query-patterns/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.63,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 9,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 6,
+          "column": 24
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 97,
+          "column": 40
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 54,
+          "column": 6
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 7,
+          "column": 23
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 70,
+          "column": 25
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 157,
+          "column": 104
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 298,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 302,
+          "column": 41
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 395,
+          "column": 39
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 23,
+          "column": 32
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 76,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 77,
+          "column": 39
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 108,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 109,
+          "column": 39
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 110,
+          "column": 38
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 117,
+          "column": 42
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 316,
+          "column": 38
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 504,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 505,
+          "column": 30
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 513,
+          "column": 29
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 514,
+          "column": 32
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 527,
+          "column": 43
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 530,
+          "column": 41
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 41,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 61,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 152,
+          "column": 53
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 127,
+          "column": 28
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 152,
+          "column": 81
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 161,
+          "column": 30
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 165,
+          "column": 70
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 166,
+          "column": 70
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 100,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 100,
+          "column": 35
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 366,
+          "column": 26
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 381,
+          "column": 32
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 21,
+          "column": 24
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 32
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 66
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 83
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 103
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 104,
+          "column": 24
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 106,
+          "column": 36
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 106,
+          "column": 70
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 106,
+          "column": 87
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 106,
+          "column": 107
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 202,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 241,
+          "column": 28
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 341,
+          "column": 30
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 7,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 26,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 37,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 40,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 511,
+          "column": 60
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 519,
+          "column": 36
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 585,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 710,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 879,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 419,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 559,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 438,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 439,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 706,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 777,
+          "column": 28
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:47.408Z",
+        "approvedAt": "2026-02-02T02:56:47.408Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "648f9194deb8c13b",
+      "subcategory": "validation",
+      "name": "Validation Patterns Detector",
+      "description": "Learns validation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/validation",
+          "patternId": "data-access/validation/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.25,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 7,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 6,
+          "column": 24
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 7,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 157,
+          "column": 104
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 298,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 302,
+          "column": 41
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 395,
+          "column": 39
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 84,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 426,
+          "column": 40
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 41,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 61,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 152,
+          "column": 53
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 366,
+          "column": 26
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 381,
+          "column": 32
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 391,
+          "column": 40
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 398,
+          "column": 34
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 7,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 26,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 37,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 40,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 511,
+          "column": 60
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 519,
+          "column": 36
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 585,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 710,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 121,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:47.594Z",
+        "approvedAt": "2026-02-02T02:56:47.594Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8a537b8ac08f0602",
+      "subcategory": "dto-patterns",
+      "name": "DTO Patterns Detector",
+      "description": "Learns Data Transfer Object patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/dto-patterns",
+          "patternId": "data-access/dto-patterns/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.26,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 5,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 12,
+          "column": 9
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 30,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 39,
+          "column": 9
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 129,
+          "column": 24
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 33,
+          "column": 28
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 47,
+          "column": 9
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 67,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 215,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 216,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 216,
+          "column": 39
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 70,
+          "column": 14
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 433,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:47.738Z",
+        "approvedAt": "2026-02-02T02:56:47.738Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "723b1c98182c3449",
+      "subcategory": "n-plus-one",
+      "name": "N+1 Query Detector",
+      "description": "Learns N+1 query patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/n-plus-one",
+          "patternId": "data-access/n-plus-one/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.38,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 7,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 6,
+          "column": 24
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 7,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 157,
+          "column": 104
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 298,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 302,
+          "column": 41
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 395,
+          "column": 39
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 41,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 61,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 152,
+          "column": 53
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 366,
+          "column": 26
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 381,
+          "column": 32
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 7,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 26,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 37,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 40,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 511,
+          "column": 60
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 519,
+          "column": 36
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 585,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 710,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:47.841Z",
+        "approvedAt": "2026-02-02T02:56:47.841Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "7a21c571c7e9468b",
+      "subcategory": "query-access",
+      "name": "Query Access Detector",
+      "description": "Detects data access points in code (ORM queries, raw SQL)",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/boundaries/query-access",
+          "patternId": "data-access/boundaries/query-access/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.22,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 7,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 6,
+          "column": 24
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 7,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 157,
+          "column": 104
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 298,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 302,
+          "column": 41
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 395,
+          "column": 39
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 41,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 61,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 152,
+          "column": 53
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 366,
+          "column": 26
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 381,
+          "column": 32
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 7,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 26,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 37,
+          "column": 25
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 40,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 879,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 419,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 559,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 511,
+          "column": 60
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 519,
+          "column": 36
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 585,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 710,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:47.933Z",
+        "approvedAt": "2026-02-02T02:56:47.933Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0d2fffd1b36cf87e",
+      "subcategory": "orm-model",
+      "name": "ORM Model Detector",
+      "description": "Detects ORM model/entity definitions to extract table mappings",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/boundaries/orm-model",
+          "patternId": "data-access/boundaries/orm-model/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.22,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 45
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 44
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 47,
+          "column": 8
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 49,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 51,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 55,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 74,
+          "column": 19
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 77,
+          "column": 20
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 91,
+          "column": 8
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 91,
+          "column": 32
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 182,
+          "column": 45
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.035Z",
+        "approvedAt": "2026-02-02T02:56:48.035Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "a4880963d7042288",
+      "subcategory": "sensitive-field",
+      "name": "Sensitive Field Detector",
+      "description": "Auto-detects potentially sensitive fields/columns in data models",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/boundaries/sensitive-field",
+          "patternId": "data-access/boundaries/sensitive-field/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 22,
+          "column": 15
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.124Z",
+        "approvedAt": "2026-02-02T02:56:48.124Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "be9b7e3c88060f5a",
+      "subcategory": "repository-pattern",
+      "name": "Repository Pattern Detector",
+      "description": "Learns repository patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/repository-pattern",
+          "patternId": "data-access/repository-pattern/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 87,
+          "column": 32
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.250Z",
+        "approvedAt": "2026-02-02T02:56:48.250Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d54f5d6b1a9ce9fb",
+      "subcategory": "validation",
+      "name": "Validation Patterns Detector",
+      "description": "Learns validation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/validation",
+          "patternId": "data-access/validation/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.05,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 10,
+          "column": 70
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 26,
+          "column": 16
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 26,
+          "column": 43
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 135,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 900,
+          "column": 23
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.353Z",
+        "approvedAt": "2026-02-02T02:56:48.353Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f4e3b63274bed982",
+      "subcategory": "query-access",
+      "name": "Query Access Detector",
+      "description": "Detects data access points in code (ORM queries, raw SQL)",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/boundaries/query-access",
+          "patternId": "data-access/boundaries/query-access/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 9,
+          "column": 50
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 489,
+          "column": 53
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 6,
+          "column": 102
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.449Z",
+        "approvedAt": "2026-02-02T02:56:48.449Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8c4bdbfc904425e9",
+      "subcategory": "n-plus-one",
+      "name": "N+1 Query Detector",
+      "description": "Learns N+1 query patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/n-plus-one",
+          "patternId": "data-access/n-plus-one/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8999999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 206,
+          "column": 73
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.554Z",
+        "approvedAt": "2026-02-02T02:56:48.554Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f3e007dd1d50fd2b",
+      "subcategory": "orm-model",
+      "name": "ORM Model Detector",
+      "description": "Detects ORM model/entity definitions to extract table mappings",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/boundaries/orm-model",
+          "patternId": "data-access/boundaries/orm-model/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.46,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.8973584905660377,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 523,
+          "column": 37
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 58,
+          "column": 24
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 33,
+          "column": 39
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 130,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 297,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 366,
+          "column": 19
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 483,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 517,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 540,
+          "column": 19
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 571,
+          "column": 35
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 602,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 642,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 756,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 762,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 768,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 891,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 918,
+          "column": 17
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.657Z",
+        "approvedAt": "2026-02-02T02:56:48.657Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "1c0db33a9a8382cd",
+      "subcategory": "validation",
+      "name": "Validation Patterns Detector",
+      "description": "Learns validation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/validation",
+          "patternId": "data-access/validation/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.03,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 36,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 67,
+          "column": 10
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 10,
+          "column": 50
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.781Z",
+        "approvedAt": "2026-02-02T02:56:48.781Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "91876bd1e21f083e",
+      "subcategory": "validation",
+      "name": "Validation Patterns Detector",
+      "description": "Learns validation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/validation",
+          "patternId": "data-access/validation/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.03,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.945,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 265,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 312,
+          "column": 5
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 32,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.889Z",
+        "approvedAt": "2026-02-02T02:56:48.889Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "588f78d89016f402",
+      "subcategory": "orm-model",
+      "name": "ORM Model Detector",
+      "description": "Detects ORM model/entity definitions to extract table mappings",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/boundaries/orm-model",
+          "patternId": "data-access/boundaries/orm-model/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.91,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 46,
+          "column": 22
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:48.974Z",
+        "approvedAt": "2026-02-02T02:56:48.974Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "218b19078a0e5685",
+      "subcategory": "transaction",
+      "name": "Transaction Patterns Detector",
+      "description": "Learns transaction patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "data-access/transaction",
+          "patternId": "data-access/transaction/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 41,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:49.150Z",
+        "approvedAt": "2026-02-02T02:56:49.150Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:08.064Z",
+  "checksum": "c957354f472bfaac"
+}

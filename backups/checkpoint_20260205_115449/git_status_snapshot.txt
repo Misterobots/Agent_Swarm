@@ -1,0 +1,276 @@
+On branch feature/neural-router
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   .drift/config.json
+	new file:   .drift/dna/styling.json
+	new file:   .drift/lake/callgraph/callgraph.db
+	new file:   .drift/lake/callgraph/callgraph.db-shm
+	new file:   .drift/lake/callgraph/callgraph.db-wal
+	new file:   .drift/manifest.json
+	new file:   .drift/memory/cortex.db
+	new file:   .drift/module-coupling/graph.json
+	new file:   .drift/patterns/approved/.backups/accessibility-2026-02-02T02-57-07-960Z.json
+	new file:   .drift/patterns/approved/.backups/accessibility-2026-02-02T02-57-08-101Z.json
+	new file:   .drift/patterns/approved/.backups/accessibility-2026-02-02T02-57-08-272Z.json
+	new file:   .drift/patterns/approved/.backups/accessibility-2026-02-02T02-57-08-404Z.json
+	new file:   .drift/patterns/approved/.backups/accessibility-2026-02-02T02-57-08-541Z.json
+	new file:   .drift/patterns/approved/.backups/api-2026-02-02T02-57-07-918Z.json
+	new file:   .drift/patterns/approved/.backups/api-2026-02-02T02-57-08-050Z.json
+	new file:   .drift/patterns/approved/.backups/api-2026-02-02T02-57-08-220Z.json
+	new file:   .drift/patterns/approved/.backups/api-2026-02-02T02-57-08-356Z.json
+	new file:   .drift/patterns/approved/.backups/api-2026-02-02T02-57-08-491Z.json
+	new file:   .drift/patterns/approved/.backups/auth-2026-02-02T02-57-07-922Z.json
+	new file:   .drift/patterns/approved/.backups/auth-2026-02-02T02-57-08-054Z.json
+	new file:   .drift/patterns/approved/.backups/auth-2026-02-02T02-57-08-225Z.json
+	new file:   .drift/patterns/approved/.backups/auth-2026-02-02T02-57-08-359Z.json
+	new file:   .drift/patterns/approved/.backups/auth-2026-02-02T02-57-08-495Z.json
+	new file:   .drift/patterns/approved/.backups/components-2026-02-02T02-57-07-909Z.json
+	new file:   .drift/patterns/approved/.backups/components-2026-02-02T02-57-08-037Z.json
+	new file:   .drift/patterns/approved/.backups/components-2026-02-02T02-57-08-211Z.json
+	new file:   .drift/patterns/approved/.backups/components-2026-02-02T02-57-08-348Z.json
+	new file:   .drift/patterns/approved/.backups/components-2026-02-02T02-57-08-483Z.json
+	new file:   .drift/patterns/approved/.backups/config-2026-02-02T02-57-07-948Z.json
+	new file:   .drift/patterns/approved/.backups/config-2026-02-02T02-57-08-087Z.json
+	new file:   .drift/patterns/approved/.backups/config-2026-02-02T02-57-08-257Z.json
+	new file:   .drift/patterns/approved/.backups/config-2026-02-02T02-57-08-389Z.json
+	new file:   .drift/patterns/approved/.backups/config-2026-02-02T02-57-08-527Z.json
+	new file:   .drift/patterns/approved/.backups/data-access-2026-02-02T02-57-07-931Z.json
+	new file:   .drift/patterns/approved/.backups/data-access-2026-02-02T02-57-08-066Z.json
+	new file:   .drift/patterns/approved/.backups/data-access-2026-02-02T02-57-08-235Z.json
+	new file:   .drift/patterns/approved/.backups/data-access-2026-02-02T02-57-08-370Z.json
+	new file:   .drift/patterns/approved/.backups/data-access-2026-02-02T02-57-08-505Z.json
+	new file:   .drift/patterns/approved/.backups/documentation-2026-02-02T02-57-07-964Z.json
+	new file:   .drift/patterns/approved/.backups/documentation-2026-02-02T02-57-08-105Z.json
+	new file:   .drift/patterns/approved/.backups/documentation-2026-02-02T02-57-08-278Z.json
+	new file:   .drift/patterns/approved/.backups/documentation-2026-02-02T02-57-08-408Z.json
+	new file:   .drift/patterns/approved/.backups/documentation-2026-02-02T02-57-08-545Z.json
+	new file:   .drift/patterns/approved/.backups/errors-2026-02-02T02-57-07-926Z.json
+	new file:   .drift/patterns/approved/.backups/errors-2026-02-02T02-57-08-059Z.json
+	new file:   .drift/patterns/approved/.backups/errors-2026-02-02T02-57-08-230Z.json
+	new file:   .drift/patterns/approved/.backups/errors-2026-02-02T02-57-08-364Z.json
+	new file:   .drift/patterns/approved/.backups/errors-2026-02-02T02-57-08-499Z.json
+	new file:   .drift/patterns/approved/.backups/logging-2026-02-02T02-57-07-941Z.json
+	new file:   .drift/patterns/approved/.backups/logging-2026-02-02T02-57-08-076Z.json
+	new file:   .drift/patterns/approved/.backups/logging-2026-02-02T02-57-08-245Z.json
+	new file:   .drift/patterns/approved/.backups/logging-2026-02-02T02-57-08-379Z.json
+	new file:   .drift/patterns/approved/.backups/logging-2026-02-02T02-57-08-516Z.json
+	new file:   .drift/patterns/approved/.backups/performance-2026-02-02T02-57-07-957Z.json
+	new file:   .drift/patterns/approved/.backups/performance-2026-02-02T02-57-08-098Z.json
+	new file:   .drift/patterns/approved/.backups/performance-2026-02-02T02-57-08-267Z.json
+	new file:   .drift/patterns/approved/.backups/performance-2026-02-02T02-57-08-400Z.json
+	new file:   .drift/patterns/approved/.backups/performance-2026-02-02T02-57-08-536Z.json
+	new file:   .drift/patterns/approved/.backups/security-2026-02-02T02-57-07-945Z.json
+	new file:   .drift/patterns/approved/.backups/security-2026-02-02T02-57-08-082Z.json
+	new file:   .drift/patterns/approved/.backups/security-2026-02-02T02-57-08-251Z.json
+	new file:   .drift/patterns/approved/.backups/security-2026-02-02T02-57-08-384Z.json
+	new file:   .drift/patterns/approved/.backups/security-2026-02-02T02-57-08-522Z.json
+	new file:   .drift/patterns/approved/.backups/structural-2026-02-02T02-57-07-905Z.json
+	new file:   .drift/patterns/approved/.backups/structural-2026-02-02T02-57-08-033Z.json
+	new file:   .drift/patterns/approved/.backups/structural-2026-02-02T02-57-08-194Z.json
+	new file:   .drift/patterns/approved/.backups/structural-2026-02-02T02-57-08-345Z.json
+	new file:   .drift/patterns/approved/.backups/structural-2026-02-02T02-57-08-480Z.json
+	new file:   .drift/patterns/approved/.backups/styling-2026-02-02T02-57-07-912Z.json
+	new file:   .drift/patterns/approved/.backups/styling-2026-02-02T02-57-08-045Z.json
+	new file:   .drift/patterns/approved/.backups/styling-2026-02-02T02-57-08-216Z.json
+	new file:   .drift/patterns/approved/.backups/styling-2026-02-02T02-57-08-352Z.json
+	new file:   .drift/patterns/approved/.backups/styling-2026-02-02T02-57-08-488Z.json
+	new file:   .drift/patterns/approved/.backups/testing-2026-02-02T02-57-07-936Z.json
+	new file:   .drift/patterns/approved/.backups/testing-2026-02-02T02-57-08-070Z.json
+	new file:   .drift/patterns/approved/.backups/testing-2026-02-02T02-57-08-239Z.json
+	new file:   .drift/patterns/approved/.backups/testing-2026-02-02T02-57-08-375Z.json
+	new file:   .drift/patterns/approved/.backups/testing-2026-02-02T02-57-08-510Z.json
+	new file:   .drift/patterns/approved/.backups/types-2026-02-02T02-57-07-952Z.json
+	new file:   .drift/patterns/approved/.backups/types-2026-02-02T02-57-08-093Z.json
+	new file:   .drift/patterns/approved/.backups/types-2026-02-02T02-57-08-262Z.json
+	new file:   .drift/patterns/approved/.backups/types-2026-02-02T02-57-08-394Z.json
+	new file:   .drift/patterns/approved/.backups/types-2026-02-02T02-57-08-531Z.json
+	new file:   .drift/patterns/approved/accessibility.json
+	new file:   .drift/patterns/approved/api.json
+	new file:   .drift/patterns/approved/auth.json
+	new file:   .drift/patterns/approved/components.json
+	new file:   .drift/patterns/approved/config.json
+	new file:   .drift/patterns/approved/data-access.json
+	new file:   .drift/patterns/approved/documentation.json
+	new file:   .drift/patterns/approved/errors.json
+	new file:   .drift/patterns/approved/logging.json
+	new file:   .drift/patterns/approved/performance.json
+	new file:   .drift/patterns/approved/security.json
+	new file:   .drift/patterns/approved/structural.json
+	new file:   .drift/patterns/approved/styling.json
+	new file:   .drift/patterns/approved/testing.json
+	new file:   .drift/patterns/approved/types.json
+	new file:   .drift/patterns/discovered/.backups/accessibility-2026-02-02T02-57-07-897Z.json
+	new file:   .drift/patterns/discovered/.backups/accessibility-2026-02-02T02-57-08-020Z.json
+	new file:   .drift/patterns/discovered/.backups/accessibility-2026-02-02T02-57-08-173Z.json
+	new file:   .drift/patterns/discovered/.backups/accessibility-2026-02-02T02-57-08-338Z.json
+	new file:   .drift/patterns/discovered/.backups/accessibility-2026-02-02T02-57-08-473Z.json
+	new file:   .drift/patterns/discovered/.backups/api-2026-02-02T02-56-43-846Z.json
+	new file:   .drift/patterns/discovered/.backups/api-2026-02-02T02-56-43-950Z.json
+	new file:   .drift/patterns/discovered/.backups/api-2026-02-02T02-56-44-053Z.json
+	new file:   .drift/patterns/discovered/.backups/api-2026-02-02T02-56-44-199Z.json
+	new file:   .drift/patterns/discovered/.backups/api-2026-02-02T02-56-44-359Z.json
+	new file:   .drift/patterns/discovered/.backups/auth-2026-02-02T02-57-07-858Z.json
+	new file:   .drift/patterns/discovered/.backups/auth-2026-02-02T02-57-07-983Z.json
+	new file:   .drift/patterns/discovered/.backups/auth-2026-02-02T02-57-08-127Z.json
+	new file:   .drift/patterns/discovered/.backups/auth-2026-02-02T02-57-08-299Z.json
+	new file:   .drift/patterns/discovered/.backups/auth-2026-02-02T02-57-08-432Z.json
+	new file:   .drift/patterns/discovered/.backups/components-2026-02-02T02-57-07-845Z.json
+	new file:   .drift/patterns/discovered/.backups/components-2026-02-02T02-57-07-976Z.json
+	new file:   .drift/patterns/discovered/.backups/components-2026-02-02T02-57-08-116Z.json
+	new file:   .drift/patterns/discovered/.backups/components-2026-02-02T02-57-08-289Z.json
+	new file:   .drift/patterns/discovered/.backups/components-2026-02-02T02-57-08-422Z.json
+	new file:   .drift/patterns/discovered/.backups/config-2026-02-02T02-57-07-885Z.json
+	new file:   .drift/patterns/discovered/.backups/config-2026-02-02T02-57-08-007Z.json
+	new file:   .drift/patterns/discovered/.backups/config-2026-02-02T02-57-08-157Z.json
+	new file:   .drift/patterns/discovered/.backups/config-2026-02-02T02-57-08-326Z.json
+	new file:   .drift/patterns/discovered/.backups/config-2026-02-02T02-57-08-460Z.json
+	new file:   .drift/patterns/discovered/.backups/data-access-2026-02-02T02-57-07-867Z.json
+	new file:   .drift/patterns/discovered/.backups/data-access-2026-02-02T02-57-07-991Z.json
+	new file:   .drift/patterns/discovered/.backups/data-access-2026-02-02T02-57-08-136Z.json
+	new file:   .drift/patterns/discovered/.backups/data-access-2026-02-02T02-57-08-308Z.json
+	new file:   .drift/patterns/discovered/.backups/data-access-2026-02-02T02-57-08-441Z.json
+	new file:   .drift/patterns/discovered/.backups/documentation-2026-02-02T02-57-07-901Z.json
+	new file:   .drift/patterns/discovered/.backups/documentation-2026-02-02T02-57-08-028Z.json
+	new file:   .drift/patterns/discovered/.backups/documentation-2026-02-02T02-57-08-179Z.json
+	new file:   .drift/patterns/discovered/.backups/documentation-2026-02-02T02-57-08-341Z.json
+	new file:   .drift/patterns/discovered/.backups/documentation-2026-02-02T02-57-08-476Z.json
+	new file:   .drift/patterns/discovered/.backups/errors-2026-02-02T02-57-07-862Z.json
+	new file:   .drift/patterns/discovered/.backups/errors-2026-02-02T02-57-07-987Z.json
+	new file:   .drift/patterns/discovered/.backups/errors-2026-02-02T02-57-08-131Z.json
+	new file:   .drift/patterns/discovered/.backups/errors-2026-02-02T02-57-08-303Z.json
+	new file:   .drift/patterns/discovered/.backups/errors-2026-02-02T02-57-08-437Z.json
+	new file:   .drift/patterns/discovered/.backups/logging-2026-02-02T02-57-07-877Z.json
+	new file:   .drift/patterns/discovered/.backups/logging-2026-02-02T02-57-08-000Z.json
+	new file:   .drift/patterns/discovered/.backups/logging-2026-02-02T02-57-08-149Z.json
+	new file:   .drift/patterns/discovered/.backups/logging-2026-02-02T02-57-08-318Z.json
+	new file:   .drift/patterns/discovered/.backups/logging-2026-02-02T02-57-08-451Z.json
+	new file:   .drift/patterns/discovered/.backups/performance-2026-02-02T02-57-07-894Z.json
+	new file:   .drift/patterns/discovered/.backups/performance-2026-02-02T02-57-08-016Z.json
+	new file:   .drift/patterns/discovered/.backups/performance-2026-02-02T02-57-08-166Z.json
+	new file:   .drift/patterns/discovered/.backups/performance-2026-02-02T02-57-08-332Z.json
+	new file:   .drift/patterns/discovered/.backups/performance-2026-02-02T02-57-08-468Z.json
+	new file:   .drift/patterns/discovered/.backups/security-2026-02-02T02-57-07-881Z.json
+	new file:   .drift/patterns/discovered/.backups/security-2026-02-02T02-57-08-004Z.json
+	new file:   .drift/patterns/discovered/.backups/security-2026-02-02T02-57-08-153Z.json
+	new file:   .drift/patterns/discovered/.backups/security-2026-02-02T02-57-08-322Z.json
+	new file:   .drift/patterns/discovered/.backups/security-2026-02-02T02-57-08-456Z.json
+	new file:   .drift/patterns/discovered/.backups/structural-2026-02-02T02-57-07-841Z.json
+	new file:   .drift/patterns/discovered/.backups/structural-2026-02-02T02-57-07-972Z.json
+	new file:   .drift/patterns/discovered/.backups/structural-2026-02-02T02-57-08-111Z.json
+	new file:   .drift/patterns/discovered/.backups/structural-2026-02-02T02-57-08-285Z.json
+	new file:   .drift/patterns/discovered/.backups/structural-2026-02-02T02-57-08-416Z.json
+	new file:   .drift/patterns/discovered/.backups/styling-2026-02-02T02-57-07-853Z.json
+	new file:   .drift/patterns/discovered/.backups/styling-2026-02-02T02-57-07-980Z.json
+	new file:   .drift/patterns/discovered/.backups/styling-2026-02-02T02-57-08-121Z.json
+	new file:   .drift/patterns/discovered/.backups/styling-2026-02-02T02-57-08-294Z.json
+	new file:   .drift/patterns/discovered/.backups/styling-2026-02-02T02-57-08-428Z.json
+	new file:   .drift/patterns/discovered/.backups/testing-2026-02-02T02-57-07-872Z.json
+	new file:   .drift/patterns/discovered/.backups/testing-2026-02-02T02-57-07-996Z.json
+	new file:   .drift/patterns/discovered/.backups/testing-2026-02-02T02-57-08-140Z.json
+	new file:   .drift/patterns/discovered/.backups/testing-2026-02-02T02-57-08-315Z.json
+	new file:   .drift/patterns/discovered/.backups/testing-2026-02-02T02-57-08-447Z.json
+	new file:   .drift/patterns/discovered/.backups/types-2026-02-02T02-57-07-889Z.json
+	new file:   .drift/patterns/discovered/.backups/types-2026-02-02T02-57-08-011Z.json
+	new file:   .drift/patterns/discovered/.backups/types-2026-02-02T02-57-08-161Z.json
+	new file:   .drift/patterns/discovered/.backups/types-2026-02-02T02-57-08-329Z.json
+	new file:   .drift/patterns/discovered/.backups/types-2026-02-02T02-57-08-464Z.json
+	new file:   .drift/patterns/discovered/accessibility.json
+	new file:   .drift/patterns/discovered/auth.json
+	new file:   .drift/patterns/discovered/components.json
+	new file:   .drift/patterns/discovered/config.json
+	new file:   .drift/patterns/discovered/data-access.json
+	new file:   .drift/patterns/discovered/documentation.json
+	new file:   .drift/patterns/discovered/errors.json
+	new file:   .drift/patterns/discovered/logging.json
+	new file:   .drift/patterns/discovered/performance.json
+	new file:   .drift/patterns/discovered/security.json
+	new file:   .drift/patterns/discovered/structural.json
+	new file:   .drift/patterns/discovered/styling.json
+	new file:   .drift/patterns/discovered/testing.json
+	new file:   .drift/patterns/discovered/types.json
+	new file:   .drift/source-of-truth.json
+	new file:   .drift/test-topology/summary.json
+	new file:   .drift/views/status.json
+	new file:   .driftignore
+	modified:   agents/context_manager.py
+	new file:   agents/registry.py
+	modified:   agents/router.py
+	modified:   agents/security_agent.py
+	modified:   agents/semantic_router.py
+	modified:   agents/tools/file_ops.py
+	modified:   agents/ui.py
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .drift/source-of-truth.json
+	modified:   README.md
+	modified:   agents/__pycache__/architect_agent.cpython-311.pyc
+	modified:   agents/__pycache__/context_manager.cpython-311.pyc
+	modified:   agents/__pycache__/dispatcher.cpython-311.pyc
+	modified:   agents/__pycache__/router.cpython-311.pyc
+	modified:   agents/__pycache__/security_agent.cpython-311.pyc
+	modified:   agents/architect_agent.py
+	modified:   agents/dispatcher.py
+	modified:   agents/main.py
+	modified:   agents/registry.py
+	modified:   agents/router.py
+	modified:   agents/security_agent.py
+	modified:   agents/semantic_router.py
+	modified:   agents/specialized/__pycache__/image_gen.cpython-311.pyc
+	modified:   agents/specialized/image_gen.py
+	modified:   agents/tools/__pycache__/file_ops.cpython-311.pyc
+	modified:   agents/tools/terminal.py
+	modified:   agents/ui.py
+	deleted:    assets/topology-visual.png
+	modified:   control_plane/docker-compose.yml
+	deleted:    debug_direct.txt
+	deleted:    delivered_artifacts/ComfyUI_HD_00013_.png
+	deleted:    delivered_artifacts/ComfyUI_HD_00014_.png
+	deleted:    delivered_artifacts/ComfyUI_SDXL_TURBO_00001_.png
+	deleted:    delivered_artifacts/ComfyUI_SDXL_TURBO_00002_.png
+	deleted:    delivered_artifacts/ComfyUI_SDXL_TURBO_00003_.png
+	deleted:    delivered_artifacts/ComfyUI_SDXL_TURBO_00004_.png
+	deleted:    delivered_artifacts/ComfyUI_SDXL_TURBO_00005_.png
+	deleted:    delivered_artifacts/ComfyUI_SDXL_TURBO_00006_.png
+	deleted:    delivered_artifacts/ComfyUI_SDXL_TURBO_00007_.png
+	deleted:    delivered_artifacts/ComfyUI_SDXL_TURBO_00008_.png
+	modified:   execution_plane/Dockerfile
+	modified:   execution_plane/docker-compose.yml
+	deleted:    gpu_status.txt
+	deleted:    hello_swarm.py
+	modified:   launch_swarm.bat
+	deleted:    story.txt
+	deleted:    test_bypass.log
+	deleted:    test_output.log
+	deleted:    test_output_unbuffered.log
+	deleted:    test_strict.log
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.continue/
+	.gitignore
+	Integrating VS Code IDE.md
+	agents/governance.py
+	agents/security_policy.json
+	agents/specialized/iot_agent.py
+	agents/swarm_request.py
+	agents/templates/wokwi_circuit.html
+	agents/tools/drift_renderer.py
+	agents/tools/esphome_ops.py
+	agents/tools/iot_ops.py
+	agents/tools/mqtt_ops.py
+	agents/tools/wokwi_ops.py
+	backups/
+	blinky.py
+	config/
+	debug_auth.py
+	debug_wokwi.py
+	docs/
+	execution_plane/init_ide/
+	governance.json
+	scripts/
+	tests/
+	user_projects/
+	workspace/
+

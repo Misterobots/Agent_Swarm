@@ -1,0 +1,162 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.4.1
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+
+********
+Warning: flash-attn is not installed. Will only run the manual PyTorch version. Please install flash-attn for faster inference.
+********
+ 
+--- Using Native Qwen3TTSModel ---
+--- [Voice Engine] Starting on cuda ---
+Loading Model: Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice...
+Downloading Model from https://www.modelscope.cn to directory: /root/.cache/modelscope/hub/models/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
+CRITICAL ERROR Loading Model: 'Qwen3TTSModel' object has no attribute 'eval'
+Generating TTS for: 'I am Beemo' | Refs: 1 | Mode: X-Vector
+Inference Error: model with 
+tokenizer_type: qwen3_tts_tokenizer_12hz
+tts_model_size: 1b7
+tts_model_type: custom_voice
+does not support generate_voice_clone, Please check Model Card or Readme for more details.
+INFO:     172.18.0.14:56116 - "POST /tts HTTP/1.1" 500 Internal Server Error
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.4.1
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+
+********
+Warning: flash-attn is not installed. Will only run the manual PyTorch version. Please install flash-attn for faster inference.
+********
+ 
+--- Using Native Qwen3TTSModel ---
+--- [Voice Engine] Starting on cuda ---
+Loading Model: Qwen/Qwen3-TTS-12Hz-1.7B...
+CRITICAL ERROR Loading Model: <Response [404]>
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.4.1
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+
+********
+Warning: flash-attn is not installed. Will only run the manual PyTorch version. Please install flash-attn for faster inference.
+********
+ 
+--- Using Native Qwen3TTSModel ---
+--- [Voice Engine] Starting on cuda ---
+Loading Model: Qwen/Qwen3-TTS-12Hz-1.7B-Base...
+Downloading Model from https://www.modelscope.cn to directory: /root/.cache/modelscope/hub/models/Qwen/Qwen3-TTS-12Hz-1.7B-Base
+CRITICAL ERROR Loading Model: 'Qwen3TTSModel' object has no attribute 'eval'
+Generating TTS for: 'This is a test of the voice cloning system.' | Refs: 1 | Mode: ICL
+INFO:     172.18.0.1:37354 - "POST /tts HTTP/1.1" 200 OK
+Generating TTS for: 'I am Beemo!' | Refs: 3 | Mode: X-Vector
+Inference Error: Batch size mismatch: prompt=3, text=1
+INFO:     172.18.0.14:59122 - "POST /tts HTTP/1.1" 500 Internal Server Error
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.4.1
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+
+********
+Warning: flash-attn is not installed. Will only run the manual PyTorch version. Please install flash-attn for faster inference.
+********
+ 
+--- Using Native Qwen3TTSModel ---
+--- [Voice Engine] Starting on cuda ---
+Loading Model: Qwen/Qwen3-TTS-12Hz-1.7B-Base...
+Downloading Model from https://www.modelscope.cn to directory: /root/.cache/modelscope/hub/models/Qwen/Qwen3-TTS-12Hz-1.7B-Base
+CRITICAL ERROR Loading Model: 'Qwen3TTSModel' object has no attribute 'eval'
+Generating TTS for: 'This is a test with multiple reference audios.' | Ref: /tmp/tmpb10m5wlf.wav | Mode: ICL
+INFO:     172.18.0.1:43232 - "POST /tts HTTP/1.1" 200 OK
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.4.1
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+
+********
+Warning: flash-attn is not installed. Will only run the manual PyTorch version. Please install flash-attn for faster inference.
+********
+ 
+--- Using Native Qwen3TTSModel ---
+--- [Voice Engine] Starting on cuda ---
+Loading Model: Qwen/Qwen3-TTS-12Hz-1.7B-Base...
+Downloading Model from https://www.modelscope.cn to directory: /root/.cache/modelscope/hub/models/Qwen/Qwen3-TTS-12Hz-1.7B-Base
+Model Loaded Successfully.
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.4.1
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+
+********
+Warning: flash-attn is not installed. Will only run the manual PyTorch version. Please install flash-attn for faster inference.
+********
+ 
+--- Using Native Qwen3TTSModel ---
+--- [Voice Engine] Starting on cuda ---
+Loading Model: Qwen/Qwen3-TTS-12Hz-1.7B-Base...
+Downloading Model from https://www.modelscope.cn to directory: /root/.cache/modelscope/hub/models/Qwen/Qwen3-TTS-12Hz-1.7B-Base

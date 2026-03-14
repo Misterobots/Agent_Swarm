@@ -1,0 +1,543 @@
+{
+  "version": "1.0.0",
+  "category": "auth",
+  "patterns": [
+    {
+      "id": "bb9ffac6f33ded9c",
+      "subcategory": "audit",
+      "name": "Audit Logging Detector",
+      "description": "Learns audit logging patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/audit",
+          "patternId": "auth/audit/class_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.9075,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 19,
+          "column": 7
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 24,
+          "column": 7
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:44.573Z",
+        "approvedAt": "2026-02-02T02:56:44.573Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "03ee3e809631d07b",
+      "subcategory": "permission-checks",
+      "name": "Permission Checks Detector",
+      "description": "Learns permission check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/permission-checks",
+          "patternId": "auth/permission-checks/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.07,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 10,
+          "column": 70
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 169,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 360,
+          "column": 19
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 26,
+          "column": 16
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 26,
+          "column": 43
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 135,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 900,
+          "column": 23
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:44.691Z",
+        "approvedAt": "2026-02-02T02:56:44.691Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "b5cce9fc6951a37f",
+      "subcategory": "permission-checks",
+      "name": "Permission Checks Detector",
+      "description": "Learns permission check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/permission-checks",
+          "patternId": "auth/permission-checks/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.8533333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 84,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 426,
+          "column": 40
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 391,
+          "column": 40
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 398,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 121,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:44.792Z",
+        "approvedAt": "2026-02-02T02:56:44.792Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d7da57a9d4f95bf6",
+      "subcategory": "audit",
+      "name": "Audit Logging Detector",
+      "description": "Learns audit logging patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/audit",
+          "patternId": "auth/audit/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.87,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 18,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 18,
+          "column": 30
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:44.937Z",
+        "approvedAt": "2026-02-02T02:56:44.937Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "2ff0b4854cb78f7c",
+      "subcategory": "middleware",
+      "name": "Auth Middleware Detector",
+      "description": "Learns auth middleware patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/middleware",
+          "patternId": "auth/middleware/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 16,
+          "column": 31
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:45.040Z",
+        "approvedAt": "2026-02-02T02:56:45.040Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "829e61675ea93546",
+      "subcategory": "permission-checks",
+      "name": "Permission Checks Detector",
+      "description": "Learns permission check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/permission-checks",
+          "patternId": "auth/permission-checks/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 67,
+          "column": 10
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 10,
+          "column": 50
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:45.134Z",
+        "approvedAt": "2026-02-02T02:56:45.134Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "c705c5f68070b776",
+      "subcategory": "permission-checks",
+      "name": "Permission Checks Detector",
+      "description": "Learns permission check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/permission-checks",
+          "patternId": "auth/permission-checks/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.03,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.945,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 265,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 312,
+          "column": 5
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 32,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:45.242Z",
+        "approvedAt": "2026-02-02T02:56:45.242Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "c6279f060c606510",
+      "subcategory": "ownership",
+      "name": "Resource Ownership Detector",
+      "description": "Learns resource ownership patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/ownership",
+          "patternId": "auth/ownership/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.05,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.9161538461538461,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 365,
+          "column": 5
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 3,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 803,
+          "column": 71
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 114,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:45.334Z",
+        "approvedAt": "2026-02-02T02:56:45.334Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d5d279da2ff7fe9a",
+      "subcategory": "middleware",
+      "name": "Auth Middleware Detector",
+      "description": "Learns auth middleware patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/middleware",
+          "patternId": "auth/middleware/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 17,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 209,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 232,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 238,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 256,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 276,
+          "column": 22
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:45.433Z",
+        "approvedAt": "2026-02-02T02:56:45.433Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "6c73f754cfee8327",
+      "subcategory": "ownership",
+      "name": "Resource Ownership Detector",
+      "description": "Learns resource ownership patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/ownership",
+          "patternId": "auth/ownership/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.11,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.9161538461538461,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 115,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 115,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 284,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 285,
+          "column": 49
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 610,
+          "column": 38
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 935,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 937,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 939,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 941,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 943,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 945,
+          "column": 23
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:45.520Z",
+        "approvedAt": "2026-02-02T02:56:45.520Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:08.054Z",
+  "checksum": "6be7e542589b14bb"
+}

@@ -1,0 +1,101 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: .pytest_cache
+rootdir: /app
+plugins: anyio-4.12.1
+collecting ... collected 12 items
+
+test_mars_loop.py::TestMarsRLLoop::test_solver_passes_first_try FAILED   [  8%]
+test_mars_loop.py::TestMarsRLLoop::test_solver_fails_corrector_invoked FAILED [ 16%]
+test_mars_loop.py::TestMarsRLLoop::test_max_iterations_respected FAILED  [ 25%]
+test_mars_loop.py::TestMarsRLLoop::test_solver_crash_returns_error_result FAILED [ 33%]
+test_mars_loop.py::TestLogicVerifier::test_valid_python_passes FAILED    [ 41%]
+test_mars_loop.py::TestLogicVerifier::test_syntax_error_fails FAILED     [ 50%]
+test_mars_loop.py::TestLogicVerifier::test_empty_response_fails FAILED   [ 58%]
+test_mars_loop.py::TestLogicVerifier::test_repetitive_response_fails FAILED [ 66%]
+test_mars_loop.py::TestLogicVerifier::test_unclosed_codeblock_fails FAILED [ 75%]
+test_mars_loop.py::TestLogicVerifier::test_plain_text_research_passes FAILED [ 83%]
+test_mars_loop.py::TestMarsLoopStream::test_stream_yields_response_on_success FAILED [ 91%]
+test_mars_loop.py::TestMarsLoopStream::test_stream_yields_error_on_loop_crash FAILED [100%]
+
+=================================== FAILURES ===================================
+_________________ TestMarsRLLoop.test_solver_passes_first_try __________________
+test_mars_loop.py:95: in test_solver_passes_first_try
+    from mars_loop import MarsRLLoop
+E   ModuleNotFoundError: No module named 'mars_loop'
+______________ TestMarsRLLoop.test_solver_fails_corrector_invoked ______________
+test_mars_loop.py:112: in test_solver_fails_corrector_invoked
+    from mars_loop import MarsRLLoop
+E   ModuleNotFoundError: No module named 'mars_loop'
+_________________ TestMarsRLLoop.test_max_iterations_respected _________________
+test_mars_loop.py:134: in test_max_iterations_respected
+    from mars_loop import MarsRLLoop
+E   ModuleNotFoundError: No module named 'mars_loop'
+____________ TestMarsRLLoop.test_solver_crash_returns_error_result _____________
+test_mars_loop.py:151: in test_solver_crash_returns_error_result
+    from mars_loop import MarsRLLoop
+E   ModuleNotFoundError: No module named 'mars_loop'
+__________________ TestLogicVerifier.test_valid_python_passes __________________
+test_mars_loop.py:178: in test_valid_python_passes
+    v = self._make_verifier()
+        ^^^^^^^^^^^^^^^^^^^^^
+test_mars_loop.py:174: in _make_verifier
+    from verifier_agent import LogicVerifier
+E   ModuleNotFoundError: No module named 'verifier_agent'
+__________________ TestLogicVerifier.test_syntax_error_fails ___________________
+test_mars_loop.py:187: in test_syntax_error_fails
+    v = self._make_verifier()
+        ^^^^^^^^^^^^^^^^^^^^^
+test_mars_loop.py:174: in _make_verifier
+    from verifier_agent import LogicVerifier
+E   ModuleNotFoundError: No module named 'verifier_agent'
+_________________ TestLogicVerifier.test_empty_response_fails __________________
+test_mars_loop.py:197: in test_empty_response_fails
+    v = self._make_verifier()
+        ^^^^^^^^^^^^^^^^^^^^^
+test_mars_loop.py:174: in _make_verifier
+    from verifier_agent import LogicVerifier
+E   ModuleNotFoundError: No module named 'verifier_agent'
+_______________ TestLogicVerifier.test_repetitive_response_fails _______________
+test_mars_loop.py:203: in test_repetitive_response_fails
+    v = self._make_verifier()
+        ^^^^^^^^^^^^^^^^^^^^^
+test_mars_loop.py:174: in _make_verifier
+    from verifier_agent import LogicVerifier
+E   ModuleNotFoundError: No module named 'verifier_agent'
+_______________ TestLogicVerifier.test_unclosed_codeblock_fails ________________
+test_mars_loop.py:209: in test_unclosed_codeblock_fails
+    v = self._make_verifier()
+        ^^^^^^^^^^^^^^^^^^^^^
+test_mars_loop.py:174: in _make_verifier
+    from verifier_agent import LogicVerifier
+E   ModuleNotFoundError: No module named 'verifier_agent'
+______________ TestLogicVerifier.test_plain_text_research_passes _______________
+test_mars_loop.py:219: in test_plain_text_research_passes
+    v = self._make_verifier()
+        ^^^^^^^^^^^^^^^^^^^^^
+test_mars_loop.py:174: in _make_verifier
+    from verifier_agent import LogicVerifier
+E   ModuleNotFoundError: No module named 'verifier_agent'
+__________ TestMarsLoopStream.test_stream_yields_response_on_success ___________
+test_mars_loop.py:235: in test_stream_yields_response_on_success
+    from mars_loop import MarsRLLoop, mars_loop_stream, VerifierResult
+E   ModuleNotFoundError: No module named 'mars_loop'
+__________ TestMarsLoopStream.test_stream_yields_error_on_loop_crash ___________
+test_mars_loop.py:250: in test_stream_yields_error_on_loop_crash
+    from mars_loop import MarsRLLoop, mars_loop_stream
+E   ModuleNotFoundError: No module named 'mars_loop'
+=========================== short test summary info ============================
+FAILED test_mars_loop.py::TestMarsRLLoop::test_solver_passes_first_try - Modu...
+FAILED test_mars_loop.py::TestMarsRLLoop::test_solver_fails_corrector_invoked
+FAILED test_mars_loop.py::TestMarsRLLoop::test_max_iterations_respected - Mod...
+FAILED test_mars_loop.py::TestMarsRLLoop::test_solver_crash_returns_error_result
+FAILED test_mars_loop.py::TestLogicVerifier::test_valid_python_passes - Modul...
+FAILED test_mars_loop.py::TestLogicVerifier::test_syntax_error_fails - Module...
+FAILED test_mars_loop.py::TestLogicVerifier::test_empty_response_fails - Modu...
+FAILED test_mars_loop.py::TestLogicVerifier::test_repetitive_response_fails
+FAILED test_mars_loop.py::TestLogicVerifier::test_unclosed_codeblock_fails - ...
+FAILED test_mars_loop.py::TestLogicVerifier::test_plain_text_research_passes
+FAILED test_mars_loop.py::TestMarsLoopStream::test_stream_yields_response_on_success
+FAILED test_mars_loop.py::TestMarsLoopStream::test_stream_yields_error_on_loop_crash
+============================== 12 failed in 0.11s ==============================

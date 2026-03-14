@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'execution_plane_cadvisor'
+    static_configs:
+      # INTERNAL DOCKER DNS: Since they are in the same network, we use the container name.
+      - targets: ['cadvisor:8080']
+
+  - job_name: 'agent_runtime'
+    static_configs:
+      # INTERNAL DOCKER DNS
+      - targets: ['agent_runtime:8000']
+  
+  - job_name: 'agent_ui'
+    static_configs:
+      - targets: ['agent_ui:8001']

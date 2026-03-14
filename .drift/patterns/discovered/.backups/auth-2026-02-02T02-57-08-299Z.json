@@ -1,0 +1,998 @@
+{
+  "version": "1.0.0",
+  "category": "auth",
+  "patterns": [
+    {
+      "id": "63586933275477c5",
+      "subcategory": "audit",
+      "name": "Audit Logging Detector",
+      "description": "Learns audit logging patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/audit",
+          "patternId": "auth/audit/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.21,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.6299999999999999,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 25,
+          "column": 30
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 56,
+          "column": 18
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 59,
+          "column": 30
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 85,
+          "column": 28
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 86,
+          "column": 24
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 97,
+          "column": 26
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 107,
+          "column": 42
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 110,
+          "column": 47
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 131,
+          "column": 42
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 143,
+          "column": 43
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 145,
+          "column": 29
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 34,
+          "column": 25
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 68,
+          "column": 14
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 74,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 21,
+          "column": 13
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 23,
+          "column": 18
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 127,
+          "column": 32
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 132,
+          "column": 27
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 241,
+          "column": 32
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 246,
+          "column": 27
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 324,
+          "column": 34
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "9dc1d6aeb8767abc",
+      "subcategory": "audit",
+      "name": "Audit Logging Detector",
+      "description": "Learns audit logging patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/audit",
+          "patternId": "auth/audit/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 40,
+          "column": 20
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 67,
+          "column": 5
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 67,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 125,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "ae12fdeac20a2686",
+      "subcategory": "audit",
+      "name": "Audit Logging Detector",
+      "description": "Learns audit logging patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/audit",
+          "patternId": "auth/audit/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.16,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 82,
+          "column": 24
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 82,
+          "column": 36
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 89,
+          "column": 20
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 89,
+          "column": 27
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 92,
+          "column": 39
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 130,
+          "column": 21
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 130,
+          "column": 29
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 140,
+          "column": 31
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 140,
+          "column": 38
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 27,
+          "column": 49
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 126,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 126,
+          "column": 44
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 128,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 240,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 240,
+          "column": 44
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 242,
+          "column": 13
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "4a3b2945aa40c3fb",
+      "subcategory": "audit",
+      "name": "Audit Logging Detector",
+      "description": "Learns audit logging patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/audit",
+          "patternId": "auth/audit/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.1,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.83,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 83,
+          "column": 51
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 84,
+          "column": 12
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 95,
+          "column": 12
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 95,
+          "column": 26
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 142,
+          "column": 12
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 130,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 244,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 328,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 293,
+          "column": 38
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "94238ff26fc94ceb",
+      "subcategory": "audit",
+      "name": "Audit Logging Detector",
+      "description": "Learns audit logging patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/audit",
+          "patternId": "auth/audit/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.05,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.83,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 9,
+          "column": 36
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 9,
+          "column": 43
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 13,
+          "column": 24
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 13,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 339,
+          "column": 41
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "fbe4c788638713d2",
+      "subcategory": "permission-checks",
+      "name": "Permission Checks Detector",
+      "description": "Learns permission check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/permission-checks",
+          "patternId": "auth/permission-checks/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.07,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 140,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 141,
+          "column": 23
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 26,
+          "column": 38
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 28,
+          "column": 24
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 268,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 314,
+          "column": 37
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "6a3e10be8ac961a2",
+      "subcategory": "permission-checks",
+      "name": "Permission Checks Detector",
+      "description": "Learns permission check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/permission-checks",
+          "patternId": "auth/permission-checks/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.03,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 37
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 11,
+          "column": 13
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "5c8dfb3ebace73be",
+      "subcategory": "ownership",
+      "name": "Resource Ownership Detector",
+      "description": "Learns resource ownership patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/ownership",
+          "patternId": "auth/ownership/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.595,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 366,
+          "column": 31
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 7,
+          "column": 30
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 26,
+          "column": 30
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 37,
+          "column": 30
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "cda8cf3111a6eff0",
+      "subcategory": "middleware",
+      "name": "Auth Middleware Detector",
+      "description": "Learns auth middleware patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/middleware",
+          "patternId": "auth/middleware/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 23,
+          "column": 44
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "48375e6ad0a68c00",
+      "subcategory": "ownership",
+      "name": "Resource Ownership Detector",
+      "description": "Learns resource ownership patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/ownership",
+          "patternId": "auth/ownership/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 6,
+          "column": 30
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "9facccae99f1bfd5",
+      "subcategory": "token-handling",
+      "name": "Token Handling Detector",
+      "description": "Learns token handling patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/token-handling",
+          "patternId": "auth/token-handling/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.26,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.6095833333333334,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 115,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 133,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 151,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 152,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 154,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 158,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 290,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 307,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 318,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 329,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 335,
+          "column": 27
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 361,
+          "column": 28
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 363,
+          "column": 16
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 378,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 448,
+          "column": 28
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 461,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 609,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 610,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 663,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 752,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 773,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 784,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 795,
+          "column": 16
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 843,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 844,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 848,
+          "column": 85
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "589c61adc1ed8481",
+      "subcategory": "token-handling",
+      "name": "Token Handling Detector",
+      "description": "Learns token handling patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/token-handling",
+          "patternId": "auth/token-handling/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.21,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8095833333333333,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 147,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 147,
+          "column": 46
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 284,
+          "column": 7
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 289,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 294,
+          "column": 15
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 360,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 360,
+          "column": 47
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 661,
+          "column": 35
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 661,
+          "column": 53
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 772,
+          "column": 36
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 792,
+          "column": 35
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 816,
+          "column": 36
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 816,
+          "column": 54
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 842,
+          "column": 44
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 902,
+          "column": 55
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 935,
+          "column": 7
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 937,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 939,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 941,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 943,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 945,
+          "column": 9
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "55a305fe499ccd2e",
+      "subcategory": "token-handling",
+      "name": "Token Handling Detector",
+      "description": "Learns token handling patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "auth/token-handling",
+          "patternId": "auth/token-handling/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8095833333333333,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 626,
+          "column": 46
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:08.126Z",
+  "checksum": "ae915042fff64e44"
+}

@@ -1,0 +1,1 @@
+from authentik.core.models import User, Token, TokenIntents; u = User.objects.filter(username='akadmin').first(); print(f"TOKEN_RESULT:{Token.objects.get_or_create(identifier='swarm-agent-config', defaults={'user': u, 'intent': TokenIntents.INTENT_API, 'key': 'swarm-agent-token-secure-123', 'expiring': False})[0].key}") if u else print("ERROR: User akadmin not found")

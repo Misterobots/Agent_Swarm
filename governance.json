@@ -1,0 +1,66 @@
+{
+  "d4e6d8e9": {
+    "id": "d4e6d8e9",
+    "type": "OTHER",
+    "description": "Test request from coding container",
+    "user": "unknown_coder",
+    "timestamp": "2026-02-04T21:49:35.184101",
+    "status": "APPROVED",
+    "assessment_notes": [
+      "Admin Approved via Dashboard"
+    ],
+    "admin_notes": null
+  },
+  "7865a546": {
+    "id": "7865a546",
+    "type": "PACKAGE",
+    "description": "Install package: numpy",
+    "user": "unknown_coder",
+    "timestamp": "2026-02-04T21:50:17.080134",
+    "status": "APPROVED",
+    "assessment_notes": [
+      "Security Assessment: SAFE",
+      "Admin Approved via Dashboard"
+    ],
+    "admin_notes": null
+  },
+  "fca00999": {
+    "id": "fca00999",
+    "type": "PACKAGE",
+    "description": "Install package: os",
+    "user": "unknown_coder",
+    "timestamp": "2026-02-04T21:50:18.964881",
+    "status": "REJECTED",
+    "assessment_notes": [
+      "Security Assessment: UNSAFE"
+    ],
+    "admin_notes": null
+  },
+  "a9ac5738": {
+    "id": "a9ac5738",
+    "type": "PACKAGE",
+    "description": "Install tensorflow",
+    "user": "tester",
+    "timestamp": "2026-02-04T22:44:38.932879",
+    "status": "REJECTED",
+    "assessment_notes": [
+      "Security Assessment: UNSAFE: Package not found on PyPI (Typo or Private?)",
+      "Technical Check: NOTE: TensorFlow can conflict with PyTorch. Ensure virtualenv is used."
+    ],
+    "admin_notes": null
+  },
+  "dae37457": {
+    "id": "dae37457",
+    "type": "OTHER",
+    "description": "Final Identity Test Post-Up",
+    "user": "coding_user",
+    "timestamp": "2026-02-04T23:41:33.823584",
+    "status": "APPROVED",
+    "assessment_notes": [
+      "Security Assessment: MANUAL_REVIEW: Non-standard request type.",
+      "Technical Check: COMPATIBLE",
+      "Admin Approved via Dashboard"
+    ],
+    "admin_notes": null
+  }
+}

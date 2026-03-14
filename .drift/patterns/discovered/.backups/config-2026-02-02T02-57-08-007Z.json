@@ -1,0 +1,378 @@
+{
+  "version": "1.0.0",
+  "category": "config",
+  "patterns": [
+    {
+      "id": "60f06474316ea839",
+      "subcategory": "env-config",
+      "name": "Environment Config Detector",
+      "description": "Learns environment configuration patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/env-config",
+          "patternId": "config/env-config/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 15,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "442ffbeeaa82782c",
+      "subcategory": "default-values",
+      "name": "Default Values Detector",
+      "description": "Learns default value patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/default-values",
+          "patternId": "config/default-values/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.595,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\memory_system.py",
+          "line": 23,
+          "column": 27
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "eea8e28408cfd2ae",
+      "subcategory": "config-validation",
+      "name": "Config Validation Detector",
+      "description": "Learns configuration validation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/config-validation",
+          "patternId": "config/config-validation/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.14,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.6299999999999999,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 140,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 141,
+          "column": 23
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 26,
+          "column": 38
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 28,
+          "column": 24
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 268,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 314,
+          "column": 37
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f9309e6944cbaedc",
+      "subcategory": "config-validation",
+      "name": "Config Validation Detector",
+      "description": "Learns configuration validation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/config-validation",
+          "patternId": "config/config-validation/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 44,
+          "column": 22
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 37
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 11,
+          "column": 13
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "2df68067446b698c",
+      "subcategory": "required-optional",
+      "name": "Required/Optional Detector",
+      "description": "Learns required/optional configuration patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/required-optional",
+          "patternId": "config/required-optional/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 24,
+          "column": 50
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 72,
+          "column": 43
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "835dcde0974ca482",
+      "subcategory": "required-optional",
+      "name": "Required/Optional Detector",
+      "description": "Learns required/optional configuration patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/required-optional",
+          "patternId": "config/required-optional/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 86,
+          "column": 22
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "a83e4b10376b88b1",
+      "subcategory": "default-values",
+      "name": "Default Values Detector",
+      "description": "Learns default value patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/default-values",
+          "patternId": "config/default-values/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7366666666666666,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 86,
+          "column": 22
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 57,
+          "column": 19
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "2922fee90fc91f12",
+      "subcategory": "config-validation",
+      "name": "Config Validation Detector",
+      "description": "Learns configuration validation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/config-validation",
+          "patternId": "config/config-validation/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.695,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 267,
+          "column": 33
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "5e673b2b524b0c80",
+      "subcategory": "feature-flags",
+      "name": "Feature Flags Detector",
+      "description": "Learns feature flag patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "config/feature-flags",
+          "patternId": "config/feature-flags/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 874,
+          "column": 43
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:07.884Z",
+  "checksum": "7972338be719a5ab"
+}

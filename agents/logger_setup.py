@@ -6,9 +6,10 @@ import sys
 # Try importing Loki, handle failure gracefully
 try:
     import logging_loki
-    LOKI_AVAILABLE = True
+    LOKI_AVAILABLE = False # HARD DISABLED for debugging stability
 except ImportError:
     LOKI_AVAILABLE = False
+# LOKI_AVAILABLE = True  # DEBUG: Disabled to check for crashes
 
 def setup_logger(name: str):
     """

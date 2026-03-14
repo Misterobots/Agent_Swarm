@@ -1,0 +1,99 @@
+{
+  "version": "1.0.0",
+  "category": "documentation",
+  "patterns": [
+    {
+      "id": "e7a0f0e19f74e3d2",
+      "subcategory": "jsdoc-patterns",
+      "name": "JSDoc Patterns Detector",
+      "description": "Learns JSDoc documentation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "documentation/jsdoc-patterns",
+          "patternId": "documentation/jsdoc-patterns/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 8,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 43,
+          "column": 9
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 32,
+          "column": 6
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 312,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 316,
+          "column": 47
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 316,
+          "column": 54
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 14,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 190,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 134,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 418,
+          "column": 9
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 14,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 548,
+          "column": 44
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:57:07.679Z",
+        "approvedAt": "2026-02-02T02:57:07.679Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:07.835Z",
+  "checksum": "d7580213198d8be6"
+}

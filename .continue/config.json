@@ -1,0 +1,19 @@
+{
+  "models": [
+    {
+      "title": "Home AI Swarm",
+      "provider": "openai",
+      "model": "swarm-standard",
+      "apiBase": "http://localhost:8008/v1",
+      "apiKey": "swarm-internal"
+    }
+  ],
+  "tabAutocompleteModel": {
+    "title": "Swarm Autocomplete",
+    "provider": "openai",
+    "model": "swarm-standard",
+    "apiBase": "http://localhost:8008/v1",
+    "apiKey": "swarm-internal"
+  },
+  "allowAnonymousTelemetry": false
+}

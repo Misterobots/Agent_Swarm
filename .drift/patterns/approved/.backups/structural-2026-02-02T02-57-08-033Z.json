@@ -1,0 +1,1687 @@
+{
+  "version": "1.0.0",
+  "category": "structural",
+  "patterns": [
+    {
+      "id": "a2f703fea1927d9c",
+      "subcategory": "file-naming",
+      "name": "File Naming Detector",
+      "description": "Learns file naming convention patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/file-naming",
+          "patternId": "structural/file-naming/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 5,
+          "column": 12
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 2,
+          "column": 12
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 305,
+          "column": 76
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 484,
+          "column": 12
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 377,
+          "column": 19
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 377,
+          "column": 59
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 419,
+          "column": 133
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 6,
+          "column": 24
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 6,
+          "column": 115
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 574,
+          "column": 16
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 615,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 615,
+          "column": 68
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.080Z",
+        "approvedAt": "2026-02-02T02:56:38.080Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8d7bf7c15951a0d3",
+      "subcategory": "file-naming",
+      "name": "File Naming Detector",
+      "description": "Learns file naming convention patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/file-naming",
+          "patternId": "structural/file-naming/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.26,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 9,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 37,
+          "column": 9
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 21,
+          "column": 5
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 21,
+          "column": 21
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 13,
+          "column": 18
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 12,
+          "column": 14
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 238,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 286,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 309,
+          "column": 39
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 516,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 531,
+          "column": 34
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 134,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 192,
+          "column": 17
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 12,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 58,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 188,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 250,
+          "column": 22
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 250,
+          "column": 44
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 379,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 35,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 416,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 71,
+          "column": 14
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 88,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 525,
+          "column": 53
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 580,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 583,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 583,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.175Z",
+        "approvedAt": "2026-02-02T02:56:38.175Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f2c4e821d31b2b35",
+      "subcategory": "import-ordering",
+      "name": "Import Ordering Detector",
+      "description": "Learns import ordering patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/import-ordering",
+          "patternId": "structural/import-ordering/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.6,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 14,
+        "score": 0.9161538461538461,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 2,
+          "column": 23
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 5,
+          "column": 21
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 6,
+          "column": 21
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 8,
+          "column": 29
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 9,
+          "column": 28
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 11,
+          "column": 32
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 52,
+          "column": 19
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 1,
+          "column": 22
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 2,
+          "column": 21
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 7,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 10,
+          "column": 19
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 3,
+          "column": 14
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 4,
+          "column": 15
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 6,
+          "column": 17
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 7,
+          "column": 14
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 8,
+          "column": 24
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 9,
+          "column": 17
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 10,
+          "column": 13
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 13,
+          "column": 19
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 4,
+          "column": 13
+        },
+        {
+          "file": "agents\\metrics.py",
+          "line": 1,
+          "column": 24
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 13,
+          "column": 9
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 13,
+          "column": 30
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 2,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 3,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 5,
+          "column": 14
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 13,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 14,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 72,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 103,
+          "column": 30
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 128,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 152,
+          "column": 37
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 187,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 223,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 245,
+          "column": 50
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 278,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 354,
+          "column": 32
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 390,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 484,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 485,
+          "column": 21
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 2,
+          "column": 23
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 8,
+          "column": 16
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 9,
+          "column": 23
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 7,
+          "column": 19
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 337,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 337,
+          "column": 46
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 337,
+          "column": 75
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 1,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 6,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 9,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 10,
+          "column": 19
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 17,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 574,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 882,
+          "column": 33
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 926,
+          "column": 33
+        },
+        {
+          "file": "core_tools\\__init__.py",
+          "line": 2,
+          "column": 15
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.362Z",
+        "approvedAt": "2026-02-02T02:56:38.362Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "693c08b27c49f46e",
+      "subcategory": "import-ordering",
+      "name": "Import Ordering Detector",
+      "description": "Learns import ordering patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/import-ordering",
+          "patternId": "structural/import-ordering/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.17,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 7,
+        "score": 0.8999999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 56,
+          "column": 19
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 20,
+          "column": 5
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 20,
+          "column": 18
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 97,
+          "column": 13
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 10,
+          "column": 8
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 20,
+          "column": 6
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 26,
+          "column": 6
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 265,
+          "column": 89
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 23,
+          "column": 5
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 64,
+          "column": 16
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 79,
+          "column": 9
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 79,
+          "column": 43
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 474,
+          "column": 15
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 45,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 368,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 521,
+          "column": 40
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 542,
+          "column": 13
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.471Z",
+        "approvedAt": "2026-02-02T02:56:38.471Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "cc544f4014da7adb",
+      "subcategory": "circular-deps",
+      "name": "Circular Dependencies Detector",
+      "description": "Learns circular dependency patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/circular-deps",
+          "patternId": "structural/circular-deps/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.55,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 13,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 2,
+          "column": 23
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 5,
+          "column": 21
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 6,
+          "column": 21
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 8,
+          "column": 29
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 9,
+          "column": 28
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 11,
+          "column": 32
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 52,
+          "column": 19
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 1,
+          "column": 22
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 2,
+          "column": 21
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 7,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 10,
+          "column": 19
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 3,
+          "column": 14
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 4,
+          "column": 15
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 6,
+          "column": 17
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 7,
+          "column": 14
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 8,
+          "column": 24
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 9,
+          "column": 17
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 10,
+          "column": 13
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 13,
+          "column": 19
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 4,
+          "column": 13
+        },
+        {
+          "file": "agents\\metrics.py",
+          "line": 1,
+          "column": 24
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 2,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 3,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 5,
+          "column": 14
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 13,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 14,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 72,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 103,
+          "column": 30
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 128,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 152,
+          "column": 37
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 187,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 223,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 245,
+          "column": 50
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 278,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 354,
+          "column": 32
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 390,
+          "column": 36
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 484,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 485,
+          "column": 21
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 1,
+          "column": 16
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 2,
+          "column": 23
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 8,
+          "column": 16
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 9,
+          "column": 23
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 7,
+          "column": 19
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 1,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 6,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 9,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 10,
+          "column": 19
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 17,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 574,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 882,
+          "column": 33
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 926,
+          "column": 33
+        },
+        {
+          "file": "core_tools\\__init__.py",
+          "line": 2,
+          "column": 15
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.592Z",
+        "approvedAt": "2026-02-02T02:56:38.592Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "6b42fb9a8217bed5",
+      "subcategory": "file-naming",
+      "name": "File Naming Detector",
+      "description": "Learns file naming convention patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/file-naming",
+          "patternId": "structural/file-naming/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.13,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 7,
+          "column": 19
+        },
+        {
+          "file": "agents\\debug_tools.py",
+          "line": 7,
+          "column": 32
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 16,
+          "column": 14
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 36,
+          "column": 53
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 39,
+          "column": 28
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 42,
+          "column": 63
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 71,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 73,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 78,
+          "column": 59
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 88,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 90,
+          "column": 46
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 97,
+          "column": 58
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 407,
+          "column": 76
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.669Z",
+        "approvedAt": "2026-02-02T02:56:38.669Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "5653f436c7d2505e",
+      "subcategory": "co-location",
+      "name": "Co-Location Detector",
+      "description": "Learns co-location patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/co-location",
+          "patternId": "structural/co-location/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.05,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 121,
+          "column": 50
+        },
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 9,
+          "column": 63
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 223,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 245,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 278,
+          "column": 18
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.763Z",
+        "approvedAt": "2026-02-02T02:56:38.763Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "1237aded33ef6e4e",
+      "subcategory": "import-ordering",
+      "name": "Import Ordering Detector",
+      "description": "Learns import ordering patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/import-ordering",
+          "patternId": "structural/import-ordering/class_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 8,
+          "column": 11
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.837Z",
+        "approvedAt": "2026-02-02T02:56:38.837Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "550fb1e25fda4008",
+      "subcategory": "import-ordering",
+      "name": "Import Ordering Detector",
+      "description": "Learns import ordering patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/import-ordering",
+          "patternId": "structural/import-ordering/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 38,
+          "column": 9
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.925Z",
+        "approvedAt": "2026-02-02T02:56:38.925Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "b1f5658ebc13e5a6",
+      "subcategory": "circular-deps",
+      "name": "Circular Dependencies Detector",
+      "description": "Learns circular dependency patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/circular-deps",
+          "patternId": "structural/circular-deps/class_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 8,
+          "column": 11
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:38.998Z",
+        "approvedAt": "2026-02-02T02:56:38.998Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "aa080df13927bb83",
+      "subcategory": "circular-deps",
+      "name": "Circular Dependencies Detector",
+      "description": "Learns circular dependency patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/circular-deps",
+          "patternId": "structural/circular-deps/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8999999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 10,
+          "column": 8
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.088Z",
+        "approvedAt": "2026-02-02T02:56:39.088Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f40005c05242cd6f",
+      "subcategory": "directory-structure",
+      "name": "Directory Structure Detector",
+      "description": "Learns directory structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/directory-structure",
+          "patternId": "structural/directory-structure/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.03,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 87,
+          "column": 32
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 43
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.168Z",
+        "approvedAt": "2026-02-02T02:56:39.168Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d5423199f23acbbe",
+      "subcategory": "module-boundaries",
+      "name": "Module Boundaries Detector",
+      "description": "Learns module boundary patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/module-boundaries",
+          "patternId": "structural/module-boundaries/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 87,
+          "column": 23
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.255Z",
+        "approvedAt": "2026-02-02T02:56:39.255Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "c97767d31582c39e",
+      "subcategory": "package-boundaries",
+      "name": "Package Boundaries Detector",
+      "description": "Learns package boundary patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/package-boundaries",
+          "patternId": "structural/package-boundaries/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 5,
+        "score": 0.9408333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 408,
+          "column": 17
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 23,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 365,
+          "column": 5
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 3,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 114,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.337Z",
+        "approvedAt": "2026-02-02T02:56:39.337Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8a10cc15e80ba342",
+      "subcategory": "circular-deps",
+      "name": "Circular Dependencies Detector",
+      "description": "Learns circular dependency patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/circular-deps",
+          "patternId": "structural/circular-deps/type_annotation"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.9116666666666666,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 24,
+          "column": 50
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.419Z",
+        "approvedAt": "2026-02-02T02:56:39.419Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8c1832d15eb47f4b",
+      "subcategory": "barrel-exports",
+      "name": "Barrel Exports Detector",
+      "description": "Learns barrel export patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/barrel-exports",
+          "patternId": "structural/barrel-exports/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8533333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 590,
+          "column": 63
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.502Z",
+        "approvedAt": "2026-02-02T02:56:39.502Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "80a11a8243a3533f",
+      "subcategory": "barrel-exports",
+      "name": "Barrel Exports Detector",
+      "description": "Learns barrel export patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/barrel-exports",
+          "patternId": "structural/barrel-exports/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8533333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 898,
+          "column": 71
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 898,
+          "column": 135
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.591Z",
+        "approvedAt": "2026-02-02T02:56:39.591Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "37b65750df0c5c77",
+      "subcategory": "circular-deps",
+      "name": "Circular Dependencies Detector",
+      "description": "Learns circular dependency patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/circular-deps",
+          "patternId": "structural/circular-deps/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8848648648648649,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 902,
+          "column": 71
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.668Z",
+        "approvedAt": "2026-02-02T02:56:39.668Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "40f8836f81a7d49c",
+      "subcategory": "package-boundaries",
+      "name": "Package Boundaries Detector",
+      "description": "Learns package boundary patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "structural/package-boundaries",
+          "patternId": "structural/package-boundaries/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.11,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.9408333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 115,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 115,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 284,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 285,
+          "column": 49
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 610,
+          "column": 38
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 935,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 937,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 939,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 941,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 943,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 945,
+          "column": 23
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.782Z",
+        "approvedAt": "2026-02-02T02:56:39.782Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:07.904Z",
+  "checksum": "212d1b8f7c4131ae"
+}

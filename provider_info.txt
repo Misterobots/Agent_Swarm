@@ -1,0 +1,1 @@
+include_claims_in_id_token: True

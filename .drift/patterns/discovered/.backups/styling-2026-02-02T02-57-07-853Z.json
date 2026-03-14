@@ -1,0 +1,1218 @@
+{
+  "version": "1.0.0",
+  "category": "styling",
+  "patterns": [
+    {
+      "id": "6ff591fdbf80a31e",
+      "subcategory": "class-naming",
+      "name": "Class Naming Detector",
+      "description": "Learns class naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/class-naming",
+          "patternId": "styling/class-naming/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.5,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 9,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 19,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 24,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 44,
+          "column": 20
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 54,
+          "column": 1
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 16,
+          "column": 19
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 19,
+          "column": 1
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 23,
+          "column": 1
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 79,
+          "column": 1
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 10,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 33
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 10,
+          "column": 1
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 16,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 94,
+          "column": 12
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 170,
+          "column": 6
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 179,
+          "column": 7
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 183,
+          "column": 6
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 193,
+          "column": 7
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 198,
+          "column": 6
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 278,
+          "column": 7
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 565,
+          "column": 6
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 568,
+          "column": 7
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 678,
+          "column": 6
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 697,
+          "column": 7
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "c0f028b55e2c48fb",
+      "subcategory": "color-usage",
+      "name": "Color Usage Detector",
+      "description": "Learns color usage patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/color-usage",
+          "patternId": "styling/color-usage/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 3,
+          "column": 30
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "1f4f9aa296dc5963",
+      "subcategory": "color-usage",
+      "name": "Color Usage Detector",
+      "description": "Learns color usage patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/color-usage",
+          "patternId": "styling/color-usage/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.44,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 63,
+          "column": 18
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 281,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 172,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 173,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 185,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 186,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 190,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 200,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 201,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 207,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 208,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 228,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 271,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 274,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 191,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 210,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 241,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 263,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 681,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 691,
+          "column": 23
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 692,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 727,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "b84ac6933ff49bb9",
+      "subcategory": "typography",
+      "name": "Typography Detector",
+      "description": "Learns typography patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/typography",
+          "patternId": "styling/typography/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.24,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 20,
+          "column": 61
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 250,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 566,
+          "column": 32
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 733,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 734,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 223,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 566,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 683,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 732,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 186,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 201,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 246,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0ff7ef7a3555b115",
+      "subcategory": "tailwind-patterns",
+      "name": "Tailwind Patterns Detector",
+      "description": "Learns Tailwind CSS patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/tailwind-patterns",
+          "patternId": "styling/tailwind-patterns/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.15,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 20,
+          "column": 61
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 687,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 688,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 847,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 856,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 864,
+          "column": 14
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 223,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 566,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 683,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 732,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "47f7cad66c601a00",
+      "subcategory": "class-naming",
+      "name": "Class Naming Detector",
+      "description": "Learns class naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/class-naming",
+          "patternId": "styling/class-naming/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.28,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 68,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 76,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 79,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 81,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 87,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 301,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 312,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 323,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 718,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 719,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 720,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 721,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 725,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 738,
+          "column": 26
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "a67d186cd928d418",
+      "subcategory": "design-tokens",
+      "name": "Design Tokens Detector",
+      "description": "Learns design token patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/design-tokens",
+          "patternId": "styling/design-tokens/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.82,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 141,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 144,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 144,
+          "column": 19
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "760e3a098de749ef",
+      "subcategory": "design-tokens",
+      "name": "Design Tokens Detector",
+      "description": "Learns design token patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/design-tokens",
+          "patternId": "styling/design-tokens/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.82,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 167,
+          "column": 4
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 181,
+          "column": 6
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 195,
+          "column": 6
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8c99e564c11127b9",
+      "subcategory": "spacing-scale",
+      "name": "Spacing Scale Detector",
+      "description": "Learns spacing scale patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/spacing-scale",
+          "patternId": "styling/spacing-scale/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.5700000000000001,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 729,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 567,
+          "column": 55
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "3ca7eb031c9355e2",
+      "subcategory": "color-usage",
+      "name": "Color Usage Detector",
+      "description": "Learns color usage patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/color-usage",
+          "patternId": "styling/color-usage/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.46,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7745454545454545,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 207,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 210,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 228,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 230,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 231,
+          "column": 35
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 231,
+          "column": 69
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 237,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 239,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 240,
+          "column": 38
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 249,
+          "column": 36
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 255,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 257,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 259,
+          "column": 35
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 262,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 265,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 274,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 275,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 684,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 693,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 694,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 174,
+          "column": 43
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 175,
+          "column": 44
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 176,
+          "column": 45
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f9c517c340368184",
+      "subcategory": "typography",
+      "name": "Typography Detector",
+      "description": "Learns typography patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/typography",
+          "patternId": "styling/typography/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.16,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7441935483870967,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 368,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 542,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 616,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 646,
+          "column": 28
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 793,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 906,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 920,
+          "column": 12
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 923,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "34235df1876d3c4d",
+      "subcategory": "typography",
+      "name": "Typography Detector",
+      "description": "Learns typography patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/typography",
+          "patternId": "styling/typography/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7441935483870967,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 702,
+          "column": 16
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "795ebbcecf9d09b7",
+      "subcategory": "class-naming",
+      "name": "Class Naming Detector",
+      "description": "Learns class naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/class-naming",
+          "patternId": "styling/class-naming/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7658333333333334,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 165,
+          "column": 27
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "191d519af73a7e71",
+      "subcategory": "class-naming",
+      "name": "Class Naming Detector",
+      "description": "Learns class naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/class-naming",
+          "patternId": "styling/class-naming/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7658333333333334,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 105,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 105,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 584,
+          "column": 85
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "3e1ac26675b1fb69",
+      "subcategory": "tailwind-patterns",
+      "name": "Tailwind Patterns Detector",
+      "description": "Learns Tailwind CSS patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/tailwind-patterns",
+          "patternId": "styling/tailwind-patterns/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8160000000000001,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 368,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 542,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 616,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 646,
+          "column": 28
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 793,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 906,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 920,
+          "column": 12
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 923,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8aa7ce98ce2ed722",
+      "subcategory": "tailwind-patterns",
+      "name": "Tailwind Patterns Detector",
+      "description": "Learns Tailwind CSS patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/tailwind-patterns",
+          "patternId": "styling/tailwind-patterns/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8160000000000001,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 702,
+          "column": 16
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "c602b504fd5173d4",
+      "subcategory": "responsive",
+      "name": "Responsive Detector",
+      "description": "Learns responsive design patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/responsive",
+          "patternId": "styling/responsive/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.83,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 60,
+          "column": 32
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 584,
+          "column": 44
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:07.692Z",
+  "checksum": "a6bff35d4855b73f"
+}

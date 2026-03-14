@@ -1,0 +1,223 @@
+<mxfile host="VSCode" modified="2026-02-22T08:23:40.000Z" agent="Home AI Lab" version="21.0.0">
+  <diagram id="hive-topology-v3" name="Agentic Hive — 3-Node Topology">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="1" background="#0d1117">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- CONTROL PLANE — Dell Wyse 5070                 -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="cp-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#8b5cf6;strokeWidth=2;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="360" y="30" width="480" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="cp-title" value="&#xa0;&#xa0;&#xa0; Control Plane — Dell Wyse 5070" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=13;fontStyle=1;fontColor=#c4b5fd;" vertex="1" parent="1">
+          <mxGeometry x="360" y="30" width="480" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="cp-ip" value="192.168.2.102" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=10;fontColor=#6d28d9;" vertex="1" parent="1">
+          <mxGeometry x="360" y="30" width="470" height="32" as="geometry" />
+        </mxCell>
+
+        <!-- Control Plane services — row 1 -->
+        <mxCell id="svc-spire" value="&#xa;SPIRE Server" style="shape=mxgraph.cisco.servers.standard_server;fillColor=#5b21b6;strokeColor=#c4b5fd;fontColor=#ffffff;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;labelPosition=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="380" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-pg" value="&#xa;PostgreSQL" style="shape=mxgraph.cisco.servers.standard_server;fillColor=#5b21b6;strokeColor=#c4b5fd;fontColor=#ffffff;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;labelPosition=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="455" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-lf" value="&#xa;Langfuse" style="shape=mxgraph.cisco.servers.standard_server;fillColor=#5b21b6;strokeColor=#c4b5fd;fontColor=#ffffff;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;labelPosition=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="530" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-ch" value="&#xa;ClickHouse" style="shape=mxgraph.cisco.servers.standard_server;fillColor=#5b21b6;strokeColor=#c4b5fd;fontColor=#ffffff;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;labelPosition=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="605" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-redis" value="&#xa;Redis" style="shape=mxgraph.cisco.servers.standard_server;fillColor=#5b21b6;strokeColor=#c4b5fd;fontColor=#ffffff;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;labelPosition=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="680" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-minio" value="&#xa;MinIO" style="shape=mxgraph.cisco.servers.standard_server;fillColor=#5b21b6;strokeColor=#c4b5fd;fontColor=#ffffff;fontSize=10;fontStyle=1;verticalLabelPosition=bottom;labelPosition=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="755" y="75" width="50" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- SPIRE label under server -->
+        <mxCell id="cp-spire-badge" value="✅ SPIRE CA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3b0764;strokeColor=#a855f7;fontSize=9;fontColor=#d8b4fe;" vertex="1" parent="1">
+          <mxGeometry x="375" y="155" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- PRIMARY INFERENCE — Hive PC (5060 Ti)          -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="pi-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0c1a3a;strokeColor=#3b82f6;strokeWidth=2;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="30" y="280" width="500" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="pi-title" value="&#xa0;&#xa0;&#xa0; Primary Inference — Hive PC" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#93c5fd;" vertex="1" parent="1">
+          <mxGeometry x="30" y="280" width="500" height="32" as="geometry" />
+        </mxCell>
+
+        <!-- GPU chip -->
+        <mxCell id="gpu1-chip" value="RTX 5060 Ti — 16 GB VRAM" style="shape=mxgraph.cisco.computers_and_peripherals.pc;fillColor=#1d4ed8;strokeColor=#93c5fd;fontColor=#ffffff;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;labelPosition=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="50" y="330" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="gpu1-label" value="&lt;b&gt;qwen3.5:9b&lt;/b&gt;&lt;br&gt;Solver + Corrector&lt;br&gt;68% SWE-Bench Verified" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;fontColor=#bfdbfe;" vertex="1" parent="1">
+          <mxGeometry x="125" y="338" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Docker sub-box -->
+        <mxCell id="docker-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0d2137;strokeColor=#22c55e;strokeWidth=1;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="50" y="420" width="460" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="docker-title" value="🐳 Docker Execution Plane" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;fontStyle=1;fontColor=#86efac;" vertex="1" parent="1">
+          <mxGeometry x="60" y="422" width="300" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="svc-runtime" value="agent-runtime :8000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#166534;strokeColor=#86efac;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="65" y="455" width="130" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-ui" value="agent-ui :8501" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#166534;strokeColor=#86efac;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="210" y="455" width="115" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-oh" value="openhands :3000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#166534;strokeColor=#86efac;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="340" y="455" width="115" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-comfy" value="comfyui :8188" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#166534;strokeColor=#86efac;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="65" y="495" width="115" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-prom" value="prometheus :9090" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#166534;strokeColor=#86efac;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="195" y="495" width="130" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-graf" value="grafana :80" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#166534;strokeColor=#86efac;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="340" y="495" width="115" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-spire-agent1" value="spire-agent ✅" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3b0764;strokeColor=#a855f7;fontSize=10;fontColor=#e9d5ff;" vertex="1" parent="1">
+          <mxGeometry x="65" y="535" width="110" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- SECONDARY INFERENCE — Dell R730                -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="si-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a0a0a;strokeColor=#ef4444;strokeWidth=2;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="640" y="280" width="530" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="si-title" value="&#xa0;&#xa0;&#xa0; Secondary Inference — Dell PowerEdge R730" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#fca5a5;" vertex="1" parent="1">
+          <mxGeometry x="640" y="280" width="530" height="32" as="geometry" />
+        </mxCell>
+
+        <!-- GPU chip R730 -->
+        <mxCell id="gpu2-chip" value="RTX 3070 Ti — 8 GB VRAM" style="shape=mxgraph.cisco.computers_and_peripherals.pc;fillColor=#991b1b;strokeColor=#fca5a5;fontColor=#ffffff;fontSize=11;fontStyle=1;verticalLabelPosition=bottom;labelPosition=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="660" y="330" width="60" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Nemotron box -->
+        <mxCell id="nemotron-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d0a0a;strokeColor=#f87171;strokeWidth=1;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="740" y="330" width="400" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="nemotron-title" value="&lt;b&gt;nemotron-orchestrator:8b&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#fca5a5;" vertex="1" parent="1">
+          <mxGeometry x="755" y="335" width="370" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="nemotron-desc" value="Router + Orchestrator — NVIDIA Purpose-Built" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;fontColor=#fecaca;" vertex="1" parent="1">
+          <mxGeometry x="755" y="357" width="370" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="nemotron-bench" value="Outperforms GPT-5 on HLE orchestration benchmark" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;fontColor=#fca5a5;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="755" y="377" width="370" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- llama-guard box -->
+        <mxCell id="guard-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d0a0a;strokeColor=#f87171;strokeWidth=1;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="740" y="430" width="400" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="guard-title" value="&lt;b&gt;llama-guard-3:8b&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#fca5a5;" vertex="1" parent="1">
+          <mxGeometry x="755" y="437" width="370" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="guard-desc" value="Safety Verifier — MarsRL Layer 3 (Hard Block)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;fontColor=#fecaca;" vertex="1" parent="1">
+          <mxGeometry x="755" y="459" width="370" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="guard-badge" value="🛡️ Input + Output Screening" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;fontColor=#fca5a5;" vertex="1" parent="1">
+          <mxGeometry x="755" y="479" width="370" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- R730 spire-agent (pending) -->
+        <mxCell id="svc-spire-agent2" value="spire-agent ⚠️ Pending" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#451a03;strokeColor=#fb923c;fontSize=10;fontColor=#fdba74;" vertex="1" parent="1">
+          <mxGeometry x="660" y="535" width="145" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="si-host" value="SECONDARY_OLLAMA_HOST=http://dell-r730:11434" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=9;fontColor=#f87171;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="640" y="590" width="520" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- MARSRL LOOP BOX                                -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="mars-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0a1628;strokeColor=#facc15;strokeWidth=1;arcSize=4;dashed=1;dashPattern=6 3;" vertex="1" parent="1">
+          <mxGeometry x="30" y="650" width="1140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-title" value="⚡ MarsRL Inference Loop (CODE intent)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#facc15;" vertex="1" parent="1">
+          <mxGeometry x="45" y="652" width="400" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-solver" value="1. Qwen 3.5&lt;br&gt;[Solver]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1d4ed8;strokeColor=#93c5fd;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="45" y="682" width="100" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-arr1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#facc15;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="mars-solver" target="mars-verifier">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-verifier" value="2. LogicVerifier&lt;br&gt;AST + Guard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#166534;strokeColor=#86efac;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="220" y="682" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-arr2-pass" value="PASS ✅" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#22c55e;strokeWidth=2;fontColor=#22c55e;fontSize=9;" edge="1" parent="1" source="mars-verifier" target="mars-user">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-arr2-fail" value="FAIL ❌" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ef4444;strokeWidth=2;fontColor=#ef4444;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="mars-verifier" target="mars-corrector">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-corrector" value="3. Qwen 3.5&lt;br&gt;[Corrector]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;strokeColor=#c4b5fd;fontSize=10;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="430" y="682" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-arr3" value="retry" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#a78bfa;strokeWidth=2;fontColor=#a78bfa;fontSize=9;" edge="1" parent="1" source="mars-corrector" target="mars-verifier">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-langfuse" value="Langfuse: solver_score&lt;br&gt;verifier_round_N&lt;br&gt;final_quality" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#8b5cf6;fontSize=9;fontColor=#c4b5fd;" vertex="1" parent="1">
+          <mxGeometry x="640" y="678" width="145" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="mars-user" value="→ User" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0d2137;strokeColor=#3b82f6;fontSize=10;fontColor=#93c5fd;" vertex="1" parent="1">
+          <mxGeometry x="870" y="682" width="80" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- CONNECTIONS                                     -->
+        <!-- ═══════════════════════════════════════════════ -->
+
+        <!-- Hive PC → Control Plane (SVID mTLS) -->
+        <mxCell id="conn-pc-cp" value="SVID / mTLS" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#a855f7;strokeWidth=2;dashed=0;fontColor=#c4b5fd;fontSize=10;fontStyle=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="pi-bg" target="cp-bg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Control Plane → R730 (Langfuse traces) -->
+        <mxCell id="conn-cp-r730" value="Langfuse traces" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#8b5cf6;strokeWidth=1;dashed=1;dashPattern=4 3;fontColor=#c4b5fd;fontSize=10;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cp-bg" target="si-bg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Hive PC → R730 (SECONDARY_OLLAMA_HOST) -->
+        <mxCell id="conn-pc-r730" value="SECONDARY_OLLAMA_HOST" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ef4444;strokeWidth=2;fontColor=#fca5a5;fontSize=10;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pi-bg" target="si-bg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- LEGEND                                         -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="legend-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#111827;strokeColor=#374151;strokeWidth=1;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="870" y="650" width="300" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" value="Legend" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;fontStyle=1;fontColor=#9ca3af;" vertex="1" parent="1">
+          <mxGeometry x="884" y="654" width="280" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-1" value="━━  SVID / mTLS (SPIFFE)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;fontColor=#a855f7;" vertex="1" parent="1">
+          <mxGeometry x="884" y="674" width="260" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-2" value="━━  Ollama API" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;fontColor=#ef4444;" vertex="1" parent="1">
+          <mxGeometry x="884" y="692" width="260" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-3" value="- -  Observability (Langfuse)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;fontColor=#8b5cf6;" vertex="1" parent="1">
+          <mxGeometry x="884" y="710" width="260" height="18" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

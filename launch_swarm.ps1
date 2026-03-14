@@ -55,18 +55,11 @@ else {
 }
 Pop-Location
 
-# 4. Launch ComfyUI (Local)
+# 4. Launch ComfyUI (Containerized)
 Print-Header "LAUNCHING COMFYUI"
-$ComfyPath = "C:\Users\panca\Documents\ComfyUI\run_nvidia_gpu.bat"
-if (Test-Path $ComfyPath) {
-    Write-Host "🎨 Starting ComfyUI..." -ForegroundColor Yellow
-    Start-Process $ComfyPath -WindowStyle Minimized
-    Write-Host "   [OK] ComfyUI started in background." -ForegroundColor Green
-}
-else {
-    Write-Host "   [WARN] ComfyUI launch script not found at $ComfyPath" -ForegroundColor Magenta
-    Write-Host "          Please ensure ComfyUI is running for Image/3D generation." -ForegroundColor Gray
-}
+Write-Host "   [INFO] ComfyUI is starting as 'comfyui_gpu' service..." -ForegroundColor Green
+Write-Host "   [INFO] Access at http://localhost:8188" -ForegroundColor Cyan
+
 
 # 5. Wait for Health & Check Connectivity
 Print-Header "SYSTEM CHECKS"
@@ -74,7 +67,13 @@ Write-Host "⏳ Giving services 10 seconds to warm up..." -ForegroundColor Yello
 Start-Sleep -Seconds 10
 
 # Check Remote Brain (PostgreSQL on Control Plane)
-$BrainIP = "192.168.1.211" 
+# Read CONTROL_NODE_IP from network.env (single source of truth)
+$NetworkEnv = Join-Path $Root "network.env"
+$BrainIP = "192.168.2.102"  # fallback
+if (Test-Path $NetworkEnv) {
+    $match = Select-String -Path $NetworkEnv -Pattern "^CONTROL_NODE_IP=(.+)$"
+    if ($match) { $BrainIP = $match.Matches[0].Groups[1].Value.Trim() }
+}
 if (Test-Connection -ComputerName $BrainIP -Count 1 -Quiet) {
     Write-Host "   [OK] Control Plane ($BrainIP) is Reachable." -ForegroundColor Green
 }

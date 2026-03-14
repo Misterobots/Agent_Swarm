@@ -1,0 +1,234 @@
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | trust_bundle_path or trust_bundle_url must be configured unless insecure_bootstrap is set
+spire-agent  | time="2026-02-08T05:47:13Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:47:13Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:47:13Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:47:13Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:48:13Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:48:13Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:48:13Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:48:13Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:49:14Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:49:14Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:49:14Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:49:14Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:50:15Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:50:15Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:50:15Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:50:15Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:51:15Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:51:15Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:51:15Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:51:15Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:52:16Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:52:16Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:52:16Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:52:16Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:17Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:17Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:17Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:17Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:18Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:18Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:18Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:18Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:18Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:18Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:18Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:19Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:19Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:19Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:19Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:20Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:20Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:20Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:20Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:21Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:21Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:21Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:21Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:23Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:23Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:23Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:23Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:27Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:27Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:27Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:27Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:33Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:33Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:33Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:33Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:53:47Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:53:47Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:53:47Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:53:47Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:54:13Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:54:13Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:54:13Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=error msg="Failed to configure plugin" error="rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=debug msg="Unloading plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=debug msg="Plugin deinitialized" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=info msg="Plugin unloaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=debug msg="Unloading plugin" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=debug msg="Plugin deinitialized" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=info msg="Plugin unloaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:13Z" level=error msg="Agent crashed" error="failed to configure plugin \"docker\": rpc error: code = Unknown desc = unable to parse docker host `/var/run/docker.sock`"
+spire-agent  | time="2026-02-08T05:54:41Z" level=warning msg="Current umask 0022 is too permissive; setting umask 0027"
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Starting agent with data directory: \"/run/spire/agent\""
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Plugin loaded" external=false plugin_name=join_token plugin_type=NodeAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:41Z" level=warning msg="Using the legacy container locator with custom cgroup matchers. The new locator will be enabled by default in a future release. Consider using it now by setting `use_new_container_locator=true`." external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Configured plugin" external=false plugin_name=docker plugin_type=WorkloadAttestor reconfigurable=false subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Plugin loaded" external=false plugin_name=docker plugin_type=WorkloadAttestor subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Plugin loaded" external=false plugin_name=memory plugin_type=KeyManager subsystem_name=catalog
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Bundle is not found" subsystem_name=attestor
+spire-agent  | time="2026-02-08T05:54:41Z" level=debug msg="No pre-existing agent SVID found. Will perform node attestation" subsystem_name=attestor
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="SVID is not found. Starting node attestation" subsystem_name=attestor
+spire-agent  | time="2026-02-08T05:54:41Z" level=warning msg="Insecure bootstrap enabled; skipping server certificate verification" subsystem_name=attestor
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Node attestation was successful" rettestable=false spiffe_id="spiffe://home-ai-lab/spire/agent/join_token/7b17e75a-2853-4a47-bce9-54d620b0a490" subsystem_name=attestor
+spire-agent  | time="2026-02-08T05:54:41Z" level=debug msg="Entry created" entry=bc943be9-8ba6-4c40-8917-289bd74dc57e selectors_added=1 spiffe_id="spiffe://home-ai-lab/spire-agent" subsystem_name=cache_manager
+spire-agent  | time="2026-02-08T05:54:41Z" level=debug msg="Renewing stale entries" cache_type=workload count=1 limit=500 subsystem_name=manager
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Creating X509-SVID" entry_id=bc943be9-8ba6-4c40-8917-289bd74dc57e spiffe_id="spiffe://home-ai-lab/spire-agent" subsystem_name=manager
+spire-agent  | time="2026-02-08T05:54:41Z" level=debug msg="SVID updated" entry=bc943be9-8ba6-4c40-8917-289bd74dc57e spiffe_id="spiffe://home-ai-lab/spire-agent" subsystem_name=cache_manager
+spire-agent  | time="2026-02-08T05:54:41Z" level=debug msg="Bundle added" subsystem_name=svid_store_cache trust_domain_id=home-ai-lab
+spire-agent  | time="2026-02-08T05:54:41Z" level=info msg="Starting Workload and SDS APIs" address=/var/run/spire/agent.sock network=unix subsystem_name=endpoints
+spire-agent  | time="2026-02-08T05:54:42Z" level=debug msg="Initializing health checkers" subsystem_name=health

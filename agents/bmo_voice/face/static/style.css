@@ -1,0 +1,149 @@
+/* ============================================================
+   BMO Face — Stylesheet
+   Designed for 7" Raspberry Pi display (800×480) in kiosk mode.
+   The entire viewport IS BMO's screen/face.
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #60CDCA; /* Authentic BMO Teal */
+  cursor: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
+canvas#bmo-face {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* ---- Touch-to-wake overlay ---- */
+#touch-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#touch-overlay.hidden {
+  display: none;
+}
+
+.touch-ring {
+  width: 80px;
+  height: 80px;
+  border: 4px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.touch-text {
+  margin-top: 16px;
+  font-family: "Press Start 2P", monospace;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+}
+
+/* ---- Text display (subtitles / chat) ---- */
+#text-display {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 85%;
+  padding: 12px 24px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+  font-family: "Press Start 2P", monospace;
+  font-size: 11px;
+  line-height: 1.8;
+  color: #ffffff;
+  text-align: center;
+  z-index: 5;
+  backdrop-filter: blur(4px);
+  animation: fade-in 0.3s ease-out;
+}
+
+#text-display.hidden {
+  display: none;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Chat Input */
+#input-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    z-index: 20;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.3s;
+}
+
+#input-container:hover, #input-container:focus-within {
+    opacity: 1.0; /* Show on hover/focus */
+}
+
+#chat-input {
+    width: 100%;
+    padding: 10px 15px;
+    border-radius: 20px;
+    border: 2px solid #005f4c;
+    background: rgba(0, 40, 30, 0.6);
+    color: #00d4aa;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.2rem;
+    outline: none;
+    text-align: center;
+}
+
+#chat-input::placeholder {
+    color: rgba(0, 212, 170, 0.5);
+}

@@ -1,0 +1,192 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: .pytest_cache
+rootdir: /app
+plugins: anyio-4.12.1
+collecting ... collected 12 items
+
+test_mars_loop.py::TestMarsRLLoop::test_solver_passes_first_try FAILED   [  8%]
+test_mars_loop.py::TestMarsRLLoop::test_solver_fails_corrector_invoked FAILED [ 16%]
+test_mars_loop.py::TestMarsRLLoop::test_max_iterations_respected FAILED  [ 25%]
+test_mars_loop.py::TestMarsRLLoop::test_solver_crash_returns_error_result FAILED [ 33%]
+test_mars_loop.py::TestLogicVerifier::test_valid_python_passes PASSED    [ 41%]
+test_mars_loop.py::TestLogicVerifier::test_syntax_error_fails PASSED     [ 50%]
+test_mars_loop.py::TestLogicVerifier::test_empty_response_fails FAILED   [ 58%]
+test_mars_loop.py::TestLogicVerifier::test_repetitive_response_fails FAILED [ 66%]
+test_mars_loop.py::TestLogicVerifier::test_unclosed_codeblock_fails FAILED [ 75%]
+test_mars_loop.py::TestLogicVerifier::test_plain_text_research_passes PASSED [ 83%]
+test_mars_loop.py::TestMarsLoopStream::test_stream_yields_response_on_success FAILED [ 91%]
+test_mars_loop.py::TestMarsLoopStream::test_stream_yields_error_on_loop_crash PASSED [100%]
+
+=================================== FAILURES ===================================
+_________________ TestMarsRLLoop.test_solver_passes_first_try __________________
+
+self = <test_mars_loop.TestMarsRLLoop object at 0x77fa92f3a990>
+
+    def test_solver_passes_first_try(self):
+        """Verifier passes immediately ΓÇö Corrector should NOT be called."""
+        from mars_loop import MarsRLLoop
+    
+        solver = make_solver("def hello(): return 'hello'")
+        verifier = self._make_passing_verifier()
+        corrector = make_corrector("should not be called")
+    
+        loop = MarsRLLoop(solver, verifier, corrector, max_iter=2)
+        result = loop.run("Write a hello function")
+    
+>       assert result.iterations == 1
+E       AssertionError: assert <MagicMock name='mock.observe()()().iterations' id='131918088146960'> == 1
+E        +  where <MagicMock name='mock.observe()()().iterations' id='131918088146960'> = <MagicMock name='mock.observe()()()' id='131918088108560'>.iterations
+
+test_mars_loop.py:104: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     MarsLoop:mars_loop.py:33 [MarsLoop] Langfuse tracing enabled
+______________ TestMarsRLLoop.test_solver_fails_corrector_invoked ______________
+
+self = <test_mars_loop.TestMarsRLLoop object at 0x77fa92bae8d0>
+
+    def test_solver_fails_corrector_invoked(self):
+        """Verifier fails first, Corrector is invoked, then verifier passes."""
+        from mars_loop import MarsRLLoop
+    
+        solver = make_solver("def hello(  # broken")
+        verifier = self._make_first_fail_then_pass_verifier()
+        corrector = make_corrector("def hello(): return 'hello'")
+    
+        loop = MarsRLLoop(solver, verifier, corrector, max_iter=2)
+        result = loop.run("Write a hello function")
+    
+>       assert result.corrector_invoked is True
+E       AssertionError: assert <MagicMock name='mock.observe()()().corrector_invoked' id='131918088404304'> is True
+E        +  where <MagicMock name='mock.observe()()().corrector_invoked' id='131918088404304'> = <MagicMock name='mock.observe()()()' id='131918088108560'>.corrector_invoked
+
+test_mars_loop.py:121: AssertionError
+_________________ TestMarsRLLoop.test_max_iterations_respected _________________
+
+self = <test_mars_loop.TestMarsRLLoop object at 0x77fa92bac110>
+
+    def test_max_iterations_respected(self):
+        """Verifier always fails ΓÇö loop should exit at max_iter without hanging."""
+        from mars_loop import MarsRLLoop
+    
+        solver = make_solver("bad code")
+        verifier = self._make_failing_verifier()
+        corrector = make_corrector("still bad code")
+    
+        loop = MarsRLLoop(solver, verifier, corrector, max_iter=2)
+        result = loop.run("Write something")
+    
+        # Should not raise; should exit gracefully
+>       assert result.iterations >= 1
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: '>=' not supported between instances of 'MagicMock' and 'int'
+
+test_mars_loop.py:144: TypeError
+____________ TestMarsRLLoop.test_solver_crash_returns_error_result _____________
+
+self = <test_mars_loop.TestMarsRLLoop object at 0x77fa92bacfd0>
+
+    def test_solver_crash_returns_error_result(self):
+        """If Solver crashes, loop returns a graceful error result."""
+        from mars_loop import MarsRLLoop
+    
+        solver = MagicMock()
+        solver.run.side_effect = RuntimeError("Ollama connection refused")
+        verifier = self._make_passing_verifier()
+        corrector = make_corrector("won't be called")
+    
+        loop = MarsRLLoop(solver, verifier, corrector, max_iter=2)
+        result = loop.run("Write something")
+    
+>       assert "Solver failed" in result.response
+E       AssertionError: assert 'Solver failed' in <MagicMock name='mock.observe()()().response' id='131918088402896'>
+E        +  where <MagicMock name='mock.observe()()().response' id='131918088402896'> = <MagicMock name='mock.observe()()()' id='131918088108560'>.response
+
+test_mars_loop.py:161: AssertionError
+_________________ TestLogicVerifier.test_empty_response_fails __________________
+
+self = <test_mars_loop.TestLogicVerifier object at 0x77fa92bde310>
+
+    def test_empty_response_fails(self):
+        v = self._make_verifier()
+        result = v.verify("Write something", "")
+>       assert result.passed is False
+E       AssertionError: assert True is False
+E        +  where True = VerifierResult(passed=True, reason='Coherence: Response is empty or too short', score=0.75).passed
+
+test_mars_loop.py:199: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     Verifier:verifier_agent.py:67 [Verifier] Verifying response (0 chars)...
+WARNING  Verifier:verifier_agent.py:77 [Verifier] Coherence fail: Response is empty or too short
+INFO     Verifier:verifier_agent.py:106 [Verifier] Score: 0.75 | Passed: True | Reason: Coherence: Response is empty or too short
+_______________ TestLogicVerifier.test_repetitive_response_fails _______________
+
+self = <test_mars_loop.TestLogicVerifier object at 0x77fa92bdd310>
+
+    def test_repetitive_response_fails(self):
+        v = self._make_verifier()
+        repeated = "\n".join(["Hello there!"]) * 20  # same line 20 times
+        result = v.verify("Say hello once", repeated)
+>       assert result.passed is False
+E       AssertionError: assert True is False
+E        +  where True = VerifierResult(passed=True, reason='All checks passed.', score=1.0).passed
+
+test_mars_loop.py:206: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     Verifier:verifier_agent.py:67 [Verifier] Verifying response (240 chars)...
+INFO     Verifier:verifier_agent.py:106 [Verifier] Score: 1.00 | Passed: True | Reason: All checks passed.
+_______________ TestLogicVerifier.test_unclosed_codeblock_fails ________________
+
+self = <test_mars_loop.TestLogicVerifier object at 0x77fa92bdd650>
+
+    def test_unclosed_codeblock_fails(self):
+        v = self._make_verifier()
+        result = v.verify(
+            "Write code",
+            "Here is your code:\n```python\ndef foo():\n    pass\n"  # No closing ```
+        )
+        assert result.passed is False
+>       assert "truncated" in result.reason.lower()
+E       AssertionError: assert 'truncated' in 'coherence: response suspiciously short (48 chars) | syntax: syntaxerror in block 1: invalid syntax (line 1)'
+E        +  where 'coherence: response suspiciously short (48 chars) | syntax: syntaxerror in block 1: invalid syntax (line 1)' = <built-in method lower of str object at 0x77fa92cec3f0>()
+E        +    where <built-in method lower of str object at 0x77fa92cec3f0> = 'Coherence: Response suspiciously short (48 chars) | Syntax: SyntaxError in block 1: invalid syntax (line 1)'.lower
+E        +      where 'Coherence: Response suspiciously short (48 chars) | Syntax: SyntaxError in block 1: invalid syntax (line 1)' = VerifierResult(passed=False, reason='Coherence: Response suspiciously short (48 chars) | Syntax: SyntaxError in block 1: invalid syntax (line 1)', score=0.35).reason
+
+test_mars_loop.py:215: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     Verifier:verifier_agent.py:67 [Verifier] Verifying response (49 chars)...
+WARNING  Verifier:verifier_agent.py:77 [Verifier] Coherence fail: Response suspiciously short (48 chars)
+WARNING  Verifier:verifier_agent.py:85 [Verifier] AST fail: SyntaxError in block 1: invalid syntax (line 1)
+INFO     Verifier:verifier_agent.py:106 [Verifier] Score: 0.35 | Passed: False | Reason: Coherence: Response suspiciously short (48 chars) | Syntax: SyntaxError in block 1: invalid syntax (line 1)
+__________ TestMarsLoopStream.test_stream_yields_response_on_success ___________
+
+self = <test_mars_loop.TestMarsLoopStream object at 0x77fa93864a10>
+
+    def test_stream_yields_response_on_success(self):
+        from mars_loop import MarsRLLoop, mars_loop_stream, VerifierResult
+    
+        solver = make_solver("def ok(): pass")
+        verifier = MagicMock()
+        verifier.verify.return_value = VerifierResult(passed=True, reason="OK", score=1.0)
+        corrector = make_corrector("unused")
+    
+        loop = MarsRLLoop(solver, verifier, corrector, max_iter=2)
+        updates = list(mars_loop_stream("Write a function", loop))
+    
+        types = [u["type"] for u in updates]
+>       assert "response" in types
+E       AssertionError: assert 'response' in ['status', 'error']
+
+test_mars_loop.py:246: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    MarsLoop:mars_loop.py:240 [MarsLoop Stream] Unhandled error: unsupported format string passed to MagicMock.__format__
+=========================== short test summary info ============================
+FAILED test_mars_loop.py::TestMarsRLLoop::test_solver_passes_first_try - Asse...
+FAILED test_mars_loop.py::TestMarsRLLoop::test_solver_fails_corrector_invoked
+FAILED test_mars_loop.py::TestMarsRLLoop::test_max_iterations_respected - Typ...
+FAILED test_mars_loop.py::TestMarsRLLoop::test_solver_crash_returns_error_result
+FAILED test_mars_loop.py::TestLogicVerifier::test_empty_response_fails - Asse...
+FAILED test_mars_loop.py::TestLogicVerifier::test_repetitive_response_fails
+FAILED test_mars_loop.py::TestLogicVerifier::test_unclosed_codeblock_fails - ...
+FAILED test_mars_loop.py::TestMarsLoopStream::test_stream_yields_response_on_success
+========================= 8 failed, 4 passed in 0.22s ==========================

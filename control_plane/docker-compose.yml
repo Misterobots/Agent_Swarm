@@ -1,45 +1,172 @@
 version: '3.8'
 
 services:
-  # --- Identity Service (SPIRE) ---
+  # --- Identity Service (SPIRE Server) ---
   spire-server:
     image: ghcr.io/spiffe/spire-server:1.10.1
     container_name: spire-server
+    hostname: spire-server
+    user: "0:0"
     ports:
       - "8081:8081"
     volumes:
       - ./config/spire:/etc/spire/server
-    command: [ "-config", "/etc/spire/server/server.conf" ]
+      - spire_data:/run/spire/data
+      - //var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["-config", "/etc/spire/server/server.conf"]
+    healthcheck:
+      test: ["CMD", "/opt/spire/bin/spire-server", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
     networks:
       - swarm_net
 
-  # --- Agent Memory (PostgreSQL) ---
+    restart: unless-stopped
+
+  # --- Langfuse Database (PostgreSQL) ---
   db:
     image: postgres:15-alpine
     container_name: postgres
     environment:
-      POSTGRES_USER: agno
-      POSTGRES_PASSWORD: agno_password
-      POSTGRES_DB: agno_memory
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse_password
+      POSTGRES_DB: langfuse
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     networks:
       - swarm_net
-  # --- AgentOS (Agno Control Plane) ---
-  # Temporarily disabled - requires custom build
-  # agno-control:
-  #   image: phidata/agno:latest
-  #   container_name: agno_control
-  #   environment:
-  #     - AGNO_DB_URL=postgresql://agno:agno_password@postgres:5432/agno_memory
-  #     - SPIRE_SERVER_URL=spire-server:8081
-  #   depends_on:
-  #     - db
-  #     - spire-server
-  #   networks:
-  #     - swarm_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+
+
+  # --- Langfuse Observability ---
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: clickhouse
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_DB=langfuse
+      - CLICKHOUSE_USER=langfuse
+      - CLICKHOUSE_PASSWORD=langfuse_password
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - swarm_net
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    container_name: langfuse-web
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    env_file:
+      - ../network.env
+    environment: &langfuse-env
+      # Database
+      - DATABASE_URL=postgresql://langfuse:langfuse_password@postgres:5432/langfuse
+      # ClickHouse
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://langfuse:langfuse_password@clickhouse:9000/langfuse
+      - CLICKHOUSE_USER=langfuse
+      - CLICKHOUSE_PASSWORD=langfuse_password
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      # Auth
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET:-changeme-langfuse-secret-32chars}
+      - NEXTAUTH_URL=http://${CONTROL_NODE_IP}:3000
+      - SALT=${LANGFUSE_SALT:-changeme-langfuse-salt}
+      - ENCRYPTION_KEY=${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=langfuse_redis_password
+      # S3/MinIO (Required for event storage)
+      - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_EVENT_UPLOAD_REGION=auto
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minio
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=miniosecret
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_EVENT_UPLOAD_PREFIX=events/
+      # Disable batch export and media upload for simpler setup
+      - LANGFUSE_S3_BATCH_EXPORT_ENABLED=false
+      - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=true
+      - TELEMETRY_ENABLED=false
+    ports:
+      - "3000:3000"
+    networks:
+      - swarm_net
+
+  # Langfuse v3 Worker: Processes ingestion queue -> ClickHouse
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    container_name: langfuse-worker
+    restart: unless-stopped
+    depends_on:
+      langfuse-web:
+        condition: service_started
+    environment: *langfuse-env
+    networks:
+      - swarm_net
+
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis_control
+    restart: unless-stopped
+    command: >
+      --requirepass langfuse_redis_password
+      --maxmemory-policy noeviction
+    networks:
+      - swarm_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "langfuse_redis_password", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_PASSWORD=miniosecret
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9190:9000"
+      - "9191:9001"
+    networks:
+      - swarm_net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 networks:
   swarm_net:
@@ -47,3 +174,6 @@ networks:
 
 volumes:
   pg_data:
+  spire_data:
+  clickhouse_data:
+  minio_data:

@@ -1,0 +1,1268 @@
+{
+  "version": "1.0.0",
+  "category": "logging",
+  "patterns": [
+    {
+      "id": "b7906ad82afdfb5b",
+      "subcategory": "structured-logging",
+      "name": "Structured Logging Detector",
+      "description": "Learns structured logging patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/structured-logging",
+          "patternId": "logging/structured-logging/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 1,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 13,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 57,
+          "column": 5
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 61,
+          "column": 5
+        },
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 60,
+          "column": 5
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 19,
+          "column": 9
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 21,
+          "column": 9
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 33,
+          "column": 9
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 41,
+          "column": 13
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 43,
+          "column": 13
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 7,
+          "column": 10
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 45,
+          "column": 24
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 65,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 68,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 87,
+          "column": 9
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 92,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 106,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 118,
+          "column": 13
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 134,
+          "column": 17
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 137,
+          "column": 17
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 147,
+          "column": 21
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 149,
+          "column": 13
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 15,
+          "column": 30
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 16,
+          "column": 33
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 19,
+          "column": 5
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 19,
+          "column": 21
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 23,
+          "column": 16
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 26,
+          "column": 17
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 27,
+          "column": 16
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 29,
+          "column": 5
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 34,
+          "column": 9
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 34,
+          "column": 54
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 37,
+          "column": 25
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 42,
+          "column": 13
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 46,
+          "column": 12
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 18,
+          "column": 14
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 34,
+          "column": 62
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 31,
+          "column": 5
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 41,
+          "column": 5
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 44,
+          "column": 5
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 65,
+          "column": 5
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 87,
+          "column": 13
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 92,
+          "column": 9
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 92,
+          "column": 22
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 94,
+          "column": 9
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 94,
+          "column": 24
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 96,
+          "column": 9
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 96,
+          "column": 21
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 16,
+          "column": 1
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 30,
+          "column": 13
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 38,
+          "column": 13
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 8,
+          "column": 10
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 27,
+          "column": 5
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 33,
+          "column": 9
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 78,
+          "column": 9
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 113,
+          "column": 9
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 177,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 198,
+          "column": 54
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 305,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 320,
+          "column": 29
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 333,
+          "column": 29
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 337,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 341,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 507,
+          "column": 13
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 533,
+          "column": 13
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 540,
+          "column": 13
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 408,
+          "column": 71
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 409,
+          "column": 67
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 13,
+          "column": 26
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 24,
+          "column": 56
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 18,
+          "column": 53
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 18,
+          "column": 71
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 93,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 112,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 117,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 131,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 153,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 181,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 12,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 210,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 347,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 370,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 387,
+          "column": 22
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 393,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 400,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 407,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 27
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 15,
+          "column": 43
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 347,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 349,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 351,
+          "column": 44
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 353,
+          "column": 44
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 395,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 470,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 472,
+          "column": 38
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 474,
+          "column": 40
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 706,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 738,
+          "column": 58
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "cc843e6d4e71142f",
+      "subcategory": "context-fields",
+      "name": "Context Fields Detector",
+      "description": "Learns logging context field patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/context-fields",
+          "patternId": "logging/context-fields/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.2,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 5,
+        "score": 0.83,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 15,
+          "column": 43
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 15,
+          "column": 75
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 25,
+          "column": 27
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 38,
+          "column": 23
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 49,
+          "column": 26
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 53,
+          "column": 27
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 56,
+          "column": 24
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 518,
+          "column": 35
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 182,
+          "column": 143
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 831,
+          "column": 49
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 436,
+          "column": 35
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 436,
+          "column": 61
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 436,
+          "column": 85
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 751,
+          "column": 207
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "668657b7b386415e",
+      "subcategory": "context-fields",
+      "name": "Context Fields Detector",
+      "description": "Learns logging context field patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/context-fields",
+          "patternId": "logging/context-fields/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.31,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 17,
+          "column": 19
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 29,
+          "column": 19
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 40,
+          "column": 23
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 18,
+          "column": 23
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 31,
+          "column": 16
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 130,
+          "column": 45
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 36,
+          "column": 27
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 50,
+          "column": 13
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 54,
+          "column": 13
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 57,
+          "column": 13
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 58,
+          "column": 31
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 70,
+          "column": 20
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 26,
+          "column": 57
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 324,
+          "column": 65
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 189,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 214,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 215,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 216,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 217,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 218,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 219,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 220,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 221,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 236,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 273,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 303,
+          "column": 27
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 438,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 439,
+          "column": 37
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "58853821e3742de7",
+      "subcategory": "log-levels",
+      "name": "Log Levels Detector",
+      "description": "Learns log level patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/log-levels",
+          "patternId": "logging/log-levels/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.14,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 34,
+          "column": 62
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 408,
+          "column": 71
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 409,
+          "column": 67
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 18,
+          "column": 53
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 18,
+          "column": 71
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 25,
+          "column": 27
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 15,
+          "column": 43
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 399,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 402,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 407,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 414,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "eac80a69376e8943",
+      "subcategory": "metrics",
+      "name": "Metrics Detector",
+      "description": "Learns metrics patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/metrics",
+          "patternId": "logging/metrics/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.83,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 50,
+          "column": 1
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "4965e11e70c35f02",
+      "subcategory": "metrics",
+      "name": "Metrics Detector",
+      "description": "Learns metrics patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/metrics",
+          "patternId": "logging/metrics/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.03,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.82,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\metrics.py",
+          "line": 15,
+          "column": 18
+        },
+        {
+          "file": "agents\\metrics.py",
+          "line": 7,
+          "column": 15
+        },
+        {
+          "file": "agents\\metrics.py",
+          "line": 23,
+          "column": 17
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "9ab60623df0b170a",
+      "subcategory": "context-fields",
+      "name": "Context Fields Detector",
+      "description": "Learns logging context field patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/context-fields",
+          "patternId": "logging/context-fields/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.8160000000000001,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 71,
+          "column": 15
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 48,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 54,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8ad6c712f779aeaf",
+      "subcategory": "health-checks",
+      "name": "Health Checks Detector",
+      "description": "Learns health check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/health-checks",
+          "patternId": "logging/health-checks/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.7815384615384615,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 84,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 426,
+          "column": 40
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 121,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f4caf4d112ee3bae",
+      "subcategory": "health-checks",
+      "name": "Health Checks Detector",
+      "description": "Learns health check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/health-checks",
+          "patternId": "logging/health-checks/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.32,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 140,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 141,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 66,
+          "column": 27
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 26,
+          "column": 38
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 28,
+          "column": 24
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 268,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 314,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 398,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 413,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 419,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 554,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 558,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 559,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 850,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 853,
+          "column": 13
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "ee685d4524022f40",
+      "subcategory": "health-checks",
+      "name": "Health Checks Detector",
+      "description": "Learns health check patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/health-checks",
+          "patternId": "logging/health-checks/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7775,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 338,
+          "column": 102
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 338,
+          "column": 112
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "40a77fedac71c80b",
+      "subcategory": "log-levels",
+      "name": "Log Levels Detector",
+      "description": "Learns log level patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/log-levels",
+          "patternId": "logging/log-levels/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.807962962962963,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 749,
+          "column": 59
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "26ee5ab3c1de665d",
+      "subcategory": "metrics",
+      "name": "Metrics Detector",
+      "description": "Learns metrics patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "logging/metrics",
+          "patternId": "logging/metrics/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 895,
+          "column": 12
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:08.450Z",
+  "checksum": "2e47991c13747595"
+}
