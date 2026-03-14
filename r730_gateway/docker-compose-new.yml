@@ -1,0 +1,269 @@
+version: '3.8'
+
+# R730 Gateway & Ops Hub Docker Compose
+# Hosts: Traefik (central routing), Monitoring (Prometheus, Loki, Grafana), Logging, Ollama, Open-WebUI
+# Compute services (Ollama, BMO Voice, ComfyUI, etc.) remain on Justin-PC @ 192.168.2.101
+
+services:
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # REVERSE PROXY & GATEWAY LAYER
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik-gateway
+    hostname: traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"        # TODO: Configure HTTPS with certificates in production
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--providers.docker.network=ai_lab_net"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--log.level=INFO"
+    ports:
+      - "80:80"                      # HTTP traffic (primary gateway)
+      - "443:443"                    # HTTPS (for future use)
+      - "8080:8080"                  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "justin-pc:192.168.2.101"    # Enable Traefik to reach Justin-PC by hostname
+      - "control-node:192.168.2.102" # For potential future routing
+    networks:
+      - ai_lab_net
+    labels:
+      - "com.example.description=Agentic Hive Central Gateway"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # METRICS & OBSERVABILITY
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-r730
+    hostname: prometheus-r730
+    restart: unless-stopped
+    volumes:
+      - ./config/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=90d'  # Keep 3 months of metrics
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prometheus.entrypoints=web"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki-r730
+    hostname: loki-r730
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki:/etc/loki
+      - loki_data:/tmp/loki
+    command: -config.file=/etc/loki/loki.yml
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.loki.rule=PathPrefix(`/loki`)"
+      - "traefik.http.routers.loki.entrypoints=web"
+      - "traefik.http.services.loki.loadbalancer.server.port=3100"
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail-r730
+    hostname: promtail-r730
+    restart: unless-stopped
+    volumes:
+      - ./config/promtail:/etc/promtail
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/promtail.yml
+    networks:
+      - ai_lab_net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor-r730
+    hostname: cadvisor-r730
+    restart: unless-stopped
+    ports:
+      - "8888:8080"  # Use 8888 to avoid conflict with Traefik dashboard @ 8080
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cadvisor.rule=PathPrefix(`/cadvisor`)"
+      - "traefik.http.routers.cadvisor.entrypoints=web"
+      - "traefik.http.services.cadvisor.loadbalancer.server.port=8080"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-r730
+    hostname: grafana-r730
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # Port 3001 to avoid conflict with Langfuse @ 3000 and Open-WebUI
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_SECRET_KEY=hive_secret_key_for_persistence_v1
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_LOG_LEVEL=info
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # TASK QUEUE & PERSISTENCE
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-r730
+    hostname: redis-r730
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes  # Enable AOF persistence
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.redis.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.redis.entrypoints=web"
+      - "traefik.tcp.services.redis.loadbalancer.server.port=6379"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # INFERENCE SERVICES (Secondary, lower priority than Justin-PC)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-r730
+    hostname: ollama-r730
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      # RTX 3070 Ti settings (8GB VRAM)
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_GPU_OVERHEAD=512MiB
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_KEEP_ALIVE=10m
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ollama.rule=PathPrefix(`/ollama`)"
+      - "traefik.http.routers.ollama.entrypoints=web"
+      - "traefik.http.services.ollama.loadbalancer.server.port=11434"
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui-r730
+    hostname: open-webui
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    environment:
+      # Point to local Ollama
+      - OLLAMA_BASE_URL=http://ollama:11434
+      # Disable default OpenAI integration
+      - OPENAI_API_BASE_URL=
+      - OPENAI_API_KEY=
+      # UI customization
+      - WEBUI_DEFAULT_MODELS=nemotron-mini
+      - WEBUI_NAME=MarsRL Hive Gateway
+      - WEBUI_URL=http://192.168.2.103:3000
+    volumes:
+      - open-webui_data:/app/backend/data
+    ports:
+      - "3000:8080"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.open-webui.rule=PathPrefix(`/webui`)"
+      - "traefik.http.routers.open-webui.entrypoints=web"
+      - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # ROUTING CONFIGURATION FOR JUSTIN-PC SERVICES (via Traefik)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # 
+  # Justin-PC containers (comfyui, bmo-voice, agent-runtime, etc.) are NOT defined here.
+  # Instead, Traefik discovers them via Docker API from Justin-PC.
+  #
+  # For local testing or specific routing, uncomment below and configure labels:
+  #
+  # Example routing to Justin-PC services:
+  # - Agent Runtime: traefik rule = PathPrefix(`/swarm`)  → justin-pc:8008
+  # - ComfyUI:       traefik rule = PathPrefix(`/comfy`)  → justin-pc:8188
+  # - OpenHands:     traefik rule = PathPrefix(`/hands`)  → justin-pc:3000
+  #
+  # These are configured via docker-compose labels on Justin-PC containers
+  # and auto-discovered by Traefik.
+
+networks:
+  ai_lab_net:
+    driver: bridge
+    name: ai_lab_net
+
+volumes:
+  prometheus_data:
+    driver: local
+  loki_data:
+    driver: local
+  grafana_data:
+    driver: local
+  redis_data:
+    driver: local
+  ollama_models:
+    driver: local
+  open-webui_data:
+    driver: local

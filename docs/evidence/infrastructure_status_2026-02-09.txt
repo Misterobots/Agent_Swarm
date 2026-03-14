@@ -1,0 +1,45 @@
+# Infrastructure Status Report
+
+**Date**: 2026-02-09
+**Generated**: Automatic Infrastructure Check
+
+## Control Plane (192.168.2.102)
+
+### Container Status
+
+| Container      | Image                           | Status    | Ports              |
+| :------------- | :------------------------------ | :-------- | :----------------- |
+| spire-server   | ghcr.io/spiffe/spire-server     | Running   | 8081               |
+| postgres       | postgres:15-alpine              | Healthy   | 5432               |
+| clickhouse     | clickhouse/clickhouse-server    | Healthy   | 8123, 9000         |
+| langfuse-web   | langfuse/langfuse:3             | Running   | 3000               |
+| minio          | minio/minio:latest              | Healthy   | 9190, 9191         |
+| redis_control  | redis:7.2-alpine                | Running   | 6379               |
+
+### Health Checks
+
+- PostgreSQL: `pg_isready -U ${POSTGRES_USER}` ✅
+- ClickHouse: `wget http://localhost:8123/ping` ✅
+- MinIO: `mc ready local` ✅
+- Redis: `redis-cli -a password ping` ✅
+
+### Network Configuration
+
+- Network: `swarm_net` (bridge driver)
+- All services on same Docker network
+- External access via host port mapping
+
+### Volume Mounts
+
+- `pg_data`: PostgreSQL persistent data
+- `spire_data`: SPIRE server data
+- `clickhouse_data`: ClickHouse trace storage
+- `minio_data`: MinIO blob storage
+
+## Verification
+
+All Control Plane services are operational and accessible:
+- Langfuse UI: http://192.168.2.102:3000 ✅
+- MinIO Console: http://192.168.2.102:9191 ✅
+- PostgreSQL: :5432 ✅
+- SPIRE Server: :8081 ✅

@@ -1,0 +1,21 @@
+NAMES               STATUS                         IMAGE
+spire-agent         Up About an hour (unhealthy)   ghcr.io/spiffe/spire-agent:1.10.1
+agent_runtime       Up About an hour               home-ai-lab/agent-runtime:latest
+openhands_sandbox   Up About an hour               custom-openhands:latest
+spire-server        Up 2 hours (healthy)           ghcr.io/spiffe/spire-server:1.10.1
+agent_ui            Up 9 hours                     3c651f1b65bf
+authentik_worker    Up 9 hours (healthy)           ghcr.io/goauthentik/server:2024.2.1
+authentik_server    Up 9 hours (healthy)           ghcr.io/goauthentik/server:2024.2.1
+authentik_db        Up 9 hours                     postgres:12-alpine
+redis_queue         Up 9 hours                     redis:alpine
+authentik_redis     Up 9 hours                     redis:alpine
+cadvisor            Up 9 hours (healthy)           gcr.io/cadvisor/cadvisor:latest
+ollama_gpu          Up 9 hours                     ollama/ollama:latest
+loki                Up 9 hours                     grafana/loki:latest
+agent_ide_devops    Up 9 hours                     lscr.io/linuxserver/code-server:latest
+agent_ide_coding    Up 9 hours                     lscr.io/linuxserver/code-server:latest
+comfyui_gpu         Up 9 hours                     yanwk/comfyui-boot:cu121
+prometheus          Up 9 hours                     prom/prometheus:latest
+grafana             Up 9 hours                     grafana/grafana:latest
+traefik             Up 9 hours                     traefik:v3.0
+promtail            Up 9 hours                     grafana/promtail:latest

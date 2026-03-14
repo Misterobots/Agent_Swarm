@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://host.docker.internal:8188")
+COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
 MODEL_NAME = "qwen2.5-coder:14b"
 
 # Directories (Mapped Volumes)
@@ -21,7 +21,7 @@ COMFY_INPUT_DIR = "/app/comfy_io/input"
 COMFY_OUTPUT_DIR = "/app/comfy_io/output"
 TEMPLATE_DIR = "/app/agents/templates"
 
-def generate_3d_model(image_path: str, workflow_name: str = "workflow_hunyuan_paint.json") -> str:
+def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.json") -> str:
     """
     Takes an input image, copies it to ComfyUI input, and triggers a 3D generation workflow.
     
@@ -117,7 +117,7 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_hunyuan_pa
     logger.info("--- [Forge] Waiting for 3D generation (Max 20 Minutes)... ---")
     time.sleep(5) 
     
-    timeout_seconds = 1200 # 20 Minutes (Increased from 10)
+    timeout_seconds = 1800 # 30 Minutes (Increased from 20)
     start_time = time.time()
     
     while (time.time() - start_time) < timeout_seconds:

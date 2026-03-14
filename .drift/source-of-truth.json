@@ -1,0 +1,101 @@
+{
+  "version": "0.1.0-beta",
+  "schemaVersion": "2.0.0",
+  "createdAt": "2026-02-02T02:57:10.008Z",
+  "updatedAt": "2026-02-02T14:30:00.000Z",
+  "project": {
+    "id": "385328f7-d204-450d-bbbc-b66b8e492cf3",
+    "name": "Home_AI_Lab",
+    "rootPath": "C:\\Users\\panca\\Documents\\GitHub\\Home_AI_Lab"
+  },
+  "baseline": {
+    "scanId": "d197c912",
+    "scannedAt": "2026-02-08T08:55:00.000Z",
+    "fileCount": 42,
+    "patternCount": 412,
+    "approvedCount": 227,
+    "categories": {
+      "security": 313,
+      "errors": 984,
+      "structural": 612,
+      "components": 788,
+      "logging": 791,
+      "testing": 373,
+      "data-access": 734,
+      "config": 134,
+      "types": 850,
+      "documentation": 45,
+      "performance": 372,
+      "auth": 165,
+      "styling": 536,
+      "accessibility": 160,
+      "api": 8
+    },
+    "checksum": "0fa5fb781244490f"
+  },
+  "features": {
+    "callGraph": {
+      "enabled": true,
+      "builtAt": "2026-02-02T02:57:09.633Z",
+      "stats": {
+        "functions": 86,
+        "callSites": 836,
+        "resolvedCalls": 109,
+        "entryPoints": 86,
+        "dataAccessors": 17,
+        "filesProcessed": 24
+      }
+    },
+    "testTopology": {
+      "enabled": true,
+      "builtAt": "2026-02-02T02:57:09.662Z",
+      "stats": {
+        "totalTests": 0,
+        "testFiles": 0,
+        "filesAnalyzed": 24,
+        "extractedFiles": 0
+      }
+    },
+    "coupling": {
+      "enabled": true,
+      "builtAt": "2026-02-02T02:57:09.688Z",
+      "stats": {
+        "modules": 0,
+        "cycles": 0,
+        "hotspots": 0,
+        "healthScore": 100,
+        "filesAnalyzed": 24
+      }
+    },
+    "dna": {
+      "enabled": true,
+      "builtAt": "2026-02-02T02:57:09.698Z",
+      "stats": {
+        "genes": 10,
+        "mutations": 0,
+        "healthScore": 60,
+        "filesAnalyzed": 0,
+        "componentFiles": 0,
+        "backendFiles": 0
+      }
+    },
+    "memory": {
+      "enabled": true,
+      "builtAt": "2026-02-02T02:57:10.005Z",
+      "stats": {
+        "initialized": 1
+      }
+    }
+  },
+  "settings": {
+    "autoApproveThreshold": 0.85,
+    "autoApproveEnabled": true
+  },
+  "history": [
+    {
+      "action": "setup_complete",
+      "timestamp": "2026-02-02T02:57:10.008Z",
+      "details": "Initial setup: 412 patterns, 227 approved"
+    }
+  ]
+}

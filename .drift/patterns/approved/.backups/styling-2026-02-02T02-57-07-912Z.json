@@ -1,0 +1,1304 @@
+{
+  "version": "1.0.0",
+  "category": "styling",
+  "patterns": [
+    {
+      "id": "454952a0abab06d8",
+      "subcategory": "typography",
+      "name": "Typography Detector",
+      "description": "Learns typography patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/typography",
+          "patternId": "styling/typography/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.26,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 41,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 720,
+          "column": 38
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 721,
+          "column": 70
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 734,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 250,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 721,
+          "column": 38
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 616,
+          "column": 70
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 646,
+          "column": 59
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 686,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 730,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 920,
+          "column": 51
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 10,
+          "column": 13
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.252Z",
+        "approvedAt": "2026-02-02T02:56:42.252Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "aaa00ea65a186afd",
+      "subcategory": "typography",
+      "name": "Typography Detector",
+      "description": "Learns typography patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/typography",
+          "patternId": "styling/typography/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.72,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 16
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 35
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 55
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 78
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 19
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 40
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 58
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 77
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 44,
+          "column": 27
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 44,
+          "column": 52
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 44,
+          "column": 77
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 44,
+          "column": 97
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 60
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 80
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 101
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 122
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 16
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 54
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 77
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 58
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 77
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 38
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 58
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 80
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 97
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 118
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 137
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 154
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 169,
+          "column": 89
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 805,
+          "column": 40
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.330Z",
+        "approvedAt": "2026-02-02T02:56:42.330Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "70bf3e3fe5f5aa5d",
+      "subcategory": "class-naming",
+      "name": "Class Naming Detector",
+      "description": "Learns class naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/class-naming",
+          "patternId": "styling/class-naming/decorator"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 37,
+          "column": 6
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.423Z",
+        "approvedAt": "2026-02-02T02:56:42.423Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "bb66cf4d0639f621",
+      "subcategory": "tailwind-patterns",
+      "name": "Tailwind Patterns Detector",
+      "description": "Learns Tailwind CSS patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/tailwind-patterns",
+          "patternId": "styling/tailwind-patterns/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.05,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 41,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 812,
+          "column": 5
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 10,
+          "column": 13
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.505Z",
+        "approvedAt": "2026-02-02T02:56:42.505Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "33368affae760be0",
+      "subcategory": "tailwind-patterns",
+      "name": "Tailwind Patterns Detector",
+      "description": "Learns Tailwind CSS patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/tailwind-patterns",
+          "patternId": "styling/tailwind-patterns/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.36,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 16
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 35
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 55
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 48,
+          "column": 78
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 19
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 40
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 58
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 50,
+          "column": 77
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 44,
+          "column": 27
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 44,
+          "column": 52
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 44,
+          "column": 77
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 44,
+          "column": 97
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 60
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 80
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 101
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 48,
+          "column": 122
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 16
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 54
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 51,
+          "column": 77
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 40
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 58
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 54,
+          "column": 77
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 38
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 58
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 80
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 97
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 118
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 137
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 154
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 305,
+          "column": 50
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 305,
+          "column": 73
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.591Z",
+        "approvedAt": "2026-02-02T02:56:42.591Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "3aa52e788240b0f9",
+      "subcategory": "color-usage",
+      "name": "Color Usage Detector",
+      "description": "Learns color usage patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/color-usage",
+          "patternId": "styling/color-usage/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.7,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 225,
+          "column": 69
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 172,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 177,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 185,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 187,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 190,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 200,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 202,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 207,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 222,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 228,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 229,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 247,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 258,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 263,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 270,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 271,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 274,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 692,
+          "column": 20
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 721,
+          "column": 52
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 735,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 237,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 246,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 255,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 262,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 684,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 694,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 726,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 230,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 239,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 248,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 257,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 275,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 680,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 736,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.671Z",
+        "approvedAt": "2026-02-02T02:56:42.671Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "94296c343cc1c3c8",
+      "subcategory": "class-naming",
+      "name": "Class Naming Detector",
+      "description": "Learns class naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/class-naming",
+          "patternId": "styling/class-naming/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.14,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.8533333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 145,
+          "column": 63
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 367,
+          "column": 44
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 63,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 63,
+          "column": 47
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 69,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 70,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 164,
+          "column": 49
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.746Z",
+        "approvedAt": "2026-02-02T02:56:42.746Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d8817738ba2a2fd5",
+      "subcategory": "z-index-scale",
+      "name": "Z-Index Scale Detector",
+      "description": "Learns z-index scale patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/z-index-scale",
+          "patternId": "styling/z-index-scale/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 122,
+          "column": 28
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.839Z",
+        "approvedAt": "2026-02-02T02:56:42.839Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "44261fbd586f18f2",
+      "subcategory": "class-naming",
+      "name": "Class Naming Detector",
+      "description": "Learns class naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/class-naming",
+          "patternId": "styling/class-naming/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8533333333333333,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 20,
+          "column": 67
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.927Z",
+        "approvedAt": "2026-02-02T02:56:42.927Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "5b4e6d479af2b3d8",
+      "subcategory": "color-usage",
+      "name": "Color Usage Detector",
+      "description": "Learns color usage patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/color-usage",
+          "patternId": "styling/color-usage/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 60,
+          "column": 39
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:43.007Z",
+        "approvedAt": "2026-02-02T02:56:43.007Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "589df05edb01388b",
+      "subcategory": "typography",
+      "name": "Typography Detector",
+      "description": "Learns typography patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/typography",
+          "patternId": "styling/typography/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 103,
+          "column": 74
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 219,
+          "column": 83
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 167,
+          "column": 22
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 167,
+          "column": 39
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:43.092Z",
+        "approvedAt": "2026-02-02T02:56:43.092Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "5a2d88712469a679",
+      "subcategory": "tailwind-patterns",
+      "name": "Tailwind Patterns Detector",
+      "description": "Learns Tailwind CSS patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/tailwind-patterns",
+          "patternId": "styling/tailwind-patterns/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 103,
+          "column": 74
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 219,
+          "column": 83
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:43.183Z",
+        "approvedAt": "2026-02-02T02:56:43.183Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d02dcf7c7ff3a4fc",
+      "subcategory": "spacing-scale",
+      "name": "Spacing Scale Detector",
+      "description": "Learns spacing scale patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/spacing-scale",
+          "patternId": "styling/spacing-scale/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.8999999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 304,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 682,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 728,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 738,
+          "column": 39
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:43.266Z",
+        "approvedAt": "2026-02-02T02:56:43.266Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "3afea67f69420701",
+      "subcategory": "spacing-scale",
+      "name": "Spacing Scale Detector",
+      "description": "Learns spacing scale patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/spacing-scale",
+          "patternId": "styling/spacing-scale/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.8999999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 305,
+          "column": 16
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 305,
+          "column": 30
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 305,
+          "column": 52
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 305,
+          "column": 75
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 719,
+          "column": 90
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 689,
+          "column": 30
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:43.354Z",
+        "approvedAt": "2026-02-02T02:56:43.354Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "66f0efe75804313a",
+      "subcategory": "z-index-scale",
+      "name": "Z-Index Scale Detector",
+      "description": "Learns z-index scale patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/z-index-scale",
+          "patternId": "styling/z-index-scale/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 89,
+          "column": 41
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:43.432Z",
+        "approvedAt": "2026-02-02T02:56:43.432Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "1599d3654a8c794d",
+      "subcategory": "responsive",
+      "name": "Responsive Detector",
+      "description": "Learns responsive design patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "styling/responsive",
+          "patternId": "styling/responsive/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.09,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 39,
+          "column": 30
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 41,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 119,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 125,
+          "column": 39
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 126,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 128,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 937,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 51,
+          "column": 32
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:43.546Z",
+        "approvedAt": "2026-02-02T02:56:43.546Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:07.761Z",
+  "checksum": "8c22fb4776545a18"
+}

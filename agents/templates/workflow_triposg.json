@@ -1,0 +1,55 @@
+{
+  "10": {
+    "inputs": {
+      "image": "{{INPUT_IMAGE}}",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "20": {
+    "inputs": {
+      "image": ["10", 0]
+    },
+    "class_type": "TripoSGPrepareImage",
+    "_meta": {
+      "title": "TripoSG Prepare Image"
+    }
+  },
+  "30": {
+    "inputs": {
+      "model": "VAST-AI/TripoSG"
+    },
+    "class_type": "TripoSGModelLoader",
+    "_meta": {
+      "title": "TripoSG Model Loader"
+    }
+  },
+  "40": {
+    "inputs": {
+      "model": ["30", 0],
+      "image": ["20", 0],
+      "seed": "{{SEED}}",
+      "steps": 75,
+      "cfg": 4.0
+    },
+    "class_type": "TripoSGInference",
+    "_meta": {
+      "title": "TripoSG Inference (High Quality)"
+    }
+  },
+  "110": {
+    "inputs": {
+      "trimesh": ["40", 0],
+      "filename_prefix": "3D/TripoSG",
+      "file_format": "glb",
+      "save_file": true
+    },
+    "class_type": "SaveTrimesh",
+    "_meta": {
+      "title": "Save Trimesh (GLB)"
+    }
+  }
+}

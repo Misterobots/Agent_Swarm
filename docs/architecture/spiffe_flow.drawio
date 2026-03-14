@@ -1,0 +1,159 @@
+<mxfile host="65bd71144e">
+    <diagram id="spiffe-flow" name="SPIFFE-SPIRE Identity Flow">
+        <mxGraphModel dx="642" dy="258" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1100" pageHeight="760" background="#0d1117" math="0" shadow="1">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="SPIFFE / SPIRE Zero-Trust Identity Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=16;fontStyle=1;fontColor=#c4b5fd;" parent="1" vertex="1">
+                    <mxGeometry y="12" width="1100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="sub" value="How workloads prove their identity without passwords — using short-lived X.509 SVIDs issued by SPIRE" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontColor=#6b7280;" parent="1" vertex="1">
+                    <mxGeometry y="40" width="1100" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="cp-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#8b5cf6;strokeWidth=2;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="75" width="340" height="230" as="geometry"/>
+                </mxCell>
+                <mxCell id="cp-title" value="🏛️  Control Plane — Dell Wyse 5070" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=12;fontStyle=1;fontColor=#c4b5fd;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="80" width="340" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="cp-ip" value="192.168.2.102" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;fontColor=#6d28d9;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="100" width="340" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="spire-srv-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3b0764;strokeColor=#a855f7;strokeWidth=2;arcSize=6;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="124" width="300" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="spire-srv-title" value="SPIRE Server :8081" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=12;fontStyle=1;fontColor=#e9d5ff;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="128" width="300" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="spire-ca" value="🔐 Root CA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#581c87;strokeColor=#c4b5fd;fontSize=11;fontStyle=1;fontColor=#f3e8ff;" parent="1" vertex="1">
+                    <mxGeometry x="466" y="158" width="168" height="32" as="geometry"/>
+                </mxCell>
+                <mxCell id="spire-reg" value="📋 Node Registration DB" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;fontColor=#d8b4fe;" parent="1" vertex="1">
+                    <mxGeometry x="412" y="202" width="276" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="spire-ttl" value="⏱️ Short-lived SVIDs (auto-rotate)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;fontColor=#d8b4fe;" parent="1" vertex="1">
+                    <mxGeometry x="412" y="220" width="276" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="spire-type" value="📜 X.509 SVID  |  Trust domain: spiffe://home-lab" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;fontColor=#d8b4fe;" parent="1" vertex="1">
+                    <mxGeometry x="412" y="238" width="276" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="spire-port" value="🌐 Port 8081 (gRPC bundle endpoint)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;fontColor=#d8b4fe;" parent="1" vertex="1">
+                    <mxGeometry x="412" y="256" width="276" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="pc-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0c1a3a;strokeColor=#3b82f6;strokeWidth=2;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="380" width="460" height="320" as="geometry"/>
+                </mxCell>
+                <mxCell id="pc-title" value="💻  Primary Inference — Hive PC (5060 Ti)" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=12;fontStyle=1;fontColor=#93c5fd;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="385" width="460" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent1-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e3a5f;strokeColor=#60a5fa;strokeWidth=1;arcSize=6;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="418" width="200" height="116" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent1-title" value="SPIRE Agent ✅ Enrolled" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontStyle=1;fontColor=#93c5fd;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="422" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent1-sock" value="📍 Unix Socket" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#bfdbfe;" parent="1" vertex="1">
+                    <mxGeometry x="58" y="446" width="185" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent1-sockpath" value="/var/run/spire/agent.sock" style="text;html=1;strokeColor=none;fillColor=#0c1a3a;strokeColor=#3b82f6;align=center;fontSize=9;fontColor=#60a5fa;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="58" y="462" width="185" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent1-attest" value="🔑 Node attestation: x509pop" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#bfdbfe;" parent="1" vertex="1">
+                    <mxGeometry x="58" y="484" width="185" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent1-workload" value="🐳 Workload attestor: Docker" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#bfdbfe;" parent="1" vertex="1">
+                    <mxGeometry x="58" y="502" width="185" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent1-rotate" value="🔁 Auto-rotation: enabled" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#bfdbfe;" parent="1" vertex="1">
+                    <mxGeometry x="58" y="520" width="185" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0d2137;strokeColor=#22c55e;strokeWidth=1;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="418" width="200" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl-title" value="Enrolled Workloads" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontStyle=1;fontColor=#86efac;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="422" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl-1" value="agent-runtime → spiffe://home-lab/agent-runtime" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#6ee7b7;" parent="1" vertex="1">
+                    <mxGeometry x="278" y="448" width="185" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl-2" value="ollama_gpu → spiffe://home-lab/ollama" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#6ee7b7;" parent="1" vertex="1">
+                    <mxGeometry x="278" y="478" width="185" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl-3" value="spire-agent → spiffe://home-lab/spire-agent" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#6ee7b7;" parent="1" vertex="1">
+                    <mxGeometry x="278" y="508" width="185" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="pyspiffe" value="py-spiffe library&#10;Fetches SVID on startup&#10;Rotates automatically" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e3a5f;strokeColor=#60a5fa;fontSize=10;fontColor=#bfdbfe;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="555" width="420" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="mtls-note" value="→ Enables mTLS between enrolled containers on this node" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#6b7280;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="605" width="420" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="svid-badge1" value="✅ SPIRE-enrolled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#052e16;strokeColor=#22c55e;fontSize=10;fontStyle=1;fontColor=#86efac;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="630" width="160" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="r730-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a0a0a;strokeColor=#ef4444;strokeWidth=2;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="668" y="380" width="460" height="320" as="geometry"/>
+                </mxCell>
+                <mxCell id="r730-title" value="🖥️  Secondary Inference — Dell PowerEdge R730" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=12;fontStyle=1;fontColor=#fca5a5;" parent="1" vertex="1">
+                    <mxGeometry x="668" y="385" width="460" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent2-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#292524;strokeColor=#f97316;strokeWidth=1;arcSize=6;dashed=1;dashPattern=6 3;" parent="1" vertex="1">
+                    <mxGeometry x="688" y="418" width="200" height="116" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent2-title" value="SPIRE Agent ⚠️ PENDING" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontStyle=1;fontColor=#fdba74;" parent="1" vertex="1">
+                    <mxGeometry x="688" y="422" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent2-1" value="Not yet enrolled" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;fontColor=#fb923c;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="688" y="448" width="200" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent2-2" value="Install after R730 commissioning" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#d97706;" parent="1" vertex="1">
+                    <mxGeometry x="688" y="468" width="200" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="enroll-code" value="See: spiffe_spire_assessment § 4.3" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#fde68a;" parent="1" vertex="1">
+                    <mxGeometry x="688" y="500" width="200" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl2-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1c0f0f;strokeColor=#f87171;strokeWidth=1;arcSize=4;dashed=1;dashPattern=4 3;" parent="1" vertex="1">
+                    <mxGeometry x="908" y="418" width="200" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl2-title" value="Future Workloads (post-enroll)" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;fontStyle=3;fontColor=#fca5a5;" parent="1" vertex="1">
+                    <mxGeometry x="908" y="422" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl2-1" value="nemotron-orchestrator" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#fecaca;" parent="1" vertex="1">
+                    <mxGeometry x="916" y="448" width="185" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl2-1b" value="→ spiffe://home-lab/dell-r730/nemotron" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#f87171;" parent="1" vertex="1">
+                    <mxGeometry x="916" y="464" width="185" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl2-2" value="llama-guard-3:8b" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#fecaca;" parent="1" vertex="1">
+                    <mxGeometry x="916" y="488" width="185" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="wl2-2b" value="→ spiffe://home-lab/dell-r730/llama-guard" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=9;fontColor=#f87171;" parent="1" vertex="1">
+                    <mxGeometry x="916" y="504" width="185" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="r730-interim" value="⚠️ INTERIM: Traffic via SECONDARY_OLLAMA_HOST (HTTP)&#10;Upgrade to mTLS after SPIRE enrollment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#292524;strokeColor=#f97316;fontSize=10;fontColor=#fdba74;" parent="1" vertex="1">
+                    <mxGeometry x="688" y="555" width="420" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="svid-badge2" value="⚠️ Enrollment pending" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#431407;strokeColor=#f97316;fontSize=10;fontStyle=1;fontColor=#fdba74;" parent="1" vertex="1">
+                    <mxGeometry x="778" y="630" width="160" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="conn-srv-agent1" value="SVID issued ✅&#10;(X.509 cert, short TTL)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#a855f7;strokeWidth=2;endArrow=block;endFill=1;fontColor=#c4b5fd;fontSize=10;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="spire-srv-bg" target="agent1-bg" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="conn-srv-agent2" value="Pending enrollment ⚠️" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#f97316;strokeWidth=1;endArrow=open;fontColor=#fdba74;fontSize=10;dashed=1;dashPattern=6 3;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="spire-srv-bg" target="agent2-bg" edge="1">
+                    <mxGeometry x="-0.4172" y="-5" relative="1" as="geometry">
+                        <mxPoint x="5" y="-5" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="conn-pc-r730" value="Future: mTLS (SPIFFE)&#10;Now: HTTP" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ef4444;strokeWidth=2;endArrow=open;startArrow=open;startFill=0;endFill=0;fontColor=#fca5a5;fontSize=10;dashed=1;dashPattern=8 4;" parent="1" source="pc-bg" target="r730-bg" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#111827;strokeColor=#374151;strokeWidth=1;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="720" width="1040" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-text" value="SVID Lifecycle:  1️⃣ Workload starts → 2️⃣ SPIRE Agent attests (Docker labels + image SHA) → 3️⃣ SPIRE Server issues X.509 SVID → 4️⃣ py-spiffe exposes TLS identity → 5️⃣ mTLS established → 6️⃣ SVID auto-rotates before expiry" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontColor=#9ca3af;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="722" width="1040" height="20" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

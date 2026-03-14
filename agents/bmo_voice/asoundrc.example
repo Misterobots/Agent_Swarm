@@ -1,0 +1,11 @@
+pcm.bmo_softvol {
+    type softvol
+    slave.pcm "plughw:1,0"
+    control.name "BMOVolume"
+    control.card 1
+}
+
+ctl.bmo_softvol {
+    type hw
+    card 1
+}

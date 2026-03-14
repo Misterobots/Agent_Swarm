@@ -1,0 +1,923 @@
+{
+  "version": "1.0.0",
+  "category": "testing",
+  "patterns": [
+    {
+      "id": "90da8b0bcd5c0d5d",
+      "subcategory": "test-structure",
+      "name": "Test Structure Detector",
+      "description": "Learns test structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-structure",
+          "patternId": "testing/test-structure/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.15,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.6533333333333333,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 22,
+          "column": 5
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 129,
+          "column": 31
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 58
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 140,
+          "column": 60
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 26,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 147,
+          "column": 25
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 149,
+          "column": 37
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 152,
+          "column": 76
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 165,
+          "column": 30
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 165,
+          "column": 55
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 166,
+          "column": 30
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 166,
+          "column": 55
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 40,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 780,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 781,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "5de828743c11df80",
+      "subcategory": "describe-naming",
+      "name": "Describe Naming Detector",
+      "description": "Learns test describe/it naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/describe-naming",
+          "patternId": "testing/describe-naming/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.26,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 5,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 22,
+          "column": 5
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 129,
+          "column": 31
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 26,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 147,
+          "column": 25
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 149,
+          "column": 37
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 152,
+          "column": 76
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 165,
+          "column": 30
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 165,
+          "column": 55
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 166,
+          "column": 30
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 166,
+          "column": 55
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 40,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 780,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 781,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "09c5ab50fc33ff83",
+      "subcategory": "setup-teardown",
+      "name": "Setup/Teardown Detector",
+      "description": "Learns test setup/teardown patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/setup-teardown",
+          "patternId": "testing/setup-teardown/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 52,
+          "column": 26
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 10,
+          "column": 26
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 13,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 14,
+          "column": 26
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 7,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 10,
+          "column": 26
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "4a8ffe6dd0ea5ad4",
+      "subcategory": "setup-teardown",
+      "name": "Setup/Teardown Detector",
+      "description": "Learns test setup/teardown patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/setup-teardown",
+          "patternId": "testing/setup-teardown/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 53,
+          "column": 10
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 13,
+          "column": 10
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 15,
+          "column": 10
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 16,
+          "column": 10
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 10,
+          "column": 10
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 13,
+          "column": 10
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "1394a5946d81bbd1",
+      "subcategory": "fixture-patterns",
+      "name": "Fixture Patterns Detector",
+      "description": "Learns test fixture patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/fixture-patterns",
+          "patternId": "testing/fixture-patterns/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.28,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.6533333333333333,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\context_manager.py",
+          "line": 18,
+          "column": 23
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 31,
+          "column": 16
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 130,
+          "column": 45
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 36,
+          "column": 27
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 50,
+          "column": 13
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 54,
+          "column": 13
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 57,
+          "column": 13
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 58,
+          "column": 31
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 70,
+          "column": 20
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 26,
+          "column": 57
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 12,
+          "column": 19
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 87,
+          "column": 28
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 189,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 214,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 215,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 216,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 217,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 218,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 219,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 220,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 221,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 236,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 273,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 303,
+          "column": 27
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 438,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 439,
+          "column": 37
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "784483be872b8aee",
+      "subcategory": "test-structure",
+      "name": "Test Structure Detector",
+      "description": "Learns test structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-structure",
+          "patternId": "testing/test-structure/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.18,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.8482608695652174,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 126,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 291,
+          "column": 44
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 39,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 189,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 206,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 206,
+          "column": 56
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 214,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 215,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 216,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 217,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 218,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 219,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 220,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 221,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 236,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 49
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 273,
+          "column": 18
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "2634449797b270bb",
+      "subcategory": "test-file-naming",
+      "name": "Test File Naming Detector",
+      "description": "Learns test file naming patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-file-naming",
+          "patternId": "testing/test-file-naming/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 15,
+          "column": 47
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 58
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 140,
+          "column": 60
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0ea2c4fae78eb2b0",
+      "subcategory": "fixture-patterns",
+      "name": "Fixture Patterns Detector",
+      "description": "Learns test fixture patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/fixture-patterns",
+          "patternId": "testing/fixture-patterns/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.13,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.8330434782608696,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\memory_system.py",
+          "line": 49,
+          "column": 26
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 53,
+          "column": 27
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 56,
+          "column": 24
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 83,
+          "column": 19
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 84,
+          "column": 46
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 86,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 436,
+          "column": 35
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 436,
+          "column": 61
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 436,
+          "column": 85
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 751,
+          "column": 207
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "8d1ce9637d826618",
+      "subcategory": "test-co-location",
+      "name": "Test Co-Location Detector",
+      "description": "Learns test co-location patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/test-co-location",
+          "patternId": "testing/test-co-location/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.6299999999999999,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 58
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 140,
+          "column": 60
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "ed25d2797dad89d7",
+      "subcategory": "mock-patterns",
+      "name": "Mock Patterns Detector",
+      "description": "Learns mocking patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/mock-patterns",
+          "patternId": "testing/mock-patterns/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.5366666666666666,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 12,
+          "column": 19
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "7d6b5feb6c0ca78d",
+      "subcategory": "mock-patterns",
+      "name": "Mock Patterns Detector",
+      "description": "Learns mocking patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/mock-patterns",
+          "patternId": "testing/mock-patterns/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7366666666666666,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 40,
+          "column": 12
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f8b051f9b50e60ce",
+      "subcategory": "fixture-patterns",
+      "name": "Fixture Patterns Detector",
+      "description": "Learns test fixture patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/fixture-patterns",
+          "patternId": "testing/fixture-patterns/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.8330434782608696,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 40,
+          "column": 12
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 48,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 54,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "4aaadab515c4df33",
+      "subcategory": "fixture-patterns",
+      "name": "Fixture Patterns Detector",
+      "description": "Learns test fixture patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "testing/fixture-patterns",
+          "patternId": "testing/fixture-patterns/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.83,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 208,
+          "column": 33
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:08.314Z",
+  "checksum": "eaa0ae96430e0ecc"
+}

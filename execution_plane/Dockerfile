@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Common Python Dependencies for AI Agents
@@ -34,16 +35,40 @@ RUN pip install --no-cache-dir \
     streamlit \
     watchdog \
     plotly \
-    plotly \
-    plotly \
     python-logging-loki \
-    redis \
-    apscheduler \
     numpy \
-    opencv-python-headless
+    scipy \
+    soundfile \
+    opencv-python-headless \
+    streamlit-monaco \
+    redis
 
-# Copy the agent code (This is also mounted as volume in docker-compose for dev)
+# Install SPIFFE SDK and Langfuse
+RUN pip install --no-cache-dir \
+    spiffe \
+    nvidia-ml-py \
+    cachetools \
+    langfuse
+
+# Fix for NVML: Create symlink for pynvml compatibility
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1 /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
+
+
+# --- MAESTRO L5: Least Privilege ---
+# Create a non-root user 'app'
+RUN useradd -m -u 1000 app
+
+# Copy the agent code
 COPY agents /app/agents
+
+# Ensure permissions
+RUN chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Fix Git "dubious ownership" for mounted volumes
+RUN git config --global --add safe.directory /workspace
 
 # Default command matches docker-compose
 CMD ["python", "agents/main.py"]

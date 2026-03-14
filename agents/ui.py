@@ -4,6 +4,7 @@ import time
 import streamlit as st
 import time
 import importlib
+import uuid
 import router
 importlib.reload(router)
 from router import chat_swarm
@@ -11,6 +12,10 @@ from logger_setup import setup_logger
 
 # Setup UI Logger
 logger = setup_logger("UI")
+
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+    logger.info(f"[UI] New session initialized: {st.session_state.session_id}")
 
 st.set_page_config(page_title="Home AI Lab Swarm", page_icon="🧠", layout="wide")
 
@@ -78,7 +83,7 @@ def render_artifact(artifact):
          st.success(f"🎨 **Image Generated:** `{artifact['name']}`")
          try:
              # Display Image
-             st.image(artifact["path"], use_container_width=True)
+             st.image(artifact["path"], width="stretch")
              
              # We need to read binary for download since it's an external file
              with open(artifact["path"], "rb") as file:
@@ -111,7 +116,11 @@ with st.sidebar:
     
     # Workspace Switcher
     st.subheader("Workspace")
-    workspace = st.radio("Mode", ["Chat", "Media", "Coding", "Prototyping", "Control", "DevOps"], label_visibility="collapsed")
+    workspace = st.radio(
+        "Mode", 
+        ["Chat", "Media", "Voice Studio", "Coding", "Prototyping", "Control", "DevOps", "Maker Space", "Governance"],
+        label_visibility="collapsed"
+    )
     st.session_state.workspace = workspace
     
     st.markdown("---")
@@ -303,7 +312,7 @@ def render_chat_workspace():
                 <p>Gather data from the web</p>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("Start Research", use_container_width=True):
+            if st.button("Start Research", width="stretch"):
                 st.session_state.quick_action = "Conduct research on..."
                 st.rerun()
                 
@@ -314,7 +323,7 @@ def render_chat_workspace():
                 <p>Generate Images & 3D Assets</p>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("Open Studio", use_container_width=True):
+            if st.button("Open Studio", width="stretch"):
                 st.session_state.quick_action = "Generate an image of..."
                 st.rerun()
 
@@ -325,7 +334,7 @@ def render_chat_workspace():
                 <p>Scan code and infrastructure</p>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("Run Audit", use_container_width=True):
+            if st.button("Run Audit", width="stretch"):
                 st.session_state.quick_action = "Audit the current directory"
 
         st.markdown("---")
@@ -365,7 +374,13 @@ def render_chat_workspace():
     with st.form(key="chat_form", clear_on_submit=True):
         cols = st.columns([8, 1])
         with cols[0]:
-            user_input = st.text_input("Task Description", value="" if run_now else "", placeholder="Type your message here...", label_visibility="collapsed")
+            user_input = st.text_input(
+                "Task Description", 
+                value="" if run_now else "", 
+                placeholder="Type your message here...", 
+                label_visibility="collapsed",
+                key="user_prompt_input"
+            )
         with cols[1]:
             submit_button = st.form_submit_button("🚀 Send")
     
@@ -390,33 +405,52 @@ def render_chat_workspace():
             artifacts = [] # Track artifacts for persistence
             
             # Stream updates from the Swarm
-            for update in chat_swarm(final_input):
+            thought_stream = st.expander("🕵️ Thought Stream", expanded=True)
+            with thought_stream:
+                log_placeholder = st.empty()
+            
+            for update in chat_swarm(final_input, session_id=st.session_state.session_id):
                 # Log to Dashboard
                 logger.info(f"[{update['type'].upper()}] {update['content']}")
                 
                 if update["type"] == "status":
                     status_box.write(update["content"])
                     trace_logs.append(f"ℹ️ {update['content']}")
+                    with thought_stream:
+                        st.caption(f"ℹ️ {update['content']}")
                 elif update["type"] == "log":
-                    # Debug Logs: Don't show in status box, but add to trace
+                    # Filter out heartbeat character from logs if needed, though they usually go to status/message
                     trace_logs.append(f"⚙️ {update['content']}")
+                    with thought_stream:
+                        st.caption(f"⚙️ {update['content']}")
                 elif update["type"] == "artifact":
-                     # Render Artifact Card Immediately
                      artifact = update["content"]
-                     artifacts.append(artifact) # Add to list for saving
+                     artifacts.append(artifact)
                      trace_logs.append(f"📦 Artifact Generated: {artifact['name']}")
-                     
-                     # Render directly to chat stream (don't use placeholder, as it gets overwritten)
                      render_artifact(artifact)
-    
+                elif update["type"] == "message":
+                    # Real-time message streaming
+                    content = update["content"]
+                    # FILTER heartbeat character to prevent UI artifacts
+                    content = content.replace("\u200B", "")
+                    
+                    if content:
+                        full_response += content
+                        message_placeholder.markdown(full_response + "▌")
                 elif update["type"] == "error":
                     status_box.error(update["content"])
                     trace_logs.append(f"🔥 {update['content']}")
                     full_response = f"🚨 {update['content']}"
                 elif update["type"] == "response":
                     full_response = update["content"]
+                    # Final cleanup of the response content
+                    full_response = full_response.replace("\u200B", "")
+                    # BREAK the loop as soon as we have final response to allow UI cleanup
+                    break
             
-            status_box.update(label="Mission Complete", state="complete", expanded=False)
+            # Finalize response UI
+            message_placeholder.markdown(full_response)
+            status_box.update(label="Mission Complete ✨", state="complete", expanded=False)
             
             # --- Smart Rendering of Final Response ---
             import json
@@ -472,13 +506,30 @@ def render_chat_workspace():
                             st.error(log)
                         else:
                             st.caption(log)
+                
+                # FINAL STEP: Reset the input field in session state and rerun to clean up live widgets
+                if "user_prompt_input" in st.session_state:
+                    st.session_state["user_prompt_input"] = ""
+                
+                # Brief pause to show "Mission Complete" then refresh
+                time.sleep(0.5)
+                st.rerun()
 
 def render_media_workspace():
+    # Helper Imports
+    import sys, os, json
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
+    from specialized.image_gen import list_available_models
+
     # --- SIDEBAR CONTROLS ---
     with st.sidebar:
         st.markdown("### 🎛️ Tuning Station")
         
-        model_name = st.selectbox("Model Checkpoint", ["Flux-Schnell (FP8)", "SDXL Turbo", "Stable Cascade"])
+        # Dynamic Model List
+        available_models = list_available_models()
+        if not available_models: available_models = ["v1-5-pruned-emaonly.ckpt"]
+        
+        model_name = st.selectbox("Model Checkpoint", available_models)
         
         col1, col2 = st.columns(2)
         with col1:
@@ -486,26 +537,40 @@ def render_media_workspace():
         with col2:
              steps = st.slider("Steps", 1, 50, 20, 1)
              
-        aspect = st.selectbox("Aspect Ratio", ["16:9 (Cinematic)", "1:1 (Square)", "9:16 (Mobile)"])
+        aspect = st.selectbox("Aspect Ratio", ["1:1 (Square)", "16:9 (Cinematic)", "9:16 (Mobile)"])
+        w, h = 1024, 1024
+        if "16:9" in aspect: w, h = 1344, 768
+        elif "9:16" in aspect: w, h = 768, 1344
         
-        st.info(f"Param String: `--cfg {cfg} --steps {steps} --ar {aspect.split()[0]}`")
+        st.caption(f"Resolution: {w}x{h}")
+        
+        with st.expander("🛠️ Advanced Settings"):
+            col_a, col_b = st.columns(2)
+            with col_a:
+                sampler = st.selectbox("Sampler", ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"], index=0)
+            with col_b:
+                scheduler = st.selectbox("Scheduler", ["normal", "karras", "simple", "sgm_uniform"], index=0)
+            
+            seed = st.number_input("Seed (-1 = Random)", value=-1, step=1)
+            
+        st.divider()
+        
+        with st.expander("📦 Resource Manager"):
+            new_model_url = st.text_input("CivitAI / HuggingFace URL")
+            if st.button("Request Import"):
+                st.info("Dispatcher: Validation Agent engaged (Stub). Checking compatibility...")
+                time.sleep(1)
+                st.success("Request Queued: Administrator approval required.")
 
     # --- MAIN GALLERY ---
     st.markdown("## 🎨 Asset Gallery")
     
-    # Refresh logic
-    if st.button("🔄 Refresh Gallery"):
-        st.rerun()
+    if st.button("🔄 Refresh Gallery"): st.rerun()
 
-    import os
     gallery_path = "delivered_artifacts"
-    
-    # Ensure path exists
     if not os.path.exists(gallery_path):
-        st.warning(f"Artifact folder not found at `{gallery_path}`. Generate something first!")
         os.makedirs(gallery_path, exist_ok=True)
         
-    # Get Images
     try:
         images = [f for f in os.listdir(gallery_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
         images.sort(key=lambda x: os.path.getmtime(os.path.join(gallery_path, x)), reverse=True)
@@ -513,14 +578,29 @@ def render_media_workspace():
         if not images:
              st.info("Gallery is empty. Start creating!")
         else:
-            # Responsive Grid
-            cols = st.columns(4) # 4 wide
+            cols = st.columns(4)
             for idx, img_name in enumerate(images):
                 img_path = os.path.join(gallery_path, img_name)
+                
+                # Load Metadata Sidecar
+                meta_path = img_path + ".json"
+                meta = {}
+                if os.path.exists(meta_path):
+                    with open(meta_path, "r") as f:
+                        meta = json.load(f)
+
                 with cols[idx % 4]:
-                    st.image(img_path, use_container_width=True)
+                    st.image(img_path, width="stretch")
                     st.caption(img_name)
-                    # Download
+                    
+                    # Metadata Popover
+                    if meta:
+                        with st.popover("ℹ️ info"):
+                            st.markdown(f"**Prompt**: {meta.get('prompt', 'N/A')}")
+                            st.markdown(f"**Model**: `{meta.get('model', 'Auto')}`")
+                            p = meta.get('params', {})
+                            st.caption(f"CFG: {p.get('cfg')} | Steps: {p.get('steps')}")
+                    
                     with open(img_path, "rb") as f:
                         st.download_button("⬇️", f, file_name=img_name, key=f"dl_gal_{idx}")
                         
@@ -531,11 +611,6 @@ def render_media_workspace():
     st.markdown("---")
     st.markdown("### 💬 Creative Director")
     
-    # Reuse the standard chat loop logic, but perhaps simpler
-    # We can just call the shared render logic or copy the form
-    # Let's copy the form logic to keep it isolated or refactor the form into a component.
-    # For now, inline copy is safer to avoid breaking the main chat.
-    
     with st.form(key="media_chat_form", clear_on_submit=True):
         cols = st.columns([8, 1])
         with cols[0]:
@@ -544,94 +619,209 @@ def render_media_workspace():
             submit_button = st.form_submit_button("🎨 Make")
             
     if submit_button and user_input:
-        # Append params
-        augmented_prompt = f"{user_input} (Parameters: Model={model_name}, CFG={cfg}, Steps={steps}, AR={aspect})"
+        # Explicit Instruction for the Agent logic
+        system_directive = f"""
+        User Request: {user_input}
+        SYSTEM OVERRIDE: Call generate_image with:
+        - model_name='{model_name}'
+        - cfg={cfg}
+        - steps={steps}
+        - width={w}
+        - height={h}
+        - sampler='{sampler}'
+        - scheduler='{scheduler}'
+        - seed={seed if seed != -1 else 'None'}
+        """
         
         with st.status("🎨 Creative Studio Active", expanded=True) as status:
             st.write(f"Sending Task: {user_input}")
-            for update in chat_swarm(augmented_prompt):
-                 if update["type"] == "status":
-                    status.write(update["content"])
-                 elif update["type"] == "artifact":
-                     st.image(update["content"]["path"])
-                 elif update["type"] == "error":
-                     status.error(update["content"])
-            status.update(label="Generation Complete", state="complete", expanded=False)
-            st.rerun() # Refresh gallery
+            
+            # BYPASS ROUTER: Direct Agent Call (v2.0)
+            from specialized.image_gen import get_image_gen_agent
+            agent = get_image_gen_agent()
+            
+            try:
+                response = agent.run(system_directive)
+                st.write(response.content)
+                
+                # Check for "Generated Image" in content (tool output usually injected)
+                # Since tool output implies success, we assume good.
+                status.update(label="Generation Complete", state="complete", expanded=False)
+                time.sleep(1) # Allow fs sync
+                st.rerun()
+            except Exception as e:
+                status.error(f"Agent Error: {e}")
 
-def render_coding_workspace():
-    # IDE-like Styling Injection
+def render_voice_workspace():
+    st.markdown("## 🎙️ Voice Studio")
+
+    # Helper Imports
+    import sys, os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
+
+    # --- SIDEBAR CONTROLS ---
+    with st.sidebar:
+        st.markdown("### 🎚️ Audio Config")
+        # Placeholder for model switching if supported later
+        st.info("Engine: Qwen3-TTS (1.7B)")
+        
+    # --- MAIN INTERFACE ---
+    col_input, col_ref = st.columns([2, 1])
+    
+    with col_input:
+        st.subheader("Text to Speech")
+        text_input = st.text_area("Enter text to speak...", height=150, placeholder="Hello, this is a test of the voice cloning system.")
+        
+    with col_ref:
+        st.subheader("Voice Reference")
+        uploaded_files = st.file_uploader("Clone Voice (Optional)", type=["wav", "mp3"], accept_multiple_files=True)
+        
+        ref_paths = []
+        if uploaded_files:
+            # Save temp files
+            import tempfile
+            for uploaded_file in uploaded_files:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp:
+                    tmp.write(uploaded_file.getvalue())
+                    ref_paths.append(tmp.name)
+            
+            if len(uploaded_files) == 1:
+                st.audio(uploaded_files[0], format="audio/wav")
+            else:
+                st.caption(f"{len(uploaded_files)} references loaded.")
+            st.caption("References ready.")
+            
+    with col_input:
+        effect_list = [
+            "None", "BMO", "Old Radio", "Telephony", "Cave", "Cathedral", "Small Room", 
+            "Chipmunk", "Deep Voice", "Robot", "Alien", "Ethereal", 
+            "Overdrive", "Megaphone", "Underwater", "Walkie Talkie", 
+            "Phaser", "Tremolo"
+        ]
+        selected_effect = st.selectbox("Audio Effect", effect_list, index=0)
+        
+    if st.button("🔊 Generate Speech", type="primary"):
+        if not text_input:
+            st.warning("Please enter text.")
+        else:
+            with st.status("🎙️ Synthesizing...", expanded=True) as status:
+                from specialized.voice_cloning import clone_voice
+                
+                try:
+                    # Pass effect if not None
+                    eff_param = selected_effect if selected_effect != "None" else None
+                    result = clone_voice(text_input, reference_audio_paths=ref_paths, effect=eff_param)
+                    
+                    if "Generated Audio" in result:
+                        # Extract filename
+                        filename = result.split("Generated Audio: ")[1].split(" ")[0]
+                        
+                        # Locate file
+                        workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        artifact_path = os.path.join(workspace_root, "delivered_artifacts", filename)
+                        
+                        if os.path.exists(artifact_path):
+                            st.success("Generation Complete!")
+                            st.audio(artifact_path)
+                            
+                            with open(artifact_path, "rb") as f:
+                                st.download_button("⬇️ Download Audio", f, file_name=filename, mime="audio/wav")
+                        else:
+                            st.error(f"File not found at {artifact_path}")
+                    else:
+                        st.error(result)
+                        
+                    status.update(label="Complete", state="complete", expanded=False)
+                    
+                except Exception as e:
+                    st.error(f"Synthesis Failed: {e}")
+                    
+            # Cleanup temp files
+            if ref_paths:
+                for p in ref_paths:
+                    if os.path.exists(p):
+                        try:
+                            os.remove(p)
+                        except:
+                            pass
+
+def render_ide(root_dir_param, mode="coding"):
+    """
+    Renders the VS Code Server via IFrame.
+    - root_dir_param: The subpath to open (e.g., 'workspace/user_projects').
+    """
+    st.markdown(f"## 🛠️ {mode.title()} IDE (VS Code)")
+    
+    # URL Construction
+    # We assume code-server is running on localhost:8443
+    # The folder param tells code-server which directory to load.
+    # Note: Inside the container, the volume is mounted at /config/workspace
+    
+    # Map the relative path to the container path
+    # Host: ./workspace/user_projects -> Container: /config/workspace/workspace/user_projects
+    
+    # Map the relative path to the container path
+    # Host: ./workspace/user_projects -> Container: /config/workspace (In coding container)
+    # Host: ./ -> Container: /config/workspace (In devops container)
+    
+    if mode == "coding":
+        # Coding Container (Port 8444)
+        base_url = "http://localhost:8444"
+        folder_path = "/config/workspace" # Root of the user_projects mount
+        st.info("💡 **Tip**: This is the Restricted Coding Environment. Password is 'password'.")
+    else:
+        # DevOps Container (Port 8443)
+        base_url = "http://localhost:8443"
+        folder_path = "/config/workspace"
+        st.warning("⚠️ **Root Access**: You are editing the entire system configuration.")
+
+    final_url = f"{base_url}/?folder={folder_path}"
+    
+    # --- CSS: Remove Padding for Full-Screen Feel ---
     st.markdown("""
-    <style>
-        .stTextArea textarea { font-family: 'Fira Code', monospace !important; }
-        .block-container { max-width: 95% !important; padding-top: 2rem; }
-    </style>
+        <style>
+            .block-container {
+                padding-top: 1rem !important;
+                padding-bottom: 0rem !important;
+                padding-left: 0rem !important;
+                padding-right: 0rem !important;
+                max-width: 100% !important;
+            }
+            [data-testid="stSidebar"] {
+                min-width: 350px;
+            }
+        </style>
     """, unsafe_allow_html=True)
     
-    col_explorer, col_editor = st.columns([1, 4])
-    
-    import os
-    from tools.file_ops import read_file, write_file
-    
-    # --- FILE EXPLORER (Left) ---
-    with col_explorer:
-        st.subheader("📂 Files")
-        root_dir = "." 
-        file_options = []
-        for root, dirs, files in os.walk(root_dir):
-            if ".git" in root or "__pycache__" in root: continue
-            for file in files:
-                if file.endswith(('.py', '.md', '.json', '.yml', '.yaml', '.txt', '.css', '.Dockerfile', '.bat')):
-                    rel_path = os.path.relpath(os.path.join(root, file), root_dir)
-                    file_options.append(rel_path)
-        
-        file_options.sort()
-        # Radio button looks more like a file list than selectbox
-        selected_file = st.radio("Select File", file_options, index=None, label_visibility="collapsed")
-        
-        if st.button("🔄 Refresh"): st.rerun()
+    # Imports
+    try:
+        from router import chat_swarm
+    except ImportError:
+        st.error("Router unavailable")
+        return
 
-    # --- EDITOR (Right) ---
-    with col_editor:
-        if selected_file:
-            st.caption(f"Editing: `{selected_file}`")
-            current_content = read_file(selected_file)
-            content_editor = "" if current_content.startswith("Error:") else current_content
-            
-            # Editor Toolbar
-            c1, c2, c3 = st.columns([1, 1, 6])
-            with c1:
-                if st.button("💾 Save"):
-                    write_file(selected_file, content_editor) # Warning: State lost on rerun if not saved carefully
-                    st.toast("Saved!")
-            with c2:
-                if st.button("▶️ Run"):
-                    st.session_state.quick_action = f"Execute/Test {selected_file}"
-                    st.session_state.workspace = "Chat"
-                    st.rerun()
-            
-            # Main Editor
-            # Note: without session_state key management, typing might be laggy or reset.
-            # We use a key based on filename to preserve state per file.
-            new_content = st.text_area("Code", value=content_editor, height=700, label_visibility="collapsed", key=f"editor_{selected_file}")
-            
-            if new_content != content_editor:
-                 # In a real app we'd need a specific save action or debounce.
-                 # For now, the Save button above reads 'content_editor' which is stale until rerun?
-                 # Actually, we need to read 'new_content' in the Save button logic.
-                 # Streamlit logic is tricky here. 
-                 # FIX: We should move the Save button BELOW or use a form.
-                 pass
-                 
-            # Re-implement Save logic to use session state value
-            if st.button("💾 Save Changes", key="save_bottom"):
-                 write_file(selected_file, new_content)
-                 st.toast("Saved!")
-                 time.sleep(0.5)
-                 st.rerun()
-
+    # --- 1. SIDEBAR (Navigation Only) ---
+    with st.sidebar:
+        st.markdown(f"### 📂 {mode.title()} Workspace")
+        if mode == "devops":
+            if st.button("🔄 Restart Stack", type="primary"):
+                 st.toast("Restarting...")
         else:
-            st.info("👈 Select a file to open the Agent IDE")
+            st.caption("Environment: Jailed")
+
+    # --- 2. MAIN AREA: VS Code Iframe (Full Width) ---
+    # No columns, just direct iframe to take 100% width
+    import streamlit.components.v1 as components
+    # Height 90vh to fill screen
+    components.iframe(final_url, height=900, scrolling=True)
+
+def render_coding_workspace():
+    # Only show user projects
+    render_ide("user_projects", mode="coding")
+
+def render_devops_workspace():
+    # Show everything
+    render_ide(".", mode="devops")
 
 
 def render_prototyping_workspace():
@@ -667,7 +857,122 @@ def render_prototyping_workspace():
         if prompt := st.chat_input("Test your prompt..."):
             st.session_state.proto_msgs.append({"role": "user", "content": prompt})
             st.rerun()
+            st.session_state.proto_msgs.append({"role": "user", "content": prompt})
+            st.rerun()
             # In real impl, we'd call the LLM here with system_prompt
+
+def render_governance_workspace():
+    st.subheader("⚖️ Governance & Approval Dashboard")
+    
+    # Fetch Requests from Runtime
+    import requests
+    try:
+        # Internal Docker Network Call
+        resp = requests.get("http://agent-runtime:8000/api/v1/request", timeout=2)
+        if resp.status_code == 200:
+            reqs = resp.json()
+        else:
+            st.error(f"API Error: {resp.status_code}")
+            reqs = []
+    except Exception as e:
+        st.error(f"Connection Failed: {e}")
+        reqs = []
+        
+    if not reqs:
+        st.info("No active requests found.")
+        return
+
+    # Metrics
+    pending = len([r for r in reqs if r['status'] == 'PENDING'])
+    rejected = len([r for r in reqs if r['status'] == 'REJECTED'])
+    approved = len([r for r in reqs if r['status'] == 'APPROVED'])
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Pending Review", pending)
+    c2.metric("Approved", approved)
+    c3.metric("Rejected", rejected)
+    
+    st.markdown("### Request Queue")
+    
+    for r in reqs:
+        # Card Style
+        with st.container():
+            # Color Code Border
+            status = r['status']
+            color = "#ffd700" # Pending Yellow
+            if status == "APPROVED": color = "#00ff00"
+            elif status == "REJECTED": color = "#ff0000"
+            
+            st.markdown(f"""
+            <div style="border-left: 5px solid {color}; padding-left: 10px; margin-bottom: 5px; background: rgba(255,255,255,0.05); border-radius: 5px 5px 0 0;">
+                <h4 style="margin:0; padding-top:10px;">{r['type']} Request</h4>
+                <p style="margin:0; padding-bottom:10px; opacity: 0.8;"><b>User:</b> {r['user']} | <b>ID:</b> {r['id']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            with st.expander("📝 Request Details", expanded=False):
+                # 1. Metadata / Context
+                c_meta1, c_meta2 = st.columns(2)
+                c_meta1.text_input("Triggered By", value=r.get('user', 'Unknown'), disabled=True, key=f"u_{r['id']}")
+                c_meta2.text_input("Timestamp", value=r.get('timestamp', 'N/A'), disabled=True, key=f"t_{r['id']}")
+                
+                st.markdown("#### Command / Payload")
+                st.code(r['description'], language="text")
+                
+                # 2. Evaluations (Parse logic)
+                sec_eval = "Pending Assessment"
+                tech_eval = "Pending Assessment"
+                
+                if r.get("assessment_notes"):
+                    for note in r["assessment_notes"]:
+                        if "Security Assessment:" in note:
+                            sec_eval = note.replace("Security Assessment:", "").strip()
+                        elif "Technical Check:" in note:
+                            tech_eval = note.replace("Technical Check:", "").strip()
+                
+                tab_sec, tab_tech = st.tabs(["🛡️ Security Evaluator", "🤖 Technical Architect"])
+                
+                with tab_sec:
+                    if "UNSAFE" in sec_eval:
+                        st.error(sec_eval)
+                    elif "SAFE" in sec_eval:
+                        st.success(sec_eval)
+                    else:
+                        st.info(sec_eval)
+                        
+                with tab_tech:
+                    if "WARNING" in tech_eval:
+                        st.warning(tech_eval)
+                    elif "COMPATIBLE" in tech_eval:
+                        st.success(tech_eval)
+                    else:
+                        st.info(tech_eval)
+            
+            # Actions (Only for Pending)
+            if status == "PENDING":
+                c_yes, c_no = st.columns([1, 1])
+                with c_yes:
+                    if st.button("✅ Approve", key=f"app_{r['id']}"):
+                        try:
+                            requests.post(f"http://agent-runtime:8000/api/v1/request/{r['id']}/status", json={"status": "APPROVED", "note": "Admin Approved via Dashboard"})
+                            st.success("Approved!")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed: {e}")
+                with c_no:
+                    if st.button("❌ Reject", key=f"rej_{r['id']}"):
+                        try:
+                            requests.post(f"http://agent-runtime:8000/api/v1/request/{r['id']}/status", json={"status": "REJECTED", "note": "Admin Rejected via Dashboard"})
+                            st.warning("Rejected!")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed: {e}")
+            else:
+                st.caption(f"Status: {status}")
+            
+            st.divider()
 
 # --- LIVE SWARM VISUALIZER ---
 def render_hub_and_spoke(active_agent=None, log_history=None, key_suffix=""):
@@ -772,9 +1077,42 @@ def render_hub_and_spoke(active_agent=None, log_history=None, key_suffix=""):
     if "selected_agent_view" in st.session_state:
         target = st.session_state.selected_agent_view
         st.markdown("---")
-        st.markdown(f"### 🕵️ Deep Dive: {target}")
         
-        logs = log_history.get(target, ["No activity recorded."])
+        # --- IDENTITY CARD RENDERING (MAESTRO L7) ---
+        from registry import registry
+        card = registry.get_card(target)
+        
+        col_card, col_logs = st.columns([1, 2])
+        
+        with col_card:
+            if card:
+                # Badge Color Logic
+                badge_bg = "#ff4b4b" if "L3" in card.security_level or "L4" in card.security_level else "#00cc00"
+                
+                st.markdown(f"""
+                <div style="background-color: #1e1e2e; border: 1px solid #444; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <span style="font-size: 1.2em; font-weight: bold; color: #fff;">🪪 {card.name}</span>
+                        <span style="background-color: {badge_bg}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: bold;">{card.security_level}</span>
+                    </div>
+                    <div style="color: #bbb; font-size: 0.9em; margin-bottom: 5px;">ROLE</div>
+                    <div style="font-size: 1.1em; color: #fff; font-weight: 500; margin-bottom: 15px;">{card.role}</div>
+                    
+                    <div style="color: #bbb; font-size: 0.9em; margin-bottom: 5px;">DESCRIPTION</div>
+                    <div style="font-size: 0.9em; color: #ddd; margin-bottom: 15px; line-height: 1.4;">{card.description}</div>
+                    
+                    <div style="border-top: 1px solid #333; padding-top: 10px; margin-top: 10px;">
+                        <div style="color: #888; font-size: 0.8em; margin-bottom: 5px;">CAPABILITIES</div>
+                         <div style="font-family: monospace; color: #00ff00; font-size: 0.8em;">{', '.join(card.capabilities)}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.warning(f"⚠️ Identity Card for '{target}' not found in Registry.")
+        
+        with col_logs:
+            st.markdown(f"### 🕵️ Activity Log: {target}")
+            logs = log_history.get(target, ["No activity recorded."])
         
         # Display full conversation history for this agent
         for item in logs:
@@ -864,78 +1202,210 @@ def render_control_workspace():
         with grid_placeholder.container():
             render_hub_and_spoke(active_agent="Router", log_history=st.session_state.control_history, key_suffix="")
 
-# --- DEVOPS WORKSPACE ---
-def render_devops_workspace():
-    st.markdown("## 🛠️ DevOps Sandbox")
+# --- MAKER SPACE WORKSPACE (PHASE 9) ---
+def render_maker_workspace():
+    st.markdown("## 🛠️ Maker & IoT Lab")
     
-    # Fix import path for tools (sibling directory)
-    import sys
+    # 1. Status Connection
     import os
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(current_dir)
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
+    from tools.iot_ops import get_states, call_service
     
-    # Priority Insert
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
-        
     try:
-        from core_tools.git_ops import get_current_branch, get_branches, get_status, create_branch, commit_changes
-    except ImportError as e:
-        st.error(f"Import Failed: {e}")
-        st.code(f"Sys Path: {sys.path}")
-        # Debug helper if even renaming fails
-        st.write(f"Looking for 'core_tools' in {parent_dir}")
-        st.stop()
-    
-    # 1. Branch Management
-    col_branch, col_actions = st.columns([1, 2])
-    
-    with col_branch:
-        current_branch = get_current_branch()
-        st.metric("Current Branch", current_branch, delta="Active", delta_color="normal")
+        states_json = get_states()
+        import json
+        states = json.loads(states_json)
+    except Exception as e:
+        st.error(f"Connection Failed: {e}")
+        states = []
         
-        all_branches = get_branches()
-        selected_branch = st.selectbox("Switch Branch", all_branches, index=0 if current_branch not in all_branches else all_branches.index(current_branch))
-        
-        if st.button("Checkout"):
-            # Mock checkout for safety in this session, requires restart usually
-            st.toast(f"Switched to {selected_branch} (Session Refresh Required)")
-            
-    with col_actions:
-        st.markdown("### Create Feature Sandbox")
-        new_branch = st.text_input("New Branch Name", placeholder="feature/new-agent-logic")
-        if st.button("🚀 Launch Sandbox") and new_branch:
-            res = create_branch(new_branch)
-            st.success(f"Sandbox Created: {res}")
-            st.rerun()
-
-    st.divider()
-
-    # 2. Staging Area
-    st.markdown("### 📦 Stage & Commit")
-    status_output = get_status()
+    # 2. Key Metrics Row
+    m1, m2, m3, m4 = st.columns(4)
     
-    c1, c2 = st.columns(2)
+    # Extract specific entities safely
+    temp = next((s for s in states if "temp" in s["entity_id"]), None)
+    studio_light = next((s for s in states if "studio" in s["entity_id"]), None)
+    front_door = next((s for s in states if "lock" in s["entity_id"]), None)
+    printer = next((s for s in states if "printer" in s["entity_id"]), None)
+    
+    with m1:
+        val = f"{temp['state']}{temp['attributes'].get('unit_of_measurement', '°F')}" if temp else "--"
+        st.metric("Test Bench Temp", val)
+        
+    with m2:
+        val = studio_light['state'].upper() if studio_light else "OFF"
+        st.metric("Work Light", val)
+    
+    with m3:
+        val = front_door['state'].upper() if front_door else "UNKNOWN"
+        st.metric("Facility Lock", val, delta_color="off" if val=="LOCKED" else "normal")
+        
+    with m4:
+        val = printer['state'].upper() if printer else "IDLE"
+        st.metric("3D Printer", val)
+        
+    st.markdown("---")
+    
+    # 3. Device Grid
+    st.subheader("🔌 Hardware Test Bench (Live)")
+    
+    c1, c2 = st.columns([2, 1])
+    
     with c1:
-        st.text_area("Git Status", status_output, height=300, disabled=True)
+        for device in states:
+            entity_id = device["entity_id"]
+            name = device["attributes"].get("friendly_name", entity_id)
+            state = device["state"]
+            
+            # Smart Card
+            with st.container():
+                cols = st.columns([3, 1, 1])
+                cols[0].write(f"**{name}** (`{entity_id}`)")
+                cols[1].caption(f"State: {state}")
+                
+                if "light" in entity_id or "switch" in entity_id:
+                    if cols[2].button("Toggle", key=f"btn_{entity_id}"):
+                        new_state = "turn_off" if state == "on" else "turn_on"
+                        domain = entity_id.split(".")[0]
+                        res = call_service(domain, new_state, entity_id)
+                        st.toast(res)
+                        time.sleep(1)
+                        st.rerun()
+                elif "lock" in entity_id:
+                    cols[2].warning("LOCKED")
     
     with c2:
-        commit_msg = st.text_input("Commit Message", placeholder="feat: updated router logic")
-        if st.button("Commit & Push") and commit_msg:
-             # Full workflow: Add . -> Commit
-             from tools.git_ops import stage_all
-             stage_all()
-             res = commit_changes(commit_msg)
-             st.success(f"Changes Committed! {res}")
-             st.rerun()
-             
-    st.info("ℹ️ Note: This is a live interface to the project's Git repository. Changes are real.")
+        st.info("ℹ️ **Lab Notes**")
+        st.caption("Use the Console below to create devices or controlling existing ones.")
+        
+    st.markdown("---")
+
+    # 4. Maker Console (Agent Interaction)
+    st.subheader("💬 Maker Console")
+    
+    with st.form(key="maker_console"):
+        col_input, col_btn = st.columns([6, 1])
+        with col_input:
+            maker_prompt = st.text_input("Command", placeholder="e.g., 'Simulate a blinky circuit with a red LED'", label_visibility="collapsed")
+        with col_btn:
+            run_maker = st.form_submit_button("🚀 Run")
+            
+    if run_maker and maker_prompt:
+        with st.status("⚡ executing...", expanded=True) as status:
+            st.write(f"Input: {maker_prompt}")
+            
+            # Run Swarm in-place
+            try:
+                # We reuse the main chat_swarm function
+                for update in chat_swarm(maker_prompt):
+                    if update["type"] == "status":
+                        status.write(f"ℹ️ {update['content']}")
+                    elif update["type"] == "response":
+                        st.success(update["content"])
+                    elif update["type"] == "artifact":
+                        st.info(f"Generated: {update['content']['name']}")
+                        
+                status.update(label="Task Complete", state="complete", expanded=False)
+                time.sleep(1.5)
+                st.rerun() # Refresh to show new simulations or device states
+            except Exception as e:
+                status.error(f"Error: {e}")
+    # 4. Simulation Lab (Wokwi Integration)
+    st.markdown("---")
+    st.subheader("🧪 Hardware Simulation Lab (Wokwi)")
+    
+    # Path relative to agents/ui.py -> workspace/simulations
+    ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
+    sim_dir = os.path.join(ROOT_DIR, "workspace", "simulations")
+    
+    if not os.path.exists(sim_dir):
+        os.makedirs(sim_dir, exist_ok=True)
+        
+    projects = [d for d in os.listdir(sim_dir) if os.path.isdir(os.path.join(sim_dir, d))]
+    
+    col_sim_list, col_sim_view = st.columns([1, 3])
+    
+    with col_sim_list:
+        selected_sim = st.radio("Select Project", projects) if projects else None
+        if st.button("🔄 Refresh Labs"): st.rerun()
+        
+    with col_sim_view:
+        if selected_sim:
+            diagram_path = os.path.join(sim_dir, selected_sim, "diagram.json")
+            if os.path.exists(diagram_path):
+                import json
+                with open(diagram_path, "r") as f:
+                    diagram_content = f.read()
+
+                # Robust JSON serialization
+                try:
+                    json_obj = json.loads(diagram_content)
+                    safe_json_str = json.dumps(json_obj)
+                except:
+                    safe_json_str = "{}"
+                    
+                # Load Template
+                template_path = os.path.join(os.path.dirname(__file__), "templates", "wokwi_circuit.html")
+                with open(template_path, "r") as f:
+                    html_template = f.read()
+                    
+                # Inject Data
+                rendered_html = html_template.replace("{{DIAGRAM_JSON}}", safe_json_str).replace("{{PROJECT_NAME}}", selected_sim)
+                
+                # --- TABS FOR VIEWING MODES ---
+                tab_board, tab_graph, tab_json = st.tabs(["🧩 Visual Board", "🕸️ Topology", "📜 JSON Source"])
+                
+                with tab_board:
+                    st.caption("Rendering Visual Board via @wokwi/elements...")
+                    # Render the HTML template which now contains the Wokwi Elements logic
+                    import streamlit.components.v1 as components
+                    components.html(rendered_html, height=600, scrolling=True)
+
+                with tab_graph:
+                    # --- MERMAID VISUALIZER ---
+                    try:
+                        data = json.loads(diagram_content)
+                        parts = {p["id"]: p["type"].replace("wokwi-", "").replace("board-", "") for p in data.get("parts", [])}
+                        
+                        mermaid_code = "graph LR;\n"
+                        # Style Nodes
+                        for pid, ptype in parts.items():
+                            mermaid_code += f"    {pid}[{ptype}]\n"
+                        
+                        # Edges
+                        for conn in data.get("connections", []):
+                            if len(conn) >= 2:
+                                src = conn[0].replace(":", "_")
+                                tgt = conn[1].replace(":", "_")
+                                src_id = conn[0].split(":")[0]
+                                tgt_id = conn[1].split(":")[0]
+                                color = conn[2] if len(conn) > 2 else "wire"
+                                mermaid_code += f"    {src_id} -- {conn[0].split(':')[1]} to {conn[1].split(':')[1]} ({color}) --> {tgt_id};\n"
+                                
+                        st.markdown(f"```mermaid\n{mermaid_code}\n```")
+                    except Exception as e:
+                        st.error(f"Graph Error: {e}")
+
+                with tab_json:
+                     st.json(json.loads(diagram_content))
+                
+                # Clean Path Display
+                rel_disp = os.path.relpath(diagram_path, ROOT_DIR)
+                st.caption(f"📍 Source: `{rel_disp}`")
+            else:
+                st.warning("Diagram.json not found in project.")
+        else:
+            st.info("No simulations found. Ask the agent to 'Simulate an ESP32'.")
+
 
 # --- MAIN DISPATCHER ---
 if st.session_state.workspace == "Chat":
     render_chat_workspace()
 elif st.session_state.workspace == "Media":
     render_media_workspace()
+elif st.session_state.workspace == "Voice Studio":
+    render_voice_workspace()
 elif st.session_state.workspace == "Coding":
     render_coding_workspace()
 elif st.session_state.workspace == "Prototyping":
@@ -944,3 +1414,7 @@ elif st.session_state.workspace == "Control":
     render_control_workspace()
 elif st.session_state.workspace == "DevOps":
     render_devops_workspace()
+elif st.session_state.workspace == "Maker Space":
+    render_maker_workspace()
+elif st.session_state.workspace == "Governance":
+    render_governance_workspace()

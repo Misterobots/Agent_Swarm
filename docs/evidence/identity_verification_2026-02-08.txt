@@ -1,0 +1,15 @@
+Failed to fetch JWT-SVID: Error fetching JWT SVID: WorkloadApiClient.fetch_jwt_svid() got an unexpected keyword argument 'audiences'
+=== SPIFFE Verification ===
+Socket Path: unix:///var/run/spire/agent.sock
+[OK] Socket file exists: /var/run/spire/agent.sock
+Successfully imported spiffe.WorkloadApiClient
+
+Initializing SpiffeAuth...
+
+Fetching X.509 SVID...
+[OK] SVID Fetched!
+    SPIFFE ID: spiffe://home-ai-lab/agent/runtime
+    Trust Domain: home-ai-lab
+
+Testing JWT Generation...
+[FAIL] Could not generate JWT

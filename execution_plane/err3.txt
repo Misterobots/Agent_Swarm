@@ -1,0 +1,47 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: .pytest_cache
+rootdir: /app
+plugins: anyio-4.12.1
+collecting ... collected 12 items
+
+test_mars_loop.py::TestMarsRLLoop::test_solver_passes_first_try PASSED   [  8%]
+test_mars_loop.py::TestMarsRLLoop::test_solver_fails_corrector_invoked PASSED [ 16%]
+test_mars_loop.py::TestMarsRLLoop::test_max_iterations_respected PASSED  [ 25%]
+test_mars_loop.py::TestMarsRLLoop::test_solver_crash_returns_error_result PASSED [ 33%]
+test_mars_loop.py::TestLogicVerifier::test_valid_python_passes PASSED    [ 41%]
+test_mars_loop.py::TestLogicVerifier::test_syntax_error_fails PASSED     [ 50%]
+test_mars_loop.py::TestLogicVerifier::test_empty_response_fails PASSED   [ 58%]
+test_mars_loop.py::TestLogicVerifier::test_repetitive_response_fails PASSED [ 66%]
+test_mars_loop.py::TestLogicVerifier::test_unclosed_codeblock_fails FAILED [ 75%]
+test_mars_loop.py::TestLogicVerifier::test_plain_text_research_passes PASSED [ 83%]
+test_mars_loop.py::TestMarsLoopStream::test_stream_yields_response_on_success PASSED [ 91%]
+test_mars_loop.py::TestMarsLoopStream::test_stream_yields_error_on_loop_crash PASSED [100%]
+
+=================================== FAILURES ===================================
+_______________ TestLogicVerifier.test_unclosed_codeblock_fails ________________
+
+self = <test_mars_loop.TestLogicVerifier object at 0x70a92be44bd0>
+
+    def test_unclosed_codeblock_fails(self):
+        v = self._make_verifier()
+        result = v.verify(
+            "Write code",
+            "Here is your code:\n```python\ndef foo():\n    pass\n"  # No closing ```
+        )
+        assert result.passed is False
+>       assert "truncated" in result.reason.lower()
+E       AssertionError: assert 'truncated' in 'coherence: response suspiciously short (48 chars) | syntax: syntaxerror in block 1: invalid syntax (line 1)'
+E        +  where 'coherence: response suspiciously short (48 chars) | syntax: syntaxerror in block 1: invalid syntax (line 1)' = <built-in method lower of str object at 0x70a92bec3c30>()
+E        +    where <built-in method lower of str object at 0x70a92bec3c30> = 'Coherence: Response suspiciously short (48 chars) | Syntax: SyntaxError in block 1: invalid syntax (line 1)'.lower
+E        +      where 'Coherence: Response suspiciously short (48 chars) | Syntax: SyntaxError in block 1: invalid syntax (line 1)' = VerifierResult(passed=False, reason='Coherence: Response suspiciously short (48 chars) | Syntax: SyntaxError in block 1: invalid syntax (line 1)', score=0.15000000000000002).reason
+
+test_mars_loop.py:221: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     Verifier:verifier_agent.py:67 [Verifier] Verifying response (49 chars)...
+WARNING  Verifier:verifier_agent.py:77 [Verifier] Coherence fail: Response suspiciously short (48 chars)
+WARNING  Verifier:verifier_agent.py:85 [Verifier] AST fail: SyntaxError in block 1: invalid syntax (line 1)
+INFO     Verifier:verifier_agent.py:106 [Verifier] Score: 0.15 | Passed: False | Reason: Coherence: Response suspiciously short (48 chars) | Syntax: SyntaxError in block 1: invalid syntax (line 1)
+=========================== short test summary info ============================
+FAILED test_mars_loop.py::TestLogicVerifier::test_unclosed_codeblock_fails - ...
+========================= 1 failed, 11 passed in 0.17s =========================

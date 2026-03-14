@@ -1,0 +1,8 @@
+Testing: 'Hello there'
+VoiceCloningExpert - INFO - --- [Voice Cloning] Using Pre-recorded Sample: Intro01_HELLO_there.wav ---
+SUCCESS: Matched 'Hello there' to '/app/agents/bmo_voice/voice_samples/Intro01_HELLO_there.wav'
+
+Testing: 'This is a random sentence that should be generated.'
+VoiceCloningExpert - INFO - --- [Voice Cloning] Request: 'This is a random sentence that should be generated.' (Refs: 0) Effect: None ---
+VoiceCloningExpert - ERROR - Voice Engine Error (500): {"detail":"Either `voice_clone_prompt` or `ref_audio` must be provided."}
+Result: Voice Engine Error (500): {"detail":"Either `voice_clone_prompt` or `ref_audio` must be provided."} (Expected generation attempt)

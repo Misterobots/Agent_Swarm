@@ -1,0 +1,873 @@
+{
+  "version": "1.0.0",
+  "category": "accessibility",
+  "patterns": [
+    {
+      "id": "7511cebe018d2fad",
+      "subcategory": "keyboard-nav",
+      "name": "Keyboard Navigation Detector",
+      "description": "Learns keyboard navigation patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/keyboard-nav",
+          "patternId": "accessibility/keyboard-nav/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 198,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 268,
+          "column": 57
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "b14590568b2e3e1c",
+      "subcategory": "focus-management",
+      "name": "Focus Management Detector",
+      "description": "Learns focus management patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/focus-management",
+          "patternId": "accessibility/focus-management/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 198,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 268,
+          "column": 57
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "43cded397e91a190",
+      "subcategory": "alt-text",
+      "name": "Alt Text Detector",
+      "description": "Learns alt text patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/alt-text",
+          "patternId": "accessibility/alt-text/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.19,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 229,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 235,
+          "column": 47
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 284,
+          "column": 13
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 284,
+          "column": 49
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 24,
+          "column": 23
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 271,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 318,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 381,
+          "column": 13
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 249,
+          "column": 22
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 249,
+          "column": 45
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 254,
+          "column": 41
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 379,
+          "column": 52
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 519,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 519,
+          "column": 55
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 173,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 186,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 201,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 208,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 510,
+          "column": 9
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0f58433201d9c103",
+      "subcategory": "alt-text",
+      "name": "Alt Text Detector",
+      "description": "Learns alt text patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/alt-text",
+          "patternId": "accessibility/alt-text/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.26,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 5,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 235,
+          "column": 67
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 136,
+          "column": 86
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 286,
+          "column": 28
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 20,
+          "column": 18
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 26,
+          "column": 20
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 58,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 64,
+          "column": 21
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 274,
+          "column": 16
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 278,
+          "column": 21
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 281,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 331,
+          "column": 24
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 250,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 251,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 268,
+          "column": 23
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 271,
+          "column": 26
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 317,
+          "column": 19
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 323,
+          "column": 22
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 324,
+          "column": 33
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 354,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 518,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 521,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 522,
+          "column": 32
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 524,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 314,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 511,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 518,
+          "column": 44
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "21cc37ffb31af6de",
+      "subcategory": "alt-text",
+      "name": "Alt Text Detector",
+      "description": "Learns alt text patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/alt-text",
+          "patternId": "accessibility/alt-text/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 223,
+          "column": 30
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 278,
+          "column": 30
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 29,
+          "column": 9
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 29,
+          "column": 49
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 29,
+          "column": 67
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 191,
+          "column": 107
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 377,
+          "column": 52
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 419,
+          "column": 159
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "6f30601a27a27b40",
+      "subcategory": "focus-management",
+      "name": "Focus Management Detector",
+      "description": "Learns focus management patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/focus-management",
+          "patternId": "accessibility/focus-management/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 182,
+          "column": 275
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0681a0eeb2052770",
+      "subcategory": "semantic-html",
+      "name": "Semantic HTML Detector",
+      "description": "Learns semantic HTML patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/semantic-html",
+          "patternId": "accessibility/semantic-html/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.09,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7350000000000001,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 189,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 214,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 215,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 216,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 217,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 218,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 219,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 220,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 221,
+          "column": 9
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "9d13df58817c1a36",
+      "subcategory": "aria-roles",
+      "name": "ARIA Roles Detector",
+      "description": "Learns ARIA roles patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/aria-roles",
+          "patternId": "accessibility/aria-roles/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8353846153846154,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 336,
+          "column": 43
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 664,
+          "column": 39
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "3a5fbca2cf4777ac",
+      "subcategory": "aria-roles",
+      "name": "ARIA Roles Detector",
+      "description": "Learns ARIA roles patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/aria-roles",
+          "patternId": "accessibility/aria-roles/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8353846153846154,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 69,
+          "column": 14
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 86,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 114,
+          "column": 99
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 419,
+          "column": 31
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 542,
+          "column": 110
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 559,
+          "column": 27
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 590,
+          "column": 75
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 616,
+          "column": 82
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "aaa10ba2e296b4ac",
+      "subcategory": "aria-roles",
+      "name": "ARIA Roles Detector",
+      "description": "Learns ARIA roles patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/aria-roles",
+          "patternId": "accessibility/aria-roles/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.6353846153846154,
+        "level": "low"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 217,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 269,
+          "column": 71
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d6e7b74f9b4ed6f1",
+      "subcategory": "aria-roles",
+      "name": "ARIA Roles Detector",
+      "description": "Learns ARIA roles patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/aria-roles",
+          "patternId": "accessibility/aria-roles/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.01,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.8353846153846154,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 368,
+          "column": 130
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0eb9519a1822f76a",
+      "subcategory": "heading-hierarchy",
+      "name": "Heading Hierarchy Detector",
+      "description": "Learns heading hierarchy patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/heading-hierarchy",
+          "patternId": "accessibility/heading-hierarchy/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.09,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 214,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 215,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 216,
+          "column": 42
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 302,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 302,
+          "column": 34
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 313,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 313,
+          "column": 41
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 324,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 324,
+          "column": 41
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "b0a50eb78e7dabfa",
+      "subcategory": "alt-text",
+      "name": "Alt Text Detector",
+      "description": "Learns alt text patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "accessibility/alt-text",
+          "patternId": "accessibility/alt-text/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7265217391304347,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 110,
+          "column": 8
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 283,
+          "column": 4
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 42,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 81,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 521,
+          "column": 24
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 556,
+          "column": 25
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:07.897Z",
+  "checksum": "c8e0d05a625b2c5c"
+}

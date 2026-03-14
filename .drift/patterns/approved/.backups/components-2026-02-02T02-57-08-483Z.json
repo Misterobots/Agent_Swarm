@@ -1,0 +1,1624 @@
+{
+  "version": "1.0.0",
+  "category": "components",
+  "patterns": [
+    {
+      "id": "6b70b31c4971401e",
+      "subcategory": "component-structure",
+      "name": "Component Structure Detector",
+      "description": "Learns component structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/component-structure",
+          "patternId": "components/component-structure/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.29,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.9199999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 125,
+          "column": 19
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 342,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 410,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 458,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 848,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 855,
+          "column": 27
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 857,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 865,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 936,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 938,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 940,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 942,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 944,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 946,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 293,
+          "column": 21
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.866Z",
+        "approvedAt": "2026-02-02T02:56:39.866Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "7d6bde9ced5b59e8",
+      "subcategory": "props-patterns",
+      "name": "Props Patterns Detector",
+      "description": "Learns props patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/props-patterns",
+          "patternId": "components/props-patterns/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.26,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 6,
+        "score": 0.8825,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 42,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 39,
+          "column": 19
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 90,
+          "column": 84
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 231,
+          "column": 69
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 50,
+          "column": 54
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 67,
+          "column": 49
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 132,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 132,
+          "column": 47
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 246,
+          "column": 17
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 246,
+          "column": 47
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 366,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 366,
+          "column": 48
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 24,
+          "column": 95
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:39.961Z",
+        "approvedAt": "2026-02-02T02:56:39.961Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "319c3931c57f57d8",
+      "subcategory": "duplicate-detection",
+      "name": "Duplicate Detection Detector",
+      "description": "Learns duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/duplicate-detection",
+          "patternId": "components/duplicate-detection/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.29,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.908235294117647,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 125,
+          "column": 19
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 342,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 410,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 458,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 848,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 855,
+          "column": 27
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 857,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 865,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 936,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 938,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 940,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 942,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 944,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 946,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 165,
+          "column": 27
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.042Z",
+        "approvedAt": "2026-02-02T02:56:40.042Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "2cac68f1edfd946f",
+      "subcategory": "duplicate-detection",
+      "name": "Duplicate Detection Detector",
+      "description": "Learns duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/duplicate-detection",
+          "patternId": "components/duplicate-detection/decorator"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 37,
+          "column": 6
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.139Z",
+        "approvedAt": "2026-02-02T02:56:40.139Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "28a29bd95f1e877c",
+      "subcategory": "near-duplicate",
+      "name": "Near Duplicate Detector",
+      "description": "Learns near-duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/near-duplicate",
+          "patternId": "components/near-duplicate/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.27,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.9199999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 125,
+          "column": 19
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 342,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 410,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 458,
+          "column": 29
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 848,
+          "column": 21
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 855,
+          "column": 27
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 857,
+          "column": 17
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 865,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 936,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 938,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 940,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 942,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 944,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 946,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.236Z",
+        "approvedAt": "2026-02-02T02:56:40.236Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "e4e47ec852906c08",
+      "subcategory": "state-patterns",
+      "name": "State Patterns Detector",
+      "description": "Learns state management patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/state-patterns",
+          "patternId": "components/state-patterns/class_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 54,
+          "column": 7
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.323Z",
+        "approvedAt": "2026-02-02T02:56:40.323Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "a9e224be9000a0b8",
+      "subcategory": "state-patterns",
+      "name": "State Patterns Detector",
+      "description": "Learns state management patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/state-patterns",
+          "patternId": "components/state-patterns/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 152,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 152,
+          "column": 14
+        },
+        {
+          "file": "agents\\metrics.py",
+          "line": 5,
+          "column": 12
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 863,
+          "column": 16
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.406Z",
+        "approvedAt": "2026-02-02T02:56:40.406Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "87593cc8b6b8e93a",
+      "subcategory": "composition",
+      "name": "Composition Detector",
+      "description": "Learns component composition patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/composition",
+          "patternId": "components/composition/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 87,
+          "column": 55
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.502Z",
+        "approvedAt": "2026-02-02T02:56:40.502Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "87c5dd6554c1e49e",
+      "subcategory": "props-patterns",
+      "name": "Props Patterns Detector",
+      "description": "Learns props patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/props-patterns",
+          "patternId": "components/props-patterns/property_access"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\prompts\\architect_prompts.py",
+          "line": 30,
+          "column": 35
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 454,
+          "column": 33
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.590Z",
+        "approvedAt": "2026-02-02T02:56:40.590Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "48fb1203882f9555",
+      "subcategory": "component-structure",
+      "name": "Component Structure Detector",
+      "description": "Learns component structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/component-structure",
+          "patternId": "components/component-structure/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.13,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 5,
+        "score": 0.9416216216216216,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 91
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 144,
+          "column": 59
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 145,
+          "column": 81
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 38,
+          "column": 43
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 84,
+          "column": 54
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 85,
+          "column": 50
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 42,
+          "column": 27
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 37,
+          "column": 31
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 272,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 31,
+          "column": 20
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.672Z",
+        "approvedAt": "2026-02-02T02:56:40.672Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "3820f7d4b8c057f8",
+      "subcategory": "duplicate-detection",
+      "name": "Duplicate Detection Detector",
+      "description": "Learns duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/duplicate-detection",
+          "patternId": "components/duplicate-detection/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.13,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 5,
+        "score": 0.9416216216216216,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 91
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 144,
+          "column": 59
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 145,
+          "column": 81
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 58,
+          "column": 67
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 38,
+          "column": 43
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 84,
+          "column": 54
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 85,
+          "column": 50
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 37,
+          "column": 31
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 272,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 31,
+          "column": 20
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.766Z",
+        "approvedAt": "2026-02-02T02:56:40.766Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "996088b2a19a76ea",
+      "subcategory": "near-duplicate",
+      "name": "Near Duplicate Detector",
+      "description": "Learns near-duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/near-duplicate",
+          "patternId": "components/near-duplicate/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.11,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 5,
+        "score": 0.9416216216216216,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 91
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 144,
+          "column": 59
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 145,
+          "column": 81
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 38,
+          "column": 43
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 84,
+          "column": 54
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 85,
+          "column": 50
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 37,
+          "column": 31
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 272,
+          "column": 25
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 31,
+          "column": 20
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.851Z",
+        "approvedAt": "2026-02-02T02:56:40.851Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "db7203c278217cdb",
+      "subcategory": "composition",
+      "name": "Composition Detector",
+      "description": "Learns component composition patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/composition",
+          "patternId": "components/composition/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 139,
+          "column": 91
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 31,
+          "column": 20
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:40.941Z",
+        "approvedAt": "2026-02-02T02:56:40.941Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "e9ca9d9cab7a23f6",
+      "subcategory": "duplicate-detection",
+      "name": "Duplicate Detection Detector",
+      "description": "Learns duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/duplicate-detection",
+          "patternId": "components/duplicate-detection/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.08,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\security_agent.py",
+          "line": 20,
+          "column": 67
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 419,
+          "column": 122
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 6,
+          "column": 124
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 43
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.025Z",
+        "approvedAt": "2026-02-02T02:56:41.025Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "e795d4ae023297f4",
+      "subcategory": "component-structure",
+      "name": "Component Structure Detector",
+      "description": "Learns component structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/component-structure",
+          "patternId": "components/component-structure/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.8999999999999999,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 22,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 22,
+          "column": 29
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 41,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 41,
+          "column": 34
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 54,
+          "column": 41
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 14,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.109Z",
+        "approvedAt": "2026-02-02T02:56:41.109Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f0c566daf444fe77",
+      "subcategory": "duplicate-detection",
+      "name": "Duplicate Detection Detector",
+      "description": "Learns duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/duplicate-detection",
+          "patternId": "components/duplicate-detection/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.1,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.9147368421052631,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 14,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 301,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 312,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 323,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 718,
+          "column": 18
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.223Z",
+        "approvedAt": "2026-02-02T02:56:41.223Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "cba313b25f556801",
+      "subcategory": "near-duplicate",
+      "name": "Near Duplicate Detector",
+      "description": "Learns near-duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/near-duplicate",
+          "patternId": "components/near-duplicate/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.9147368421052631,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 14,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.304Z",
+        "approvedAt": "2026-02-02T02:56:41.304Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0d0d91c4bc474743",
+      "subcategory": "component-structure",
+      "name": "Component Structure Detector",
+      "description": "Learns component structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/component-structure",
+          "patternId": "components/component-structure/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 419,
+          "column": 122
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 6,
+          "column": 124
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 43
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.484Z",
+        "approvedAt": "2026-02-02T02:56:41.484Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "0825f1030976b523",
+      "subcategory": "near-duplicate",
+      "name": "Near Duplicate Detector",
+      "description": "Learns near-duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/near-duplicate",
+          "patternId": "components/near-duplicate/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 3,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 419,
+          "column": 122
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 6,
+          "column": 124
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 43
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.571Z",
+        "approvedAt": "2026-02-02T02:56:41.571Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "80d58b45f3b22faa",
+      "subcategory": "ref-forwarding",
+      "name": "Ref Forwarding Detector",
+      "description": "Learns ref forwarding patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/ref-forwarding",
+          "patternId": "components/ref-forwarding/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.945,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 85,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.665Z",
+        "approvedAt": "2026-02-02T02:56:41.665Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "5da6c74dd41b266f",
+      "subcategory": "props-patterns",
+      "name": "Props Patterns Detector",
+      "description": "Learns props patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/props-patterns",
+          "patternId": "components/props-patterns/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 6,
+          "column": 135
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.750Z",
+        "approvedAt": "2026-02-02T02:56:41.750Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "d5f7c8121ff94971",
+      "subcategory": "component-structure",
+      "name": "Component Structure Detector",
+      "description": "Learns component structure patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/component-structure",
+          "patternId": "components/component-structure/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.16,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 292,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 476,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 562,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 637,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 673,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 788,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 868,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.835Z",
+        "approvedAt": "2026-02-02T02:56:41.835Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f36ea27a8de016cd",
+      "subcategory": "duplicate-detection",
+      "name": "Duplicate Detection Detector",
+      "description": "Learns duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/duplicate-detection",
+          "patternId": "components/duplicate-detection/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.16,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.9280645161290323,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 292,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 476,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 562,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 637,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 673,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 788,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 868,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:41.924Z",
+        "approvedAt": "2026-02-02T02:56:41.924Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "e8e5d37e1747a957",
+      "subcategory": "near-duplicate",
+      "name": "Near Duplicate Detector",
+      "description": "Learns near-duplicate component patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/near-duplicate",
+          "patternId": "components/near-duplicate/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.16,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.945,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 292,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 476,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 562,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 637,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 673,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 788,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 868,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.000Z",
+        "approvedAt": "2026-02-02T02:56:42.000Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "f02ffdcc51359b6a",
+      "subcategory": "composition",
+      "name": "Composition Detector",
+      "description": "Learns component composition patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/composition",
+          "patternId": "components/composition/function_definition"
+        }
+      },
+      "confidence": {
+        "frequency": 0.16,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 292,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 476,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 562,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 637,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 673,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 788,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 868,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.072Z",
+        "approvedAt": "2026-02-02T02:56:42.072Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "9c1db59365db7d3d",
+      "subcategory": "ref-forwarding",
+      "name": "Ref Forwarding Detector",
+      "description": "Learns ref forwarding patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "components/ref-forwarding",
+          "patternId": "components/ref-forwarding/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.06,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.95,
+        "level": "high"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 497,
+          "column": 22
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 592,
+          "column": 26
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 902,
+          "column": 63
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:42.166Z",
+        "approvedAt": "2026-02-02T02:56:42.166Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:08.348Z",
+  "checksum": "ddff85a7a626ef34"
+}

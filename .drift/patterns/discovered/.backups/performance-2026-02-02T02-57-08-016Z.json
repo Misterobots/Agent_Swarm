@@ -1,0 +1,833 @@
+{
+  "version": "1.0.0",
+  "category": "performance",
+  "patterns": [
+    {
+      "id": "4e8976c5aeac458b",
+      "subcategory": "code-splitting",
+      "name": "Code Splitting Detector",
+      "description": "Learns code splitting patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/code-splitting",
+          "patternId": "performance/code-splitting/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 1,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 16,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 1,
+          "column": 1
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\context_manager.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 9,
+          "column": 1
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "file": "agents\\logger_setup.py",
+          "line": 8,
+          "column": 5
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 1,
+          "column": 1
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 7,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 8,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 9,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 10,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 11,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 12,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 234,
+          "column": 17
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 283,
+          "column": 13
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 310,
+          "column": 21
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 334,
+          "column": 29
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 371,
+          "column": 13
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 482,
+          "column": 1
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 483,
+          "column": 1
+        },
+        {
+          "file": "agents\\security_agent.py",
+          "line": 1,
+          "column": 1
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\semantic_router.py",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 1,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 7,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\forge_agent.py",
+          "line": 70,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 1,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 207,
+          "column": 5
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 263,
+          "column": 1
+        },
+        {
+          "file": "agents\\specialized\\image_gen.py",
+          "line": 358,
+          "column": 5
+        },
+        {
+          "file": "agents\\test_capabilities.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\tools\\file_ops.py",
+          "line": 1,
+          "column": 1
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 1,
+          "column": 1
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\tools\\terminal.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 7,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 8,
+          "column": 1
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 47,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 53,
+          "column": 18
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 207,
+          "column": 57
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 208,
+          "column": 37
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 223,
+          "column": 32
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 228,
+          "column": 57
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 230,
+          "column": 57
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 231,
+          "column": 92
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 271,
+          "column": 44
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 274,
+          "column": 54
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 422,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 500,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 566,
+          "column": 69
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 567,
+          "column": 44
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 573,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 702,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 709,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 744,
+          "column": 13
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 804,
+          "column": 9
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 872,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 873,
+          "column": 5
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 883,
+          "column": 12
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 1,
+          "column": 1
+        },
+        {
+          "file": "core_tools\\git_ops.py",
+          "line": 2,
+          "column": 1
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "713138370dd9cf51",
+      "subcategory": "memoization",
+      "name": "Memoization Detector",
+      "description": "Learns memoization patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/memoization",
+          "patternId": "performance/memoization/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 4,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\architect_agent.py",
+          "line": 22,
+          "column": 74
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 12,
+          "column": 26
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 153,
+          "column": 34
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 378,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 391,
+          "column": 30
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 19,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "1fa75c974703734b",
+      "subcategory": "caching-patterns",
+      "name": "Caching Patterns Detector",
+      "description": "Learns caching patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/caching-patterns",
+          "patternId": "performance/caching-patterns/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\dispatcher.py",
+          "line": 56,
+          "column": 48
+        },
+        {
+          "file": "agents\\ui.py",
+          "line": 19,
+          "column": 5
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "9f584199eb08a534",
+      "subcategory": "lazy-loading",
+      "name": "Lazy Loading Detector",
+      "description": "Learns lazy loading patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/lazy-loading",
+          "patternId": "performance/lazy-loading/unknown"
+        }
+      },
+      "confidence": {
+        "frequency": 0.1,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.6699999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\main.py",
+          "line": 29,
+          "column": 1
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 55,
+          "column": 1
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 59,
+          "column": 1
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 61,
+          "column": 5
+        },
+        {
+          "file": "agents\\main.py",
+          "line": 85,
+          "column": 1
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "e8c5f4480e3bb963",
+      "subcategory": "memoization",
+      "name": "Memoization Detector",
+      "description": "Learns memoization patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/memoization",
+          "patternId": "performance/memoization/assignment"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 2,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\memory_system.py",
+          "line": 7,
+          "column": 1
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 30,
+          "column": 43
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 38,
+          "column": 43
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 155,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 157,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 157,
+          "column": 49
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "4b09e622ebc2d7c8",
+      "subcategory": "memoization",
+      "name": "Memoization Detector",
+      "description": "Learns memoization patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/memoization",
+          "patternId": "performance/memoization/function_call"
+        }
+      },
+      "confidence": {
+        "frequency": 0.04,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.77,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\memory_system.py",
+          "line": 88,
+          "column": 1
+        },
+        {
+          "file": "agents\\memory_system.py",
+          "line": 88,
+          "column": 10
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "2a00e13453a722b2",
+      "subcategory": "memoization",
+      "name": "Memoization Detector",
+      "description": "Learns memoization patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/memoization",
+          "patternId": "performance/memoization/import"
+        }
+      },
+      "confidence": {
+        "frequency": 0.12,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\router.py",
+          "line": 152,
+          "column": 23
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 152,
+          "column": 44
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 354,
+          "column": 18
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 354,
+          "column": 39
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 390,
+          "column": 22
+        },
+        {
+          "file": "agents\\router.py",
+          "line": 390,
+          "column": 43
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    },
+    {
+      "id": "b2a02677d7ab87e9",
+      "subcategory": "caching-patterns",
+      "name": "Caching Patterns Detector",
+      "description": "Learns caching patterns from your codebase",
+      "detector": {
+        "type": "regex",
+        "config": {
+          "detectorId": "performance/caching-patterns",
+          "patternId": "performance/caching-patterns/conditional"
+        }
+      },
+      "confidence": {
+        "frequency": 0.02,
+        "consistency": 0.9,
+        "age": 0,
+        "spread": 1,
+        "score": 0.7949999999999999,
+        "level": "medium"
+      },
+      "locations": [
+        {
+          "file": "agents\\ui.py",
+          "line": 390,
+          "column": 50
+        }
+      ],
+      "outliers": [],
+      "metadata": {
+        "firstSeen": "2026-02-02T02:56:37.962Z",
+        "lastSeen": "2026-02-02T02:56:37.962Z"
+      },
+      "severity": "warning",
+      "autoFixable": false
+    }
+  ],
+  "lastUpdated": "2026-02-02T02:57:07.892Z",
+  "checksum": "9fc7b3547d392a68"
+}

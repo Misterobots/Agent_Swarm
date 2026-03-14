@@ -1,81 +1,39 @@
-# AI Home Lab: Distributed Agent Swarm
+# Home AI Lab: Agentic Hive
 
-This project contains the configuration and source code for a local, privacy-focused AI Lab using a **Functional Swarm** architecture.
+A distributed, multi-agent "Swarm Intelligence" system for home automation, coding, and creative tasks.
 
-## Architecture
+## 🚀 MarsRL Inference Loop
 
-![AI Swarm Topology](assets/topology-visual-v2.png)
+The Hive uses a **Solver → Verifier → Corrector** loop for high-speed, self-correcting code generation.
 
 ```mermaid
 graph TD
-    classDef hardware fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef container fill:#d4e1f5,stroke:#333,stroke-width:1px;
-    classDef software fill:#e1f5d4,stroke:#333,stroke-width:1px;
-    classDef db fill:#f5d4d4,stroke:#333,stroke-width:1px;
-
-    User((User)) -->|Port 80| Grafana
-    User -->|Port 3000| OpenHandsUI
-
-    subgraph Control_Plane ["Control Plane"]
-        Postgres[("PostgreSQL")]:::db
-        Spire["SPIRE"]:::software
-    end
-
-    subgraph Execution_Plane ["Execution Plane"]
-        Ollama["Ollama (GPU)"]:::software
-        Router["Router Agent"]:::software
-        Metrics["Metrics"]:::software
-        Prometheus["Prometheus"]:::db
-        Grafana["Grafana"]:::software
-    end
-
-    Router --> Ollama
-    Router --> Postgres
-    Prometheus --> Metrics
-    Prometheus --> cAdvisor
-    Grafana --> Prometheus
-    Router -.-> Postgres
+    User((User)) --> Router{Nemotron Router}
+    Router -- CODE --> Solver[Primary Solver\nqwen3.5:9b]:::software
+    Solver --> Verifier{Logic Verifier}
+    Verifier -- PASS --> Done((Success))
+    Verifier -- FAIL --> Corrector[Corrector Agent\nqwen3.5:9b]:::software
+    Corrector --> Verifier
+    
+    classDef software fill:#1d4ed8,stroke:#3b82f6,color:#bfdbfe
 ```
 
-The system is designed to run on a split-compute infrastructure:
+## 🏗️ Hardware Topology (3 Nodes)
 
-### 1. Control Plane (Dell Wyse 5070)
-- **Role**: Swarm Controller, Memory Store.
-- **Stack**: Docker, Agno AgentOS, PostgreSQL.
-- **Task**: Hosts the state and routes high-level instructions.
+The Hive scales across dedicated hardware to match the right model to the right workload.
 
-### 2. Execution Plane (Main PC - "Justin-PC")
-- **Role**: Heavy Inference, Logic Validation, & **Observability**.
-- **Stack**: Docker (WSL2), Ollama, OpenHands, **Prometheus, Grafana**.
-- **Isolation**: Fully containerized environment. Agents run in Docker, and code execution is sandboxed.
-- **Hardware Allocation**:
-    - **Primary GPU (RTX 5060 Ti - 16GB)**: `qwen2.5-coder:14b` (Architect Agent).
-    - **Secondary GPU (RTX 3070 Ti - 8GB)**: `llama-guard-3:8b` (Security/Validator Agent).
-- **System Memory**: 32GB (Bottleneck Mitigation via distributed offloading).
+- **Dell Wyse 5070 (Control Plane)**: SPIRE, PostgreSQL, Langfuse, ClickHouse.
+- **R730 Server (Primary Gateway)**: `nemotron-orchestrator:8b` (Routing) + `llama-guard-3:8b` (Safety) + `qwen3.5:9b` (Inference).
+- **Justin-PC (Heavy Inference)**: RTX 5060 Ti (16GB) — `qwen3.5:9b` (Secondary Solver) + ComfyUI.
 
-### 3. Networking & Ports
-The Swarm uses the following internal ports:
-- **11434**: Ollama API (Inference).
-- **3000**: OpenHands UI/API (Sandbox) & Grafana Dashboard (Port 80 mapped).
-- **5432**: PostgreSQL (Agent Memory on Control Plane).
-- **9090**: Prometheus (Metrics).
+### VRAM Optimization
+- **High context/Primary tasks**: `qwen3.5:9b` is handled by the R730 or Justin-PC depending on current load.
+- **Why separate?** Frees Justin-PC's RTX 5060 Ti from routing overhead, dedicating resources to heavy inference and generative art.
 
-### 4. Accessing the Ecosystem
-- **Dashboard (Grafana)**: `http://localhost/` (Running on Main PC)
-- **Workbench (OpenHands)**: `http://localhost:3000/`
-- **API (Ollama)**: `http://localhost:11434/`
+## 🛡️ Security & Identity (MAESTRO)
+- **SPIFFE/SPIRE**: Zero-trust workload identity for all inter-agent communication.
+- **Output Validation**: 3-layer Verifier (Python AST + Coherence + Safety).
+- **Auditability**: Full Langfuse traces with process-reward scores for every response.
 
-
-*Tip: Use **Tailscale** to access these via consistent hostnames (e.g., `http://dell-control-plane`) regardless of network changes.*
-
-## Structure
-
-- `/control_plane`: Docker Compose files for the Dell Wyse node.
-- `/execution_plane`: Docker Compose setup for the Main PC (Ollama + Agents).
-- `/agents`: Python source code for the Agno (Phidata) agents.
-
-## Getting Started
-
-1. **Setup Control Plane**: Copy `control_plane` to the Dell Wyse and run `docker-compose up -d`.
-2. **Setup Execution Plane**: Ensure Docker Desktop & WSL2 are installed. Run `docker-compose up -d` in `execution_plane`.
-3. **Launch Swarm**: The agents will auto-start within the container. Monitor logs with `docker logs -f agent-runtime`.
+---
+_Version 3.1 | 2026-03-12 | Qwen 3.5 Standard_

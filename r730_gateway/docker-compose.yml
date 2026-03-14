@@ -1,0 +1,52 @@
+services:
+  # ── Ollama (GPU inference on R730) ──────────────────────────────
+  ollama:
+    image: ollama/ollama
+    container_name: ollama-r730
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    volumes:
+      - ollama-data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always
+    networks:
+      - ai_lab_net
+
+  # ── OpenWebUI (Gateway UI) ─────────────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:8080"
+    environment:
+      # Connect to the AI Lab's own Ollama via Docker network
+      - OLLAMA_BASE_URL=http://ollama:11434
+      # Disable OpenAI defaults
+      - OPENAI_API_BASE_URL=
+      - OPENAI_API_KEY=
+      - WEBUI_DEFAULT_MODELS=nemotron-mini
+      - WEBUI_NAME=MarsRL Hive Gateway
+    volumes:
+      - open-webui-data:/app/backend/data
+    depends_on:
+      - ollama
+    restart: always
+    networks:
+      - ai_lab_net
+
+networks:
+  ai_lab_net:
+    name: ai_lab_net
+    driver: bridge
+
+volumes:
+  ollama-data:
+  open-webui-data:
