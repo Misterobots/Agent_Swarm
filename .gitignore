@@ -25,6 +25,12 @@ logs/
 .vscode/
 .idea/
 
+# Claude Code
+.claude/
+
+# Backups
+*.backup.*
+
 # OS
 .DS_Store
 Thumbs.db

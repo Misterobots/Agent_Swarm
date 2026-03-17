@@ -61,3 +61,8 @@ OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434
 ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "nemotron-mini")
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      "qwen2.5-coder:14b-instruct-q4_k_m")
 LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      "llama3.2:3b")
+
+# ---------------------------------------------------------------------------
+# ExpertiseTemplate Database (swarm schema in langfuse DB)
+# ---------------------------------------------------------------------------
+TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse_password@{CONTROL_NODE_IP}:5432/langfuse")

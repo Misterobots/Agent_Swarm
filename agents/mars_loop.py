@@ -60,6 +60,8 @@ class MarsLoopResult:
     corrector_invoked: bool
     final_score: float                      # Verifier's final score
     trace_id: Optional[str] = None          # Langfuse trace ID (if available)
+    token: Optional[str] = None             # JWT-ACE token used during execution
+    template_metadata: dict = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)
 
 
@@ -76,13 +78,25 @@ class MarsRLLoop:
     building a training dataset for future fine-tuning.
     """
 
-    def __init__(self, solver, verifier, corrector, max_iter: int = 2, intent: str = "CODE", session_id: Optional[str] = None):
+    def __init__(
+        self,
+        solver,
+        verifier,
+        corrector,
+        max_iter: int = 2,
+        intent: str = "CODE",
+        session_id: Optional[str] = None,
+        token: Optional[str] = None,
+        template_metadata: Optional[dict] = None,
+    ):
         self.solver = solver
         self.verifier = verifier
         self.corrector = corrector
         self.max_iter = max_iter
         self.intent = intent
         self.session_id = session_id
+        self.token = token
+        self.template_metadata = template_metadata or {}
 
     @observe(name="mars_loop")
     def run(self, task: str, event_callback: Optional[Callable[[dict], None]] = None, stream_timeout: float = 60.0) -> MarsLoopResult:
@@ -96,10 +110,19 @@ class MarsRLLoop:
         trace_id = None
         if USE_LANGFUSE and _langfuse:
             try:
+                trace_metadata = {"intent": self.intent, "max_iter": self.max_iter}
+                # Enrich with JWT-ACE template metadata
+                if self.template_metadata:
+                    trace_metadata.update({
+                        "template_id": self.template_metadata.get("template_id"),
+                        "template_version": self.template_metadata.get("template_version"),
+                        "agent_instance_id": self.template_metadata.get("agent_instance_id"),
+                        "token_capabilities": self.template_metadata.get("token_capabilities"),
+                    })
                 trace = _langfuse.trace(
                     name="mars_loop",
                     session_id=self.session_id,
-                    metadata={"intent": self.intent, "max_iter": self.max_iter}
+                    metadata=trace_metadata,
                 )
                 trace_id = trace.id
             except Exception as e:
@@ -197,6 +220,10 @@ class MarsRLLoop:
         self._inject_score("solver_score", solver_score, f"Passed in {iterations} round(s)", trace_id)
         self._inject_score("final_quality", final_score, "Final verifier score", trace_id)
 
+        # Tag high-reward traces as training candidates for future fine-tuning
+        if final_score > 0.8:
+            self._inject_score("training_candidate", 1.0, "High-reward trace for training export", trace_id)
+
         return MarsLoopResult(
             response=current_response,
             iterations=iterations,
@@ -204,6 +231,8 @@ class MarsRLLoop:
             corrector_invoked=corrector_invoked,
             final_score=final_score,
             trace_id=trace_id,
+            token=self.token,
+            template_metadata=self.template_metadata,
         )
 
     def _inject_score(self, name: str, value: float, comment: str, trace_id: Optional[str]):
