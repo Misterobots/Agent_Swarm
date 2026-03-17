@@ -64,18 +64,41 @@ async def lifespan(app: FastAPI):
         # 1. Register Routers to Dispatcher
         logger.info("Registering Swarm Event Handlers...")
         dispatcher.register(EventType.USER_TASK, handle_task_event)
-        
+
         # 2. Reset Metrics
         print("DEBUG: Resetting Metrics...")
         AGENT_STATE.labels(agent_name="Router").set(1)
         AGENT_STATE.labels(agent_name="Security").set(1)
         AGENT_STATE.labels(agent_name="Architect").set(1)
-        
+
+        # 3. Initialize ExpertiseTemplate Registry + Async Updater
+        template_updater = None
+        try:
+            from expertise.template_registry import get_template_registry
+            from expertise.async_template_updater import AsyncTemplateUpdater
+
+            print("DEBUG: Initializing Template Registry...")
+            registry = get_template_registry()
+            if registry.initialize():
+                logger.info("ExpertiseTemplate registry initialized (schema + seed data)")
+                template_updater = AsyncTemplateUpdater(registry)
+                await template_updater.start()
+                logger.info("Async Template Updater started")
+            else:
+                logger.warning("Template registry DB unavailable — running without templates")
+        except ImportError as e:
+            logger.warning(f"Template system not available: {e}")
+        except Exception as e:
+            logger.warning(f"Template system init failed (non-fatal): {e}")
+
         print("DEBUG: Startup Complete. Yielding...")
         logger.info("Swarm Engine Online. Waiting for events...")
         yield
         # Shutdown
         logger.info("Shutting down Swarm Engine...")
+        if template_updater:
+            await template_updater.stop()
+            logger.info("Async Template Updater stopped")
     except Exception:
         import traceback
         traceback.print_exc()

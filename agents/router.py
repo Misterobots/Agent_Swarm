@@ -19,6 +19,26 @@ from utils.gpu_queue import request_lock
 
 logger = setup_logger("Router")
 
+# --- JWT-ACE Integration ---
+try:
+    from intent_capabilities import get_capabilities_for_intent
+    from security.token_issuer import EphemeralAgentCard, get_token_issuer
+    from security.execution_context import set_current_token, clear_current_token
+    JWT_ACE_AVAILABLE = True
+    logger.info("[Router] JWT-ACE capability gating enabled")
+except ImportError as e:
+    JWT_ACE_AVAILABLE = False
+    logger.warning(f"[Router] JWT-ACE not available: {e}")
+
+# --- Template Registry ---
+try:
+    from expertise.template_registry import get_template_registry, PerformanceRecord
+    TEMPLATES_AVAILABLE = True
+    logger.info("[Router] ExpertiseTemplate registry enabled")
+except ImportError as e:
+    TEMPLATES_AVAILABLE = False
+    logger.warning(f"[Router] Template registry not available: {e}")
+
 # --- Langfuse Tracing ---
 try:
     from langfuse import Langfuse, observe
@@ -105,6 +125,90 @@ def handle_task_event(event: Event):
     # Reset state after loop
     AGENT_STATE.labels(agent_name="Router").set(1)
 
+# --- JWT-ACE Token Issuance ---
+def _issue_ephemeral_token(intent: str, session_id: str) -> tuple:
+    """
+    Issue a JWT-ACE token for the given intent.
+
+    Returns:
+        (token_str, template_metadata_dict) or (None, {}) on failure
+    """
+    if not JWT_ACE_AVAILABLE:
+        return None, {}
+
+    try:
+        caps = get_capabilities_for_intent(intent)
+
+        # Look up template version if registry is available
+        template_version = "1.0"
+        template_system_prompt = None
+        if TEMPLATES_AVAILABLE:
+            try:
+                registry = get_template_registry()
+                tv = registry.get_template_version(caps["template_id"], "latest")
+                if tv:
+                    template_version = tv.version
+                    template_system_prompt = tv.system_prompt
+            except Exception as e:
+                logger.debug(f"[JWT-ACE] Template lookup failed (using defaults): {e}")
+
+        card = EphemeralAgentCard(
+            template_id=caps["template_id"],
+            template_version=template_version,
+            agent_name=caps["agent_name"],
+            activated_capabilities=caps["capabilities"],
+            security_level=caps["security_level"],
+            session_id=session_id,
+            expiry_hours=caps["expiry_hours"],
+        )
+
+        issuer = get_token_issuer()
+        token = issuer.issue_token(card)
+
+        metadata = {
+            "template_id": caps["template_id"],
+            "template_version": template_version,
+            "agent_instance_id": card.agent_instance_id,
+            "token_capabilities": caps["capabilities"],
+            "system_prompt_override": template_system_prompt,
+        }
+
+        logger.info(
+            f"[JWT-ACE] Token issued for {caps['agent_name']} "
+            f"(template: {caps['template_id']} v{template_version}, "
+            f"{len(caps['capabilities'])} capabilities)"
+        )
+        return token, metadata
+
+    except Exception as e:
+        logger.warning(f"[JWT-ACE] Token issuance failed (non-fatal): {e}")
+        return None, {}
+
+
+def _record_performance(intent: str, template_metadata: dict, result_data: dict):
+    """Record execution performance for template evolution."""
+    if not TEMPLATES_AVAILABLE or not template_metadata.get("template_id"):
+        return
+    try:
+        registry = get_template_registry()
+        record = PerformanceRecord(
+            template_id=template_metadata["template_id"],
+            template_version=template_metadata.get("template_version", "1.0"),
+            trace_id=result_data.get("trace_id"),
+            session_id=result_data.get("session_id"),
+            intent=intent,
+            solver_score=result_data.get("solver_score"),
+            verifier_score=result_data.get("verifier_score"),
+            final_score=result_data.get("final_score"),
+            corrector_invoked=result_data.get("corrector_invoked", False),
+            iterations=result_data.get("iterations", 1),
+            latency_ms=result_data.get("latency_ms"),
+        )
+        registry.record_performance(record)
+    except Exception as e:
+        logger.debug(f"[JWT-ACE] Performance recording failed (non-fatal): {e}")
+
+
 # --- SPECIALIZED INTENT DETECTION ---
 # (Keyword-based detect_intent() was removed in favor of neural semantic_router)
 def chat_swarm(user_input: str, session_id: str = "default_session", history: list = None):
@@ -114,7 +218,12 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     """
     AGENT_STATE.labels(agent_name="Router").set(2)
     WORKFLOW_STEPS.labels(status="started", agent_type="Router").inc()
-    
+
+    # JWT-ACE state (initialized here so finally block can always access them)
+    ace_token = None
+    template_metadata = {}
+    route_start_time = time.time()
+
     # --- HISTORY CONVERSION ---
     # PHI Agents use their own storage/history, but we can seed it or pass it.
     # For now, we'll use history to enhance the prompt if provided.
@@ -200,7 +309,15 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                 output=routing_decision,
                 scores=[{"name": "routing_confidence", "value": confidence}]
             )
-        
+
+        # --- JWT-ACE: Issue ephemeral token for this intent ---
+        ace_token, template_metadata = _issue_ephemeral_token(intent, session_id)
+        if ace_token:
+            set_current_token(ace_token) if JWT_ACE_AVAILABLE else None
+            yield {"type": "log", "content": f"[JWT-ACE] Token issued for {template_metadata.get('template_id', intent)} v{template_metadata.get('template_version', '1.0')}"}
+
+        route_start_time = time.time()
+
         # --- AMBIGUITY CHECK ---
         if intent == "AMBIGUOUS":
              question = routing_decision.get("disambiguation_question", "Could you clarify your request?")
@@ -561,12 +678,18 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                     max_iter=2,
                     intent=intent,
                     session_id=session_id,
+                    token=ace_token,
+                    template_metadata=template_metadata,
                 )
 
                 yield {"type": "log", "content": f"[MarsRL] Intent: {intent} | Loop initialized."}
 
                 with request_lock(context="text"):
                     for update in mars_loop_stream(final_input, mars):
+                        # Capture MarsLoopResult for performance recording
+                        if update.get("type") == "log" and "[MarsRL] Iterations:" in update.get("content", ""):
+                            # Extract scores from the summary line for perf recording
+                            pass
                         yield update
 
             except Exception as e:
@@ -598,6 +721,19 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         WORKFLOW_STEPS.labels(status="error", agent_type="Router").inc()
     finally:
         AGENT_STATE.labels(agent_name="Router").set(1)
+        # Clean up JWT-ACE execution context
+        if JWT_ACE_AVAILABLE:
+            try:
+                clear_current_token()
+            except Exception:
+                pass
+        # Record performance metrics
+        if template_metadata:
+            latency_ms = int((time.time() - route_start_time) * 1000) if 'route_start_time' in dir() else None
+            _record_performance(intent if 'intent' in dir() else "UNKNOWN", template_metadata, {
+                "session_id": session_id,
+                "latency_ms": latency_ms,
+            })
 
 def run_swarm(user_input: str):
     """CLI Wrapper for chat_swarm"""
