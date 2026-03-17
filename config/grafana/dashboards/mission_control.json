@@ -403,81 +403,80 @@
       "type": "row"
     },
     {
-      {
-        "datasource": {
-          "type": "loki",
-          "uid": "Loki"
-        },
-        "gridPos": {
-          "h": 6,
-          "w": 24,
-          "x": 0,
-          "y": 17
-        },
-        "id": 26,
-        "options": {
-          "dedupStrategy": "none",
-          "enableLogDetails": true,
-          "prettifyLogMessage": false,
-          "showCommonLabels": false,
-          "showLabels": false,
-          "showTime": true,
-          "sortOrder": "Descending",
-          "wrapLogMessage": false
-        },
-        "targets": [
-          {
-            "datasource": {
-              "type": "loki",
-              "uid": "Loki"
-            },
-            "editorMode": "code",
-            "expr": "{container_name=~\"agent_runtime|agent_ui\"} |= \"COMFY\"",
-            "queryType": "range",
-            "refId": "A"
-          }
-        ],
-        "title": "ComfyUI Event Stream",
-        "type": "logs"
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
       },
-      {
-        "datasource": {
-          "type": "loki",
-          "uid": "Loki"
-        },
-        "gridPos": {
-          "h": 10,
-          "w": 24,
-          "x": 0,
-          "y": 23
-        },
-        "id": 10,
-        "options": {
-          "dedupStrategy": "none",
-          "enableLogDetails": true,
-          "prettifyLogMessage": false,
-          "showCommonLabels": false,
-          "showLabels": false,
-          "showTime": true,
-          "sortOrder": "Descending",
-          "wrapLogMessage": false
-        },
-        "targets": [
-          {
-            "datasource": {
-              "type": "loki",
-              "uid": "Loki"
-            },
-            "editorMode": "code",
-            "expr": "{container_name=~\"agent_runtime|agent_ui\"} != \"/metrics\"",
-            "queryType": "range",
-            "refId": "A"
-          }
-        ],
-        "title": "Live Agent Stream",
-        "type": "logs"
-      }
-    ],
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 26,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "editorMode": "code",
+          "expr": "{container_name=~\"agent_runtime|agent_ui\"} |= \"COMFY\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "ComfyUI Event Stream",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 10,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "editorMode": "code",
+          "expr": "{container_name=~\"agent_runtime|agent_ui\"} != \"/metrics\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Live Agent Stream",
+      "type": "logs"
+    }
+  ],
     "refresh": "5s",
     "schemaVersion": 38,
     "style": "dark",

@@ -1,21 +1,59 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+rule_files:
+  - /etc/prometheus/alert_rules.yml
 
 scrape_configs:
+  # ═══════════════════════════════════════════════════════════════
+  # R730 GATEWAY (192.168.2.103) — Self-monitoring
+  # ═══════════════════════════════════════════════════════════════
+
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+        labels:
+          node: 'r730'
 
-  - job_name: 'execution_plane_cadvisor'
+  - job_name: 'r730_cadvisor'
     static_configs:
-      # INTERNAL DOCKER DNS: Since they are in the same network, we use the container name.
-      - targets: ['cadvisor:8080']
+      - targets: ['cadvisor-r730:8080']
+        labels:
+          node: 'r730'
+    scrape_timeout: 30s
+    scrape_interval: 30s
 
-  - job_name: 'agent_runtime'
+  - job_name: 'r730_traefik'
     static_configs:
-      # INTERNAL DOCKER DNS
-      - targets: ['agent_runtime:8000']
-  
-  - job_name: 'agent_ui'
+      - targets: ['traefik-gateway:8080']
+        labels:
+          node: 'r730'
+    metrics_path: /metrics
+
+  # ═══════════════════════════════════════════════════════════════
+  # JUSTIN-PC COMPUTE (192.168.2.101) — GPU & Agent Services
+  # ═══════════════════════════════════════════════════════════════
+
+  - job_name: 'justin_agent_runtime'
     static_configs:
-      - targets: ['agent_ui:8001']
+      - targets: ['192.168.2.101:8008']
+        labels:
+          node: 'justin-pc'
+          service: 'agent-runtime'
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # ═══════════════════════════════════════════════════════════════
+  # CONTROL PLANE — WYSE 5070 (192.168.2.102)
+  # ═══════════════════════════════════════════════════════════════
+
+  - job_name: 'control_security'
+    static_configs:
+      - targets: ['192.168.2.102:8001']
+        labels:
+          node: 'wyse-5070'
+          service: 'security'
+    metrics_path: /metrics
+    scrape_interval: 30s

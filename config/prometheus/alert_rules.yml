@@ -1,0 +1,101 @@
+groups:
+  # ═══════════════════════════════════════════════════════════════
+  # SERVICE AVAILABILITY
+  # ═══════════════════════════════════════════════════════════════
+  - name: service_availability
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is DOWN"
+          description: "Scrape target {{ $labels.job }} ({{ $labels.instance }}) has been unreachable for 2 minutes."
+
+      - alert: OllamaDown
+        expr: up{job="justin_ollama"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ollama GPU inference is DOWN on Justin-PC"
+          description: "Primary inference engine at 192.168.2.101:11434 is unreachable. All LLM requests will fail."
+
+  # ═══════════════════════════════════════════════════════════════
+  # CONTAINER RESOURCES
+  # ═══════════════════════════════════════════════════════════════
+  - name: container_resources
+    rules:
+      - alert: ContainerHighMemory
+        expr: container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} memory > 90%"
+          description: "Container {{ $labels.name }} is using {{ $value | humanizePercentage }} of its memory limit."
+
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) > 2.0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} sustained high CPU"
+          description: "Container {{ $labels.name }} is consuming {{ $value }} CPU cores for 10+ minutes."
+
+      - alert: ContainerRestarting
+        expr: increase(container_restart_count{name!=""}[15m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} restart loop"
+          description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last 15 minutes."
+
+  # ═══════════════════════════════════════════════════════════════
+  # GPU INFERENCE (container-level proxies until nvidia exporter)
+  # ═══════════════════════════════════════════════════════════════
+  - name: gpu_inference
+    rules:
+      - alert: OllamaHighMemory
+        expr: container_memory_usage_bytes{name="ollama_gpu"} > 14e9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ollama container memory > 14GB"
+          description: "Ollama is using {{ $value | humanize1024 }}B of RAM. GPU VRAM may be saturated (16GB limit). ComfyUI co-scheduling may fail."
+
+      - alert: OllamaSlowRequests
+        expr: rate(ollama_request_duration_seconds_sum{job="justin_ollama"}[5m]) / rate(ollama_request_duration_seconds_count{job="justin_ollama"}[5m]) > 300
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ollama avg request latency > 5 minutes"
+          description: "Average Ollama request is taking {{ $value | humanizeDuration }}. Model may be swapping or loading."
+
+  # ═══════════════════════════════════════════════════════════════
+  # MONITORING STACK SELF-HEALTH
+  # ═══════════════════════════════════════════════════════════════
+  - name: monitoring_health
+    rules:
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} missing"
+          description: "Target {{ $labels.instance }} (job: {{ $labels.job }}) has been down for 5+ minutes."
+
+      - alert: PrometheusTSDBCompactionsFailing
+        expr: increase(prometheus_tsdb_compactions_failed_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus TSDB compactions failing"
+          description: "TSDB compactions are failing. Storage may be corrupted or full."

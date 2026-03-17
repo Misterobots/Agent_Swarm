@@ -1,38 +1,15 @@
-# version: '3.8'
+# JUSTIN-PC EXECUTION PLANE - PHASE 3
+# Removed: Traefik, Prometheus, Grafana, Loki, Promtail, cAdvisor, Redis monitoring
+# Kept: Compute services (Ollama, ComfyUI, BMO Voice, OpenHands, Agent Runtime, Agent UI, Ops Portal)
+# NOTE: Services are now accessed through R730 Traefik Gateway on port 80/443
+# Routing: Justin-PC (192.168.2.101) <- R730 Traefik (192.168.2.103:80) <- Existing media stack
 
 services:
-  # TRAEFIK - Reverse Proxy with Authentik Forward Auth
-  traefik:
-    image: traefik:v3.0
-    container_name: traefik
-    command:
-      - "--api.dashboard=true"
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedByDefault=false"
-      - "--providers.docker.network=execution_plane_execution_net"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--log.level=DEBUG"
-    ports:
-      - "81:80"       # Web traffic (moved from 80 to avoid Grafana conflict)
-      - "443:443"     # HTTPS
-      - "8082:8080"   # Traefik Dashboard
-    volumes:
-      - //var/run/docker.sock:/var/run/docker.sock:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - execution_net
-    restart: unless-stopped
-
   # SPIRE AGENT - Workload Identity Provider
   spire-agent:
     image: ghcr.io/spiffe/spire-agent:1.10.1
     container_name: spire-agent
     hostname: spire-agent
-    depends_on:
-      - traefik  # Ensure traefik is up first
     volumes:
       - ./config/spire:/etc/spire/agent
       - spire_agent_data:/run/spire/agent
@@ -47,10 +24,8 @@ services:
       retries: 3
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
     networks:
       - execution_net
-
     restart: unless-stopped
 
   # OLLAMA SERVICE - GPU Accelerated Inference
@@ -299,6 +274,7 @@ services:
       - "traefik.http.routers.comfyui.middlewares=strip-comfy,authentik@docker"
       - "traefik.http.middlewares.strip-comfy.stripprefix.prefixes=/comfy"
       - "traefik.http.services.comfyui.loadbalancer.server.port=8188"
+
   # --- VS CODE SERVER (DevOps - Full Access, Protected by Authentik SSO) ---
   agent_ide_devops:
     image: lscr.io/linuxserver/code-server:latest
@@ -307,8 +283,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Etc/UTC
-      - PASSWORD=password
-      - SUDO_PASSWORD=password
+      - PASSWORD=${VSCODE_PASSWORD}
+      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
       - DEFAULT_WORKSPACE=/config/workspace
       - SWARM_API_KEY=sk-devops-identity
     volumes:
@@ -336,8 +312,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Etc/UTC
-      - PASSWORD=password
-      - SUDO_PASSWORD=password
+      - PASSWORD=${VSCODE_PASSWORD}
+      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
       - DEFAULT_WORKSPACE=/config/workspace
       - SWARM_API_KEY=sk-coder-identity
     volumes:
@@ -365,7 +341,6 @@ services:
       - ollama
       - agent-runtime
       - comfyui
-      - traefik
     env_file:
       - ../network.env
     environment:
@@ -400,7 +375,7 @@ services:
       # Authentik Forward Auth Middleware (shared by all services)
       - "traefik.http.middlewares.authentik.forwardauth.address=http://authentik_server:9000/outpost.goauthentik.io/auth/traefik"
       - "traefik.http.middlewares.authentik.forwardauth.trustForwardHeader=true"
-      - "traefik.http.middlewares.authentik.forwardauth.authResponseHeaders=X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
+      - "traefik.http.middlewares.authentik.authResponseHeaders=X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
 
   # OPS PORTAL - Admin Dashboard (Protected by Authentik SSO)
   ops-portal:
@@ -436,118 +411,6 @@ services:
       - "traefik.http.middlewares.strip-ops.stripprefix.prefixes=/ops"
       - "traefik.http.services.ops-portal.loadbalancer.server.port=8502"
 
-  # MONITORING - Container Stats
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor
-    ports:
-      - "8080:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    devices:
-      - /dev/kmsg
-    networks:
-      - execution_net
-
-  # MONITORING - Metrics Database
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./config/prometheus:/etc/prometheus
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - execution_net
-
-  # MONITORING - Dashboard UI
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "80:3000" # Standard HTTP Port for easy access
-    # Allow container to reach host machine via host.docker.internal
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SECURITY_SECRET_KEY=fixed_secret_key_for_persistence_12345
-      - GF_PANELS_DISABLE_SANITIZE_HTML=true # Required for Glassmorphism CSS hack
-      - GF_LOG_LEVEL=debug
-      # Authentik OIDC Configuration
-      - GF_SERVER_ROOT_URL=http://localhost
-      - GF_AUTH_DISABLE_LOGIN_FORM=true # Force OIDC (No Basic Auth UI)
-      - GF_AUTH_GENERIC_OAUTH_ENABLED=true
-      - GF_AUTH_GENERIC_OAUTH_NAME=Home AI Login
-      - GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
-      - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=e6xl4adDhaDNjvOGKgLfxnZlcFQ8EGadEmOIZMar
-      - GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=simple_secret_12345
-      - GF_AUTH_GENERIC_OAUTH_SCOPES=openid profile email
-      - GF_AUTH_GENERIC_OAUTH_TLS_SKIP_VERIFY_INSECURE=true
-      - GF_AUTH_GENERIC_OAUTH_USE_PKCE=true
-      - GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN=true
-      - GF_AUTH_GENERIC_OAUTH_SEND_CLIENT_CREDENTIALS_VIA_BODY=true
-      # Browser-Facing URL -> User's browser redirects here (localhost)
-      - GF_AUTH_GENERIC_OAUTH_AUTH_URL=http://localhost:9000/application/o/authorize/
-      # Backend-Facing URLs -> Grafana container calls these via host.docker.internal
-      # This resolves to the Docker host, which has Authentik on port 9000
-      - GF_AUTH_GENERIC_OAUTH_TOKEN_URL=http://host.docker.internal:9000/application/o/token/
-      - GF_AUTH_GENERIC_OAUTH_API_URL=http://host.docker.internal:9000/application/o/userinfo/
-      # Attribute mappings - tell Grafana where to find user data in Authentik's response
-      - GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH=email
-      - GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH=preferred_username
-      - GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH=name
-      # Role mapping (optional, all users become Viewers by default)
-      - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'grafana-admins') && 'Admin' || 'Viewer'
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./config/grafana/provisioning:/etc/grafana/provisioning # Provisioning Config
-      - ./config/grafana/dashboards:/etc/grafana/dashboards # Dashboard JSONs
-    networks:
-      - execution_net
-
-  # LOGGING - Aggregation
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    user: "root"
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./config/loki:/etc/loki
-      - loki_data:/tmp/loki
-    command: -config.file=/etc/loki/loki.yml
-    networks:
-      - execution_net
-
-  # LOGGING - Agent (Ships logs to Loki)
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
-    volumes:
-      - ./config/promtail:/etc/promtail
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: -config.file=/etc/promtail/promtail.yml
-    networks:
-      - execution_net
-
-  # TRAFFIC CONTROL - Persistent Queuing
-  redis_queue:
-    image: redis:alpine
-    container_name: redis_queue
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-    networks:
-      - execution_net
-
   # --- IDENTITY - Authentik DB ---
   authentik_db:
     image: postgres:12-alpine
@@ -556,7 +419,7 @@ services:
     volumes:
       - database_authentik:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD=FfyWCWx4gRZaPj1ygfjs
+      - POSTGRES_PASSWORD=${AUTHENTIK_DB_PASSWORD}
       - POSTGRES_USER=authentik
       - POSTGRES_DB=authentik
     networks:
@@ -584,8 +447,8 @@ services:
       - AUTHENTIK_POSTGRESQL__HOST=authentik_db
       - AUTHENTIK_POSTGRESQL__USER=authentik
       - AUTHENTIK_POSTGRESQL__NAME=authentik
-      - AUTHENTIK_POSTGRESQL__PASSWORD=FfyWCWx4gRZaPj1ygfjs
-      - AUTHENTIK_SECRET_KEY=Zuq8Ce96z5Sch4HNnuHUtjyGnWbehZ2XGT7yWMczYMJFggee0q
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
       # CRITICAL: Tell Authentik its external-facing hostname for OIDC discovery
       - AUTHENTIK_HOST=http://localhost:9000
       - AUTHENTIK_HOST_BROWSER=http://localhost:9000
@@ -612,8 +475,8 @@ services:
       - AUTHENTIK_POSTGRESQL__HOST=authentik_db
       - AUTHENTIK_POSTGRESQL__USER=authentik
       - AUTHENTIK_POSTGRESQL__NAME=authentik
-      - AUTHENTIK_POSTGRESQL__PASSWORD=FfyWCWx4gRZaPj1ygfjs
-      - AUTHENTIK_SECRET_KEY=Zuq8Ce96z5Sch4HNnuHUtjyGnWbehZ2XGT7yWMczYMJFggee0q
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
     volumes:
       - ./config/authentik/media:/media
       - ./config/authentik/certs:/certs
@@ -623,9 +486,6 @@ services:
       - authentik_redis
     networks:
       - execution_net
-
-
-
 
   # ─────────────────────────────────────────────────────────────────
   # DIAGNOSTIC TOOL — Text Generation WebUI (oobabooga)
@@ -677,10 +537,6 @@ networks:
 volumes:
   bmo_models:
   ollama_models:
-  prometheus_data:
-  grafana_data:
-  loki_data:
-  redis_data:
   vscode_config_devops:
   vscode_config_coding:
   database_authentik:
