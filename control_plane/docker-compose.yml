@@ -25,14 +25,45 @@ services:
 
     restart: unless-stopped
 
+  # --- Control Plane Security Service ---
+  security:
+    build:
+      context: ./security
+      dockerfile: Dockerfile
+    container_name: control-security
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+      - ./security/.env
+      - ../network.env
+    environment:
+      - DATABASE_URL=postgresql://${LANGFUSE_DB_USER}:${LANGFUSE_DB_PASSWORD}@postgres:5432/${LANGFUSE_DB_NAME}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_EXPIRATION_HOURS=24
+      - LOG_LEVEL=INFO
+    ports:
+      - "8001:8001"
+    networks:
+      - swarm_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # --- Langfuse Database (PostgreSQL) ---
   db:
     image: postgres:15-alpine
     container_name: postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: langfuse_password
-      POSTGRES_DB: langfuse
+      POSTGRES_USER: ${LANGFUSE_DB_USER}
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD}
+      POSTGRES_DB: ${LANGFUSE_DB_NAME}
     ports:
       - "5432:5432"
     volumes:
@@ -54,9 +85,9 @@ services:
     container_name: clickhouse
     restart: unless-stopped
     environment:
-      - CLICKHOUSE_DB=langfuse
-      - CLICKHOUSE_USER=langfuse
-      - CLICKHOUSE_PASSWORD=langfuse_password
+      - CLICKHOUSE_DB=${LANGFUSE_DB_NAME}
+      - CLICKHOUSE_USER=${LANGFUSE_DB_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     networks:
@@ -82,29 +113,31 @@ services:
         condition: service_healthy
     env_file:
       - ../network.env
+    env_file:
+      - .env
     environment: &langfuse-env
       # Database
-      - DATABASE_URL=postgresql://langfuse:langfuse_password@postgres:5432/langfuse
+      - DATABASE_URL=postgresql://${LANGFUSE_DB_USER}:${LANGFUSE_DB_PASSWORD}@postgres:5432/${LANGFUSE_DB_NAME}
       # ClickHouse
       - CLICKHOUSE_URL=http://clickhouse:8123
-      - CLICKHOUSE_MIGRATION_URL=clickhouse://langfuse:langfuse_password@clickhouse:9000/langfuse
-      - CLICKHOUSE_USER=langfuse
-      - CLICKHOUSE_PASSWORD=langfuse_password
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://${LANGFUSE_DB_USER}:${CLICKHOUSE_PASSWORD}@clickhouse:9000/${LANGFUSE_DB_NAME}
+      - CLICKHOUSE_USER=${LANGFUSE_DB_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
       - CLICKHOUSE_CLUSTER_ENABLED=false
       # Auth
-      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET:-changeme-langfuse-secret-32chars}
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
       - NEXTAUTH_URL=http://${CONTROL_NODE_IP}:3000
-      - SALT=${LANGFUSE_SALT:-changeme-langfuse-salt}
-      - ENCRYPTION_KEY=${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      - SALT=${LANGFUSE_SALT}
+      - ENCRYPTION_KEY=${LANGFUSE_ENCRYPTION_KEY}
       # Redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_AUTH=langfuse_redis_password
+      - REDIS_AUTH=${REDIS_PASSWORD}
       # S3/MinIO (Required for event storage)
       - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
       - LANGFUSE_S3_EVENT_UPLOAD_REGION=auto
-      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minio
-      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=miniosecret
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://minio:9000
       - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
       - LANGFUSE_S3_EVENT_UPLOAD_PREFIX=events/
@@ -135,12 +168,14 @@ services:
     container_name: redis_control
     restart: unless-stopped
     command: >
-      --requirepass langfuse_redis_password
+      --requirepass ${REDIS_PASSWORD}
       --maxmemory-policy noeviction
+    env_file:
+      - .env
     networks:
       - swarm_net
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "langfuse_redis_password", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 3s
       timeout: 10s
       retries: 10
@@ -152,8 +187,8 @@ services:
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
     environment:
-      - MINIO_ROOT_USER=minio
-      - MINIO_ROOT_PASSWORD=miniosecret
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
     ports:
