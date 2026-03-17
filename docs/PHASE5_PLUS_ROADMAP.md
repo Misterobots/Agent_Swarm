@@ -1,0 +1,698 @@
+# Phase 5+ Implementation Roadmap
+**Planning Date**: March 15, 2026  
+**Current Status**: Phase 4 Complete (Distributed Monitoring Operational)  
+**Timeline**: Q2 2026 (3-4 months)
+
+---
+
+## Overview
+
+With Phase 4 complete, the infrastructure provides:
+- ✅ Distributed three-tier architecture (Control, Gateway, Compute)
+- ✅ Centralized monitoring (Prometheus, Grafana, Loki)
+- ✅ Zero-trust identity (SPIRE)
+- ✅ Service observability (Langfuse)
+
+**Phase 5-8** focuses on:
+1. **Advanced Agent Capabilities** (ephemeral agents with RL)
+2. **Multi-Model Orchestration** (scale inference)
+3. **High Availability** (redundancy)
+4. **Enterprise Features** (k8s, security hardening)
+
+---
+
+## PHASE 5: JWT-ACE Architecture & Ephemeral Agents
+**Duration**: 2-3 weeks | **Effort**: 60 story points  
+**Goal**: Enable ephemeral agents with persistence at template level
+
+### 5.1 Implement JWT-ACE (Agent Card Embedded JWT)
+
+#### Task 5.1.1: Create token_issuer.py
+```python
+# Generate file: agents/security/token_issuer.py
+
+Key responsibilities:
+- EphemeralAgentCard dataclass (extends AgentCard from registry.py)
+  - Template ID + version
+  - Activated capabilities list
+  - Expiry timestamp (default 1 hour)
+- TokenIssuer class
+  - issue_token(agent_card: EphemeralAgentCard) → JWT
+  - Uses SPIRE for signing (cryptographic verification)
+- TokenValidator class
+  - validate_token(token: str) → EphemeralAgentCard (or raise)
+  - Verify SPIRE signature + expiry
+
+Dependencies:
+- PyJWT (encoding/decoding)
+- SPIRE client (signing key)
+- Pydantic (models)
+```
+
+**Status Tracking**:
+- [ ] Create EphemeralAgentCard dataclass
+- [ ] Implement TokenIssuer with SPIRE integration
+- [ ] Implement TokenValidator with signature verification
+- [ ] Write unit tests (sign/verify cycle)
+- [ ] Deploy to agents/security/token_issuer.py
+
+---
+
+#### Task 5.1.2: Create capability_gate.py
+```python
+# Generate file: agents/security/capability_gate.py
+
+Key responsibilities:
+- @CapabilityRequired(capability='file_write') decorator
+  - Extracts JWT from request headers
+  - Validates token with TokenValidator
+  - Checks if capability is in token.capabilities list
+  - Allows/denies function execution
+- Tool-level enforcement (file operations, API calls, etc.)
+- Logging: Track denied access attempts for audit
+
+Example usage:
+@app.post("/api/v1/write-file")
+@CapabilityRequired(capability='file_write')
+async def write_file_endpoint(path: str, content: str, request: Request):
+    # This endpoint only executes if JWT has 'file_write' capability
+    ...
+```
+
+**Status Tracking**:
+- [ ] Create @CapabilityRequired decorator
+- [ ] Implement JWT extraction from headers
+- [ ] Add capability checking logic
+- [ ] Write tests for allowed/denied scenarios
+- [ ] Deploy to agents/security/capability_gate.py
+
+---
+
+#### Task 5.1.3: Integrate with router.py
+
+**Modify**: agents/router.py (entry point for all agent requests)
+
+```python
+# Changes to route_and_execute():
+1. Extract JWT from Authorization header
+2. Validate JWT with TokenValidator
+3. Extract EphemeralAgentCard (template_id, version, capabilities)
+4. Pass token to MarsRL loop (for trace metadata)
+5. Enforce @CapabilityRequired on tool calls
+
+# Changes to semantic_router():
+1. Select agent template based on intent
+2. Create ephemeral card with template capabilities
+3. Issue JWT token (1-hour TTL)
+4. Pass token to executor
+```
+
+**Status Tracking**:
+- [ ] Add JWT extraction to route entry
+- [ ] Integrate TokenValidator
+- [ ] Store token in context for MarsRL loop
+- [ ] Update executor to enforce capabilities
+- [ ] Test end-to-end flow
+
+---
+
+#### Task 5.1.4: Langfuse Integration
+
+**Trace Format**:
+```json
+{
+  "trace_id": "uuid",
+  "agent_instance_id": "ephemeral-uuid",
+  "template_id": "expertise_template_v1.3",
+  "token_capabilities": ["file_write", "api_call"],
+  "solver_output": "...",
+  "verifier_output": "...",
+  "corrector_output": "...",
+  "reward_score": 0.92,
+  "timestamp": "2026-03-15T10:30:00Z"
+}
+```
+
+**Status Tracking**:
+- [ ] Add metadata fields to trace schema
+- [ ] Link trace to expertise_template_id
+- [ ] Export high-reward traces (>0.8) to training data
+- [ ] Create dashboard: Template Performance Trend
+
+---
+
+### 5.2 Implement ExpertiseTemplate Registry
+
+#### Task 5.2.1: Database Schema
+
+```sql
+-- Table: expertise_templates
+CREATE TABLE expertise_templates (
+  id SERIAL PRIMARY KEY,
+  template_name VARCHAR(255) NOT NULL,
+  current_version INT NOT NULL DEFAULT 1,
+  
+  -- Learnable parameters
+  system_prompt TEXT,
+  generation_parameters JSONB,  -- temp, top_p, etc.
+  tool_strategy TEXT,  -- which tools to use
+  antipatterns TEXT[],  -- things to avoid
+  
+  -- Performance tracking
+  avg_reward_score FLOAT,
+  samples_count INT,
+  
+  -- Versioning
+  created_at TIMESTAMP DEFAULT NOW(),
+  last_updated TIMESTAMP DEFAULT NOW()
+);
+
+-- Table: expertise_template_versions
+CREATE TABLE expertise_template_versions (
+  id SERIAL PRIMARY KEY,
+  template_id INT REFERENCES expertise_templates(id),
+  version INT,
+  
+  -- Snapshot of parameters at this version
+  system_prompt TEXT,
+  generation_parameters JSONB,
+  tool_strategy TEXT,
+  antipatterns TEXT[],
+  
+  -- Version metrics
+  avg_reward FLOAT,
+  num_instances INT,
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  
+  UNIQUE(template_id, version)
+);
+
+-- Table: performance_history
+CREATE TABLE performance_history (
+  id SERIAL PRIMARY KEY,
+  template_id INT REFERENCES expertise_templates(id),
+  version INT,
+  metric_date DATE,
+  
+  avg_reward FLOAT,
+  p95_latency INT,  -- milliseconds
+  error_rate FLOAT,
+  
+  UNIQUE(template_id, version, metric_date)
+);
+```
+
+**Status Tracking**:
+- [ ] Create PostgreSQL migration script
+- [ ] Deploy on Control Plane (192.168.2.102)
+- [ ] Run migration on production
+- [ ] Verify tables created and accessible
+
+---
+
+#### Task 5.2.2: Create template_registry.py
+
+```python
+# Generate file: agents/expertise/template_registry.py
+
+Key responsibilities:
+- ExpertiseTemplate dataclass
+  - id, name, version
+  - Learnable: system_prompt, generation_parameters, tool_strategy, antipatterns
+- ExpertiseTemplateRegistry class
+  - get_template(template_id, version=None) → ExpertiseTemplate
+  - create_version(template_id, params) → new version
+  - update_metrics(template_id, version, reward_score)
+  - get_performance_trend(template_id, days=30) → chart data
+  - rollback_to_version(template_id, version)
+- Database layer (PostgreSQL)
+```
+
+**Example Usage**:
+```python
+registry = ExpertiseTemplateRegistry()
+
+# Load template (get latest or specific version)
+template_v1_3 = registry.get_template(template_id='security_agent')
+print(template_v1_3.system_prompt)
+
+# Create ephemeral agent with template state
+ephemeral_card = EphemeralAgentCard(
+    template_id='security_agent',
+    template_version=1.3,
+    system_prompt=template_v1_3.system_prompt,
+    capabilities=template_v1_3.available_capabilities
+)
+
+# After execution, record reward
+registry.update_metrics(
+    template_id='security_agent',
+    version=1.3,
+    reward_score=0.95
+)
+
+# Next instance gets updated template (if reward improved)
+template_v1_4 = registry.get_template('security_agent')  # Gets latest
+```
+
+**Status Tracking**:
+- [ ] Create ExpertiseTemplate dataclass
+- [ ] Implement get_template (with version caching)
+- [ ] Implement create_version (database writes)
+- [ ] Implement update_metrics (async batch updates)
+- [ ] Implement rollback_to_version (safety feature)
+- [ ] Write integration tests with PostgreSQL
+- [ ] Deploy to agents/expertise/template_registry.py
+
+---
+
+#### Task 5.2.3: Async Template Update Job
+
+```python
+# Generate file: agents/expertise/async_template_updater.py
+
+Key responsibilities:
+- Monitor Langfuse for completed traces
+- Collect traces for (template_id, version) in time window
+- If avg_reward improves by >2%, trigger template update
+- Generate new parameters via heuristics or LLM:
+  - If high failure rate on tool X, remove it
+  - If low reward with high latency, reduce generation choices
+  - If antipattern detected, add to antipatterns list
+- Create new version in registry
+- Emit notification (optional: Slack/Discord)
+
+Trigger: Every hour (configurable)
+Window: Last 100 instances of template
+Threshold: 2% improvement to version bump
+```
+
+**Status Tracking**:
+- [ ] Create async update job skeleton
+- [ ] Integrate with Langfuse client
+- [ ] Implement reward aggregation logic
+- [ ] Implement parameter update heuristics
+- [ ] Test on non-prod template first
+- [ ] Add monitoring/alerting
+- [ ] Deploy to agents/expertise/async_template_updater.py
+- [ ] Add to APScheduler or equivalent
+
+---
+
+### 5.3 Integration Testing
+
+#### Test Scenarios
+1. **Ephemeral Agent Lifecycle**
+   - Router creates token for agent
+   - Agent executes with token
+   - Token expires after 1 hour
+   - New request gets fresh token
+   
+2. **Template Evolution**
+   - Instance 1 runs template v1.0 (reward 0.75)
+   - Instance 2 runs template v1.1 (improved from 0.78)
+   - Instance 3 runs template v1.2 (further improved to 0.82)
+   - Performance trend shows monotonic improvement
+
+3. **Capability Gating**
+   - Token with file_write capability succeeds
+   - Token without file_write capability fails with 403
+   - Audit log records both attempts
+
+**Status Tracking**:
+- [ ] Create integration test suite
+- [ ] Test ephemeral agent full cycle
+- [ ] Test template versioning
+- [ ] Test capability enforcement
+- [ ] Test performance trend calculation
+
+---
+
+## PHASE 6: Multi-Model Orchestration & Inference Scaling
+**Duration**: 2-3 weeks | **Effort**: 50 story points  
+**Goal**: Enable load balancing across multiple GPU nodes
+
+### 6.1 Add R730 as Secondary GPU Node
+
+**Objective**: R730 currently runs Ollama + Open-WebUI (media stack). Redeploy GPU access for inference.
+
+#### Task 6.1.1: Configure Ollama on R730
+- Install NVIDIA drivers (if not present)
+- Deploy Ollama container on R730
+- Mount shared model directory (NFS from Control Plane)
+- Register R730 Ollama in load balancer
+
+**Status Tracking**:
+- [ ] Verify R730 GPU availability (NVIDIA GPU?)
+- [ ] Install drivers if needed
+- [ ] Deploy Ollama on R730
+- [ ] Test model loading
+- [ ] Benchmark inference latency
+
+#### Task 6.1.2: Implement Load Balancer
+
+```python
+# Generate file: agents/inference/load_balancer.py
+
+Key responsibilities:
+- InferenceNodePool
+  - Register nodes: [ollama:11434, r730_ollama:11434]
+  - Health check each (periodic /api/tags)
+  - Round-robin or weighted selection
+  - Failover on node down
+- Smart routing:
+  - Small model (3B) → fastest node
+  - Large model (7B) → most available VRAM
+  - Image gen → GPU with highest VRAM
+```
+
+**Status Tracking**:
+- [ ] Create InferenceNodePool class
+- [ ] Implement health checks
+- [ ] Implement routing strategies
+- [ ] Test failover (stop one node)
+- [ ] Benchmark throughput improvement
+
+---
+
+### 6.2 Model Version Pinning
+
+**Objective**: Allow agents to request specific model versions for reproducibility.
+
+```python
+# Extend ExpertiseTemplate to include:
+model_config = {
+    'primary_model': 'qwen2.5:7b@latest',  # Can pin version hash
+    'fallback_model': 'mistral:7b@v1.0',
+    'tool_models': {
+        'web_search': 'neural-chat:7b@latest',
+        'code_analysis': 'dolphin-mixtral:latest'
+    }
+}
+
+# Load balancer resolves @version to specific checkpoint
+# If version not available locally, pull from registry
+```
+
+**Status Tracking**:
+- [ ] Create ModelVersionRegistry class
+- [ ] Implement version resolution
+- [ ] Add model pull/cache logic
+- [ ] Extend load balancer for version affinity
+
+---
+
+### 6.3 A/B Testing Infrastructure
+
+**Objective**: Compare template versions in production with statistical confidence.
+
+```python
+# Route requests:
+# - 50% → template_v1.3 (control)
+# - 50% → template_v1.4 (experimental)
+
+# Collect metrics:
+# - Reward score
+# - Latency
+# - Error rate
+
+# After 100 samples:
+# - Report if v1.4 > v1.3 + 1 stddev (statistically significant)
+# - Auto-promote if significant
+```
+
+**Status Tracking**:
+- [ ] Create ExperimentRunner class
+- [ ] Implement bucketing logic
+- [ ] Add statistical analysis (t-test)
+- [ ] Create reporting dashboard
+
+---
+
+## PHASE 7: High Availability & Resilience
+**Duration**: 3-4 weeks | **Effort**: 70 story points  
+**Goal**: Eliminate single points of failure
+
+### 7.1 PostgreSQL Replication
+
+**Current**: Single PostgreSQL on Control Plane (SPOF)  
+**Target**: Primary (Control) + Replica (R730)
+
+```bash
+# On Control Plane:
+# 1. Enable replication role
+# 2. Create replication user
+# 3. Configure pg_hba.conf for replica
+
+# On R730:
+# 1. pg_basebackup from Control Plane
+# 2. Configure as streaming replica
+# 3. Start replication
+
+# HA Setup:
+# - Use patroni + etcd for automatic failover
+# - Agent Runtime connects to virtual IP (patroni-managed)
+# - If primary fails, replica promoted automatically
+```
+
+**Status Tracking**:
+- [ ] Configure replication on primary
+- [ ] Set up replica on R730
+- [ ] Test failover procedure
+- [ ] Deploy patroni + etcd
+- [ ] Verify automatic promotion
+
+---
+
+### 7.2 Redis Sentinel for Monitoring Queue
+
+**Current**: Single Redis on R730  
+**Target**: Master + 2 Replicas + Sentinel for failover
+
+**Status Tracking**:
+- [ ] Deploy Redis replicas on Control + Compute nodes
+- [ ] Configure Sentinel trio
+- [ ] Test failover (kill master)
+- [ ] Update connection strings to sentinel DNS
+
+---
+
+### 7.3 Ollama Model Caching Across Nodes
+
+**Objective**: Model loaded on one node available to others without re-download.
+
+```python
+# Strategy:
+# 1. Shared NFS mount for models: /shared/ollama/models
+# 2. All Ollama instances mount same directory
+# 3. First node to load model caches it
+# 4. Other nodes use cached copy (saves 5-10 min per model)
+```
+
+**Status Tracking**:
+- [ ] Set up NFS export on Control Plane
+- [ ] Mount on Justin-PC and R730
+- [ ] Reconfigure Ollama to use shared mount
+- [ ] Test model sharing
+
+---
+
+## PHASE 8: Kubernetes Migration
+**Duration**: 4-6 weeks | **Effort**: 100+ story points  
+**Goal**: Move from Docker Compose to k3s for production readiness
+
+### 8.1 k3s Cluster Setup
+
+```bash
+# Control Plane: k3s server
+# Compute Nodes: k3s agents (justin-pc, r730)
+
+# Install:
+# Control: curl -sfL https://get.k3s.io | sh -
+# Agents: k3s agent --server https://control:6443 --token $TOKEN
+```
+
+**Status Tracking**:
+- [ ] Install k3s on Control Plane
+- [ ] Install k3s agents on Compute nodes
+- [ ] Configure networking (CNI)
+- [ ] Verify cluster health (kubectl get nodes)
+
+---
+
+### 8.2 Helm Charts
+
+**Create Helm charts for each tier**:
+1. control-plane/ (SPIRE, Langfuse, PostgreSQL, ClickHouse, MinIO)
+2. gateway/ (Traefik, Prometheus, Grafana, Loki)
+3. compute/ (Ollama, ComfyUI, Agent Runtime, Voice Services)
+
+**Status Tracking**:
+- [ ] Create Helm chart scaffolds
+- [ ] Test chart deployment
+- [ ] Document values.yaml for customization
+- [ ] Create upgrade procedures
+
+---
+
+### 8.3 Auto-Scaling
+
+**Horizontal Pod Autoscaling**:
+```yaml
+# Scale Agent Runtime based on queue depth
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agent-runtime-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: agent-runtime
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Pods
+    pods:
+      metric:
+        name: queue_depth  # Custom metric from Prometheus
+      target:
+        type: AverageValue
+        averageValue: "30"  # Scale up if avg queue > 30
+```
+
+**Status Tracking**:
+- [ ] Define autoscaling metrics
+- [ ] Create HPAs for key services
+- [ ] Test scaling under load
+- [ ] Document cost implications
+
+---
+
+## Implementation Timeline
+
+```
+Q2 2026 (April - June)
+├─ Week 1-2: Phase 5.1 (JWT-ACE) ✓ Core
+├─ Week 2-3: Phase 5.2 (Template Registry) ✓ Core
+├─ Week 3-4: Phase 5.3 (Integration Tests) ✓ Core
+├─ Week 4-5: Phase 6.1 (Multi-GPU) 
+├─ Week 5-6: Phase 6.2 (Model Versioning)
+├─ Week 6-7: Phase 6.3 (A/B Testing)
+└─ Week 7-8: Buffer + Phase 7 (HA)
+
+Q3 2026 (July - September)
+├─ Week 1-3: Phase 7 (PostgreSQL HA, Redis Sentinel)
+├─ Week 3-4: Phase 8.1-8.2 (k3s + Helm)
+└─ Week 4-5: Phase 8.3 (Auto-scaling)
+```
+
+---
+
+## Resource Allocation
+
+### Development Team
+- **1 Senior Engineer**: Phase 5 architecture, Phase 8 k3s setup
+- **2 Mid-Level Engineers**: Phase 5 implementation, Phase 6 features
+- **1 QA Engineer**: Phase 5/6 testing, chaos testing
+- **1 DevOps Engineer**: Phase 7 HA, Phase 8 deployment
+
+### Infrastructure
+- **Phase 5-6**: Current infrastructure (no new hardware)
+- **Phase 7**: HA requires 1 additional IP (virtual IP for PostgreSQL)
+- **Phase 8**: k3s runs on existing 3 nodes (no new hardware)
+
+### Budget Estimate
+- **Development**: 300 story points @ $25/point = ~$7,500
+- **Infrastructure**: Minimal (same hardware) + NFS storage (~$2,000)
+- **Testing/QA**: 50 hours @ $50/hr = $2,500
+- **Total**: ~$12,000 over 4 months
+
+---
+
+## Risk Assessment
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|-----------|
+| JWT signature verification bug | Medium | High | Extensive unit tests, cryptographic validation |
+| Template update breaks production | Low | High | A/B testing framework, automatic rollback |
+| PostgreSQL replication lag | Low | Medium | Synchronous replication, monitoring |
+| k3s cluster incompatibility | Medium | High | Test on staging cluster first |
+
+---
+
+## Success Metrics
+
+### Phase 5
+- ✓ Ephemeral agents created/destroyed on demand
+- ✓ Token validation enforces capabilities
+- ✓ Template versions created from trace data
+- ✓ >50% code coverage for new modules
+
+### Phase 6
+- ✓ Load balancer distributes requests across 2 GPU nodes
+- ✓ Throughput increases 50% (2 nodes) vs single
+- ✓ Model versioning enables reproducible experiments
+- ✓ A/B testing detects 5% improvement with <100 samples
+
+### Phase 7
+- ✓ Database failover <5 seconds
+- ✓ System tolerates node failure without downtime
+- ✓ Model cache shared across nodes
+- ✓ 99.9% availability target
+
+### Phase 8
+- ✓ All services deployable via Helm
+- ✓ Auto-scaling works under load
+- ✓ Rolling updates with zero downtime
+- ✓ Cost reduced 30% via efficient resource packing
+
+---
+
+## Dependencies & Blockers
+
+### On Phase 5
+- **Langfuse API stability** (trace format must be finalized)
+- **SPIRE deployment** (must be operational on Control Plane)
+- **PostgreSQL** (must support JSON columns for parameters)
+
+### On Phase 6
+- **Phase 5 completion** (load balancer needs template versioning)
+- **Secondary GPU availability** (R730 or new node must have GPU)
+- **Network performance** (multi-node inference needs <10ms latency)
+
+### On Phase 7-8
+- **Team expertise** (Kubernetes requires special skills)
+- **Production validation** (must test HA extensively before live)
+
+---
+
+## Communication Plan
+
+- **Weekly standups**: 15 min (progress, blockers)
+- **Bi-weekly architecture reviews**: 1 hour (design decisions)
+- **Monthly stakeholder updates**: 30 min (business value, roadmap)
+- **Documentation**: Continuous (update as progress)
+
+---
+
+## Next Action Items (Q2 Week 1)
+
+1. **Approve Phase 5 design** (JWT-ACE, Template Registry)
+2. **Allocate development team** (5 people for 1 week / Phase 5.1)
+3. **Create PostgreSQL schema** (run migration on Control Plane)
+4. **Reserve testing environment** (staging cluster for k3s)
+5. **Schedule architecture review** (March 20, 2026)
+
+---
+
+**Document Version**: 1.0 (Draft)  
+**Status**: Ready for team review  
+**Next Review**: March 20, 2026 (After initial feedback)
