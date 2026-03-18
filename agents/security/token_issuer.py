@@ -27,8 +27,9 @@ Usage:
 import jwt
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List, Any
+import dataclasses
 from dataclasses import dataclass, asdict
 from functools import lru_cache
 import uuid
@@ -51,14 +52,14 @@ class EphemeralAgentCard:
     template_id: str                    # Reference to ExpertiseTemplate
     template_version: str              # "1.3", "2.0", etc.
     agent_name: str                    # "SecurityValidator_001"
-    agent_instance_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    activated_capabilities: List[str] = Field(default_factory=list)  # ["file_read", "api_call"]
+    agent_instance_id: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
+    activated_capabilities: List[str] = dataclasses.field(default_factory=list)  # ["file_read", "api_call"]
     security_level: str = "L2_USER"    # L1_PUBLIC, L2_USER, L3_ADMIN, L4_SYSTEM
     session_id: Optional[str] = None   # Link to user session
-    metadata: Dict[str, Any] = Field(default_factory=dict)  # Custom metadata
-    
+    metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)  # Custom metadata
+
     # Timestamps (UTC)
-    issued_at: datetime = Field(default_factory=datetime.utcnow)
+    issued_at: datetime = dataclasses.field(default_factory=datetime.utcnow)
     expiry_hours: int = 1  # Default 1 hour TTL
     
     def to_dict(self) -> Dict[str, Any]:
@@ -75,7 +76,7 @@ class EphemeralAgentCard:
     def from_dict(cls, data: Dict[str, Any]) -> "EphemeralAgentCard":
         """Reconstruct from JWT payload."""
         # Remove JWT reserved claims before creating object
-        jwt_claims = {k: v for k, v in data.items() if k not in ['exp', 'iat', 'sub', 'iss']}
+        jwt_claims = {k: v for k, v in data.items() if k not in ['exp', 'iat', 'sub', 'iss', 'aud']}
         if 'issued_at' in jwt_claims and isinstance(jwt_claims['issued_at'], str):
             jwt_claims['issued_at'] = datetime.fromisoformat(jwt_claims['issued_at'])
         return cls(**jwt_claims)
@@ -167,10 +168,10 @@ class TokenIssuer:
         payload['iss'] = 'home-ai-lab-token-issuer'
         payload['aud'] = 'home-ai-lab-agents'
         payload['sub'] = card.agent_instance_id
-        payload['iat'] = datetime.utcnow().timestamp()
+        payload['iat'] = datetime.now(timezone.utc).timestamp()
         
         # Calculate expiry
-        expiry = datetime.utcnow() + timedelta(hours=card.expiry_hours)
+        expiry = datetime.now(timezone.utc) + timedelta(hours=card.expiry_hours)
         payload['exp'] = expiry.timestamp()
         
         logger.info(
