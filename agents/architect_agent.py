@@ -14,10 +14,9 @@ from prompts.architect_prompts import ARCHITECT_INSTRUCTIONS
 # Configuration
 from phi.storage.agent.postgres import PgAgentStorage
 from config import AGNO_DB_URL
-from utils.gpu_queue import get_ollama_host
+from utils.gpu_queue import get_best_host_for_model
 
-MODEL_NAME = os.getenv("SOLVER_MODEL", "qwen2.5-coder:14b-instruct-q4_k_m")
-OLLAMA_HOST = get_ollama_host(MODEL_NAME)
+DEFAULT_MODEL = os.getenv("SOLVER_MODEL", "qwen2.5-coder:14b-instruct-q4_k_m")
 
 # Shared Storage for persistent sessions
 agent_storage = PgAgentStorage(
@@ -25,15 +24,19 @@ agent_storage = PgAgentStorage(
     db_url=AGNO_DB_URL
 )
 
-def get_architect_agent(session_id: Optional[str] = None):
+def get_architect_agent(session_id: Optional[str] = None, model_name: Optional[str] = None):
     """
     Returns an instance of the Architect Agent (MarsRL Solver role).
+    Host is resolved lazily at call time via health-aware routing.
     """
+    resolved_model = model_name or DEFAULT_MODEL
+    resolved_host = get_best_host_for_model(resolved_model)
+
     if not AGNO_DB_URL or "dell_wyse_ip" in AGNO_DB_URL:
         knowledge_base = None
     else:
         knowledge_base = CombinedKnowledgeBase(
-            sources=[], 
+            sources=[],
             vector_db=PgVector(
                 table_name="architect_knowledge",
                 db_url=AGNO_DB_URL,
@@ -43,8 +46,8 @@ def get_architect_agent(session_id: Optional[str] = None):
     return Agent(
         name="Architect",
         model=Ollama(
-            id=MODEL_NAME,
-            host=OLLAMA_HOST,
+            id=resolved_model,
+            host=resolved_host,
             options={"temperature": 0.1},
             client_kwargs={"timeout": 300.0}
         ),
