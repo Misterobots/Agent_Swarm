@@ -113,7 +113,6 @@ services:
         condition: service_healthy
     env_file:
       - ../network.env
-    env_file:
       - .env
     environment: &langfuse-env
       # Database
