@@ -172,6 +172,8 @@ services:
       --maxmemory-policy noeviction
     env_file:
       - .env
+    ports:
+      - "6379:6379"
     networks:
       - swarm_net
     healthcheck:

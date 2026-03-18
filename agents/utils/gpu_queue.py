@@ -19,8 +19,9 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "redis"])
     import redis
 
-REDIS_HOST = os.getenv("REDIS_HOST", "redis_queue")  # Assuming redis_queue is the hostname in docker-compose
+REDIS_HOST = os.getenv("REDIS_HOST", "redis_queue")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
@@ -111,7 +112,10 @@ def get_best_host_for_model(model_name: str) -> str:
     return get_ollama_host(model_name)
 
 def get_redis_client():
-    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+    return redis.Redis(
+        host=REDIS_HOST, port=REDIS_PORT, db=0,
+        password=REDIS_PASSWORD, decode_responses=True
+    )
 
 LOCK_KEY = "swarm_gpu_lock"
 ZONE_KEY = "swarm_gpu_zone"  # Track whether VRAM is currently dedicated to "text" or "image"
@@ -154,8 +158,16 @@ def request_lock(context: str, timeout: int = 300):
     """
     Acquires a global Mutex lock for the GPU and handles VRAM eviction for context switching.
     context must be either "text" or "image".
+    Fail-open: if Redis is unavailable, skip the lock and run without GPU mutex.
     """
-    client = get_redis_client()
+    try:
+        client = get_redis_client()
+        client.ping()  # Verify connection before proceeding
+    except Exception as e:
+        logger.warning(f"[GPU Queue] Redis unavailable ({e}). Running without GPU lock (fail-open).")
+        yield
+        return
+
     lock_id = os.urandom(16).hex()
     acquired = False
     logger.info(f"[GPU Queue] Attempting to acquire GPU lock for context: '{context}'...")

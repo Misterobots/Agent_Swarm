@@ -163,6 +163,10 @@ services:
       # Agent session storage + Template registry
       - AGNO_DB_URL=${AGNO_DB_URL}
       - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}
+      # Redis GPU mutex (control plane)
+      - REDIS_HOST=192.168.2.102
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       # Home Assistant Integration
       - HOME_ASSISTANT_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhYjFiNzAxZjE0YjA0ZDAyOGIxYzVmN2RjOTc1NzY3ZiIsImlhdCI6MTc3MTU1OTg4NCwiZXhwIjoyMDg2OTE5ODg0fQ.8lFUd7KEZzRb1e6-PHPPtynGGX-aJzPaoiAhoLsGu6M
       # BMO Voice LLM — small 3B model that fits alongside comfyui
