@@ -13,7 +13,8 @@ from prompts.architect_prompts import ARCHITECT_INSTRUCTIONS
 
 # Configuration
 from phi.storage.agent.postgres import PgAgentStorage
-from config import get_ollama_host, AGNO_DB_URL
+from config import AGNO_DB_URL
+from utils.gpu_queue import get_ollama_host
 
 MODEL_NAME = os.getenv("SOLVER_MODEL", "qwen2.5-coder:14b-instruct-q4_k_m")
 OLLAMA_HOST = get_ollama_host(MODEL_NAME)

@@ -12,7 +12,8 @@ from typing import Optional
 from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 from phi.storage.agent.postgres import PgAgentStorage
-from config import get_ollama_host, AGNO_DB_URL
+from config import AGNO_DB_URL
+from utils.gpu_queue import get_ollama_host
 from logger_setup import setup_logger
 
 logger = setup_logger("Corrector")
