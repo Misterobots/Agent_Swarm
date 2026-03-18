@@ -43,12 +43,13 @@ RUN pip install --no-cache-dir \
     streamlit-monaco \
     redis
 
-# Install SPIFFE SDK and Langfuse
+# Install SPIFFE SDK, Langfuse, and JWT-ACE dependencies
 RUN pip install --no-cache-dir \
     spiffe \
     nvidia-ml-py \
     cachetools \
-    langfuse
+    langfuse \
+    PyJWT
 
 # Fix for NVML: Create symlink for pynvml compatibility
 RUN ln -sf /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1 /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
