@@ -5,6 +5,31 @@
 
 services:
   # ═══════════════════════════════════════════════════════════════════════════════
+  # WORKLOAD IDENTITY (SPIRE Agent)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  spire-agent-r730:
+    image: ghcr.io/spiffe/spire-agent:1.10.1
+    container_name: spire-agent-r730
+    hostname: spire-agent-r730
+    restart: unless-stopped
+    volumes:
+      - ./config/spire:/etc/spire/agent
+      - spire_agent_data:/run/spire/agent
+      - spire_socket:/var/run/spire
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["-config", "/etc/spire/agent/agent.conf", "-joinToken", "${SPIRE_R730_JOIN_TOKEN}"]
+    healthcheck:
+      test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck", "-socketPath", "/var/run/spire/agent.sock"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ai_lab_net
+
+  # ═══════════════════════════════════════════════════════════════════════════════
   # METRICS & OBSERVABILITY
   # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -140,6 +165,9 @@ services:
     container_name: ollama-r730
     hostname: ollama-r730
     restart: always
+    depends_on:
+      spire-agent-r730:
+        condition: service_started
     deploy:
       resources:
         reservations:
@@ -165,6 +193,7 @@ services:
       - "traefik.http.routers.ollama.rule=PathPrefix(`/ollama`)"
       - "traefik.http.routers.ollama.entrypoints=web"
       - "traefik.http.services.ollama.loadbalancer.server.port=11434"
+      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/ollama-r730"
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
@@ -218,6 +247,10 @@ networks:
     name: ai_lab_net
 
 volumes:
+  spire_agent_data:
+    driver: local
+  spire_socket:
+    driver: local
   prometheus_data:
     driver: local
   loki_data:
