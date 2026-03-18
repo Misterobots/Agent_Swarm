@@ -225,6 +225,29 @@ services:
       - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
 
   # ═══════════════════════════════════════════════════════════════════════════════
+  # UNIFIED UI (Hive Mind — Next.js)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  hive-ui:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+    image: home-ai-lab/hive-ui:latest
+    container_name: hive_ui
+    restart: unless-stopped
+    environment:
+      - API_BASE_URL=http://192.168.2.101:8008
+    ports:
+      - "3200:3000"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
+      - "traefik.http.routers.hive-ui.entrypoints=web"
+      - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
   # ROUTING CONFIGURATION FOR JUSTIN-PC SERVICES (via Traefik)
   # ═══════════════════════════════════════════════════════════════════════════════
   # 

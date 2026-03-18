@@ -30,6 +30,11 @@ logs/
 
 # Backups
 *.backup.*
+backups/
+
+# Node
+node_modules/
+.next/
 
 # OS
 .DS_Store
