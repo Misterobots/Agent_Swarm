@@ -8,8 +8,8 @@ class SemanticRouter:
         # Nemotron-Orchestrator-8B: Nvidia's purpose-built multi-agent routing model
         # Runs on Dell R730 (RTX 3070 Ti 8GB) via SECONDARY_OLLAMA_HOST
         self.model_name = os.getenv("ROUTER_MODEL", "nemotron-orchestrator:8b")
-        from utils.gpu_queue import get_ollama_host
-        self.host = get_ollama_host(self.model_name)
+        from utils.gpu_queue import get_best_host_for_model
+        self.host = get_best_host_for_model(self.model_name)
         
         # Self-Healing: Ensure model exists before Agent init
         self.ensure_model(self.model_name)

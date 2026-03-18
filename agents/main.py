@@ -455,6 +455,15 @@ async def update_request_status(req_id: str, update: UpdateRequestModel):
     logger.info(f"Request {req_id} updated to {update.status}")
     return item
 
+# --- Node Health Endpoint (Phase 6) ---
+@app.get("/api/v1/health/nodes")
+async def health_nodes():
+    """Returns health status of all Ollama inference nodes."""
+    from inference.node_health import get_node_monitor
+    monitor = get_node_monitor()
+    return {"nodes": monitor.get_all_statuses()}
+
+
 if __name__ == "__main__":
     # If run directly via python, use uvicorn
     import uvicorn

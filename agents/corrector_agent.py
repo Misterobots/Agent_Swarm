@@ -14,14 +14,13 @@ from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 from phi.storage.agent.postgres import PgAgentStorage
 from config import AGNO_DB_URL
-from utils.gpu_queue import get_ollama_host
+from utils.gpu_queue import get_best_host_for_model
 from logger_setup import setup_logger
 
 logger = setup_logger("Corrector")
 
 # Config
-CORRECTOR_MODEL = os.getenv("CORRECTOR_MODEL", "qwen3.5:9b")
-OLLAMA_HOST = get_ollama_host(CORRECTOR_MODEL)
+DEFAULT_CORRECTOR_MODEL = os.getenv("CORRECTOR_MODEL", "qwen3.5:9b")
 
 CORRECTOR_SYSTEM_PROMPT = """You are the Corrector Agent in a multi-agent software engineering system.
 
@@ -58,18 +57,20 @@ class CorrectorAgent:
     Wraps qwen3.5:9b as the Corrector in the MarsRL loop.
     """
 
-    def __init__(self, session_id: Optional[str] = None):
+    def __init__(self, session_id: Optional[str] = None, model_name: Optional[str] = None):
         self._agent = None
         self.session_id = session_id
+        self.model_name = model_name or DEFAULT_CORRECTOR_MODEL
 
     def _get_agent(self) -> Agent:
         if self._agent is None:
-            logger.info(f"[Corrector] Initializing with model: {CORRECTOR_MODEL} | Session: {self.session_id}")
+            resolved_host = get_best_host_for_model(self.model_name)
+            logger.info(f"[Corrector] Initializing with model: {self.model_name} @ {resolved_host} | Session: {self.session_id}")
             self._agent = Agent(
                 name="Corrector",
                 model=Ollama(
-                    id=CORRECTOR_MODEL,
-                    host=OLLAMA_HOST,
+                    id=self.model_name,
+                    host=resolved_host,
                     options={"temperature": 0.05},  # Low temp — precise corrections
                     client_kwargs={"timeout": 300.0}
                 ),

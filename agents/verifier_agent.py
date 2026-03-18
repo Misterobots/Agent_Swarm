@@ -18,10 +18,8 @@ from mars_loop import VerifierResult
 
 logger = setup_logger("Verifier")
 
-# Config
-from utils.gpu_queue import get_ollama_host
+# Config — host resolved lazily via get_best_host_for_model() in _get_guard_agent()
 SECURITY_MODEL = "llama-guard-3:8b"
-OLLAMA_HOST = get_ollama_host(SECURITY_MODEL)
 
 
 class LogicVerifier:

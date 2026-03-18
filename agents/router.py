@@ -15,7 +15,7 @@ import re
 import os
 from dispatcher import Event, EventType
 from logger_setup import setup_logger
-from utils.gpu_queue import request_lock
+from utils.gpu_queue import request_lock, get_best_host_for_model
 
 logger = setup_logger("Router")
 
@@ -38,6 +38,25 @@ try:
 except ImportError as e:
     TEMPLATES_AVAILABLE = False
     logger.warning(f"[Router] Template registry not available: {e}")
+
+def _resolve_model_for_intent(intent: str, fallback_model: str) -> str:
+    """
+    Look up the default_model from the ExpertiseTemplate registry for a given intent.
+    Falls back to the provided default if templates are unavailable or no match found.
+    """
+    if not TEMPLATES_AVAILABLE:
+        return fallback_model
+    try:
+        registry = get_template_registry()
+        templates = registry.list_templates(intent=intent)
+        if templates and templates[0].default_model:
+            resolved = templates[0].default_model
+            logger.debug(f"[Router] Template resolved model for {intent}: {resolved}")
+            return resolved
+    except Exception as e:
+        logger.debug(f"[Router] Template model lookup failed for {intent}: {e}")
+    return fallback_model
+
 
 # --- Langfuse Tracing ---
 try:
@@ -341,10 +360,9 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
              AGENT_STATE.labels(agent_name="ArtDirector").set(2)
              
              from phi.model.ollama import Ollama
-             from utils.gpu_queue import get_ollama_host
-             # Config
-             MODEL_NAME = "qwen2.5-coder:14b"
-             OLLAMA_HOST = get_ollama_host(MODEL_NAME)
+             # Config — template-driven model selection with health-aware routing
+             MODEL_NAME = _resolve_model_for_intent("IMAGE", os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b"))
+             OLLAMA_HOST = get_best_host_for_model(MODEL_NAME)
              
              art_director = Agent(
                  name="Art Director",
@@ -400,10 +418,9 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             yield {"type": "status", "content": "📝 Technical Writer: Reviewing document structure..."}
             AGENT_STATE.labels(agent_name="TechnicalWriter").set(2)
             
-            from utils.gpu_queue import get_ollama_host
-            # Use qwen3.5:9b for efficient 256k context coding
-            TECH_MODEL = os.getenv("ARCHITECT_MODEL", "qwen3.5:9b")
-            OLLAMA_HOST = get_ollama_host(TECH_MODEL)
+            # Template-driven model selection with health-aware routing
+            TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", "qwen3.5:9b"))
+            OLLAMA_HOST = get_best_host_for_model(TECH_MODEL)
             
             tech_writer = Agent(
                 name="Technical Writer",
@@ -456,11 +473,14 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             AGENT_STATE.labels(agent_name="Librarian").set(2)
             
             from phi.model.ollama import Ollama
-            from agents.config import LIBRARIAN_MODEL, OLLAMA_HOST
-            
+            from agents.config import LIBRARIAN_MODEL
+
+            resolved_model = _resolve_model_for_intent("RESEARCH", LIBRARIAN_MODEL)
+            resolved_host = get_best_host_for_model(resolved_model)
+
             researcher = Agent(
                 name="Librarian",
-                model=Ollama(id=LIBRARIAN_MODEL, host=OLLAMA_HOST),
+                model=Ollama(id=resolved_model, host=resolved_host),
                 instructions="""You are the Hive Librarian and Scholar.
                 Your goal is to provide deep historical context, literary analysis, and general knowledge.
                 You are the guardian of facts and culture. Focus on: History, Literature, Philosophy, Science, and Factual Explanations.
