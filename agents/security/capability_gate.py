@@ -16,7 +16,12 @@ Usage:
 import logging
 import functools
 from typing import Callable, Optional, Any
-from fastapi import Request, HTTPException, status
+try:
+    from fastapi import Request, HTTPException, status
+except ImportError:
+    Request = None
+    HTTPException = None
+    status = None
 import jwt
 
 logger = logging.getLogger(__name__)

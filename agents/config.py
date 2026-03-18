@@ -27,7 +27,7 @@ def _load_network_env():
     """Parse network.env into os.environ (won't overwrite existing vars)."""
     for candidate in _CANDIDATES:
         if candidate.is_file():
-            with open(candidate) as f:
+            with open(candidate, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith("#"):
