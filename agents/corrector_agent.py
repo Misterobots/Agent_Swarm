@@ -8,6 +8,7 @@ Model: qwen3.5:9b (same as Solver but with different system prompt)
 This follows MarsRL's agent-specific optimization — same model, different role.
 """
 
+import os
 from typing import Optional
 from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
@@ -19,7 +20,6 @@ from logger_setup import setup_logger
 logger = setup_logger("Corrector")
 
 # Config
-from utils.gpu_queue import get_ollama_host
 CORRECTOR_MODEL = os.getenv("CORRECTOR_MODEL", "qwen3.5:9b")
 OLLAMA_HOST = get_ollama_host(CORRECTOR_MODEL)
 
