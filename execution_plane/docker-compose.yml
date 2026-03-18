@@ -16,7 +16,7 @@ services:
       - spire_socket:/var/run/spire  # Shared socket for workloads
       - //var/run/docker.sock:/var/run/docker.sock:ro
     # pid: "host"
-    command: ["-config", "/etc/spire/agent/agent.conf", "-joinToken", "a5dcf51f-fc1e-455f-96e5-33bf165ca42e"]
+    command: ["-config", "/etc/spire/agent/agent.conf", "-joinToken", "${SPIRE_JOIN_TOKEN}"]
     healthcheck:
       test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck"]
       interval: 30s
@@ -168,7 +168,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       # Home Assistant Integration
-      - HOME_ASSISTANT_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhYjFiNzAxZjE0YjA0ZDAyOGIxYzVmN2RjOTc1NzY3ZiIsImlhdCI6MTc3MTU1OTg4NCwiZXhwIjoyMDg2OTE5ODg0fQ.8lFUd7KEZzRb1e6-PHPPtynGGX-aJzPaoiAhoLsGu6M
+      - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
       # BMO Voice LLM — small 3B model that fits alongside comfyui
       # Heavy models may OOM when ComfyUI is loaded
       - BMO_LLM_MODEL=qwen2.5:3b
