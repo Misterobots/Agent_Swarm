@@ -285,45 +285,62 @@ async def chat_completions(request: ChatRequest):
     if request.stream:
         async def stream_generator():
             # Get generator from the swarm router
-            gen = chat_swarm(last_msg, history=history)
-            
-            for update in gen:
-                # Update is expected to be a dict: {"type": ..., "content": ...}
-                if not isinstance(update, dict):
-                    continue
-                    
-                msg_type = update.get("type", "response")
-                raw_content = update.get("content", "")
-                
-                # In standard mode, we only yield the actual assistant segments
-                if is_standard_mode:
-                    if msg_type not in ["message", "response"]:
+            import logging
+            logger = logging.getLogger("uvicorn")
+            try:
+                gen = chat_swarm(last_msg, history=history)
+            except Exception as e:
+                logger.error(f"[Stream] chat_swarm init failed: {e}")
+                yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':0,'model':request.model,'choices':[{'index':0,'delta':{'content':f'Error: {e}'},'finish_reason':None}]})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            update_count = 0
+            try:
+                for update in gen:
+                    update_count += 1
+                    logger.debug(f"[Stream] update #{update_count}: {update}")
+                    # Update is expected to be a dict: {"type": ..., "content": ...}
+                    if not isinstance(update, dict):
                         continue
-                    content = raw_content
-                else:
-                    # Format non-response items as markdown blockquotes for the Swarm UI
-                    if msg_type == "status":
-                        content = f"\n> ⏳ _{raw_content}_\n\n"
-                    elif msg_type == "log":
-                        content = f"\n> 🛠️ _{raw_content}_\n\n"
-                    elif msg_type == "error":
-                        content = f"\n> ❌ **ERROR**: {raw_content}\n\n"
-                    else:
+
+                    msg_type = update.get("type", "response")
+                    raw_content = update.get("content", "")
+
+                    # In standard mode, we only yield the actual assistant segments
+                    if is_standard_mode:
+                        if msg_type not in ["message", "response"]:
+                            continue
                         content = raw_content
-                    
-                if content:
-                    # Strip heartbeat if it leaks through
-                    content = content.replace("\u200B", "")
-                    
-                    chunk = {
-                        "id": "chatcmpl-swarm",
-                        "object": "chat.completion.chunk",
-                        "created": 1234567890,
-                        "model": request.model,
-                        "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}]
-                    }
-                    yield f"data: {json.dumps(chunk)}\n\n"
-            
+                    else:
+                        # Format non-response items as markdown blockquotes for the Swarm UI
+                        if msg_type == "status":
+                            content = f"\n> ⏳ _{raw_content}_\n\n"
+                        elif msg_type == "log":
+                            content = f"\n> 🛠️ _{raw_content}_\n\n"
+                        elif msg_type == "error":
+                            content = f"\n> ❌ **ERROR**: {raw_content}\n\n"
+                        else:
+                            content = raw_content
+
+                    if content:
+                        # Strip heartbeat if it leaks through
+                        content = content.replace("\u200B", "")
+
+                        chunk = {
+                            "id": "chatcmpl-swarm",
+                            "object": "chat.completion.chunk",
+                            "created": 1234567890,
+                            "model": request.model,
+                            "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}]
+                        }
+                        yield f"data: {json.dumps(chunk)}\n\n"
+            except Exception as e:
+                logger.error(f"[Stream] Generator error after {update_count} updates: {e}", exc_info=True)
+                err_msg = f"\nStream error: {e}"
+                yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':0,'model':request.model,'choices':[{'index':0,'delta':{'content':err_msg},'finish_reason':None}]})}\n\n"
+
+            logger.info(f"[Stream] Completed with {update_count} updates")
             # Finish
             yield "data: [DONE]\n\n"
 
