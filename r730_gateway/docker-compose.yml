@@ -379,7 +379,7 @@ services:
       - vscode_config_devops:/config
       - ../execution_plane/init_ide:/custom-cont-init.d:ro
     ports:
-      - "8443:8443"
+      - "8445:8443"  # 8443 used by Saltbox/Traefik on R730
     networks:
       - ai_lab_net
     labels:
