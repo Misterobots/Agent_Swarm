@@ -1,7 +1,7 @@
-# JUSTIN-PC EXECUTION PLANE - PHASE 3
-# Removed: Traefik, Prometheus, Grafana, Loki, Promtail, cAdvisor, Redis monitoring
-# Kept: Compute services (Ollama, ComfyUI, BMO Voice, OpenHands, Agent Runtime, Agent UI, Ops Portal)
-# NOTE: Services are now accessed through R730 Traefik Gateway on port 80/443
+# JUSTIN-PC EXECUTION PLANE - GPU COMPUTE ONLY
+# Phase 8: Non-GPU services migrated to R730 (Authentik, IDEs, OpenHands, ops-portal, agent-ui)
+# Kept: GPU-bound services (Ollama, ComfyUI, BMO Voice, Voice Engine, Agent Runtime)
+# NOTE: Services are accessed through R730 Traefik Gateway on port 80/443
 # Routing: Justin-PC (192.168.2.101) <- R730 Traefik (192.168.2.103:80) <- Existing media stack
 
 services:
@@ -111,31 +111,6 @@ services:
       - "traefik.http.routers.voice-engine.entrypoints=web"
       - "traefik.http.services.voice-engine.loadbalancer.server.port=8020"
 
-  # OPENHANDS - Sandboxed Execution Environment (Protected by Authentik SSO)
-  openhands:
-    build:
-      context: .
-      dockerfile: Dockerfile.openhands
-    image: custom-openhands:latest
-    container_name: openhands_sandbox
-    privileged: true # Required for Docker-in-Docker sandboxing
-    environment:
-      - SANDBOX_USER_ID=1000
-    ports:
-      - "3000:3000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ../workspace:/workspace
-    networks:
-      - execution_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.openhands.rule=PathPrefix(`/hands`)"
-      - "traefik.http.routers.openhands.entrypoints=web"
-      - "traefik.http.routers.openhands.middlewares=strip-hands,authentik@docker"
-      - "traefik.http.middlewares.strip-hands.stripprefix.prefixes=/hands"
-      - "traefik.http.services.openhands.loadbalancer.server.port=3000"
-
   # AGENT RUNTIME - Custom Python Environment for Agno Agents
   agent-runtime:
     build:
@@ -146,14 +121,13 @@ services:
     restart: always
     depends_on:
       - ollama
-      - openhands
       - comfyui
       - spire-agent  # Wait for SPIRE Agent
     env_file:
       - ../network.env
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - OPENHANDS_URL=http://openhands:3000
+      - OPENHANDS_URL=http://192.168.2.103:3002  # OpenHands migrated to R730
       - OPENHANDS_API_KEY=sk-sandbox-local
       - COMFYUI_HOST=http://comfyui_gpu:8188
       - "VALID_API_KEYS={\"sk-coder-identity\": \"coding_user\", \"sk-devops-identity\": \"devops_user\"}"
@@ -282,217 +256,14 @@ services:
       - "traefik.http.middlewares.strip-comfy.stripprefix.prefixes=/comfy"
       - "traefik.http.services.comfyui.loadbalancer.server.port=8188"
 
-  # --- VS CODE SERVER (DevOps - Full Access, Protected by Authentik SSO) ---
-  agent_ide_devops:
-    image: lscr.io/linuxserver/code-server:latest
-    container_name: agent_ide_devops
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-      - PASSWORD=${VSCODE_PASSWORD}
-      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
-      - DEFAULT_WORKSPACE=/config/workspace
-      - SWARM_API_KEY=sk-devops-identity
-    volumes:
-      - ../:/config/workspace
-      - vscode_config_devops:/config
-      - ./init_ide:/custom-cont-init.d:ro
-    ports:
-      - "8443:8443"
-    restart: unless-stopped
-    networks:
-      - execution_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.ide-devops.rule=PathPrefix(`/devops`)"
-      - "traefik.http.routers.ide-devops.entrypoints=web"
-      - "traefik.http.routers.ide-devops.middlewares=strip-devops,authentik@docker"
-      - "traefik.http.middlewares.strip-devops.stripprefix.prefixes=/devops"
-      - "traefik.http.services.ide-devops.loadbalancer.server.port=8443"
-
-  # --- VS CODE SERVER (Coding - Restricted Sandbox, Protected by Authentik SSO) ---
-  agent_ide_coding:
-    image: lscr.io/linuxserver/code-server:latest
-    container_name: agent_ide_coding
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-      - PASSWORD=${VSCODE_PASSWORD}
-      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
-      - DEFAULT_WORKSPACE=/config/workspace
-      - SWARM_API_KEY=sk-coder-identity
-    volumes:
-      - ../user_projects:/config/workspace
-      - vscode_config_coding:/config
-      - ./init_ide:/custom-cont-init.d:ro
-    ports:
-      - "8444:8443"
-    restart: unless-stopped
-    networks:
-      - execution_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.ide-coding.rule=PathPrefix(`/code`)"
-      - "traefik.http.routers.ide-coding.entrypoints=web"
-      - "traefik.http.routers.ide-coding.middlewares=strip-code,authentik@docker"
-      - "traefik.http.middlewares.strip-code.stripprefix.prefixes=/code"
-      - "traefik.http.services.ide-coding.loadbalancer.server.port=8443"
-
-  # AGENT UI - Streamlit Interface (Protected by Authentik SSO)
-  agent-ui:
-    image: home-ai-lab/agent-runtime:latest
-    container_name: agent_ui
-    depends_on:
-      - ollama
-      - agent-runtime
-      - comfyui
-    env_file:
-      - ../network.env
-    environment:
-      - AGNO_DB_URL=${AGNO_DB_URL}
-      - OLLAMA_HOST=http://ollama:11434
-      - COMFYUI_HOST=http://comfyui_gpu:8188
-      - STREAMLIT_THEME_BASE=dark
-      - STREAMLIT_THEME_PRIMARY_COLOR=#00ffff
-      - STREAMLIT_THEME_BACKGROUND_COLOR=#0e1117
-      - STREAMLIT_THEME_SECONDARY_BACKGROUND_COLOR=#1c1c2e
-      - STREAMLIT_THEME_TEXT_COLOR=#e0e0e0
-    volumes:
-      - ../agents:/app/agents
-      - ../:/workspace
-      - C:/Users/panca/Documents/ComfyUI/ComfyUI/output:/app/comfy_io/output
-      - C:/Users/panca/Documents/ComfyUI/ComfyUI/input:/app/comfy_io/input
-    working_dir: /workspace
-    command: [ "streamlit", "run", "agents/ui.py", "--server.port=8501", "--server.address=0.0.0.0" ]
-    ports:
-      - "8501:8501"
-      - "8001:8001"
-    networks:
-      - execution_net
-    labels:
-      - "traefik.enable=true"
-      # Route: /ai -> Agent UI (works from any host including Tailscale)
-      - "traefik.http.routers.agent-ui.rule=PathPrefix(`/ai`)"
-      - "traefik.http.routers.agent-ui.entrypoints=web"
-      - "traefik.http.routers.agent-ui.middlewares=strip-ai,authentik@docker"
-      - "traefik.http.middlewares.strip-ai.stripprefix.prefixes=/ai"
-      - "traefik.http.services.agent-ui.loadbalancer.server.port=8501"
-      # Authentik Forward Auth Middleware (shared by all services)
-      - "traefik.http.middlewares.authentik.forwardauth.address=http://authentik_server:9000/outpost.goauthentik.io/auth/traefik"
-      - "traefik.http.middlewares.authentik.forwardauth.trustForwardHeader=true"
-      - "traefik.http.middlewares.authentik.authResponseHeaders=X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
-
-  # OPS PORTAL - Admin Dashboard (Protected by Authentik SSO)
-  ops-portal:
-    image: home-ai-lab/agent-runtime:latest
-    container_name: ops_portal
-    user: "0"  # Run as root for Docker socket access
-    depends_on:
-      - agent-runtime
-    env_file:
-      - ../network.env
-    environment:
-      - AGNO_DB_URL=${AGNO_DB_URL}
-      # Langfuse connection now sourced from network.env
-      - LANGFUSE_HOST=${LANGFUSE_HOST}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
-    volumes:
-      - ../agents:/app/agents
-      - ../docs:/app/docs
-      - ../:/workspace
-      - //var/run/docker.sock:/var/run/docker.sock
-    working_dir: /workspace
-    command: [ "streamlit", "run", "agents/ops_dashboard.py", "--server.port=8502", "--server.address=0.0.0.0" ]
-    ports:
-      - "8502:8502"
-    networks:
-      - execution_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.ops-portal.rule=PathPrefix(`/ops`)"
-      - "traefik.http.routers.ops-portal.entrypoints=web"
-      - "traefik.http.routers.ops-portal.middlewares=strip-ops,authentik@docker"
-      - "traefik.http.middlewares.strip-ops.stripprefix.prefixes=/ops"
-      - "traefik.http.services.ops-portal.loadbalancer.server.port=8502"
-
-  # --- IDENTITY - Authentik DB ---
-  authentik_db:
-    image: postgres:12-alpine
-    container_name: authentik_db
-    restart: unless-stopped
-    volumes:
-      - database_authentik:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=${AUTHENTIK_DB_PASSWORD}
-      - POSTGRES_USER=authentik
-      - POSTGRES_DB=authentik
-    networks:
-      - execution_net
-
-  # --- IDENTITY - Authentik Redis ---
-  authentik_redis:
-    image: redis:alpine
-    container_name: authentik_redis
-    command: --save 60 1 --loglevel warning
-    restart: unless-stopped
-    volumes:
-      - redis_authentik:/data
-    networks:
-      - execution_net
-
-  # --- IDENTITY - Authentik Server ---
-  authentik_server:
-    image: ghcr.io/goauthentik/server:2024.2.1
-    container_name: authentik_server
-    restart: unless-stopped
-    command: server
-    environment:
-      - AUTHENTIK_REDIS__HOST=authentik_redis
-      - AUTHENTIK_POSTGRESQL__HOST=authentik_db
-      - AUTHENTIK_POSTGRESQL__USER=authentik
-      - AUTHENTIK_POSTGRESQL__NAME=authentik
-      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
-      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
-      # CRITICAL: Tell Authentik its external-facing hostname for OIDC discovery
-      - AUTHENTIK_HOST=http://localhost:9000
-      - AUTHENTIK_HOST_BROWSER=http://localhost:9000
-    volumes:
-      - ./config/authentik/media:/media
-      - ./config/authentik/custom-templates:/templates
-    ports:
-      - "9000:9000"
-      - "9443:9443"
-    depends_on:
-      - authentik_db
-      - authentik_redis
-    networks:
-      - execution_net
-
-  # --- IDENTITY - Authentik Worker ---
-  authentik_worker:
-    image: ghcr.io/goauthentik/server:2024.2.1
-    container_name: authentik_worker
-    restart: unless-stopped
-    command: worker
-    environment:
-      - AUTHENTIK_REDIS__HOST=authentik_redis
-      - AUTHENTIK_POSTGRESQL__HOST=authentik_db
-      - AUTHENTIK_POSTGRESQL__USER=authentik
-      - AUTHENTIK_POSTGRESQL__NAME=authentik
-      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
-      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
-    volumes:
-      - ./config/authentik/media:/media
-      - ./config/authentik/certs:/certs
-      - ./config/authentik/custom-templates:/templates
-    depends_on:
-      - authentik_db
-      - authentik_redis
-    networks:
-      - execution_net
+  # ─────────────────────────────────────────────────────────────────
+  # MIGRATED TO R730 (Phase 8):
+  # - agent_ide_devops, agent_ide_coding (Code Servers)
+  # - agent-ui (Streamlit — replaced by hive-ui)
+  # - ops-portal (Streamlit admin dashboard)
+  # - authentik_db, authentik_redis, authentik_server, authentik_worker
+  # - openhands (sandboxed execution)
+  # ─────────────────────────────────────────────────────────────────
 
   # ─────────────────────────────────────────────────────────────────
   # DIAGNOSTIC TOOL — Text Generation WebUI (oobabooga)
@@ -544,10 +315,6 @@ networks:
 volumes:
   bmo_models:
   ollama_models:
-  vscode_config_devops:
-  vscode_config_coding:
-  database_authentik:
-  redis_authentik:
   spire_agent_data:
   spire_socket:
   tgw_models:

@@ -248,21 +248,211 @@ services:
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
-  # ROUTING CONFIGURATION FOR JUSTIN-PC SERVICES (via Traefik)
+  # IDENTITY — Authentik SSO (migrated from Justin-PC, Phase 8)
   # ═══════════════════════════════════════════════════════════════════════════════
-  # 
-  # Justin-PC containers (comfyui, bmo-voice, agent-runtime, etc.) are NOT defined here.
-  # Instead, Traefik discovers them via Docker API from Justin-PC.
-  #
-  # For local testing or specific routing, uncomment below and configure labels:
-  #
-  # Example routing to Justin-PC services:
-  # - Agent Runtime: traefik rule = PathPrefix(`/swarm`)  → justin-pc:8008
-  # - ComfyUI:       traefik rule = PathPrefix(`/comfy`)  → justin-pc:8188
-  # - OpenHands:     traefik rule = PathPrefix(`/hands`)  → justin-pc:3000
-  #
-  # These are configured via docker-compose labels on Justin-PC containers
-  # and auto-discovered by Traefik.
+
+  authentik_db:
+    image: postgres:12-alpine
+    container_name: authentik_db
+    restart: unless-stopped
+    volumes:
+      - database_authentik:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - POSTGRES_USER=authentik
+      - POSTGRES_DB=authentik
+    networks:
+      - ai_lab_net
+
+  authentik_redis:
+    image: redis:alpine
+    container_name: authentik_redis
+    command: --save 60 1 --loglevel warning
+    restart: unless-stopped
+    volumes:
+      - redis_authentik:/data
+    networks:
+      - ai_lab_net
+
+  authentik_server:
+    image: ghcr.io/goauthentik/server:2024.2.1
+    container_name: authentik_server
+    restart: unless-stopped
+    command: server
+    environment:
+      - AUTHENTIK_REDIS__HOST=authentik_redis
+      - AUTHENTIK_POSTGRESQL__HOST=authentik_db
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      - AUTHENTIK_HOST=http://192.168.2.103:9000
+      - AUTHENTIK_HOST_BROWSER=http://192.168.2.103:9000
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    depends_on:
+      - authentik_db
+      - authentik_redis
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      # Authentik Forward Auth Middleware (shared by all services across nodes)
+      - "traefik.http.middlewares.authentik.forwardauth.address=http://authentik_server:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.authentik.forwardauth.trustForwardHeader=true"
+      - "traefik.http.middlewares.authentik.forwardauth.authResponseHeaders=X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
+      - "traefik.http.routers.authentik.rule=PathPrefix(`/auth`)"
+      - "traefik.http.routers.authentik.entrypoints=web"
+      - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+
+  authentik_worker:
+    image: ghcr.io/goauthentik/server:2024.2.1
+    container_name: authentik_worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      - AUTHENTIK_REDIS__HOST=authentik_redis
+      - AUTHENTIK_POSTGRESQL__HOST=authentik_db
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+    volumes:
+      - authentik_media:/media
+      - authentik_certs:/certs
+      - authentik_templates:/templates
+    depends_on:
+      - authentik_db
+      - authentik_redis
+    networks:
+      - ai_lab_net
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # DEVELOPMENT TOOLS (migrated from Justin-PC, Phase 8)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  # OPENHANDS - Sandboxed Execution Environment
+  openhands:
+    build:
+      context: ../execution_plane
+      dockerfile: Dockerfile.openhands
+    image: custom-openhands:latest
+    container_name: openhands_sandbox
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - SANDBOX_USER_ID=1000
+    ports:
+      - "3002:3000"  # 3000 = OpenWebUI, 3100 = Loki
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../workspace:/workspace
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openhands.rule=PathPrefix(`/hands`)"
+      - "traefik.http.routers.openhands.entrypoints=web"
+      - "traefik.http.routers.openhands.middlewares=strip-hands,authentik@docker"
+      - "traefik.http.middlewares.strip-hands.stripprefix.prefixes=/hands"
+      - "traefik.http.services.openhands.loadbalancer.server.port=3000"
+
+  # VS CODE SERVER (DevOps - Full Access, Protected by Authentik SSO)
+  agent_ide_devops:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: agent_ide_devops
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PASSWORD=${VSCODE_PASSWORD}
+      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
+      - DEFAULT_WORKSPACE=/config/workspace
+      - SWARM_API_KEY=sk-devops-identity
+    volumes:
+      - ../:/config/workspace
+      - vscode_config_devops:/config
+      - ../execution_plane/init_ide:/custom-cont-init.d:ro
+    ports:
+      - "8443:8443"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ide-devops.rule=PathPrefix(`/devops`)"
+      - "traefik.http.routers.ide-devops.entrypoints=web"
+      - "traefik.http.routers.ide-devops.middlewares=strip-devops,authentik@docker"
+      - "traefik.http.middlewares.strip-devops.stripprefix.prefixes=/devops"
+      - "traefik.http.services.ide-devops.loadbalancer.server.port=8443"
+
+  # VS CODE SERVER (Coding - Restricted Sandbox, Protected by Authentik SSO)
+  agent_ide_coding:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: agent_ide_coding
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PASSWORD=${VSCODE_PASSWORD}
+      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
+      - DEFAULT_WORKSPACE=/config/workspace
+      - SWARM_API_KEY=sk-coder-identity
+    volumes:
+      - ../user_projects:/config/workspace
+      - vscode_config_coding:/config
+      - ../execution_plane/init_ide:/custom-cont-init.d:ro
+    ports:
+      - "8444:8443"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ide-coding.rule=PathPrefix(`/code`)"
+      - "traefik.http.routers.ide-coding.entrypoints=web"
+      - "traefik.http.routers.ide-coding.middlewares=strip-code,authentik@docker"
+      - "traefik.http.middlewares.strip-code.stripprefix.prefixes=/code"
+      - "traefik.http.services.ide-coding.loadbalancer.server.port=8443"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # OPS PORTAL — Admin Dashboard (migrated from Justin-PC, Phase 8)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  ops-portal:
+    image: home-ai-lab/agent-runtime:latest
+    container_name: ops_portal
+    restart: unless-stopped
+    user: "0"
+    env_file:
+      - ../network.env
+    environment:
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+    volumes:
+      - ../agents:/app/agents
+      - ../docs:/app/docs
+      - ../:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    command: ["streamlit", "run", "agents/ops_dashboard.py", "--server.port=8502", "--server.address=0.0.0.0"]
+    ports:
+      - "8502:8502"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ops-portal.rule=PathPrefix(`/ops`)"
+      - "traefik.http.routers.ops-portal.entrypoints=web"
+      - "traefik.http.routers.ops-portal.middlewares=strip-ops,authentik@docker"
+      - "traefik.http.middlewares.strip-ops.stripprefix.prefixes=/ops"
+      - "traefik.http.services.ops-portal.loadbalancer.server.port=8502"
 
 networks:
   ai_lab_net:
@@ -285,4 +475,20 @@ volumes:
   ollama_models:
     driver: local
   open-webui_data:
+    driver: local
+  # Authentik (migrated from Justin-PC)
+  database_authentik:
+    driver: local
+  redis_authentik:
+    driver: local
+  authentik_media:
+    driver: local
+  authentik_certs:
+    driver: local
+  authentik_templates:
+    driver: local
+  # Code Servers (migrated from Justin-PC)
+  vscode_config_devops:
+    driver: local
+  vscode_config_coding:
     driver: local
