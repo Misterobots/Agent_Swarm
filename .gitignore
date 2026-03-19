@@ -32,6 +32,16 @@ logs/
 *.backup.*
 backups/
 
+# Large binaries / models / media (use LFS or external storage)
+*.iso
+*.zip
+*.pth
+*.mp4
+*.wav
+*.png
+*.index
+delivered_artifacts/
+
 # Node
 node_modules/
 .next/
