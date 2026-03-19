@@ -273,8 +273,8 @@ async def chat_completions(request: ChatRequest):
     from router import chat_swarm
     import json
 
-    # Extract history (all but the last message)
-    history = request.messages[:-1]
+    # Extract history (all but the last message), convert Pydantic models to dicts
+    history = [{"role": m.role, "content": m.content} for m in request.messages[:-1]]
     # Extract latest prompt
     last_msg = request.messages[-1].content
     
