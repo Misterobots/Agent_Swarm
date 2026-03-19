@@ -13,8 +13,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG API_BASE_URL=http://192.168.2.101:8008
-ENV API_BASE_URL=${API_BASE_URL}
 RUN npm run build
 
 # --- Runtime ---
