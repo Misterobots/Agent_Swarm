@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppShell } from "@/components/layout/app-shell";
-import { HydrationGuard } from "@/components/layout/hydration-guard";
+import { ClientShell } from "@/components/layout/client-shell";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,12 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body suppressHydrationWarning
+      <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <HydrationGuard>
-          <AppShell>{children}</AppShell>
-        </HydrationGuard>
+        <ClientShell>{children}</ClientShell>
       </body>
     </html>
   );
