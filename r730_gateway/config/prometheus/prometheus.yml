@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # R730 node
+  - job_name: 'cadvisor-r730'
+    static_configs:
+      - targets: ['cadvisor-r730:8080']
+        labels:
+          node: 'r730'
+
+  - job_name: 'ollama-r730'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['ollama-r730:11434']
+        labels:
+          node: 'r730'
+
+  # Justin-PC node (cross-network via host IP)
+  - job_name: 'agent-runtime'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['192.168.2.101:8008']
+        labels:
+          node: 'justin-pc'
+
+  - job_name: 'ollama-justin'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['192.168.2.101:11434']
+        labels:
+          node: 'justin-pc'
+
+  # Control plane (Wyse)
+  - job_name: 'langfuse'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['192.168.2.102:3000']
+        labels:
+          node: 'wyse'
