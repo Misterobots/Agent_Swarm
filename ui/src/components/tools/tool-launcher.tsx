@@ -7,35 +7,36 @@ import { ExternalLink } from "lucide-react";
 import { Bot, Code2, Laptop, MessageSquare } from "lucide-react";
 import type { ToolDefinition } from "@/types/tools";
 
-const TOOLS_BASE = process.env.NEXT_PUBLIC_TOOLS_BASE_URL || "http://192.168.2.103";
+// Direct port access bypasses Traefik/Authentik middleware which sets X-Frame-Options: DENY
+const R730 = "http://192.168.2.103";
 
 const TOOLS: ToolDefinition[] = [
   {
     id: "openhands",
     label: "OpenHands",
     icon: Bot,
-    path: "/hands",
+    path: `${R730}:3002`,
     description: "AI Development Agent",
   },
   {
     id: "ide-devops",
     label: "IDE (DevOps)",
     icon: Code2,
-    path: "/devops",
+    path: `${R730}:8445`,
     description: "VS Code — Full Access",
   },
   {
     id: "ide-coding",
     label: "IDE (Coding)",
     icon: Laptop,
-    path: "/code",
+    path: `${R730}:8444`,
     description: "VS Code — Sandbox",
   },
   {
     id: "open-webui",
     label: "Open WebUI",
     icon: MessageSquare,
-    path: "/webui",
+    path: `${R730}:3000`,
     description: "Chat with local models",
   },
 ];
@@ -43,7 +44,7 @@ const TOOLS: ToolDefinition[] = [
 export function ToolLauncher() {
   const { activeTab, setActiveTab } = useToolsStore();
   const activeTool = TOOLS.find((t) => t.id === activeTab) || TOOLS[0];
-  const iframeUrl = `${TOOLS_BASE}${activeTool.path}`;
+  const iframeUrl = activeTool.path;
 
   return (
     <div className="flex flex-col h-full">

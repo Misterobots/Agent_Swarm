@@ -5,7 +5,8 @@ import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DashboardSelector, DASHBOARDS } from "./dashboard-selector";
 import { ExternalLink, Loader2 } from "lucide-react";
 
-const GRAFANA_URL = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://192.168.2.103/grafana";
+// Direct port access bypasses Traefik — Grafana on R730 is exposed on port 3001
+const GRAFANA_URL = "http://192.168.2.103:3001";
 
 export function MonitorHub() {
   const { activeDashboard, setActiveDashboard } = useMonitorStore();
