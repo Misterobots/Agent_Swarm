@@ -123,6 +123,9 @@ services:
       - GF_SECURITY_SECRET_KEY=${GF_SECURITY_SECRET_KEY}
       - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=
       - GF_LOG_LEVEL=info
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_SECURITY_COOKIE_SAMESITE=none
+      - GF_SECURITY_COOKIE_SECURE=false
     volumes:
       - grafana_data:/var/lib/grafana
       - ./provisioning:/etc/grafana/provisioning:ro
@@ -237,6 +240,11 @@ services:
     restart: unless-stopped
     environment:
       - API_BASE_URL=http://192.168.2.101:8008
+      - LANGFUSE_URL=http://192.168.2.102:3000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - NEXT_PUBLIC_TOOLS_BASE_URL=http://192.168.2.103
+      - NEXT_PUBLIC_GRAFANA_URL=http://192.168.2.103/grafana
     ports:
       - "3200:3000"
     networks:
@@ -248,109 +256,31 @@ services:
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
-  # IDENTITY — Authentik SSO (migrated from Justin-PC, Phase 8)
+  # IDENTITY — Authentik SSO is now managed by Saltbox (Phase 8B)
+  # Container names: authentik, authentik-worker, authentik-postgres
+  # Network: saltbox (Traefik bridges both saltbox and ai_lab_net)
   # ═══════════════════════════════════════════════════════════════════════════════
-
-  authentik_db:
-    image: postgres:12-alpine
-    container_name: authentik_db
-    restart: unless-stopped
-    volumes:
-      - database_authentik:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=${AUTHENTIK_DB_PASSWORD}
-      - POSTGRES_USER=authentik
-      - POSTGRES_DB=authentik
-    networks:
-      - ai_lab_net
-
-  authentik_redis:
-    image: redis:alpine
-    container_name: authentik_redis
-    command: --save 60 1 --loglevel warning
-    restart: unless-stopped
-    volumes:
-      - redis_authentik:/data
-    networks:
-      - ai_lab_net
-
-  authentik_server:
-    image: ghcr.io/goauthentik/server:2024.2.1
-    container_name: authentik_server
-    restart: unless-stopped
-    command: server
-    environment:
-      - AUTHENTIK_REDIS__HOST=authentik_redis
-      - AUTHENTIK_POSTGRESQL__HOST=authentik_db
-      - AUTHENTIK_POSTGRESQL__USER=authentik
-      - AUTHENTIK_POSTGRESQL__NAME=authentik
-      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
-      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
-      - AUTHENTIK_HOST=http://192.168.2.103:9000
-      - AUTHENTIK_HOST_BROWSER=http://192.168.2.103:9000
-    volumes:
-      - authentik_media:/media
-      - authentik_templates:/templates
-    ports:
-      - "9000:9000"
-      - "9443:9443"
-    depends_on:
-      - authentik_db
-      - authentik_redis
-    networks:
-      - ai_lab_net
-    labels:
-      - "traefik.enable=true"
-      # Authentik Forward Auth Middleware (shared by all services across nodes)
-      - "traefik.http.middlewares.authentik.forwardauth.address=http://authentik_server:9000/outpost.goauthentik.io/auth/traefik"
-      - "traefik.http.middlewares.authentik.forwardauth.trustForwardHeader=true"
-      - "traefik.http.middlewares.authentik.forwardauth.authResponseHeaders=X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
-      - "traefik.http.routers.authentik.rule=PathPrefix(`/auth`)"
-      - "traefik.http.routers.authentik.entrypoints=web"
-      - "traefik.http.services.authentik.loadbalancer.server.port=9000"
-
-  authentik_worker:
-    image: ghcr.io/goauthentik/server:2024.2.1
-    container_name: authentik_worker
-    restart: unless-stopped
-    command: worker
-    environment:
-      - AUTHENTIK_REDIS__HOST=authentik_redis
-      - AUTHENTIK_POSTGRESQL__HOST=authentik_db
-      - AUTHENTIK_POSTGRESQL__USER=authentik
-      - AUTHENTIK_POSTGRESQL__NAME=authentik
-      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
-      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
-    volumes:
-      - authentik_media:/media
-      - authentik_certs:/certs
-      - authentik_templates:/templates
-    depends_on:
-      - authentik_db
-      - authentik_redis
-    networks:
-      - ai_lab_net
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # DEVELOPMENT TOOLS (migrated from Justin-PC, Phase 8)
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  # OPENHANDS - Sandboxed Execution Environment
+  # OPENHANDS - AI Development Agent (v1.5)
   openhands:
-    build:
-      context: ../execution_plane
-      dockerfile: Dockerfile.openhands
-    image: custom-openhands:latest
+    image: docker.openhands.dev/openhands/openhands:1.5
     container_name: openhands_sandbox
     restart: unless-stopped
-    privileged: true
     environment:
-      - SANDBOX_USER_ID=1000
+      - AGENT_SERVER_IMAGE_REPOSITORY=ghcr.io/openhands/agent-server
+      - AGENT_SERVER_IMAGE_TAG=1.12.0-python
+      - LOG_ALL_EVENTS=true
     ports:
-      - "3002:3000"  # 3000 = OpenWebUI, 3100 = Loki
+      - "3002:3000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ../workspace:/workspace
+      - openhands_data:/.openhands
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - ai_lab_net
     labels:
@@ -476,16 +406,8 @@ volumes:
     driver: local
   open-webui_data:
     driver: local
-  # Authentik (migrated from Justin-PC)
-  database_authentik:
-    driver: local
-  redis_authentik:
-    driver: local
-  authentik_media:
-    driver: local
-  authentik_certs:
-    driver: local
-  authentik_templates:
+  # Authentik volumes removed — now managed by Saltbox (Phase 8B)
+  openhands_data:
     driver: local
   # Code Servers (migrated from Justin-PC)
   vscode_config_devops:

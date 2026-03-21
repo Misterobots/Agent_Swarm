@@ -1,11 +1,21 @@
 "use client";
 
-import { useSettingsStore } from "@/lib/stores/settings-store";
 import { ModelSelector } from "@/components/chat/model-selector";
+import { useToolsStore } from "@/lib/stores/tools-store";
+import { useMonitorStore } from "@/lib/stores/monitor-store";
+import { DASHBOARDS } from "@/components/monitor/dashboard-selector";
 import { Settings } from "lucide-react";
 
+const TOOL_OPTIONS = [
+  { id: "openhands", label: "OpenHands" },
+  { id: "ide-devops", label: "IDE (DevOps)" },
+  { id: "ide-coding", label: "IDE (Coding)" },
+  { id: "open-webui", label: "Open WebUI" },
+];
+
 export default function SettingsPage() {
-  const mode = useSettingsStore((s) => s.mode);
+  const { activeTab, setActiveTab } = useToolsStore();
+  const { activeDashboard, setActiveDashboard } = useMonitorStore();
 
   return (
     <div className="flex flex-col h-full">
@@ -14,20 +24,58 @@ export default function SettingsPage() {
         <h1 className="text-sm font-medium text-zinc-300">Settings</h1>
       </div>
       <div className="flex-1 overflow-y-auto p-6 max-w-2xl">
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-sm font-medium text-zinc-300 mb-2">Default Model</h2>
-            <ModelSelector />
-          </div>
-          <div>
-            <h2 className="text-sm font-medium text-zinc-300 mb-2">Interface Mode</h2>
-            <p className="text-xs text-zinc-500">
-              Current mode: <span className="text-cyan-400">{mode}</span>
-            </p>
-            <p className="text-xs text-zinc-600 mt-1">
-              Switch modes using the toggle in the sidebar.
-            </p>
-          </div>
+        <div className="space-y-8">
+          {/* Chat */}
+          <section>
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Chat</h2>
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">Default Model</label>
+              <ModelSelector />
+            </div>
+          </section>
+
+          {/* Tools */}
+          <section>
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Tools</h2>
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">Default Tool Tab</label>
+              <select
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-cyan-800"
+              >
+                {TOOL_OPTIONS.map((t) => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+          </section>
+
+          {/* Monitor */}
+          <section>
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Monitor</h2>
+            <div>
+              <label className="text-sm text-zinc-300 mb-2 block">Default Dashboard</label>
+              <select
+                value={activeDashboard}
+                onChange={(e) => setActiveDashboard(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-cyan-800"
+              >
+                {DASHBOARDS.map((d) => (
+                  <option key={d.uid} value={d.uid}>{d.label}</option>
+                ))}
+              </select>
+            </div>
+          </section>
+
+          {/* About */}
+          <section>
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">About</h2>
+            <div className="space-y-2 text-sm text-zinc-500">
+              <p>Hive Mind Workspace v1.0</p>
+              <p>Backend: {process.env.NEXT_PUBLIC_API_BASE_URL || "http://192.168.2.101:8008"}</p>
+            </div>
+          </section>
         </div>
       </div>
     </div>

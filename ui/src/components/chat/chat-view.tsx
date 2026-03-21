@@ -5,7 +5,6 @@ import { useChatStream } from "@/lib/hooks/use-chat-stream";
 import { MessageBubble } from "./message-bubble";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
-import { NodeStatus } from "@/components/shared/node-status";
 import { Bot } from "lucide-react";
 
 export function ChatView() {
@@ -22,7 +21,6 @@ export function ChatView() {
       <div className="flex items-center justify-between border-b border-zinc-800 bg-[#0e1117] px-4 py-2">
         <div className="flex items-center gap-3">
           <ModelSelector />
-          <NodeStatus />
         </div>
       </div>
 
