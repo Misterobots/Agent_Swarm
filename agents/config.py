@@ -66,3 +66,20 @@ LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      "llama3.2:3b")
 # ExpertiseTemplate Database (swarm schema in langfuse DB)
 # ---------------------------------------------------------------------------
 TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse_password@{CONTROL_NODE_IP}:5432/langfuse")
+
+# ---------------------------------------------------------------------------
+# Training Pipeline Configuration
+# ---------------------------------------------------------------------------
+TRAINING_OUTPUT_DIR          = os.getenv("TRAINING_OUTPUT_DIR",          "/workspace/training_output")
+TRAINING_DATASET_DIR         = os.getenv("TRAINING_DATASET_DIR",         "/workspace/training_data")
+TRAINING_BASE_SOLVER         = os.getenv("TRAINING_BASE_SOLVER",         "Qwen/Qwen2.5-Coder-7B-Instruct")
+TRAINING_BASE_ROUTER         = os.getenv("TRAINING_BASE_ROUTER",         "nvidia/Nemotron-Mini-4B-Instruct")
+TRAINING_LORA_RANK           = int(os.getenv("TRAINING_LORA_RANK",       "16"))
+TRAINING_LORA_ALPHA          = int(os.getenv("TRAINING_LORA_ALPHA",      "32"))
+TRAINING_BATCH_SIZE          = int(os.getenv("TRAINING_BATCH_SIZE",      "1"))
+TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION", "8"))
+TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "5e-6"))
+TRAINING_NUM_EPOCHS          = int(os.getenv("TRAINING_NUM_EPOCHS",      "3"))
+TRAINING_MAX_SEQ_LEN         = int(os.getenv("TRAINING_MAX_SEQ_LEN",    "4096"))
+TRAINING_WINDOW_START        = int(os.getenv("TRAINING_WINDOW_START",    "2"))   # hour
+TRAINING_WINDOW_END          = int(os.getenv("TRAINING_WINDOW_END",      "6"))   # hour
