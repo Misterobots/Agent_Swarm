@@ -12,6 +12,8 @@ export const DASHBOARDS: DashboardDef[] = [
   { uid: "infra-overview", label: "Infrastructure" },
   { uid: "gpu-inference", label: "GPU & Inference" },
   { uid: "system-overview", label: "System Overview" },
+  { uid: "training-pipeline", label: "Training Pipeline" },
+  { uid: "template-performance", label: "Template Scores" },
 ];
 
 interface DashboardSelectorProps {

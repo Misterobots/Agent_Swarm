@@ -122,6 +122,7 @@ class MarsRLLoop:
                 trace = _langfuse.trace(
                     name="mars_loop",
                     session_id=self.session_id,
+                    input={"input": task[:4000]},
                     metadata=trace_metadata,
                 )
                 trace_id = trace.id
@@ -164,7 +165,26 @@ class MarsRLLoop:
                 current_response = solver_resp.content if hasattr(solver_resp, "content") else str(solver_resp)
                 
             iterations += 1
-            logger.info(f"[MarsLoop] Solver completed in {time.time() - t0:.2f}s")
+            solver_elapsed = time.time() - t0
+            logger.info(f"[MarsLoop] Solver completed in {solver_elapsed:.2f}s")
+
+            # Langfuse span for solver generation
+            if USE_LANGFUSE and _langfuse and trace_id:
+                try:
+                    _langfuse.span(
+                        trace_id=trace_id,
+                        name="solver_generation",
+                        input=task[:2000],
+                        output=current_response[:2000],
+                        metadata={
+                            "model": getattr(self.solver, "model", {}).get("id", "unknown") if hasattr(self.solver, "model") and isinstance(getattr(self.solver, "model", None), dict) else str(getattr(self.solver, "model", "unknown")),
+                            "elapsed_s": round(solver_elapsed, 2),
+                            "response_len": len(current_response),
+                        },
+                    )
+                except Exception as e_span:
+                    logger.debug(f"[MarsLoop] Solver span failed: {e_span}")
+
         except Exception as e:
             logger.error(f"[MarsLoop] Solver failed: {e}")
             return MarsLoopResult(
@@ -192,6 +212,19 @@ class MarsRLLoop:
 
             self._inject_score(f"verifier_round_{attempt + 1}", vr.score, vr.reason, trace_id)
 
+            # Langfuse span for verifier
+            if USE_LANGFUSE and _langfuse and trace_id:
+                try:
+                    _langfuse.span(
+                        trace_id=trace_id,
+                        name=f"verifier_round_{attempt + 1}",
+                        input=current_response[:1000],
+                        output={"passed": vr.passed, "score": vr.score, "reason": vr.reason},
+                        metadata={"attempt": attempt + 1},
+                    )
+                except Exception as e_span:
+                    logger.debug(f"[MarsLoop] Verifier span failed: {e_span}")
+
             if vr.passed:
                 solver_score = 1.0 if attempt == 0 else max(0.0, 1.0 - attempt * 0.3)
                 if event_callback:
@@ -204,10 +237,29 @@ class MarsRLLoop:
                     event_callback({"type": "status", "content": f"🛠️ MarsRL: Correcting response..."})
                 
                 corrector_invoked = True
+                t_corr = time.time()
                 try:
                     corrected = self.corrector.run(task, current_response, vr.reason)
                     current_response = corrected.content if hasattr(corrected, "content") else str(corrected)
                     iterations += 1
+                    corr_elapsed = time.time() - t_corr
+
+                    # Langfuse span for corrector
+                    if USE_LANGFUSE and _langfuse and trace_id:
+                        try:
+                            _langfuse.span(
+                                trace_id=trace_id,
+                                name="corrector_generation",
+                                input={"task": task[:1000], "failure_reason": vr.reason},
+                                output=current_response[:2000],
+                                metadata={
+                                    "elapsed_s": round(corr_elapsed, 2),
+                                    "response_len": len(current_response),
+                                },
+                            )
+                        except Exception as e_span:
+                            logger.debug(f"[MarsLoop] Corrector span failed: {e_span}")
+
                     if event_callback:
                          event_callback({"type": "log", "content": "[Corrector] Revised response generated."})
                 except Exception as e:
@@ -219,6 +271,13 @@ class MarsRLLoop:
 
         self._inject_score("solver_score", solver_score, f"Passed in {iterations} round(s)", trace_id)
         self._inject_score("final_quality", final_score, "Final verifier score", trace_id)
+
+        # Update trace with final output
+        if USE_LANGFUSE and _langfuse and trace_id:
+            try:
+                _langfuse.trace(id=trace_id, output={"response": current_response[:4000]})
+            except Exception:
+                pass
 
         # Tag high-reward traces as training candidates for future fine-tuning
         if final_score > 0.8:

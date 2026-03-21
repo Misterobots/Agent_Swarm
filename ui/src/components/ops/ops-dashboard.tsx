@@ -4,6 +4,7 @@ import { useServiceHealth } from "@/lib/hooks/use-service-health";
 import { MetricCard } from "./metric-card";
 import { ServiceGrid } from "./service-grid";
 import { AlertBanner } from "./alert-banner";
+import { TrainingStatusPanel } from "./training-status";
 import { Activity, Container, Shield, Clock, RefreshCw } from "lucide-react";
 
 export function OpsDashboard() {
@@ -68,6 +69,9 @@ export function OpsDashboard() {
         <ServiceGrid title="Inference Nodes" nodes={nodes} />
         <ServiceGrid title="Control Plane" services={controlPlane} />
       </div>
+
+      {/* Training Pipeline */}
+      <TrainingStatusPanel />
 
       {/* Alerts */}
       <div>
