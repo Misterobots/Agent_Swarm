@@ -307,9 +307,9 @@ async def chat_completions(request: ChatRequest):
                     msg_type = update.get("type", "response")
                     raw_content = update.get("content", "")
 
-                    # In standard mode, we only yield the actual assistant segments
+                    # In standard mode, we only yield assistant segments and errors
                     if is_standard_mode:
-                        if msg_type not in ["message", "response"]:
+                        if msg_type not in ["message", "response", "error"]:
                             continue
                         content = raw_content
                     else:

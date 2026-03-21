@@ -689,7 +689,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
 
                 solver = get_architect_agent(session_id=session_id)
                 verifier = get_verifier()
-                corrector = get_corrector(session_id=session_id)
+                corrector = get_corrector()
 
                 mars = MarsRLLoop(
                     solver=solver,
