@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import logging
+from datetime import datetime
 from contextlib import contextmanager
 
 from logger_setup import setup_logger
@@ -25,6 +26,8 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
+TRAINING_WINDOW_START = int(os.getenv("TRAINING_WINDOW_START", "2"))   # hour (24h)
+TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (24h)
 
 def _get_preferred_host(model_name: str) -> str:
     """
@@ -111,6 +114,20 @@ def get_best_host_for_model(model_name: str) -> str:
     logger.info(f"[GPU Queue] '{model_name}' not found on any node, using health-aware fallback.")
     return get_ollama_host(model_name)
 
+def is_training_window() -> bool:
+    """
+    Check if current time falls within the training window.
+    Default: 2am–6am local time (configurable via env vars).
+    Training should only run during idle hours to avoid disrupting inference.
+    """
+    now = datetime.now()
+    if TRAINING_WINDOW_START < TRAINING_WINDOW_END:
+        return TRAINING_WINDOW_START <= now.hour < TRAINING_WINDOW_END
+    else:
+        # Handles wrap-around (e.g., 22:00–06:00)
+        return now.hour >= TRAINING_WINDOW_START or now.hour < TRAINING_WINDOW_END
+
+
 def get_redis_client():
     return redis.Redis(
         host=REDIS_HOST, port=REDIS_PORT, db=0,
@@ -118,7 +135,7 @@ def get_redis_client():
     )
 
 LOCK_KEY = "swarm_gpu_lock"
-ZONE_KEY = "swarm_gpu_zone"  # Track whether VRAM is currently dedicated to "text" or "image"
+ZONE_KEY = "swarm_gpu_zone"  # Track whether VRAM is currently dedicated to "text", "image", or "training"
 
 def evict_comfyui():
     """Sends a request to ComfyUI to completely dump its VRAM (models)."""
@@ -197,9 +214,13 @@ def request_lock(context: str, timeout: int = 300):
             elif context == "image":
                 # Switching to image -> we need VRAM for Flux/Forge. Dump Ollama.
                 evict_ollama()
+            elif context == "training":
+                # Training needs exclusive VRAM — evict everything
+                evict_ollama()
+                evict_comfyui()
             else:
                 logger.warning(f"[GPU Queue] Unknown context '{context}'.")
-            
+
             # Update the current zone
             client.set(ZONE_KEY, context)
         else:

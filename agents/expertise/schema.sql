@@ -130,3 +130,37 @@ CREATE INDEX IF NOT EXISTS idx_model_versions_status
 
 CREATE INDEX IF NOT EXISTS idx_training_runs_status
     ON swarm.training_runs(status, run_type);
+
+-- -----------------------------------------------------------------------------
+-- ab_tests: A/B test configurations for model comparison
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS swarm.ab_tests (
+    id SERIAL PRIMARY KEY,
+    template_id VARCHAR(128) REFERENCES swarm.expertise_templates(id),
+    candidate_model VARCHAR(128) NOT NULL,
+    base_model VARCHAR(128) NOT NULL,
+    traffic_split FLOAT DEFAULT 0.2,
+    min_invocations INTEGER DEFAULT 100,
+    status VARCHAR(32) DEFAULT 'active',   -- active, concluded, cancelled
+    winner VARCHAR(32),                     -- candidate, base, or NULL
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    concluded_at TIMESTAMP
+);
+
+-- -----------------------------------------------------------------------------
+-- ab_test_results: per-invocation scores during A/B tests
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS swarm.ab_test_results (
+    id SERIAL PRIMARY KEY,
+    test_id INTEGER REFERENCES swarm.ab_tests(id),
+    model_used VARCHAR(128),
+    score FLOAT,
+    latency_ms INTEGER,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ab_tests_active
+    ON swarm.ab_tests(template_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_ab_results_test
+    ON swarm.ab_test_results(test_id, model_used);
