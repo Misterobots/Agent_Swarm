@@ -365,8 +365,8 @@ services:
       - TRAINING_OUTPUT_DIR=/workspace/training_output
       - TRAINING_DATASET_DIR=/workspace/training_data
     volumes:
-      - training_output:/workspace/training_output
-      - training_data:/workspace/training_data
+      - ./training_output:/workspace/training_output
+      - ./training_data:/workspace/training_data
       - ../agents:/app/agents:ro
     networks:
       - execution_net
@@ -384,5 +384,3 @@ volumes:
   tgw_models:
   tgw_loras:
   tgw_presets:
-  training_output:
-  training_data:
