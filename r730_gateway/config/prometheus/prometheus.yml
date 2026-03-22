@@ -10,6 +10,13 @@ scrape_configs:
         labels:
           node: 'r730'
 
+  # Justin-PC node — GPU execution plane container metrics
+  - job_name: 'cadvisor-justin'
+    static_configs:
+      - targets: ['192.168.2.101:8080']
+        labels:
+          node: 'justin-pc'
+
   # Justin-PC — Agent Runtime (custom Prometheus metrics: agent_state, workflow_steps, training_*, ab_test_*)
   - job_name: 'agent-runtime'
     metrics_path: /metrics/
