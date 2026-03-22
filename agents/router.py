@@ -39,9 +39,19 @@ except ImportError as e:
     TEMPLATES_AVAILABLE = False
     logger.warning(f"[Router] Template registry not available: {e}")
 
+# --- A/B Testing ---
+try:
+    from training.ab_test import get_ab_manager
+    AB_TESTING_AVAILABLE = True
+    logger.info("[Router] A/B testing enabled")
+except ImportError as e:
+    AB_TESTING_AVAILABLE = False
+    logger.warning(f"[Router] A/B testing not available: {e}")
+
 def _resolve_model_for_intent(intent: str, fallback_model: str) -> str:
     """
     Look up the default_model from the ExpertiseTemplate registry for a given intent.
+    If an active A/B test exists for the template, probabilistically route to candidate.
     Falls back to the provided default if templates are unavailable or no match found.
     """
     if not TEMPLATES_AVAILABLE:
@@ -51,7 +61,17 @@ def _resolve_model_for_intent(intent: str, fallback_model: str) -> str:
         templates = registry.list_templates(intent=intent)
         if templates and templates[0].default_model:
             resolved = templates[0].default_model
+            template_id = templates[0].id
             logger.debug(f"[Router] Template resolved model for {intent}: {resolved}")
+
+            # A/B test hook: check for active test and probabilistically route
+            if AB_TESTING_AVAILABLE:
+                try:
+                    ab_mgr = get_ab_manager()
+                    resolved = ab_mgr.route_model(template_id, resolved)
+                except Exception as e:
+                    logger.debug(f"[Router] A/B routing check failed: {e}")
+
             return resolved
     except Exception as e:
         logger.debug(f"[Router] Template model lookup failed for {intent}: {e}")
@@ -754,6 +774,22 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                 "session_id": session_id,
                 "latency_ms": latency_ms,
             })
+        # Record A/B test result if applicable
+        if AB_TESTING_AVAILABLE and template_metadata.get("template_id"):
+            try:
+                ab_mgr = get_ab_manager()
+                # Use final_score from performance if available, else default
+                ab_score = template_metadata.get("final_score", 0.0)
+                model_used = template_metadata.get("model_used")
+                if model_used and ab_score:
+                    ab_mgr.record_result(
+                        template_id=template_metadata["template_id"],
+                        model_used=model_used,
+                        score=ab_score,
+                        latency_ms=latency_ms,
+                    )
+            except Exception:
+                pass
 
 def run_swarm(user_input: str):
     """CLI Wrapper for chat_swarm"""
