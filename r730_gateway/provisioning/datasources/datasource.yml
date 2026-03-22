@@ -14,3 +14,17 @@ datasources:
     url: http://loki-r730:3100
     isDefault: false
     editable: true
+
+  - name: PostgreSQL-Swarm
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: 192.168.2.102:5432
+    database: langfuse
+    user: langfuse
+    isDefault: false
+    editable: true
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+    secureJsonData:
+      password: langfuse_password
