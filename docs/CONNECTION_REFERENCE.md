@@ -28,8 +28,8 @@ This document serves as the living reference for all User Interfaces and backend
 | :----------------------- | :-------------------------- | :----------- | :---------------------------------------------------------------- |
 | **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell R730    | Central reverse proxy (primary entry point for all services)       |
 | **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell R730    | Primary chat interface to interact with the Swarm.                |
-| **Grafana / Ops Portal** | `http://192.168.2.103:3002` | Dell R730    | Real-time Docker logs, GPU metrics, training pipeline, template scores. |
-| **Prometheus Metrics**   | `http://192.168.2.103:9090` | Dell R730    | Time-series metrics database + query interface.                   |
+| **Grafana / Ops Portal** | `http://192.168.2.103:3001` | Dell R730    | Real-time Docker logs, GPU metrics, training pipeline, template scores. |
+| **Prometheus Metrics**   | `http://192.168.2.103:9091` | Dell R730    | Time-series metrics database + query interface.                   |
 | **Loki Logs API**        | `http://192.168.2.103:3100` | Dell R730    | Log aggregation backend (data source for Grafana).                |
 | **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell R730    | Live routing and load balancer metrics.                           |
 | **Langfuse Dashboard**   | `http://192.168.2.102:3000` | Control-Node | Live tracking of LLM traces, MarsRL Process Rewards, token usage. |
@@ -131,7 +131,7 @@ For off-site access, use your Tailscale IP addresses or MagicDNS names instead o
 
 | Node           | Tailscale Address (Example) | Common Ports          | Purpose |
 | :------------- | :-------------------------- | :-------------------- | :------ |
-| **Dell R730**  | `dell-r730.tail-xxxx.ts.net` | 80, 3000, 3001, 9090, 8080 | Gateway/Ops Hub (Traefik + all monitoring) |
+| **Dell R730**  | `dell-r730.tail-xxxx.ts.net` | 80, 3000, 3001, 9091, 8080 | Gateway/Ops Hub (Traefik + all monitoring) |
 | **Justin-PC**  | `justin-pc.tail-xxxx.ts.net` | 8008, 8188, 11434 (direct access only) | Compute Node (direct access if needed) |
 | **Control-Node**| `control-node.tail-xxxx.ts.net`| 3000 | SPIRE, Langfuse, DB |
 

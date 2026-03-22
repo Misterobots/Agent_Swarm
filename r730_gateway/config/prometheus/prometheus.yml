@@ -3,39 +3,34 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  # R730 node
+  # R730 node — container-level metrics (CPU, memory, network, disk I/O)
   - job_name: 'cadvisor-r730'
     static_configs:
       - targets: ['cadvisor-r730:8080']
         labels:
           node: 'r730'
 
-  - job_name: 'ollama-r730'
-    metrics_path: /metrics
-    static_configs:
-      - targets: ['ollama-r730:11434']
-        labels:
-          node: 'r730'
-
-  # Justin-PC node (cross-network via host IP)
+  # Justin-PC — Agent Runtime (custom Prometheus metrics: agent_state, workflow_steps, training_*, ab_test_*)
   - job_name: 'agent-runtime'
-    metrics_path: /metrics
+    metrics_path: /metrics/
     static_configs:
       - targets: ['192.168.2.101:8008']
         labels:
           node: 'justin-pc'
 
-  - job_name: 'ollama-justin'
-    metrics_path: /metrics
-    static_configs:
-      - targets: ['192.168.2.101:11434']
-        labels:
-          node: 'justin-pc'
+  # NOTE: Ollama 0.15.x does not expose /metrics.
+  # Ollama resource usage is tracked via cAdvisor container metrics.
+  # When Ollama adds native Prometheus support, re-enable these targets.
+  #
+  # - job_name: 'ollama-r730'
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ['ollama-r730:11434']
+  #
+  # - job_name: 'ollama-justin'
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ['192.168.2.101:11434']
 
-  # Control plane (Wyse)
-  - job_name: 'langfuse'
-    metrics_path: /metrics
-    static_configs:
-      - targets: ['192.168.2.102:3000']
-        labels:
-          node: 'wyse'
+  # NOTE: Langfuse does not expose a Prometheus /metrics endpoint.
+  # Langfuse observability data is accessed via its API and PostgreSQL-Swarm datasource in Grafana.

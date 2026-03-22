@@ -70,7 +70,7 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 - **Targets**: cadvisor, ollama, comfyui, agent_runtime
 
 #### Grafana (Dashboards)
-- **Port**: 3002
+- **Port**: 3001
 - **Admin**: admin / admin (⚠️ CHANGE IMMEDIATELY)
 - **Auth**: Anonymous access enabled (Viewer role) for iframe embedding
 - **Datasources**: Prometheus, Loki, **PostgreSQL-Swarm** (swarm.* tables in langfuse DB)
@@ -156,7 +156,7 @@ R730 Traefik:80/443
     ├─ /ai → Justin-PC:8501 (Agent UI)
     ├─ /comfy → Justin-PC:8188 (ComfyUI)
     ├─ /ops → Justin-PC:8502 (Ops Portal)
-    ├─ /prometheus → R730:9090 (Prometheus)
+    ├─ /prometheus → R730:9091 (Prometheus)
     ├─ /grafana → R730:3000 (Grafana)
     └─ ... (30+ routes)
 ```
@@ -181,7 +181,7 @@ R730 Traefik:80/443
 ```
 Services (Ollama, ComfyUI, etc.)
     ↓ (metrics + logs)
-Prometheus:9090 (scrapes 15s)
+Prometheus:9091 (scrapes 15s)
 Promtail:9080 (ships logs → Loki)
     ↓
 R730 Monitoring Stack
@@ -325,7 +325,7 @@ docker-compose -f docker-compose-monitoring-fixed.yml ps
 # Service endpoints
 curl http://192.168.2.101:8008/health
 curl http://192.168.2.103:9091/-/healthy
-curl http://192.168.2.103:3002/api/health
+curl http://192.168.2.103:3001/api/health
 ```
 
 ### Service Restart
