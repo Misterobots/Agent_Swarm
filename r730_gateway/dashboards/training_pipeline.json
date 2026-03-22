@@ -15,7 +15,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -40,11 +40,11 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
           "editorMode": "code",
-          "expr": "sum(training_runs_total)",
-          "legendFormat": "",
-          "range": true,
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Total Training Runs\" FROM swarm.training_runs",
           "refId": "A"
         }
       ],
@@ -52,7 +52,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -69,7 +69,7 @@
       "id": 2,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -77,11 +77,11 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
           "editorMode": "code",
-          "expr": "training_dataset_size{dataset_type=\"exported\"}",
-          "legendFormat": "Exported",
-          "range": true,
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(dataset_size), 0) AS \"Exported Traces\" FROM swarm.training_runs WHERE run_type = 'export'",
           "refId": "A"
         }
       ],
@@ -89,7 +89,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -106,7 +106,7 @@
       "id": 3,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -114,11 +114,11 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
           "editorMode": "code",
-          "expr": "training_dataset_size{dataset_type=\"synthetic\"}",
-          "legendFormat": "Synthetic",
-          "range": true,
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(dataset_size), 0) AS \"Synthetic Trajectories\" FROM swarm.training_runs WHERE run_type = 'synthetic'",
           "refId": "A"
         }
       ],
@@ -126,7 +126,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -152,11 +152,11 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
           "editorMode": "code",
-          "expr": "sum(training_runs_total{status=\"failed\"})",
-          "legendFormat": "Failed",
-          "range": true,
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Failed Runs\" FROM swarm.training_runs WHERE status = 'failed'",
           "refId": "A"
         }
       ],
@@ -164,14 +164,14 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
-            "axisLabel": "Trajectories",
+            "axisLabel": "Datasets",
             "axisPlacement": "auto",
             "drawStyle": "line",
             "fillOpacity": 25,
@@ -180,9 +180,9 @@
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": { "type": "linear" },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": { "group": "A", "mode": "normal" },
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
@@ -193,44 +193,40 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Exported" },
+            "matcher": { "id": "byName", "options": "export" },
             "properties": [{ "id": "color", "value": { "fixedColor": "cyan", "mode": "fixed" } }]
           },
           {
-            "matcher": { "id": "byName", "options": "Synthetic" },
+            "matcher": { "id": "byName", "options": "training" },
             "properties": [{ "id": "color", "value": { "fixedColor": "violet", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "conversion" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
           }
         ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
       "id": 5,
       "options": {
-        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "legend": { "calcs": ["lastNotNull", "sum"], "displayMode": "table", "placement": "bottom", "showLegend": true },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
           "editorMode": "code",
-          "expr": "training_dataset_size{dataset_type=\"exported\"}",
-          "legendFormat": "Exported",
-          "range": true,
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT started_at AS time, dataset_size AS value, run_type AS metric FROM swarm.training_runs WHERE $__timeFilter(started_at) ORDER BY started_at",
           "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "editorMode": "code",
-          "expr": "training_dataset_size{dataset_type=\"synthetic\"}",
-          "legendFormat": "Synthetic",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "Dataset Growth Over Time",
+      "title": "Dataset Size per Run",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -256,7 +252,20 @@
             "steps": [{ "color": "green", "value": null }]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "completed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "running" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          }
+        ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
       "id": 6,
@@ -266,15 +275,15 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
           "editorMode": "code",
-          "expr": "increase(training_runs_total[24h])",
-          "legendFormat": "{{run_type}} ({{status}})",
-          "range": true,
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT started_at AS time, 1 AS value, status AS metric FROM swarm.training_runs WHERE $__timeFilter(started_at) ORDER BY started_at",
           "refId": "A"
         }
       ],
-      "title": "Training Runs by Type (24h)",
+      "title": "Training Runs by Status",
       "type": "timeseries"
     },
     {
