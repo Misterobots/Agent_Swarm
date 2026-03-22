@@ -27,4 +27,4 @@ datasources:
       sslmode: disable
       postgresVersion: 1500
     secureJsonData:
-      password: langfuse_password
+      password: langfuse
