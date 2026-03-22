@@ -308,6 +308,49 @@ services:
       - "traefik.http.middlewares.strip-tokenlab.stripprefix.prefixes=/tokenlab"
       - "traefik.http.services.tgw.loadbalancer.server.port=7860"
 
+  # ─────────────────────────────────────────────────────────────────
+  # TRAINING RUNTIME — QLoRA GRPO Fine-Tuning
+  # Purpose : Fine-tune solver/router models on MarsRL trace data
+  # Start   : docker compose --profile training run --rm training-runtime \
+  #             python -m training.grpo_trainer -d /workspace/training_data/traces.jsonl
+  # Convert : docker compose --profile training run --rm training-runtime \
+  #             python -m training.convert_gguf -a /workspace/training_output/grpo_*/adapter
+  # VRAM    : ~12.5GB (4-bit QLoRA) — evicts Ollama + ComfyUI via GPU mutex
+  # Schedule: Best run during 2am–6am idle window
+  # ─────────────────────────────────────────────────────────────────
+  training-runtime:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile.training
+    image: home-ai-lab/training-runtime:latest
+    container_name: training_runtime
+    profiles:
+      - training
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - OLLAMA_HOST=http://ollama:11434
+      - REDIS_HOST=redis_queue
+      - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://192.168.2.102:3000}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - TRAINING_OUTPUT_DIR=/workspace/training_output
+      - TRAINING_DATASET_DIR=/workspace/training_data
+    volumes:
+      - training_output:/workspace/training_output
+      - training_data:/workspace/training_data
+      - ../agents:/app/agents:ro
+    networks:
+      - execution_net
+    restart: "no"
+
 networks:
   execution_net:
     driver: bridge
@@ -320,3 +363,5 @@ volumes:
   tgw_models:
   tgw_loras:
   tgw_presets:
+  training_output:
+  training_data:
