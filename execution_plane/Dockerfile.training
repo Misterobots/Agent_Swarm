@@ -1,0 +1,53 @@
+# Training runtime — extends base agent-runtime with CUDA + QLoRA dependencies
+# Built and used only on Justin-PC for fine-tuning runs
+#
+# Usage:
+#   docker build -f execution_plane/Dockerfile.training -t home-ai-lab/training-runtime:latest .
+#   docker run --gpus all -v ollama_models:/models home-ai-lab/training-runtime:latest \
+#     python -m training.grpo_trainer --dataset /workspace/training_data/grpo_traces.jsonl
+
+FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+
+WORKDIR /app
+
+# System deps (same as base Dockerfile)
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Base agent deps (subset needed for training)
+RUN pip install --no-cache-dir \
+    requests \
+    psycopg2-binary \
+    langfuse \
+    prometheus_client \
+    redis
+
+# Training-specific dependencies
+RUN pip install --no-cache-dir \
+    transformers \
+    peft \
+    trl \
+    bitsandbytes \
+    datasets \
+    accelerate \
+    sentencepiece \
+    protobuf
+
+# Copy agent code
+COPY agents /app/agents
+
+# Create non-root user
+RUN useradd -m -u 1000 app && chown -R app:app /app
+
+# Training output and data directories
+RUN mkdir -p /workspace/training_output /workspace/training_data \
+    && chown -R app:app /workspace
+
+USER app
+
+# Default: show help
+CMD ["python", "-m", "training.grpo_trainer", "--help"]
