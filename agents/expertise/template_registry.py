@@ -211,7 +211,7 @@ class TemplateRegistry:
         from config import CONTROL_NODE_IP
         self.db_url = db_url or os.getenv(
             "TEMPLATE_DB_URL",
-            f"postgresql://langfuse:langfuse_password@{CONTROL_NODE_IP}:5432/langfuse"
+            f"postgresql://langfuse:langfuse@{CONTROL_NODE_IP}:5432/langfuse"
         )
         self._pool = None
         self._cache: Dict[str, _CacheEntry] = {}
