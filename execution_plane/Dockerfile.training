@@ -18,6 +18,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade PyTorch to nightly with CUDA 12.8 support (required for RTX 5060 Ti / sm_120)
+RUN pip install --no-cache-dir --pre torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/nightly/cu128
+
 # Base agent deps (subset needed for training)
 RUN pip install --no-cache-dir \
     requests \
@@ -39,6 +43,9 @@ RUN pip install --no-cache-dir \
 
 # Copy agent code
 COPY agents /app/agents
+
+# Set PYTHONPATH so `from training.xxx` and `from config import xxx` work
+ENV PYTHONPATH=/app/agents
 
 # Create non-root user
 RUN useradd -m -u 1000 app && chown -R app:app /app
