@@ -46,6 +46,7 @@ services:
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
       - OLLAMA_NUM_PARALLEL=1          # One request at a time (home lab)
       - OLLAMA_KEEP_ALIVE=5m           # Evict models from VRAM after 5min idle
+      - OLLAMA_METRICS=1               # Expose /metrics for Prometheus scraping
     volumes:
       - ollama_models:/root/.ollama
     ports:
