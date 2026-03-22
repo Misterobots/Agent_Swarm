@@ -13,7 +13,7 @@ This document serves as the living reference for all User Interfaces and backend
 | Node           | IP Address      | Role                                    |
 | :------------- | :-------------- | :-------------------------------------- |
 | Home Assistant | `192.168.2.100` | Smart Home Hub                          |
-| Justin-PC      | `192.168.2.101` | Compute Node (Inference + ComfyUI)      |
+| Justin-PC      | `192.168.2.101` | Compute Node (Inference + ComfyUI + Training) |
 | Control-Node   | `192.168.2.102` | Control Plane (SPIRE, Langfuse, DB)     |
 | **R730**       | `192.168.2.103` | **Gateway/Ops Hub** (Traefik, Monitoring) |
 | iDRAC          | `192.168.2.104` | R730 Remote Management                  |
@@ -28,13 +28,16 @@ This document serves as the living reference for all User Interfaces and backend
 | :----------------------- | :-------------------------- | :----------- | :---------------------------------------------------------------- |
 | **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell R730    | Central reverse proxy (primary entry point for all services)       |
 | **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell R730    | Primary chat interface to interact with the Swarm.                |
-| **Grafana / Ops Portal** | `http://192.168.2.103:3001` | Dell R730    | Real-time Docker logs, GPU metrics, agent performance.            |
+| **Grafana / Ops Portal** | `http://192.168.2.103:3002` | Dell R730    | Real-time Docker logs, GPU metrics, training pipeline, template scores. |
 | **Prometheus Metrics**   | `http://192.168.2.103:9090` | Dell R730    | Time-series metrics database + query interface.                   |
 | **Loki Logs API**        | `http://192.168.2.103:3100` | Dell R730    | Log aggregation backend (data source for Grafana).                |
 | **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell R730    | Live routing and load balancer metrics.                           |
 | **Langfuse Dashboard**   | `http://192.168.2.102:3000` | Control-Node | Live tracking of LLM traces, MarsRL Process Rewards, token usage. |
-| **OpenHands Sandbox**    | `http://192.168.2.103/hands` | R730→Justin-PC | Secure Docker-in-Docker (routed via Traefik).                    |
+| **OpenHands Sandbox**    | `http://192.168.2.103:3002` | Dell R730    | Secure code execution sandbox (migrated from Justin-PC).          |
 | **ComfyUI**              | `http://192.168.2.103/comfy` | R730→Justin-PC | Node-based GUI for 3D/Image Generation (routed via Traefik).     |
+| **Authentik SSO**        | `http://192.168.2.103:9000` | Dell R730    | Single Sign-On identity provider.                                 |
+| **VS Code (DevOps)**     | `http://192.168.2.103:8445` | Dell R730    | Full workspace IDE (port remapped from 8443).                     |
+| **VS Code (Coding)**     | `http://192.168.2.103:8444` | Dell R730    | Restricted sandbox IDE.                                           |
 
 ---
 
@@ -89,6 +92,34 @@ To connect directly to the **Offload Solver** (Efficient):
 - **Target Model:** `qwen3.5:9b`
 - **Context Window:** `256,000`
 - **Orchestrator Model:** `nemotron-orchestrator:8b` (Context: 4,096)
+
+### 3. Training Pipeline (Justin-PC — On-Demand)
+
+The training runtime runs as a profile-gated Docker service. It is NOT always running — start it only when training.
+
+```bash
+# Build training runtime (first time only)
+docker compose --profile training build training-runtime
+
+# Generate synthetic training data
+docker compose --profile training run --rm training-runtime \
+  python -m training.synthetic_gen --target_count=50
+
+# Run QLoRA GRPO training
+docker compose --profile training run --rm training-runtime \
+  python -m training.grpo_trainer --dataset /workspace/training_data/traces.jsonl
+
+# Convert LoRA → GGUF → Ollama
+docker compose --profile training run --rm training-runtime \
+  python -m training.convert_gguf --adapter /workspace/training_output/grpo_*/adapter
+```
+
+### 4. Grafana Dashboards
+
+| Dashboard | UID | Datasource | Purpose |
+|-----------|-----|------------|---------|
+| Training Pipeline | `training-pipeline` | PostgreSQL-Swarm | Training runs, dataset growth, model versions, A/B tests |
+| Template Scores | `template-performance` | PostgreSQL-Swarm + Prometheus | Score trends, invocation volume, corrector rate |
 
 ---
 
