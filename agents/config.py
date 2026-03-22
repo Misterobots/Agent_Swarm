@@ -65,7 +65,7 @@ LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      "llama3.2:3b")
 # ---------------------------------------------------------------------------
 # ExpertiseTemplate Database (swarm schema in langfuse DB)
 # ---------------------------------------------------------------------------
-TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse_password@{CONTROL_NODE_IP}:5432/langfuse")
+TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse@{CONTROL_NODE_IP}:5432/langfuse")
 
 # ---------------------------------------------------------------------------
 # Training Pipeline Configuration
