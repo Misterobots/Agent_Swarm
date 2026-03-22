@@ -1,6 +1,6 @@
 # Home AI Lab Infrastructure Reference
-**Last Updated**: March 15, 2026  
-**Current Architecture Version**: 3.1 (Post-Phase 4 Distributed)  
+**Last Updated**: March 21, 2026
+**Current Architecture Version**: 3.3 (Post-Phase 6 Training Pipeline)
 **Maintenance Owner**: Engineering Team
 
 ---
@@ -12,8 +12,8 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 | Tier | Host | Role | Hardware | Services |
 |------|------|------|----------|----------|
 | **Control** | Wyse 5070 (192.168.2.102) | Orchestration & Observability Backend | 16GB RAM, 512GB SSD | SPIRE, Langfuse, PostgreSQL, ClickHouse, MinIO |
-| **Ops/Gateway** | Dell R730 (192.168.2.103) | Reverse Proxy & Monitoring | 384GB RAM, 24 CPU, 450GB SSD | Traefik, Prometheus, Grafana, Loki, cAdvisor, Redis |
-| **Compute** | Justin-PC (192.168.2.101) | GPU Inference & Agent Runtime | 32GB RAM, RTX 5060 Ti (16GB), 500GB SSD | Ollama, ComfyUI, Agent Runtime, Voice Services |
+| **Ops/Gateway** | Dell R730 (192.168.2.103) | Reverse Proxy & Monitoring | 384GB RAM, 24 CPU, 450GB SSD | Traefik, Prometheus, Grafana, Loki, cAdvisor, Redis, Authentik, IDEs, OpenHands |
+| **Compute** | Justin-PC (192.168.2.101) | GPU Inference, Agent Runtime & Training | 32GB RAM, RTX 5060 Ti (16GB), 500GB SSD | Ollama, ComfyUI, Agent Runtime, Voice Services, Training Runtime |
 
 ---
 
@@ -72,8 +72,13 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 #### Grafana (Dashboards)
 - **Port**: 3002
 - **Admin**: admin / admin (⚠️ CHANGE IMMEDIATELY)
-- **Datasources**: Prometheus, Loki
+- **Auth**: Anonymous access enabled (Viewer role) for iframe embedding
+- **Datasources**: Prometheus, Loki, **PostgreSQL-Swarm** (swarm.* tables in langfuse DB)
 - **Data**: PostgreSQL storage for config
+- **Provisioned Dashboards**:
+  - Training Pipeline (`training-pipeline`) — training runs, dataset growth, model registry, A/B tests
+  - Template Scores (`template-performance`) — score trends, invocation volume, corrector rate, latency
+- **Dashboard Provisioning**: File-based from `/etc/grafana/dashboards/`, 30s update interval
 
 #### Loki (Log Aggregation)
 - **Port**: 3101 (mapped from 3100)
@@ -101,7 +106,7 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 
 ### TIER 3: COMPUTE (192.168.2.101 - JUSTIN-PC)
 
-#### 15 Compute Services
+#### Compute Services (GPU-bound on Justin-PC)
 
 | Service | Port | GPU | Purpose |
 |---------|------|-----|---------|
@@ -110,22 +115,24 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 | ComfyUI | 8188 | ✓ | Image generation (shared GPU) |
 | BMO Voice | 8100 | ✓ | Voice conversion (RVC) |
 | Voice Engine | 8020 | ✓ | Text-to-speech (Qwen3-TTS 1.7B) |
-| OpenHands | 3000 | - | Code execution sandbox |
 | Agent Runtime | 8008 | - | FastAPI backend (orchestrator) |
-| Agent UI | 8501 | - | Streamlit web interface |
-| Ops Portal | 8502 | - | Admin dashboard |
-| VS Code (DevOps) | 8443 | - | Full workspace IDE |
-| VS Code (Coding) | 8444 | - | Restricted sandbox IDE |
-| Authentik Server | 9000 | - | SSO & identity |
-| Authentik Worker | - | - | Background tasks |
-| Authentik DB | - | - | User storage (PostgreSQL) |
-| Authentik Redis | - | - | Session cache |
+| Training Runtime | profile | ✓ | QLoRA GRPO fine-tuning (on-demand) |
+| Text Gen WebUI | 7860 | ✓ | Diagnostic token inspection (on-demand) |
+
+**Migrated to R730 (Phase 8)**:
+- Authentik (Server, Worker, DB, Redis) — SSO & identity
+- VS Code IDEs (DevOps port 8445, Coding port 8444)
+- OpenHands — code execution sandbox (port 3002)
+- Ops Portal — admin dashboard
+- Agent UI — replaced by Hive UI
 
 **GPU Memory Sharing**:
 - RTX 5060 Ti: 16GB total
 - Ollama: 512MB overhead + model (5-10GB typical)
 - ComfyUI: 4-8GB typical
+- **Training**: ~12.5GB (QLoRA 4-bit, evicts Ollama + ComfyUI via GPU mutex)
 - Management: OLLAMA_KEEP_ALIVE=5m (auto-unload after idle)
+- GPU Mutex: Redis-based lock with context switching (inference/training)
 
 ---
 
@@ -180,7 +187,27 @@ Promtail:9080 (ships logs → Loki)
 R730 Monitoring Stack
 ├─ Prometheus (time-series)
 ├─ Loki (logs)
-└─ Grafana (visualization)
+├─ Grafana (visualization)
+│   ├─ Training Pipeline dashboard (PostgreSQL-Swarm)
+│   └─ Template Scores dashboard (PostgreSQL-Swarm + Prometheus)
+└─ PostgreSQL-Swarm datasource (langfuse DB → swarm.* tables)
+```
+
+### Training Pipeline (Phase 6)
+```
+Langfuse Traces (training_candidate)
+    ↓ export_traces.py
+GRPO JSONL Dataset
+    ↓ (+ synthetic_gen.py)
+QLoRA GRPO Training (training-runtime container)
+    ↓ grpo_trainer.py
+LoRA Adapter
+    ↓ convert_gguf.py
+GGUF Model (Q4_K_M) → Ollama Import
+    ↓ ab_test.py
+A/B Testing (20% traffic split)
+    ↓ async_template_updater.py
+Auto-Promote Winner → Update ExpertiseTemplate
 ```
 
 ### Workload Identity (SPIRE)
@@ -226,12 +253,12 @@ X.509 SVID issued (mTLS ready)
 
 | Layer | Component | Function |
 |-------|-----------|----------|
-| L7 | SPIFFE (SVID) | Network identity verification |
-| L6 | Governance.py | Request policy assessment |
-| L4 | Llama-Guard-3:8b | Security policy scanning |
-| L3 | Agent Registry | Static capability lists |
-| L2 | Authentik | User authentication |
-| L1 | Traefik TLS | Transport encryption |
+| L7 | SPIFFE (SVID) + JWT-ACE | Network identity + per-request capability gating |
+| L6 | Governance.py + A/B Testing | Request policy + model lifecycle management |
+| L4 | Llama-Guard-3:8b + MarsRL | Security scanning + Solver→Verifier→Corrector |
+| L3 | ExpertiseTemplate Registry | Versioned capability lists with performance tracking |
+| L2 | Authentik | User authentication (SSO via R730) |
+| L1 | Traefik TLS + GPU Mutex | Transport encryption + GPU resource isolation |
 
 ---
 
@@ -262,22 +289,23 @@ X.509 SVID issued (mTLS ready)
 ### Justin-PC
 ```
 ~/execution_plane/
-├── docker-compose.yml
-├── Dockerfile (Agent Runtime)
+├── docker-compose.yml          (GPU services + agent runtime)
+├── Dockerfile                  (Agent Runtime)
+├── Dockerfile.training         (Training Runtime — QLoRA + GRPO deps)
 └── config/
-    ├── spire/agent.conf
-    └── authentik/
+    └── spire/agent.conf
 ```
 
 ### R730
 ```
 ~/r730_gateway/
-├── docker-compose-monitoring-fixed.yml
-└── config/
-    ├── prometheus/prometheus.yml
-    ├── loki/loki.yml
-    ├── promtail/promtail.yml
-    └── provisioning/ (Grafana datasources)
+├── docker-compose.yml          (Monitoring + Authentik + IDEs + OpenHands)
+├── dashboards/
+│   ├── training_pipeline.json  (Training Pipeline — Grafana provisioned)
+│   └── template_performance.json (Template Scores — Grafana provisioned)
+└── provisioning/
+    └── datasources/
+        └── datasource.yml      (Prometheus, Loki, PostgreSQL-Swarm)
 ```
 
 ---
@@ -336,11 +364,29 @@ docker-compose -f docker-compose-monitoring-fixed.yml restart
 
 ---
 
+## Database Schema (PostgreSQL — swarm.*)
+
+| Table | Purpose | Added |
+|-------|---------|-------|
+| `swarm.expertise_templates` | Versioned agent templates with performance tracking | Phase 5 |
+| `swarm.expertise_template_versions` | Template version snapshots | Phase 5 |
+| `swarm.performance_history` | Per-template daily metrics (reward, latency, error rate) | Phase 5 |
+| `swarm.training_runs` | Training pipeline run tracking (export, synthetic, training, conversion) | Phase 6 |
+| `swarm.model_versions` | Trained model lifecycle (candidate → ab_testing → promoted → retired) | Phase 6 |
+| `swarm.ab_tests` | A/B test definitions and status | Phase 6 |
+| `swarm.ab_test_results` | Per-request A/B test measurements | Phase 6 |
+
+---
+
 ## Glossary
 
 - **SPIFFE**: Secure Production Identity Framework for Everyone
 - **SVID**: SPIFFE Verifiable Identity Document (X.509)
+- **JWT-ACE**: JWT with Agent Card Embedded — per-request capability gating
 - **MarsRL**: Mars RL loop (Solver → Verifier → Corrector)
+- **GRPO**: Group Relative Policy Optimization — fine-tuning via group-relative advantage
+- **QLoRA**: Quantized Low-Rank Adaptation — 4-bit fine-tuning method
+- **ExpertiseTemplate**: Versioned agent template with learnable parameters and performance tracking
 - **ComfyUI**: Node-based image generation engine
 - **Langfuse**: LLM analytics & observability platform
 - **cAdvisor**: Container metrics collector
@@ -348,7 +394,8 @@ docker-compose -f docker-compose-monitoring-fixed.yml restart
 - **Prometheus**: Time-series metrics database
 - **Loki**: Log aggregation engine
 - **Authentik**: Open-source identity provider
+- **GPU Mutex**: Redis-based GPU lock with context switching (inference/training)
 
 ---
 
-**Version**: 1.0 | **Architecture**: 3.1 (Post-Phase 4) | **Last Updated**: March 15, 2026
+**Version**: 2.0 | **Architecture**: 3.3 (Post-Phase 6 Training Pipeline) | **Last Updated**: March 21, 2026
