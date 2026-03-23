@@ -88,7 +88,7 @@
         {
           "expr": "rate(container_cpu_usage_seconds_total{image!=\"\"}[1m])",
           "interval": "",
-          "legendFormat": "{{name}}",
+          "legendFormat": "{{id}}",
           "refId": "A"
         }
       ],

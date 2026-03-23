@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -8,39 +10,66 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
       "panels": [],
       "title": "TRAINING OVERVIEW",
       "type": "row"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "text", "value": null }
+              {
+                "color": "text",
+                "value": null
+              }
             ]
           }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
       "id": 1,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -52,32 +81,54 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "cyan", "value": null }
+              {
+                "color": "cyan",
+                "value": null
+              }
             ]
           }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
       "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -89,32 +140,54 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "violet", "value": null }
+              {
+                "color": "violet",
+                "value": null
+              }
             ]
           }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
       "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -126,33 +199,58 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           }
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
       "id": 4,
       "options": {
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -164,10 +262,15 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -179,42 +282,106 @@
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "auto",
             "spanNulls": true,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "export" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "cyan", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "export"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "cyan",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "training" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "violet", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "training"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "violet",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "conversion" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "conversion"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
       "id": 5,
       "options": {
-        "legend": { "calcs": ["lastNotNull", "sum"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
@@ -226,10 +393,15 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -240,42 +412,105 @@
             "gradientMode": "scheme",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "normal" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "completed" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "completed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "failed" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "running" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "running"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
       "id": 6,
       "options": {
-        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
@@ -288,62 +523,127 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
       "id": 101,
       "panels": [],
       "title": "TRAINING RUNS HISTORY",
       "type": "row"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": true
           },
           "mappings": [
             {
               "options": {
-                "completed": { "color": "green", "index": 0, "text": "COMPLETED" },
-                "failed": { "color": "red", "index": 1, "text": "FAILED" },
-                "running": { "color": "yellow", "index": 2, "text": "RUNNING" },
-                "pending": { "color": "blue", "index": 3, "text": "PENDING" }
+                "completed": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "COMPLETED"
+                },
+                "failed": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "FAILED"
+                },
+                "running": {
+                  "color": "yellow",
+                  "index": 2,
+                  "text": "RUNNING"
+                },
+                "pending": {
+                  "color": "blue",
+                  "index": 3,
+                  "text": "PENDING"
+                }
               },
               "type": "value"
             }
           ],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "text", "value": null }]
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "status" },
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
             "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "basic", "type": "color-background" } }
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "started_at" },
-            "properties": [{ "id": "unit", "value": "dateTimeFromNow" }]
+            "matcher": {
+              "id": "byName",
+              "options": "started_at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeFromNow"
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "id": 7,
       "options": {
         "showHeader": true,
         "cellHeight": "sm",
-        "footer": { "show": false },
-        "sortBy": [{ "desc": true, "displayName": "started_at" }]
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "started_at"
+          }
+        ]
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -356,73 +656,154 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
       "id": 102,
       "panels": [],
       "title": "MODEL REGISTRY",
       "type": "row"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": true
           },
           "mappings": [
             {
               "options": {
-                "promoted": { "color": "green", "index": 0, "text": "PROMOTED" },
-                "candidate": { "color": "blue", "index": 1, "text": "CANDIDATE" },
-                "ab_testing": { "color": "yellow", "index": 2, "text": "A/B TESTING" },
-                "retired": { "color": "text", "index": 3, "text": "RETIRED" }
+                "promoted": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "PROMOTED"
+                },
+                "candidate": {
+                  "color": "blue",
+                  "index": 1,
+                  "text": "CANDIDATE"
+                },
+                "ab_testing": {
+                  "color": "yellow",
+                  "index": 2,
+                  "text": "A/B TESTING"
+                },
+                "retired": {
+                  "color": "text",
+                  "index": 3,
+                  "text": "RETIRED"
+                }
               },
               "type": "value"
             }
           ],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "text", "value": null }]
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "status" },
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
             "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "basic", "type": "color-background" } }
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "avg_score" },
+            "matcher": {
+              "id": "byName",
+              "options": "avg_score"
+            },
             "properties": [
-              { "id": "decimals", "value": 3 },
-              { "id": "thresholds", "value": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "red", "value": null },
-                  { "color": "yellow", "value": 0.6 },
-                  { "color": "green", "value": 0.8 }
-                ]
-              }},
-              { "id": "custom.cellOptions", "value": { "mode": "basic", "type": "color-background" } }
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.6
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
             ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "id": 8,
       "options": {
         "showHeader": true,
         "cellHeight": "sm",
-        "footer": { "show": false },
-        "sortBy": [{ "desc": true, "displayName": "created_at" }]
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "created_at"
+          }
+        ]
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -435,57 +816,110 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
       "id": 103,
       "panels": [],
       "title": "A/B TESTS",
       "type": "row"
     },
     {
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PostgreSQL-Swarm"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "custom": {
             "align": "auto",
-            "cellOptions": { "type": "auto" },
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": true
           },
           "mappings": [
             {
               "options": {
-                "active": { "color": "green", "index": 0, "text": "ACTIVE" },
-                "concluded": { "color": "blue", "index": 1, "text": "CONCLUDED" },
-                "cancelled": { "color": "text", "index": 2, "text": "CANCELLED" }
+                "active": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "ACTIVE"
+                },
+                "concluded": {
+                  "color": "blue",
+                  "index": 1,
+                  "text": "CONCLUDED"
+                },
+                "cancelled": {
+                  "color": "text",
+                  "index": 2,
+                  "text": "CANCELLED"
+                }
               },
               "type": "value"
             }
           ],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "text", "value": null }]
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "status" },
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
             "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "basic", "type": "color-background" } }
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
             ]
           }
         ]
       },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 32 },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
       "id": 9,
       "options": {
         "showHeader": true,
         "cellHeight": "sm",
-        "footer": { "show": false },
-        "sortBy": [{ "desc": true, "displayName": "started_at" }]
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "started_at"
+          }
+        ]
       },
       "targets": [
         {
-          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PostgreSQL-Swarm" },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PostgreSQL-Swarm"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -497,10 +931,15 @@
       "type": "table"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -512,11 +951,18 @@
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "auto",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "line" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
           },
           "mappings": [],
           "max": 1,
@@ -524,25 +970,50 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 0.8 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
             ]
           }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 38 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
       "id": 10,
       "options": {
-        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "editorMode": "code",
           "expr": "ab_test_score",
-          "legendFormat": "Test {{test_id}} — {{arm}}",
+          "legendFormat": "Test {{test_id}} \u2014 {{arm}}",
           "range": true,
           "refId": "A"
         }
@@ -552,15 +1023,28 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
       "id": 104,
       "panels": [],
       "title": "TRAINING LOGS",
       "type": "row"
     },
     {
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 47 },
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
       "id": 11,
       "options": {
         "dedupStrategy": "none",
@@ -574,7 +1058,10 @@
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "Loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
           "editorMode": "code",
           "expr": "{container_name=\"agent_runtime\"} |~ \"(?i)(training|grpo|qlora|lora|gguf|convert|export_traces|synthetic_gen|ab.test)\"",
           "queryType": "range",
@@ -588,9 +1075,17 @@
   "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["training", "mission-control"],
-  "templating": { "list": [] },
-  "time": { "from": "now-24h", "to": "now" },
+  "tags": [
+    "training",
+    "mission-control"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "",
   "title": "Training Pipeline",
