@@ -125,8 +125,8 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(container_cpu_usage_seconds_total{name!=\"\"}[1m])",
-          "legendFormat": "{{name}}",
+          "expr": "rate(container_cpu_usage_seconds_total{id=~\".*docker.*\"}[1m])",
+          "legendFormat": "{{id}}",
           "range": true,
           "refId": "A"
         }
@@ -219,8 +219,8 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "container_memory_usage_bytes{name!=\"\"}",
-          "legendFormat": "{{name}}",
+          "expr": "container_memory_usage_bytes{id=~\".*docker.*\"}",
+          "legendFormat": "{{id}}",
           "range": true,
           "refId": "A"
         }
@@ -477,23 +477,23 @@
       "type": "logs"
     }
   ],
-    "refresh": "5s",
-    "schemaVersion": 38,
-    "style": "dark",
-    "tags": [
-      "mission-control"
-    ],
-    "templating": {
-      "list": []
-    },
-    "time": {
-      "from": "now-15m",
-      "to": "now"
-    },
-    "timepicker": {},
-    "timezone": "",
-    "title": "Mission Control",
-    "uid": "mission-control-uid",
-    "version": 1,
-    "weekStart": ""
-  }
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [
+    "mission-control"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Mission Control",
+  "uid": "mission-control-uid",
+  "version": 1,
+  "weekStart": ""
+}
