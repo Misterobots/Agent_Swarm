@@ -49,3 +49,9 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# Training Artifacts
+execution_plane/training_output/
+execution_plane/training_data/
+*.safetensors
+*.gguf

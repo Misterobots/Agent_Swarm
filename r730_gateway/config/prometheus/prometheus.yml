@@ -12,8 +12,9 @@ scrape_configs:
 
   # Justin-PC node — GPU execution plane container metrics
   - job_name: 'cadvisor-justin'
+    scrape_interval: 15s
     static_configs:
-      - targets: ['192.168.2.101:8080']
+      - targets: ['192.168.2.101:8081']
         labels:
           node: 'justin-pc'
 
