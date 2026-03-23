@@ -11,6 +11,7 @@ services:
     container_name: cadvisor_gpu_node
     hostname: cadvisor-justin
     privileged: true
+    command: []
     devices:
       - /dev/kmsg:/dev/kmsg
     volumes:
@@ -24,6 +25,25 @@ services:
     restart: unless-stopped
     networks:
       - execution_net
+
+  # cAdvisor Proxy - Injects Docker container names into metrics on Windows WSL2
+  cadvisor-proxy:
+    image: python:3.9-slim
+    container_name: cadvisor_proxy
+    hostname: cadvisor-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./cadvisor_proxy.py:/app/cadvisor_proxy.py:ro
+    environment:
+      - CADVISOR_HOST=cadvisor_gpu_node:8080
+      - PORT=8081
+    command: python /app/cadvisor_proxy.py
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+    networks:
+      - execution_net
+
 
   # SPIRE AGENT - Workload Identity Provider
   spire-agent:
