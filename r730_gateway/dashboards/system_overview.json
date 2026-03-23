@@ -86,7 +86,7 @@
       },
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{image!=\"\"}[1m])",
+          "expr": "rate(container_cpu_usage_seconds_total{name!=\"\"}[1m])",
           "interval": "",
           "legendFormat": "{{id}}",
           "refId": "A"
