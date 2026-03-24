@@ -38,16 +38,33 @@ async function proxyGrafana(req: NextRequest) {
 
   const upstream = await fetch(target, init);
 
-  // Pass through the response, preserving content type and status
   const contentType = upstream.headers.get("Content-Type") || "text/html";
-  const body = await upstream.arrayBuffer();
+  const cacheControl = upstream.headers.get("Cache-Control") || "no-cache";
 
+  // For HTML responses, rewrite the <base href> tag so the browser resolves
+  // Grafana's relative asset paths through /api/grafana/ instead of /grafana/.
+  if (contentType.includes("text/html")) {
+    let html = await upstream.text();
+    html = html.replace(
+      /<base\s+href="\/grafana\/"\s*\/?>/,
+      '<base href="/api/grafana/" />'
+    );
+    return new Response(html, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "no-cache",
+      },
+    });
+  }
+
+  // Non-HTML: pass through as-is (JS, CSS, images, JSON API responses)
+  const body = await upstream.arrayBuffer();
   return new Response(body, {
     status: upstream.status,
     headers: {
       "Content-Type": contentType,
-      "Cache-Control":
-        upstream.headers.get("Cache-Control") || "no-cache",
+      "Cache-Control": cacheControl,
     },
   });
 }
