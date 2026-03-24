@@ -488,13 +488,18 @@ async def health_nodes():
 class TrainingStartRequest(BaseModel):
     """Request body for /v1/training/start."""
     model_config = ConfigDict(extra="allow")
-    run_type: str = "training"           # training | export | full_pipeline
+    run_type: str = "training"           # training | export | full_pipeline | curated | synthetic
     time_budget_minutes: Optional[float] = None
     base_model: Optional[str] = None
     lora_rank: Optional[int] = None
     learning_rate: Optional[float] = None
     epochs: Optional[int] = None
     dataset_path: Optional[str] = None
+    # For curated dataset runs
+    curated_datasets: Optional[List[str]] = None   # e.g. ["glaive-function-calling", "hermes-function-calling"]
+    max_samples: Optional[int] = None              # per-dataset sample limit
+    # For synthetic generation runs
+    synthetic_target: Optional[int] = None          # target trajectory count (default 552)
 
 # In-memory tracking for the active training background task
 _active_training: dict = {"run_id": None, "status": "idle", "started_at": None, "task": None}
@@ -553,7 +558,10 @@ async def training_status():
                               for _ in open(f, encoding="utf-8"))
                 synthetic = sum(1 for f in dataset_dir.glob("synthetic_*.jsonl")
                                for _ in open(f, encoding="utf-8"))
-                result["dataset_size"] = {"exported": exported, "synthetic": synthetic}
+                curated = sum(1 for f in dataset_dir.glob("curated_*.jsonl")
+                             if "_rejected" not in f.name
+                             for _ in open(f, encoding="utf-8"))
+                result["dataset_size"] = {"exported": exported, "synthetic": synthetic, "curated": curated}
         except Exception:
             pass
 
@@ -615,6 +623,38 @@ async def training_runs(limit: int = 50):
     return {"runs": runs}
 
 
+@app.get("/v1/training/curated-datasets")
+async def list_curated_datasets():
+    """List available curated HuggingFace datasets for training."""
+    from training.dataset_curator import CURATED_DATASETS
+    return {
+        "datasets": [
+            {
+                "key": key,
+                "hf_id": meta["hf_id"],
+                "description": meta["description"],
+                "category": meta["category"],
+                "default_max": meta["default_max"],
+            }
+            for key, meta in CURATED_DATASETS.items()
+        ]
+    }
+
+
+@app.post("/v1/training/scan")
+async def scan_dataset(dataset_path: str):
+    """Scan an existing dataset file for training data poisoning."""
+    import asyncio
+    from training.dataset_curator import scan_existing_dataset
+    try:
+        report = await asyncio.to_thread(scan_existing_dataset, dataset_path)
+        return report
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_path}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/v1/training/start")
 async def training_start(req: TrainingStartRequest, background_tasks: BackgroundTasks):
     """Launch a training run in the background."""
@@ -635,6 +675,85 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                 count = await asyncio.to_thread(exporter.export_dataset)
                 _active_training["status"] = "idle"
                 logger.info(f"Export complete: {count} traces")
+
+            elif req.run_type == "curated":
+                # Download curated datasets → security scan → train
+                from training.dataset_curator import DatasetCurator
+                from training.grpo_trainer import train_grpo, GRPOTrainingConfig
+                from config import TRAINING_BASE_SOLVER, \
+                    TRAINING_LORA_RANK, TRAINING_LEARNING_RATE, TRAINING_NUM_EPOCHS
+
+                ds_keys = req.curated_datasets or ["glaive-function-calling", "hermes-function-calling"]
+                curator = DatasetCurator()
+                curation_result = await asyncio.to_thread(
+                    curator.download_and_convert,
+                    dataset_keys=ds_keys,
+                    max_samples=req.max_samples,
+                    scan_security=True,
+                )
+
+                output_path = curation_result["output_path"]
+                if curation_result["total_written"] == 0:
+                    raise ValueError("No samples survived curation + security scanning")
+
+                logger.info(
+                    f"Curated {curation_result['total_written']} samples "
+                    f"({curation_result['total_rejected']} rejected by security scan)"
+                )
+
+                cfg = GRPOTrainingConfig(
+                    time_budget_minutes=req.time_budget_minutes,
+                    base_model=req.base_model or TRAINING_BASE_SOLVER,
+                    lora_rank=req.lora_rank or TRAINING_LORA_RANK,
+                    learning_rate=req.learning_rate or TRAINING_LEARNING_RATE,
+                    num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
+                )
+                result = await asyncio.to_thread(train_grpo, output_path, cfg)
+                _active_training["run_id"] = result.get("run_id")
+                _active_training["status"] = "idle"
+
+            elif req.run_type == "synthetic":
+                # Generate synthetic trajectories → security scan → train
+                from training.synthetic_gen import SyntheticTrajectoryGenerator
+                from training.dataset_curator import scan_existing_dataset
+                from training.grpo_trainer import train_grpo, GRPOTrainingConfig
+                from config import TRAINING_DATASET_DIR, TRAINING_BASE_SOLVER, \
+                    TRAINING_LORA_RANK, TRAINING_LEARNING_RATE, TRAINING_NUM_EPOCHS
+
+                target = req.synthetic_target or 552
+                gen = SyntheticTrajectoryGenerator(output_dir=TRAINING_DATASET_DIR)
+                count = await asyncio.to_thread(
+                    gen.generate_dataset, target_count=target
+                )
+                logger.info(f"Synthetic generation complete: {count} trajectories")
+
+                if count == 0:
+                    raise ValueError("Synthetic generation produced 0 trajectories")
+
+                # Find the generated file and scan it
+                import glob
+                synth_files = sorted(
+                    glob.glob(f"{TRAINING_DATASET_DIR}/synthetic_*.jsonl"),
+                    reverse=True,
+                )
+                dataset_path = synth_files[0]
+
+                # Security scan the generated data
+                scan_report = await asyncio.to_thread(scan_existing_dataset, dataset_path)
+                blocked = scan_report["scan_summary"].get("blocked", 0)
+                if blocked > 0:
+                    logger.warning(f"Security scan found {blocked} blocked samples in synthetic data")
+
+                cfg = GRPOTrainingConfig(
+                    time_budget_minutes=req.time_budget_minutes,
+                    base_model=req.base_model or TRAINING_BASE_SOLVER,
+                    lora_rank=req.lora_rank or TRAINING_LORA_RANK,
+                    learning_rate=req.learning_rate or TRAINING_LEARNING_RATE,
+                    num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
+                )
+                result = await asyncio.to_thread(train_grpo, dataset_path, cfg)
+                _active_training["run_id"] = result.get("run_id")
+                _active_training["status"] = "idle"
 
             elif req.run_type == "full_pipeline":
                 # Export → Train
