@@ -26,15 +26,8 @@ scrape_configs:
         labels:
           node: 'justin-pc'
 
-  # NOTE: Ollama 0.15.x does not expose /metrics.
-  # Ollama resource usage is tracked via cAdvisor container metrics.
-  # When Ollama adds native Prometheus support, re-enable these targets.
-  #
-  # - job_name: 'ollama-r730'
-  #   metrics_path: /metrics
-  #   static_configs:
-  #     - targets: ['ollama-r730:11434']
-  #
+  # NOTE: Ollama v0.15.x does not expose /metrics regardless of OLLAMA_METRICS=1.
+  # Re-enable when Ollama adds confirmed Prometheus support:
   # - job_name: 'ollama-justin'
   #   metrics_path: /metrics
   #   static_configs:

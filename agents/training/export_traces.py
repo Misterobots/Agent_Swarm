@@ -192,6 +192,15 @@ class TraceExporter:
                         "content": tool_output,
                     })
 
+        # Fallback: use trace-level output if no GENERATION observations were found
+        # (covers non-MarsRL agents: IoT, Image, Conversation, Research, etc.)
+        if len(conversations) < 2:
+            trace_output = trace.get("output")
+            if isinstance(trace_output, dict):
+                trace_output = trace_output.get("response", trace_output.get("content", ""))
+            if isinstance(trace_output, str) and trace_output.strip():
+                conversations.append({"role": "assistant", "content": trace_output})
+
         # Need at least user + one assistant turn
         if len(conversations) < 2:
             logger.debug(f"Skipping trace {trace_id}: insufficient conversation turns")

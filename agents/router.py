@@ -250,6 +250,22 @@ def _record_performance(intent: str, template_metadata: dict, result_data: dict)
 
 # --- SPECIALIZED INTENT DETECTION ---
 # (Keyword-based detect_intent() was removed in favor of neural semantic_router)
+def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None):
+    """Score a Langfuse trace as a training candidate and optionally set its output."""
+    if not lf_trace or not langfuse_inst:
+        return
+    try:
+        if output:
+            lf_trace.update(output={"response": output[:4000]})
+        langfuse_inst.score(
+            trace_id=lf_trace.id,
+            name="training_candidate",
+            value=score,
+        )
+    except Exception as e:
+        logger.debug(f"[Router] Trace scoring failed: {e}")
+
+
 def chat_swarm(user_input: str, session_id: str = "default_session", history: list = None):
     """
     Generator that yields status updates and final response for UI.
@@ -262,6 +278,18 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     ace_token = None
     template_metadata = {}
     route_start_time = time.time()
+
+    # --- Langfuse top-level trace for all intents ---
+    lf_trace = None
+    if USE_LANGFUSE and langfuse:
+        try:
+            lf_trace = langfuse.trace(
+                name="chat_swarm",
+                session_id=session_id,
+                input={"message": user_input[:4000]},
+            )
+        except Exception as e:
+            logger.debug(f"[Router] Trace creation failed: {e}")
 
     # --- HISTORY CONVERSION ---
     # PHI Agents use their own storage/history, but we can seed it or pass it.
@@ -340,7 +368,13 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         
         yield {"type": "log", "content": f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}"}
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
-        
+
+        if lf_trace:
+            try:
+                lf_trace.update(metadata={"intent": intent, "confidence": confidence, "reasoning": reasoning[:200]})
+            except Exception:
+                pass
+
         if USE_LANGFUSE and langfuse_context:
             langfuse_context.update_current_observation(
                 name="intent_routing",
@@ -357,6 +391,127 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
 
         route_start_time = time.time()
 
+        # --- ROUTE: CONVERSATION / CASUAL CHAT ---
+        if intent == "CONVERSATION":
+            yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
+            AGENT_STATE.labels(agent_name="Conversationalist").set(2)
+
+            from phi.model.ollama import Ollama
+            CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", "qwen2.5:3b"))
+            OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
+
+            conversationalist = Agent(
+                name="Hive Mind",
+                model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+                instructions="""You are Hive Mind, a friendly and knowledgeable AI assistant in a self-hosted home lab.
+                You have a warm, direct personality. You can answer general questions, chat casually, explain concepts clearly,
+                and help the user understand their AI system. Keep responses concise unless depth is clearly needed.
+                You are running entirely on local hardware — no cloud dependencies.""",
+                show_tool_calls=False,
+            )
+
+            full_content = ""
+            try:
+                with request_lock(context="text"):
+                    response_stream = conversationalist.run(user_input, stream=True)
+                    for chunk in response_stream:
+                        if chunk.content:
+                            full_content += chunk.content
+                            yield {"type": "message", "content": chunk.content}
+                _score_trace(lf_trace, langfuse, 0.85, output=full_content)
+            except Exception as e:
+                _score_trace(lf_trace, langfuse, 0.0)
+                yield {"type": "error", "content": f"Conversation failed: {e}"}
+
+            AGENT_STATE.labels(agent_name="Conversationalist").set(1)
+            WORKFLOW_STEPS.labels(status="success", agent_type="Conversationalist").inc()
+            return
+
+        # --- ROUTE: DEVOPS / INFRASTRUCTURE ---
+        if intent == "DEVOPS":
+            yield {"type": "status", "content": "🖥️ DevOps Engineer: Analyzing infrastructure task..."}
+            AGENT_STATE.labels(agent_name="DevOps").set(2)
+
+            DEVOPS_MODEL = _resolve_model_for_intent("DEVOPS", os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b"))
+            OLLAMA_HOST = get_best_host_for_model(DEVOPS_MODEL)
+
+            solver = get_architect_agent(session_id=session_id)
+            verifier = get_verifier()
+            corrector = get_corrector()
+
+            mars = MarsRLLoop(
+                solver=solver,
+                verifier=verifier,
+                corrector=corrector,
+                max_iter=2,
+                intent=intent,
+                session_id=session_id,
+                token=ace_token,
+                template_metadata=template_metadata,
+            )
+
+            devops_input = f"[DEVOPS TASK] {user_input}"
+            if extracted_context:
+                devops_input = f"{devops_input}\n\n[Attached Context]:\n{extracted_context}"
+
+            yield {"type": "log", "content": f"[DevOps] Routing to MarsRL with infra context."}
+            try:
+                with request_lock(context="text"):
+                    for update in mars_loop_stream(devops_input, mars):
+                        yield update
+                _score_trace(lf_trace, langfuse, 0.9)
+            except Exception as e:
+                _score_trace(lf_trace, langfuse, 0.0)
+                raise e
+
+            AGENT_STATE.labels(agent_name="DevOps").set(1)
+            WORKFLOW_STEPS.labels(status="success", agent_type="DevOps").inc()
+            return
+
+        # --- ROUTE: DATA ANALYSIS ---
+        if intent == "DATA":
+            yield {"type": "status", "content": "📊 Data Analyst: Processing your data request..."}
+            AGENT_STATE.labels(agent_name="DataAnalyst").set(2)
+
+            from phi.model.ollama import Ollama
+            DATA_MODEL = _resolve_model_for_intent("DATA", os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b"))
+            OLLAMA_HOST = get_best_host_for_model(DATA_MODEL)
+
+            data_agent = Agent(
+                name="Data Analyst",
+                model=Ollama(id=DATA_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}),
+                instructions="""You are a Staff-Level Data Engineer and Analyst.
+                Expertise: SQL, Python (pandas/numpy/polars), data pipelines, statistical analysis, and data visualization.
+                For SQL queries: write clean, well-commented SQL with CTEs where appropriate.
+                For Python: use pandas or polars, include sample output in comments.
+                For analysis: provide clear findings with supporting logic.
+                Always explain your approach before diving into code.""",
+                show_tool_calls=False,
+            )
+
+            full_content = ""
+            try:
+                final_input = user_input
+                if extracted_context:
+                    yield {"type": "log", "content": f"[DataAnalyst] Reading attached context ({len(extracted_context)} chars)..."}
+                    final_input = f"{user_input}\n\n[Data Context]:\n{extracted_context}"
+
+                with request_lock(context="text"):
+                    response_stream = data_agent.run(final_input, stream=True)
+                    yield {"type": "status", "content": "📊 Data Analyst: Generating analysis..."}
+                    for chunk in response_stream:
+                        if chunk.content:
+                            full_content += chunk.content
+                            yield {"type": "message", "content": chunk.content}
+                _score_trace(lf_trace, langfuse, 0.85, output=full_content)
+            except Exception as e:
+                _score_trace(lf_trace, langfuse, 0.0)
+                yield {"type": "error", "content": f"Data analysis failed: {e}"}
+
+            AGENT_STATE.labels(agent_name="DataAnalyst").set(1)
+            WORKFLOW_STEPS.labels(status="success", agent_type="DataAnalyst").inc()
+            return
+
         # --- AMBIGUITY CHECK ---
         if intent == "AMBIGUOUS":
              question = routing_decision.get("disambiguation_question", "Could you clarify your request?")
@@ -370,6 +525,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
              })
              
              yield {"type": "response", "content": f"🤔 **Ambiguous Request:** {question}"}
+             _score_trace(lf_trace, langfuse, 0.7, output=question)
              AGENT_STATE.labels(agent_name="Router").set(1)
              return
         
@@ -421,6 +577,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                      
                      question = review.content.replace("CLARIFY:", "").strip()
                      yield {"type": "response", "content": f"🎨 **Art Director:** {question}"}
+                     _score_trace(lf_trace, langfuse, 0.7, output=question)
                      AGENT_STATE.labels(agent_name="ArtDirector").set(1)
                      return
                  
@@ -477,12 +634,13 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                             full_content += chunk.content
                             yield {"type": "message", "content": chunk.content}
                 
-                yield {"type": "log", "content": "[TechnicalWriter] Document Transformation Complete."}
-                yield {"type": "response", "content": full_content}
-                
+                    yield {"type": "log", "content": "[TechnicalWriter] Document Transformation Complete."}
+                _score_trace(lf_trace, langfuse, 0.85, output=full_content)
+
             except Exception as e:
+                _score_trace(lf_trace, langfuse, 0.0)
                 yield {"type": "error", "content": f"Technical Writing Failed: {e}"}
-                
+
             AGENT_STATE.labels(agent_name="TechnicalWriter").set(1)
             WORKFLOW_STEPS.labels(status="success", agent_type="TechnicalWriter").inc()
             return
@@ -526,11 +684,12 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                             yield {"type": "message", "content": chunk.content}
                 
                 yield {"type": "log", "content": f"[Research] Completed query: {user_input}"}
-                yield {"type": "response", "content": full_content}
-                
+                _score_trace(lf_trace, langfuse, 0.85, output=full_content)
+
             except Exception as e:
+                _score_trace(lf_trace, langfuse, 0.0)
                 yield {"type": "error", "content": f"Research Failed: {e}"}
-                
+
             AGENT_STATE.labels(agent_name="Librarian").set(1)
             WORKFLOW_STEPS.labels(status="success", agent_type="Librarian").inc()
             return
@@ -643,6 +802,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             AGENT_STATE.labels(agent_name="CreativeStudio").set(1)
             WORKFLOW_STEPS.labels(status="success", agent_type="CreativeStudio").inc()
             yield {"type": "response", "content": response}
+            _score_trace(lf_trace, langfuse, 0.9, output=response)
             return
 
         # --- ROUTE: TRAINER (FEEDBACK LOOP) ---
@@ -668,6 +828,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                 
             result = memory.add_rule(domain, keyword, rule)
             yield {"type": "response", "content": f"🧠 **Learned**: {result}"}
+            _score_trace(lf_trace, langfuse, 1.0, output=result)
             return
 
         # --- ROUTE: IOT CONTROLLER (HOME ASSISTANT) ---
@@ -682,9 +843,11 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                 yield {"type": "log", "content": f"[IoT] Dispatching: '{user_input}'"}
                 response: RunResponse = iot_agent.run(user_input)
                 yield {"type": "response", "content": response.content}
+                _score_trace(lf_trace, langfuse, 1.0, output=response.content)
             except Exception as e:
+                _score_trace(lf_trace, langfuse, 0.0)
                 yield {"type": "error", "content": f"IoT Error: {e}"}
-                
+
             AGENT_STATE.labels(agent_name="IoTController").set(1)
             WORKFLOW_STEPS.labels(status="success", agent_type="IoTController").inc()
             return
@@ -761,6 +924,12 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         WORKFLOW_STEPS.labels(status="error", agent_type="Router").inc()
     finally:
         AGENT_STATE.labels(agent_name="Router").set(1)
+        # Flush Langfuse traces to ensure they're sent
+        if USE_LANGFUSE and langfuse:
+            try:
+                langfuse.flush()
+            except Exception:
+                pass
         # Clean up JWT-ACE execution context
         if JWT_ACE_AVAILABLE:
             try:

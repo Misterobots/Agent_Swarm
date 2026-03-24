@@ -527,7 +527,7 @@
             "uid": "Loki"
           },
           "editorMode": "code",
-          "expr": "{container_name=~\".+\"} |~ \"(?i)(error|fatal|panic|exception)\"",
+          "expr": "{container=~\".+\"} |~ \"(?i)(error|fatal|panic|exception)\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -564,7 +564,7 @@
             "uid": "Loki"
           },
           "editorMode": "code",
-          "expr": "{container_name=~\".+\"} |~ \"(?i)(warn|warning|deprecated)\"",
+          "expr": "{container=~\".+\"} |~ \"(?i)(warn|warning|deprecated)\"",
           "queryType": "range",
           "refId": "A"
         }

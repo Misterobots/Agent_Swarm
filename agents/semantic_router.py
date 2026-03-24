@@ -26,15 +26,18 @@ class SemanticRouter:
             If the input contains "Original Request", "System Question", and "User Answer", merge the "User Answer" into the "Original Request" context to deduce the final intent.
             
             CATEGORIES:
-            1. **CODE**: Software engineering, writing scripts (Python/JS/etc.), debugging, fixing errors, or building apps. (Keywords: "write script", "fix bug", "function", "develop", "code")
-            2. **IMAGE**: Generating 2D visual art, photos, concept art, or textures. (Keywords: "draw", "generate image", "picture of", "photo")
-            3. **3D**: Creating 3D geometry, meshes, or 3D models. (Keywords: "3d model", "mesh", "glb", "obj", "forge")
-            4. **RESEARCH**: Deep knowledge quests, History, Literature, Humanities, facts, or explanations. (Keywords: "explain", "who was", "history", "summarize book", "literature", "culture")
-            5. **TRAIN**: Teaching the system new rules, instructions, or corrections to its behavior. (Keywords: "remember that", "learn this", "correction:")
-            6. **IOT_CONTROL**: Turning on/off smart home devices, lights, sending raw commands to home automation. (Keywords: "turn on", "lights", "temperature", "unlock", "scene")
-            7. **IOT_DEV**: Developing firmware, simulating circuits, or raw MQTT backend development. (Keywords: "simulate", "wokwi", "flash esp32", "compile firmware")
-            8. **DOCUMENTATION**: Rewriting text, formatting markdown documents, technical writing, or summarizing large RAG files. (Keywords: "rewrite", "document", "summarize", "format")
-            
+            1. **CONVERSATION**: Greetings, casual chat, small talk, simple factual questions, or anything social in nature. Default for any message that is unclear but does not require specialized tools. (Keywords: "hello", "hi", "how are you", "what is", "tell me about", "who are you", "what can you do")
+            2. **CODE**: Software engineering, writing scripts (Python/JS/etc.), debugging, fixing errors, or building apps. (Keywords: "write script", "fix bug", "function", "develop", "code", "implement", "refactor")
+            3. **DEVOPS**: Infrastructure, Docker, Kubernetes, CI/CD pipelines, Linux administration, networking, shell scripts, server configuration, or cloud deployment. (Keywords: "docker", "kubernetes", "deploy", "nginx", "server", "firewall", "pipeline", "bash script", "systemd", "compose")
+            4. **DATA**: Data analysis, SQL queries, CSV/JSON processing, statistics, charts, dashboards, or data transformation. (Keywords: "query", "sql", "analyze data", "csv", "dataframe", "statistics", "chart", "pandas", "aggregate")
+            5. **IMAGE**: Generating 2D visual art, photos, concept art, or textures. (Keywords: "draw", "generate image", "picture of", "photo", "paint", "illustration")
+            6. **3D**: Creating 3D geometry, meshes, or 3D models. (Keywords: "3d model", "mesh", "glb", "obj", "forge", "blender")
+            7. **RESEARCH**: Deep knowledge quests, academic research, History, Literature, Humanities, Philosophy, Science facts, or multi-source analysis. Requires depth beyond a quick answer. (Keywords: "research", "analyze", "compare", "history of", "literature review", "what caused", "deep dive")
+            8. **DOCUMENTATION**: Rewriting text, formatting markdown documents, technical writing, or summarizing large RAG files. (Keywords: "rewrite", "document", "summarize", "format", "write a guide", "write a readme")
+            9. **TRAIN**: Teaching the system new rules, instructions, or corrections to its behavior. (Keywords: "remember that", "learn this", "correction:", "from now on")
+            10. **IOT_CONTROL**: Turning on/off smart home devices, lights, sending raw commands to home automation. (Keywords: "turn on", "lights", "temperature", "unlock", "scene", "home assistant")
+            11. **IOT_DEV**: Developing firmware, simulating circuits, or raw MQTT backend development. (Keywords: "simulate", "wokwi", "flash esp32", "compile firmware", "mqtt", "arduino")
+
             OUTPUT FORMAT CHECKLIST (JSON ONLY):
             {
                 "intent": "<EXACT STRING FROM CATEGORIES OR 'AMBIGUOUS'>",
@@ -42,9 +45,11 @@ class SemanticRouter:
                 "reasoning": "<short logical deduction of why this category fits>",
                 "disambiguation_question": "<if AMBIGUOUS, a question to ask the user to clarify>"
             }
-            
+
             CRITICAL DIRECTIVES:
-            - If confidence is < 0.60, you MUST output "AMBIGUOUS".
+            - CONVERSATION is the default for social, general, or ambiguous inputs. Prefer CONVERSATION over AMBIGUOUS unless the user is asking for a specific capability you cannot determine.
+            - Only output AMBIGUOUS if the user is asking for something that could be CODE, IMAGE, DEVOPS, or another capability-specific intent but you cannot tell which.
+            - If confidence is < 0.50, output AMBIGUOUS with a disambiguation_question.
             - Output VALID JSON only. Do not wrap in markdown or add conversational text.
             """,
             show_tool_calls=False,
@@ -120,7 +125,7 @@ class SemanticRouter:
         if 'decision' in locals() and isinstance(decision, dict):
             return decision
 
-        return {"intent": "RESEARCH", "confidence": 0.0, "reasoning": "Fallback Error (Router failed all retries)"}
+        return {"intent": "CONVERSATION", "confidence": 0.0, "reasoning": "Fallback Error (Router failed all retries)"}
 
 # Global Singleton (Lazy Loaded)
 _router_instance = None

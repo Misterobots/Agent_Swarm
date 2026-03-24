@@ -17,6 +17,7 @@ import os
 import sys
 import logging
 import argparse
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Any
@@ -56,6 +57,7 @@ class GRPOTrainingConfig:
         warmup_ratio: float = 0.1,
         group_size: int = 4,
         kl_coeff: float = 0.05,
+        time_budget_minutes: Optional[float] = None,
     ):
         self.base_model = base_model
         self.output_dir = output_dir
@@ -69,6 +71,7 @@ class GRPOTrainingConfig:
         self.warmup_ratio = warmup_ratio
         self.group_size = group_size
         self.kl_coeff = kl_coeff
+        self.time_budget_minutes = time_budget_minutes
 
     def to_dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items()}
@@ -176,9 +179,36 @@ def train_grpo(
     # Lazy imports — these are heavy and only needed on Justin-PC
     try:
         import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainerCallback
         from peft import LoraConfig, get_peft_model, TaskType
         from trl import GRPOConfig, GRPOTrainer
+
+        class TimeBudgetCallback(TrainerCallback):
+            """Stop training when wall-clock budget is exhausted."""
+
+            def __init__(self, budget_seconds: float):
+                self.budget_seconds = budget_seconds
+                self.start_time: Optional[float] = None
+                self._warned = False
+
+            def on_train_begin(self, args, state, control, **kwargs):
+                self.start_time = time.time()
+                logger.info(f"[TimeBudget] Training window: {self.budget_seconds / 60:.1f} min")
+
+            def on_step_end(self, args, state, control, **kwargs):
+                if self.start_time is None:
+                    return control
+                elapsed = time.time() - self.start_time
+                remaining = self.budget_seconds - elapsed
+                if remaining <= 0:
+                    logger.info(
+                        f"[TimeBudget] Budget exhausted after {elapsed:.0f}s — stopping training."
+                    )
+                    control.should_training_stop = True
+                elif remaining < 120 and not self._warned:
+                    logger.info("[TimeBudget] <2 min remaining — wrapping up current step.")
+                    self._warned = True
+                return control
     except ImportError as e:
         raise RuntimeError(
             f"Training dependencies not installed: {e}. "
@@ -285,6 +315,12 @@ def train_grpo(
 
         logger.info(f"Prepared {len(prompts)} training examples")
 
+        # When a time budget is set, save every 50 steps so partial progress
+        # is preserved when the callback halts training mid-epoch.
+        time_bounded = config.time_budget_minutes is not None
+        save_strategy = "steps" if time_bounded else "epoch"
+        save_steps = 50 if time_bounded else 500
+
         # GRPO training config
         training_args = GRPOConfig(
             output_dir=str(run_dir),
@@ -296,7 +332,8 @@ def train_grpo(
             max_completion_length=config.max_seq_len,
             num_generations=config.group_size,
             logging_steps=1,
-            save_strategy="epoch",
+            save_strategy=save_strategy,
+            save_steps=save_steps,
             bf16=True,
             gradient_checkpointing=True,
             report_to="none",
@@ -323,12 +360,22 @@ def train_grpo(
             "prompt": prompts,
         })
 
+        callbacks = []
+        if time_bounded:
+            budget_seconds = config.time_budget_minutes * 60
+            callbacks.append(TimeBudgetCallback(budget_seconds))
+            logger.info(
+                f"[TimeBudget] Budget set: {config.time_budget_minutes:.1f} min "
+                f"(timer starts after model load)"
+            )
+
         trainer = GRPOTrainer(
             model=model,
             args=training_args,
             train_dataset=train_dataset,
             reward_funcs=reward_function,
             processing_class=tokenizer,
+            callbacks=callbacks if callbacks else None,
         )
 
         logger.info("Starting GRPO training...")
@@ -347,6 +394,8 @@ def train_grpo(
             "train_samples": len(prompts),
             "trainable_params": trainable_params,
             "total_params": total_params,
+            "time_budget_minutes": config.time_budget_minutes,
+            "budget_limited": time_bounded,
         }
 
         # Update training run record
@@ -387,6 +436,13 @@ def main():
     parser.add_argument("--epochs", type=int, default=TRAINING_NUM_EPOCHS)
     parser.add_argument("--lora-rank", type=int, default=TRAINING_LORA_RANK)
     parser.add_argument("--lr", type=float, default=TRAINING_LEARNING_RATE)
+    parser.add_argument(
+        "--time-budget",
+        type=float,
+        default=None,
+        metavar="MINUTES",
+        help="Stop training after this many minutes (saves checkpoint every 50 steps)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(name)s | %(levelname)s | %(message)s")
@@ -397,6 +453,7 @@ def main():
         num_epochs=args.epochs,
         lora_rank=args.lora_rank,
         learning_rate=args.lr,
+        time_budget_minutes=args.time_budget,
     )
 
     result = train_grpo(args.dataset, config)
@@ -404,6 +461,8 @@ def main():
     print(f"  Adapter: {result['adapter_path']}")
     print(f"  Loss:    {result['metrics'].get('train_loss', 'N/A')}")
     print(f"  Runtime: {result['metrics'].get('train_runtime', 0):.1f}s")
+    if args.time_budget:
+        print(f"  Budget:  {args.time_budget:.1f} min")
 
 
 if __name__ == "__main__":
