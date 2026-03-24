@@ -1,6 +1,6 @@
 export interface TrainingRun {
   id: number;
-  run_type: "export" | "synthetic" | "training" | "conversion";
+  run_type: "export" | "synthetic" | "training" | "conversion" | "curated" | "full_pipeline";
   target_model: string | null;
   dataset_path?: string | null;
   dataset_size: number | null;
@@ -30,7 +30,7 @@ export interface ActiveRun {
 
 export interface TrainingStatus {
   last_run: TrainingRun | null;
-  dataset_size: { exported: number; synthetic: number };
+  dataset_size: { exported: number; synthetic: number; curated?: number };
   active_ab_tests: number;
   model_versions: ModelVersion[];
   active_run?: ActiveRun | null;

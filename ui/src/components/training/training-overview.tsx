@@ -41,7 +41,8 @@ export function TrainingOverview() {
   const lastRun = status?.last_run;
   const totalData =
     (status?.dataset_size.exported ?? 0) +
-    (status?.dataset_size.synthetic ?? 0);
+    (status?.dataset_size.synthetic ?? 0) +
+    (status?.dataset_size.curated ?? 0);
   const activeRun = status?.active_run;
 
   return (
@@ -88,7 +89,7 @@ export function TrainingOverview() {
           icon={<Database size={16} className="text-cyan-500" />}
           label="Training Data"
           value={totalData.toLocaleString()}
-          detail={`${status?.dataset_size.exported ?? 0} exported · ${status?.dataset_size.synthetic ?? 0} synthetic`}
+          detail={`${status?.dataset_size.exported ?? 0} exported · ${status?.dataset_size.synthetic ?? 0} synthetic · ${status?.dataset_size.curated ?? 0} curated`}
         />
         <MetricCard
           icon={<FlaskConical size={16} className="text-violet-500" />}
