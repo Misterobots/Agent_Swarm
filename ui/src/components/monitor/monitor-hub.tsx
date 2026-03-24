@@ -5,17 +5,21 @@ import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DashboardSelector, DASHBOARDS } from "./dashboard-selector";
 import { ExternalLink, Loader2 } from "lucide-react";
 
-// Grafana is served via Traefik at /grafana on the R730 (port 80).
-// On LAN this is http://192.168.2.103/grafana. The env var is baked at build time.
-const GRAFANA_BASE = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://192.168.2.103/grafana";
+// Iframe always uses the server-side proxy so Grafana works from any origin
+// (LAN or external via Cloudflare). The proxy route forwards to the real
+// Grafana instance on the LAN.
+const GRAFANA_IFRAME = "/api/grafana";
+
+// "Open full Grafana" link — only works on LAN, but useful as a fallback.
+const GRAFANA_DIRECT = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://192.168.2.103/grafana";
 
 export function MonitorHub() {
   const { activeDashboard, setActiveDashboard } = useMonitorStore();
   const [loading, setLoading] = useState(true);
 
   const activeLabel = DASHBOARDS.find((d) => d.uid === activeDashboard)?.label || "Dashboard";
-  const iframeSrc = `${GRAFANA_BASE}/d/${activeDashboard}?orgId=1&kiosk`;
-  const fullUrl = `${GRAFANA_BASE}/d/${activeDashboard}?orgId=1`;
+  const iframeSrc = `${GRAFANA_IFRAME}/d/${activeDashboard}?orgId=1&kiosk`;
+  const fullUrl = `${GRAFANA_DIRECT}/d/${activeDashboard}?orgId=1`;
 
   return (
     <div className="flex flex-col h-full">
