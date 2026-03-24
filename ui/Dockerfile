@@ -14,7 +14,7 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 # Bake NEXT_PUBLIC_ vars at build time (relative paths work from any origin)
-ARG NEXT_PUBLIC_GRAFANA_URL=/grafana
+ARG NEXT_PUBLIC_GRAFANA_URL=http://192.168.2.103/grafana
 ENV NEXT_PUBLIC_GRAFANA_URL=$NEXT_PUBLIC_GRAFANA_URL
 RUN npm run build
 

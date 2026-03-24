@@ -5,8 +5,9 @@ import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DashboardSelector, DASHBOARDS } from "./dashboard-selector";
 import { ExternalLink, Loader2 } from "lucide-react";
 
-// Use the Traefik-proxied /grafana subpath so it works from both LAN and external (HTTPS)
-const GRAFANA_BASE = process.env.NEXT_PUBLIC_GRAFANA_URL || "/grafana";
+// Grafana is served via Traefik at /grafana on the R730 (port 80).
+// On LAN this is http://192.168.2.103/grafana. The env var is baked at build time.
+const GRAFANA_BASE = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://192.168.2.103/grafana";
 
 export function MonitorHub() {
   const { activeDashboard, setActiveDashboard } = useMonitorStore();
