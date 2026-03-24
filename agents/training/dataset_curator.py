@@ -99,7 +99,10 @@ _INJECTION_PATTERNS = [
     r"[\u200b\u200c\u200d\u2060\ufeff]{3,}",
     # Adversarial suffix patterns (GCG-style gibberish tokens)
     r"[!@#$%^&*]{10,}",
-    r"(?:[A-Z][a-z]){8,}",  # CamelCase gibberish repetition
+    # CamelCase gibberish (case-sensitive via inline flag — the global
+    # IGNORECASE made the old pattern match any 16+ alpha chars).
+    # Requires 10+ strict Upper-lower alternations like "AbCdEfGhIjKl".
+    r"(?-i:(?:[A-Z][a-z]){10,})",
     # Encoded payload attempts
     r"(?:eval|exec|import|__import__|os\.system|subprocess)\s*\(",
     r"base64\.\s*(?:b64decode|decodebytes)",
