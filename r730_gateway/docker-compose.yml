@@ -249,7 +249,7 @@ services:
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - NEXT_PUBLIC_TOOLS_BASE_URL=http://192.168.2.103
-      - NEXT_PUBLIC_GRAFANA_URL=http://192.168.2.103/grafana
+      - NEXT_PUBLIC_GRAFANA_URL=/grafana
     volumes:
       - ../docs:/app/docs:ro
     ports:

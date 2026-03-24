@@ -5,16 +5,16 @@ import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DashboardSelector, DASHBOARDS } from "./dashboard-selector";
 import { ExternalLink, Loader2 } from "lucide-react";
 
-// Direct port access bypasses Traefik — Grafana on R730 is exposed on port 3001
-const GRAFANA_URL = "http://192.168.2.103:3001";
+// Use the Traefik-proxied /grafana subpath so it works from both LAN and external (HTTPS)
+const GRAFANA_BASE = process.env.NEXT_PUBLIC_GRAFANA_URL || "/grafana";
 
 export function MonitorHub() {
   const { activeDashboard, setActiveDashboard } = useMonitorStore();
   const [loading, setLoading] = useState(true);
 
   const activeLabel = DASHBOARDS.find((d) => d.uid === activeDashboard)?.label || "Dashboard";
-  const iframeSrc = `${GRAFANA_URL}/d/${activeDashboard}?orgId=1&kiosk`;
-  const fullUrl = `${GRAFANA_URL}/d/${activeDashboard}?orgId=1`;
+  const iframeSrc = `${GRAFANA_BASE}/d/${activeDashboard}?orgId=1&kiosk`;
+  const fullUrl = `${GRAFANA_BASE}/d/${activeDashboard}?orgId=1`;
 
   return (
     <div className="flex flex-col h-full">
