@@ -29,7 +29,6 @@ async function proxyGrafana(req: NextRequest) {
   const init: RequestInit = {
     method: req.method,
     headers,
-    // @ts-expect-error — Next.js fetch supports redirect
     redirect: "follow",
   };
 
