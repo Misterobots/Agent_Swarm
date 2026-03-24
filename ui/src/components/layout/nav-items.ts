@@ -4,6 +4,8 @@ import {
   Shield,
   Wrench,
   BarChart3,
+  BookOpen,
+  FlaskConical,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -18,7 +20,9 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Chat", href: "/chat", icon: MessageSquare },
   { label: "Dev", href: "/dev", icon: Code2 },
   { label: "Ops", href: "/ops", icon: Shield },
+  { label: "Training", href: "/training", icon: FlaskConical },
   { label: "Tools", href: "/tools", icon: Wrench },
   { label: "Monitor", href: "/monitor", icon: BarChart3 },
+  { label: "Docs", href: "/docs", icon: BookOpen },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

@@ -86,7 +86,7 @@
       },
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{name!=\"\"}[1m])",
+          "expr": "rate(container_cpu_usage_seconds_total{image!=\"\"}[1m])",
           "interval": "",
           "legendFormat": "{{id}}",
           "refId": "A"
@@ -118,7 +118,7 @@
       },
       "targets": [
         {
-          "expr": "{container_name=\"agent_runtime\"} |= \"error\"",
+          "expr": "{container=\"agent_runtime\"} |= \"error\"",
           "refId": "A"
         }
       ],

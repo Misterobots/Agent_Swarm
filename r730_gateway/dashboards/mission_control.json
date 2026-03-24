@@ -431,7 +431,7 @@
             "uid": "Loki"
           },
           "editorMode": "code",
-          "expr": "{container_name=~\"agent_runtime|agent_ui\"} |= \"COMFY\"",
+          "expr": "{container=~\"agent_runtime|agent_ui\"} |= \"COMFY\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -468,7 +468,7 @@
             "uid": "Loki"
           },
           "editorMode": "code",
-          "expr": "{container_name=~\"agent_runtime|agent_ui\"} != \"/metrics\"",
+          "expr": "{container=~\"agent_runtime|agent_ui\"} != \"/metrics\"",
           "queryType": "range",
           "refId": "A"
         }

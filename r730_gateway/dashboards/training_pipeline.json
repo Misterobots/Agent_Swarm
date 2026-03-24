@@ -1063,7 +1063,7 @@
             "uid": "Loki"
           },
           "editorMode": "code",
-          "expr": "{container_name=\"agent_runtime\"} |~ \"(?i)(training|grpo|qlora|lora|gguf|convert|export_traces|synthetic_gen|ab.test)\"",
+          "expr": "{container=\"agent_runtime\"} |~ \"(?i)(training|grpo|qlora|lora|gguf|convert|export_traces|synthetic_gen|ab.test)\"",
           "queryType": "range",
           "refId": "A"
         }

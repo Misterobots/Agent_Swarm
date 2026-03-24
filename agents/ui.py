@@ -117,8 +117,8 @@ with st.sidebar:
     # Workspace Switcher
     st.subheader("Workspace")
     workspace = st.radio(
-        "Mode", 
-        ["Chat", "Media", "Voice Studio", "Coding", "Prototyping", "Control", "DevOps", "Maker Space", "Governance"],
+        "Mode",
+        ["Chat", "Media", "Voice Studio", "Coding", "Prototyping", "Control", "DevOps", "Maker Space", "Governance", "Documents"],
         label_visibility="collapsed"
     )
     st.session_state.workspace = workspace
@@ -1399,6 +1399,48 @@ def render_maker_workspace():
             st.info("No simulations found. Ask the agent to 'Simulate an ESP32'.")
 
 
+# --- DOCUMENTS WORKSPACE ---
+def render_documents_workspace():
+    import os
+
+    DOCS_ROOT = os.path.join(os.path.dirname(__file__), "..", "docs")
+
+    def read_doc(rel_path):
+        path = os.path.normpath(os.path.join(DOCS_ROOT, rel_path))
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return f"_Document not found: `{rel_path}`_"
+
+    st.markdown("## 📚 Documentation")
+    st.caption("Home AI Lab v3.3 · All documentation · Use the tabs below to navigate")
+
+    user_tab, admin_tab = st.tabs(["👤 User Guide", "🔧 Admin Reference"])
+
+    with user_tab:
+        ov_tab, fw_tab, faq_tab = st.tabs(["System Overview", "How It Works", "FAQ"])
+        with ov_tab:
+            st.markdown(read_doc("user/overview.md"))
+        with fw_tab:
+            st.markdown(read_doc("user/framework.md"))
+        with faq_tab:
+            st.markdown(read_doc("user/faq.md"))
+
+    with admin_tab:
+        ref_tab, design_tab, sec_tab, ts_tab = st.tabs([
+            "Technical Reference", "Design Framework", "Security", "Troubleshooting"
+        ])
+        with ref_tab:
+            st.markdown(read_doc("admin/technical_reference.md"))
+        with design_tab:
+            st.markdown(read_doc("admin/design_framework.md"))
+        with sec_tab:
+            st.markdown(read_doc("admin/security.md"))
+        with ts_tab:
+            st.markdown(read_doc("admin/troubleshooting.md"))
+
+
 # --- MAIN DISPATCHER ---
 if st.session_state.workspace == "Chat":
     render_chat_workspace()
@@ -1418,3 +1460,5 @@ elif st.session_state.workspace == "Maker Space":
     render_maker_workspace()
 elif st.session_state.workspace == "Governance":
     render_governance_workspace()
+elif st.session_state.workspace == "Documents":
+    render_documents_workspace()

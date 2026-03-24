@@ -92,7 +92,7 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "up{job=~\"justin_ollama|justin_agent_runtime|control_security\"}",
+          "expr": "up{job=~\"agent-runtime|cadvisor-justin|cadvisor-r730\"}",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
@@ -188,13 +188,13 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(ollama_request_duration_seconds_count{job=\"justin_ollama\"}[5m])",
-          "legendFormat": "{{method}} {{path}}",
+          "expr": "rate(workflow_steps_total[5m])",
+          "legendFormat": "{{agent_type}} / {{status}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Ollama Request Rate (5m)",
+      "title": "Agent Workflow Rate (5m)",
       "type": "timeseries"
     },
     {
@@ -278,8 +278,8 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(ollama_request_duration_seconds_sum{job=\"justin_ollama\"}[5m]) / rate(ollama_request_duration_seconds_count{job=\"justin_ollama\"}[5m])",
-          "legendFormat": "avg {{method}} {{path}}",
+          "expr": "rate(agent_operation_seconds_sum[5m]) / rate(agent_operation_seconds_count[5m])",
+          "legendFormat": "avg latency",
           "range": true,
           "refId": "A"
         },
@@ -289,13 +289,13 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, rate(ollama_request_duration_seconds_bucket{job=\"justin_ollama\"}[5m]))",
-          "legendFormat": "p95 {{method}} {{path}}",
+          "expr": "histogram_quantile(0.95, rate(agent_operation_seconds_bucket[5m]))",
+          "legendFormat": "p95 latency",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Ollama Request Latency",
+      "title": "Agent Response Latency",
       "type": "timeseries"
     },
     {
@@ -376,7 +376,7 @@
           },
           "editorMode": "code",
           "expr": "container_memory_usage_bytes{name=~\"ollama_gpu|comfyui_gpu|bmo_voice_gpu|voice_engine_gpu\"}",
-          "legendFormat": "{{id}}",
+          "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
         }
@@ -461,7 +461,7 @@
           },
           "editorMode": "code",
           "expr": "rate(container_cpu_usage_seconds_total{name=~\"ollama_gpu|comfyui_gpu|bmo_voice_gpu|voice_engine_gpu\"}[1m])",
-          "legendFormat": "{{id}}",
+          "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
         }
@@ -511,7 +511,7 @@
             "uid": "Loki"
           },
           "editorMode": "code",
-          "expr": "{container_name=\"agent_runtime\"} |~ \"(?i)(mars|solver|verifier|corrector|router)\"",
+          "expr": "{container=\"agent_runtime\"} |~ \"(?i)(mars|solver|verifier|corrector|router)\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -548,7 +548,7 @@
             "uid": "Loki"
           },
           "editorMode": "code",
-          "expr": "{container_name=~\"ollama_gpu|comfyui_gpu\"} |~ \"(?i)(error|loaded|unloaded|model)\"",
+          "expr": "{container=~\"ollama_gpu|comfyui_gpu\"} |~ \"(?i)(error|loaded|unloaded|model)\"",
           "queryType": "range",
           "refId": "A"
         }

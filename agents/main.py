@@ -481,6 +481,227 @@ async def health_nodes():
     return {"nodes": monitor.get_all_statuses()}
 
 
+# ---------------------------------------------------------------------------
+#  Training Pipeline API
+# ---------------------------------------------------------------------------
+
+class TrainingStartRequest(BaseModel):
+    """Request body for /v1/training/start."""
+    model_config = ConfigDict(extra="allow")
+    run_type: str = "training"           # training | export | full_pipeline
+    time_budget_minutes: Optional[float] = None
+    base_model: Optional[str] = None
+    lora_rank: Optional[int] = None
+    learning_rate: Optional[float] = None
+    epochs: Optional[int] = None
+    dataset_path: Optional[str] = None
+
+# In-memory tracking for the active training background task
+_active_training: dict = {"run_id": None, "status": "idle", "started_at": None, "task": None}
+
+
+@app.get("/v1/training/status")
+async def training_status():
+    """Summary stats: last run, dataset size, model versions, active A/B tests."""
+    import json as _json
+    from config import TEMPLATE_DB_URL
+    result = {
+        "last_run": None,
+        "dataset_size": {"exported": 0, "synthetic": 0},
+        "active_ab_tests": 0,
+        "model_versions": [],
+        "active_run": None,
+    }
+
+    # If there's an in-memory active run, include it
+    if _active_training["status"] == "running":
+        result["active_run"] = {
+            "run_id": _active_training["run_id"],
+            "status": "running",
+            "started_at": _active_training["started_at"],
+        }
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+
+        # Last training run
+        cur.execute("""
+            SELECT id, run_type, target_model, dataset_size, status,
+                   metrics::text, started_at, completed_at, error_message
+            FROM swarm.training_runs ORDER BY started_at DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        if row:
+            result["last_run"] = {
+                "id": row[0], "run_type": row[1], "target_model": row[2],
+                "dataset_size": row[3], "status": row[4],
+                "metrics": _json.loads(row[5]) if row[5] else {},
+                "started_at": row[6].isoformat() if row[6] else None,
+                "completed_at": row[7].isoformat() if row[7] else None,
+                "error_message": row[8],
+            }
+
+        # Dataset counts
+        try:
+            from pathlib import Path as _Path
+            from config import TRAINING_DATASET_DIR
+            dataset_dir = _Path(TRAINING_DATASET_DIR)
+            if dataset_dir.exists():
+                exported = sum(1 for f in dataset_dir.glob("grpo_traces_*.jsonl")
+                              for _ in open(f, encoding="utf-8"))
+                synthetic = sum(1 for f in dataset_dir.glob("synthetic_*.jsonl")
+                               for _ in open(f, encoding="utf-8"))
+                result["dataset_size"] = {"exported": exported, "synthetic": synthetic}
+        except Exception:
+            pass
+
+        # Model versions
+        cur.execute("""
+            SELECT id, base_model, version_tag, ollama_model_name, status,
+                   COALESCE(avg_score, 0), COALESCE(total_invocations, 0), created_at
+            FROM swarm.model_versions ORDER BY created_at DESC LIMIT 20
+        """)
+        for row in cur.fetchall():
+            result["model_versions"].append({
+                "id": row[0], "base_model": row[1], "version_tag": row[2],
+                "ollama_model_name": row[3], "status": row[4],
+                "avg_score": float(row[5]), "total_invocations": row[6],
+                "created_at": row[7].isoformat() if row[7] else None,
+            })
+
+        # A/B tests
+        cur.execute("SELECT COUNT(*) FROM swarm.model_versions WHERE status = 'ab_testing'")
+        result["active_ab_tests"] = cur.fetchone()[0]
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Training status DB query failed: {e}")
+
+    return result
+
+
+@app.get("/v1/training/runs")
+async def training_runs(limit: int = 50):
+    """Paginated list of past training runs."""
+    import json as _json
+    from config import TEMPLATE_DB_URL
+    runs = []
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, run_type, target_model, dataset_path, dataset_size,
+                   status, metrics::text, started_at, completed_at, error_message
+            FROM swarm.training_runs ORDER BY started_at DESC LIMIT %s
+        """, (limit,))
+        for row in cur.fetchall():
+            runs.append({
+                "id": row[0], "run_type": row[1], "target_model": row[2],
+                "dataset_path": row[3], "dataset_size": row[4],
+                "status": row[5],
+                "metrics": _json.loads(row[6]) if row[6] else {},
+                "started_at": row[7].isoformat() if row[7] else None,
+                "completed_at": row[8].isoformat() if row[8] else None,
+                "error_message": row[9],
+            })
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Training runs query failed: {e}")
+    return {"runs": runs}
+
+
+@app.post("/v1/training/start")
+async def training_start(req: TrainingStartRequest, background_tasks: BackgroundTasks):
+    """Launch a training run in the background."""
+    from datetime import datetime
+
+    if _active_training["status"] == "running":
+        raise HTTPException(status_code=409, detail="A training run is already in progress")
+
+    async def _run_training():
+        import asyncio
+        _active_training["status"] = "running"
+        _active_training["started_at"] = datetime.utcnow().isoformat()
+        try:
+            if req.run_type == "export":
+                # Export traces only
+                from training.export_traces import TraceExporter
+                exporter = TraceExporter()
+                count = await asyncio.to_thread(exporter.export_dataset)
+                _active_training["status"] = "idle"
+                logger.info(f"Export complete: {count} traces")
+
+            elif req.run_type == "full_pipeline":
+                # Export → Train
+                from training.export_traces import TraceExporter
+                from training.grpo_trainer import train_grpo, GRPOTrainingConfig
+                from config import TRAINING_DATASET_DIR, TRAINING_BASE_SOLVER, \
+                    TRAINING_LORA_RANK, TRAINING_LEARNING_RATE, TRAINING_NUM_EPOCHS
+                import glob
+
+                exporter = TraceExporter()
+                await asyncio.to_thread(exporter.export_dataset)
+
+                # Find latest dataset
+                datasets_found = sorted(
+                    glob.glob(f"{TRAINING_DATASET_DIR}/grpo_traces_*.jsonl"),
+                    reverse=True,
+                )
+                if not datasets_found:
+                    raise ValueError("No dataset found after export")
+
+                cfg = GRPOTrainingConfig(
+                    time_budget_minutes=req.time_budget_minutes,
+                    base_model=req.base_model or TRAINING_BASE_SOLVER,
+                    lora_rank=req.lora_rank or TRAINING_LORA_RANK,
+                    learning_rate=req.learning_rate or TRAINING_LEARNING_RATE,
+                    num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
+                )
+                result = await asyncio.to_thread(train_grpo, datasets_found[0], cfg)
+                _active_training["run_id"] = result.get("run_id")
+                _active_training["status"] = "idle"
+
+            else:
+                # Training only — use specified or latest dataset
+                from training.grpo_trainer import train_grpo, GRPOTrainingConfig
+                from config import TRAINING_DATASET_DIR, TRAINING_BASE_SOLVER, \
+                    TRAINING_LORA_RANK, TRAINING_LEARNING_RATE, TRAINING_NUM_EPOCHS
+                import glob
+
+                dataset = req.dataset_path
+                if not dataset:
+                    datasets_found = sorted(
+                        glob.glob(f"{TRAINING_DATASET_DIR}/grpo_traces_*.jsonl"),
+                        reverse=True,
+                    )
+                    if not datasets_found:
+                        raise ValueError("No training dataset found")
+                    dataset = datasets_found[0]
+
+                cfg = GRPOTrainingConfig(
+                    time_budget_minutes=req.time_budget_minutes,
+                    base_model=req.base_model or TRAINING_BASE_SOLVER,
+                    lora_rank=req.lora_rank or TRAINING_LORA_RANK,
+                    learning_rate=req.learning_rate or TRAINING_LEARNING_RATE,
+                    num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
+                )
+                result = await asyncio.to_thread(train_grpo, dataset, cfg)
+                _active_training["run_id"] = result.get("run_id")
+                _active_training["status"] = "idle"
+
+        except Exception as e:
+            logger.error(f"Background training failed: {e}", exc_info=True)
+            _active_training["status"] = "idle"
+
+    background_tasks.add_task(_run_training)
+    return {"status": "started", "run_type": req.run_type, "time_budget_minutes": req.time_budget_minutes}
+
+
 if __name__ == "__main__":
     # If run directly via python, use uvicorn
     import uvicorn
