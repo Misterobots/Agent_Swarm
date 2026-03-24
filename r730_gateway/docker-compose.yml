@@ -266,7 +266,7 @@ services:
       - "traefik.http.routers.hive-ext.tls=true"
       - "traefik.http.routers.hive-ext.tls.certresolver=cfdns"
       - "traefik.http.routers.hive-ext.service=hive-ui"
-      - "traefik.http.routers.hive-ext.middlewares=globalHeaders@file,secureHeaders@file,hive-root-redirect"
+      - "traefik.http.routers.hive-ext.middlewares=globalHeaders@file,secureHeaders@file,authentik@docker,hive-root-redirect"
       # HTTP → HTTPS redirect
       - "traefik.http.routers.hive-ext-http.rule=Host(`hive.shivelymedia.com`)"
       - "traefik.http.routers.hive-ext-http.entrypoints=web"
