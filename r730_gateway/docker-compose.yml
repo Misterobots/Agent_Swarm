@@ -256,9 +256,25 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
+      # Internal LAN route (existing)
       - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
       - "traefik.http.routers.hive-ui.entrypoints=web"
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
+      # External route: hive.shivelymedia.com → /chat
+      - "traefik.http.routers.hive-ext.rule=Host(`hive.shivelymedia.com`)"
+      - "traefik.http.routers.hive-ext.entrypoints=websecure"
+      - "traefik.http.routers.hive-ext.tls=true"
+      - "traefik.http.routers.hive-ext.tls.certresolver=cfdns"
+      - "traefik.http.routers.hive-ext.service=hive-ui"
+      - "traefik.http.routers.hive-ext.middlewares=globalHeaders@file,secureHeaders@file,hive-root-redirect"
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.hive-ext-http.rule=Host(`hive.shivelymedia.com`)"
+      - "traefik.http.routers.hive-ext-http.entrypoints=web"
+      - "traefik.http.routers.hive-ext-http.middlewares=redirect-to-https@docker"
+      # Redirect bare / to /chat
+      - "traefik.http.middlewares.hive-root-redirect.redirectregex.regex=^https://hive\\.shivelymedia\\.com/?$$"
+      - "traefik.http.middlewares.hive-root-redirect.redirectregex.replacement=https://hive.shivelymedia.com/chat"
+      - "traefik.http.middlewares.hive-root-redirect.redirectregex.permanent=false"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # IDENTITY — Authentik SSO is now managed by Saltbox (Phase 8B)
