@@ -15,6 +15,7 @@
 |----------|-------------|
 | [System Overview](user/overview.md) | What the Hive is, what it can do, and how to interact with it |
 | [How the Agent Swarm Works](user/framework.md) | Plain-language explanation of MarsRL, agents, and routing |
+| [Training Guide](user/training_guide.md) | How to use the Training interface — run types, options, security scanning, CLI, API |
 | [FAQ](user/faq.md) | Common questions from day-to-day users |
 
 ---
