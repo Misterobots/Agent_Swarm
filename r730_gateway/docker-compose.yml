@@ -127,7 +127,7 @@ services:
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_SECURITY_COOKIE_SAMESITE=none
-      - GF_SECURITY_COOKIE_SECURE=false
+      - GF_SECURITY_COOKIE_SECURE=true
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
@@ -141,9 +141,18 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
+      # LAN route: 192.168.2.103/grafana
       - "traefik.http.routers.grafana.rule=PathPrefix(`/grafana`)"
       - "traefik.http.routers.grafana.entrypoints=web"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      # External route: grafana.shivelymedia.com/grafana (via Cloudflare tunnel)
+      # No Authentik — Grafana is embedded in an iframe inside the auth-protected Hive UI.
+      # Anonymous access is read-only (Viewer role).
+      - "traefik.http.routers.grafana-ext.rule=Host(`grafana.shivelymedia.com`)"
+      - "traefik.http.routers.grafana-ext.entrypoints=web"
+      - "traefik.http.routers.grafana-ext.priority=20"
+      - "traefik.http.routers.grafana-ext.service=grafana-ext"
+      - "traefik.http.services.grafana-ext.loadbalancer.server.port=3000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # TASK QUEUE & PERSISTENCE
