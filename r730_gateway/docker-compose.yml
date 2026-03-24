@@ -256,25 +256,29 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
-      # Internal LAN route (existing)
+      # Internal LAN route (no auth)
       - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
       - "traefik.http.routers.hive-ui.entrypoints=web"
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
-      # External route: hive.shivelymedia.com → /chat
+      # External HTTPS route: hive.shivelymedia.com (behind Authentik)
       - "traefik.http.routers.hive-ext.rule=Host(`hive.shivelymedia.com`)"
       - "traefik.http.routers.hive-ext.entrypoints=websecure"
+      - "traefik.http.routers.hive-ext.priority=20"
       - "traefik.http.routers.hive-ext.tls=true"
       - "traefik.http.routers.hive-ext.tls.certresolver=cfdns"
-      - "traefik.http.routers.hive-ext.service=hive-ui"
-      - "traefik.http.routers.hive-ext.middlewares=globalHeaders@file,secureHeaders@file,authentik@docker,hive-root-redirect"
-      # HTTP → HTTPS redirect
+      - "traefik.http.routers.hive-ext.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.hive-ext.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.hive-ext.tls.options=securetls@file"
+      - "traefik.http.routers.hive-ext.service=hive-ext"
+      - "traefik.http.routers.hive-ext.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@docker"
+      - "traefik.http.services.hive-ext.loadbalancer.server.port=3000"
+      # External HTTP route: redirect + Authentik (Cloudflare forwards here on port 80)
       - "traefik.http.routers.hive-ext-http.rule=Host(`hive.shivelymedia.com`)"
       - "traefik.http.routers.hive-ext-http.entrypoints=web"
-      - "traefik.http.routers.hive-ext-http.middlewares=redirect-to-https@docker"
-      # Redirect bare / to /chat
-      - "traefik.http.middlewares.hive-root-redirect.redirectregex.regex=^https://hive\\.shivelymedia\\.com/?$$"
-      - "traefik.http.middlewares.hive-root-redirect.redirectregex.replacement=https://hive.shivelymedia.com/chat"
-      - "traefik.http.middlewares.hive-root-redirect.redirectregex.permanent=false"
+      - "traefik.http.routers.hive-ext-http.priority=20"
+      - "traefik.http.routers.hive-ext-http.service=hive-ext-http"
+      - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
+      - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # IDENTITY — Authentik SSO is now managed by Saltbox (Phase 8B)
