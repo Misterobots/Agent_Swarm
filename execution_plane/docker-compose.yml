@@ -89,6 +89,7 @@ services:
       - OLLAMA_METRICS=1               # Expose /metrics for Prometheus scraping
     volumes:
       - ollama_models:/root/.ollama
+      - ./training_output:/training_output:ro  # Shared with agent_runtime for model imports
     ports:
       - "11434:11434"
     restart: always

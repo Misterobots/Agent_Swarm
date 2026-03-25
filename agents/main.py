@@ -972,6 +972,306 @@ async def training_run_report(run_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ---------------------------------------------------------------------------
+#  Convert & Deploy API
+# ---------------------------------------------------------------------------
+
+class ConvertRequest(BaseModel):
+    """Request body for /v1/training/convert."""
+    model_config = ConfigDict(extra="allow")
+    training_run_id: int
+    base_model: Optional[str] = None
+    system_prompt: Optional[str] = None
+
+
+class DeployRequest(BaseModel):
+    """Request body for /v1/training/deploy."""
+    model_config = ConfigDict(extra="allow")
+    training_run_id: int
+    template_id: str
+    traffic_split: float = 0.2
+    min_invocations: int = 100
+
+
+@app.post("/v1/training/convert")
+async def start_conversion(req: ConvertRequest, background_tasks: BackgroundTasks):
+    """Launch LoRA merge + Ollama import as a background task."""
+    # Reuse the _active_training guard (GPU/disk contention)
+    if _active_training["status"] == "running":
+        raise HTTPException(
+            status_code=409,
+            detail=f"A task is already running (run_id={_active_training['run_id']}). Wait for it to finish."
+        )
+
+    from training.convert_gguf import run_convert
+    from config import TRAINING_BASE_SOLVER
+
+    _active_training["status"] = "running"
+    _active_training["run_id"] = f"convert-{req.training_run_id}"
+    _active_training["started_at"] = __import__("datetime").datetime.utcnow().isoformat()
+
+    async def _run_conversion():
+        try:
+            report = run_convert(
+                training_run_id=req.training_run_id,
+                base_model=req.base_model or TRAINING_BASE_SOLVER,
+                system_prompt=req.system_prompt,
+            )
+            _active_training["status"] = "idle"
+            _active_training["last_report"] = report
+            logger.info(f"Conversion finished: {report['status']}")
+        except Exception as e:
+            _active_training["status"] = "idle"
+            logger.error(f"Conversion background task failed: {e}", exc_info=True)
+
+    background_tasks.add_task(_run_conversion)
+    return {"status": "started", "training_run_id": req.training_run_id}
+
+
+@app.post("/v1/training/deploy")
+async def start_deploy(req: DeployRequest):
+    """Start an A/B test for a converted model. Synchronous (fast DB operation)."""
+    from training.convert_gguf import run_deploy
+
+    report = run_deploy(
+        training_run_id=req.training_run_id,
+        template_id=req.template_id,
+        traffic_split=req.traffic_split,
+        min_invocations=req.min_invocations,
+    )
+
+    if report["status"] == "failed":
+        raise HTTPException(status_code=400, detail=report["error"])
+
+    return report
+
+
+@app.get("/v1/training/runs/{run_id}/convert-report")
+async def convert_report(run_id: int):
+    """Fetch conversion report for a training run."""
+    import json as _json
+    from config import TEMPLATE_DB_URL
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+
+        # Find conversion run that references this source training run
+        cur.execute("""
+            SELECT id, status, metrics::text, config::text, started_at, completed_at, error_message
+            FROM swarm.training_runs
+            WHERE run_type = 'conversion' AND config::text LIKE %s
+            ORDER BY id DESC LIMIT 1
+        """, (f'%"source_run_id": {run_id}%',))
+        row = cur.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="No conversion found for this run")
+
+        conv_metrics = _json.loads(row[2]) if row[2] else {}
+        conv_config = _json.loads(row[3]) if row[3] else {}
+
+        # Get model version info
+        model_version = None
+        version_id = conv_metrics.get("version_id")
+        if version_id:
+            cur.execute("""
+                SELECT id, version_tag, ollama_model_name, status,
+                       COALESCE(avg_score, 0), COALESCE(total_invocations, 0)
+                FROM swarm.model_versions WHERE id = %s
+            """, (version_id,))
+            mv_row = cur.fetchone()
+            if mv_row:
+                model_version = {
+                    "id": mv_row[0], "version_tag": mv_row[1],
+                    "ollama_model_name": mv_row[2], "status": mv_row[3],
+                    "avg_score": float(mv_row[4]), "total_invocations": mv_row[5],
+                }
+
+        cur.close()
+        conn.close()
+
+        duration_sec = None
+        if row[4] and row[5]:
+            duration_sec = (row[5] - row[4]).total_seconds()
+
+        return {
+            "source_run_id": run_id,
+            "conversion_run_id": row[0],
+            "status": row[1],
+            "method": conv_metrics.get("method"),
+            "timing": {
+                "total_sec": conv_metrics.get("total_sec") or (round(duration_sec, 1) if duration_sec else None),
+                "merge_sec": conv_metrics.get("merge_sec"),
+                "convert_sec": conv_metrics.get("convert_sec"),
+                "ollama_import_sec": conv_metrics.get("ollama_import_sec"),
+            },
+            "ollama": {
+                "model_name": conv_metrics.get("ollama_name") or conv_config.get("ollama_name"),
+                "verified": conv_metrics.get("verified"),
+            },
+            "model_version": model_version,
+            "warnings": conv_metrics.get("warnings", []),
+            "error": row[6],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Convert report failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/training/runs/{run_id}/deploy-report")
+async def deploy_report(run_id: int):
+    """Fetch live A/B test report for a training run's deployed model."""
+    import json as _json
+    from config import TEMPLATE_DB_URL
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+
+        # Find model version for this training run
+        cur.execute("""
+            SELECT id, ollama_model_name, version_tag, status
+            FROM swarm.model_versions
+            WHERE training_run_id = %s
+            ORDER BY id DESC LIMIT 1
+        """, (run_id,))
+        mv = cur.fetchone()
+        if not mv:
+            raise HTTPException(status_code=404, detail="No model version found for this run")
+
+        version_id, candidate_model, version_tag, mv_status = mv
+
+        # Find A/B test for this candidate
+        cur.execute("""
+            SELECT id, template_id, candidate_model, base_model, traffic_split,
+                   min_invocations, status, winner, started_at, concluded_at
+            FROM swarm.ab_tests
+            WHERE candidate_model = %s
+            ORDER BY id DESC LIMIT 1
+        """, (candidate_model,))
+        ab_row = cur.fetchone()
+
+        if not ab_row:
+            cur.close()
+            conn.close()
+            return {
+                "source_run_id": run_id,
+                "status": "not_deployed",
+                "model_version": {
+                    "id": version_id, "ollama_model_name": candidate_model,
+                    "version_tag": version_tag, "status": mv_status,
+                },
+                "test": None,
+            }
+
+        test_id = ab_row[0]
+
+        # Get result counts and averages
+        cur.execute("""
+            SELECT
+                COUNT(*) FILTER (WHERE model_used = %s) as n_candidate,
+                COUNT(*) FILTER (WHERE model_used = %s) as n_base,
+                AVG(score) FILTER (WHERE model_used = %s) as avg_candidate,
+                AVG(score) FILTER (WHERE model_used = %s) as avg_base,
+                COUNT(*) as total
+            FROM swarm.ab_test_results WHERE test_id = %s
+        """, (ab_row[2], ab_row[3], ab_row[2], ab_row[3], test_id))
+        stats = cur.fetchone()
+
+        # Try to evaluate the test
+        evaluation = None
+        try:
+            from training.ab_test import ABTestManager
+            mgr = ABTestManager()
+            evaluation = mgr.evaluate_test(test_id)
+        except Exception:
+            pass
+
+        cur.close()
+        conn.close()
+
+        n_candidate = stats[0] or 0
+        n_base = stats[1] or 0
+        avg_candidate = float(stats[2]) if stats[2] else None
+        avg_base = float(stats[3]) if stats[3] else None
+
+        improvement = None
+        if avg_candidate is not None and avg_base is not None and avg_base > 0:
+            improvement = round((avg_candidate - avg_base) / avg_base * 100, 2)
+
+        return {
+            "source_run_id": run_id,
+            "status": ab_row[6],  # active / concluded
+            "model_version": {
+                "id": version_id, "ollama_model_name": candidate_model,
+                "version_tag": version_tag, "status": mv_status,
+            },
+            "test": {
+                "id": test_id,
+                "template_id": ab_row[1],
+                "candidate_model": ab_row[2],
+                "base_model": ab_row[3],
+                "traffic_split": float(ab_row[4]) if ab_row[4] else None,
+                "min_invocations": ab_row[5],
+                "status": ab_row[6],
+                "winner": ab_row[7],
+                "started_at": ab_row[8].isoformat() if ab_row[8] else None,
+                "concluded_at": ab_row[9].isoformat() if ab_row[9] else None,
+            },
+            "results": {
+                "n_candidate": n_candidate,
+                "n_base": n_base,
+                "total_samples": n_candidate + n_base,
+                "candidate_avg_score": round(avg_candidate, 4) if avg_candidate else None,
+                "base_avg_score": round(avg_base, 4) if avg_base else None,
+                "improvement_pct": improvement,
+                "p_value": evaluation.get("p_value") if evaluation else None,
+            },
+            "evaluation": evaluation,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Deploy report failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/templates")
+async def list_templates():
+    """List all expertise templates (for deploy form's template dropdown)."""
+    from config import TEMPLATE_DB_URL
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, intent, default_model
+            FROM swarm.expertise_templates
+            ORDER BY id
+        """)
+        templates = []
+        for row in cur.fetchall():
+            templates.append({
+                "id": row[0],
+                "intent": row[1],
+                "default_model": row[2],
+            })
+        cur.close()
+        conn.close()
+        return {"templates": templates}
+    except Exception as e:
+        logger.warning(f"Failed to list templates: {e}")
+        return {"templates": []}
+
+
 if __name__ == "__main__":
     # If run directly via python, use uvicorn
     import uvicorn
