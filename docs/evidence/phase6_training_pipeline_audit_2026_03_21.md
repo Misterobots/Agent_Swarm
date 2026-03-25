@@ -1,5 +1,7 @@
 # Phase 6 Audit: GRPO Training Pipeline & Model Lifecycle
 
+> **Note**: This is a historical audit snapshot from 2026-03-21. Node names have been updated to current logical designations.
+
 **Date**: 2026-03-21
 **Auditor**: Home AI Lab Governance Automation
 **Phase**: 6 — GRPO Training Pipeline, A/B Testing, Monitoring Dashboards
@@ -136,11 +138,11 @@
 ### Deployment Steps
 
 1. Schema applied to control plane PostgreSQL (192.168.2.102)
-2. Dashboards deployed to R730 via `docker cp` + Grafana restart
-3. PostgreSQL-Swarm datasource provisioned on R730 Grafana
+2. Dashboards deployed to Gateway Node via `docker cp` + Grafana restart
+3. PostgreSQL-Swarm datasource provisioned on Gateway Node Grafana
 4. Sample data seeded for dashboard validation
 5. Grafana anonymous auth enabled for iframe embedding
-6. Training runtime Dockerfile created (not yet built — requires Justin-PC GPU)
+6. Training runtime Dockerfile created (not yet built — requires Execution Node GPU)
 
 ---
 
@@ -191,7 +193,7 @@ All trajectories structurally valid.
 
 ## Open Items Post-Phase 6
 
-1. Build training-runtime Docker image on Justin-PC (`docker compose --profile training build`)
+1. Build training-runtime Docker image on Execution Node (`docker compose --profile training build`)
 2. Execute first real QLoRA training run with synthetic data
 3. Run Langfuse trace export after accumulating production traces
 4. Conduct training data sanitization audit
@@ -202,6 +204,6 @@ All trajectories structurally valid.
 
 ## Verdict
 
-Phase 6 is **DEPLOYED AND OPERATIONAL**. All code committed, dashboards provisioned, schema applied, monitoring live. The training pipeline is code-complete and ready for its first execution once the training-runtime Docker image is built on Justin-PC.
+Phase 6 is **DEPLOYED AND OPERATIONAL**. All code committed, dashboards provisioned, schema applied, monitoring live. The training pipeline is code-complete and ready for its first execution once the training-runtime Docker image is built on Execution Node.
 
 **Testing Plan**: See [TESTING_PLAN_PHASE6.md](../TESTING_PLAN_PHASE6.md) for comprehensive test matrix (31 unit tests, 14 integration tests, 8 system tests, 6 compliance tests, 5 performance tests).

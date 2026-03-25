@@ -31,9 +31,10 @@ Auto-refreshes every 15 seconds.
 
 Paginated table of all past training runs. Click any row to expand and see:
 
-- Full metrics (loss, runtime, trainable params, budget info)
+- **Training Report** — timing breakdown (training vs overhead), model info, hyperparameters, results, deployment status
+- **Convert to Ollama Model** button — merges the LoRA adapter into the base model and imports it into Ollama for inference (appears for completed training runs)
+- **Deploy for A/B Testing** button — starts an A/B test comparing the new model against the current baseline (appears after conversion)
 - Error messages (for failed runs)
-- Duration, dataset size, target model
 
 Auto-refreshes every 30 seconds.
 
@@ -184,6 +185,57 @@ Click "Show advanced options" to configure:
 
 ---
 
+## After Training: Convert & Deploy
+
+Once a training run completes, two additional steps turn the adapter into a live model:
+
+### Convert to Ollama Model
+
+Click **"Convert to Ollama Model"** in the expanded run details. This:
+
+1. **Merges** the LoRA adapter into the base model (~5–15 min depending on model size)
+2. **Imports** into Ollama — uses GGUF quantization if llama.cpp is installed, otherwise imports safetensors directly
+3. **Records** a model version with status "candidate" in the database
+
+The conversion report shows:
+- Timing breakdown (merge, convert, Ollama import) with a visual bar
+- Import method used (GGUF vs safetensors direct)
+- Ollama model name and verification status
+- Warnings (e.g., llama.cpp not available, path issues)
+
+**Optional**: Set a system prompt before converting. This gets baked into the Ollama Modelfile.
+
+### Deploy for A/B Testing
+
+After conversion, click **"Deploy for A/B Testing"**. Configure:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| Template | (first available) | Which expertise template to test against (e.g., code_developer, technical_writer) |
+| Traffic Split | 20% | Percentage of requests routed to the candidate model |
+| Min Invocations | 100 | Minimum samples before the test can conclude |
+
+The deploy report shows:
+- Test configuration (candidate vs baseline model)
+- Live scores updating every 15 seconds
+- Progress bar toward minimum invocations
+- Statistical significance (p-value via Welch's t-test)
+- Winner determination when sufficient data is collected
+
+The test runs passively as real chat requests come in — no manual intervention needed. Once enough samples are collected and a statistically significant winner emerges, the test concludes automatically.
+
+### Full Workflow
+
+```
+Training Run (completed)
+  → Convert to Ollama Model (merge LoRA + import)
+    → Deploy for A/B Testing (candidate vs baseline)
+      → Auto-evaluate (Welch's t-test, p < 0.05)
+        → Promote winner to production
+```
+
+---
+
 ## Interpreting Results
 
 ### Overview Tab Metrics
@@ -255,8 +307,14 @@ For programmatic access or integrating with external tools:
 |--------|----------|-------------|
 | GET | `/v1/training/status` | Current status, dataset sizes, model versions, active run |
 | GET | `/v1/training/runs?limit=50` | Paginated run history |
+| GET | `/v1/training/runs/{id}/report` | Structured post-training report |
+| GET | `/v1/training/runs/{id}/convert-report` | Conversion report (timing, method, warnings) |
+| GET | `/v1/training/runs/{id}/deploy-report` | Live A/B test report with scores and p-value |
 | GET | `/v1/training/curated-datasets` | List available curated datasets |
+| GET | `/v1/templates` | List expertise templates (for deploy form) |
 | POST | `/v1/training/start` | Launch a training run (see body below) |
+| POST | `/v1/training/convert` | Convert adapter to Ollama model (background task) |
+| POST | `/v1/training/deploy` | Start A/B test for a converted model |
 | POST | `/v1/training/scan?dataset_path=...` | Scan a dataset file for poisoning |
 
 ### POST /v1/training/start — Request Body

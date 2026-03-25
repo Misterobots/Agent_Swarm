@@ -6,13 +6,13 @@
 
 ## 1. Overview
 
-Langfuse is deployed on the Control Plane (192.168.2.102) to provide LLM observability, tracing, and debugging capabilities for the Agentic Hive.
+Langfuse is deployed on the Control Plane (<control-node-ip>) to provide LLM observability, tracing, and debugging capabilities for the Agentic Hive.
 
 ## 2. Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                   Control Plane (192.168.2.102)                 │
+│                   Control Plane (<control-node-ip>)                 │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
 │  │ Langfuse Web │  │  ClickHouse  │  │    MinIO     │          │
@@ -62,7 +62,7 @@ Langfuse is deployed on the Control Plane (192.168.2.102) to provide LLM observa
 | CLICKHOUSE_MIGRATION_URL             | clickhouse://...@clickhouse:9000   | ✅       |
 | CLICKHOUSE_CLUSTER_ENABLED           | false                              | ✅       |
 | NEXTAUTH_SECRET                      | (from env)                         | ✅       |
-| NEXTAUTH_URL                         | http://192.168.2.102:3000          | ✅       |
+| NEXTAUTH_URL                         | http://<control-node-ip>:3000          | ✅       |
 | ENCRYPTION_KEY                       | (64-char hex)                      | ✅       |
 | REDIS_HOST / REDIS_PORT / REDIS_AUTH | redis / 6379 / (password)          | ✅       |
 | LANGFUSE*S3_EVENT_UPLOAD*\*          | MinIO configuration                | ✅       |
@@ -71,8 +71,8 @@ Langfuse is deployed on the Control Plane (192.168.2.102) to provide LLM observa
 
 | Service       | URL                       | Credentials          |
 | :------------ | :------------------------ | :------------------- |
-| Langfuse UI   | http://192.168.2.102:3000 | User signup required |
-| MinIO Console | http://192.168.2.102:9191 | minio / miniosecret  |
+| Langfuse UI   | http://<control-node-ip>:3000 | User signup required |
+| MinIO Console | http://<control-node-ip>:9191 | minio / miniosecret  |
 
 ## 5. Health Checks
 
