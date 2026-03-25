@@ -51,6 +51,8 @@ node_modules/
 Thumbs.db
 
 # Training Artifacts
+training_output/
+training_data/
 execution_plane/training_output/
 execution_plane/training_data/
 *.safetensors
