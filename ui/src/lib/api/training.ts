@@ -49,6 +49,7 @@ export interface CuratedDataset {
   description: string;
   category: string;
   default_max: number;
+  recommended_for: string[];
 }
 
 export async function fetchCuratedDatasets(): Promise<CuratedDataset[]> {
