@@ -51,6 +51,11 @@ RUN pip install --no-cache-dir \
     langfuse \
     PyJWT
 
+# Training pipeline dependencies (curated dataset downloads, security scanning)
+RUN pip install --no-cache-dir \
+    datasets \
+    huggingface_hub
+
 # Fix for NVML: Create symlink for pynvml compatibility
 RUN ln -sf /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1 /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
 
