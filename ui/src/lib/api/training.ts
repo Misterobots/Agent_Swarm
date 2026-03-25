@@ -40,6 +40,7 @@ export interface StartTrainingRequest {
   curated_datasets?: string[] | null;
   max_samples?: number | null;
   synthetic_target?: number | null;
+  template_id?: string | null;
 }
 
 export interface CuratedDataset {

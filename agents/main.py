@@ -500,6 +500,8 @@ class TrainingStartRequest(BaseModel):
     max_samples: Optional[int] = None              # per-dataset sample limit
     # For synthetic generation runs
     synthetic_target: Optional[int] = None          # target trajectory count (default 552)
+    # Template filter — train only on traces from this agent template
+    template_id: Optional[str] = None               # e.g. "code_developer", "creative_writer"
 
 # In-memory tracking for the active training background task
 _active_training: dict = {"run_id": None, "status": "idle", "started_at": None, "task": None}
@@ -672,7 +674,9 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                 # Export traces only
                 from training.export_traces import TraceExporter
                 exporter = TraceExporter()
-                count = await asyncio.to_thread(exporter.export_dataset)
+                count = await asyncio.to_thread(
+                    exporter.export_dataset, template_id=req.template_id
+                )
                 _active_training["status"] = "idle"
                 logger.info(f"Export complete: {count} traces")
 
@@ -764,7 +768,9 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                 import glob
 
                 exporter = TraceExporter()
-                await asyncio.to_thread(exporter.export_dataset)
+                await asyncio.to_thread(
+                    exporter.export_dataset, template_id=req.template_id
+                )
 
                 # Find latest dataset
                 datasets_found = sorted(
