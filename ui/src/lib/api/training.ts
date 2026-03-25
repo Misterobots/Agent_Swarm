@@ -124,6 +124,150 @@ export async function fetchTrainingReport(runId: number): Promise<TrainingReport
   }
 }
 
+// ---------------------------------------------------------------------------
+//  Convert & Deploy types + API functions
+// ---------------------------------------------------------------------------
+
+export interface ConvertReport {
+  source_run_id: number;
+  conversion_run_id: number;
+  status: string;
+  method: string | null;
+  timing: {
+    total_sec: number | null;
+    merge_sec: number | null;
+    convert_sec: number | null;
+    ollama_import_sec: number | null;
+  };
+  ollama: {
+    model_name: string | null;
+    verified: boolean | null;
+  };
+  model_version: {
+    id: number;
+    version_tag: string;
+    ollama_model_name: string | null;
+    status: string;
+    avg_score: number;
+    total_invocations: number;
+  } | null;
+  warnings: string[];
+  error: string | null;
+}
+
+export interface DeployReport {
+  source_run_id: number;
+  status: string;
+  model_version: {
+    id: number;
+    ollama_model_name: string | null;
+    version_tag: string;
+    status: string;
+  };
+  test: {
+    id: number;
+    template_id: string;
+    candidate_model: string;
+    base_model: string;
+    traffic_split: number | null;
+    min_invocations: number;
+    status: string;
+    winner: string | null;
+    started_at: string | null;
+    concluded_at: string | null;
+  } | null;
+  results?: {
+    n_candidate: number;
+    n_base: number;
+    total_samples: number;
+    candidate_avg_score: number | null;
+    base_avg_score: number | null;
+    improvement_pct: number | null;
+    p_value: number | null;
+  };
+  evaluation?: Record<string, unknown> | null;
+}
+
+export interface Template {
+  id: string;
+  intent: string;
+  default_model: string;
+}
+
+export async function startConvert(req: {
+  training_run_id: number;
+  base_model?: string | null;
+  system_prompt?: string | null;
+}): Promise<{ status: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/training/convert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { status: "error", error: body.detail ?? `HTTP ${res.status}` };
+    }
+    return await res.json();
+  } catch (e) {
+    return { status: "error", error: String(e) };
+  }
+}
+
+export async function startDeploy(req: {
+  training_run_id: number;
+  template_id: string;
+  traffic_split?: number;
+  min_invocations?: number;
+}): Promise<DeployReport | { status: string; error: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/training/deploy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { status: "error", error: body.detail ?? `HTTP ${res.status}` };
+    }
+    return await res.json();
+  } catch (e) {
+    return { status: "error", error: String(e) };
+  }
+}
+
+export async function fetchConvertReport(runId: number): Promise<ConvertReport | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/training/runs/${runId}/convert-report`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchDeployReport(runId: number): Promise<DeployReport | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/training/runs/${runId}/deploy-report`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchTemplates(): Promise<Template[]> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/templates`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.templates ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function startTraining(
   req: StartTrainingRequest
 ): Promise<{ status: string; error?: string }> {

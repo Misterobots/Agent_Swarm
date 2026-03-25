@@ -255,6 +255,418 @@ def _record_model_version(
         return None
 
 
+def _translate_path_for_ollama(host_path: str) -> str:
+    """
+    Translate agent_runtime's /workspace/training_output/... path
+    to Ollama container's /training_output/... mount point.
+    """
+    host_path = str(host_path)
+    if host_path.startswith("/workspace/training_output"):
+        return host_path.replace("/workspace/training_output", "/training_output", 1)
+    return host_path
+
+
+def _dir_size_mb(path: str) -> float:
+    """Get total size of a directory in MB."""
+    total = 0
+    p = Path(path)
+    if p.is_dir():
+        for f in p.rglob("*"):
+            if f.is_file():
+                total += f.stat().st_size
+    elif p.is_file():
+        total = p.stat().st_size
+    return total / (1024 * 1024)
+
+
+def run_convert(
+    training_run_id: int,
+    base_model: str = TRAINING_BASE_SOLVER,
+    system_prompt: Optional[str] = None,
+    model_name_prefix: str = "marsrl-solver",
+) -> Dict[str, Any]:
+    """
+    Convert a completed training run's adapter to an Ollama model.
+
+    Steps:
+      1. Look up adapter_path from training run metrics
+      2. Merge LoRA into base model (timed)
+      3. Try GGUF conversion; fall back to safetensors import if llama.cpp missing
+      4. Create Ollama model (timed)
+      5. Record model version in DB
+      6. Return structured report dict
+
+    Returns a detailed report dict.
+    """
+    import time
+    from training.grpo_trainer import _record_training_run, _update_training_run
+
+    report: Dict[str, Any] = {
+        "source_run_id": training_run_id,
+        "status": "running",
+        "method": None,
+        "warnings": [],
+        "timing": {},
+        "model": {},
+        "ollama": {},
+        "version": {},
+        "error": None,
+    }
+
+    # Step 0: Look up the source training run
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT metrics, target_model FROM swarm.training_runs WHERE id = %s",
+            (training_run_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        report["status"] = "failed"
+        report["error"] = f"Database lookup failed: {e}"
+        return report
+
+    if not row or not row[0]:
+        report["status"] = "failed"
+        report["error"] = f"Training run {training_run_id} not found or has no metrics"
+        return report
+
+    metrics = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+    adapter_path = metrics.get("adapter_path")
+    if not adapter_path:
+        report["status"] = "failed"
+        report["error"] = "No adapter_path in training run metrics"
+        return report
+
+    # Use the base_model from the training run if not overridden
+    if base_model == TRAINING_BASE_SOLVER and row[1]:
+        base_model = row[1]
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M")
+    version_tag = f"v{timestamp}"
+    ollama_name = f"{model_name_prefix}:{version_tag}"
+
+    # Record conversion run in DB
+    conv_run_id = _record_training_run(
+        run_type="conversion",
+        target_model=base_model,
+        dataset_path=adapter_path,
+        dataset_size=0,
+        status="running",
+        config={
+            "source_run_id": training_run_id,
+            "ollama_name": ollama_name,
+            "system_prompt": system_prompt,
+        },
+    )
+
+    total_start = time.time()
+
+    try:
+        # Step 1: Merge LoRA
+        logger.info(f"[Convert] Step 1: Merging LoRA from {adapter_path}")
+        merge_start = time.time()
+        merged_dir = merge_lora(adapter_path, base_model)
+        merge_sec = time.time() - merge_start
+        report["timing"]["merge_sec"] = round(merge_sec, 1)
+        report["model"]["merged_dir"] = merged_dir
+        report["model"]["merged_size_mb"] = round(_dir_size_mb(merged_dir), 1)
+        logger.info(f"[Convert] Merge complete in {merge_sec:.0f}s")
+
+        # Step 2: Try GGUF conversion, fall back to safetensors
+        gguf_path = None
+        import_path = None
+        convert_start = time.time()
+
+        try:
+            logger.info("[Convert] Step 2: Attempting GGUF conversion...")
+            gguf_path = convert_to_gguf(merged_dir)
+            report["method"] = "gguf"
+            report["model"]["gguf_path"] = gguf_path
+            report["model"]["gguf_size_mb"] = round(_dir_size_mb(gguf_path), 1)
+            import_path = gguf_path
+        except FileNotFoundError as e:
+            logger.warning(f"[Convert] GGUF unavailable: {e}")
+            report["method"] = "safetensors_direct"
+            report["warnings"].append(
+                f"llama.cpp not installed — using Ollama safetensors import. "
+                f"This works but produces larger models. Install llama.cpp for Q4_K_M quantization."
+            )
+            import_path = merged_dir
+
+        convert_sec = time.time() - convert_start
+        report["timing"]["convert_sec"] = round(convert_sec, 1)
+
+        # Step 3: Create Ollama model
+        logger.info(f"[Convert] Step 3: Creating Ollama model {ollama_name}")
+        ollama_start = time.time()
+
+        # Translate path for Ollama container's volume mount
+        ollama_import_path = _translate_path_for_ollama(str(import_path))
+        logger.info(f"[Convert] Import path (Ollama view): {ollama_import_path}")
+
+        # Build Modelfile content with translated path
+        modelfile_lines = [f"FROM {ollama_import_path}"]
+        if system_prompt:
+            escaped = system_prompt.replace('"', '\\"')
+            modelfile_lines.append(f'SYSTEM "{escaped}"')
+        modelfile_lines.extend([
+            "PARAMETER temperature 0.7",
+            "PARAMETER top_p 0.9",
+            "PARAMETER num_ctx 4096",
+        ])
+
+        import requests
+        resp = requests.post(
+            f"{OLLAMA_HOST}/api/create",
+            json={"name": ollama_name, "modelfile": "\n".join(modelfile_lines)},
+            timeout=600,
+            stream=True,
+        )
+        ollama_status_messages = []
+        for line in resp.iter_lines():
+            if line:
+                try:
+                    status = json.loads(line)
+                    if "status" in status:
+                        ollama_status_messages.append(status["status"])
+                        logger.info(f"  Ollama: {status['status']}")
+                except json.JSONDecodeError:
+                    pass
+        if resp.status_code != 200:
+            raise RuntimeError(f"Ollama create failed: HTTP {resp.status_code}")
+
+        # Verify model exists
+        list_resp = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=10)
+        models = [m["name"] for m in list_resp.json().get("models", [])]
+        verified = any(ollama_name in m for m in models)
+
+        ollama_sec = time.time() - ollama_start
+        report["timing"]["ollama_import_sec"] = round(ollama_sec, 1)
+        report["ollama"] = {
+            "model_name": ollama_name,
+            "host": OLLAMA_HOST,
+            "verified": verified,
+            "status_log": ollama_status_messages[-5:],  # last 5 status messages
+        }
+
+        if not verified:
+            report["warnings"].append(
+                f"Model {ollama_name} not found in Ollama after creation. "
+                "The import may have silently failed."
+            )
+
+        # Step 4: Record model version
+        version_id = _record_model_version(
+            base_model=base_model,
+            version_tag=version_tag,
+            adapter_path=adapter_path,
+            gguf_path=gguf_path,
+            ollama_model_name=ollama_name,
+            training_run_id=training_run_id,
+        )
+        report["version"] = {
+            "id": version_id,
+            "tag": version_tag,
+            "status": "candidate",
+        }
+
+        # Total timing
+        total_sec = time.time() - total_start
+        report["timing"]["total_sec"] = round(total_sec, 1)
+        report["status"] = "completed"
+
+        # Update conversion run in DB
+        if conv_run_id:
+            _update_training_run(conv_run_id, "completed", metrics={
+                "method": report["method"],
+                "ollama_name": ollama_name,
+                "total_sec": report["timing"]["total_sec"],
+                "merge_sec": report["timing"]["merge_sec"],
+                "verified": verified,
+                "source_run_id": training_run_id,
+                "version_id": version_id,
+            })
+
+        # Clean up merged dir (adapter + GGUF/Ollama are the keepers)
+        try:
+            shutil.rmtree(merged_dir)
+            logger.info(f"Cleaned up merged model dir: {merged_dir}")
+        except OSError:
+            report["warnings"].append(f"Could not clean up merged dir: {merged_dir}")
+
+        # Prometheus
+        try:
+            from metrics import TRAINING_RUNS_TOTAL
+            TRAINING_RUNS_TOTAL.labels(run_type="conversion", status="completed").inc()
+        except Exception:
+            pass
+
+        return report
+
+    except Exception as e:
+        total_sec = time.time() - total_start
+        report["timing"]["total_sec"] = round(total_sec, 1)
+        report["status"] = "failed"
+        report["error"] = str(e)
+        logger.error(f"[Convert] Failed: {e}", exc_info=True)
+
+        if conv_run_id:
+            _update_training_run(conv_run_id, "failed", error=str(e))
+        try:
+            from metrics import TRAINING_RUNS_TOTAL
+            TRAINING_RUNS_TOTAL.labels(run_type="conversion", status="failed").inc()
+        except Exception:
+            pass
+
+        return report
+
+
+def run_deploy(
+    training_run_id: int,
+    template_id: str,
+    traffic_split: float = 0.2,
+    min_invocations: int = 100,
+) -> Dict[str, Any]:
+    """
+    Start an A/B test for a converted model.
+
+    Looks up the model version for the given training run, finds the
+    template's current default_model as baseline, and starts the test.
+
+    Returns a structured deploy report dict.
+    """
+    from training.ab_test import ABTestManager
+
+    report: Dict[str, Any] = {
+        "source_run_id": training_run_id,
+        "status": "pending",
+        "config": {},
+        "test": {},
+        "warnings": [],
+        "error": None,
+    }
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+
+        # Find model version for this training run
+        cur.execute(
+            """
+            SELECT id, ollama_model_name, version_tag, status
+            FROM swarm.model_versions
+            WHERE training_run_id = %s
+            ORDER BY id DESC LIMIT 1
+            """,
+            (training_run_id,),
+        )
+        mv = cur.fetchone()
+        if not mv:
+            report["status"] = "failed"
+            report["error"] = (
+                f"No model version found for training run {training_run_id}. "
+                "Run Convert first."
+            )
+            cur.close()
+            conn.close()
+            return report
+
+        version_id, candidate_model, version_tag, mv_status = mv
+        if not candidate_model:
+            report["status"] = "failed"
+            report["error"] = "Model version has no Ollama model name"
+            cur.close()
+            conn.close()
+            return report
+
+        # Get template's current default_model as baseline
+        cur.execute(
+            "SELECT default_model, intent FROM swarm.expertise_templates WHERE id = %s",
+            (template_id,),
+        )
+        tmpl = cur.fetchone()
+        if not tmpl:
+            report["status"] = "failed"
+            report["error"] = f"Template '{template_id}' not found"
+            cur.close()
+            conn.close()
+            return report
+
+        base_model, intent = tmpl
+        cur.close()
+        conn.close()
+
+        if candidate_model == base_model:
+            report["warnings"].append(
+                "Candidate and baseline are the same model — test will not produce meaningful results"
+            )
+
+        # Start the A/B test
+        mgr = ABTestManager()
+        test_id = mgr.start_test(
+            template_id=template_id,
+            candidate_model=candidate_model,
+            base_model=base_model,
+            traffic_split=traffic_split,
+            min_invocations=min_invocations,
+        )
+
+        # Update model version status to ab_testing
+        try:
+            conn2 = psycopg2.connect(TEMPLATE_DB_URL)
+            cur2 = conn2.cursor()
+            cur2.execute(
+                "UPDATE swarm.model_versions SET status = 'ab_testing' WHERE id = %s",
+                (version_id,),
+            )
+            conn2.commit()
+            cur2.close()
+            conn2.close()
+        except Exception as e:
+            report["warnings"].append(f"Could not update model version status: {e}")
+
+        report["status"] = "active"
+        report["config"] = {
+            "template_id": template_id,
+            "template_intent": intent,
+            "candidate_model": candidate_model,
+            "base_model": base_model,
+            "traffic_split": traffic_split,
+            "min_invocations": min_invocations,
+            "version_tag": version_tag,
+        }
+        report["test"] = {
+            "id": test_id,
+            "status": "active",
+            "result_count": 0,
+            "candidate_avg_score": None,
+            "base_avg_score": None,
+        }
+
+        logger.info(
+            f"[Deploy] A/B test {test_id} started: {candidate_model} vs {base_model} "
+            f"on {template_id} ({traffic_split*100:.0f}% candidate)"
+        )
+        return report
+
+    except ValueError as e:
+        # ABTestManager raises ValueError if active test already exists
+        report["status"] = "failed"
+        report["error"] = str(e)
+        return report
+    except Exception as e:
+        report["status"] = "failed"
+        report["error"] = str(e)
+        logger.error(f"[Deploy] Failed: {e}", exc_info=True)
+        return report
+
+
 def full_pipeline(
     adapter_path: str,
     base_model: str = TRAINING_BASE_SOLVER,
