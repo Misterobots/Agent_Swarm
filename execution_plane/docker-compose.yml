@@ -204,13 +204,13 @@ services:
       - "8008:8000"
     networks:
       - execution_net
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     labels:
       # Labels for SPIRE workload attestation
       - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/runtime"
