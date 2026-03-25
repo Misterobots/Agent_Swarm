@@ -45,6 +45,7 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
         "format": "sharegpt",
         "content_field": "conversations",  # may vary per split
         "default_max": 10000,
+        "recommended_for": ["code_developer", "iot_controller"],
     },
     "hermes-function-calling": {
         "hf_id": "NousResearch/hermes-function-calling-v1",
@@ -53,6 +54,7 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
         "format": "sharegpt",
         "content_field": "conversations",
         "default_max": 11600,
+        "recommended_for": ["iot_controller", "code_developer"],
     },
     "openhermes": {
         "hf_id": "teknium/OpenHermes-2.5",
@@ -61,6 +63,7 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
         "format": "sharegpt",
         "content_field": "conversations",
         "default_max": 10000,
+        "recommended_for": ["librarian", "technical_writer", "code_developer"],
     },
     "glaive-code-assistant": {
         "hf_id": "glaiveai/glaive-code-assistant-v3",
@@ -69,6 +72,7 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
         "format": "sharegpt",
         "content_field": "conversations",
         "default_max": 10000,
+        "recommended_for": ["code_developer"],
     },
     "slim-orca": {
         "hf_id": "Open-Orca/SlimOrca",
@@ -77,6 +81,7 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
         "format": "sharegpt",
         "content_field": "conversations",
         "default_max": 10000,
+        "recommended_for": ["librarian", "code_developer", "technical_writer"],
     },
 }
 
@@ -340,7 +345,7 @@ class DatasetCurator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.scanner = TrainingDataScanner()
 
-    def list_available(self) -> List[Dict[str, str]]:
+    def list_available(self) -> List[Dict[str, Any]]:
         """Return catalog of available curated datasets."""
         return [
             {
@@ -349,6 +354,7 @@ class DatasetCurator:
                 "description": meta["description"],
                 "category": meta["category"],
                 "default_max": meta["default_max"],
+                "recommended_for": meta.get("recommended_for", []),
             }
             for key, meta in CURATED_DATASETS.items()
         ]

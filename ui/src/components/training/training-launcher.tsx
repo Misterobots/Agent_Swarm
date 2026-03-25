@@ -94,6 +94,19 @@ export function TrainingLauncher() {
     });
   };
 
+  const handleTemplateSelect = (templateId: string | null) => {
+    setSelectedTemplate(templateId);
+    // Auto-suggest datasets when selecting a template in curated mode
+    if (runType === "curated" && templateId && curatedList.length > 0) {
+      const recommended = curatedList
+        .filter((ds) => ds.recommended_for?.includes(templateId))
+        .map((ds) => ds.key);
+      if (recommended.length > 0) {
+        setSelectedDatasets(new Set(recommended));
+      }
+    }
+  };
+
   const handleLaunch = async () => {
     setLaunching(true);
     setResult(null);
@@ -103,7 +116,7 @@ export function TrainingLauncher() {
       time_budget_minutes: timeBudget,
     };
 
-    if (selectedTemplate && (runType === "full_pipeline" || runType === "export")) {
+    if (selectedTemplate && (runType === "full_pipeline" || runType === "export" || runType === "curated")) {
       req.template_id = selectedTemplate;
     }
 
@@ -182,8 +195,8 @@ export function TrainingLauncher() {
           </div>
         </div>
 
-        {/* Template Filter — for Full Pipeline and Export */}
-        {(runType === "full_pipeline" || runType === "export") && templates.length > 0 && (
+        {/* Template Filter — for Full Pipeline, Export, and Curated */}
+        {(runType === "full_pipeline" || runType === "export" || runType === "curated") && templates.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Filter size={14} className="text-cyan-500" />
@@ -193,12 +206,13 @@ export function TrainingLauncher() {
               <span className="text-xs text-zinc-600">(optional)</span>
             </div>
             <p className="text-xs text-zinc-600">
-              Filter exported traces to only include data from a specific agent
-              template. This focuses training on improving that agent&apos;s capabilities.
+              {runType === "curated"
+                ? "Select an agent to auto-suggest the most relevant datasets for improving that agent\u2019s capabilities."
+                : "Filter exported traces to only include data from a specific agent template. This focuses training on improving that agent\u2019s capabilities."}
             </p>
             <div className="grid gap-2">
               <button
-                onClick={() => setSelectedTemplate(null)}
+                onClick={() => handleTemplateSelect(null)}
                 className={cn(
                   "flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
                   selectedTemplate === null
@@ -224,7 +238,7 @@ export function TrainingLauncher() {
                 return (
                   <button
                     key={t.id}
-                    onClick={() => setSelectedTemplate(t.id)}
+                    onClick={() => handleTemplateSelect(t.id)}
                     className={cn(
                       "flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
                       selected
@@ -268,6 +282,7 @@ export function TrainingLauncher() {
             <div className="grid gap-2">
               {curatedList.map((ds) => {
                 const checked = selectedDatasets.has(ds.key);
+                const isRecommended = selectedTemplate != null && ds.recommended_for?.includes(selectedTemplate);
                 return (
                   <button
                     key={ds.key}
@@ -276,7 +291,9 @@ export function TrainingLauncher() {
                       "flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
                       checked
                         ? "border-emerald-500/40 bg-emerald-500/5"
-                        : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                        : isRecommended
+                          ? "border-cyan-500/20 bg-cyan-500/5 hover:border-cyan-500/30"
+                          : "border-zinc-800 hover:border-zinc-700 bg-transparent"
                     )}
                   >
                     <div
@@ -301,6 +318,11 @@ export function TrainingLauncher() {
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
                           {ds.category}
                         </span>
+                        {isRecommended && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                            Recommended
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-zinc-600 mt-0.5">{ds.description}</p>
                       <p className="text-[10px] text-zinc-700 mt-0.5">
