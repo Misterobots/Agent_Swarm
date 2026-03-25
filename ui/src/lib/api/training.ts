@@ -61,6 +61,69 @@ export async function fetchCuratedDatasets(): Promise<CuratedDataset[]> {
   }
 }
 
+export interface TrainingReport {
+  run_id: number;
+  status: string;
+  run_type: string;
+  timing: {
+    started_at: string | null;
+    completed_at: string | null;
+    total_wall_clock_sec: number | null;
+    active_training_sec: number | null;
+    overhead_sec: number | null;
+    overhead_note: string;
+  };
+  dataset: {
+    path: string | null;
+    total_samples: number | null;
+    training_examples: number | null;
+  };
+  model: {
+    base_model: string | null;
+    trainable_params: number | null;
+    total_params: number | null;
+    trainable_pct: number | null;
+  };
+  hyperparameters: Record<string, unknown>;
+  results: {
+    final_loss: number | null;
+    train_samples_per_second: number | null;
+    train_steps_per_second: number | null;
+    adapter_path: string | null;
+  };
+  deployment: {
+    model_version: {
+      id: number;
+      version_tag: string;
+      ollama_model_name: string | null;
+      status: string;
+      avg_score: number;
+      total_invocations: number;
+    } | null;
+    ab_test: {
+      id: number;
+      candidate_model: string;
+      base_model: string;
+      status: string;
+      winner: string | null;
+      result_count: number;
+      candidate_avg_score: number | null;
+      base_avg_score: number | null;
+    } | null;
+  };
+  error: string | null;
+}
+
+export async function fetchTrainingReport(runId: number): Promise<TrainingReport | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/training/runs/${runId}/report`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function startTraining(
   req: StartTrainingRequest
 ): Promise<{ status: string; error?: string }> {

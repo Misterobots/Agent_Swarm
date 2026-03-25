@@ -485,14 +485,29 @@ def train_grpo(
         logger.info(f"LoRA adapter saved to {adapter_path}")
 
         # Collect metrics
+        train_metrics = train_result.metrics or {}
         metrics = {
             "train_loss": train_result.training_loss,
-            "train_runtime": train_result.metrics.get("train_runtime", 0),
+            "train_runtime": train_metrics.get("train_runtime", 0),
+            "train_samples_per_second": train_metrics.get("train_samples_per_second", 0),
+            "train_steps_per_second": train_metrics.get("train_steps_per_second", 0),
+            "total_steps": train_metrics.get("total_flos", 0) and state.global_step if hasattr(train_result, 'global_step') else train_metrics.get("train_steps", 0),
             "train_samples": len(prompts),
             "trainable_params": trainable_params,
             "total_params": total_params,
+            "trainable_pct": round(100 * trainable_params / total_params, 2) if total_params else 0,
+            "lora_rank": config.lora_rank,
+            "lora_alpha": config.lora_alpha,
+            "learning_rate": config.learning_rate,
+            "batch_size": config.batch_size,
+            "gradient_accumulation": config.gradient_accumulation,
+            "max_seq_len": config.max_seq_len,
+            "num_epochs": config.num_epochs,
+            "base_model": config.base_model,
             "time_budget_minutes": config.time_budget_minutes,
             "budget_limited": time_bounded,
+            "adapter_path": adapter_path,
+            "run_dir": str(run_dir),
         }
 
         # Update training run record
