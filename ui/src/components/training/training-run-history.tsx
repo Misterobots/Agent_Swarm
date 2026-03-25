@@ -134,7 +134,7 @@ export function TrainingRunHistory() {
                     {expanded && (
                       <tr className="bg-zinc-900/50">
                         <td colSpan={8} className="p-4">
-                          <RunDetails run={run} />
+                          <TrainingReportView runId={run.id} />
                         </td>
                       </tr>
                     )}
@@ -150,37 +150,7 @@ export function TrainingRunHistory() {
 }
 
 import { Fragment } from "react";
-
-function RunDetails({ run }: { run: TrainingRun }) {
-  const metrics = run.metrics;
-  return (
-    <div className="space-y-3">
-      {Object.keys(metrics).length > 0 && (
-        <div>
-          <p className="text-xs text-zinc-600 mb-1">Metrics</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {Object.entries(metrics).map(([k, v]) => (
-              <div key={k}>
-                <p className="text-[10px] text-zinc-600">{k}</p>
-                <p className="text-xs text-zinc-300 font-mono">
-                  {typeof v === "number" ? v.toFixed(4) : String(v ?? "—")}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {run.error_message && (
-        <div className="bg-red-500/5 border border-red-500/20 rounded p-3">
-          <p className="text-xs text-zinc-600 mb-1">Error</p>
-          <p className="text-xs text-red-400 font-mono whitespace-pre-wrap">
-            {run.error_message}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
+import { TrainingReportView } from "./training-report";
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;

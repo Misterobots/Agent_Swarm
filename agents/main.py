@@ -821,6 +821,157 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
     return {"status": "started", "run_type": req.run_type, "time_budget_minutes": req.time_budget_minutes}
 
 
+@app.get("/v1/training/runs/{run_id}/report")
+async def training_run_report(run_id: int):
+    """Generate a structured post-training report for a completed run."""
+    import json as _json
+    from config import TEMPLATE_DB_URL
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+
+        # Fetch the run
+        cur.execute("""
+            SELECT id, run_type, target_model, dataset_path, dataset_size,
+                   status, config::text, metrics::text, started_at, completed_at,
+                   error_message
+            FROM swarm.training_runs WHERE id = %s
+        """, (run_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Training run {run_id} not found")
+
+        run = {
+            "id": row[0], "run_type": row[1], "target_model": row[2],
+            "dataset_path": row[3], "dataset_size": row[4], "status": row[5],
+            "config": _json.loads(row[6]) if row[6] else {},
+            "metrics": _json.loads(row[7]) if row[7] else {},
+            "started_at": row[8].isoformat() if row[8] else None,
+            "completed_at": row[9].isoformat() if row[9] else None,
+            "error_message": row[10],
+        }
+
+        # Calculate durations
+        duration_sec = None
+        if row[8] and row[9]:
+            duration_sec = (row[9] - row[8]).total_seconds()
+
+        metrics = run["metrics"]
+        train_runtime = metrics.get("train_runtime", 0)
+        overhead_sec = (duration_sec - train_runtime) if duration_sec and train_runtime else None
+
+        # Check if a model version was created from this run
+        model_version = None
+        adapter_path = metrics.get("adapter_path", "")
+        if adapter_path:
+            cur.execute("""
+                SELECT id, version_tag, ollama_model_name, status,
+                       COALESCE(avg_score, 0), COALESCE(total_invocations, 0)
+                FROM swarm.model_versions
+                WHERE adapter_path = %s OR adapter_path LIKE %s
+                ORDER BY created_at DESC LIMIT 1
+            """, (adapter_path, f"%{adapter_path.split('/')[-1]}%"))
+            mv_row = cur.fetchone()
+            if mv_row:
+                model_version = {
+                    "id": mv_row[0], "version_tag": mv_row[1],
+                    "ollama_model_name": mv_row[2], "status": mv_row[3],
+                    "avg_score": float(mv_row[4]), "total_invocations": mv_row[5],
+                }
+
+        # Check for A/B test associated with this model
+        ab_test = None
+        if model_version:
+            cur.execute("""
+                SELECT id, candidate_model, base_model, traffic_split,
+                       status, winner,
+                       (SELECT COUNT(*) FROM swarm.ab_test_results WHERE test_id = t.id) as result_count,
+                       (SELECT AVG(score) FROM swarm.ab_test_results WHERE test_id = t.id AND model_used = t.candidate_model) as candidate_avg,
+                       (SELECT AVG(score) FROM swarm.ab_test_results WHERE test_id = t.id AND model_used = t.base_model) as base_avg
+                FROM swarm.ab_tests t
+                WHERE candidate_model = %s
+                ORDER BY created_at DESC LIMIT 1
+            """, (model_version.get("ollama_model_name") or model_version.get("version_tag"),))
+            ab_row = cur.fetchone()
+            if ab_row:
+                ab_test = {
+                    "id": ab_row[0], "candidate_model": ab_row[1],
+                    "base_model": ab_row[2], "traffic_split": float(ab_row[3]) if ab_row[3] else None,
+                    "status": ab_row[4], "winner": ab_row[5],
+                    "result_count": ab_row[6],
+                    "candidate_avg_score": float(ab_row[7]) if ab_row[7] else None,
+                    "base_avg_score": float(ab_row[8]) if ab_row[8] else None,
+                }
+
+        cur.close()
+        conn.close()
+
+        # Build the report
+        report = {
+            "run_id": run["id"],
+            "status": run["status"],
+            "run_type": run["run_type"],
+
+            "timing": {
+                "started_at": run["started_at"],
+                "completed_at": run["completed_at"],
+                "total_wall_clock_sec": round(duration_sec, 1) if duration_sec else None,
+                "active_training_sec": round(train_runtime, 1) if train_runtime else None,
+                "overhead_sec": round(overhead_sec, 1) if overhead_sec else None,
+                "overhead_note": "Model loading, quantization, dataset preparation",
+            },
+
+            "dataset": {
+                "path": run["dataset_path"],
+                "total_samples": run["dataset_size"],
+                "training_examples": metrics.get("train_samples"),
+            },
+
+            "model": {
+                "base_model": metrics.get("base_model") or run["target_model"],
+                "trainable_params": metrics.get("trainable_params"),
+                "total_params": metrics.get("total_params"),
+                "trainable_pct": metrics.get("trainable_pct"),
+            },
+
+            "hyperparameters": {
+                "lora_rank": metrics.get("lora_rank"),
+                "lora_alpha": metrics.get("lora_alpha"),
+                "learning_rate": metrics.get("learning_rate"),
+                "batch_size": metrics.get("batch_size"),
+                "gradient_accumulation": metrics.get("gradient_accumulation"),
+                "max_seq_len": metrics.get("max_seq_len"),
+                "num_epochs": metrics.get("num_epochs"),
+                "time_budget_minutes": metrics.get("time_budget_minutes"),
+                "budget_limited": metrics.get("budget_limited"),
+            },
+
+            "results": {
+                "final_loss": metrics.get("train_loss"),
+                "train_samples_per_second": metrics.get("train_samples_per_second"),
+                "train_steps_per_second": metrics.get("train_steps_per_second"),
+                "adapter_path": metrics.get("adapter_path"),
+            },
+
+            "deployment": {
+                "model_version": model_version,
+                "ab_test": ab_test,
+            },
+
+            "error": run["error_message"],
+        }
+
+        return report
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Training report generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     # If run directly via python, use uvicorn
     import uvicorn
