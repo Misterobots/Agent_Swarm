@@ -113,15 +113,14 @@ def handle_task_event(event: Event):
     if not user_input:
         return
     
-    # Add context to Langfuse trace
+    # Enrich the current Langfuse trace (created by @observe decorator)
     if USE_LANGFUSE and langfuse:
         try:
-            langfuse.trace(
-                name="handle_task_event",
-                session_id=session_id,
+            langfuse.update_current_span(
                 metadata={
                     "intent": intent,
-                    "target_device": target_device
+                    "target_device": target_device,
+                    "session_id": session_id,
                 }
             )
         except Exception as e:
@@ -251,14 +250,13 @@ def _record_performance(intent: str, template_metadata: dict, result_data: dict)
 # --- SPECIALIZED INTENT DETECTION ---
 # (Keyword-based detect_intent() was removed in favor of neural semantic_router)
 def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None):
-    """Score a Langfuse trace as a training candidate and optionally set its output."""
-    if not lf_trace or not langfuse_inst:
+    """Score the current Langfuse trace as a training candidate and optionally set its output."""
+    if not langfuse_inst or not USE_LANGFUSE:
         return
     try:
         if output:
-            lf_trace.update(output={"response": output[:4000]})
-        langfuse_inst.score(
-            trace_id=lf_trace.id,
+            langfuse_inst.set_current_trace_io(output={"response": output[:4000]})
+        langfuse_inst.score_current_trace(
             name="training_candidate",
             value=score,
         )
@@ -279,16 +277,19 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     template_metadata = {}
     route_start_time = time.time()
 
-    # --- Langfuse top-level trace for all intents ---
-    lf_trace = None
+    # --- Langfuse top-level trace for all intents (v4 context manager) ---
+    _lf_ctx = None
     if USE_LANGFUSE and langfuse:
         try:
-            lf_trace = langfuse.trace(
+            _lf_ctx = langfuse.start_as_current_observation(
                 name="chat_swarm",
-                session_id=session_id,
+                as_type="agent",
                 input={"message": user_input[:4000]},
+                metadata={"session_id": session_id},
             )
+            _lf_ctx.__enter__()
         except Exception as e:
+            _lf_ctx = None
             logger.debug(f"[Router] Trace creation failed: {e}")
 
     # --- HISTORY CONVERSION ---
@@ -369,9 +370,9 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         yield {"type": "log", "content": f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}"}
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
 
-        if lf_trace:
+        if USE_LANGFUSE and langfuse:
             try:
-                lf_trace.update(metadata={"intent": intent, "confidence": confidence, "reasoning": reasoning[:200]})
+                langfuse.update_current_span(metadata={"intent": intent, "confidence": confidence, "reasoning": reasoning[:200]})
             except Exception:
                 pass
 
@@ -924,8 +925,13 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         WORKFLOW_STEPS.labels(status="error", agent_type="Router").inc()
     finally:
         AGENT_STATE.labels(agent_name="Router").set(1)
-        # Flush Langfuse traces to ensure they're sent
+        # Close Langfuse trace context and flush
         if USE_LANGFUSE and langfuse:
+            try:
+                if _lf_ctx is not None:
+                    _lf_ctx.__exit__(None, None, None)
+            except Exception:
+                pass
             try:
                 langfuse.flush()
             except Exception:
