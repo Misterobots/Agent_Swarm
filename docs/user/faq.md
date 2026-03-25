@@ -32,15 +32,15 @@ Alternatively, ask in the Chat workspace: "Generate an image of [description]" �
 
 ---
 
-**Q: Can I talk to BMO?**
+**Q: What is BMO?**
 
-Yes. Switch to the **Voice Studio workspace**. You can type or use your microphone. BMO responds using the RVC voice model. To adjust the voice or reference sample, use the sidebar controls in the Voice Studio.
+BMO is a personal voice assistant integrated into the Hive. It uses a custom RVC-cloned voice model for responses. BMO is available in the **Voice Studio workspace** and also runs on a dedicated physical voice satellite. This is a personal feature — BMO is configured for the system owner's home setup and voice preferences.
 
 ---
 
-**Q: How do I control my smart home?**
+**Q: How does smart home control work?**
 
-In the **Chat workspace**, just ask naturally: "Turn off the bedroom lights" or "What's the temperature in the living room?" The IoT agent translates these to Home Assistant API calls. It only executes changes explicitly listed in its approved tool set — it cannot make arbitrary API calls.
+The IoT agent connects to the owner's **Home Assistant** instance. In the Chat workspace, natural language requests like "turn off the bedroom lights" are translated into validated Home Assistant API calls. The agent only executes actions from its approved tool set — it cannot make arbitrary API calls. This integration is specific to the owner's home network and HA configuration.
 
 ---
 
@@ -99,9 +99,9 @@ The Corrector ran out of attempts (default: 2 cycles). The problem was too compl
 
 ---
 
-**Q: A voice response sounds wrong or choppy.**
+**Q: A BMO voice response sounds wrong or choppy.**
 
-The BMO voice uses RVC reconstruction. Issues can occur when the input text is very long or contains unusual characters. Try shorter, cleaner sentences. Also check that the `bmo-voice` and `voice-engine` containers are running on the Execution Node.
+BMO's voice uses RVC reconstruction. Issues can occur when the input text is very long or contains unusual characters. Try shorter, cleaner sentences. Also check that the `bmo-voice` and `voice-engine` containers are running on the Execution Node.
 
 ---
 
