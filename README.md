@@ -1,6 +1,6 @@
 # Home AI Lab: Agentic Hive
 
-**Version**: 3.3 (Phase 6 complete) · **Status**: Production · **Updated**: 2026-03-23
+**Version**: 3.4 (Phase 6 complete) · **Status**: Production · **Updated**: 2026-03-25
 
 A self-hosted, distributed multi-agent AI system for home automation, coding, creative media, and voice interaction. All inference runs on-premises — no external AI services.
 
@@ -62,11 +62,11 @@ Bad code is **fixed before it reaches you**. High-quality traces (score ≥ 0.80
 | 1–3 | ✅ Complete | Infrastructure, MarsRL loop, 3-node topology |
 | 4 | ✅ Complete | Gateway node migration, distributed monitoring |
 | 5 | ✅ Complete | JWT-ACE capability gating, ExpertiseTemplate versioning |
-| 6 | ✅ Complete | GRPO fine-tuning pipeline, A/B testing, health-aware routing |
+| 6 | ✅ Complete | GRPO fine-tuning pipeline, A/B testing, model conversion & deployment |
 | 7 | 🔜 Next | HA, Gateway Node SPIRE enrollment, k3s migration |
 
 See [Phase Roadmap](docs/PHASE5_PLUS_ROADMAP.md) for Phase 7–9 plans.
 
 ---
 
-_Agentic Hive v3.3 · Self-hosted · Private inference · No cloud dependencies_
+_Agentic Hive v3.4 · Self-hosted · Private inference · No cloud dependencies_

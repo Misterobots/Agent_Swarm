@@ -13,7 +13,7 @@ All IP addresses are managed in [`network.env`](../../network.env) — edit that
 
 | Node | IP | Role | Hardware |
 |------|----|------|----------|
-| Home Assistant | `192.168.2.100` | Smart Home Hub | Dedicated HA device |
+| Home Assistant | `<home-assistant-ip>` | Smart Home Hub | Dedicated HA device |
 | **Execution Node** | `<execution-node-ip>` | GPU Compute / Agent Runtime | RTX 5060 Ti 16GB, 32GB RAM, 500GB SSD |
 | **Control Node** | `<control-node-ip>` | Control Plane | x86 low-power, 16GB RAM, 512GB SSD |
 | **Gateway Node** | `<gateway-node-ip>` | Gateway / Ops | 384GB RAM, 24 CPU, 450GB SSD |

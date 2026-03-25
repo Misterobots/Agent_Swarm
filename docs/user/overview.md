@@ -64,6 +64,7 @@ The Hive Mind UI is organized into **workspaces**, each optimized for a differen
 | **Maker Space** | IoT prototyping, hardware simulation, device flashing |
 | **Governance** | Review AI security evaluations and output quality |
 | **Control** | System status, node health, live metrics |
+| **Training** | Fine-tune local models using Langfuse traces, synthetic data, or curated datasets. Convert adapters and deploy via A/B testing |
 | **Documents** | This documentation — user guides, admin reference, specs |
 
 ---
@@ -79,11 +80,11 @@ The Hive Mind UI is organized into **workspaces**, each optimized for a differen
 
 ## System Status
 
-The current system is running **Version 3.3** (Phase 6 complete):
+The current system is running **Version 3.4** (Phase 6 complete):
 - ✅ MarsRL inference-time quality loop
 - ✅ JWT-ACE capability-based security
 - ✅ ExpertiseTemplate versioned agents
-- ✅ GRPO fine-tuning pipeline with A/B testing
+- ✅ GRPO fine-tuning pipeline with model conversion, A/B testing, and deployment
 - ⚠️ Gateway Node not yet enrolled in SPIRE zero-trust identity (JWT-ACE covers runtime gaps)
 
 ---

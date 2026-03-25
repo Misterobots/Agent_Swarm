@@ -1,5 +1,7 @@
 # Training Pipeline Evolution & Validation
 
+> **Note**: This is a historical document from Phase 6 development. Node names have been updated to current logical designations.
+
 ## Overview
 This document chronicles the successful testing, fixing, and end-to-end validation of the Home AI Lab **Phase 6 Agent Training Runtime**. The goal of Phase 6 was to establish a fully reproducible, automated loop for generating synthetic data, fine-tuning reasoning models via GRPO (Generative Reward Policy Optimization), and converting those models to run directly in the local GPU cluster.
 
@@ -40,10 +42,10 @@ During the training pipeline validation, several massive upgrades were made to t
 - Uses `$__timeFilter()` dynamic Postgres buckets for time-series charts.
 
 ### 2. cAdvisor GPU Hardware Telemetry
-**Problem**: Prometheus is hosted on the R730 Gateway, but the heavy GPU containers (`comfyui_gpu`, `ollama_gpu`, `training_runtime`) run exclusively on the Justin-PC Execution Plane. Grafana reported "No data" for all Container Memory and CPU usage for the AI stack.
+**Problem**: Prometheus is hosted on the Gateway Node, but the heavy GPU containers (`comfyui_gpu`, `ollama_gpu`, `training_runtime`) run exclusively on the Execution Node. Grafana reported "No data" for all Container Memory and CPU usage for the AI stack.
 **Solution**: 
-- Injected Google `cAdvisor` into `execution_plane/docker-compose.yml` (Justin-PC) natively mapped to the Docker daemon.
-- Configured R730 Prometheus to hit `192.168.2.101:8080/metrics`.
+- Injected Google `cAdvisor` into `execution_plane/docker-compose.yml` (Execution Node) natively mapped to the Docker daemon.
+- Configured Gateway Node Prometheus to hit `192.168.2.101:8080/metrics`.
 - **Result**: Complete, real-time hardware tracking for all GPU inference nodes visible instantly in the Hive UI.
 
 ### 3. Mount Persistence Overhaul
