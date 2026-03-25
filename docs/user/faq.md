@@ -14,7 +14,7 @@ The Hive runs a Solver → Verifier → Corrector loop for coding tasks. A slow 
 
 **Q: The AI said it can't do something. Why?**
 
-Each agent has a **capability token** that limits which tools it can call. A coding agent cannot call IoT tools; a voice agent cannot write files to the workspace. This is by design — it prevents an AI from taking unintended actions outside its scope. If you need a capability that's being blocked, use the appropriate workspace (e.g., switch to "Maker Space" for IoT tasks).
+Each agent has a **capability token** that limits which tools it can call. A coding agent cannot call media tools; a creative agent cannot write files to the workspace. This is by design — it prevents an AI from taking unintended actions outside its scope. If you need a capability that's being blocked, use the appropriate workspace for that task.
 
 ---
 
@@ -29,18 +29,6 @@ No. The Hive is fully air-gapped for inference. Models run locally and have no o
 Switch to the **Media workspace**. Type a description of what you want. You can also adjust the model checkpoint, aspect ratio, and sampler settings in the sidebar before generating.
 
 Alternatively, ask in the Chat workspace: "Generate an image of [description]" — the Router will detect the image intent and delegate to the Forge agent automatically.
-
----
-
-**Q: What is BMO?**
-
-BMO is a personal voice assistant integrated into the Hive. It uses a custom RVC-cloned voice model for responses. BMO is available in the **Voice Studio workspace** and also runs on a dedicated physical voice satellite. This is a personal feature — BMO is configured for the system owner's home setup and voice preferences.
-
----
-
-**Q: How does smart home control work?**
-
-The IoT agent connects to the owner's **Home Assistant** instance. In the Chat workspace, natural language requests like "turn off the bedroom lights" are translated into validated Home Assistant API calls. The agent only executes actions from its approved tool set — it cannot make arbitrary API calls. This integration is specific to the owner's home network and HA configuration.
 
 ---
 
@@ -96,12 +84,6 @@ ComfyUI is GPU-bound and may have been evicted to free VRAM for a training run o
 **Q: I asked for code and got an error about "max iterations reached".**
 
 The Corrector ran out of attempts (default: 2 cycles). The problem was too complex for the model to fix automatically. Try rephrasing the request with more specific requirements, or break it into smaller steps. You can also switch to the **Coding workspace** for interactive debugging.
-
----
-
-**Q: A BMO voice response sounds wrong or choppy.**
-
-BMO's voice uses RVC reconstruction. Issues can occur when the input text is very long or contains unusual characters. Try shorter, cleaner sentences. Also check that the `bmo-voice` and `voice-engine` containers are running on the Execution Node.
 
 ---
 
