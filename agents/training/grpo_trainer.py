@@ -185,7 +185,7 @@ def train_grpo(
     if config is None:
         config = GRPOTrainingConfig()
 
-    # Lazy imports — these are heavy and only needed on Justin-PC
+    # Lazy imports — these are heavy and only needed on the Execution Node
     try:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainerCallback

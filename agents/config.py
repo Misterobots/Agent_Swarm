@@ -45,9 +45,9 @@ _load_network_env()
 # Node IPs
 # ---------------------------------------------------------------------------
 HOME_ASSISTANT_IP = os.getenv("HOME_ASSISTANT_IP", "192.168.2.100")
-JUSTIN_PC_IP      = os.getenv("JUSTIN_PC_IP",      "192.168.2.101")
+EXECUTION_NODE_IP  = os.getenv("EXECUTION_NODE_IP", os.getenv("JUSTIN_PC_IP", "192.168.2.101"))
 CONTROL_NODE_IP    = os.getenv("CONTROL_NODE_IP",    "192.168.2.102")
-R730_IP            = os.getenv("R730_IP",            "192.168.2.103")
+GATEWAY_NODE_IP    = os.getenv("GATEWAY_NODE_IP",  os.getenv("R730_IP", "192.168.2.103"))
 IDRAC_IP           = os.getenv("IDRAC_IP",           "192.168.2.104")
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ IDRAC_IP           = os.getenv("IDRAC_IP",           "192.168.2.104")
 AGNO_DB_URL          = os.getenv("AGNO_DB_URL",          f"postgresql://agno:agno_password@{CONTROL_NODE_IP}:5432/agno_memory")
 LANGFUSE_HOST        = os.getenv("LANGFUSE_HOST",        f"http://{CONTROL_NODE_IP}:3000")
 HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTANT_IP}:8123")
-SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{R730_IP}:11434")
+SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{GATEWAY_NODE_IP}:11434")
 OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
 ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "nemotron-mini")
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      "qwen2.5-coder:14b-instruct-q4_k_m")

@@ -36,11 +36,11 @@ for _candidate in [os.path.join(_script_dir, "..", "network.env"), os.path.join(
         break
 
 # Try centralized config first, then env var, then fallback
-HOST_IP = os.getenv("JUSTIN_PC_IP", os.getenv("BMO_HOST_IP", ""))
+HOST_IP = os.getenv("EXECUTION_NODE_IP", os.getenv("JUSTIN_PC_IP", os.getenv("BMO_HOST_IP", "")))
 
 if not HOST_IP:
     print("\n❌ ERROR: HOST_IP could not be determined.")
-    print("Set JUSTIN_PC_IP in network.env or BMO_HOST_IP environment variable.")
+    print("Set EXECUTION_NODE_IP in network.env or BMO_HOST_IP environment variable.")
     sys.exit(1)
 
 print(f"🌐 Host IP: {HOST_IP}")
