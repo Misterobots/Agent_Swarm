@@ -21,30 +21,29 @@ The Hive runs across three physical machines, each with a distinct role:
 │                    YOUR BROWSER / APP                       │
 └──────────────────────────┬──────────────────────────────────┘
                            │
-                    ┌──────▼──────┐
-                    │  Dell R730  │  ← Gateway (192.168.2.103)
-                    │  Traefik    │    Routes all traffic
-                    │  Grafana    │    Monitoring dashboards
-                    │  Prometheus │    Metrics collection
-                    └──────┬──────┘
+                    ┌──────────────────┐
+                    │  Gateway Node    │  ← Reverse Proxy & Monitoring
+                    │  Traefik         │    Routes all traffic
+                    │  Grafana         │    Monitoring dashboards
+                    │  Prometheus      │    Metrics collection
+                    └──────┬───────────┘
                            │
           ┌────────────────┼────────────────┐
           │                                 │
-   ┌──────▼──────┐                 ┌────────▼────────┐
-   │  Justin-PC  │                 │   Wyse 5070     │
-   │  192.168.2.101               │   192.168.2.102  │
-   │             │                 │                  │
-   │  Agent      │                 │  SPIRE (Identity)│
-   │  Runtime    │                 │  Langfuse (Traces│
-   │  Ollama GPU │                 │  PostgreSQL      │
-   │  ComfyUI    │                 │  MinIO (Storage) │
-   │  Training   │                 │  ClickHouse      │
-   └─────────────┘                 └──────────────────┘
+   ┌──────▼──────────┐            ┌─────────▼─────────┐
+   │ Execution Node  │            │  Control Node      │
+   │ (GPU Compute)   │            │  (Identity & Data) │
+   │                 │            │                    │
+   │  Agent Runtime  │            │  SPIRE (Identity)  │
+   │  Ollama GPU     │            │  Langfuse (Traces) │
+   │  ComfyUI        │            │  PostgreSQL        │
+   │  Training       │            │  MinIO (Storage)   │
+   └─────────────────┘            └────────────────────┘
 ```
 
-- **Gateway (R730)**: Your entry point. Routes all traffic, hosts monitoring.
-- **Compute (Justin-PC)**: Runs the AI models and agent logic.
-- **Control (Wyse 5070)**: Stores data, manages identity, tracks all AI interactions.
+- **Gateway Node**: Your entry point. Routes all traffic, hosts monitoring.
+- **Execution Node**: Runs the AI models and agent logic (GPU compute).
+- **Control Node**: Stores data, manages identity, tracks all AI interactions.
 
 ---
 
@@ -151,14 +150,14 @@ You can watch this pipeline live in the **Grafana Training Pipeline dashboard**.
 
 ## Observability
 
-Every AI call generates a **Langfuse trace** you can inspect at `http://192.168.2.102:3000`:
+Every AI call generates a **Langfuse trace** you can inspect at `http://<control-node-ip>:3000`:
 
 - See exactly which model ran, what it was given, and what it returned
 - See the verifier score at each step
 - See whether the Corrector was invoked and why
 - Export the trace timeline for debugging
 
-The **Grafana Agent Activity dashboard** (`http://192.168.2.103:3001`) shows:
+The **Grafana Agent Activity dashboard** (`http://<gateway-node-ip>:3001`) shows:
 - Live agent states (Idle / Working / Error)
 - Conversation volume and quality scores over time
 - Corrector invocation rate

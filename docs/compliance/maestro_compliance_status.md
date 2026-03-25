@@ -12,9 +12,9 @@
 The system now employs:
 
 - **Active Defense**: Drift (Code) + SecurityAgent (Runtime) + MarsRL LogicVerifier (Output)
-- **Strict Identity (L7)**: SPIRE/SPIFFE workload identity (Dell Wyse CA → Hive PC agent) + JWT-ACE per-request capability tokens
+- **Strict Identity (L7)**: SPIRE/SPIFFE workload identity (Control Node CA → Execution Node agent) + JWT-ACE per-request capability tokens
 - **Full Observability**: Langfuse LLM tracing with **process-level reward scoring** at each MarsRL step + Grafana dashboards for training pipeline and template performance
-- **Smart Host Routing**: Hardware-aware load balancing between Justin-PC (16GB) and Dell R730 (8GB)
+- **Smart Host Routing**: Hardware-aware load balancing between Execution Node (16GB) and Gateway Node (8GB)
 - **JWT-ACE Capability Gating**: Ephemeral tokens with embedded agent cards enforcing tool-level access control
 - **ExpertiseTemplate Evolution**: Versioned agent templates with performance tracking and automatic version bumping
 - **GRPO Training Pipeline**: QLoRA fine-tuning on local trace data → GGUF conversion → Ollama import → A/B testing → auto-promotion
@@ -34,7 +34,7 @@ pie title Component Compliance
 ```
 
 > [!NOTE]
-> Identity score is 98% (not 100%) because the Dell R730 is not yet enrolled in SPIRE. JWT-ACE provides an additional per-request capability-based identity layer that covers runtime access control. See Section 5 below.
+> Identity score is 98% (not 100%) because the Gateway Node is not yet enrolled in SPIRE. JWT-ACE provides an additional per-request capability-based identity layer that covers runtime access control. See Section 5 below.
 
 ---
 
@@ -45,7 +45,7 @@ pie title Component Compliance
 | **Infrastructure**    | L1, L5 | ✅ Compliant | [eval_infrastructure.md](eval_infrastructure.md)             | [2026-02-22 audit](../evidence/maestro_full_audit_2026_02_22.md) |
 | **Data Layer**        | L2, L3 | ✅ Compliant | [eval_data_layer.md](eval_data_layer.md)                     | [env check](../evidence/data_layer_env_check_2026-02-08.txt)     |
 | **Agent Logic**       | L4, L6 | ✅ Compliant | [eval_agent_logic.md](eval_agent_logic.md)                   | MarsRL loop + LogicVerifier                                      |
-| **Identity**          | L7     | ⚠️ Partial   | [eval_identity_security.md](eval_identity_security.md)       | R730 not yet SPIRE-enrolled; JWT-ACE covers runtime identity     |
+| **Identity**          | L7     | ⚠️ Partial   | [eval_identity_security.md](eval_identity_security.md)       | Gateway Node not yet SPIRE-enrolled; JWT-ACE covers runtime identity     |
 | **Governance**        | L6     | ✅ Compliant | [eval_governance.md](eval_governance.md)                     | [drift analysis](../evidence/drift_analysis_2026-02-09.md)       |
 | **Observability**     | L4, L6 | ✅ Compliant | [Spec](../specs/langfuse_observability_spec.md)              | Process rewards live                                             |
 | **MarsRL Loop (New)** | L4, L6 | ✅ Compliant | [marsrl walkthrough](../marsrl_hive_redesign_walkthrough.md) | Solver→Verifier→Corrector                                        |
@@ -74,7 +74,7 @@ pie title Component Compliance
 
 ## 4. Infrastructure Services
 
-### Control Plane (Dell Wyse 5070 — 192.168.2.102)
+### Control Plane (Control Node — <control-node-ip>)
 
 | Service      | Port | Status | Purpose                             |
 | ------------ | ---- | ------ | ----------------------------------- |
@@ -96,12 +96,12 @@ pie title Component Compliance
 | text_gen_webui | 7860  | ⏸ Off  | Diagnostic only (profile: diagnostic) |
 | spire-agent    | —     | ✅ Up  | SVID delivery                         |
 
-### Secondary Inference (Dell R730 — Offload Node)
+### Secondary Inference (Gateway Node — Offload Node)
 
 | Service       | Port  | Status          | Model                    |
 | ------------- | ----- | --------------- | ------------------------ |
-| ollama (R730) | 11434 | ✅ Up           | qwen3.5:9b (Primary)      |
-| ollama (R730) | 11434 | ✅ Up           | nemotron-mini, llama-guard|
+| ollama (Gateway Node) | 11434 | ✅ Up           | qwen3.5:9b (Primary)      |
+| ollama (Gateway Node) | 11434 | ✅ Up           | nemotron-mini, llama-guard|
 | spire-agent   | —     | ⚠️ Not enrolled | Pending SPIRE enrollment |
 
 ---
@@ -110,13 +110,13 @@ pie title Component Compliance
 
 | Item                            | Severity | Status  | Action                          |
 | ------------------------------- | -------- | ------- | ------------------------------- |
-| Dell R730 SPIRE enrollment      | Medium   | ⚠️ Open | Enroll R730 as SPIRE agent node |
-| mTLS between Justin-PC and R730 | Medium   | ⚠️ Open | Requires R730 SVID              |
+| Gateway Node SPIRE enrollment      | Medium   | ⚠️ Open | Enroll Gateway Node as SPIRE agent node |
+| mTLS between Execution Node and Gateway Node | Medium   | ⚠️ Open | Requires Gateway Node SVID              |
 | JWT-ACE integration             | High     | ✅ Done | Per-request capability gating live |
 | GRPO Training Pipeline          | High     | ✅ Done | Data export, QLoRA training, GGUF conversion, A/B testing |
 | Grafana template dashboards     | Medium   | ✅ Done | Training Pipeline + Template Scores dashboards provisioned |
 | Default credential rotation     | High     | ⚠️ Open | 20+ default passwords identified (Grafana admin, PostgreSQL, Redis, etc.) |
-| TLS on Ollama API (R730)        | Low      | ⚠️ Open | nginx reverse proxy + cert      |
+| TLS on Ollama API (Gateway Node)        | Low      | ⚠️ Open | nginx reverse proxy + cert      |
 | OIDC Auth on UI                 | Low      | Future  | Replace Basic Auth              |
 | Training data sanitization audit | Medium  | ⚠️ Open | Verify no PII/secrets in exported training data |
 
@@ -127,9 +127,9 @@ pie title Component Compliance
 > Phase 5 (JWT-ACE + ExpertiseTemplate) and Phase 6 (GRPO Training Pipeline) are **complete**. Phase 7 (HA & Resilience) is next.
 
 1. **Rotate default credentials** — 20+ default passwords identified across the stack (see credential audit)
-2. **Enroll Dell R730 in SPIRE** — run `spire-agent` on R730, register via control plane
-3. **Build training-runtime on Justin-PC** — `docker compose --profile training build training-runtime`
+2. **Enroll Gateway Node in SPIRE** — run `spire-agent` on Gateway Node, register via control plane
+3. **Build training-runtime on Execution Node** — `docker compose --profile training build training-runtime`
 4. **Execute first full training run** — synthetic data → QLoRA → GGUF → Ollama → A/B test
 5. **Training data sanitization audit** — verify no PII/secrets in exported training data
-6. **mTLS between Justin-PC and R730** — requires R730 SVID from SPIRE enrollment
+6. **mTLS between Execution Node and Gateway Node** — requires Gateway Node SVID from SPIRE enrollment
 7. **Phase 7: High Availability** — PostgreSQL replication, Redis Sentinel

@@ -55,7 +55,7 @@ Where you start new training runs. There are five run types, described below.
 ```
 Langfuse traces (score > 0.8)
   --> Export to GRPO JSONL
-    --> QLoRA GRPO training on Justin-PC GPU
+    --> QLoRA GRPO training on Execution Node GPU
       --> LoRA adapter saved
 ```
 
@@ -308,7 +308,7 @@ This protects against:
 Only one run can execute at a time. Wait for the current run to finish or check Run History — if a run is stuck as "running" but the process has ended, it may be a stale record (these can be cleaned up in the database).
 
 **Curated dataset download fails**
-The GPU node (Justin-PC) needs internet access to reach HuggingFace Hub. Check network connectivity. If a specific dataset is unavailable, try a different one.
+The GPU node (Execution Node) needs internet access to reach HuggingFace Hub. Check network connectivity. If a specific dataset is unavailable, try a different one.
 
 **Synthetic generation produces 0 trajectories**
 The Ollama model must be running and accessible. Verify `OLLAMA_HOST` is correct and the Architect model is pulled. Check that the model generates responses >20 characters (very small models may produce empty output).

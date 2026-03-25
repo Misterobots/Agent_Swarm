@@ -91,7 +91,7 @@
 
 ### Your Current Setup
 
-- ✅ PostgreSQL @ `192.168.2.102:5432` (Control Plane)
+- ✅ PostgreSQL @ `<control-node-ip>:5432` (Control Plane)
 - ✅ Redis @ `redis_queue` (already have)
 - ❌ ClickHouse (would need to add)
 - ❌ S3/MinIO (would need to add)
@@ -103,7 +103,7 @@
 agno-ui:
   image: phidata/agno:latest # Requires custom build
   environment:
-    - AGNO_DB_URL=postgresql://agno:password@192.168.2.102:5432/agno_memory
+    - AGNO_DB_URL=postgresql://agno:password@<control-node-ip>:5432/agno_memory
   ports:
     - "7777:7777"
   networks:
@@ -119,7 +119,7 @@ agno-ui:
 langfuse-web:
   image: langfuse/langfuse:latest
   environment:
-    - DATABASE_URL=postgresql://langfuse:password@192.168.2.102:5432/langfuse
+    - DATABASE_URL=postgresql://langfuse:password@<control-node-ip>:5432/langfuse
     - NEXTAUTH_URL=http://localhost:3001
     - NEXTAUTH_SECRET=your-secret
     - CLICKHOUSE_URL=http://clickhouse:8123

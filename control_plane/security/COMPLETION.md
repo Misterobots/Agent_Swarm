@@ -2,7 +2,7 @@
 
 ## ✅ What Was Created
 
-You now have a **production-ready centralized JWT authentication system** running on the Control Plane (192.168.2.102:8001).
+You now have a **production-ready centralized JWT authentication system** running on the Control Plane (<control-node-ip>:8001).
 
 ### 📦 Files Created
 
@@ -40,15 +40,15 @@ control_plane/security/
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                 R730 Traefik Gateway                    │
-│                  (192.168.2.103)                        │
+│                 Gateway Node Traefik Gateway                    │
+│                  (<gateway-node-ip>)                        │
 │                                                         │
 │  Routes auth requests to Control Plane                 │
 └────────────────────────┬────────────────────────────────┘
                          │
                          ▼
     ┌──────────────────────────────────────────────┐
-    │  Control Plane (192.168.2.102) ⭐             │
+    │  Control Plane (<control-node-ip>) ⭐             │
     │                                              │
     │  ┌────────────────────────────────────────┐ │
     │  │  Security Service (Port 8001)          │ │
@@ -121,7 +121,7 @@ service       service       service       auth
 
 ## 📡 API Endpoints
 
-All running on `http://192.168.2.102:8001`
+All running on `http://<control-node-ip>:8001`
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
@@ -143,14 +143,14 @@ docker-compose up -d security
 
 ### Check Status
 ```bash
-curl http://192.168.2.102:8001/health
+curl http://<control-node-ip>:8001/health
 ```
 
 ### Get Token (from Agent)
 ```python
 from control_plane_security import SecurityClient
 
-client = SecurityClient("http://192.168.2.102:8001")
+client = SecurityClient("http://<control-node-ip>:8001")
 token = client.issue_token(
     agent_name="my-agent",
     capabilities=["file_read", "file_write"]
@@ -222,13 +222,13 @@ docker-compose up -d security postgres
 
 ### 2. Verify Running ✅
 ```bash
-curl http://192.168.2.102:8001/health
+curl http://<control-node-ip>:8001/health
 # Should return: {"status": "healthy", ...}
 ```
 
 ### 3. Test Token Issuance ✅
 ```bash
-curl -X POST http://192.168.2.102:8001/api/security/v1/token \
+curl -X POST http://<control-node-ip>:8001/api/security/v1/token \
   -H "Content-Type: application/json" \
   -d '{"agent_name":"test","capabilities":["file_read"]}'
 # Returns token
@@ -239,7 +239,7 @@ curl -X POST http://192.168.2.102:8001/api/security/v1/token \
 - Point agents to Control Plane
 
 ### 5. Monitor Audit Logs ✅
-- View in Langfuse: `http://192.168.2.103:3000`
+- View in Langfuse: `http://<gateway-node-ip>:3000`
 - View in database: `docker exec postgres psql ...`
 
 ---
@@ -318,7 +318,7 @@ Agents can request these capabilities:
 
 ### Service Health
 ```bash
-curl http://192.168.2.102:8001/health
+curl http://<control-node-ip>:8001/health
 ```
 
 ### Service Logs
@@ -333,7 +333,7 @@ SELECT * FROM security_audit LIMIT 10;
 ```
 
 ### Langfuse Traces
-Visit: `http://192.168.2.103:3000`
+Visit: `http://<gateway-node-ip>:3000`
 
 ---
 
@@ -462,17 +462,17 @@ You now have:
 **Created:** March 15, 2026  
 **Status:** ✅ Production Ready  
 **Version:** 1.0  
-**Location:** Control Plane (192.168.2.102:8001)
+**Location:** Control Plane (<control-node-ip>:8001)
 
 ---
 
 ## 🔗 Links
 
-- **Service:** `http://192.168.2.102:8001`
-- **Docs/API:** `http://192.168.2.102:8001/docs`
+- **Service:** `http://<control-node-ip>:8001`
+- **Docs/API:** `http://<control-node-ip>:8001/docs`
 - **PostgreSQL:** `control_plane/docker-compose.yml`
-- **Langfuse:** `http://192.168.2.103:3000`
-- **SPIRE:** `http://192.168.2.102:8081`
+- **Langfuse:** `http://<gateway-node-ip>:3000`
+- **SPIRE:** `http://<control-node-ip>:8081`
 
 ---
 

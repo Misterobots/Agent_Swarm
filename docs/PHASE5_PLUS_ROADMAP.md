@@ -231,7 +231,7 @@ CREATE TABLE performance_history (
 
 **Status Tracking**:
 - [x] Create PostgreSQL migration script
-- [x] Deploy on Control Plane (192.168.2.102)
+- [x] Deploy on Control Plane (<control-node-ip>)
 - [x] Run migration on production
 - [x] Verify tables created and accessible
 
@@ -381,7 +381,7 @@ Threshold: 2% improvement to version bump
 | PostgreSQL-Swarm datasource | `r730_gateway/provisioning/datasources/datasource.yml` | ✅ Configured |
 | Training config variables | `agents/config.py` | ✅ Modified (14 new vars) |
 
-**Deployment**: Training pipeline code-complete, dashboards live on R730 Grafana, schema applied to control plane, training-runtime Docker image ready to build on Justin-PC.
+**Deployment**: Training pipeline code-complete, dashboards live on Gateway Node Grafana, schema applied to control plane, training-runtime Docker image ready to build on Execution Node.
 
 **Evidence**: [Phase 6 Audit](docs/evidence/phase6_training_pipeline_audit_2026_03_21.md) | **Testing**: [Testing Plan](docs/TESTING_PLAN_PHASE6.md)
 
@@ -391,20 +391,20 @@ Threshold: 2% improvement to version bump
 **Duration**: 2-3 weeks | **Effort**: 50 story points
 **Goal**: Enable load balancing across multiple GPU nodes
 
-### 7.1 Add R730 as Secondary GPU Node
+### 7.1 Add Gateway Node as Secondary GPU Node
 
-**Objective**: R730 currently runs Ollama + Open-WebUI (media stack). Redeploy GPU access for inference.
+**Objective**: Gateway Node currently runs Ollama + Open-WebUI (media stack). Redeploy GPU access for inference.
 
-#### Task 7.1.1: Configure Ollama on R730
+#### Task 7.1.1: Configure Ollama on Gateway Node
 - Install NVIDIA drivers (if not present)
-- Deploy Ollama container on R730
+- Deploy Ollama container on Gateway Node
 - Mount shared model directory (NFS from Control Plane)
-- Register R730 Ollama in load balancer
+- Register Gateway Node Ollama in load balancer
 
 **Status Tracking**:
-- [ ] Verify R730 GPU availability (NVIDIA GPU?)
+- [ ] Verify Gateway Node GPU availability (NVIDIA GPU?)
 - [ ] Install drivers if needed
-- [ ] Deploy Ollama on R730
+- [ ] Deploy Ollama on Gateway Node
 - [ ] Test model loading
 - [ ] Benchmark inference latency
 
@@ -495,7 +495,7 @@ model_config = {
 ### 8.1 PostgreSQL Replication
 
 **Current**: Single PostgreSQL on Control Plane (SPOF)  
-**Target**: Primary (Control) + Replica (R730)
+**Target**: Primary (Control) + Replica (Gateway Node)
 
 ```bash
 # On Control Plane:
@@ -503,7 +503,7 @@ model_config = {
 # 2. Create replication user
 # 3. Configure pg_hba.conf for replica
 
-# On R730:
+# On Gateway Node:
 # 1. pg_basebackup from Control Plane
 # 2. Configure as streaming replica
 # 3. Start replication
@@ -516,7 +516,7 @@ model_config = {
 
 **Status Tracking**:
 - [ ] Configure replication on primary
-- [ ] Set up replica on R730
+- [ ] Set up replica on Gateway Node
 - [ ] Test failover procedure
 - [ ] Deploy patroni + etcd
 - [ ] Verify automatic promotion
@@ -525,7 +525,7 @@ model_config = {
 
 ### 8.2 Redis Sentinel for Monitoring Queue
 
-**Current**: Single Redis on R730  
+**Current**: Single Redis on Gateway Node  
 **Target**: Master + 2 Replicas + Sentinel for failover
 
 **Status Tracking**:
@@ -550,7 +550,7 @@ model_config = {
 
 **Status Tracking**:
 - [ ] Set up NFS export on Control Plane
-- [ ] Mount on Justin-PC and R730
+- [ ] Mount on Execution Node and Gateway Node
 - [ ] Reconfigure Ollama to use shared mount
 - [ ] Test model sharing
 
@@ -564,7 +564,7 @@ model_config = {
 
 ```bash
 # Control Plane: k3s server
-# Compute Nodes: k3s agents (justin-pc, r730)
+# Compute Nodes: k3s agents (execution-node, gateway-node)
 
 # Install:
 # Control: curl -sfL https://get.k3s.io | sh -
@@ -735,7 +735,7 @@ Q3 2026 (July - September)
 
 ### On Phase 7
 - **Phase 6 completion** ✅ (A/B testing and model versioning available)
-- **Secondary GPU availability** (R730 or new node must have GPU)
+- **Secondary GPU availability** (Gateway Node or new node must have GPU)
 - **Network performance** (multi-node inference needs <10ms latency)
 
 ### On Phase 8-9
@@ -755,12 +755,12 @@ Q3 2026 (July - September)
 
 ## Next Action Items (Phase 7 Planning)
 
-1. **Build training-runtime on Justin-PC** — `docker compose --profile training build training-runtime`
+1. **Build training-runtime on Execution Node** — `docker compose --profile training build training-runtime`
 2. **Execute first full training run** — synthetic data → QLoRA → GGUF → Ollama → A/B test
 3. **Rotate default credentials** — 20+ default passwords identified across the stack
-4. **R730 SPIRE enrollment** — complete the remaining identity gap
-5. **Verify R730 GPU availability** — confirm NVIDIA drivers and VRAM for secondary inference
-6. **Design load balancer** — route requests across Justin-PC + R730 based on model size and VRAM
+4. **Gateway Node SPIRE enrollment** — complete the remaining identity gap
+5. **Verify Gateway Node GPU availability** — confirm NVIDIA drivers and VRAM for secondary inference
+6. **Design load balancer** — route requests across Execution Node + Gateway Node based on model size and VRAM
 7. **Template auto-versioning** — accumulate performance data to trigger first automatic version bump
 
 ---
