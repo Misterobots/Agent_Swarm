@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const BACKEND_URL = process.env.API_BASE_URL || "http://localhost:8000";
-const CONTROL_IP = "192.168.2.102";
+const CONTROL_IP = process.env.CONTROL_NODE_IP || "control-node";
 
 interface ServiceCheck {
   name: string;

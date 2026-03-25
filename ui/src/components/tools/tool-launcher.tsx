@@ -8,35 +8,35 @@ import { Bot, Code2, Laptop, MessageSquare } from "lucide-react";
 import type { ToolDefinition } from "@/types/tools";
 
 // Direct port access bypasses Traefik/Authentik middleware which sets X-Frame-Options: DENY
-const R730 = "http://192.168.2.103";
+const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://gateway-node";
 
 const TOOLS: ToolDefinition[] = [
   {
     id: "openhands",
     label: "OpenHands",
     icon: Bot,
-    path: `${R730}:3002`,
+    path: `${GATEWAY}:3002`,
     description: "AI Development Agent",
   },
   {
     id: "ide-devops",
     label: "IDE (DevOps)",
     icon: Code2,
-    path: `${R730}:8445`,
+    path: `${GATEWAY}:8445`,
     description: "VS Code — Full Access",
   },
   {
     id: "ide-coding",
     label: "IDE (Coding)",
     icon: Laptop,
-    path: `${R730}:8444`,
+    path: `${GATEWAY}:8444`,
     description: "VS Code — Sandbox",
   },
   {
     id: "open-webui",
     label: "Open WebUI",
     icon: MessageSquare,
-    path: `${R730}:3000`,
+    path: `${GATEWAY}:3000`,
     description: "Chat with local models",
   },
 ];

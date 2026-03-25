@@ -44,12 +44,12 @@ const RUN_TYPES = [
 ];
 
 const TIME_PRESETS = [
-  { label: "15 min", value: 15 },
-  { label: "30 min", value: 30 },
-  { label: "1 hour", value: 60 },
-  { label: "2 hours", value: 120 },
-  { label: "4 hours", value: 240 },
-  { label: "No limit", value: null },
+  { label: "15 min", value: 15, estimate: "~25-85 min total" },
+  { label: "30 min", value: 30, estimate: "~40-100 min total" },
+  { label: "1 hour", value: 60, estimate: "~70-130 min total" },
+  { label: "2 hours", value: 120, estimate: "~130-190 min total" },
+  { label: "4 hours", value: 240, estimate: "~250-310 min total" },
+  { label: "No limit", value: null, estimate: "Runs until all epochs complete" },
 ];
 
 export function TrainingLauncher() {
@@ -279,27 +279,41 @@ export function TrainingLauncher() {
             <div className="flex items-center gap-2">
               <Clock size={14} className="text-zinc-500" />
               <label className="text-sm font-medium text-zinc-400">
-                Time Budget
+                Training Time Budget
               </label>
             </div>
+            <p className="text-xs text-zinc-600">
+              Time budget controls active training only. Total wall-clock time
+              also includes model loading (~10-70 min depending on cache) and
+              dataset preparation. Estimates shown assume a 7B model on the
+              Execution Node GPU.
+            </p>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-              {TIME_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => {
-                    setTimeBudget(preset.value);
-                    setCustomTime("");
-                  }}
-                  className={cn(
-                    "px-3 py-2 text-xs rounded-lg border transition-colors",
-                    timeBudget === preset.value && !customTime
-                      ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300"
-                      : "border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
-                  )}
-                >
-                  {preset.label}
-                </button>
-              ))}
+              {TIME_PRESETS.map((preset) => {
+                const isSelected = timeBudget === preset.value && !customTime;
+                return (
+                  <button
+                    key={preset.label}
+                    onClick={() => {
+                      setTimeBudget(preset.value);
+                      setCustomTime("");
+                    }}
+                    className={cn(
+                      "px-3 py-2 rounded-lg border transition-colors text-left",
+                      isSelected
+                        ? "border-cyan-500/50 bg-cyan-500/10"
+                        : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                    )}
+                  >
+                    <span className={cn("text-xs font-medium block", isSelected ? "text-cyan-300" : "text-zinc-400")}>
+                      {preset.label}
+                    </span>
+                    <span className="text-[10px] text-zinc-600 block mt-0.5">
+                      {preset.estimate}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -313,12 +327,16 @@ export function TrainingLauncher() {
                 }}
                 className="w-48 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-cyan-500/50"
               />
-              <span className="text-xs text-zinc-600">minutes</span>
+              <span className="text-xs text-zinc-600">minutes (training only)</span>
             </div>
             {timeBudget && (
               <p className="text-xs text-zinc-600">
-                Training will automatically stop after {timeBudget} minutes.
-                Checkpoints are saved every 50 steps so no progress is lost.
+                Training stops after {timeBudget} min of active training.
+                Checkpoints saved every 50 steps. Estimated total time:{" "}
+                <span className="text-zinc-400">
+                  {timeBudget + 10}&ndash;{timeBudget + 70} min
+                </span>{" "}
+                (including model load + dataset prep).
               </p>
             )}
           </div>

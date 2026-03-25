@@ -1,7 +1,7 @@
 # R730 Gateway & Ops Hub Docker Compose
 # Routing handled by Saltbox's Traefik (connected to ai_lab_net externally)
 # Hosts: Monitoring (Prometheus, Loki, Grafana), Logging, Ollama, Open-WebUI
-# Compute services (Ollama, BMO Voice, ComfyUI, etc.) remain on Justin-PC @ 192.168.2.101
+# Compute services (Ollama, BMO Voice, ComfyUI, etc.) remain on the Execution Node
 
 services:
   # ═══════════════════════════════════════════════════════════════════════════════
@@ -252,13 +252,16 @@ services:
     image: home-ai-lab/hive-ui:latest
     container_name: hive_ui
     restart: unless-stopped
+    env_file:
+      - ../network.env
     environment:
-      - API_BASE_URL=http://192.168.2.101:8008
-      - LANGFUSE_URL=http://192.168.2.102:3000
+      - API_BASE_URL=http://${EXECUTION_NODE_IP:-192.168.2.101}:8008
+      - LANGFUSE_URL=http://${CONTROL_NODE_IP:-192.168.2.102}:3000
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
-      - NEXT_PUBLIC_TOOLS_BASE_URL=http://192.168.2.103
-      - NEXT_PUBLIC_GRAFANA_URL=http://192.168.2.103/grafana
+      - CONTROL_NODE_IP=${CONTROL_NODE_IP:-192.168.2.102}
+      - NEXT_PUBLIC_GATEWAY_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}
+      - NEXT_PUBLIC_GRAFANA_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}/grafana
     volumes:
       - ../docs:/app/docs:ro
     ports:

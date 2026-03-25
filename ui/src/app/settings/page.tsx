@@ -73,7 +73,7 @@ export default function SettingsPage() {
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">About</h2>
             <div className="space-y-2 text-sm text-zinc-500">
               <p>Hive Mind Workspace v1.0</p>
-              <p>Backend: {process.env.NEXT_PUBLIC_API_BASE_URL || "http://192.168.2.101:8008"}</p>
+              <p>Backend: {process.env.NEXT_PUBLIC_API_BASE_URL || "Agent Runtime"}</p>
             </div>
           </section>
         </div>

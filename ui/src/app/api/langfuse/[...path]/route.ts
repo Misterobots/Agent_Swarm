@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const LANGFUSE_URL = process.env.LANGFUSE_URL || "http://192.168.2.102:3000";
+const LANGFUSE_URL = process.env.LANGFUSE_URL || "http://control-node:3000";
 const LF_PUBLIC = process.env.LANGFUSE_PUBLIC_KEY || "";
 const LF_SECRET = process.env.LANGFUSE_SECRET_KEY || "";
 

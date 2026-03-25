@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 const GRAFANA_URL =
   process.env.GRAFANA_INTERNAL_URL ||
   process.env.NEXT_PUBLIC_GRAFANA_URL ||
-  "http://192.168.2.103/grafana";
+  "http://gateway-node/grafana";
 
 async function proxyGrafana(req: NextRequest) {
   const url = new URL(req.url);
