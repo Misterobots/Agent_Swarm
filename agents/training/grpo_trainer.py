@@ -183,6 +183,87 @@ def train_grpo(
         from peft import LoraConfig, get_peft_model, TaskType
         from trl import GRPOConfig, GRPOTrainer
 
+        class PrometheusTrainingCallback(TrainerCallback):
+            """Push per-step training metrics to Prometheus gauges."""
+
+            def __init__(self):
+                self._metrics = None
+
+            def _load_metrics(self):
+                if self._metrics is None:
+                    try:
+                        from metrics import (
+                            TRAINING_IS_ACTIVE, TRAINING_STEP_CURRENT,
+                            TRAINING_EPOCH_CURRENT, TRAINING_LOSS,
+                            TRAINING_GRAD_NORM, TRAINING_LEARNING_RATE,
+                            TRAINING_REWARD_MEAN, TRAINING_REWARD_STD,
+                            TRAINING_COMPLETION_LEN_MEAN, TRAINING_COMPLETION_LEN_MIN,
+                            TRAINING_COMPLETION_LEN_MAX, TRAINING_ENTROPY,
+                            TRAINING_STEP_TIME,
+                        )
+                        self._metrics = {
+                            "active": TRAINING_IS_ACTIVE,
+                            "step": TRAINING_STEP_CURRENT,
+                            "epoch": TRAINING_EPOCH_CURRENT,
+                            "loss": TRAINING_LOSS,
+                            "grad_norm": TRAINING_GRAD_NORM,
+                            "lr": TRAINING_LEARNING_RATE,
+                            "reward_mean": TRAINING_REWARD_MEAN,
+                            "reward_std": TRAINING_REWARD_STD,
+                            "comp_mean": TRAINING_COMPLETION_LEN_MEAN,
+                            "comp_min": TRAINING_COMPLETION_LEN_MIN,
+                            "comp_max": TRAINING_COMPLETION_LEN_MAX,
+                            "entropy": TRAINING_ENTROPY,
+                            "step_time": TRAINING_STEP_TIME,
+                        }
+                    except ImportError:
+                        logger.warning("Prometheus metrics not available for training callback")
+                        self._metrics = {}
+                return self._metrics
+
+            def on_train_begin(self, args, state, control, **kwargs):
+                m = self._load_metrics()
+                if m.get("active"):
+                    m["active"].set(1)
+                logger.info("[PrometheusCallback] Training metrics active")
+
+            def on_log(self, args, state, control, logs=None, **kwargs):
+                m = self._load_metrics()
+                if not m or not logs:
+                    return
+                # Map TRL log keys to Prometheus gauges
+                mapping = {
+                    "loss": "loss",
+                    "grad_norm": "grad_norm",
+                    "learning_rate": "lr",
+                    "reward": "reward_mean",
+                    "reward_std": "reward_std",
+                    "completions/mean_length": "comp_mean",
+                    "completions/min_length": "comp_min",
+                    "completions/max_length": "comp_max",
+                    "entropy": "entropy",
+                    "step_time": "step_time",
+                    "epoch": "epoch",
+                }
+                for log_key, metric_key in mapping.items():
+                    val = logs.get(log_key)
+                    if val is not None and metric_key in m:
+                        try:
+                            m[metric_key].set(float(val))
+                        except (TypeError, ValueError):
+                            pass
+
+            def on_step_end(self, args, state, control, **kwargs):
+                m = self._load_metrics()
+                if m.get("step"):
+                    m["step"].set(state.global_step)
+
+            def on_train_end(self, args, state, control, **kwargs):
+                m = self._load_metrics()
+                if m.get("active"):
+                    m["active"].set(0)
+                logger.info("[PrometheusCallback] Training ended, metrics reset")
+
         class TimeBudgetCallback(TrainerCallback):
             """Stop training when wall-clock budget is exhausted."""
 
@@ -336,7 +417,8 @@ def train_grpo(
             save_steps=save_steps,
             bf16=True,
             gradient_checkpointing=True,
-            report_to="none",
+            report_to="tensorboard",
+            logging_dir=str(run_dir / "tensorboard_logs"),
         )
 
         # Build reward function for GRPO — takes list of completions,
@@ -361,6 +443,12 @@ def train_grpo(
         })
 
         callbacks = []
+        # Always add Prometheus callback for live metrics
+        try:
+            callbacks.append(PrometheusTrainingCallback())
+        except Exception as e:
+            logger.warning(f"Prometheus training callback unavailable: {e}")
+
         if time_bounded:
             budget_seconds = config.time_budget_minutes * 60
             callbacks.append(TimeBudgetCallback(budget_seconds))

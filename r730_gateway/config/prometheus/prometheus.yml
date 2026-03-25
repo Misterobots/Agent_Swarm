@@ -21,6 +21,7 @@ scrape_configs:
   # Justin-PC — Agent Runtime (custom Prometheus metrics: agent_state, workflow_steps, training_*, ab_test_*)
   - job_name: 'agent-runtime'
     metrics_path: /metrics/
+    scrape_interval: 5s
     static_configs:
       - targets: ['192.168.2.101:8008']
         labels:

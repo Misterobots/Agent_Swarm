@@ -392,6 +392,21 @@ services:
       - execution_net
     restart: "no"
 
+  # --- TENSORBOARD (Training Monitoring) ---
+  tensorboard:
+    image: python:3.11-slim
+    container_name: tensorboard
+    command: >
+      bash -c "pip install -q tensorboard &&
+      tensorboard --logdir=/data --host=0.0.0.0 --port=6006 --reload_interval=10"
+    volumes:
+      - ./training_output:/data:ro
+    ports:
+      - "6006:6006"
+    networks:
+      - execution_net
+    restart: unless-stopped
+
 networks:
   execution_net:
     driver: bridge

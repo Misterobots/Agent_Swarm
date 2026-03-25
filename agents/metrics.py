@@ -60,3 +60,60 @@ MARS_LOOP_SCORE = Histogram(
     ['intent', 'template_id'],
     buckets=[0.0, 0.2, 0.4, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0]
 )
+
+# ---------------------------------------------------------------------------
+# Live Training Step Metrics (updated by PrometheusTrainingCallback)
+# ---------------------------------------------------------------------------
+
+TRAINING_IS_ACTIVE = Gauge(
+    'training_is_active',
+    'Whether training is currently running (1=yes, 0=no)',
+)
+TRAINING_STEP_CURRENT = Gauge(
+    'training_step_current',
+    'Current training step number',
+)
+TRAINING_EPOCH_CURRENT = Gauge(
+    'training_epoch_current',
+    'Current training epoch',
+)
+TRAINING_LOSS = Gauge(
+    'training_loss',
+    'Current training loss',
+)
+TRAINING_GRAD_NORM = Gauge(
+    'training_grad_norm',
+    'Current gradient norm',
+)
+TRAINING_LEARNING_RATE = Gauge(
+    'training_learning_rate_current',
+    'Current learning rate',
+)
+TRAINING_REWARD_MEAN = Gauge(
+    'training_reward_mean',
+    'Mean reward across GRPO group',
+)
+TRAINING_REWARD_STD = Gauge(
+    'training_reward_std',
+    'Reward standard deviation across GRPO group',
+)
+TRAINING_COMPLETION_LEN_MEAN = Gauge(
+    'training_completion_length_mean',
+    'Mean completion length in tokens',
+)
+TRAINING_COMPLETION_LEN_MIN = Gauge(
+    'training_completion_length_min',
+    'Min completion length in tokens',
+)
+TRAINING_COMPLETION_LEN_MAX = Gauge(
+    'training_completion_length_max',
+    'Max completion length in tokens',
+)
+TRAINING_ENTROPY = Gauge(
+    'training_entropy',
+    'Policy entropy',
+)
+TRAINING_STEP_TIME = Gauge(
+    'training_step_time_seconds',
+    'Time per training step in seconds',
+)
