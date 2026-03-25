@@ -40,6 +40,15 @@ from training.reward_function import MarsRewardFunction, RewardSignal
 logger = logging.getLogger("GRPOTrainer")
 
 
+def _has_tensorboard() -> bool:
+    """Check if tensorboard is installed without importing it."""
+    try:
+        import importlib.util
+        return importlib.util.find_spec("tensorboard") is not None
+    except Exception:
+        return False
+
+
 class GRPOTrainingConfig:
     """Training hyperparameters — maps to config.py defaults."""
 
@@ -417,7 +426,7 @@ def train_grpo(
             save_steps=save_steps,
             bf16=True,
             gradient_checkpointing=True,
-            report_to="tensorboard",
+            report_to="tensorboard" if _has_tensorboard() else "none",
             logging_dir=str(run_dir / "tensorboard_logs"),
         )
 
