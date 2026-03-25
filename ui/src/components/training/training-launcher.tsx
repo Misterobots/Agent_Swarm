@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import {
   startTraining,
   fetchCuratedDatasets,
+  fetchTemplates,
   type StartTrainingRequest,
   type CuratedDataset,
+  type Template,
 } from "@/lib/api/training";
-import { Rocket, Clock, Cpu, Database, Zap, Loader2, BookOpen, ShieldCheck, Sparkles } from "lucide-react";
+import { Rocket, Clock, Cpu, Database, Zap, Loader2, BookOpen, ShieldCheck, Sparkles, Filter } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const RUN_TYPES = [
@@ -74,8 +76,13 @@ export function TrainingLauncher() {
   const [maxSamples, setMaxSamples] = useState("");
   const [syntheticTarget, setSyntheticTarget] = useState("552");
 
+  // Template filter state
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+
   useEffect(() => {
     fetchCuratedDatasets().then(setCuratedList);
+    fetchTemplates().then(setTemplates);
   }, []);
 
   const toggleDataset = (key: string) => {
@@ -95,6 +102,10 @@ export function TrainingLauncher() {
       run_type: runType,
       time_budget_minutes: timeBudget,
     };
+
+    if (selectedTemplate && (runType === "full_pipeline" || runType === "export")) {
+      req.template_id = selectedTemplate;
+    }
 
     if (runType === "curated") {
       req.curated_datasets = Array.from(selectedDatasets);
@@ -170,6 +181,77 @@ export function TrainingLauncher() {
             })}
           </div>
         </div>
+
+        {/* Template Filter — for Full Pipeline and Export */}
+        {(runType === "full_pipeline" || runType === "export") && templates.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-cyan-500" />
+              <label className="text-sm font-medium text-zinc-400">
+                Train Toward Agent
+              </label>
+              <span className="text-xs text-zinc-600">(optional)</span>
+            </div>
+            <p className="text-xs text-zinc-600">
+              Filter exported traces to only include data from a specific agent
+              template. This focuses training on improving that agent&apos;s capabilities.
+            </p>
+            <div className="grid gap-2">
+              <button
+                onClick={() => setSelectedTemplate(null)}
+                className={cn(
+                  "flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
+                  selectedTemplate === null
+                    ? "border-cyan-500/40 bg-cyan-500/5"
+                    : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                )}
+              >
+                <div className={cn(
+                  "mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                  selectedTemplate === null ? "border-cyan-500 bg-cyan-500" : "border-zinc-700"
+                )}>
+                  {selectedTemplate === null && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+                <div>
+                  <p className={cn("text-sm font-medium", selectedTemplate === null ? "text-cyan-300" : "text-zinc-300")}>
+                    All Agents
+                  </p>
+                  <p className="text-xs text-zinc-600 mt-0.5">Use traces from every agent template</p>
+                </div>
+              </button>
+              {templates.map((t) => {
+                const selected = selectedTemplate === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setSelectedTemplate(t.id)}
+                    className={cn(
+                      "flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
+                      selected
+                        ? "border-cyan-500/40 bg-cyan-500/5"
+                        : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                    )}
+                  >
+                    <div className={cn(
+                      "mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                      selected ? "border-cyan-500 bg-cyan-500" : "border-zinc-700"
+                    )}>
+                      {selected && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                    <div>
+                      <p className={cn("text-sm font-medium", selected ? "text-cyan-300" : "text-zinc-300")}>
+                        {t.id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </p>
+                      <p className="text-xs text-zinc-600 mt-0.5">
+                        {t.intent} &middot; {t.default_model}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Curated Dataset Selection */}
         {runType === "curated" && (

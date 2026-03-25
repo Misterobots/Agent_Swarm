@@ -284,9 +284,14 @@ class TraceExporter:
         output_path: Optional[str] = None,
         min_score: float = 0.8,
         since_hours: int = 168,
+        template_id: Optional[str] = None,
     ) -> int:
         """
         Main entry point: fetch training candidates, convert, write JSONL.
+
+        Args:
+            template_id: If provided, only export traces from this agent template
+                         (e.g. 'code_developer', 'creative_writer').
         Returns count of exported trajectories.
         """
         if output_path is None:
@@ -298,6 +303,7 @@ class TraceExporter:
         )
 
         exported = 0
+        skipped_template = 0
         with open(output_path, "w", encoding="utf-8") as f:
             for candidate in candidates:
                 trajectory = self.trace_to_grpo_trajectory(
@@ -305,9 +311,21 @@ class TraceExporter:
                     candidate["observations"],
                 )
                 if trajectory:
+                    # Filter by template_id if specified
+                    if template_id:
+                        trace_template = trajectory.get("metadata", {}).get("template_id")
+                        if trace_template != template_id:
+                            skipped_template += 1
+                            continue
                     f.write(json.dumps(trajectory) + "\n")
                     self._exported_ids.add(trajectory["id"])
                     exported += 1
+
+        if template_id:
+            logger.info(
+                f"Template filter '{template_id}': exported {exported}, "
+                f"skipped {skipped_template} from other templates"
+            )
 
         self._save_exported_ids()
         logger.info(f"Exported {exported} trajectories to {output_path}")
