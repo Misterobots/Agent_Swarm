@@ -48,7 +48,7 @@ In the **Chat workspace**, just ask naturally: "Turn off the bedroom lights" or 
 
 Yes. In the Chat workspace, status messages appear in real-time showing which agent is running and what stage the MarsRL loop is at (`Solver generating...`, `Verifying...`, `Correcting...`).
 
-For deeper inspection, open **Langfuse** at `http://192.168.2.102:3000` — every trace shows each agent step, the model inputs and outputs, and the quality score at each stage.
+For deeper inspection, open **Langfuse** at `http://<control-node-ip>:3000` — every trace shows each agent step, the model inputs and outputs, and the quality score at each stage.
 
 ---
 
@@ -60,7 +60,7 @@ Files created by agents (code, images, exports) appear as **artifact cards** in 
 
 **Q: How do I access this outside my home?**
 
-Use **Tailscale**. Connect to `dell-r730` (or its Tailscale IP) on port 80 as the gateway entry point. All services are available through that same gateway.
+Use **Tailscale**. Connect to the Gateway Node (or its Tailscale IP) on port 80 as the entry point. All services are available through that same gateway.
 
 ---
 
@@ -79,11 +79,11 @@ All AI interactions are logged locally to Langfuse and Loki. If you want to revi
 **Q: I see "System Offline" in the sidebar.**
 
 The health check couldn't reach the agent runtime. Common causes:
-1. The `agent-runtime` container on Justin-PC is not running
-2. Network issue between R730 and Justin-PC
-3. Justin-PC is powered off or sleeping
+1. The `agent-runtime` container on the Execution Node is not running
+2. Network issue between the Gateway Node and Execution Node
+3. The Execution Node is powered off or sleeping
 
-Check the **Control workspace** for node status, or ask an admin to check `docker compose ps` on Justin-PC.
+Check the **Control workspace** for node status, or ask an admin to check `docker compose ps` on the Execution Node.
 
 ---
 
@@ -101,7 +101,7 @@ The Corrector ran out of attempts (default: 2 cycles). The problem was too compl
 
 **Q: A voice response sounds wrong or choppy.**
 
-The BMO voice uses RVC reconstruction. Issues can occur when the input text is very long or contains unusual characters. Try shorter, cleaner sentences. Also check that the `bmo-voice` and `voice-engine` containers are running on Justin-PC.
+The BMO voice uses RVC reconstruction. Issues can occur when the input text is very long or contains unusual characters. Try shorter, cleaner sentences. Also check that the `bmo-voice` and `voice-engine` containers are running on the Execution Node.
 
 ---
 

@@ -39,7 +39,7 @@ Execution Plane
 ### After: Architecture
 
 ```
-Control Plane (192.168.2.102:8001)
+Control Plane (<control-node-ip>:8001)
 └── Security Service ← All planes authenticate here
 
 Execution Planes
@@ -63,7 +63,7 @@ cd control_plane
 docker-compose up -d security postgres
 
 # Verify it's running
-curl http://192.168.2.102:8001/health
+curl http://<control-node-ip>:8001/health
 ```
 
 ### Phase 2: Update Execution Plane Agents (Week 1)
@@ -82,7 +82,7 @@ token = issuer.issue_token(...)
 ```python
 from control_plane_security import SecurityClient
 
-client = SecurityClient("http://192.168.2.102:8001")
+client = SecurityClient("http://<control-node-ip>:8001")
 token = client.issue_token(...)
 ```
 
@@ -165,7 +165,7 @@ token = issuer.issue_token(...)
 # agents/auth_setup.py (new)
 from control_plane_security import SecurityClient
 
-client = SecurityClient("http://192.168.2.102:8001")
+client = SecurityClient("http://<control-node-ip>:8001")
 token = client.issue_token(
     agent_name="agent-1",
     capabilities=["file_read", "file_write"]
@@ -198,7 +198,7 @@ async def validate_auth_header(request: Request, call_next):
     # Optionally validate with Control Plane
     if needs_validation:
         from control_plane_security import SecurityClient
-        client = SecurityClient("http://192.168.2.102:8001")
+        client = SecurityClient("http://<control-node-ip>:8001")
         if not client.validate_token(token):
             raise HTTPException(status_code=401)
     
@@ -257,7 +257,7 @@ async def write_file(request: Request, agent = Depends(require_capability('file_
 **Solution:**
 ```bash
 # From execution plane, test connection
-curl -I http://192.168.2.102:8001/health
+curl -I http://<control-node-ip>:8001/health
 
 # If fails, check:
 # 1. Control Plane service is running
@@ -295,7 +295,7 @@ print(payload['jti'])
 **Cause:** Langfuse not configured
 
 **Solution:**
-1. Verify Langfuse running: `http://192.168.2.103:3000`
+1. Verify Langfuse running: `http://<gateway-node-ip>:3000`
 2. Check security service logs: `docker logs control-security`
 3. Database might not be connected
 
@@ -404,7 +404,7 @@ docker exec postgres pg_dump -U langfuse -d langfuse \
 3. [control_plane/security/client.py](./control_plane/security/client.py) docstrings
 
 **Key points:**
-- Security service at `http://192.168.2.102:8001`
+- Security service at `http://<control-node-ip>:8001`
 - Use `SecurityClient` class
 - Token lifecycle management
 - Audit logging automatic
@@ -412,7 +412,7 @@ docker exec postgres pg_dump -U langfuse -d langfuse \
 ### For Operations
 
 **Monitoring points:**
-- Service health: `curl http://192.168.2.102:8001/health`
+- Service health: `curl http://<control-node-ip>:8001/health`
 - Database: PostgreSQL tables in Langfuse DB
 - Logs: `docker logs control-security`
 - Traces: Langfuse dashboard
@@ -453,7 +453,7 @@ A: Same as before. Configure via `JWT_EXPIRATION_HOURS` (default 24).
 ## Next Steps
 
 1. ✅ Start Control Plane: `docker-compose up -d security`
-2. ✅ Verify health: `curl http://192.168.2.102:8001/health`
+2. ✅ Verify health: `curl http://<control-node-ip>:8001/health`
 3. ✅ Get one agent working
 4. ✅ Test end-to-end (token → validation → revocation)
 5. ✅ Roll out to all agents

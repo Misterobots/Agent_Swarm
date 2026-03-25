@@ -21,13 +21,13 @@ A self-hosted, distributed multi-agent AI system for home automation, coding, cr
 ## Architecture at a Glance
 
 ```
-                  Dell R730 — Gateway (192.168.2.103)
-                  Traefik · Grafana · Prometheus · Loki
+                Gateway Node — Reverse Proxy & Monitoring
+                Traefik · Grafana · Prometheus · Loki
                            │              │
-          Justin-PC (192.168.2.101)    Wyse 5070 (192.168.2.102)
-          RTX 5060 Ti 16GB             SPIRE · Langfuse · PostgreSQL
-          Ollama · Agent Runtime       ClickHouse · MinIO · Redis
-          ComfyUI · Voice · Training
+         Execution Node (GPU)         Control Node
+         RTX 5060 Ti 16GB             SPIRE · Langfuse · PostgreSQL
+         Ollama · Agent Runtime       ClickHouse · MinIO · Redis
+         ComfyUI · Voice · Training
 ```
 
 ### MarsRL Quality Loop
@@ -47,7 +47,7 @@ Bad code is **fixed before it reaches you**. High-quality traces (score ≥ 0.80
 
 ## Security Posture
 
-- **SPIFFE/SPIRE**: Zero-trust X.509 workload identity (Justin-PC enrolled; R730 pending)
+- **SPIFFE/SPIRE**: Zero-trust X.509 workload identity (Execution Node enrolled; Gateway Node pending)
 - **JWT-ACE**: Ephemeral per-request capability tokens — agents can only call their approved tools
 - **MAESTRO**: L1–L7 security framework audit (98% compliant — see [compliance status](docs/compliance/maestro_compliance_status.md))
 - **Output validation**: 3-layer LogicVerifier (AST + coherence + llama-guard-3:8b hard-block)
@@ -60,10 +60,10 @@ Bad code is **fixed before it reaches you**. High-quality traces (score ≥ 0.80
 | Phase | Status | Key Capability |
 |-------|--------|----------------|
 | 1–3 | ✅ Complete | Infrastructure, MarsRL loop, 3-node topology |
-| 4 | ✅ Complete | R730 gateway migration, distributed monitoring |
+| 4 | ✅ Complete | Gateway node migration, distributed monitoring |
 | 5 | ✅ Complete | JWT-ACE capability gating, ExpertiseTemplate versioning |
 | 6 | ✅ Complete | GRPO fine-tuning pipeline, A/B testing, health-aware routing |
-| 7 | 🔜 Next | HA, R730 SPIRE enrollment, k3s migration |
+| 7 | 🔜 Next | HA, Gateway Node SPIRE enrollment, k3s migration |
 
 See [Phase Roadmap](docs/PHASE5_PLUS_ROADMAP.md) for Phase 7–9 plans.
 

@@ -22,7 +22,7 @@ The "Flight Recorder" of the Hive. Langfuse captures every LLM call, providing f
   - Langfuse SDK integrated with Phidata agents.
   - `@observe` decorators on key agent functions.
   - Session-based trace linking for conversation continuity.
-- **Verification**: Langfuse UI at http://192.168.2.102:3000
+- **Verification**: Langfuse UI at http://<control-node-ip>:3000
 
 ### L6: Audit Trail
 

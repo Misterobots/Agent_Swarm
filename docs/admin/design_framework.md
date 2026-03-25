@@ -24,15 +24,15 @@ The Agentic Hive is built around three principles:
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │  TIER 2 — OPS/GATEWAY                                               │
-│  Dell PowerEdge R730 · 192.168.2.103                                │
+│  Gateway Node · <gateway-node-ip>                                   │
 │  Traefik v3.6 · Prometheus · Grafana · Loki · Authentik SSO        │
 │  Ollama (nemotron-8B, llama-guard-3) · OpenHands · IDEs             │
 └──────────────────────────┬──────────────┬──────────────────────────┘
                            │              │
         ┌──────────────────▼──┐      ┌────▼───────────────────────┐
         │  TIER 3 — COMPUTE   │      │  TIER 1 — CONTROL          │
-        │  Justin-PC          │      │  Dell Wyse 5070            │
-        │  192.168.2.101      │      │  192.168.2.102             │
+        │  Execution Node     │      │  Control Node              │
+        │  <execution-node-ip>│      │  <control-node-ip>         │
         │                     │      │                             │
         │  RTX 5060 Ti 16GB   │      │  SPIRE Server              │
         │  Ollama (qwen3.5)   │      │  Langfuse                  │
@@ -47,9 +47,9 @@ The Agentic Hive is built around three principles:
 
 | Tier | Why Separate? |
 |------|---------------|
-| **Control** (Wyse) | Low-power always-on node. Stores data, runs identity/auth. Isolated from compute to prevent data exfiltration if compute is compromised. |
-| **Compute** (Justin-PC) | GPU workloads require isolation. Training, inference, and generation compete for 16GB VRAM — managed by Redis GPU mutex. |
-| **Ops/Gateway** (R730) | Traffic routing and monitoring must be independent of compute. If Justin-PC is down, you can still see why via Grafana. R730's large RAM handles OpenHands, IDEs, and media stacks without GPU pressure. |
+| **Control** (Control Node) | Low-power always-on node. Stores data, runs identity/auth. Isolated from compute to prevent data exfiltration if compute is compromised. |
+| **Compute** (Execution Node) | GPU workloads require isolation. Training, inference, and generation compete for 16GB VRAM — managed by Redis GPU mutex. |
+| **Ops/Gateway** (Gateway Node) | Traffic routing and monitoring must be independent of compute. If Execution Node is down, you can still see why via Grafana. Gateway Node's large RAM handles OpenHands, IDEs, and media stacks without GPU pressure. |
 
 ---
 
@@ -143,9 +143,9 @@ The `NodeHealthMonitor` checks both Ollama nodes every 30 seconds (cached TTL):
 
 ```python
 get_best_host_for_model(model_name):
-  1. Check Justin-PC VRAM headroom (via /api/ps)
-  2. If Justin-PC VRAM hot → route to R730
-  3. If R730 doesn't have the model → static fallback to Justin-PC
+  1. Check Execution Node VRAM headroom (via /api/ps)
+  2. If Execution Node VRAM hot → route to Gateway Node
+  3. If Gateway Node doesn't have the model → static fallback to Execution Node
 ```
 
 This ensures large-context tasks (`qwen3.5:9b` 256K) go to the node with available VRAM.
@@ -176,8 +176,8 @@ ExpertiseTemplate {
 
 ```
 Browser/App
-  → R730 Traefik (L7 routing, Authentik forward-auth)
-  → Justin-PC:8008 (Agent Runtime FastAPI)
+  → Gateway Node Traefik (L7 routing, Authentik forward-auth)
+  → Execution Node:8008 (Agent Runtime FastAPI)
     → SPIFFE SVID validation (workload identity check)
     → JWT-ACE token issuance (capability gating)
     → Security Agent (llama-guard input screen)
@@ -216,15 +216,15 @@ convert_gguf.py
 
 ```
 Agent Runtime → Prometheus metrics endpoint (:8008/metrics/)
-  ↑ scraped by Prometheus (R730) every 15s
+  ↑ scraped by Prometheus (Gateway Node) every 15s
 
-Agent Runtime → Langfuse API (Wyse 5070:3210)
+Agent Runtime → Langfuse API (Control Node:3210)
   → traces, spans, scores written per request
 
 Docker containers → Promtail (Docker socket)
-  → Loki (R730:3100) indexed by {container, service, logstream}
+  → Loki (Gateway Node:3100) indexed by {container, service, logstream}
 
-cAdvisor (R730) + cAdvisor Proxy (Justin-PC:8081)
+cAdvisor (Gateway Node) + cAdvisor Proxy (Execution Node:8081)
   → Prometheus ← container CPU/memory/network/disk
 ```
 
@@ -232,7 +232,7 @@ cAdvisor (R730) + cAdvisor Proxy (Justin-PC:8081)
 
 ## 6. GPU Resource Management
 
-### VRAM Budget (Justin-PC — RTX 5060 Ti 16GB)
+### VRAM Budget (Execution Node — RTX 5060 Ti 16GB)
 
 | State | Allocations | Available |
 |-------|-------------|-----------|
@@ -247,7 +247,7 @@ A Redis-based lock (`redis.lock("gpu_request", context="training")`) prevents co
 - Training acquires the lock → sends `EVICT` signal to Ollama and ComfyUI
 - Inference requests during training: mutex is **fail-open** (returns lock immediately) if Redis is unavailable — safe for single-user usage
 
-**Redis host**: `192.168.2.102:6379` (Wyse 5070)
+**Redis host**: `<control-node-ip>:6379` (Control Node)
 **Password**: set in `execution_plane/.env` as `REDIS_PASSWORD`
 
 > ⚠️ Redis port 6379 must be exposed in `control_plane/docker-compose.yml`. If the GPU mutex is not working, check this first.
@@ -259,8 +259,25 @@ A Redis-based lock (`redis.lock("gpu_request", context="training")`) prevents co
 | Model | Size | VRAM | Location | Role |
 |-------|------|------|----------|------|
 | `qwen3.5:9b` | ~5.5GB GGUF | ~9GB loaded | Both nodes | Solver, Corrector, Architect |
-| `nemotron-orchestrator:8b` | ~5GB | ~8GB | R730 | Router/Orchestrator |
-| `llama-guard-3:8b` | ~5GB | ~8GB | R730 | Safety screening |
-| `qwen2.5:3b` | ~2GB | ~3GB | Justin-PC | BMO conversational voice |
-| Local fine-tuned models | varies | varies | Justin-PC | Promoted GRPO adapters |
+| `nemotron-orchestrator:8b` | ~5GB | ~8GB | Gateway Node | Router/Orchestrator |
+| `llama-guard-3:8b` | ~5GB | ~8GB | Gateway Node | Safety screening |
+| `qwen2.5:3b` | ~2GB | ~3GB | Execution Node | BMO conversational voice |
+| Local fine-tuned models | varies | varies | Execution Node | Promoted GRPO adapters |
 
+---
+
+## 8. Versioning & Phase History
+
+| Version | Phase | Key Changes |
+|---------|-------|-------------|
+| 1.0 (Feb 2026) | Phase 1 | Initial deployment, single-node |
+| 1.2 (Feb 2026) | Phase 2 | SPIFFE enrollment, Langfuse |
+| 3.0 (Feb 2026) | Phase 3 | MarsRL loop, 3-node topology, Qwen + Nemotron |
+| 3.1 (Mar 2026) | Phase 4 | Gateway Node migration, Traefik consolidation, distributed monitoring |
+| 3.2 (Mar 2026) | Phase 5 | JWT-ACE, ExpertiseTemplate, capability gating |
+| **3.3 (Mar 2026)** | **Phase 6** | **GRPO training pipeline, A/B testing, model lifecycle, health-aware routing** |
+| 3.x (planned) | Phase 7 | HA, Gateway Node SPIRE enrollment, k3s migration |
+
+---
+
+*See the [Phase Roadmap](../PHASE5_PLUS_ROADMAP.md) for Phase 7–9 plans · [Back to Index](../INDEX.md)*

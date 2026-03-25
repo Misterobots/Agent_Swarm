@@ -2,7 +2,7 @@
 
 ## 📋 Overview
 
-This directory contains the centralized JWT authentication system for the Home AI Lab multi-plane architecture. The security service runs on the Control Plane (192.168.2.102) and provides token issuance, validation, and capability management for all Execution Planes.
+This directory contains the centralized JWT authentication system for the Home AI Lab multi-plane architecture. The security service runs on the Control Plane (<control-node-ip>) and provides token issuance, validation, and capability management for all Execution Planes.
 
 ## 🏗️ Architecture
 
@@ -55,7 +55,7 @@ docker-compose up -d
 ### 2. Verify Running
 
 ```bash
-curl http://192.168.2.102:8001/health
+curl http://<control-node-ip>:8001/health
 ```
 
 Response: `{"status": "healthy", "service": "control-plane-security", "version": "1.0"}`
@@ -66,7 +66,7 @@ Response: `{"status": "healthy", "service": "control-plane-security", "version":
 from control_plane_security import SecurityClient
 
 # Connect to security service
-client = SecurityClient("http://192.168.2.102:8001")
+client = SecurityClient("http://<control-node-ip>:8001")
 
 # Get token
 token = client.issue_token(
@@ -215,7 +215,7 @@ Use in Execution Planes to interact with security service.
 ```python
 from control_plane_security import SecurityClient
 
-client = SecurityClient("http://192.168.2.102:8001")
+client = SecurityClient("http://<control-node-ip>:8001")
 
 # Issue token
 token = client.issue_token(
@@ -307,7 +307,7 @@ SELECT * FROM security_tokens WHERE status = 'revoked';
 
 ### Langfuse Integration
 
-All security events are logged to Langfuse (192.168.2.103:3000):
+All security events are logged to Langfuse (<gateway-node-ip>:3000):
 - Token issuance
 - Authentication failures
 - Audit events
@@ -374,7 +374,7 @@ No changes needed - just add more execution planes!
 
 ```python
 def initialize_agent():
-    client = SecurityClient("http://192.168.2.102:8001")
+    client = SecurityClient("http://<control-node-ip>:8001")
     
     # Get token once
     token = client.issue_token(
@@ -395,7 +395,7 @@ def do_work(token):
 
 ```python
 def call_other_service(agent_name):
-    client = SecurityClient("http://192.168.2.102:8001")
+    client = SecurityClient("http://<control-node-ip>:8001")
     
     # Get token with required capabilities
     token = client.issue_token(
@@ -417,7 +417,7 @@ def call_other_service(agent_name):
 
 ```python
 def run_temporary_task(task_id):
-    client = SecurityClient("http://192.168.2.102:8001")
+    client = SecurityClient("http://<control-node-ip>:8001")
     
     # Issue short-lived token for task
     token = client.issue_token(
@@ -445,7 +445,7 @@ def run_temporary_task(task_id):
 
 ```bash
 # Test with curl
-curl -X POST "http://192.168.2.102:8001/api/security/v1/token" \
+curl -X POST "http://<control-node-ip>:8001/api/security/v1/token" \
   -H "Content-Type: application/json" \
   -d '{
     "agent_name": "test-agent",
@@ -453,7 +453,7 @@ curl -X POST "http://192.168.2.102:8001/api/security/v1/token" \
   }'
 
 # Test with Python client
-python -m control_plane.security.client http://192.168.2.102:8001
+python -m control_plane.security.client http://<control-node-ip>:8001
 ```
 
 ## 📝 Version History
@@ -465,7 +465,7 @@ python -m control_plane.security.client http://192.168.2.102:8001
 ## ✅ Status
 
 - **Status:** Production Ready
-- **Location:** Control Plane (192.168.2.102:8001)
+- **Location:** Control Plane (<control-node-ip>:8001)
 - **Database:** PostgreSQL in Control Plane
 - **Observability:** Langfuse integration
 - **Scaling:** Ready for multiple execution planes

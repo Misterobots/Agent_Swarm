@@ -2,13 +2,13 @@
 
 ## Overview
 
-The Control Plane Security Service is a centralized JWT token issuer running on the Control Plane (192.168.2.102). It serves tokens to all Execution Planes and validates their requests.
+The Control Plane Security Service is a centralized JWT token issuer running on the Control Plane (<control-node-ip>). It serves tokens to all Execution Planes and validates their requests.
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────┐
-│  Execution Plane (192.168.2.101) │
+│  Execution Plane (<execution-node-ip>) │
 │  - Agents running                │
 │  - Requests tokens               │
 │  - Uses JWT for auth             │
@@ -18,7 +18,7 @@ The Control Plane Security Service is a centralized JWT token issuer running on 
                │
                ▼
 ┌────────────────────────────────────────────┐
-│  Control Plane (192.168.2.102) ⭐          │  
+│  Control Plane (<control-node-ip>) ⭐          │  
 │  ┌──────────────────────────────────────┐  │
 │  │  Security Service (Port 8001)        │  │
 │  │  - Issues JWT tokens                 │  │
@@ -62,7 +62,7 @@ This starts:
 ### 2. Verify Service is Running
 
 ```bash
-curl http://192.168.2.102:8001/health
+curl http://<control-node-ip>:8001/health
 ```
 
 Expected response:
@@ -76,7 +76,7 @@ Expected response:
 
 ### 3. Get API Documentation
 
-Visit: `http://192.168.2.102:8001/docs` (Swagger UI)
+Visit: `http://<control-node-ip>:8001/docs` (Swagger UI)
 
 ## API Endpoints
 
@@ -86,7 +86,7 @@ Visit: `http://192.168.2.102:8001/docs` (Swagger UI)
 
 Request:
 ```bash
-curl -X POST "http://192.168.2.102:8001/api/security/v1/token" \
+curl -X POST "http://<control-node-ip>:8001/api/security/v1/token" \
   -H "Content-Type: application/json" \
   -d '{
     "agent_name": "worker-1",
@@ -111,7 +111,7 @@ Response:
 
 Request:
 ```bash
-curl -X POST "http://192.168.2.102:8001/api/security/v1/validate" \
+curl -X POST "http://<control-node-ip>:8001/api/security/v1/validate" \
   -H "Content-Type: application/json" \
   -d '{
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -135,7 +135,7 @@ Response:
 
 Request:
 ```bash
-curl -X POST "http://192.168.2.102:8001/api/security/v1/revoke" \
+curl -X POST "http://<control-node-ip>:8001/api/security/v1/revoke" \
   -H "Content-Type: application/json" \
   -d '{
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -162,7 +162,7 @@ import requests
 # 1. Get token from security service
 def get_auth_token(agent_name: str) -> str:
     response = requests.post(
-        "http://192.168.2.102:8001/api/security/v1/token",
+        "http://<control-node-ip>:8001/api/security/v1/token",
         json={
             "agent_name": agent_name,
             "capabilities": [
@@ -186,7 +186,7 @@ def make_authenticated_request(endpoint: str, token: str):
 # 3. Usage
 token = get_auth_token("agent-worker-1")
 result = make_authenticated_request(
-    "http://192.168.2.101:8008/api/v1/models",
+    "http://<execution-node-ip>:8008/api/v1/models",
     token
 )
 ```
@@ -244,7 +244,7 @@ ORDER BY issued_at DESC;
 
 ### View in Langfuse Dashboard
 
-1. Go to `http://192.168.2.103:3000` (Langfuse on R730)
+1. Go to `http://<gateway-node-ip>:3000` (Langfuse on Gateway Node)
 2. Token issuance events appear as traces
 3. Failed authentications logged as errors
 4. Capability denials tracked for compliance
@@ -384,7 +384,7 @@ As you add more execution planes:
 For issues:
 1. Check service logs: `docker logs control-security`
 2. Verify database access: `docker exec -it postgres psql ...`
-3. Check Langfuse traces: `http://192.168.2.103:3000`
+3. Check Langfuse traces: `http://<gateway-node-ip>:3000`
 4. Review this guide's troubleshooting section
 
 ---
@@ -393,4 +393,4 @@ For issues:
 
 **Version:** 1.0
 
-**Location:** Control Plane (192.168.2.102:8001)
+**Location:** Control Plane (<control-node-ip>:8001)

@@ -14,79 +14,79 @@ All IP addresses are managed in [`network.env`](../../network.env) — edit that
 | Node | IP | Role | Hardware |
 |------|----|------|----------|
 | Home Assistant | `192.168.2.100` | Smart Home Hub | Dedicated HA device |
-| **Justin-PC** | `192.168.2.101` | GPU Compute / Agent Runtime | RTX 5060 Ti 16GB, 32GB RAM, 500GB SSD |
-| **Wyse 5070** | `192.168.2.102` | Control Plane | x86 low-power, 16GB RAM, 512GB SSD |
-| **Dell R730** | `192.168.2.103` | Gateway / Ops | 384GB RAM, 24 CPU, 450GB SSD |
-| iDRAC | `192.168.2.104` | R730 Remote Management | — |
+| **Execution Node** | `<execution-node-ip>` | GPU Compute / Agent Runtime | RTX 5060 Ti 16GB, 32GB RAM, 500GB SSD |
+| **Control Node** | `<control-node-ip>` | Control Plane | x86 low-power, 16GB RAM, 512GB SSD |
+| **Gateway Node** | `<gateway-node-ip>` | Gateway / Ops | 384GB RAM, 24 CPU, 450GB SSD |
+| iDRAC | `<idrac-ip>` | Gateway Remote Management | — |
 
-**Tailscale Remote Access**: Connect to `dell-r730.tail-xxxx.ts.net:80` for all services. Run `tailscale status` on any node for the current MagicDNS hostname.
+**Tailscale Remote Access**: Connect to `gateway-node.tail-xxxx.ts.net:80` for all services. Run `tailscale status` on any node for the current MagicDNS hostname.
 
 ---
 
 ## 2. User Interfaces
 
-All UIs are accessible via the R730 Traefik gateway (`http://192.168.2.103`).
+All UIs are accessible via the Gateway Node Traefik gateway (`http://<gateway-node-ip>`).
 
 | Interface | URL | Hosted On | Purpose |
 |-----------|-----|-----------|---------|
-| Traefik Gateway | `http://192.168.2.103:80` | R730 | Central reverse proxy, primary entry point |
-| Hive Mind UI | `http://192.168.2.103` (root) | R730→Justin-PC | Primary Streamlit chat + all workspaces |
-| Open-WebUI | `http://192.168.2.103:3000` | R730 | Alternative OpenAI-compatible chat UI |
-| Grafana | `http://192.168.2.103:3001` | R730 | Monitoring dashboards (metrics + logs) |
-| Prometheus | `http://192.168.2.103:9091` | R730 | Metrics query interface |
-| Loki | `http://192.168.2.103:3100` | R730 | Log aggregation backend |
-| Traefik Dashboard | `http://192.168.2.103:8080` | R730 | Live routing and load balancer metrics |
-| Langfuse | `http://192.168.2.102:3000` | Wyse 5070 | LLM trace viewer, process reward scores |
-| OpenHands | `http://192.168.2.103:3002` | R730 | Secure code execution sandbox |
-| ComfyUI | `http://192.168.2.103/comfy` | R730→Justin-PC | Image/3D generation node editor |
-| Authentik SSO | `http://192.168.2.103:9000` | R730 | Single Sign-On identity provider |
-| VS Code (DevOps) | `http://192.168.2.103:8445` | R730 | Infrastructure workspace IDE |
-| VS Code (Coding) | `http://192.168.2.103:8444` | R730 | Coding sandbox IDE |
-| MinIO Console | `http://192.168.2.102:9001` | Wyse 5070 | Object storage browser |
+| Traefik Gateway | `http://<gateway-node-ip>:80` | Gateway Node | Central reverse proxy, primary entry point |
+| Hive Mind UI | `http://<gateway-node-ip>` (root) | Gateway Node→Execution Node | Primary Streamlit chat + all workspaces |
+| Open-WebUI | `http://<gateway-node-ip>:3000` | Gateway Node | Alternative OpenAI-compatible chat UI |
+| Grafana | `http://<gateway-node-ip>:3001` | Gateway Node | Monitoring dashboards (metrics + logs) |
+| Prometheus | `http://<gateway-node-ip>:9091` | Gateway Node | Metrics query interface |
+| Loki | `http://<gateway-node-ip>:3100` | Gateway Node | Log aggregation backend |
+| Traefik Dashboard | `http://<gateway-node-ip>:8080` | Gateway Node | Live routing and load balancer metrics |
+| Langfuse | `http://<control-node-ip>:3000` | Control Node | LLM trace viewer, process reward scores |
+| OpenHands | `http://<gateway-node-ip>:3002` | Gateway Node | Secure code execution sandbox |
+| ComfyUI | `http://<gateway-node-ip>/comfy` | Gateway Node→Execution Node | Image/3D generation node editor |
+| Authentik SSO | `http://<gateway-node-ip>:9000` | Gateway Node | Single Sign-On identity provider |
+| VS Code (DevOps) | `http://<gateway-node-ip>:8445` | Gateway Node | Infrastructure workspace IDE |
+| VS Code (Coding) | `http://<gateway-node-ip>:8444` | Gateway Node | Coding sandbox IDE |
+| MinIO Console | `http://<control-node-ip>:9001` | Control Node | Object storage browser |
 
 ---
 
 ## 3. API Endpoints
 
-### Swarm Engine (via R730 Traefik)
+### Swarm Engine (via Gateway Node Traefik)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `http://192.168.2.103/swarm/docs` | GET | Swagger UI — all FastAPI endpoints |
-| `http://192.168.2.103/swarm/v1/chat/completions` | POST | OpenAI-compatible endpoint (used by Open-WebUI, Continue) |
-| `http://192.168.2.103/swarm/v1/models` | GET | Returns `Home-AI-Swarm` model for UI dropdowns |
-| `http://192.168.2.103/swarm/task` | POST | Raw task submission: `{"prompt": "..."}` |
-| `http://192.168.2.103/swarm/voice/stream` | POST | BMO Voice PCM → TTS stream |
-| `http://192.168.2.103/swarm/api/v1/health/nodes` | GET | Node health status + loaded models |
-| `http://192.168.2.103/swarm/metrics/` | GET | Prometheus metrics endpoint |
+| `http://<gateway-node-ip>/swarm/docs` | GET | Swagger UI — all FastAPI endpoints |
+| `http://<gateway-node-ip>/swarm/v1/chat/completions` | POST | OpenAI-compatible endpoint (used by Open-WebUI, Continue) |
+| `http://<gateway-node-ip>/swarm/v1/models` | GET | Returns `Home-AI-Swarm` model for UI dropdowns |
+| `http://<gateway-node-ip>/swarm/task` | POST | Raw task submission: `{"prompt": "..."}` |
+| `http://<gateway-node-ip>/swarm/voice/stream` | POST | BMO Voice PCM → TTS stream |
+| `http://<gateway-node-ip>/swarm/api/v1/health/nodes` | GET | Node health status + loaded models |
+| `http://<gateway-node-ip>/swarm/metrics/` | GET | Prometheus metrics endpoint |
 
-**Direct access (bypass gateway)**: `http://192.168.2.101:8008/...`
+**Direct access (bypass gateway)**: `http://<execution-node-ip>:8008/...`
 
 ### Local Inference Services
 
 | Service | Endpoint | Node | Models |
 |---------|----------|------|--------|
-| Ollama (Primary) | `http://192.168.2.101:11434` | Justin-PC | `qwen3.5:9b` |
-| Ollama (Gateway) | `http://192.168.2.103:11434` | R730 | `qwen3.5:9b`, `nemotron-orchestrator:8b`, `llama-guard-3:8b` |
-| RVC Voice | `http://192.168.2.101:8100/infer` | Justin-PC | BMO voice model |
-| Qwen-TTS | `http://192.168.2.101:8020/tts` | Justin-PC | Text-to-speech |
-| ComfyUI API | `http://192.168.2.101:8188` | Justin-PC | Image/3D generation (internal) |
+| Ollama (Primary) | `http://<execution-node-ip>:11434` | Execution Node | `qwen3.5:9b` |
+| Ollama (Gateway) | `http://<gateway-node-ip>:11434` | Gateway Node | `qwen3.5:9b`, `nemotron-orchestrator:8b`, `llama-guard-3:8b` |
+| RVC Voice | `http://<execution-node-ip>:8100/infer` | Execution Node | BMO voice model |
+| Qwen-TTS | `http://<execution-node-ip>:8020/tts` | Execution Node | Text-to-speech |
+| ComfyUI API | `http://<execution-node-ip>:8188` | Execution Node | Image/3D generation (internal) |
 
 ### Open-WebUI / External Agent Connection Settings
 
 ```
 Primary (via Gateway):
-  API Base URL:   http://192.168.2.103/swarm/v1
+  API Base URL:   http://<gateway-node-ip>/swarm/v1
   Model:          Home-AI-Swarm
   API Key:        sk-swarm
   Context Window: 128,000
   Max Tokens:     4,096
 
-Direct (Justin-PC bypass):
-  API Base URL:   http://192.168.2.101:8008/v1
+Direct (Execution Node bypass):
+  API Base URL:   http://<execution-node-ip>:8008/v1
 
-Raw Ollama (Justin-PC):
-  OLLAMA_BASE_URL: http://192.168.2.101:11434
+Raw Ollama (Execution Node):
+  OLLAMA_BASE_URL: http://<execution-node-ip>:11434
   Model:           qwen3.5:9b
 ```
 
@@ -94,7 +94,7 @@ Raw Ollama (Justin-PC):
 
 ## 4. Service Inventory by Node
 
-### Control Plane — Wyse 5070 (192.168.2.102)
+### Control Plane — Control Node (<control-node-ip>)
 
 | Service | Port | Purpose | Compose File |
 |---------|------|---------|--------------|
@@ -105,7 +105,7 @@ Raw Ollama (Justin-PC):
 | MinIO | 9000 (S3), 9001 (Console) | Object storage (models, outputs, backups, training data) | `control_plane/docker-compose.yml` |
 | Redis | 6379 | GPU mutex (langfuse_redis_password), session cache | `control_plane/docker-compose.yml` |
 
-### Ops/Gateway — Dell R730 (192.168.2.103)
+### Ops/Gateway — Gateway Node (<gateway-node-ip>)
 
 | Service | Port | Purpose | Compose File |
 |---------|------|---------|--------------|
@@ -114,16 +114,16 @@ Raw Ollama (Justin-PC):
 | Grafana | 3001 | Dashboards (Prometheus + Loki + PostgreSQL-Swarm) | `r730_gateway/docker-compose.yml` |
 | Loki | 3100 | Log aggregation | `r730_gateway/docker-compose.yml` |
 | Promtail | — | Log collector (Docker socket → Loki) | `r730_gateway/docker-compose.yml` |
-| cAdvisor | 8888 (→8080) | Container resource metrics for R730 | `r730_gateway/docker-compose.yml` |
+| cAdvisor | 8888 (→8080) | Container resource metrics for Gateway Node | `r730_gateway/docker-compose.yml` |
 | Authentik | 9000, 9443 | SSO identity provider | `r730_gateway/docker-compose.yml` |
-| Ollama (R730) | 11434 | Secondary inference (nemotron, llama-guard) | `r730_gateway/docker-compose.yml` |
+| Ollama (Gateway) | 11434 | Secondary inference (nemotron, llama-guard) | `r730_gateway/docker-compose.yml` |
 | Open-WebUI | 3000 | Chat UI connected to Swarm API | `r730_gateway/docker-compose.yml` |
 | OpenHands | 3002 | Code execution sandbox | `r730_gateway/docker-compose.yml` |
 | VS Code (DevOps) | 8445 | Infrastructure IDE | `r730_gateway/docker-compose.yml` |
 | VS Code (Coding) | 8444 | Coding sandbox IDE | `r730_gateway/docker-compose.yml` |
-| SPIRE Agent (R730) | — (Unix socket) | Workload identity agent (pending enrollment) | `r730_gateway/docker-compose.yml` |
+| SPIRE Agent (Gateway) | — (Unix socket) | Workload identity agent (pending enrollment) | `r730_gateway/docker-compose.yml` |
 
-### Compute Node — Justin-PC (192.168.2.101)
+### Compute Node — Execution Node (<execution-node-ip>)
 
 | Service | Container Name | Port | Purpose | Compose File |
 |---------|----------------|------|---------|--------------|
@@ -145,10 +145,10 @@ Configured in `r730_gateway/config/prometheus/prometheus.yml`:
 
 | Job Name | Target | Metrics |
 |----------|--------|---------|
-| `cadvisor-r730` | `cadvisor-r730:8080` | R730 container CPU/memory/net/disk |
-| `cadvisor-justin` | `192.168.2.101:8081` | Justin-PC container metrics (via proxy, with name labels) |
-| `agent-runtime` | `192.168.2.101:8008/metrics/` | Agent state, workflow steps, latency, training metrics |
-| `ollama-justin` | `192.168.2.101:11434/metrics` | Ollama request rate/latency (requires `OLLAMA_METRICS=1`) |
+| `cadvisor-r730` | `cadvisor-r730:8080` | Gateway Node container CPU/memory/net/disk |
+| `cadvisor-justin` | `<execution-node-ip>:8081` | Execution Node container metrics (via proxy, with name labels) |
+| `agent-runtime` | `<execution-node-ip>:8008/metrics/` | Agent state, workflow steps, latency, training metrics |
+| `ollama-justin` | `<execution-node-ip>:11434/metrics` | Ollama request rate/latency (requires `OLLAMA_METRICS=1`) |
 
 ### Custom Agent Runtime Metrics
 
@@ -167,7 +167,7 @@ Configured in `r730_gateway/config/prometheus/prometheus.yml`:
 
 ## 6. Grafana Dashboards
 
-Access: `http://192.168.2.103:3001`
+Access: `http://<gateway-node-ip>:3001`
 Datasource UIDs: `Prometheus`, `Loki`, `PostgreSQL-Swarm`
 
 | Dashboard | UID | Datasources | Purpose |
@@ -184,7 +184,7 @@ Datasource UIDs: `Prometheus`, `Loki`, `PostgreSQL-Swarm`
 
 ## 7. PostgreSQL — Swarm Schema
 
-Database: `langfuse` (on Wyse 5070:5432, user: `langfuse`)
+Database: `langfuse` (on Control Node:5432, user: `langfuse`)
 Schema prefix: `swarm.*`
 
 | Table | Key Columns | Purpose |
@@ -201,7 +201,7 @@ Schema prefix: `swarm.*`
 
 ## 8. Training Pipeline
 
-The training pipeline runs as a Docker profile-gated service on Justin-PC. It is NOT always running.
+The training pipeline runs as a Docker profile-gated service on Execution Node. It is NOT always running.
 
 ```bash
 # Build training container (first time or after code changes)
@@ -232,7 +232,7 @@ docker compose --profile training run --rm training-runtime \
 
 **Training schedule**: Recommended during the 02:00–06:00 idle window to avoid VRAM conflicts with active inference.
 
-**Output directories** (Justin-PC):
+**Output directories** (Execution Node):
 - Training data: `execution_plane/training_data/`
 - Adapters + GGUF: `execution_plane/training_output/`
 

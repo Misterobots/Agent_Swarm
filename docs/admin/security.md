@@ -36,7 +36,7 @@ Request Ingress
 Response Delivered
 ```
 
-**Overall MAESTRO Status**: ✅ 98% compliant (2% gap = R730 not yet SPIRE-enrolled; covered by JWT-ACE at runtime).
+**Overall MAESTRO Status**: ✅ 98% compliant (2% gap = Gateway Node not yet SPIRE-enrolled; covered by JWT-ACE at runtime).
 
 ---
 
@@ -44,28 +44,28 @@ Response Delivered
 
 ### What It Does
 
-SPIRE (Secure Production Identity Runtime for Everyone) issues **short-lived X.509 SVIDs** (SPIFFE Verifiable Identity Documents) to each container workload on Justin-PC. These certificates:
+SPIRE (Secure Production Identity Runtime for Everyone) issues **short-lived X.509 SVIDs** (SPIFFE Verifiable Identity Documents) to each container workload on Execution Node. These certificates:
 
 - Rotate automatically (no long-lived secrets)
 - Are cryptographically tied to the specific Docker workload (image SHA + container labels)
 - Enable **mutual TLS (mTLS)** between services — both sides authenticate each other
-- Are issued by a SPIRE Server running on the Wyse 5070 (acting as the certificate authority)
+- Are issued by a SPIRE Server running on the Control Node (acting as the certificate authority)
 
 ### Architecture
 
 ```
-Wyse 5070 (192.168.2.102)
+Control Node (<control-node-ip>)
   └── SPIRE Server
         ├── Workload Registry (PostgreSQL)
         └── Issues SVIDs to enrolled agents
 
-Justin-PC (192.168.2.101)
+Execution Node (<execution-node-ip>)
   └── SPIRE Agent (spire-agent container)
         ├── Receives SVIDs from server
         ├── Exposes Unix socket: /var/run/spire/agent.sock
         └── Agent Runtime reads SVID via SPIFFE_ENDPOINT_SOCKET env var
 
-R730 (192.168.2.103)
+Gateway Node (<gateway-node-ip>)
   └── SPIRE Agent (spire-agent-r730 container) — ⚠️ pending enrollment
 ```
 
@@ -83,9 +83,9 @@ SPIRE verifies the workload against the Docker attestor (image SHA, container la
 
 | Node | Status | Notes |
 |------|--------|-------|
-| Justin-PC | ✅ Enrolled | Agent runtime authenticated via SVID |
-| Wyse 5070 | ✅ Enrolled | SPIRE server itself |
-| Dell R730 | ⚠️ Pending | JWT-ACE covers runtime gaps; SPIRE enrollment is Phase 7 |
+| Execution Node | ✅ Enrolled | Agent runtime authenticated via SVID |
+| Control Node | ✅ Enrolled | SPIRE server itself |
+| Gateway Node | ⚠️ Pending | JWT-ACE covers runtime gaps; SPIRE enrollment is Phase 7 |
 
 ---
 
@@ -167,7 +167,7 @@ The **LogicVerifier** enforces output quality and safety at the end of every cod
 
 **Pass threshold**: ≥ 0.60. Below this, the Corrector is invoked for up to 2 rounds.
 
-The llama-guard layer runs on the R730 Ollama instance (`llama-guard-3:8b`) and is isolated from the primary inference workload.
+The llama-guard layer runs on the Gateway Node Ollama instance (`llama-guard-3:8b`) and is isolated from the primary inference workload.
 
 ---
 
@@ -251,7 +251,7 @@ Source: `agents/security_agent.py`
 
 **Authentik** provides Single Sign-On authentication for all gateway-exposed services:
 
-- Provider: `http://192.168.2.103:9000`
+- Provider: `http://<gateway-node-ip>:9000`
 - Integration: Traefik forward-auth (`authentik@docker` middleware)
 - Protected services: ComfyUI, VS Code IDEs, OpenHands, and any future services tagged with the Authentik middleware
 - Authentication flows: Local username/password + optional MFA
@@ -287,9 +287,9 @@ Evidence files: see [`docs/evidence/`](../evidence/) for all point-in-time audit
 
 | Item | Risk | Mitigation | Phase |
 |------|------|-----------|-------|
-| R730 not SPIRE-enrolled | Medium — no mTLS from R730 workloads | JWT-ACE covers runtime identity | Phase 7 |
+| Gateway Node not SPIRE-enrolled | Medium — no mTLS from Gateway Node workloads | JWT-ACE covers runtime identity | Phase 7 |
 | Grafana anonymous viewer | Low — read-only, internal only | Restrict to Authentik auth when public | Phase 7 |
-| Redis port not exposed (Wyse) | Low — GPU mutex fail-open | Manual sudo on Wyse console | Next session |
+| Redis port not exposed (Control Node) | Low — GPU mutex fail-open | Manual sudo on Control Node console | Next session |
 | Traefik TLS (HTTPS) | Medium — HTTP only on LAN | Add TLS certs (Let's Encrypt / self-signed) | Phase 7 |
 
 ---

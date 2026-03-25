@@ -2,7 +2,7 @@
 
 **Component**: Agent Registry, RBAC & SPIFFE/SPIRE Workload Identity
 **Date**: 2026-02-22 (updated 2026-03-17)
-**Status**: ✅ Fully Compliant — JWT-ACE capability gating live; R730 SPIRE enrollment pending
+**Status**: ✅ Fully Compliant — JWT-ACE capability gating live; Gateway Node SPIRE enrollment pending
 
 ## 1. Component Description
 
@@ -50,9 +50,9 @@ The "Passport Control" of the Hive. It defines WHO agents are and WHAT they can 
 
 - **Requirement**: "Workloads must have cryptographically verifiable identity independent of the network."
 - **Implementation**:
-  - **SPIRE Server** (Dell Wyse 5070): Issues short-lived X.509 SVIDs to attested workloads.
+  - **SPIRE Server** (Control Node): Issues short-lived X.509 SVIDs to attested workloads.
   - **SPIRE Agent** (Hive PC): ✅ Enrolled — validates Docker labels + image SHA before delivering SVIDs.
-  - **SPIRE Agent** (Dell R730): ⚠️ Pending — must be enrolled after hardware commissioning.
+  - **SPIRE Agent** (Gateway Node): ⚠️ Pending — must be enrolled after hardware commissioning.
   - **py-spiffe**: Agents fetch SVIDs from `unix:///var/run/spire/agent.sock`, enabling mTLS.
   - **SVIDs**: Short-lived (1 hour), auto-rotated. Trust domain: `spiffe://home-lab`.
 - **Verification**: [identity_verification_2026-02-08.txt](../evidence/identity_verification_2026-02-08.txt)
@@ -81,4 +81,4 @@ The "Passport Control" of the Hive. It defines WHO agents are and WHAT they can 
 
 - **Identity Spoofing (Internal)**: Since the Registry is in-memory Python, a compromised `main.py` could overwrite it. This is mitigated by L5 Container Isolation (immutable code volume in production), though currently we mount code for dev.
 - **Tool-level enforcement opt-in**: JWT-ACE tokens are issued and propagated, but individual tools are not yet required to validate them. A compromised tool could bypass capability checks. Planned mitigation: make enforcement mandatory and fail-closed in a future phase.
-- **HS256 shared secret**: The primary signing key is a symmetric secret (`JWT_SECRET`). If leaked, tokens can be forged. Mitigated by short TTL (1 hour) and planned migration to RS256-only via SPIRE once R730 enrollment is complete.
+- **HS256 shared secret**: The primary signing key is a symmetric secret (`JWT_SECRET`). If leaked, tokens can be forged. Mitigated by short TTL (1 hour) and planned migration to RS256-only via SPIRE once Gateway Node enrollment is complete.

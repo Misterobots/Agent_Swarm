@@ -36,17 +36,17 @@ The Maker Space workspace simulates and programs embedded hardware (ESP32, Ardui
 
 ## How Do I Access It?
 
-All services are available through the **R730 Gateway** (`http://192.168.2.103`).
+All services are available through the **Gateway Node** (`http://<gateway-node-ip>`).
 
 | Interface | URL | What It's For |
 |-----------|-----|---------------|
-| **Hive Mind UI** | `http://192.168.2.103` | Primary chat + all workspaces |
-| **Open-WebUI** | `http://192.168.2.103:3000` | Alternative chat interface |
-| **ComfyUI** | `http://192.168.2.103/comfy` | Direct image/3D workflow editor |
-| **Grafana** | `http://192.168.2.103:3001` | System performance dashboards |
-| **Langfuse** | `http://192.168.2.102:3000` | AI trace viewer (LLM call history) |
+| **Hive Mind UI** | `http://<gateway-node-ip>` | Primary chat + all workspaces |
+| **Open-WebUI** | `http://<gateway-node-ip>:3000` | Alternative chat interface |
+| **ComfyUI** | `http://<gateway-node-ip>/comfy` | Direct image/3D workflow editor |
+| **Grafana** | `http://<gateway-node-ip>:3001` | System performance dashboards |
+| **Langfuse** | `http://<control-node-ip>:3000` | AI trace viewer (LLM call history) |
 
-For remote access outside the home network, use Tailscale MagicDNS — connect to `dell-r730` as your gateway for all services.
+For remote access outside the home network, use Tailscale MagicDNS — connect to the Gateway Node as your entry point for all services.
 
 ---
 
@@ -72,8 +72,8 @@ The Hive Mind UI is organized into **workspaces**, each optimized for a differen
 
 - **All data stays on your hardware.** No requests are sent to external AI services.
 - Every AI interaction is logged to **Langfuse** (on your Control Node) for quality monitoring and optional model training.
-- Logs are stored locally on the R730 for 90 days (Prometheus metrics) and indefinitely (Loki logs, unless purged).
-- You can review all traces at `http://192.168.2.102:3000`.
+- Logs are stored locally on the Gateway Node for 90 days (Prometheus metrics) and indefinitely (Loki logs, unless purged).
+- You can review all traces at `http://<control-node-ip>:3000`.
 
 ---
 
@@ -84,7 +84,7 @@ The current system is running **Version 3.3** (Phase 6 complete):
 - ✅ JWT-ACE capability-based security
 - ✅ ExpertiseTemplate versioned agents
 - ✅ GRPO fine-tuning pipeline with A/B testing
-- ⚠️ R730 not yet enrolled in SPIRE zero-trust identity (JWT-ACE covers runtime gaps)
+- ⚠️ Gateway Node not yet enrolled in SPIRE zero-trust identity (JWT-ACE covers runtime gaps)
 
 ---
 
