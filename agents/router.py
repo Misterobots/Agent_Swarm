@@ -400,6 +400,18 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
 
         route_start_time = time.time()
 
+        # --- ART WORKSPACE OFFER (for creative intents) ---
+        CREATIVE_INTENTS = {"IMAGE", "3D", "ACTION_FIGURE"}
+        if intent in CREATIVE_INTENTS:
+            yield {
+                "type": "workspace_offer",
+                "content": {
+                    "intent": intent,
+                    "prompt": user_input,
+                    "message": "This looks like a creative request. Would you like to enter the Art Studio for a full workspace experience?"
+                }
+            }
+
         # --- ROUTE: CONVERSATION / CASUAL CHAT ---
         if intent == "CONVERSATION":
             yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
@@ -764,6 +776,69 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                     return
             except Exception as e:
                 yield {"type": "error", "content": f"Concept Generation Failed: {e}"}
+                yield {"type": "log", "content": f"[Exception] {str(e)}"}
+                return
+
+        # --- ROUTE: ACTION FIGURE GENERATION ---
+        if intent == "ACTION_FIGURE":
+            yield {"type": "status", "content": "🦾 Router: Detected Action Figure Request."}
+
+            # Step A: Concept Art (T-Pose optimized)
+            yield {"type": "status", "content": "🎨 Action Figure Forge: Generating T-Pose Concept Art..."}
+            AGENT_STATE.labels(agent_name="ActionFigureForge").set(2)
+
+            from specialized.image_gen import generate_image
+
+            concept_prompt = (
+                f"T-pose character concept art for 3D action figure, "
+                f"full body front view, neutral gray background, "
+                f"arms extended to sides, symmetrical pose, "
+                f"clean silhouette for 3D modeling: {user_input}"
+            )
+            yield {"type": "log", "content": f"[ActionFigureForge] Prompt: '{concept_prompt}'"}
+
+            try:
+                with request_lock(context="image"):
+                    img_result = generate_image(concept_prompt)
+                yield {"type": "status", "content": f"🖼️ {img_result}"}
+                yield {"type": "log", "content": f"[ActionFigureForge] Concept Art: {img_result}"}
+
+                import re
+                match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
+
+                if match:
+                    filename = match.group(1)
+                    full_image_path = f"/app/comfy_io/output/{filename}"
+
+                    # Step B: Action Figure Pipeline (3D mesh + segmentation + joints)
+                    yield {"type": "status", "content": "⚒️ Action Figure Forge: Generating mesh & adding ball-socket joints..."}
+
+                    from specialized.action_figure_agent import generate_action_figure
+
+                    yield {"type": "log", "content": f"[ActionFigureForge] Processing: {full_image_path}"}
+                    with request_lock(context="image"):
+                        figure_result = generate_action_figure(full_image_path)
+                    AGENT_STATE.labels(agent_name="ActionFigureForge").set(1)
+
+                    # Yield Action Figure Artifact
+                    yield {
+                        "type": "artifact",
+                        "content": {
+                            "type": "action_figure",
+                            "path": f"action_figures/",
+                            "name": f"ActionFigure_{filename}"
+                        }
+                    }
+
+                    yield {"type": "response", "content": figure_result}
+                    WORKFLOW_STEPS.labels(status="success", agent_type="ActionFigureForge").inc()
+                    return
+                else:
+                    yield {"type": "error", "content": f"Failed to parse image filename from: {img_result}"}
+                    WORKFLOW_STEPS.labels(status="error", agent_type="ActionFigureForge").inc()
+                    return
+            except Exception as e:
+                yield {"type": "error", "content": f"Action Figure Generation Failed: {e}"}
                 yield {"type": "log", "content": f"[Exception] {str(e)}"}
                 return
 

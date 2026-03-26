@@ -79,6 +79,8 @@ def detect_intent(input_text: str) -> str:
     Duplicated minimal logic to avoid circular dependency with router.py
     """
     text = input_text.lower()
+    if "action figure" in text or "posable" in text or "ball joint" in text or "figurine" in text:
+        return "ACTION_FIGURE"
     if "3d" in text or "forge" in text or ("model" in text and "generate" in text):
         return "3D"
     if "image" in text or "picture" in text or "draw" in text or "photo" in text:
@@ -117,9 +119,10 @@ class Dispatcher:
         
         # Queue Configuration: (Queue Name, Concurrency Limit)
         self.queues = {
-            "queue:3d": 1,      # MAX 1 3D Job (Protect GPU)
-            "queue:image": 2,   # MAX 2 Image Jobs
-            "queue:default": 5  # Chat/Code (Lightweight)
+            "queue:3d": 1,              # MAX 1 3D Job (Protect GPU)
+            "queue:action_figure": 1,   # MAX 1 Action Figure Job (GPU + heavy post-processing)
+            "queue:image": 2,           # MAX 2 Image Jobs
+            "queue:default": 5          # Chat/Code (Lightweight)
         }
         
         # Start Consumers
