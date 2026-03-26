@@ -47,7 +47,7 @@ export function useChatStream() {
       abortRef.current = controller;
 
       try {
-        for await (const delta of sendChatStream(apiMessages, model, controller.signal)) {
+        for await (const delta of sendChatStream(apiMessages, model, controller.signal, convId)) {
           appendToMessage(convId!, assistantId, delta);
         }
       } catch (err) {

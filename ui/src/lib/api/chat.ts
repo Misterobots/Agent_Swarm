@@ -6,12 +6,13 @@ const API_BASE = "/api/backend";
 export async function* sendChatStream(
   messages: Pick<ChatMessage, "role" | "content">[],
   model: string = "swarm-standard",
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string,
 ): AsyncGenerator<string, void, unknown> {
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify({ model, messages, stream: true, session_id: sessionId }),
     signal,
   });
 

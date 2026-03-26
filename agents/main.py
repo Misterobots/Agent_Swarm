@@ -233,6 +233,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     model: str = "default"
     stream: bool = False
+    session_id: Optional[str] = None  # conversation ID for multi-turn history
 
 @app.get("/v1/models")
 async def list_models():
@@ -288,7 +289,7 @@ async def chat_completions(request: ChatRequest):
             import logging
             logger = logging.getLogger("uvicorn")
             try:
-                gen = chat_swarm(last_msg, history=history)
+                gen = chat_swarm(last_msg, session_id=request.session_id or "default_session", history=history)
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
                 yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':0,'model':request.model,'choices':[{'index':0,'delta':{'content':f'Error: {e}'},'finish_reason':None}]})}\n\n"
@@ -347,7 +348,7 @@ async def chat_completions(request: ChatRequest):
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
     else:
         # Non-streaming (accumulate all rendered output)
-        gen = chat_swarm(last_msg, history=history)
+        gen = chat_swarm(last_msg, session_id=request.session_id or "default_session", history=history)
         full_resp = ""
         for update in gen:
             if not isinstance(update, dict):
