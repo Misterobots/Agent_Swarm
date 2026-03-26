@@ -329,11 +329,17 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     # Check if this is a reply to a clarification
     if pending_ctx:
         if pending_ctx.get("type") == "image_clarification":
-            original_prompt = pending_ctx.get("prompt")
-            logger.info(f"--- [Router] Merging Context. Original: '{original_prompt}' + New: '{user_input}' ---")
-            user_input = f"{original_prompt} {user_input}"
-            yield {"type": "log", "content": f"[Context Manager] Context Merged: '{user_input}'"}
-            clear_context(session_id=session_id)
+            original_prompt = pending_ctx.get("prompt", "")
+            # Guard: discard stale/snowballing context (>500 chars means it's been re-merged)
+            if len(original_prompt) > 500:
+                logger.warning(f"--- [Router] Discarding stale context ({len(original_prompt)} chars) ---")
+                yield {"type": "log", "content": "[Context Manager] Stale context discarded."}
+                clear_context(session_id=session_id)
+            else:
+                logger.info(f"--- [Router] Merging Context. Original: '{original_prompt}' + New: '{user_input}' ---")
+                user_input = f"{original_prompt} {user_input}"
+                yield {"type": "log", "content": f"[Context Manager] Context Merged: '{user_input}'"}
+                clear_context(session_id=session_id)
             
         elif pending_ctx.get("type") == "ambiguity_resolution":
             original = pending_ctx.get("prompt")
@@ -931,10 +937,10 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         if intent == "IOT_CONTROL":
             yield {"type": "status", "content": "🏠 IoT Controller: Connecting to Home..."}
             AGENT_STATE.labels(agent_name="IoTController").set(2)
-            
+
             from specialized.iot_agent import get_iot_agent
             iot_agent = get_iot_agent()
-            
+
             try:
                 yield {"type": "log", "content": f"[IoT] Dispatching: '{user_input}'"}
                 response: RunResponse = iot_agent.run(user_input)
@@ -949,7 +955,10 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             return
 
         # --- ROUTE: STANDARD ARCHITECT / CODE (MarsRL Loop) ---
-        else:
+        # Only fall through to MarsRL if no specialized route handled this intent
+        if intent not in ("CONVERSATION", "DEVOPS", "DATA", "AMBIGUOUS", "IMAGE",
+                          "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE",
+                          "TRAIN", "IOT_CONTROL"):
             yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}
             AGENT_STATE.labels(agent_name="Architect").set(2)
 
