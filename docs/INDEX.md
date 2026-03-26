@@ -16,6 +16,7 @@
 | [System Overview](user/overview.md) | What the Hive is, what it can do, and how to interact with it |
 | [How the Agent Swarm Works](user/framework.md) | Plain-language explanation of MarsRL, agents, and routing |
 | [Training Guide](user/training_guide.md) | How to use the Training interface — run types, options, security scanning, CLI, API |
+| [Art Studio Guide](user/art_studio_guide.md) | Image, 3D model, and action figure generation workspace |
 | [FAQ](user/faq.md) | Common questions from day-to-day users |
 
 ---
@@ -28,6 +29,7 @@
 | [Design Framework](admin/design_framework.md) | 3-tier architecture, MarsRL loop, agent topology, data flows |
 | [Security](admin/security.md) | SPIRE/SPIFFE, JWT-ACE, MAESTRO framework, defensive layers |
 | [Troubleshooting](admin/troubleshooting.md) | Common failure modes, SPIRE, monitoring, voice, GPU issues |
+| [Agent Training Reference](admin/agent_training_reference.md) | Agent architecture, adding new agents, semantic router training, templates |
 
 ---
 
