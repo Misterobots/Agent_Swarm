@@ -203,7 +203,7 @@ def queue_prompt(prompt_text: str, **kwargs):
     print("--- [ComfyUI] Waiting for generation... ---")
     time.sleep(2) 
     
-    for i in range(60): 
+    for i in range(180):  # Up to 3 minutes for model loading + generation
         try:
             history_url = f"{COMFYUI_HOST}/history/{prompt_id}"
             res = requests.get(history_url)
@@ -308,18 +308,23 @@ def generate_image(
         scheduler: Scheduler type (normal, karras, etc).
         seed: Random seed (-1 for random).
     """
-    # Pack arguments into a dict for internal use
-    kwargs = {
+    # Pack arguments into a dict for internal use.
+    # When model_name is "auto", omit generation params so queue_prompt's
+    # auto-detection picks the right cfg/steps/sampler for the selected checkpoint.
+    kwargs: dict = {
         "model_name": model_name,
-        "cfg": cfg,
-        "steps": steps,
         "width": width,
         "height": height,
-        "sampler": sampler,
-        "scheduler": scheduler,
         "seed": seed,
-        "target_device": target_device
+        "target_device": target_device,
     }
+    if model_name != "auto":
+        kwargs.update({
+            "cfg": cfg,
+            "steps": steps,
+            "sampler": sampler,
+            "scheduler": scheduler,
+        })
 
     if target_device != "auto":
         logger.info(f"--- [Creative Studio] Targeted Generation on {target_device} ---")

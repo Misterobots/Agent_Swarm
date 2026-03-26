@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300; // 5 minutes for long-running generation
 
 const BACKEND_URL = process.env.API_BASE_URL || "http://localhost:8000";
 
@@ -35,7 +36,10 @@ async function proxyRequest(req: NextRequest) {
     // not JSON, that's fine
   }
 
-  const upstream = await fetch(target, init);
+  const upstream = await fetch(target, {
+    ...init,
+    signal: AbortSignal.timeout(300_000), // 5 min timeout for generation endpoints
+  });
 
   const isSSE =
     upstream.headers.get("content-type")?.includes("text/event-stream") ||

@@ -1,5 +1,15 @@
 const API_BASE = "/api/backend";
 
+async function safeJson(res: Response): Promise<{ status: string; result: string }> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Backend or proxy returned non-JSON (e.g. HTML error page)
+    return { status: "error", result: `Server error (${res.status}): ${text.slice(0, 120)}` };
+  }
+}
+
 export async function fetchArtModels(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/v1/art/models`);
   if (!res.ok) return ["v1-5-pruned-emaonly.ckpt"];
@@ -25,7 +35,7 @@ export async function generateImage(params: ImageGenParams) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
-  return res.json();
+  return safeJson(res);
 }
 
 export interface ThreeDGenParams {
@@ -40,7 +50,7 @@ export async function generate3D(params: ThreeDGenParams) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
-  return res.json();
+  return safeJson(res);
 }
 
 export interface ActionFigureParams {
@@ -56,7 +66,7 @@ export async function generateActionFigure(params: ActionFigureParams) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
-  return res.json();
+  return safeJson(res);
 }
 
 export interface GalleryImage {
