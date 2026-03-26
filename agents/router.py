@@ -16,8 +16,16 @@ import os
 from dispatcher import Event, EventType
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock, get_best_host_for_model
+from phi.storage.agent.postgres import PgAgentStorage
+from config import AGNO_DB_URL
 
 logger = setup_logger("Router")
+
+# Shared storage for conversationalist sessions (same pattern as architect_agent)
+_conv_storage = PgAgentStorage(
+    table_name="conversation_sessions",
+    db_url=AGNO_DB_URL,
+)
 
 # --- JWT-ACE Integration ---
 try:
@@ -404,6 +412,10 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             conversationalist = Agent(
                 name="Hive Mind",
                 model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+                storage=_conv_storage,
+                session_id=session_id,
+                add_history_to_messages=True,
+                num_history_responses=10,
                 instructions="""You are Hive Mind, a friendly and knowledgeable AI assistant in a self-hosted home lab.
                 You have a warm, direct personality. You can answer general questions, chat casually, explain concepts clearly,
                 and help the user understand their AI system. Keep responses concise unless depth is clearly needed.
