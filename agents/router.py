@@ -279,6 +279,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     """
     AGENT_STATE.labels(agent_name="Router").set(2)
     WORKFLOW_STEPS.labels(status="started", agent_type="Router").inc()
+    logger.info("--- [Router] chat_swarm v4.1 (ACTION_FIGURE + context-session-scoped) ---")
 
     # JWT-ACE state (initialized here so finally block can always access them)
     ace_token = None
