@@ -3,17 +3,25 @@
 import { useEffect, useRef } from "react";
 import { useChatStream } from "@/lib/hooks/use-chat-stream";
 import { MessageBubble } from "./message-bubble";
+import { ThinkingIndicator } from "./thinking-indicator";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
 import { Bot } from "lucide-react";
 
 export function ChatView() {
-  const { messages, isStreaming, sendMessage, stopGeneration } = useChatStream();
+  const { messages, isStreaming, statusMessage, sendMessage, stopGeneration } = useChatStream();
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Show the thinking indicator when streaming and either we have a status
+  // message or the assistant message is still empty (waiting for first content)
+  const lastMsg = messages[messages.length - 1];
+  const showThinking =
+    isStreaming &&
+    (statusMessage !== null || (lastMsg?.role === "assistant" && !lastMsg.content));
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, messages[messages.length - 1]?.content]);
+  }, [messages, lastMsg?.content, statusMessage]);
 
   return (
     <div className="flex flex-col h-full">
@@ -57,6 +65,7 @@ export function ChatView() {
                 />
               );
             })}
+            {showThinking && <ThinkingIndicator statusMessage={statusMessage} />}
             <div ref={bottomRef} />
           </div>
         )}

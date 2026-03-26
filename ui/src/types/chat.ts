@@ -21,7 +21,7 @@ export interface ChatCompletionChunk {
   model: string;
   choices: {
     index: number;
-    delta: { content?: string; role?: string };
+    delta: { content?: string; role?: string; type?: "content" | "status" };
     finish_reason: string | null;
   }[];
 }
@@ -31,6 +31,11 @@ export interface Model {
   object: string;
   created: number;
   owned_by: string;
+}
+
+export interface StreamEvent {
+  type: "content" | "status";
+  content: string;
 }
 
 export interface NodeHealth {

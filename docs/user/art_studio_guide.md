@@ -22,7 +22,7 @@ You can also navigate to Art Studio directly from the sidebar at any time.
 
 ## Generation Modes
 
-The Art Studio supports three modes, selectable from the sidebar.
+The Art Studio supports three modes, selectable from the left panel on the Generate tab.
 
 ### 1. Image Generation
 
@@ -97,25 +97,34 @@ Text prompt
 
 ## Workspace Layout
 
-### Sidebar
+The Art Studio uses a tabbed layout with three top-level tabs: **Generate**, **Gallery**, and **Exports**.
 
-- **Mode selector** — switch between Image, 3D, and Action Figure
-- **Generation controls** — mode-specific settings (changes based on selected mode)
-- **Resource manager** — import external models and assets
+### Generate Tab
 
-### Top Bar
+The main workspace, split into two panels:
 
-- **Prompt input** — text field with a Generate button
-- **Image upload** — drag-and-drop or browse for direct image-to-3D conversion
+**Left Panel (Controls):**
+- **Mode selector** — switch between Image, 3D Model, and Action Figure
+- **Generation controls** — mode-specific settings that change based on selected mode (see Generation Modes above)
 
-### Main Area Tabs
+**Right Panel (Prompt + History):**
+- **Prompt bar** — text input with a Generate button. Pre-filled automatically when redirected from Chat
+- **Generation history** — live feed of all generation attempts with status indicators (generating/complete/error), progress bars, and result output
 
-| Tab | What It Shows |
-|-----|---------------|
-| **Preview** | Last generated asset with download button |
-| **Image Gallery** | Grid of all generated images with metadata popovers, download, and a "To 3D" button for converting any image to a 3D model |
-| **3D Gallery** | Lists GLB/OBJ/STL files from output directories with file sizes. Action figure assemblies show their manifest alongside the parts |
-| **Exports** | Batch ZIP download for all images or all 3D files. Includes a generation log |
+### Gallery Tab
+
+Browse all generated assets across two sub-tabs:
+
+| Sub-Tab | What It Shows |
+|---------|---------------|
+| **Images** | Grid of generated images with thumbnails, filenames, prompt metadata, file sizes, and download links |
+| **3D Files** | Cards for GLB/STL/OBJ files from output directories, categorized by type (models vs action figures) with file sizes |
+
+A refresh button reloads both galleries from the backend.
+
+### Exports Tab
+
+A chronological generation log listing all completed generations with mode icons, prompts, timestamps, and result details.
 
 ---
 
@@ -125,7 +134,6 @@ Text prompt
 - **T-pose concept art works best:** arms extended, symmetrical stance, clean silhouette. The segmentation pipeline relies on clear limb separation.
 - **FDM printers:** use the default 0.3 mm joint clearance. **Resin:** reduce to 0.15 mm for tighter fits.
 - **Ball joints should press-fit into sockets** after printing. If joints are too loose, reduce clearance by 0.05 mm increments. If too tight, increase.
-- **Use the "To 3D" button** in the Image Gallery to convert any existing generated image into a 3D model — no need to regenerate the image.
 - **For fast iteration on 3D shapes**, use TripoSG first to validate the form, then switch to Hunyuan 3D for the final textured version.
 
 ---

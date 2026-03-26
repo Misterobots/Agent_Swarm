@@ -7,6 +7,7 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 
 export function useChatStream() {
   const [isStreaming, setIsStreaming] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const {
@@ -43,12 +44,19 @@ export function useChatStream() {
 
       // Stream response
       setIsStreaming(true);
+      setStatusMessage(null);
       const controller = new AbortController();
       abortRef.current = controller;
 
       try {
-        for await (const delta of sendChatStream(apiMessages, model, controller.signal, convId)) {
-          appendToMessage(convId!, assistantId, delta);
+        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId)) {
+          if (event.type === "status") {
+            setStatusMessage(event.content);
+          } else {
+            // Clear status once real content arrives
+            setStatusMessage(null);
+            appendToMessage(convId!, assistantId, event.content);
+          }
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
@@ -58,6 +66,7 @@ export function useChatStream() {
         }
       } finally {
         setIsStreaming(false);
+        setStatusMessage(null);
         abortRef.current = null;
       }
     },
@@ -71,6 +80,7 @@ export function useChatStream() {
   return {
     messages: activeConversation()?.messages || [],
     isStreaming,
+    statusMessage,
     sendMessage,
     stopGeneration,
   };

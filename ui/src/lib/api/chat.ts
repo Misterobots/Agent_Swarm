@@ -1,4 +1,4 @@
-import type { ChatMessage, Model, NodeHealth } from "@/types/chat";
+import type { ChatMessage, Model, NodeHealth, StreamEvent } from "@/types/chat";
 import { streamSSE } from "@/lib/utils/sse-parser";
 
 const API_BASE = "/api/backend";
@@ -8,7 +8,7 @@ export async function* sendChatStream(
   model: string = "swarm-standard",
   signal?: AbortSignal,
   sessionId?: string,
-): AsyncGenerator<string, void, unknown> {
+): AsyncGenerator<StreamEvent, void, unknown> {
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

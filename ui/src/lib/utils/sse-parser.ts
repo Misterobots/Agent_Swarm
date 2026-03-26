@@ -1,4 +1,4 @@
-import type { ChatCompletionChunk } from "@/types/chat";
+import type { ChatCompletionChunk, StreamEvent } from "@/types/chat";
 
 /**
  * Parse an SSE line from the OpenAI-compatible streaming API.
@@ -19,11 +19,11 @@ export function parseSSELine(line: string): ChatCompletionChunk | null {
 }
 
 /**
- * Async generator that reads an SSE response body and yields content deltas.
+ * Async generator that reads an SSE response body and yields typed stream events.
  */
 export async function* streamSSE(
   response: Response
-): AsyncGenerator<string, void, unknown> {
+): AsyncGenerator<StreamEvent, void, unknown> {
   const reader = response.body?.getReader();
   if (!reader) return;
 
@@ -42,8 +42,13 @@ export async function* streamSSE(
       for (const line of lines) {
         const chunk = parseSSELine(line);
         if (chunk) {
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) yield content;
+          const delta = chunk.choices[0]?.delta;
+          if (delta?.content) {
+            yield {
+              type: delta.type === "status" ? "status" : "content",
+              content: delta.content,
+            };
+          }
         }
       }
     }
@@ -52,8 +57,13 @@ export async function* streamSSE(
     if (buffer.trim()) {
       const chunk = parseSSELine(buffer);
       if (chunk) {
-        const content = chunk.choices[0]?.delta?.content;
-        if (content) yield content;
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.content) {
+          yield {
+            type: delta.type === "status" ? "status" : "content",
+            content: delta.content,
+          };
+        }
       }
     }
   } finally {

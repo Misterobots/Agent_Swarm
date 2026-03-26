@@ -308,8 +308,19 @@ async def chat_completions(request: ChatRequest):
                     msg_type = update.get("type", "response")
                     raw_content = update.get("content", "")
 
-                    # In standard mode, we only yield assistant segments and errors
+                    # In standard mode, forward status as typed chunks; only yield assistant segments, errors, and status
                     if is_standard_mode:
+                        if msg_type == "status":
+                            # Send status as a typed delta so the UI can render a thinking indicator
+                            status_chunk = {
+                                "id": "chatcmpl-swarm",
+                                "object": "chat.completion.chunk",
+                                "created": 1234567890,
+                                "model": request.model,
+                                "choices": [{"index": 0, "delta": {"content": raw_content, "type": "status"}, "finish_reason": None}]
+                            }
+                            yield f"data: {json.dumps(status_chunk)}\n\n"
+                            continue
                         if msg_type not in ["message", "response", "error"]:
                             continue
                         content = raw_content
