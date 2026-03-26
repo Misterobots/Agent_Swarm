@@ -429,9 +429,10 @@ def render_chat_workspace():
                         st.caption(f"⚙️ {update['content']}")
                 elif update["type"] == "workspace_offer":
                     # Creative intent detected — offer to switch to Art Studio
-                    offer = update["content"]
+                    import json as _json
+                    offer = _json.loads(update["content"]) if isinstance(update["content"], str) else update["content"]
                     st.session_state._workspace_offer = offer
-                    trace_logs.append(f"🎨 Creative intent detected: {offer['intent']}")
+                    trace_logs.append(f"🎨 Creative intent detected: {offer.get('intent', 'unknown')}")
                     # Don't break — let the pipeline continue generating in chat
                     # The offer will be rendered after the response completes
                 elif update["type"] == "artifact":

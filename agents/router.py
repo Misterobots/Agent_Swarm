@@ -13,6 +13,7 @@ import sys
 import subprocess
 import re
 import os
+import json
 from dispatcher import Event, EventType
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock, get_best_host_for_model
@@ -419,12 +420,16 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         CREATIVE_INTENTS = {"IMAGE", "3D", "ACTION_FIGURE"}
         if intent in CREATIVE_INTENTS:
             yield {
+                "type": "status",
+                "content": f"🎨 Creative intent detected ({intent}). Tip: Switch to the Art Studio workspace for advanced controls."
+            }
+            yield {
                 "type": "workspace_offer",
-                "content": {
+                "content": json.dumps({
                     "intent": intent,
                     "prompt": user_input,
                     "message": "This looks like a creative request. Would you like to enter the Art Studio for a full workspace experience?"
-                }
+                })
             }
 
         # --- ROUTE: CONVERSATION / CASUAL CHAT ---
