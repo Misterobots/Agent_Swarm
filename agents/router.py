@@ -323,7 +323,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     
     # 1. Load Context (Memory Bridge)
     from context_manager import get_pending_context, clear_context, save_pending_image_clarification
-    pending_ctx = get_pending_context()
+    pending_ctx = get_pending_context(session_id=session_id)
     
     # Check if this is a reply to a clarification
     if pending_ctx:
@@ -332,7 +332,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             logger.info(f"--- [Router] Merging Context. Original: '{original_prompt}' + New: '{user_input}' ---")
             user_input = f"{original_prompt} {user_input}"
             yield {"type": "log", "content": f"[Context Manager] Context Merged: '{user_input}'"}
-            clear_context()
+            clear_context(session_id=session_id)
             
         elif pending_ctx.get("type") == "ambiguity_resolution":
             original = pending_ctx.get("prompt")
@@ -343,7 +343,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             user_input = f"Original Request: '{original}'\nSystem Question: '{question}'\nUser Answer: '{user_input}'"
             
             yield {"type": "log", "content": f"[Context Manager] Ambiguity Resolved. Analying composite input..."}
-            clear_context()
+            clear_context(session_id=session_id)
 
     try:
         # 2. Security Check (on the Merged Input)
@@ -547,7 +547,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                  "type": "ambiguity_resolution",
                  "prompt": user_input,
                  "question": question
-             })
+             }, session_id=session_id)
              
              yield {"type": "response", "content": f"🤔 **Ambiguous Request:** {question}"}
              _score_trace(lf_trace, langfuse, 0.7, output=question)
@@ -598,7 +598,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                  if "CLARIFY:" in review.content:
                      # HITL STOP: Return the clarifying question and EXIT the generator.
                      # SAVE CONTEXT so we remember next time.
-                     save_pending_image_clarification(user_input)
+                     save_pending_image_clarification(user_input, session_id=session_id)
                      
                      question = review.content.replace("CLARIFY:", "").strip()
                      yield {"type": "response", "content": f"🎨 **Art Director:** {question}"}

@@ -28,6 +28,10 @@ logs/
 # Claude Code
 .claude/
 
+# Context sessions (ephemeral per-session state)
+agents/swarm_context.json
+agents/context_sessions/
+
 # Backups
 *.backup.*
 backups/
