@@ -284,6 +284,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     ace_token = None
     template_metadata = {}
     route_start_time = time.time()
+    lf_trace = None  # Langfuse trace handle (populated below if Langfuse is active)
 
     # --- Langfuse top-level trace for all intents (v4 context manager) ---
     _lf_ctx = None
@@ -374,6 +375,13 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         intent = routing_decision.get("intent", "RESEARCH") # Fail safe default
         confidence = routing_decision.get("confidence", 0.0)
         reasoning = routing_decision.get("reasoning", "No reasoning provided.")
+
+        # --- KEYWORD OVERRIDE: Catch intents the LLM doesn't know about ---
+        _lower = user_input.lower()
+        if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
+            intent = "ACTION_FIGURE"
+            confidence = 0.95
+            reasoning = f"Keyword override: action figure keywords detected in '{user_input[:60]}'"
         
         yield {"type": "log", "content": f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}"}
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
