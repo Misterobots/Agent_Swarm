@@ -3,6 +3,11 @@
 .env.*
 *.secret
 
+# SPIRE private keys and CSRs (certs are OK to commit)
+**/config/spire/certs/*.key
+**/config/spire/certs/*.csr
+**/config/spire/certs/*.srl
+
 # Python
 __pycache__/
 *.py[cod]

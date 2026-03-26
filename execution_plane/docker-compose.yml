@@ -56,7 +56,7 @@ services:
       - spire_socket:/var/run/spire  # Shared socket for workloads
       - //var/run/docker.sock:/var/run/docker.sock:ro
     # pid: "host"
-    command: ["-config", "/etc/spire/agent/agent.conf", "-joinToken", "${SPIRE_JOIN_TOKEN}"]
+    command: ["-config", "/etc/spire/agent/agent.conf"]
     healthcheck:
       test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck"]
       interval: 30s
