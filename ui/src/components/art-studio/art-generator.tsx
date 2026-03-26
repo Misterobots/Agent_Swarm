@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { useArtStore, type ArtMode } from "@/lib/stores/art-store";
 import { generateImage, generate3D, generateActionFigure, fetchArtModels } from "@/lib/api/art";
 import { ImageControls } from "./controls/image-controls";
@@ -24,6 +25,7 @@ export function ArtGenerator() {
     prefillPrompt, setPrefillPrompt,
   } = useArtStore();
 
+  const searchParams = useSearchParams();
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [models, setModels] = useState<string[]>([]);
@@ -33,13 +35,16 @@ export function ArtGenerator() {
     fetchArtModels().then(setModels);
   }, []);
 
-  // Handle prefill from chat redirect
+  // Handle prefill from chat redirect (URL param or store)
   useEffect(() => {
-    if (prefillPrompt) {
+    const urlPrompt = searchParams.get("prompt");
+    if (urlPrompt) {
+      setPrompt(urlPrompt);
+    } else if (prefillPrompt) {
       setPrompt(prefillPrompt);
       setPrefillPrompt("");
     }
-  }, [prefillPrompt, setPrefillPrompt]);
+  }, [searchParams, prefillPrompt, setPrefillPrompt]);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim() || isGenerating) return;

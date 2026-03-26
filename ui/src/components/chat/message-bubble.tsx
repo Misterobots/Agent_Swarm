@@ -8,15 +8,19 @@ import Link from "next/link";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  userPrompt?: string;
 }
 
 function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
+  const artStudioHref = userPrompt
+    ? `/art-studio?prompt=${encodeURIComponent(userPrompt)}`
+    : "/art-studio";
 
   return (
     <div className={cn("flex gap-3 py-4 px-4", isUser ? "bg-transparent" : "bg-[#0a0a14]")}>
@@ -36,7 +40,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             <MarkdownRenderer content={message.content} />
             {showArtButton && (
               <Link
-                href="/art-studio"
+                href={artStudioHref}
                 className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors shadow-lg shadow-violet-900/30"
               >
                 <Palette size={16} />

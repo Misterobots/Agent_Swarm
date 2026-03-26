@@ -38,9 +38,25 @@ export function ChatView() {
           </div>
         ) : (
           <div className="max-w-3xl mx-auto">
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
-            ))}
+            {messages.map((msg, idx) => {
+              // Find the preceding user message for creative-redirect links
+              let precedingUserPrompt: string | undefined;
+              if (msg.role === "assistant") {
+                for (let i = idx - 1; i >= 0; i--) {
+                  if (messages[i].role === "user") {
+                    precedingUserPrompt = messages[i].content;
+                    break;
+                  }
+                }
+              }
+              return (
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  userPrompt={precedingUserPrompt}
+                />
+              );
+            })}
             <div ref={bottomRef} />
           </div>
         )}
