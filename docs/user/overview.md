@@ -17,8 +17,8 @@ At its core is the **Agentic Hive**: a coordinated swarm of specialized AI agent
 ### Intelligent Chat & Coding
 Ask anything. The Hive routes your request to the most appropriate specialist agent. For coding tasks, a multi-step verification loop (`Solver → Verifier → Corrector`) ensures the code actually works before you see it — broken syntax and unsafe code are automatically fixed or blocked.
 
-### Image & 3D Generation
-Generate photorealistic images and 3D models using ComfyUI and TripoSG. Describe what you want; the Creative Forge agent handles the rest.
+### Image, 3D & Action Figure Generation
+Generate photorealistic images, 3D models, and 3D-printable posable action figures using the **Art Studio** workspace. Powered by ComfyUI, TripoSG, and Hunyuan3D — describe what you want and the system handles concept art, mesh generation, and export.
 
 ### Voice Interaction (BMO)
 Speak to BMO, a physical voice-enabled robot that responds using a cloned voice model. The Voice Studio handles speech recognition, TTS synthesis, and RVC voice cloning.
@@ -57,7 +57,7 @@ The Hive Mind UI is organized into **workspaces**, each optimized for a differen
 | Workspace | What You Do There |
 |-----------|-------------------|
 | **Chat** | General AI assistance, Q&A, research, writing, coding help |
-| **Media** | Image and 3D model generation (ComfyUI) |
+| **Art Studio** | Image, 3D model, and posable action figure generation (ComfyUI + TripoSG/Hunyuan3D) |
 | **Voice Studio** | Record voice samples, test TTS, interact with BMO |
 | **Coding** | Collaborative code editing in a VS Code sandbox |
 | **DevOps** | Infrastructure management, Docker, system automation |
