@@ -1250,6 +1250,165 @@ async def deploy_report(run_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# ART STUDIO API
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ImageGenRequest(BaseModel):
+    prompt: str
+    model_name: str = "auto"
+    cfg: float = 7.0
+    steps: int = 20
+    width: int = 1024
+    height: int = 1024
+    sampler: str = "euler"
+    scheduler: str = "normal"
+    seed: int = -1
+
+class ThreeDGenRequest(BaseModel):
+    prompt: str
+    workflow: str = "workflow_triposg.json"
+    auto_concept: bool = True
+
+class ActionFigureRequest(BaseModel):
+    prompt: str
+    workflow: str = "workflow_triposg.json"
+    target_height: int = 150
+    clearance: float = 0.3
+
+@app.get("/v1/art/models")
+async def list_art_models():
+    """List available ComfyUI model checkpoints."""
+    try:
+        from specialized.image_gen import list_available_models
+        models = list_available_models()
+        return {"models": models or ["v1-5-pruned-emaonly.ckpt"]}
+    except Exception as e:
+        logger.warning(f"Failed to list art models: {e}")
+        return {"models": ["v1-5-pruned-emaonly.ckpt"]}
+
+@app.post("/v1/art/generate/image")
+async def art_generate_image(req: ImageGenRequest, background_tasks: BackgroundTasks):
+    """Generate an image via ComfyUI."""
+    try:
+        from specialized.image_gen import generate_image
+        result = generate_image(
+            prompt=req.prompt,
+            model_name=req.model_name,
+            cfg=req.cfg,
+            steps=req.steps,
+            width=req.width,
+            height=req.height,
+            sampler=req.sampler,
+            scheduler=req.scheduler,
+            seed=req.seed,
+        )
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Art Studio image gen failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/v1/art/generate/3d")
+async def art_generate_3d(req: ThreeDGenRequest):
+    """Generate a 3D model, optionally with concept art first."""
+    try:
+        image_path = None
+        if req.auto_concept:
+            from specialized.image_gen import generate_image
+            import re
+            concept_prompt = f"Concept art for 3d modeling, neutral background: {req.prompt}"
+            img_result = generate_image(concept_prompt)
+            match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
+            if not match:
+                return {"status": "error", "result": f"Concept art failed: {img_result}"}
+            image_path = f"/app/comfy_io/output/{match.group(1)}"
+        else:
+            return {"status": "error", "result": "No image provided. Enable auto_concept or use /v1/art/generate/3d-from-image."}
+
+        from specialized.forge_agent import generate_3d_model
+        result = generate_3d_model(image_path, req.workflow)
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Art Studio 3D gen failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/v1/art/generate/action-figure")
+async def art_generate_action_figure(req: ActionFigureRequest):
+    """Generate a 3D-printable posable action figure."""
+    try:
+        # Step 1: T-pose concept art
+        from specialized.image_gen import generate_image
+        import re
+        concept_prompt = (
+            f"T-pose character concept art for 3D action figure, "
+            f"full body front view, neutral gray background, "
+            f"arms extended to sides, symmetrical pose: {req.prompt}"
+        )
+        img_result = generate_image(concept_prompt)
+        match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
+        if not match:
+            return {"status": "error", "result": f"Concept art failed: {img_result}"}
+        image_path = f"/app/comfy_io/output/{match.group(1)}"
+
+        # Step 2: Action figure pipeline
+        from specialized.action_figure_agent import generate_action_figure
+        result = generate_action_figure(image_path, req.workflow)
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Art Studio action figure gen failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/v1/art/gallery/images")
+async def art_gallery_images():
+    """List generated images with metadata."""
+    import json as _json
+    gallery_path = "/workspace/delivered_artifacts"
+    if not os.path.exists(gallery_path):
+        return {"images": []}
+    try:
+        images = []
+        for f in sorted(os.listdir(gallery_path), key=lambda x: os.path.getmtime(os.path.join(gallery_path, x)), reverse=True):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                fpath = os.path.join(gallery_path, f)
+                meta = {}
+                meta_path = fpath + ".json"
+                if os.path.exists(meta_path):
+                    with open(meta_path, "r") as mf:
+                        meta = _json.load(mf)
+                images.append({
+                    "filename": f,
+                    "url": f"/delivered_artifacts/{f}",
+                    "size_bytes": os.path.getsize(fpath),
+                    "meta": meta,
+                })
+        return {"images": images}
+    except Exception as e:
+        return {"images": [], "error": str(e)}
+
+@app.get("/v1/art/gallery/3d")
+async def art_gallery_3d():
+    """List 3D model files."""
+    output_dirs = [
+        ("3d_models", "/app/comfy_io/output/3D"),
+        ("action_figures", "/app/comfy_io/output/action_figures"),
+    ]
+    files = []
+    for category, dir_path in output_dirs:
+        if not os.path.exists(dir_path):
+            continue
+        for f in sorted(os.listdir(dir_path), key=lambda x: os.path.getmtime(os.path.join(dir_path, x)), reverse=True):
+            if f.lower().endswith(('.glb', '.obj', '.stl', '.3mf')):
+                fpath = os.path.join(dir_path, f)
+                files.append({
+                    "filename": f,
+                    "category": category,
+                    "ext": f.rsplit(".", 1)[-1].upper(),
+                    "size_bytes": os.path.getsize(fpath),
+                    "path": fpath,
+                })
+    return {"files": files}
+
+
 @app.get("/v1/templates")
 async def list_templates():
     """List all expertise templates (for deploy form's template dropdown)."""
