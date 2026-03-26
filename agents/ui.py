@@ -583,11 +583,25 @@ def render_art_workspace():
         st.session_state.art_studio_mode = intent_map.get(st.session_state.art_studio_intent, "Image")
         del st.session_state.art_studio_intent
 
-    # Pre-fill prompt from chat redirect
+    # Pre-fill prompt from chat redirect (session state or context manager)
     prefill_prompt = ""
     if "art_studio_prompt" in st.session_state:
         prefill_prompt = st.session_state.art_studio_prompt
         del st.session_state.art_studio_prompt
+    else:
+        # Check context manager for saved art_studio_redirect
+        try:
+            from context_manager import get_pending_context, clear_context
+            ctx = get_pending_context(session_id=st.session_state.get("session_id", "default"))
+            if ctx and ctx.get("type") == "art_studio_redirect":
+                prefill_prompt = ctx.get("prompt", "")
+                redirect_intent = ctx.get("intent", "")
+                if redirect_intent:
+                    intent_map = {"IMAGE": "Image", "3D": "3D Model", "ACTION_FIGURE": "Action Figure"}
+                    st.session_state.art_studio_mode = intent_map.get(redirect_intent, "Image")
+                clear_context(session_id=st.session_state.get("session_id", "default"))
+        except Exception:
+            pass
 
     # --- SIDEBAR: Generation Controls ---
     with st.sidebar:

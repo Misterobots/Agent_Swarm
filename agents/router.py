@@ -343,6 +343,10 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                 yield {"type": "log", "content": f"[Context Manager] Context Merged: '{user_input}'"}
                 clear_context(session_id=session_id)
             
+        elif pending_ctx.get("type") == "art_studio_redirect":
+            # This was saved for the Art Studio workspace — clear it, don't merge
+            clear_context(session_id=session_id)
+
         elif pending_ctx.get("type") == "ambiguity_resolution":
             original = pending_ctx.get("prompt")
             question = pending_ctx.get("question")
@@ -417,20 +421,40 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         route_start_time = time.time()
 
         # --- ART WORKSPACE OFFER (for creative intents) ---
+        # Creative intents redirect to the Art Studio workspace instead of
+        # running heavy generation pipelines inline in chat.
         CREATIVE_INTENTS = {"IMAGE", "3D", "ACTION_FIGURE"}
         if intent in CREATIVE_INTENTS:
-            yield {
-                "type": "status",
-                "content": f"🎨 Creative intent detected ({intent}). Tip: Switch to the Art Studio workspace for advanced controls."
-            }
+            mode_label = {"IMAGE": "Image", "3D": "3D Model", "ACTION_FIGURE": "Action Figure"}.get(intent, intent)
             yield {
                 "type": "workspace_offer",
                 "content": json.dumps({
                     "intent": intent,
                     "prompt": user_input,
-                    "message": "This looks like a creative request. Would you like to enter the Art Studio for a full workspace experience?"
+                    "message": f"This looks like a creative request. Switch to the Art Studio for {mode_label} generation."
                 })
             }
+            yield {
+                "type": "response",
+                "content": (
+                    f"🎨 **Creative Request Detected: {mode_label}**\n\n"
+                    f"Switch to the **Art Studio** workspace (sidebar) for:\n"
+                    f"- Advanced generation controls & model selection\n"
+                    f"- Real-time 3D preview\n"
+                    f"- Gallery management & batch export\n"
+                    f"- Image upload for direct 3D conversion\n\n"
+                    f"Your prompt has been saved and will auto-fill when you enter the Art Studio."
+                )
+            }
+            # Save prompt so Art Studio can pick it up
+            from context_manager import save_pending_context
+            save_pending_context({
+                "type": "art_studio_redirect",
+                "intent": intent,
+                "prompt": user_input
+            }, session_id=session_id)
+            AGENT_STATE.labels(agent_name="Router").set(1)
+            return
 
         # --- ROUTE: CONVERSATION / CASUAL CHAT ---
         if intent == "CONVERSATION":
