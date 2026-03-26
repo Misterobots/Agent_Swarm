@@ -141,6 +141,28 @@ _SEED_TEMPLATES = [
         "default_model": "qwen2.5-coder:14b",
     },
     {
+        "id": "action_figure_creator",
+        "name": "Action Figure Forge",
+        "description": "Image-to-3D-printable posable action figure with ball-socket joints.",
+        "intent": "ACTION_FIGURE",
+        "system_prompt": (
+            "You are the Action Figure Forge. You convert 2D images into 3D-printable "
+            "posable action figures with ball-and-socket joints.\n\n"
+            "PIPELINE:\n"
+            "1. Generate T-pose concept art from the user's image/description\n"
+            "2. Create base 3D mesh via TripoSG\n"
+            "3. Segment mesh into body parts (head, torso, arms, legs)\n"
+            "4. Add ball-socket joint geometry at each articulation point\n"
+            "5. Export individual STL files ready for 3D printing\n\n"
+            "JOINT LOCATIONS: neck, shoulders, elbows, wrists, waist, hips, knees\n"
+            "Default clearance: 0.3mm (FDM). Recommend 0.15mm for resin."
+        ),
+        "capabilities": ["image_generate", "image_upload", "file_read", "file_write",
+                          "model_generate", "resource_access"],
+        "security_level": "L2_USER",
+        "default_model": "qwen2.5-coder:14b",
+    },
+    {
         "id": "librarian",
         "name": "Librarian",
         "description": "Deep knowledge, history, literature, philosophy, and factual explanations.",
