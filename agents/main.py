@@ -1704,7 +1704,7 @@ async def art_segment_with_joints(req: SegmentRequest):
     return {"job_id": job_id, "status": "running"}
 
 
-def _infer_joint_normal(joint_name: str) -> np.ndarray:
+def _infer_joint_normal(joint_name: str):
     """Infer cut plane normal from joint name (standard humanoid)."""
     import numpy as np
     normals = {
