@@ -2,6 +2,7 @@
 import logging
 import sys
 import os
+import uuid
 # Ensure agents dir is in path
 if "/app/agents" not in sys.path:
     sys.path.append("/app/agents")
