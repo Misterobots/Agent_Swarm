@@ -78,13 +78,15 @@ async function proxyRequest(req: NextRequest) {
     });
   }
 
-  // Non-streaming: forward as-is
-  const body = await upstream.text();
-  return new Response(body, {
+  // Non-streaming: pipe body directly (preserves binary files like GLB/STL)
+  const contentType = upstream.headers.get("Content-Type") || "application/json";
+  const responseHeaders: Record<string, string> = { "Content-Type": contentType };
+  const contentLength = upstream.headers.get("Content-Length");
+  if (contentLength) responseHeaders["Content-Length"] = contentLength;
+
+  return new Response(upstream.body, {
     status: upstream.status,
-    headers: {
-      "Content-Type": upstream.headers.get("Content-Type") || "application/json",
-    },
+    headers: responseHeaders,
   });
 }
 
