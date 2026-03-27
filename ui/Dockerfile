@@ -10,6 +10,7 @@ RUN npm ci
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+ARG CACHE_BUST=0
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
