@@ -42,9 +42,9 @@ function LoadedModel({ url }: { url: string }) {
   }, [scene]);
 
   const handleClick = useCallback(
-    (e: THREE.Event & { point?: THREE.Vector3 }) => {
+    (e: { point: THREE.Vector3; stopPropagation: () => void }) => {
       if (!activeJoint || !e.point) return;
-      e.stopPropagation?.();
+      e.stopPropagation();
       placeJoint({
         name: activeJoint,
         position: [e.point.x, e.point.y, e.point.z],
