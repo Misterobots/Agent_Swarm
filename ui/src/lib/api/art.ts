@@ -1,14 +1,74 @@
 const API_BASE = "/api/backend";
 
-async function safeJson(res: Response): Promise<{ status: string; result: string }> {
+// ── Job polling infrastructure ─────────────────────────────────────────────
+
+interface ArtJobResponse {
+  status: string;
+  result: string | null;
+  mode: string;
+  prompt: string;
+  created_at: string;
+  finished_at: string | null;
+}
+
+interface SubmitResponse {
+  job_id: string;
+  status: string;
+}
+
+/**
+ * Poll a generation job until it finishes.
+ * Returns the final {status, result} matching the old synchronous contract.
+ * Calls onProgress with intermediate status messages for UI feedback.
+ */
+async function pollJob(
+  jobId: string,
+  onProgress?: (msg: string) => void,
+  intervalMs = 3000,
+  maxWaitMs = 1800_000, // 30 min
+): Promise<{ status: string; result: string }> {
+  const deadline = Date.now() + maxWaitMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${API_BASE}/v1/art/jobs/${jobId}`);
+      if (!res.ok) {
+        return { status: "error", result: `Job poll failed (${res.status})` };
+      }
+      const job: ArtJobResponse = await res.json();
+
+      if (job.status === "running") {
+        if (job.result && onProgress) onProgress(job.result);
+        await new Promise((r) => setTimeout(r, intervalMs));
+        continue;
+      }
+
+      // Terminal state: ok or error
+      return { status: job.status, result: job.result ?? "No result" };
+    } catch (err) {
+      // Network blip — retry
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
+
+  return { status: "error", result: "Generation timed out waiting for result." };
+}
+
+async function safeSubmit(url: string, body: object): Promise<SubmitResponse> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   const text = await res.text();
   try {
     return JSON.parse(text);
   } catch {
-    // Backend or proxy returned non-JSON (e.g. HTML error page)
-    return { status: "error", result: `Server error (${res.status}): ${text.slice(0, 120)}` };
+    return { job_id: "", status: "error" } as SubmitResponse & { result?: string };
   }
 }
+
+// ── Public API ──────────────────────────────────────────────────────────────
 
 export async function fetchArtModels(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/v1/art/models`);
@@ -29,13 +89,13 @@ export interface ImageGenParams {
   seed: number;
 }
 
-export async function generateImage(params: ImageGenParams) {
-  const res = await fetch(`${API_BASE}/v1/art/generate/image`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  return safeJson(res);
+export async function generateImage(
+  params: ImageGenParams,
+  onProgress?: (msg: string) => void,
+) {
+  const sub = await safeSubmit(`${API_BASE}/v1/art/generate/image`, params);
+  if (!sub.job_id) return { status: "error", result: "Failed to submit job" };
+  return pollJob(sub.job_id, onProgress);
 }
 
 export interface ThreeDGenParams {
@@ -44,13 +104,13 @@ export interface ThreeDGenParams {
   auto_concept: boolean;
 }
 
-export async function generate3D(params: ThreeDGenParams) {
-  const res = await fetch(`${API_BASE}/v1/art/generate/3d`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  return safeJson(res);
+export async function generate3D(
+  params: ThreeDGenParams,
+  onProgress?: (msg: string) => void,
+) {
+  const sub = await safeSubmit(`${API_BASE}/v1/art/generate/3d`, params);
+  if (!sub.job_id) return { status: "error", result: "Failed to submit job" };
+  return pollJob(sub.job_id, onProgress);
 }
 
 export interface ActionFigureParams {
@@ -60,13 +120,13 @@ export interface ActionFigureParams {
   clearance: number;
 }
 
-export async function generateActionFigure(params: ActionFigureParams) {
-  const res = await fetch(`${API_BASE}/v1/art/generate/action-figure`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  return safeJson(res);
+export async function generateActionFigure(
+  params: ActionFigureParams,
+  onProgress?: (msg: string) => void,
+) {
+  const sub = await safeSubmit(`${API_BASE}/v1/art/generate/action-figure`, params);
+  if (!sub.job_id) return { status: "error", result: "Failed to submit job" };
+  return pollJob(sub.job_id, onProgress);
 }
 
 export interface GalleryImage {

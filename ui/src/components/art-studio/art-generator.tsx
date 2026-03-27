@@ -28,6 +28,7 @@ export function ArtGenerator() {
   const searchParams = useSearchParams();
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [models, setModels] = useState<string[]>([]);
 
   // Load models on mount
@@ -59,6 +60,12 @@ export function ArtGenerator() {
     });
 
     setIsGenerating(true);
+    setProgressMsg(null);
+
+    const onProgress = (msg: string) => {
+      setProgressMsg(msg);
+      updateEntry(id, { result: msg });
+    };
 
     try {
       let result;
@@ -73,20 +80,20 @@ export function ArtGenerator() {
           sampler: imageSettings.sampler,
           scheduler: imageSettings.scheduler,
           seed: imageSettings.seed,
-        });
+        }, onProgress);
       } else if (mode === "3d") {
         result = await generate3D({
           prompt,
           workflow: threeDSettings.workflow,
           auto_concept: threeDSettings.autoConcept,
-        });
+        }, onProgress);
       } else {
         result = await generateActionFigure({
           prompt,
           workflow: actionFigureSettings.workflow,
           target_height: actionFigureSettings.targetHeight,
           clearance: actionFigureSettings.clearance,
-        });
+        }, onProgress);
       }
 
       updateEntry(id, {
@@ -100,6 +107,7 @@ export function ArtGenerator() {
       });
     } finally {
       setIsGenerating(false);
+      setProgressMsg(null);
       setPrompt("");
     }
   }, [prompt, mode, isGenerating, imageSettings, threeDSettings, actionFigureSettings, addEntry, updateEntry]);
@@ -173,7 +181,7 @@ export function ArtGenerator() {
               ) : (
                 <Sparkles size={16} />
               )}
-              {isGenerating ? "Generating..." : "Generate"}
+              {isGenerating ? (progressMsg || "Generating...") : "Generate"}
             </button>
           </div>
         </div>

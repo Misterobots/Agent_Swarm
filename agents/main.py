@@ -1287,6 +1287,39 @@ class ActionFigureRequest(BaseModel):
     target_height: int = 150
     clearance: float = 0.3
 
+# ── Art Studio async job queue ──────────────────────────────────────────────
+# All generation runs in background; clients poll GET /v1/art/jobs/{id}
+import asyncio as _art_asyncio
+from datetime import datetime as _dt
+
+_art_jobs: dict[str, dict] = {}  # job_id → {status, result, mode, prompt, created_at, finished_at}
+
+def _art_job_create(mode: str, prompt: str) -> str:
+    job_id = str(uuid.uuid4())
+    _art_jobs[job_id] = {
+        "status": "running",
+        "result": None,
+        "mode": mode,
+        "prompt": prompt,
+        "created_at": _dt.utcnow().isoformat(),
+        "finished_at": None,
+    }
+    return job_id
+
+def _art_job_finish(job_id: str, status: str, result: str):
+    if job_id in _art_jobs:
+        _art_jobs[job_id]["status"] = status
+        _art_jobs[job_id]["result"] = result
+        _art_jobs[job_id]["finished_at"] = _dt.utcnow().isoformat()
+
+@app.get("/v1/art/jobs/{job_id}")
+async def art_job_status(job_id: str):
+    """Poll for generation job status."""
+    job = _art_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
 @app.get("/v1/art/models")
 async def list_art_models():
     """List available ComfyUI model checkpoints."""
@@ -1299,90 +1332,112 @@ async def list_art_models():
         return {"models": ["v1-5-pruned-emaonly.ckpt"]}
 
 @app.post("/v1/art/generate/image")
-async def art_generate_image(req: ImageGenRequest, background_tasks: BackgroundTasks):
-    """Generate an image via ComfyUI."""
-    import asyncio
-    try:
-        from specialized.image_gen import generate_image
-        result = await asyncio.to_thread(
-            generate_image,
-            prompt=req.prompt,
-            model_name=req.model_name,
-            cfg=req.cfg,
-            steps=req.steps,
-            width=req.width,
-            height=req.height,
-            sampler=req.sampler,
-            scheduler=req.scheduler,
-            seed=req.seed,
-        )
-        status = "error" if result.startswith("Error") or result.startswith("Failed") else "ok"
-        return {"status": status, "result": result}
-    except Exception as e:
-        logger.error(f"Art Studio image gen failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def art_generate_image(req: ImageGenRequest):
+    """Queue an image generation job. Returns job_id for polling."""
+    job_id = _art_job_create("image", req.prompt)
+
+    async def _run():
+        try:
+            from specialized.image_gen import generate_image
+            result = await _art_asyncio.to_thread(
+                generate_image,
+                prompt=req.prompt,
+                model_name=req.model_name,
+                cfg=req.cfg,
+                steps=req.steps,
+                width=req.width,
+                height=req.height,
+                sampler=req.sampler,
+                scheduler=req.scheduler,
+                seed=req.seed,
+            )
+            status = "error" if result.startswith("Error") or result.startswith("Failed") else "ok"
+            _art_job_finish(job_id, status, result)
+        except Exception as e:
+            logger.error(f"Art Studio image gen failed: {e}")
+            _art_job_finish(job_id, "error", str(e))
+
+    _art_asyncio.get_event_loop().create_task(_run())
+    return {"job_id": job_id, "status": "running"}
 
 @app.post("/v1/art/generate/3d")
 async def art_generate_3d(req: ThreeDGenRequest):
-    """Generate a 3D model, optionally with concept art first."""
-    import asyncio
-    try:
-        image_path = None
-        if req.auto_concept:
-            from specialized.image_gen import generate_image
-            import re
-            concept_prompt = f"Concept art for 3d modeling, neutral background: {req.prompt}"
-            img_result = await asyncio.to_thread(generate_image, concept_prompt)
-            match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
-            if not match:
-                return {"status": "error", "result": f"Concept art failed: {img_result}"}
-            image_path = f"/app/comfy_io/output/{match.group(1)}"
-        else:
-            return {"status": "error", "result": "No image provided. Enable auto_concept or use /v1/art/generate/3d-from-image."}
+    """Queue a 3D model generation job. Returns job_id for polling."""
+    job_id = _art_job_create("3d", req.prompt)
 
-        import os
-        if not os.path.exists(image_path):
-            return {"status": "error", "result": f"Concept art image not found at {image_path}"}
+    async def _run():
+        try:
+            image_path = None
+            if req.auto_concept:
+                from specialized.image_gen import generate_image
+                import re
+                concept_prompt = f"Concept art for 3d modeling, neutral background: {req.prompt}"
+                _art_jobs[job_id]["result"] = "Generating concept art..."
+                img_result = await _art_asyncio.to_thread(generate_image, concept_prompt)
+                match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
+                if not match:
+                    _art_job_finish(job_id, "error", f"Concept art failed: {img_result}")
+                    return
+                image_path = f"/app/comfy_io/output/{match.group(1)}"
+            else:
+                _art_job_finish(job_id, "error", "No image provided. Enable auto_concept or use /v1/art/generate/3d-from-image.")
+                return
 
-        from specialized.forge_agent import generate_3d_model
-        result = await asyncio.to_thread(generate_3d_model, image_path, req.workflow)
-        status = "error" if result.startswith("Error") else "ok"
-        return {"status": status, "result": result}
-    except Exception as e:
-        logger.error(f"Art Studio 3D gen failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+            import os
+            if not os.path.exists(image_path):
+                _art_job_finish(job_id, "error", f"Concept art image not found at {image_path}")
+                return
+
+            _art_jobs[job_id]["result"] = "Generating 3D model (this may take several minutes)..."
+            from specialized.forge_agent import generate_3d_model
+            result = await _art_asyncio.to_thread(generate_3d_model, image_path, req.workflow)
+            status = "error" if result.startswith("Error") else "ok"
+            _art_job_finish(job_id, status, result)
+        except Exception as e:
+            logger.error(f"Art Studio 3D gen failed: {e}")
+            _art_job_finish(job_id, "error", str(e))
+
+    _art_asyncio.get_event_loop().create_task(_run())
+    return {"job_id": job_id, "status": "running"}
 
 @app.post("/v1/art/generate/action-figure")
 async def art_generate_action_figure(req: ActionFigureRequest):
-    """Generate a 3D-printable posable action figure."""
-    import asyncio
-    try:
-        # Step 1: T-pose concept art
-        from specialized.image_gen import generate_image
-        import re
-        concept_prompt = (
-            f"T-pose character concept art for 3D action figure, "
-            f"full body front view, neutral gray background, "
-            f"arms extended to sides, symmetrical pose: {req.prompt}"
-        )
-        img_result = await asyncio.to_thread(generate_image, concept_prompt)
-        match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
-        if not match:
-            return {"status": "error", "result": f"Concept art failed: {img_result}"}
-        image_path = f"/app/comfy_io/output/{match.group(1)}"
+    """Queue an action figure generation job. Returns job_id for polling."""
+    job_id = _art_job_create("action-figure", req.prompt)
 
-        import os
-        if not os.path.exists(image_path):
-            return {"status": "error", "result": f"Concept art image not found at {image_path}"}
+    async def _run():
+        try:
+            from specialized.image_gen import generate_image
+            import re
+            concept_prompt = (
+                f"T-pose character concept art for 3D action figure, "
+                f"full body front view, neutral gray background, "
+                f"arms extended to sides, symmetrical pose: {req.prompt}"
+            )
+            _art_jobs[job_id]["result"] = "Generating T-pose concept art..."
+            img_result = await _art_asyncio.to_thread(generate_image, concept_prompt)
+            match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
+            if not match:
+                _art_job_finish(job_id, "error", f"Concept art failed: {img_result}")
+                return
+            image_path = f"/app/comfy_io/output/{match.group(1)}"
 
-        # Step 2: Action figure pipeline
-        from specialized.action_figure_agent import generate_action_figure
-        result = await asyncio.to_thread(generate_action_figure, image_path, req.workflow)
-        status = "error" if "Failed" in result else "ok"
-        return {"status": status, "result": result}
-    except Exception as e:
-        logger.error(f"Art Studio action figure gen failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+            import os
+            if not os.path.exists(image_path):
+                _art_job_finish(job_id, "error", f"Concept art image not found at {image_path}")
+                return
+
+            _art_jobs[job_id]["result"] = "Generating 3D mesh and segmenting into posable parts..."
+            from specialized.action_figure_agent import generate_action_figure
+            result = await _art_asyncio.to_thread(generate_action_figure, image_path, req.workflow)
+            status = "error" if "Failed" in result else "ok"
+            _art_job_finish(job_id, status, result)
+        except Exception as e:
+            logger.error(f"Art Studio action figure gen failed: {e}")
+            _art_job_finish(job_id, "error", str(e))
+
+    _art_asyncio.get_event_loop().create_task(_run())
+    return {"job_id": job_id, "status": "running"}
 
 @app.get("/v1/art/gallery/images")
 async def art_gallery_images():

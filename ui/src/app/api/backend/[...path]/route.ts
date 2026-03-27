@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 300; // 5 minutes for long-running generation
+export const maxDuration = 60; // Generation uses async polling, only needs short proxy window
 
 const BACKEND_URL = process.env.API_BASE_URL || "http://localhost:8000";
 
@@ -38,7 +38,7 @@ async function proxyRequest(req: NextRequest) {
 
   const upstream = await fetch(target, {
     ...init,
-    signal: AbortSignal.timeout(300_000), // 5 min timeout for generation endpoints
+    signal: AbortSignal.timeout(55_000), // Short timeout — generation uses async job polling
   });
 
   const isSSE =
