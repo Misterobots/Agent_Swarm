@@ -97,8 +97,8 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
     
     try:
         url = f"{COMFYUI_HOST}/prompt"
-        req = requests.post(url, json=payload)
-        
+        req = requests.post(url, json=payload, timeout=30)
+
         if req.status_code != 200:
             return f"Error form ComfyUI (Status {req.status_code}): {req.text}"
             
@@ -114,17 +114,18 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
         return f"Error connecting to ComfyUI API: {e}"
 
     # 6. Poll for Result
-    logger.info("--- [Forge] Waiting for 3D generation (Max 20 Minutes)... ---")
+    logger.info("--- [Forge] Waiting for 3D generation (Max 30 Minutes)... ---")
     time.sleep(5) 
     
-    timeout_seconds = 1800 # 30 Minutes (Increased from 20)
+    timeout_seconds = 1800 # 30 Minutes
     start_time = time.time()
+    lost_count = 0
     
     while (time.time() - start_time) < timeout_seconds:
         try:
             # Check History (Did it finish?)
             history_url = f"{COMFYUI_HOST}/history/{prompt_id}"
-            res = requests.get(history_url)
+            res = requests.get(history_url, timeout=10)
             history = res.json()
             
             if prompt_id in history:
@@ -140,7 +141,7 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
                     return f"Error: ComfyUI 3D generation failed: {err_detail.strip()}"
 
                 logger.info("--- [Forge] Generation Complete. Parsing outputs... ---")
-                outputs = entry['outputs']
+                outputs = entry.get('outputs', {})
                 
                 # Robust Output Finding (Ported from hybridService.ts)
                 for node_id, node_output in outputs.items():
@@ -156,20 +157,28 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
                             elif isinstance(val, dict): found_files.append(val)
                             
                     for item in found_files:
+                        # Handle dict items (e.g. SaveImage nodes)
                         if isinstance(item, dict) and 'filename' in item:
                             fname = item['filename']
-                            # Look for 3D extensions
-                            if fname.endswith('.glb') or fname.endswith('.obj') or fname.endswith('.3mf'):
-                                full_path = os.path.join(COMFY_OUTPUT_DIR, item.get('subfolder', ''), fname)
-                                logger.info(f"--- [Forge] Found 3D Model: {full_path} ---")
-                                return f"3D Model Generated Successfully: {full_path}"
+                            subfolder = item.get('subfolder', '')
+                        # Handle string items (e.g. SaveTrimesh glb_path)
+                        elif isinstance(item, str):
+                            fname = item
+                            subfolder = ''
+                        else:
+                            continue
+                        # Look for 3D extensions
+                        if fname.endswith('.glb') or fname.endswith('.obj') or fname.endswith('.3mf'):
+                            full_path = os.path.join(COMFY_OUTPUT_DIR, subfolder, fname)
+                            logger.info(f"--- [Forge] Found 3D Model: {full_path} ---")
+                            return f"3D Model Generated Successfully: {full_path}"
                                 
                 return "Error: Generation finished but no 3D model file (.glb/.obj) was found in outputs."
 
             # Check Queue (Is it still running?)
             # This prevents premature timeouts if the queue is deep or processing is slow
             queue_url = f"{COMFYUI_HOST}/queue"
-            q_res = requests.get(queue_url)
+            q_res = requests.get(queue_url, timeout=10)
             q_data = q_res.json()
             
             # Queue data format: { "queue_pending": [...], "queue_running": [...] }
@@ -182,17 +191,17 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
                 pass
             
             if not is_pending and not is_running:
-                # It's not in history, not in pending, not in running.
-                # Did it fail silently? Or just moved to history in the split second between calls?
-                # We'll give it a few more retries before declaring lost.
-                pass
+                # Not in history, queue, or running — may be lost
+                lost_count += 1
+                if lost_count > 5:
+                    return "Error: ComfyUI job disappeared from queue without producing output."
 
             time.sleep(5)
         except Exception as e:
-            logger.info(f"Polling error: {e}")
+            logger.warning(f"Polling error: {e}")
             time.sleep(5)
-            
-    return "Error: 3D Generation operation timed out after 20 minutes."
+
+    return "Error: 3D Generation timed out after 30 minutes."
 
 def get_forge_agent():
     return Agent(

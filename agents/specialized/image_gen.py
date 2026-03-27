@@ -223,12 +223,15 @@ def queue_prompt(prompt_text: str, **kwargs):
                     return f"Error: ComfyUI execution failed: {err_detail.strip()}"
                 outputs = entry.get('outputs', {})
                 if '9' in outputs:
-                     images = outputs['9']['images']
-                     filename = images[0]['filename']
-                     subfolder = images[0]['subfolder']
-                     return f"Generated Image: {filename} (in {subfolder} output)"
-        except:
-            pass
+                     images = outputs['9'].get('images', [])
+                     if images:
+                         filename = images[0]['filename']
+                         subfolder = images[0].get('subfolder', '')
+                         return f"Generated Image: {filename} (in {subfolder} output)"
+                     return "Error: ComfyUI completed but produced no image output."
+                return "Error: ComfyUI completed but SaveImage node produced no output."
+        except Exception as e:
+            logger.warning(f"Polling error: {e}")
         time.sleep(1)
 
     return "Error: Generation timed out."

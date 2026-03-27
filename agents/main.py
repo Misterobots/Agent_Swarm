@@ -1316,7 +1316,8 @@ async def art_generate_image(req: ImageGenRequest, background_tasks: BackgroundT
             scheduler=req.scheduler,
             seed=req.seed,
         )
-        return {"status": "ok", "result": result}
+        status = "error" if result.startswith("Error") or result.startswith("Failed") else "ok"
+        return {"status": status, "result": result}
     except Exception as e:
         logger.error(f"Art Studio image gen failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1339,9 +1340,14 @@ async def art_generate_3d(req: ThreeDGenRequest):
         else:
             return {"status": "error", "result": "No image provided. Enable auto_concept or use /v1/art/generate/3d-from-image."}
 
+        import os
+        if not os.path.exists(image_path):
+            return {"status": "error", "result": f"Concept art image not found at {image_path}"}
+
         from specialized.forge_agent import generate_3d_model
         result = await asyncio.to_thread(generate_3d_model, image_path, req.workflow)
-        return {"status": "ok", "result": result}
+        status = "error" if result.startswith("Error") else "ok"
+        return {"status": status, "result": result}
     except Exception as e:
         logger.error(f"Art Studio 3D gen failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1365,10 +1371,15 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             return {"status": "error", "result": f"Concept art failed: {img_result}"}
         image_path = f"/app/comfy_io/output/{match.group(1)}"
 
+        import os
+        if not os.path.exists(image_path):
+            return {"status": "error", "result": f"Concept art image not found at {image_path}"}
+
         # Step 2: Action figure pipeline
         from specialized.action_figure_agent import generate_action_figure
         result = await asyncio.to_thread(generate_action_figure, image_path, req.workflow)
-        return {"status": "ok", "result": result}
+        status = "error" if "Failed" in result else "ok"
+        return {"status": status, "result": result}
     except Exception as e:
         logger.error(f"Art Studio action figure gen failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
