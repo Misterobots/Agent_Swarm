@@ -128,8 +128,19 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
             history = res.json()
             
             if prompt_id in history:
+                entry = history[prompt_id]
+                status_str = entry.get('status', {}).get('status_str', '')
+                if status_str == 'error':
+                    msgs = entry.get('status', {}).get('messages', [])
+                    err_detail = "Unknown ComfyUI error"
+                    for msg in msgs:
+                        if isinstance(msg, list) and msg[0] == 'execution_error':
+                            err_detail = msg[1].get('exception_message', err_detail)
+                            break
+                    return f"Error: ComfyUI 3D generation failed: {err_detail.strip()}"
+
                 logger.info("--- [Forge] Generation Complete. Parsing outputs... ---")
-                outputs = history[prompt_id]['outputs']
+                outputs = entry['outputs']
                 
                 # Robust Output Finding (Ported from hybridService.ts)
                 for node_id, node_output in outputs.items():
