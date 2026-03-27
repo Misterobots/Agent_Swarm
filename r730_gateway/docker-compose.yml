@@ -92,6 +92,10 @@ services:
     container_name: cadvisor-r730
     hostname: cadvisor-r730
     restart: unless-stopped
+    command:
+      - --housekeeping_interval=30s      # Reduce collection frequency (default 1s)
+      - --docker_only=true               # Only monitor Docker containers, skip host metrics
+      - --disable_metrics=udp,tcp,advtcp,sched,hugetlb,referenced_memory,resctrl,process
     ports:
       - "8888:8080"  # Use 8888 to avoid conflict with Traefik dashboard @ 8080
     volumes:

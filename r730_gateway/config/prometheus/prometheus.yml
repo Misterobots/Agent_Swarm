@@ -5,6 +5,8 @@ global:
 scrape_configs:
   # R730 node — container-level metrics (CPU, memory, network, disk I/O)
   - job_name: 'cadvisor-r730'
+    scrape_interval: 30s
+    scrape_timeout: 25s
     static_configs:
       - targets: ['cadvisor-r730:8080']
         labels:
