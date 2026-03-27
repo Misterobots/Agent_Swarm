@@ -254,26 +254,28 @@ services:
         export LD_LIBRARY_PATH="$$NVIDIA_BASE/cudnn/lib:$$NVIDIA_BASE/cublas/lib:$$NVIDIA_BASE/cuda_runtime/lib:$$NVIDIA_BASE/cuda_cupti/lib:$$NVIDIA_BASE/cufft/lib:$$NVIDIA_BASE/curand/lib:$$NVIDIA_BASE/cusolver/lib:$$NVIDIA_BASE/cusparse/lib:$$NVIDIA_BASE/nccl/lib:$$NVIDIA_BASE/nvtx/lib:$$LD_LIBRARY_PATH"
         echo "[ENV] Updated LD_LIBRARY_PATH: $$LD_LIBRARY_PATH"
         
-        if [ ! -f .5060_patch_v10_applied ]; then
-            echo "[SETUP] Applying 5060 Ti Patches (v10)..."
-            
-            echo "[SETUP] Installing PyTorch Nightly (CUDA 12.8 compatible)..."
-            pip install "numpy<2.0" "pillow>=12.1.0" rembg --pre torch torchvision torchaudio --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu128 --extra-index-url https://pypi.org/simple
-            
+        if [ ! -f .5060_patch_v11_applied ]; then
+            echo "[SETUP] Applying 5060 Ti Patches (v11 — system site-packages)..."
+
+            echo "[SETUP] Installing PyTorch Nightly (CUDA 12.8 — sm_120 for 5060 Ti)..."
+            pip install --break-system-packages "numpy<2.0" "pillow>=12.1.0" rembg --pre torch torchvision torchaudio --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu128 --extra-index-url https://pypi.org/simple
+
             echo "[SETUP] Installing Critical Dependencies..."
-            pip install xatlas accelerate utils3d pymeshlab watchdog kiui onnxruntime-gpu transformers diffusers sentencepiece protobuf scipy einops opencv-python jaxtyping typeguard lxml pyfqmr plyfile pyhocon omegaconf matplotlib tripo3d easydict simpleeval huggingface_hub[hf_xet] pyvista
-            
+            pip install --break-system-packages xatlas accelerate utils3d pymeshlab watchdog kiui onnxruntime-gpu transformers diffusers sentencepiece protobuf scipy einops opencv-python jaxtyping typeguard lxml pyfqmr plyfile pyhocon omegaconf matplotlib tripo3d easydict simpleeval huggingface_hub[hf_xet] pyvista
+
             echo "[SETUP] Cleaning up old xformers artifacts..."
             rm -rf /home/runner/.local/lib/python3.11/site-packages/xformers
             rm -rf /home/runner/.local/lib/python3.11/site-packages/xformers-*.dist-info
-            
+            rm -rf /usr/local/lib64/python3.11/site-packages/xformers
+            rm -rf /usr/local/lib64/python3.11/site-packages/xformers-*.dist-info
+
             # Note: xformers masking is now handled by custom_nodes/AAA_Antigravity_Patch/
-            
+
             rm .5060_patch_* 2>/dev/null || true
-            touch .5060_patch_v10_applied
-            echo "[SETUP] Patching Complete. Marker v10 created."
+            touch .5060_patch_v11_applied
+            echo "[SETUP] Patching Complete. Marker v11 created."
         else
-            echo "[SETUP] Patches already applied. Skipping install."
+            echo "[SETUP] Patches v11 already applied. Skipping install."
         fi
         
         echo "Launching ComfyUI..."
