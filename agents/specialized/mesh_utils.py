@@ -170,7 +170,7 @@ def analyze_cross_section(
         "areas": areas,
         "bboxes": bboxes,
         "total_area": sum(areas),
-        "width": pts[:, 0].ptp(),
+        "width": float(pts[:, 0].max() - pts[:, 0].min()),
     }
 
 
