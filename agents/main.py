@@ -1285,7 +1285,7 @@ class ThreeDGenRequest(BaseModel):
 class ActionFigureRequest(BaseModel):
     prompt: str
     workflow: str = "workflow_triposg.json"
-    target_height: int = 150
+    target_height: float = 150.0
     clearance: float = 0.3
 
 # ── Art Studio async job queue ──────────────────────────────────────────────
@@ -1372,7 +1372,10 @@ async def art_generate_3d(req: ThreeDGenRequest):
             if req.auto_concept:
                 from specialized.image_gen import generate_image
                 import re
-                concept_prompt = f"Concept art for 3d modeling, neutral background: {req.prompt}"
+                concept_prompt = (
+                    f"3D modeling reference, single subject centered on pure white background, "
+                    f"studio lighting, no text, no watermark, high detail, clean edges: {req.prompt}"
+                )
                 _art_jobs[job_id]["result"] = "Generating concept art..."
                 img_result = await _art_asyncio.to_thread(generate_image, concept_prompt)
                 match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
@@ -1411,9 +1414,11 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             from specialized.image_gen import generate_image
             import re
             concept_prompt = (
-                f"T-pose character concept art for 3D action figure, "
-                f"full body front view, neutral gray background, "
-                f"arms extended to sides, symmetrical pose: {req.prompt}"
+                f"Character design reference sheet, T-pose, full body front view, "
+                f"arms extended straight to sides at shoulder height, "
+                f"legs shoulder-width apart, symmetrical pose, standing on flat ground, "
+                f"clean white background, even studio lighting, no text, no props, "
+                f"3D modeling reference: {req.prompt}"
             )
             _art_jobs[job_id]["result"] = "Generating T-pose concept art..."
             img_result = await _art_asyncio.to_thread(generate_image, concept_prompt)
@@ -1430,7 +1435,10 @@ async def art_generate_action_figure(req: ActionFigureRequest):
 
             _art_jobs[job_id]["result"] = "Generating 3D mesh and segmenting into posable parts..."
             from specialized.action_figure_agent import generate_action_figure
-            result = await _art_asyncio.to_thread(generate_action_figure, image_path, req.workflow)
+            result = await _art_asyncio.to_thread(
+                generate_action_figure, image_path, req.workflow,
+                target_height=req.target_height, clearance=req.clearance,
+            )
             status = "error" if "Failed" in result else "ok"
             _art_job_finish(job_id, status, result)
         except Exception as e:

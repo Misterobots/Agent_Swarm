@@ -1,30 +1,29 @@
 """
-Action Figure Agent
-====================
+Action Figure Agent  (v2 — skeleton-aware)
+============================================
 
 Image-to-3D-printable posable action figure pipeline.
 
 Pipeline:
   1. Generate base 3D mesh from input image via ComfyUI (TripoSG)
-  2. Segment mesh into body parts at joint locations
-  3. Add ball-and-socket joint geometry at each cut plane
-  4. Export individual parts as print-ready STL files
+  2. Repair mesh (fill holes, fix normals, merge vertices)
+  3. Detect humanoid skeleton from cross-section analysis
+  4. Cut mesh into 11 body parts at detected joint positions
+  5. Attach parametric ball-socket joints to each cut surface
+  6. Validate printability and export STL parts + manifest
 
-Joint system uses ball-socket design:
-  - Ball (male): sphere protruding from the parent part
-  - Socket (female): hollow hemisphere recessed into the child part
-  - Clearance gap for FDM/resin tolerance
+Joint system:
+  Ball-socket at every joint — sphere on a stem (parent side),
+  hemispherical cavity with snap-fit retention lip (child side),
+  reinforcement housing collar around each socket.
 """
 
 import json
 import os
-import time
 import uuid
-import shutil
 import logging
-import math
-import requests
-from typing import List, Dict, Tuple, Optional
+import numpy as np
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,322 +32,287 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
 MODEL_NAME = "qwen2.5-coder:14b"
 
-# Directories (Mapped Volumes)
+# Directories
 COMFY_INPUT_DIR = "/app/comfy_io/input"
 COMFY_OUTPUT_DIR = "/app/comfy_io/output"
 TEMPLATE_DIR = "/app/agents/templates"
 ACTION_FIGURE_OUTPUT_DIR = "/app/comfy_io/output/action_figures"
 
-# ============================================================================
-# JOINT DEFINITIONS
-# ============================================================================
-
-# Default joint locations as normalized height ratios (0 = bottom, 1 = top)
-# and the axis perpendicular to the cut plane.
-# These are starting estimates; the LLM refines them per-model.
-
-DEFAULT_JOINT_PLAN = {
-    "neck":             {"height_ratio": 0.85, "axis": "z", "ball_radius": 3.5},
-    "left_shoulder":    {"height_ratio": 0.78, "axis": "x", "ball_radius": 4.0, "side": "left"},
-    "right_shoulder":   {"height_ratio": 0.78, "axis": "x", "ball_radius": 4.0, "side": "right"},
-    "left_elbow":       {"height_ratio": 0.60, "axis": "x", "ball_radius": 3.0, "side": "left"},
-    "right_elbow":      {"height_ratio": 0.60, "axis": "x", "ball_radius": 3.0, "side": "right"},
-    "left_wrist":       {"height_ratio": 0.45, "axis": "x", "ball_radius": 2.5, "side": "left"},
-    "right_wrist":      {"height_ratio": 0.45, "axis": "x", "ball_radius": 2.5, "side": "right"},
-    "waist":            {"height_ratio": 0.52, "axis": "z", "ball_radius": 5.0},
-    "left_hip":         {"height_ratio": 0.45, "axis": "z", "ball_radius": 4.5, "side": "left"},
-    "right_hip":        {"height_ratio": 0.45, "axis": "z", "ball_radius": 4.5, "side": "right"},
-    "left_knee":        {"height_ratio": 0.25, "axis": "x", "ball_radius": 3.5, "side": "left"},
-    "right_knee":       {"height_ratio": 0.25, "axis": "x", "ball_radius": 3.5, "side": "right"},
-}
-
-# Print tolerance (mm gap between ball and socket for clearance)
+# Defaults
+TARGET_HEIGHT_MM = 150.0
 JOINT_CLEARANCE_MM = 0.3
 
-# Target figure height in mm (scales the mesh)
-TARGET_HEIGHT_MM = 150.0
+
+# ============================================================================
+# BODY PART TOPOLOGY
+# ============================================================================
+#
+# Each body part is defined by which joints bound it and the part's role
+# at that joint:
+#   'parent' → this part has the BALL, keeps the opposite side of joint normal
+#   'child'  → this part has the SOCKET, keeps the same side as joint normal
+
+BODY_PARTS: Dict[str, List[tuple]] = {
+    "head":            [("neck", "child")],
+    "torso":           [("neck", "parent"), ("waist", "parent"),
+                        ("left_shoulder", "parent"), ("right_shoulder", "parent")],
+    "pelvis":          [("waist", "child"),
+                        ("left_hip", "parent"), ("right_hip", "parent")],
+    "left_upper_arm":  [("left_shoulder", "child"), ("left_elbow", "parent")],
+    "left_forearm":    [("left_elbow", "child")],
+    "right_upper_arm": [("right_shoulder", "child"), ("right_elbow", "parent")],
+    "right_forearm":   [("right_elbow", "child")],
+    "left_upper_leg":  [("left_hip", "child"), ("left_knee", "parent")],
+    "left_lower_leg":  [("left_knee", "child")],
+    "right_upper_leg": [("right_hip", "child"), ("right_knee", "parent")],
+    "right_lower_leg": [("right_knee", "child")],
+}
 
 
 # ============================================================================
-# MESH PROCESSING UTILITIES
+# MESH HELPERS
 # ============================================================================
 
 def _ensure_output_dir():
-    """Create output directory for action figure parts."""
     os.makedirs(ACTION_FIGURE_OUTPUT_DIR, exist_ok=True)
 
 
-def _scale_mesh_to_height(mesh, target_height_mm: float):
-    """Scale a trimesh object so its bounding box height matches target."""
-    import trimesh
-    bounds = mesh.bounds
-    current_height = bounds[1][2] - bounds[0][2]  # Z-axis height
-    if current_height <= 0:
-        logger.warning("[ActionFigure] Mesh has zero height, skipping scale")
-        return mesh
-    scale_factor = target_height_mm / current_height
-    mesh.apply_scale(scale_factor)
-    logger.info(f"[ActionFigure] Scaled mesh by {scale_factor:.3f}x to {target_height_mm}mm height")
-    return mesh
-
-
 def _center_mesh(mesh):
-    """Center mesh at origin on XY, with bottom at Z=0."""
-    import trimesh
+    """Center on XY origin, bottom at Z=0."""
     bounds = mesh.bounds
-    center_x = (bounds[0][0] + bounds[1][0]) / 2
-    center_y = (bounds[0][1] + bounds[1][1]) / 2
-    min_z = bounds[0][2]
-    mesh.apply_translation([-center_x, -center_y, -min_z])
+    cx = (bounds[0][0] + bounds[1][0]) / 2
+    cy = (bounds[0][1] + bounds[1][1]) / 2
+    mesh.apply_translation([-cx, -cy, -bounds[0][2]])
     return mesh
 
 
-def _create_ball_joint(center: list, radius: float, socket: bool = False) -> "trimesh.Trimesh":
-    """
-    Create a ball or socket joint primitive.
+def _scale_mesh_to_height(mesh, target_mm: float):
+    """Scale mesh so bounding-box height = target_mm."""
+    bounds = mesh.bounds
+    h = bounds[1][2] - bounds[0][2]
+    if h <= 0:
+        return mesh
+    factor = target_mm / h
+    mesh.apply_scale(factor)
+    logger.info(f"[ActionFigure] Scaled {factor:.3f}x → {target_mm}mm height")
+    return mesh
 
-    Args:
-        center: [x, y, z] position
-        radius: Ball radius in mm
-        socket: If True, creates a socket (hollow sphere) instead of a ball
 
-    Returns:
-        trimesh sphere primitive
-    """
+def _load_mesh(mesh_path: str):
+    """Load a GLB/OBJ and flatten to a single Trimesh."""
     import trimesh
 
-    if socket:
-        # Socket: slightly larger sphere (with clearance) to be subtracted
-        sphere = trimesh.creation.icosphere(subdivisions=3, radius=radius + JOINT_CLEARANCE_MM)
-    else:
-        # Ball: solid sphere at nominal radius
-        sphere = trimesh.creation.icosphere(subdivisions=3, radius=radius)
-
-    sphere.apply_translation(center)
-    return sphere
-
-
-def _create_peg(center: list, radius: float, length: float, axis: str = "z") -> "trimesh.Trimesh":
-    """Create a cylindrical peg for the ball stem."""
-    import trimesh
-    import numpy as np
-
-    cylinder = trimesh.creation.cylinder(radius=radius * 0.4, height=length, sections=32)
-
-    # Orient cylinder along the correct axis
-    if axis == "x":
-        rotation = trimesh.transformations.rotation_matrix(math.pi / 2, [0, 1, 0])
-        cylinder.apply_transform(rotation)
-    elif axis == "y":
-        rotation = trimesh.transformations.rotation_matrix(math.pi / 2, [1, 0, 0])
-        cylinder.apply_transform(rotation)
-    # z is default (no rotation needed)
-
-    cylinder.apply_translation(center)
-    return cylinder
-
-
-def _split_mesh_at_plane(mesh, origin: list, normal: list) -> Tuple:
-    """
-    Split a mesh into two halves using a plane.
-
-    Returns:
-        (upper_half, lower_half) trimesh objects, either may be None if split fails
-    """
-    import trimesh
-    import numpy as np
-
-    try:
-        # trimesh.intersections.slice_mesh_plane returns the portion ABOVE the plane
-        upper = mesh.slice_plane(origin, normal)
-        lower = mesh.slice_plane(origin, [-n for n in normal])
-        return upper, lower
-    except Exception as e:
-        logger.warning(f"[ActionFigure] Plane split failed: {e}")
-        return None, None
-
-
-def segment_and_joint(mesh_path: str, joint_plan: Optional[Dict] = None,
-                      output_prefix: str = "figure") -> Dict[str, str]:
-    """
-    Main segmentation pipeline.
-
-    Takes a monolithic 3D mesh and produces individual STL parts
-    with ball-socket joints for posable assembly.
-
-    Args:
-        mesh_path: Path to input GLB/OBJ mesh
-        joint_plan: Joint definitions (uses DEFAULT_JOINT_PLAN if None)
-        output_prefix: Filename prefix for output parts
-
-    Returns:
-        Dict mapping part names to output file paths
-    """
-    import trimesh
-    import numpy as np
-
-    _ensure_output_dir()
-
-    if joint_plan is None:
-        joint_plan = DEFAULT_JOINT_PLAN
-
-    # Load and prepare mesh
     scene = trimesh.load(mesh_path, force="scene")
     if isinstance(scene, trimesh.Scene):
-        mesh = scene.to_geometry()
-        if isinstance(mesh, trimesh.Scene):
-            # Flatten all geometries into one mesh
-            meshes = [g for g in scene.geometry.values() if isinstance(g, trimesh.Trimesh)]
-            if not meshes:
-                raise ValueError(f"No valid geometry found in {mesh_path}")
-            mesh = trimesh.util.concatenate(meshes)
-    else:
+        meshes = [g for g in scene.geometry.values() if isinstance(g, trimesh.Trimesh)]
+        if not meshes:
+            raise ValueError(f"No geometry in {mesh_path}")
+        mesh = trimesh.util.concatenate(meshes) if len(meshes) > 1 else meshes[0]
+    elif isinstance(scene, trimesh.Trimesh):
         mesh = scene
+    else:
+        raise ValueError(f"Unexpected type from trimesh.load: {type(scene)}")
 
-    if not isinstance(mesh, trimesh.Trimesh):
-        raise ValueError(f"Could not extract mesh from {mesh_path}")
+    return mesh
 
-    # Center and scale
-    mesh = _center_mesh(mesh)
-    mesh = _scale_mesh_to_height(mesh, TARGET_HEIGHT_MM)
 
-    bounds = mesh.bounds
-    mesh_height = bounds[1][2] - bounds[0][2]
-    mesh_width = bounds[1][0] - bounds[0][0]
-    mesh_center_x = (bounds[0][0] + bounds[1][0]) / 2
+# ============================================================================
+# SEGMENTATION — CUT MESH AT SKELETON JOINTS
+# ============================================================================
 
-    output_files = {}
+def extract_body_part(mesh, part_name: str, skeleton: Dict):
+    """
+    Extract one body part by sequentially cutting at each adjacent joint.
 
-    # Sort joints by height ratio (process from top to bottom)
-    sorted_joints = sorted(joint_plan.items(), key=lambda x: x[1]["height_ratio"], reverse=True)
+    For each joint bounding this part:
+      - parent role → keep opposite side of joint normal (toward body center)
+      - child role  → keep same side as joint normal (away from body center)
+    """
+    joints = skeleton["joints"]
+    result = mesh.copy()
 
-    # Track remaining mesh regions for progressive cutting
-    # We'll use a simpler approach: cut the full mesh at each joint plane
-    # and collect the segments between consecutive cuts.
+    for joint_name, role in BODY_PARTS[part_name]:
+        joint = joints[joint_name]
+        pos = joint["position"]
+        normal = joint["normal"]
 
-    # Compute absolute Z heights for horizontal cuts
-    z_cuts = []
-    for joint_name, joint_def in sorted_joints:
-        z = bounds[0][2] + joint_def["height_ratio"] * mesh_height
-        z_cuts.append((joint_name, z, joint_def))
-
-    # Sort cuts by Z ascending for sequential slicing
-    z_cuts.sort(key=lambda x: x[1])
-
-    # Sequential horizontal slicing to create body segments
-    remaining = mesh.copy()
-    segments = []
-
-    for i, (joint_name, z_height, joint_def) in enumerate(z_cuts):
-        origin = [0, 0, z_height]
-        normal = [0, 0, 1]  # Cut plane faces up
+        # Determine which side of the plane to keep
+        if role == "parent":
+            cut_normal = -normal  # keep opposite side
+        else:
+            cut_normal = normal   # keep same side
 
         try:
-            # below = portion under the cut plane
-            below = remaining.slice_plane(origin, [0, 0, -1])
-            above = remaining.slice_plane(origin, [0, 0, 1])
-
-            if below is not None and len(below.faces) > 0:
-                # For side-specific joints (left/right), further split on X axis
-                side = joint_def.get("side")
-                if side == "left":
-                    left_part = below.slice_plane([mesh_center_x, 0, 0], [-1, 0, 0])
-                    if left_part is not None and len(left_part.faces) > 0:
-                        segments.append((f"{joint_name}_part", left_part, joint_def))
-                    # Keep right side in remaining
-                    right_remain = below.slice_plane([mesh_center_x, 0, 0], [1, 0, 0])
-                    if right_remain is not None and above is not None:
-                        remaining = trimesh.util.concatenate([right_remain, above])
-                    elif above is not None:
-                        remaining = above
-                    continue
-                elif side == "right":
-                    right_part = below.slice_plane([mesh_center_x, 0, 0], [1, 0, 0])
-                    if right_part is not None and len(right_part.faces) > 0:
-                        segments.append((f"{joint_name}_part", right_part, joint_def))
-                    left_remain = below.slice_plane([mesh_center_x, 0, 0], [-1, 0, 0])
-                    if left_remain is not None and above is not None:
-                        remaining = trimesh.util.concatenate([left_remain, above])
-                    elif above is not None:
-                        remaining = above
-                    continue
-
-                segments.append((f"{joint_name}_part", below, joint_def))
-
-            if above is not None and len(above.faces) > 0:
-                remaining = above
+            sliced = result.slice_plane(pos, cut_normal, cap=True)
+            if sliced is not None and len(sliced.faces) > 5:
+                result = sliced
             else:
-                break
-
+                logger.warning(
+                    f"[Segment] {part_name}/{joint_name}: cut produced "
+                    f"{len(sliced.faces) if sliced else 0} faces, skipping"
+                )
         except Exception as e:
-            logger.warning(f"[ActionFigure] Failed to cut at {joint_name} (z={z_height:.1f}): {e}")
+            logger.warning(f"[Segment] {part_name}/{joint_name} cut failed: {e}")
+
+    return result
+
+
+# ============================================================================
+# JOINT ATTACHMENT
+# ============================================================================
+
+def attach_joints(part_mesh, part_name: str, skeleton: Dict, clearance: float):
+    """
+    Add ball-socket joint geometry to a body part.
+
+    Parent side → ball protrudes in joint-normal direction
+    Child side  → socket cavity carved opposite to joint normal,
+                  with reinforcement housing
+    """
+    import trimesh
+    from specialized.joint_library import (
+        BallSocketJoint, orient_joint_geometry, safe_boolean,
+    )
+
+    joints = skeleton["joints"]
+    result = part_mesh
+
+    for joint_name, role in BODY_PARTS[part_name]:
+        joint = joints[joint_name]
+        pos = np.array(joint["position"])
+        normal = np.array(joint["normal"])
+        radius = joint["radius"]
+
+        bsj = BallSocketJoint(ball_radius=radius, clearance=clearance)
+
+        if role == "parent":
+            # Ball protrudes toward child (in joint normal direction)
+            ball = bsj.create_ball_assembly()
+            orient_joint_geometry(ball, pos, normal)
+            result = safe_boolean("union", [result, ball], f"{part_name}/{joint_name}/ball")
+
+        else:
+            # Socket faces the parent (opposite to joint normal)
+            socket_dir = -normal
+
+            # Add reinforcement housing first
+            housing = bsj.create_socket_housing()
+            orient_joint_geometry(housing, pos, socket_dir)
+            result = safe_boolean("union", [result, housing], f"{part_name}/{joint_name}/housing")
+
+            # Carve socket cavity
+            void = bsj.create_socket_void()
+            orient_joint_geometry(void, pos, socket_dir)
+            result = safe_boolean("difference", [result, void], f"{part_name}/{joint_name}/socket")
+
+    return result
+
+
+# ============================================================================
+# MAIN SEGMENTATION PIPELINE
+# ============================================================================
+
+def segment_and_joint(
+    mesh_path: str,
+    output_prefix: str = "figure",
+    target_height: float = TARGET_HEIGHT_MM,
+    clearance: float = JOINT_CLEARANCE_MM,
+) -> Dict[str, str]:
+    """
+    Full segmentation pipeline: load → repair → detect skeleton →
+    cut into 11 parts → attach joints → validate → export STL.
+
+    Returns dict mapping part names to output file paths.
+    """
+    import trimesh
+    from specialized.mesh_utils import repair_mesh, detect_skeleton, validate_printability
+
+    # ── 1. Load & prepare ──
+    mesh = _load_mesh(mesh_path)
+    mesh = repair_mesh(mesh)
+    mesh = _center_mesh(mesh)
+    mesh = _scale_mesh_to_height(mesh, target_height)
+
+    logger.info(
+        f"[ActionFigure] Prepared mesh: {len(mesh.vertices)} verts, "
+        f"{len(mesh.faces)} faces, bounds {mesh.bounds.tolist()}"
+    )
+
+    # ── 2. Detect skeleton ──
+    skeleton = detect_skeleton(mesh)
+    confidence = skeleton["confidence"]
+    features = skeleton.get("detected_features", {})
+    logger.info(
+        f"[ActionFigure] Skeleton confidence={confidence:.2f}, "
+        f"features={features}"
+    )
+
+    # ── 3. Cut & joint each body part ──
+    _ensure_output_dir()
+    output_files: Dict[str, str] = {}
+    part_meshes: Dict[str, trimesh.Trimesh] = {}
+    skipped = []
+
+    for part_name in BODY_PARTS:
+        logger.info(f"[ActionFigure] Extracting: {part_name}")
+        part = extract_body_part(mesh, part_name, skeleton)
+
+        if len(part.faces) < 20:
+            logger.warning(
+                f"[ActionFigure] {part_name}: only {len(part.faces)} faces — skipping"
+            )
+            skipped.append(part_name)
             continue
 
-    # Add the final remaining piece (top of head typically)
-    if remaining is not None and len(remaining.faces) > 0:
-        segments.append(("head_top", remaining, {"ball_radius": 3.5, "axis": "z"}))
+        # Attach joint geometry
+        part = attach_joints(part, part_name, skeleton, clearance)
+        part_meshes[part_name] = part
 
-    # Process each segment: add joint geometry and export
-    for part_name, part_mesh, joint_def in segments:
-        ball_radius = joint_def.get("ball_radius", 3.5)
-        part_bounds = part_mesh.bounds
-
-        try:
-            # Add ball joint peg on top face of each segment
-            top_center = [
-                (part_bounds[0][0] + part_bounds[1][0]) / 2,
-                (part_bounds[0][1] + part_bounds[1][1]) / 2,
-                part_bounds[1][2]
-            ]
-            ball = _create_ball_joint(top_center, ball_radius, socket=False)
-            peg = _create_peg(top_center, ball_radius, ball_radius * 1.5, axis="z")
-
-            # Add socket recess on bottom face
-            bottom_center = [
-                (part_bounds[0][0] + part_bounds[1][0]) / 2,
-                (part_bounds[0][1] + part_bounds[1][1]) / 2,
-                part_bounds[0][2]
-            ]
-            socket = _create_ball_joint(bottom_center, ball_radius, socket=True)
-
-            # Boolean operations: union ball+peg onto top, subtract socket from bottom
-            try:
-                part_with_ball = trimesh.boolean.union([part_mesh, ball, peg], engine="blender")
-                final_part = trimesh.boolean.difference([part_with_ball, socket], engine="blender")
-            except Exception:
-                # Fallback: try manifold engine or skip booleans
-                try:
-                    part_with_ball = trimesh.boolean.union([part_mesh, ball, peg], engine="manifold")
-                    final_part = trimesh.boolean.difference([part_with_ball, socket], engine="manifold")
-                except Exception as bool_err:
-                    logger.warning(f"[ActionFigure] Boolean ops failed for {part_name}: {bool_err}, exporting raw segment")
-                    final_part = part_mesh
-
-        except Exception as e:
-            logger.warning(f"[ActionFigure] Joint geometry failed for {part_name}: {e}")
-            final_part = part_mesh
-
-        # Export as STL
-        out_path = os.path.join(ACTION_FIGURE_OUTPUT_DIR, f"{output_prefix}_{part_name}.stl")
-        final_part.export(out_path, file_type="stl")
+        # Export STL
+        out_path = os.path.join(
+            ACTION_FIGURE_OUTPUT_DIR, f"{output_prefix}_{part_name}.stl"
+        )
+        part.export(out_path, file_type="stl")
         output_files[part_name] = out_path
-        logger.info(f"[ActionFigure] Exported: {out_path} ({len(final_part.faces)} faces)")
+        logger.info(f"[ActionFigure] Exported: {out_path} ({len(part.faces)} faces)")
 
-    # Also export a manifest JSON for the slicer / assembly reference
+    # ── 4. Validate printability ──
+    warnings = validate_printability(part_meshes)
+    for w in warnings:
+        logger.warning(f"[PrintCheck] {w}")
+
+    # ── 5. Write manifest ──
     manifest = {
         "figure_name": output_prefix,
-        "target_height_mm": TARGET_HEIGHT_MM,
-        "joint_clearance_mm": JOINT_CLEARANCE_MM,
-        "parts": {name: {"path": path, "joint_type": "ball_socket"}
-                  for name, path in output_files.items()},
+        "target_height_mm": target_height,
+        "joint_clearance_mm": clearance,
+        "joint_type": "ball_socket",
+        "skeleton_confidence": confidence,
+        "skeleton_features": {k: float(v) if isinstance(v, (int, float, np.floating)) else v
+                              for k, v in features.items()},
+        "parts": {
+            name: {
+                "path": path,
+                "faces": len(part_meshes[name].faces),
+                "joints": [
+                    {"name": jn, "role": jr}
+                    for jn, jr in BODY_PARTS[name]
+                ],
+            }
+            for name, path in output_files.items()
+        },
+        "skipped_parts": skipped,
+        "print_warnings": warnings,
         "assembly_notes": (
-            "Print all parts individually. "
-            "Ball joints should press-fit into sockets. "
-            f"Designed with {JOINT_CLEARANCE_MM}mm clearance for FDM printers. "
-            "Reduce clearance to 0.15mm for resin printers."
-        )
+            f"11-part posable action figure ({target_height}mm tall). "
+            f"All joints are ball-socket with {clearance}mm clearance (FDM). "
+            "Reduce clearance to 0.15mm for resin. "
+            "Ball joints snap-fit into sockets — press firmly to seat."
+        ),
     }
-    manifest_path = os.path.join(ACTION_FIGURE_OUTPUT_DIR, f"{output_prefix}_manifest.json")
+    manifest_path = os.path.join(
+        ACTION_FIGURE_OUTPUT_DIR, f"{output_prefix}_manifest.json"
+    )
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
     output_files["_manifest"] = manifest_path
@@ -360,81 +324,90 @@ def segment_and_joint(mesh_path: str, joint_plan: Optional[Dict] = None,
 # COMFYUI 3D GENERATION (reuses forge pipeline)
 # ============================================================================
 
-def _generate_base_mesh(image_path: str, workflow_name: str = "workflow_triposg.json") -> str:
+def _generate_base_mesh(
+    image_path: str, workflow_name: str = "workflow_triposg.json",
+) -> str:
     """
-    Generate base 3D mesh from image via ComfyUI.
-    Thin wrapper around the forge pipeline logic.
-
-    Returns:
-        Path to generated GLB/OBJ file, or error string.
+    Generate base 3D mesh from image via ComfyUI / TripoSG.
+    Returns path to generated GLB, or error string.
     """
     from specialized.forge_agent import generate_3d_model
     return generate_3d_model(image_path, workflow_name)
 
 
 # ============================================================================
-# MAIN PIPELINE
+# FULL PIPELINE ENTRY POINT
 # ============================================================================
 
-def generate_action_figure(image_path: str,
-                           workflow_name: str = "workflow_triposg.json",
-                           figure_name: Optional[str] = None) -> str:
+def generate_action_figure(
+    image_path: str,
+    workflow_name: str = "workflow_triposg.json",
+    figure_name: Optional[str] = None,
+    target_height: float = TARGET_HEIGHT_MM,
+    clearance: float = JOINT_CLEARANCE_MM,
+) -> str:
     """
-    Full image-to-action-figure pipeline.
+    Full image → posable action figure pipeline.
 
-    1. Generate base 3D mesh from input image
-    2. Segment into body parts
-    3. Add ball-socket joints
-    4. Export individual STL parts
+    1. Generate base 3D mesh from concept art via TripoSG
+    2. Detect skeleton, segment into body parts
+    3. Attach ball-socket joints
+    4. Export print-ready STL parts
 
     Args:
         image_path: Path to source 2D image
-        workflow_name: ComfyUI workflow template for base mesh generation
-        figure_name: Name prefix for output files (auto-generated if None)
+        workflow_name: ComfyUI workflow template name
+        figure_name: Filename prefix (auto-generated if None)
+        target_height: Figure height in mm
+        clearance: Joint clearance in mm
 
     Returns:
-        Summary string with output paths, or error message.
+        Summary string with part counts and paths, or error message.
     """
     if figure_name is None:
         figure_name = f"action_fig_{uuid.uuid4().hex[:8]}"
 
-    logger.info(f"[ActionFigure] Starting pipeline for: {image_path}")
-    logger.info(f"[ActionFigure] Figure name: {figure_name}")
+    logger.info(f"[ActionFigure] Pipeline start: {image_path}")
 
     # Step 1: Generate base mesh
-    logger.info("[ActionFigure] Step 1/3: Generating base 3D mesh...")
+    logger.info("[ActionFigure] Step 1/3: Generating base 3D mesh via TripoSG...")
     mesh_result = _generate_base_mesh(image_path, workflow_name)
 
     if mesh_result.startswith("Error"):
         return f"Action Figure Generation Failed (mesh step): {mesh_result}"
 
-    # Extract mesh path from result string
-    # Format: "3D Model Generated Successfully: /path/to/file.glb"
+    # Extract path from "3D Model Generated Successfully: /path/to/file.glb"
     if ":" in mesh_result:
         mesh_path = mesh_result.split(":", 1)[1].strip()
     else:
-        return f"Action Figure Generation Failed: Could not parse mesh path from: {mesh_result}"
+        return f"Action Figure Generation Failed: could not parse mesh path from: {mesh_result}"
 
     if not os.path.exists(mesh_path):
-        return f"Action Figure Generation Failed: Generated mesh not found at {mesh_path}"
+        return f"Action Figure Generation Failed: mesh not found at {mesh_path}"
 
-    # Step 2 & 3: Segment and add joints
-    logger.info("[ActionFigure] Step 2/3: Segmenting mesh and adding ball-socket joints...")
+    # Step 2 & 3: Segment, joint, export
+    logger.info("[ActionFigure] Step 2/3: Skeleton detection, segmentation, joint attachment...")
     try:
-        output_files = segment_and_joint(mesh_path, output_prefix=figure_name)
+        output_files = segment_and_joint(
+            mesh_path,
+            output_prefix=figure_name,
+            target_height=target_height,
+            clearance=clearance,
+        )
     except Exception as e:
-        return f"Action Figure Generation Failed (segmentation step): {e}"
+        logger.error(f"[ActionFigure] Segmentation failed: {e}", exc_info=True)
+        return f"Action Figure Generation Failed (segmentation): {e}"
 
-    # Step 3: Summary
     part_count = len([k for k in output_files if not k.startswith("_")])
-    manifest_path = output_files.get("_manifest", "unknown")
+    manifest = output_files.get("_manifest", "unknown")
 
-    logger.info(f"[ActionFigure] Pipeline complete: {part_count} parts generated")
+    logger.info(f"[ActionFigure] Pipeline complete: {part_count} parts")
 
     return (
-        f"Action Figure Generated Successfully: {part_count} posable parts with ball-socket joints.\n"
+        f"Action Figure Generated Successfully: {part_count} posable parts "
+        f"with ball-socket joints.\n"
         f"Parts directory: {ACTION_FIGURE_OUTPUT_DIR}\n"
-        f"Manifest: {manifest_path}\n"
+        f"Manifest: {manifest}\n"
         f"Figure name: {figure_name}"
     )
 
@@ -444,7 +417,6 @@ def generate_action_figure(image_path: str,
 # ============================================================================
 
 def get_action_figure_agent():
-    """Create the Action Figure Generator agent."""
     from phi.agent import Agent
     from phi.model.ollama import Ollama
 
@@ -453,14 +425,13 @@ def get_action_figure_agent():
         model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST),
         description=(
             "I convert images into 3D-printable posable action figures. "
-            "I generate a base 3D mesh, then segment it into body parts "
-            "connected by ball-and-socket joints for full poseability."
+            "I generate a base 3D mesh, detect the skeleton, segment into "
+            "body parts, and add ball-socket joints for full poseability."
         ),
         instructions=(
-            "Use `generate_action_figure` to convert a 2D image into a set of "
-            "3D-printable STL files representing a posable action figure with "
-            "ball-socket joints at neck, shoulders, elbows, wrists, waist, "
-            "hips, and knees. You need a source image path first."
+            "Use `generate_action_figure` to convert a 2D image into print-ready "
+            "STL files. The pipeline auto-detects the humanoid skeleton and places "
+            "ball-socket joints at neck, shoulders, elbows, waist, hips, and knees."
         ),
         tools=[generate_action_figure],
         show_tool_calls=True,
