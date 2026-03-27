@@ -8,6 +8,8 @@ export interface GenerationEntry {
   prompt: string;
   status: "generating" | "complete" | "error";
   result?: string;
+  /** For 3D/action-figure: the path to the generated mesh (for viewer) */
+  meshPath?: string;
   timestamp: number;
 }
 
@@ -33,6 +35,23 @@ interface ActionFigureSettings {
   clearance: number;
 }
 
+// Joint placement for the interactive Meshy-style editor
+export interface JointMarker {
+  name: string;
+  position: [number, number, number]; // world-space x, y, z on the mesh
+}
+
+export const JOINT_TYPES = [
+  "neck",
+  "left_shoulder", "right_shoulder",
+  "left_elbow", "right_elbow",
+  "waist",
+  "left_hip", "right_hip",
+  "left_knee", "right_knee",
+] as const;
+
+export type JointName = (typeof JOINT_TYPES)[number];
+
 interface ArtState {
   mode: ArtMode;
   setMode: (mode: ArtMode) => void;
@@ -53,6 +72,21 @@ interface ArtState {
   // Redirect from chat
   prefillPrompt: string;
   setPrefillPrompt: (prompt: string) => void;
+
+  // ── Joint placement editor state ──
+  /** The mesh currently loaded in the joint editor (backend path) */
+  editorMeshPath: string | null;
+  setEditorMeshPath: (path: string | null) => void;
+
+  /** Which joint type is currently selected for placement */
+  activeJoint: JointName | null;
+  setActiveJoint: (name: JointName | null) => void;
+
+  /** Placed joints */
+  placedJoints: JointMarker[];
+  placeJoint: (marker: JointMarker) => void;
+  removeJoint: (name: string) => void;
+  clearJoints: () => void;
 }
 
 export const useArtStore = create<ArtState>()((set) => ({
@@ -101,4 +135,26 @@ export const useArtStore = create<ArtState>()((set) => ({
 
   prefillPrompt: "",
   setPrefillPrompt: (prompt) => set({ prefillPrompt: prompt }),
+
+  // ── Joint placement editor ──
+  editorMeshPath: null,
+  setEditorMeshPath: (path) => set({ editorMeshPath: path }),
+
+  activeJoint: null,
+  setActiveJoint: (name) => set({ activeJoint: name }),
+
+  placedJoints: [],
+  placeJoint: (marker) =>
+    set((state) => ({
+      // Replace if same joint name already placed
+      placedJoints: [
+        ...state.placedJoints.filter((j) => j.name !== marker.name),
+        marker,
+      ],
+    })),
+  removeJoint: (name) =>
+    set((state) => ({
+      placedJoints: state.placedJoints.filter((j) => j.name !== name),
+    })),
+  clearJoints: () => set({ placedJoints: [], activeJoint: null }),
 }));

@@ -1498,6 +1498,241 @@ async def art_gallery_3d():
                 })
     return {"files": files}
 
+# ── Serve 3D model files (GLB/OBJ/STL) for the viewer ─────────────────────
+
+@app.get("/v1/art/files/{filepath:path}")
+async def art_serve_file(filepath: str):
+    """Serve a generated 3D file for the browser viewer."""
+    # Only allow serving from known output directories
+    allowed_roots = ["/app/comfy_io/output", "/app/comfy_io/output/action_figures"]
+    full_path = os.path.join("/app/comfy_io/output", filepath)
+    full_path = os.path.normpath(full_path)
+
+    if not any(full_path.startswith(root) for root in ["/app/comfy_io/output"]):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail=f"File not found: {filepath}")
+
+    ext = full_path.rsplit(".", 1)[-1].lower()
+    media_types = {"glb": "model/gltf-binary", "gltf": "model/gltf+json",
+                   "obj": "text/plain", "stl": "model/stl", "3mf": "model/3mf"}
+    media_type = media_types.get(ext, "application/octet-stream")
+    return FileResponse(full_path, media_type=media_type)
+
+# ── Smooth / optimize a generated mesh for 3D printing ─────────────────────
+
+class SmoothRequest(BaseModel):
+    mesh_path: str
+    target_height: float = 150.0
+    smooth_iterations: int = 10
+
+@app.post("/v1/art/smooth")
+async def art_smooth_mesh(req: SmoothRequest):
+    """Smooth and optimize a mesh for 3D printing. Returns path to optimized GLB."""
+    import trimesh
+
+    if not os.path.isfile(req.mesh_path):
+        raise HTTPException(status_code=404, detail=f"Mesh not found: {req.mesh_path}")
+
+    try:
+        from specialized.mesh_utils import optimize_for_printing
+
+        scene = trimesh.load(req.mesh_path, force="scene")
+        if isinstance(scene, trimesh.Scene):
+            meshes = [g for g in scene.geometry.values() if isinstance(g, trimesh.Trimesh)]
+            mesh = trimesh.util.concatenate(meshes) if meshes else None
+        else:
+            mesh = scene
+
+        if mesh is None or not isinstance(mesh, trimesh.Trimesh):
+            raise HTTPException(status_code=400, detail="Could not extract mesh")
+
+        mesh = optimize_for_printing(
+            mesh, target_height_mm=req.target_height,
+            smooth_iterations=req.smooth_iterations,
+        )
+
+        # Save optimized version alongside original
+        base, ext = os.path.splitext(req.mesh_path)
+        out_path = f"{base}_print{ext}"
+        mesh.export(out_path)
+
+        return {"status": "ok", "path": out_path, "vertices": len(mesh.vertices), "faces": len(mesh.faces)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mesh smoothing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── User-guided segmentation (Meshy-style joint placement) ─────────────────
+
+class JointPosition(BaseModel):
+    x: float
+    y: float
+    z: float
+
+class SegmentRequest(BaseModel):
+    mesh_path: str
+    joints: dict[str, JointPosition]  # e.g. {"neck": {x, y, z}, "left_shoulder": {x, y, z}}
+    target_height: float = 150.0
+    clearance: float = 0.3
+
+@app.post("/v1/art/segment")
+async def art_segment_with_joints(req: SegmentRequest):
+    """
+    Segment a mesh at user-placed joint positions.
+    Returns job_id for polling — segmentation runs in background.
+    """
+    if not os.path.isfile(req.mesh_path):
+        raise HTTPException(status_code=404, detail=f"Mesh not found: {req.mesh_path}")
+
+    job_id = _art_job_create("segment", f"Segmenting with {len(req.joints)} joints")
+
+    async def _run():
+        try:
+            import trimesh
+            import numpy as np
+            from specialized.mesh_utils import repair_mesh, validate_printability
+            from specialized.joint_library import BallSocketJoint, orient_joint_geometry, safe_boolean
+            from specialized.action_figure_agent import (
+                BODY_PARTS, ACTION_FIGURE_OUTPUT_DIR, _load_mesh,
+                _center_mesh, _scale_mesh_to_height, _ensure_output_dir,
+            )
+
+            _art_jobs[job_id]["result"] = "Loading and repairing mesh..."
+            mesh = _load_mesh(req.mesh_path)
+            mesh = repair_mesh(mesh)
+            mesh = _center_mesh(mesh)
+            mesh = _scale_mesh_to_height(mesh, req.target_height)
+
+            # Build skeleton dict from user-placed joints
+            # For joints the user didn't place, we skip those body parts
+            user_joints = {}
+            for name, pos in req.joints.items():
+                user_joints[name] = {
+                    "position": np.array([pos.x, pos.y, pos.z]),
+                    "normal": _infer_joint_normal(name),
+                    "radius": _infer_joint_radius(name, req.target_height),
+                }
+
+            skeleton = {"joints": user_joints, "confidence": 1.0, "detected_features": {}}
+
+            _art_jobs[job_id]["result"] = f"Cutting mesh at {len(user_joints)} joints..."
+
+            # Determine which body parts we can extract (all required joints must be placed)
+            _ensure_output_dir()
+            prefix = f"segment_{uuid.uuid4().hex[:8]}"
+            output_files = {}
+            part_meshes = {}
+            skipped = []
+
+            for part_name, joint_reqs in BODY_PARTS.items():
+                required_joints = [jn for jn, _ in joint_reqs]
+                if not all(jn in user_joints for jn in required_joints):
+                    skipped.append(part_name)
+                    continue
+
+                # Extract part by cutting at each adjacent joint
+                part = mesh.copy()
+                for joint_name, role in joint_reqs:
+                    joint = user_joints[joint_name]
+                    normal = joint["normal"]
+                    cut_normal = -normal if role == "parent" else normal
+
+                    try:
+                        sliced = part.slice_plane(joint["position"], cut_normal, cap=True)
+                        if sliced is not None and len(sliced.faces) > 5:
+                            part = sliced
+                    except Exception:
+                        pass
+
+                if len(part.faces) < 20:
+                    skipped.append(part_name)
+                    continue
+
+                # Add ball-socket joints
+                for joint_name, role in joint_reqs:
+                    joint = user_joints[joint_name]
+                    bsj = BallSocketJoint(ball_radius=joint["radius"], clearance=req.clearance)
+
+                    if role == "parent":
+                        ball = bsj.create_ball_assembly()
+                        orient_joint_geometry(ball, joint["position"], joint["normal"])
+                        part = safe_boolean("union", [part, ball])
+                    else:
+                        housing = bsj.create_socket_housing()
+                        orient_joint_geometry(housing, joint["position"], -joint["normal"])
+                        part = safe_boolean("union", [part, housing])
+                        void = bsj.create_socket_void()
+                        orient_joint_geometry(void, joint["position"], -joint["normal"])
+                        part = safe_boolean("difference", [part, void])
+
+                out_path = os.path.join(ACTION_FIGURE_OUTPUT_DIR, f"{prefix}_{part_name}.stl")
+                part.export(out_path, file_type="stl")
+                output_files[part_name] = out_path
+                part_meshes[part_name] = part
+
+            warnings = validate_printability(part_meshes)
+            part_count = len(output_files)
+
+            # Manifest
+            manifest = {
+                "prefix": prefix,
+                "target_height_mm": req.target_height,
+                "clearance_mm": req.clearance,
+                "user_joints": {n: {"x": j.x, "y": j.y, "z": j.z} for n, j in req.joints.items()},
+                "parts": {n: p for n, p in output_files.items()},
+                "skipped": skipped,
+                "warnings": warnings,
+            }
+            manifest_path = os.path.join(ACTION_FIGURE_OUTPUT_DIR, f"{prefix}_manifest.json")
+            with open(manifest_path, "w") as f:
+                json.dump(manifest, f, indent=2)
+
+            result_msg = (
+                f"Segmentation complete: {part_count} parts exported.\n"
+                f"Skipped: {', '.join(skipped) if skipped else 'none'}\n"
+                f"Manifest: {manifest_path}"
+            )
+            _art_job_finish(job_id, "ok", result_msg)
+
+        except Exception as e:
+            logger.error(f"Segmentation failed: {e}", exc_info=True)
+            _art_job_finish(job_id, "error", str(e))
+
+    _art_asyncio.get_event_loop().create_task(_run())
+    return {"job_id": job_id, "status": "running"}
+
+
+def _infer_joint_normal(joint_name: str) -> np.ndarray:
+    """Infer cut plane normal from joint name (standard humanoid)."""
+    import numpy as np
+    normals = {
+        "neck": [0, 0, 1], "waist": [0, 0, 1],
+        "left_shoulder": [-1, 0, 0], "right_shoulder": [1, 0, 0],
+        "left_elbow": [-1, 0, 0], "right_elbow": [1, 0, 0],
+        "left_wrist": [-1, 0, 0], "right_wrist": [1, 0, 0],
+        "left_hip": [0, 0, -1], "right_hip": [0, 0, -1],
+        "left_knee": [0, 0, -1], "right_knee": [0, 0, -1],
+        "left_ankle": [0, 0, -1], "right_ankle": [0, 0, -1],
+    }
+    return np.array(normals.get(joint_name, [0, 0, 1]), dtype=float)
+
+
+def _infer_joint_radius(joint_name: str, target_height: float) -> float:
+    """Estimate ball-socket radius from joint name and figure scale."""
+    scale = target_height / 150.0
+    radii = {
+        "neck": 3.5, "waist": 5.0,
+        "left_shoulder": 4.0, "right_shoulder": 4.0,
+        "left_elbow": 3.0, "right_elbow": 3.0,
+        "left_wrist": 2.5, "right_wrist": 2.5,
+        "left_hip": 4.5, "right_hip": 4.5,
+        "left_knee": 3.5, "right_knee": 3.5,
+        "left_ankle": 2.5, "right_ankle": 2.5,
+    }
+    return radii.get(joint_name, 3.5) * scale
+
 
 @app.get("/v1/templates")
 async def list_templates():

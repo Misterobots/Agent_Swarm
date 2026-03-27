@@ -44,6 +44,61 @@ def repair_mesh(mesh):
     return mesh
 
 
+# ── Print-optimized Smoothing ──────────────────────────────────────────────
+
+def smooth_for_printing(mesh, iterations: int = 10, lamb: float = 0.5):
+    """
+    Smooth mesh for 3D printing — softens sharp features and reduces
+    surface noise while preserving overall shape.
+
+    Uses Taubin smoothing (alternating positive/negative Laplacian)
+    which avoids the volume shrinkage of simple Laplacian smoothing.
+
+    Args:
+        mesh: trimesh.Trimesh to smooth (modified in place)
+        iterations: Number of smoothing passes (more = smoother)
+        lamb: Smoothing factor (0.3–0.7 typical)
+    """
+    import trimesh
+
+    f_before = len(mesh.faces)
+    logger.info(f"[Smooth] Input: {len(mesh.vertices)} verts, {f_before} faces")
+
+    # Taubin smoothing: preserves volume better than plain Laplacian
+    trimesh.smoothing.filter_taubin(mesh, lamb=lamb, nu=-(lamb + 0.03), iterations=iterations)
+
+    logger.info(f"[Smooth] Taubin smoothing done ({iterations} iterations, λ={lamb})")
+    return mesh
+
+
+def optimize_for_printing(mesh, target_height_mm: float = 150.0, smooth_iterations: int = 10):
+    """
+    Full print-optimization pipeline: repair → smooth → center → scale.
+
+    Returns the processed mesh ready for viewing or segmentation.
+    """
+    mesh = repair_mesh(mesh)
+    mesh = smooth_for_printing(mesh, iterations=smooth_iterations)
+
+    # Center on XY, bottom at Z=0
+    bounds = mesh.bounds
+    cx = (bounds[0][0] + bounds[1][0]) / 2
+    cy = (bounds[0][1] + bounds[1][1]) / 2
+    mesh.apply_translation([-cx, -cy, -bounds[0][2]])
+
+    # Scale to target height
+    bounds = mesh.bounds
+    h = bounds[1][2] - bounds[0][2]
+    if h > 0:
+        mesh.apply_scale(target_height_mm / h)
+
+    logger.info(
+        f"[PrintOptimize] Final: {len(mesh.vertices)} verts, {len(mesh.faces)} faces, "
+        f"height={target_height_mm}mm"
+    )
+    return mesh
+
+
 # ── Cross-section Analysis ─────────────────────────────────────────────────
 
 def _flood_fill_labels(grid: np.ndarray) -> Tuple[np.ndarray, int]:

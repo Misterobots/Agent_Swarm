@@ -157,3 +157,55 @@ export async function fetch3DGallery(): Promise<Gallery3DFile[]> {
   const data = await res.json();
   return data.files || [];
 }
+
+// ── Mesh file URL (for Three.js viewer) ──────────────────────────────────
+
+/**
+ * Convert a backend mesh path to a browser-fetchable URL.
+ * e.g. "/app/comfy_io/output/3D/TripoSG_00001.glb" → "/api/backend/v1/art/files/3D/TripoSG_00001.glb"
+ */
+export function meshFileUrl(backendPath: string): string {
+  const relative = backendPath.replace(/^\/app\/comfy_io\/output\//, "");
+  return `${API_BASE}/v1/art/files/${relative}`;
+}
+
+// ── Smooth mesh for printing ─────────────────────────────────────────────
+
+export async function smoothMesh(
+  meshPath: string,
+  targetHeight = 150,
+  smoothIterations = 10,
+): Promise<{ status: string; path?: string }> {
+  const res = await fetch(`${API_BASE}/v1/art/smooth`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mesh_path: meshPath,
+      target_height: targetHeight,
+      smooth_iterations: smoothIterations,
+    }),
+  });
+  return res.json();
+}
+
+// ── Segment mesh at user-placed joints ───────────────────────────────────
+
+export interface JointPositionInput {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export async function segmentWithJoints(
+  params: {
+    mesh_path: string;
+    joints: Record<string, JointPositionInput>;
+    target_height: number;
+    clearance: number;
+  },
+  onProgress?: (msg: string) => void,
+) {
+  const sub = await safeSubmit(`${API_BASE}/v1/art/segment`, params);
+  if (!sub.job_id) return { status: "error", result: "Failed to submit segmentation job" };
+  return pollJob(sub.job_id, onProgress);
+}
