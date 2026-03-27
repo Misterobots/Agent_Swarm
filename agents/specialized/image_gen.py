@@ -206,11 +206,22 @@ def queue_prompt(prompt_text: str, **kwargs):
     for i in range(180):  # Up to 3 minutes for model loading + generation
         try:
             history_url = f"{COMFYUI_HOST}/history/{prompt_id}"
-            res = requests.get(history_url)
+            res = requests.get(history_url, timeout=5)
             history = res.json()
-            
+
             if prompt_id in history:
-                outputs = history[prompt_id]['outputs']
+                entry = history[prompt_id]
+                # Check for ComfyUI execution error
+                status_str = entry.get('status', {}).get('status_str', '')
+                if status_str == 'error':
+                    msgs = entry.get('status', {}).get('messages', [])
+                    err_detail = "Unknown ComfyUI error"
+                    for msg in msgs:
+                        if isinstance(msg, list) and msg[0] == 'execution_error':
+                            err_detail = msg[1].get('exception_message', err_detail)
+                            break
+                    return f"Error: ComfyUI execution failed: {err_detail.strip()}"
+                outputs = entry.get('outputs', {})
                 if '9' in outputs:
                      images = outputs['9']['images']
                      filename = images[0]['filename']
@@ -219,7 +230,7 @@ def queue_prompt(prompt_text: str, **kwargs):
         except:
             pass
         time.sleep(1)
-        
+
     return "Error: Generation timed out."
 
 # --- LAYER 6: VERIFICATION ---

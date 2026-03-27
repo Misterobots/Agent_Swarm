@@ -1301,9 +1301,11 @@ async def list_art_models():
 @app.post("/v1/art/generate/image")
 async def art_generate_image(req: ImageGenRequest, background_tasks: BackgroundTasks):
     """Generate an image via ComfyUI."""
+    import asyncio
     try:
         from specialized.image_gen import generate_image
-        result = generate_image(
+        result = await asyncio.to_thread(
+            generate_image,
             prompt=req.prompt,
             model_name=req.model_name,
             cfg=req.cfg,
@@ -1322,13 +1324,14 @@ async def art_generate_image(req: ImageGenRequest, background_tasks: BackgroundT
 @app.post("/v1/art/generate/3d")
 async def art_generate_3d(req: ThreeDGenRequest):
     """Generate a 3D model, optionally with concept art first."""
+    import asyncio
     try:
         image_path = None
         if req.auto_concept:
             from specialized.image_gen import generate_image
             import re
             concept_prompt = f"Concept art for 3d modeling, neutral background: {req.prompt}"
-            img_result = generate_image(concept_prompt)
+            img_result = await asyncio.to_thread(generate_image, concept_prompt)
             match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
             if not match:
                 return {"status": "error", "result": f"Concept art failed: {img_result}"}
@@ -1337,7 +1340,7 @@ async def art_generate_3d(req: ThreeDGenRequest):
             return {"status": "error", "result": "No image provided. Enable auto_concept or use /v1/art/generate/3d-from-image."}
 
         from specialized.forge_agent import generate_3d_model
-        result = generate_3d_model(image_path, req.workflow)
+        result = await asyncio.to_thread(generate_3d_model, image_path, req.workflow)
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Art Studio 3D gen failed: {e}")
@@ -1346,6 +1349,7 @@ async def art_generate_3d(req: ThreeDGenRequest):
 @app.post("/v1/art/generate/action-figure")
 async def art_generate_action_figure(req: ActionFigureRequest):
     """Generate a 3D-printable posable action figure."""
+    import asyncio
     try:
         # Step 1: T-pose concept art
         from specialized.image_gen import generate_image
@@ -1355,7 +1359,7 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             f"full body front view, neutral gray background, "
             f"arms extended to sides, symmetrical pose: {req.prompt}"
         )
-        img_result = generate_image(concept_prompt)
+        img_result = await asyncio.to_thread(generate_image, concept_prompt)
         match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
         if not match:
             return {"status": "error", "result": f"Concept art failed: {img_result}"}
@@ -1363,7 +1367,7 @@ async def art_generate_action_figure(req: ActionFigureRequest):
 
         # Step 2: Action figure pipeline
         from specialized.action_figure_agent import generate_action_figure
-        result = generate_action_figure(image_path, req.workflow)
+        result = await asyncio.to_thread(generate_action_figure, image_path, req.workflow)
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Art Studio action figure gen failed: {e}")
