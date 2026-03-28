@@ -32,8 +32,8 @@
       "model": ["30", 0],
       "image": ["20", 0],
       "seed": "{{SEED}}",
-      "steps": 75,
-      "cfg": 4.0
+      "steps": 100,
+      "cfg": 7.0
     },
     "class_type": "TripoSGInference",
     "_meta": {

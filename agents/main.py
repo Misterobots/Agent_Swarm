@@ -1373,11 +1373,21 @@ async def art_generate_3d(req: ThreeDGenRequest):
                 from specialized.image_gen import generate_image
                 import re
                 concept_prompt = (
-                    f"3D modeling reference, single subject centered on pure white background, "
-                    f"studio lighting, no text, no watermark, high detail, clean edges: {req.prompt}"
+                    f"full body character concept art, front view, isolated on pure white background, "
+                    f"flat neutral studio lighting, clean silhouette, no shadow, no background detail, "
+                    f"clear head and hands visible: {req.prompt}"
+                )
+                _CONCEPT_NEG = (
+                    "background, environment, scene, landscape, shadow, gradient, dark background, "
+                    "texture pattern, multiple characters, cropped, cut off, portrait only, "
+                    "bad anatomy, deformed, extra limbs, blurry"
                 )
                 _art_jobs[job_id]["result"] = "Generating concept art..."
-                img_result = await _art_asyncio.to_thread(generate_image, concept_prompt)
+                img_result = await _art_asyncio.to_thread(
+                    generate_image, concept_prompt,
+                    width=1024, height=1024,
+                    negative_prompt=_CONCEPT_NEG,
+                )
                 match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
                 if not match:
                     _art_job_finish(job_id, "error", f"Concept art failed: {img_result}")
@@ -1414,14 +1424,22 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             from specialized.image_gen import generate_image
             import re
             concept_prompt = (
-                f"Character design reference sheet, T-pose, full body front view, "
-                f"arms extended straight to sides at shoulder height, "
-                f"legs shoulder-width apart, symmetrical pose, standing on flat ground, "
-                f"clean white background, even studio lighting, no text, no props, "
-                f"3D modeling reference: {req.prompt}"
+                f"full body character concept art, T-pose reference, front view, "
+                f"arms extended straight to sides at shoulder height, legs slightly apart, "
+                f"symmetrical, isolated on pure white background, flat neutral lighting, "
+                f"no shadow, entire body visible head to toe, no props, no text: {req.prompt}"
+            )
+            _TPOSE_NEG = (
+                "background, environment, shadow, gradient, dark background, "
+                "multiple characters, cropped, portrait only, partial body, cut off feet, "
+                "bad anatomy, deformed, extra limbs, blurry, low quality"
             )
             _art_jobs[job_id]["result"] = "Generating T-pose concept art..."
-            img_result = await _art_asyncio.to_thread(generate_image, concept_prompt)
+            img_result = await _art_asyncio.to_thread(
+                generate_image, concept_prompt,
+                width=1024, height=1024,
+                negative_prompt=_TPOSE_NEG,
+            )
             match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
             if not match:
                 _art_job_finish(job_id, "error", f"Concept art failed: {img_result}")
