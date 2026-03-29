@@ -26,6 +26,9 @@ export interface ActiveRun {
   run_id: number | null;
   status: string;
   started_at: string | null;
+  run_type?: string;
+  target_model?: string | null;
+  dataset_size?: number | null;
 }
 
 export interface TrainingStatus {

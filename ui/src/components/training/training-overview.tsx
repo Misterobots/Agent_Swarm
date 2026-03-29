@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils/cn";
 export function TrainingOverview() {
   const [status, setStatus] = useState<TrainingStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(Date.now());
 
   const refresh = useCallback(async () => {
     const data = await fetchTrainingStatus();
@@ -29,6 +30,11 @@ export function TrainingOverview() {
     const interval = setInterval(refresh, 15000);
     return () => clearInterval(interval);
   }, [refresh]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (loading) {
     return (
@@ -44,6 +50,15 @@ export function TrainingOverview() {
     (status?.dataset_size.synthetic ?? 0) +
     (status?.dataset_size.curated ?? 0);
   const activeRun = status?.active_run;
+  const startedMs = activeRun?.started_at
+    ? new Date(activeRun.started_at).getTime()
+    : null;
+  const elapsedSec = startedMs ? Math.max(0, Math.floor((now - startedMs) / 1000)) : null;
+  const elapsedLabel = elapsedSec != null
+    ? elapsedSec < 60
+      ? `${elapsedSec}s`
+      : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`
+    : null;
 
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6">
@@ -78,7 +93,14 @@ export function TrainingOverview() {
                 ? new Date(activeRun.started_at).toLocaleTimeString()
                 : "just now"}
               {activeRun.run_id && ` (Run #${activeRun.run_id})`}
+              {activeRun.run_type && ` · ${activeRun.run_type}`}
+              {elapsedLabel && ` · elapsed ${elapsedLabel}`}
             </p>
+            {activeRun.target_model && (
+              <p className="text-xs text-zinc-600 mt-1 truncate">
+                Model: {activeRun.target_model}
+              </p>
+            )}
           </div>
         </div>
       )}

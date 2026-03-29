@@ -96,6 +96,13 @@ export function TrainingRunHistory() {
                           new Date(run.started_at).getTime()) /
                           1000
                       )
+                    : run.status === "running" && run.started_at
+                    ? Math.max(
+                        0,
+                        Math.round(
+                          (Date.now() - new Date(run.started_at).getTime()) / 1000
+                        )
+                      )
                     : null;
 
                 return (
@@ -144,7 +151,9 @@ export function TrainingRunHistory() {
                         {new Date(run.started_at).toLocaleString()}
                       </td>
                       <td className="p-3 text-right text-zinc-400 text-xs">
-                        {duration != null ? formatDuration(duration) : "—"}
+                        {duration != null
+                          ? `${formatDuration(duration)}${run.status === "running" ? " (live)" : ""}`
+                          : "—"}
                       </td>
                     </tr>
                     {expanded && (

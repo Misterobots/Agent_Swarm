@@ -527,7 +527,7 @@ async def training_status():
     from config import TEMPLATE_DB_URL
     result = {
         "last_run": None,
-        "dataset_size": {"exported": 0, "synthetic": 0},
+        "dataset_size": {"exported": 0, "synthetic": 0, "curated": 0},
         "active_ab_tests": 0,
         "model_versions": [],
         "active_run": None,
@@ -562,6 +562,17 @@ async def training_status():
                 "completed_at": row[7].isoformat() if row[7] else None,
                 "error_message": row[8],
             }
+
+            # If DB reports a running row, prefer that as active run metadata.
+            if row[4] == "running":
+                result["active_run"] = {
+                    "run_id": row[0],
+                    "status": row[4],
+                    "started_at": row[6].isoformat() if row[6] else None,
+                    "run_type": row[1],
+                    "target_model": row[2],
+                    "dataset_size": row[3],
+                }
 
         # Dataset counts
         try:
@@ -650,6 +661,7 @@ async def list_curated_datasets():
                 "description": meta["description"],
                 "category": meta["category"],
                 "default_max": meta["default_max"],
+                "recommended_for": meta.get("recommended_for", []),
             }
             for key, meta in CURATED_DATASETS.items()
         ]

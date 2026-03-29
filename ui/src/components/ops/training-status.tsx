@@ -20,7 +20,11 @@ export function TrainingStatusPanel() {
   if (!status) return null;
 
   const lastRun = status.last_run;
-  const totalData = status.dataset_size.exported + status.dataset_size.synthetic;
+  const totalData =
+    status.dataset_size.exported +
+    status.dataset_size.synthetic +
+    (status.dataset_size.curated ?? 0);
+  const activeRun = status.active_run;
 
   return (
     <div className="space-y-3">
@@ -34,7 +38,7 @@ export function TrainingStatusPanel() {
           </div>
           <p className="text-lg font-semibold text-zinc-200">{totalData}</p>
           <p className="text-[10px] text-zinc-600">
-            {status.dataset_size.exported} exported · {status.dataset_size.synthetic} synthetic
+            {status.dataset_size.exported} exported · {status.dataset_size.synthetic} synthetic · {status.dataset_size.curated ?? 0} curated
           </p>
         </div>
 
@@ -88,6 +92,17 @@ export function TrainingStatusPanel() {
           </p>
         </div>
       </div>
+
+      {activeRun && (
+        <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg px-3 py-2">
+          <p className="text-[11px] text-amber-300 font-medium">Training active</p>
+          <p className="text-[10px] text-zinc-500">
+            {activeRun.run_id ? `Run #${activeRun.run_id}` : "Run pending"}
+            {activeRun.run_type ? ` · ${activeRun.run_type}` : ""}
+            {activeRun.started_at ? ` · started ${new Date(activeRun.started_at).toLocaleTimeString()}` : ""}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
