@@ -21,13 +21,64 @@ COMFY_INPUT_DIR = "/app/comfy_io/input"
 COMFY_OUTPUT_DIR = "/app/comfy_io/output"
 TEMPLATE_DIR = "/app/agents/templates"
 
-def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.json") -> str:
+# Default TripoSG quality settings
+_DEFAULT_STEPS = 100
+_DEFAULT_CFG = 5.0
+
+
+def prepare_image_for_3d(image_path: str) -> str:
+    """
+    Prepare an image for 3D generation by removing the background
+    and compositing the subject onto a black background.
+
+    TripoSG interprets white/bright areas as solid mass, so the subject
+    must be isolated against black (0,0,0) for clean geometry.
+
+    Returns path to the prepared image, or None if preparation fails
+    (caller should fall back to original image).
+    """
+    try:
+        from PIL import Image
+        import numpy as np
+
+        img = Image.open(image_path).convert("RGBA")
+
+        # Try rembg for high-quality background removal
+        try:
+            from rembg import remove
+            img_nobg = remove(img)
+        except ImportError:
+            # Fallback: simple white-background threshold removal
+            data = np.array(img)
+            # Identify near-white pixels (R>240, G>240, B>240)
+            white_mask = (data[:, :, 0] > 240) & (data[:, :, 1] > 240) & (data[:, :, 2] > 240)
+            data[white_mask, 3] = 0  # Set alpha to transparent
+            img_nobg = Image.fromarray(data)
+
+        # Composite onto solid black background
+        black_bg = Image.new("RGBA", img_nobg.size, (0, 0, 0, 255))
+        composite = Image.alpha_composite(black_bg, img_nobg)
+        result = composite.convert("RGB")
+
+        # Save alongside original
+        base, ext = os.path.splitext(image_path)
+        prepared_path = f"{base}_3d_prep{ext}"
+        result.save(prepared_path, quality=95)
+        logger.info(f"--- [Forge] Prepared image for 3D: {prepared_path} ---")
+        return prepared_path
+
+    except Exception as e:
+        logger.warning(f"[Forge] Image preparation failed (using original): {e}")
+        return None
+
+def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.json", quality_overrides: dict = None) -> str:
     """
     Takes an input image, copies it to ComfyUI input, and triggers a 3D generation workflow.
     
     Args:
         image_path (str): Path to the source 2D image (e.g., from ImageGen agent).
         workflow_name (str): Name of the JSON workflow file template.
+        quality_overrides (dict): Optional overrides for workflow params (e.g. {"steps": 75, "cfg": 5.0}).
         
     Returns:
         str: Path to the generated 3D model (GLB/OBJ).
@@ -69,6 +120,11 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
     # 4. Inject Image and Seed into Workflow
     import random
     seed_value = random.randint(1, 1000000000000)
+    steps_value = _DEFAULT_STEPS
+    cfg_value = _DEFAULT_CFG
+    if quality_overrides:
+        steps_value = quality_overrides.get("steps", steps_value)
+        cfg_value = quality_overrides.get("cfg", cfg_value)
     
     def recursive_replace(obj):
         if isinstance(obj, dict):
@@ -81,11 +137,17 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
             if "{{INPUT_IMAGE}}" in obj:
                 return obj.replace("{{INPUT_IMAGE}}", unique_filename)
             if "{{SEED}}" in obj:
-                # If the string is EXACTLY {{SEED}}, return int.
-                # If part of string, replace and return string.
                 if obj == "{{SEED}}":
                     return seed_value
                 return obj.replace("{{SEED}}", str(seed_value))
+            if "{{STEPS}}" in obj:
+                if obj == "{{STEPS}}":
+                    return int(steps_value)
+                return obj.replace("{{STEPS}}", str(int(steps_value)))
+            if "{{CFG}}" in obj:
+                if obj == "{{CFG}}":
+                    return float(cfg_value)
+                return obj.replace("{{CFG}}", str(cfg_value))
         return obj
 
     # Apply replacement to the entire workflow structure

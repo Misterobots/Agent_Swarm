@@ -27,6 +27,8 @@ interface ImageSettings {
 interface ThreeDSettings {
   workflow: string;
   autoConcept: boolean;
+  quality: "fast" | "balanced" | "high";
+  sourceAdherence: "low" | "medium" | "high";
 }
 
 interface ActionFigureSettings {
@@ -109,6 +111,8 @@ export const useArtStore = create<ArtState>()((set) => ({
   threeDSettings: {
     workflow: "workflow_triposg.json",
     autoConcept: true,
+    quality: "high",
+    sourceAdherence: "medium",
   },
   setThreeDSettings: (s) =>
     set((state) => ({ threeDSettings: { ...state.threeDSettings, ...s } })),

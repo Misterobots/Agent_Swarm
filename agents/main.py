@@ -1281,6 +1281,9 @@ class ThreeDGenRequest(BaseModel):
     prompt: str
     workflow: str = "workflow_triposg.json"
     auto_concept: bool = True
+    steps: int = 0        # 0 = use workflow default
+    cfg: float = 0.0      # 0 = use workflow default
+    quality: str = "high" # fast | balanced | high
 
 class ActionFigureRequest(BaseModel):
     prompt: str
@@ -1373,19 +1376,23 @@ async def art_generate_3d(req: ThreeDGenRequest):
                 from specialized.image_gen import generate_image
                 import re
                 concept_prompt = (
-                    f"full body character concept art, front view, isolated on pure white background, "
-                    f"flat neutral studio lighting, clean silhouette, no shadow, no background detail, "
-                    f"clear head and hands visible: {req.prompt}"
+                    f"{req.prompt}, full body, single character, centered subject, "
+                    f"front view, clean edges, isolated on solid white background, "
+                    f"studio product photo lighting, high detail, sharp focus, "
+                    f"no cropping, entire figure visible head to toe"
                 )
                 _CONCEPT_NEG = (
-                    "background, environment, scene, landscape, shadow, gradient, dark background, "
-                    "texture pattern, multiple characters, cropped, cut off, portrait only, "
-                    "bad anatomy, deformed, extra limbs, blurry"
+                    "multiple objects, multiple characters, text, watermark, frame, border, "
+                    "vignette, gradient background, shadow on ground, complex background, "
+                    "environment, landscape, cropped, cut off, portrait only, partial body, "
+                    "bad anatomy, deformed, extra limbs, blurry, low quality, low resolution"
                 )
                 _art_jobs[job_id]["result"] = "Generating concept art..."
                 img_result = await _art_asyncio.to_thread(
                     generate_image, concept_prompt,
                     width=1024, height=1024,
+                    cfg=7.0, steps=30,
+                    sampler="dpmpp_2m", scheduler="karras",
                     negative_prompt=_CONCEPT_NEG,
                 )
                 match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
@@ -1402,9 +1409,30 @@ async def art_generate_3d(req: ThreeDGenRequest):
                 _art_job_finish(job_id, "error", f"Concept art image not found at {image_path}")
                 return
 
+            # Prepare image for 3D: remove background, composite on black
+            from specialized.forge_agent import generate_3d_model, prepare_image_for_3d
+            prepared_path = prepare_image_for_3d(image_path)
+            if prepared_path:
+                image_path = prepared_path
+
             _art_jobs[job_id]["result"] = "Generating 3D model (this may take several minutes)..."
-            from specialized.forge_agent import generate_3d_model
-            result = await _art_asyncio.to_thread(generate_3d_model, image_path, req.workflow)
+            # Build quality overrides from request
+            quality_overrides = {}
+            if req.steps > 0:
+                quality_overrides["steps"] = req.steps
+            if req.cfg > 0:
+                quality_overrides["cfg"] = req.cfg
+            if not quality_overrides and req.quality:
+                _QUALITY_PRESETS = {
+                    "fast":     {"steps": 50, "cfg": 5.0},
+                    "balanced": {"steps": 75, "cfg": 5.0},
+                    "high":     {"steps": 100, "cfg": 5.0},
+                }
+                quality_overrides = _QUALITY_PRESETS.get(req.quality, {})
+
+            result = await _art_asyncio.to_thread(
+                generate_3d_model, image_path, req.workflow, quality_overrides
+            )
             status = "error" if result.startswith("Error") else "ok"
             _art_job_finish(job_id, status, result)
         except Exception as e:
@@ -1424,20 +1452,26 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             from specialized.image_gen import generate_image
             import re
             concept_prompt = (
-                f"full body character concept art, T-pose reference, front view, "
+                f"{req.prompt}, T-pose reference sheet, front view, "
                 f"arms extended straight to sides at shoulder height, legs slightly apart, "
-                f"symmetrical, isolated on pure white background, flat neutral lighting, "
-                f"no shadow, entire body visible head to toe, no props, no text: {req.prompt}"
+                f"symmetrical, single character, centered subject, "
+                f"isolated on solid white background, studio product photo lighting, "
+                f"entire body visible head to toe, high detail, sharp focus, "
+                f"no props, no text, no cropping"
             )
             _TPOSE_NEG = (
-                "background, environment, shadow, gradient, dark background, "
-                "multiple characters, cropped, portrait only, partial body, cut off feet, "
-                "bad anatomy, deformed, extra limbs, blurry, low quality"
+                "multiple objects, multiple characters, text, watermark, frame, border, "
+                "vignette, gradient background, shadow on ground, complex background, "
+                "environment, landscape, cropped, portrait only, partial body, cut off feet, "
+                "perspective distortion, foreshortening, dynamic pose, action pose, "
+                "bad anatomy, deformed, extra limbs, blurry, low quality, low resolution"
             )
             _art_jobs[job_id]["result"] = "Generating T-pose concept art..."
             img_result = await _art_asyncio.to_thread(
                 generate_image, concept_prompt,
                 width=1024, height=1024,
+                cfg=7.0, steps=30,
+                sampler="dpmpp_2m", scheduler="karras",
                 negative_prompt=_TPOSE_NEG,
             )
             match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
@@ -1450,6 +1484,12 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             if not os.path.exists(image_path):
                 _art_job_finish(job_id, "error", f"Concept art image not found at {image_path}")
                 return
+
+            # Prepare image for 3D: remove background, composite on black
+            from specialized.forge_agent import prepare_image_for_3d
+            prepared_path = prepare_image_for_3d(image_path)
+            if prepared_path:
+                image_path = prepared_path
 
             _art_jobs[job_id]["result"] = "Generating 3D mesh and segmenting into posable parts..."
             from specialized.action_figure_agent import generate_action_figure

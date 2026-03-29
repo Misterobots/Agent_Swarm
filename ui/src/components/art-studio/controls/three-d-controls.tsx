@@ -7,6 +7,18 @@ const WORKFLOWS = [
   { label: "Hunyuan 3D (Textured, ~8 min)", value: "workflow_hunyuan_paint.json" },
 ];
 
+const QUALITY_OPTS = [
+  { label: "Fast (~50 steps)", value: "fast" as const },
+  { label: "Balanced (~75 steps)", value: "balanced" as const },
+  { label: "High (~100 steps)", value: "high" as const },
+];
+
+const ADHERENCE_OPTS = [
+  { label: "Low (more creative)", value: "low" as const },
+  { label: "Medium", value: "medium" as const },
+  { label: "High (strict to source)", value: "high" as const },
+];
+
 export function ThreeDControls() {
   const { threeDSettings, setThreeDSettings } = useArtStore();
 
@@ -29,8 +41,35 @@ export function ThreeDControls() {
         </select>
       </label>
 
+      <label className="block">
+        <span className="text-xs text-zinc-500">Quality</span>
+        <select
+          value={threeDSettings.quality}
+          onChange={(e) => setThreeDSettings({ quality: e.target.value as "fast" | "balanced" | "high" })}
+          className="mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-violet-500"
+        >
+          {QUALITY_OPTS.map((q) => (
+            <option key={q.value} value={q.value}>{q.label}</option>
+          ))}
+        </select>
+      </label>
+
+      <label className="block">
+        <span className="text-xs text-zinc-500">Source Adherence</span>
+        <select
+          value={threeDSettings.sourceAdherence}
+          onChange={(e) => setThreeDSettings({ sourceAdherence: e.target.value as "low" | "medium" | "high" })}
+          className="mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-violet-500"
+        >
+          {ADHERENCE_OPTS.map((a) => (
+            <option key={a.value} value={a.value}>{a.label}</option>
+          ))}
+        </select>
+      </label>
+
       <p className="text-xs text-zinc-600">
-        TripoSG produces untextured GLB meshes quickly. Hunyuan generates full-color textured meshes but takes longer.
+        Quality controls inference steps. Source adherence controls how closely
+        the 3D geometry follows the input image (higher = stricter match).
       </p>
 
       <label className="flex items-center gap-2 cursor-pointer">
@@ -44,7 +83,9 @@ export function ThreeDControls() {
       </label>
 
       <p className="text-xs text-zinc-600">
-        When enabled, the system creates concept art from your prompt before converting to 3D.
+        When enabled, the system creates optimized concept art from your prompt
+        before converting to 3D. The image is preprocessed with background
+        removal for cleaner geometry.
       </p>
     </div>
   );

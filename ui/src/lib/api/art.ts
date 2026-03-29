@@ -102,6 +102,9 @@ export interface ThreeDGenParams {
   prompt: string;
   workflow: string;
   auto_concept: boolean;
+  quality?: string;
+  steps?: number;
+  cfg?: number;
 }
 
 export async function generate3D(

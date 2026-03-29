@@ -429,9 +429,14 @@ def get_action_figure_agent():
             "body parts, and add ball-socket joints for full poseability."
         ),
         instructions=(
-            "Use `generate_action_figure` to convert a 2D image into print-ready "
-            "STL files. The pipeline auto-detects the humanoid skeleton and places "
-            "ball-socket joints at neck, shoulders, elbows, waist, hips, and knees."
+            "Use `generate_action_figure` to convert a 2D image into print-ready STL files. "
+            "CRITICAL: 3D generation will FAIL and create distorted monsters if the input image "
+            "contains multiple characters (e.g., a character sheet) or complex backgrounds. "
+            "BEFORE calling `generate_action_figure`, you MUST show the image path or display "
+            "the image to the user and ask them to confirm it contains exactly ONE character in "
+            "a neutral standing pose on a clean background. Proceed ONLY after the user confirms.\n"
+            "The pipeline auto-detects the humanoid skeleton and places ball-socket joints. You can "
+            "specify `workflow_name` as `workflow_hunyuan_paint.json` for higher accuracy if desired."
         ),
         tools=[generate_action_figure],
         show_tool_calls=True,

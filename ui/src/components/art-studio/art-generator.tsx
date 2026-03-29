@@ -96,6 +96,8 @@ export function ArtGenerator() {
           prompt,
           workflow: threeDSettings.workflow,
           auto_concept: threeDSettings.autoConcept,
+          quality: threeDSettings.quality,
+          cfg: { low: 3.0, medium: 5.0, high: 7.0 }[threeDSettings.sourceAdherence],
         }, onProgress);
       } else {
         // Action figure: generate base 3D mesh only (via 3D pipeline),
