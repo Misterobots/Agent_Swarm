@@ -19,7 +19,12 @@ import os
 from typing import Optional
 import uuid
 
-from .token_issuer import initialize_token_issuer, get_token_issuer
+try:
+    # Package-style import (e.g., python -m)
+    from .token_issuer import initialize_token_issuer, get_token_issuer
+except ImportError:
+    # Script-style import used by container command: uvicorn main:app
+    from token_issuer import initialize_token_issuer, get_token_issuer
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
