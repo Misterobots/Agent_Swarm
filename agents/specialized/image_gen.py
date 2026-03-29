@@ -18,12 +18,13 @@ def list_available_models() -> list:
     """Queries ComfyUI for all available checkpoints."""
     try:
         url = f"{COMFYUI_HOST}/object_info/CheckpointLoaderSimple"
-        req = requests.get(url, timeout=2)
+        req = requests.get(url, timeout=5)
         if req.status_code == 200:
             return req.json().get('CheckpointLoaderSimple', {}).get('input', {}).get('required', {}).get('ckpt_name', [])[0]
     except Exception as e:
         logger.warning(f"Failed to list models: {e}")
-    return ["v1-5-pruned-emaonly.ckpt"] # Fallback
+    # Fallback to the checkpoint we actually deploy in this stack.
+    return ["sd_xl_turbo_1.0_fp16.safetensors"]
 
 def get_available_checkpoint():
     """Queries ComfyUI for the first available checkpoint."""
@@ -115,7 +116,10 @@ def queue_prompt(prompt_text: str, **kwargs):
         "height": int(kwargs.get("height", raw_params["height"]))
     }
     
-    final_prompt = refine_prompt(prompt_text, model_type)
+    if kwargs.get("skip_refinement"):
+        final_prompt = prompt_text
+    else:
+        final_prompt = refine_prompt(prompt_text, model_type)
     print(f"--- [ComfyUI] Config: {model_type} | Ckpt: {ckpt_name} | Params: {params} ---")
 
     # 3. Payload
@@ -314,6 +318,7 @@ def generate_image(
     seed: int = -1,
     target_device: str = "auto",
     negative_prompt: str = None,
+    skip_refinement: bool = False,
 ) -> str:
     """
     Generates an image using ComfyUI. 
@@ -349,6 +354,8 @@ def generate_image(
         kwargs["sampler"] = sampler
     if model_name != "auto" or scheduler != "normal":
         kwargs["scheduler"] = scheduler
+    if skip_refinement:
+        kwargs["skip_refinement"] = True
 
     if negative_prompt is not None:
         kwargs["negative_prompt"] = negative_prompt

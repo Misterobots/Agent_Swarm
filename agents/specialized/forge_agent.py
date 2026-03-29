@@ -55,6 +55,37 @@ def prepare_image_for_3d(image_path: str) -> str:
             data[white_mask, 3] = 0  # Set alpha to transparent
             img_nobg = Image.fromarray(data)
 
+        # Isolate the single largest subject (handles duplicate characters)
+        try:
+            import cv2
+            alpha = np.array(img_nobg)[:, :, 3]
+            _, thresh = cv2.threshold(alpha, 30, 255, cv2.THRESH_BINARY)
+            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if len(contours) > 1:
+                largest = max(contours, key=cv2.contourArea)
+                mask = np.zeros_like(alpha)
+                cv2.drawContours(mask, [largest], -1, 255, cv2.FILLED)
+                nobg_data = np.array(img_nobg)
+                nobg_data[mask == 0, 3] = 0
+                # Crop to bounding box of largest subject with padding
+                x, y, w, h = cv2.boundingRect(largest)
+                pad = max(w, h) // 20  # 5% padding
+                x0 = max(0, x - pad)
+                y0 = max(0, y - pad)
+                x1 = min(nobg_data.shape[1], x + w + pad)
+                y1 = min(nobg_data.shape[0], y + h + pad)
+                cropped = nobg_data[y0:y1, x0:x1]
+                # Resize to square (TripoSG expects square input)
+                side = max(cropped.shape[0], cropped.shape[1])
+                square = np.zeros((side, side, 4), dtype=np.uint8)
+                oy = (side - cropped.shape[0]) // 2
+                ox = (side - cropped.shape[1]) // 2
+                square[oy:oy+cropped.shape[0], ox:ox+cropped.shape[1]] = cropped
+                img_nobg = Image.fromarray(square).resize((1024, 1024), Image.LANCZOS)
+                logger.info(f"--- [Forge] Isolated largest subject from {len(contours)} contours ---")
+        except Exception as e:
+            logger.warning(f"[Forge] Subject isolation skipped: {e}")
+
         # Composite onto solid black background
         black_bg = Image.new("RGBA", img_nobg.size, (0, 0, 0, 255))
         composite = Image.alpha_composite(black_bg, img_nobg)

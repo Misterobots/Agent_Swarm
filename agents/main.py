@@ -1376,9 +1376,10 @@ async def art_generate_3d(req: ThreeDGenRequest):
                 from specialized.image_gen import generate_image
                 import re
                 concept_prompt = (
-                    f"{req.prompt}, full body, single character, centered subject, "
-                    f"front view, clean edges, isolated on solid white background, "
-                    f"studio product photo lighting, high detail, sharp focus, "
+                    f"one single {req.prompt}, solo, alone, full body, centered subject, "
+                    f"standing straight, neutral pose, front facing camera, "
+                    f"clean edges, isolated on plain white background, "
+                    f"studio lighting, high detail, sharp focus, "
                     f"no cropping, entire figure visible head to toe"
                 )
                 _CONCEPT_NEG = (
@@ -1391,9 +1392,9 @@ async def art_generate_3d(req: ThreeDGenRequest):
                 img_result = await _art_asyncio.to_thread(
                     generate_image, concept_prompt,
                     width=1024, height=1024,
-                    cfg=7.0, steps=30,
-                    sampler="dpmpp_2m", scheduler="karras",
+                    cfg=2.0, steps=6,
                     negative_prompt=_CONCEPT_NEG,
+                    skip_refinement=True,
                 )
                 match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
                 if not match:
@@ -1470,9 +1471,9 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             img_result = await _art_asyncio.to_thread(
                 generate_image, concept_prompt,
                 width=1024, height=1024,
-                cfg=7.0, steps=30,
-                sampler="dpmpp_2m", scheduler="karras",
+                cfg=2.0, steps=6,
                 negative_prompt=_TPOSE_NEG,
+                skip_refinement=True,
             )
             match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
             if not match:
