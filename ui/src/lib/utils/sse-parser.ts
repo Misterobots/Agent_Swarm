@@ -45,7 +45,7 @@ export async function* streamSSE(
           const delta = chunk.choices[0]?.delta;
           if (delta?.content) {
             yield {
-              type: delta.type === "status" ? "status" : "content",
+              type: delta.type === "status" || delta.type === "thought" ? delta.type : "content",
               content: delta.content,
             };
           }
@@ -60,7 +60,7 @@ export async function* streamSSE(
         const delta = chunk.choices[0]?.delta;
         if (delta?.content) {
           yield {
-            type: delta.type === "status" ? "status" : "content",
+            type: delta.type === "status" || delta.type === "thought" ? delta.type : "content",
             content: delta.content,
           };
         }

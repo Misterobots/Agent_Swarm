@@ -141,6 +141,7 @@ class MarsRLLoop:
         # --- Step 1: Solver ---
         if event_callback:
             event_callback({"type": "status", "content": "🏗️ MarsRL: Solver is generating initial response..."})
+            event_callback({"type": "thought", "content": f"→ MarsRL: Solver generating (max {self.max_iter} iterations)"})
 
         t0 = time.time()
         last_tok_time = time.time()
@@ -234,12 +235,14 @@ class MarsRLLoop:
                 solver_score = 1.0 if attempt == 0 else max(0.0, 1.0 - attempt * 0.3)
                 if event_callback:
                     event_callback({"type": "status", "content": "✅ MarsRL: Verification Passed!"})
+                    event_callback({"type": "thought", "content": f"→ Verifier: PASS (score: {vr.score:.2f})"})
                 break
 
             # --- Step 3: Corrector ---
             if attempt < self.max_iter - 1:
                 if event_callback:
                     event_callback({"type": "status", "content": f"🛠️ MarsRL: Correcting response..."})
+                    event_callback({"type": "thought", "content": f"→ Verifier: FAIL (score: {vr.score:.2f}) — Corrector engaged"})
                 
                 corrector_invoked = True
                 t_corr = time.time()

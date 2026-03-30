@@ -2,15 +2,26 @@
 
 import { useEffect, useRef } from "react";
 import { useChatStream } from "@/lib/hooks/use-chat-stream";
+import { useChatStore } from "@/lib/stores/chat-store";
 import { MessageBubble } from "./message-bubble";
 import { ThinkingIndicator } from "./thinking-indicator";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
-import { Bot } from "lucide-react";
+import { Bot, Brain } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
+
+function usageBarClass(pct: number): string {
+  if (pct >= 0.95) return "bg-red-500";
+  if (pct >= 0.85) return "bg-orange-500";
+  if (pct >= 0.7) return "bg-amber-500";
+  return "bg-zinc-500";
+}
 
 export function ChatView() {
-  const { messages, isStreaming, statusMessage, sendMessage, stopGeneration } = useChatStream();
+  const { messages, isStreaming, statusMessage, latestThought, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
+  const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const activeConv = activeConversation();
 
   // Show the thinking indicator when streaming and either we have a status
   // message or the assistant message is still empty (waiting for first content)
@@ -29,6 +40,44 @@ export function ChatView() {
       <div className="flex items-center justify-between border-b border-zinc-800 bg-[#0e1117] px-4 py-2">
         <div className="flex items-center gap-3">
           <ModelSelector />
+          {activeConversationId && (
+            <button
+              type="button"
+              onClick={() =>
+                updateConversation(activeConversationId, {
+                  memoryEnabled: !(activeConv?.memoryEnabled ?? false),
+                })
+              }
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs border transition-colors",
+                activeConv?.memoryEnabled
+                  ? "bg-cyan-900/30 text-cyan-300 border-cyan-700/60"
+                  : "bg-zinc-900/60 text-zinc-400 border-zinc-700/60"
+              )}
+              title="Toggle cross-session memory recall"
+            >
+              <Brain size={14} />
+              Memory
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              void compactConversation();
+            }}
+            className="w-44 h-2 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700"
+            title={`Context usage: ${(tokenUsage.pct * 100).toFixed(1)}% (${tokenUsage.used}/${tokenUsage.total}) - Click to compact`}
+          >
+            <div
+              className={cn("h-full transition-all", usageBarClass(tokenUsage.pct))}
+              style={{ width: `${Math.min(100, tokenUsage.pct * 100)}%` }}
+            />
+          </button>
+          <span className="text-xs text-zinc-400 min-w-[3rem]">
+            {(tokenUsage.pct * 100).toFixed(0)}%
+          </span>
         </div>
       </div>
 
@@ -65,7 +114,7 @@ export function ChatView() {
                 />
               );
             })}
-            {showThinking && <ThinkingIndicator statusMessage={statusMessage} />}
+            {showThinking && <ThinkingIndicator statusMessage={statusMessage} latestThought={latestThought} />}
             <div ref={bottomRef} />
           </div>
         )}

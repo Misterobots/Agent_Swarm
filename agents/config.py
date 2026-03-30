@@ -78,6 +78,19 @@ TRAINING_LORA_RANK           = int(os.getenv("TRAINING_LORA_RANK",       "16"))
 TRAINING_LORA_ALPHA          = int(os.getenv("TRAINING_LORA_ALPHA",      "32"))
 TRAINING_BATCH_SIZE          = int(os.getenv("TRAINING_BATCH_SIZE",      "1"))
 TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION", "8"))
+
+# ---------------------------------------------------------------------------
+# Context Window Management
+# ---------------------------------------------------------------------------
+CONTEXT_WINDOWS: dict[str, int] = {
+    "qwen2.5-coder:14b": 32768,
+    "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
+    "qwen3.5:9b": 32768,
+    "nemotron-mini": 4096,
+    "llama3.2:3b": 8192,
+    "default": 8192,
+}
+COMPACT_AUTO_THRESHOLD = 0.95
 TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "5e-6"))
 TRAINING_NUM_EPOCHS          = int(os.getenv("TRAINING_NUM_EPOCHS",      "3"))
 TRAINING_MAX_SEQ_LEN         = int(os.getenv("TRAINING_MAX_SEQ_LEN",    "4096"))

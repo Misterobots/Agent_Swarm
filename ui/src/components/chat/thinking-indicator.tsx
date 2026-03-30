@@ -64,9 +64,10 @@ function pickRandom(): string {
 
 interface ThinkingIndicatorProps {
   statusMessage: string | null;
+  latestThought?: string | null;
 }
 
-export function ThinkingIndicator({ statusMessage }: ThinkingIndicatorProps) {
+export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndicatorProps) {
   const [verb, setVerb] = useState(pickRandom);
 
   // Rotate the ambient verb every 3 seconds
@@ -89,6 +90,9 @@ export function ThinkingIndicator({ statusMessage }: ThinkingIndicatorProps) {
         {/* Real backend status */}
         {statusMessage && (
           <p className="text-sm text-zinc-300 mb-1.5">{statusMessage}</p>
+        )}
+        {latestThought && (
+          <p className="text-xs text-cyan-400/80 font-mono mb-1.5">{latestThought}</p>
         )}
         {/* Ambient office verb */}
         <div className="flex items-center gap-2">

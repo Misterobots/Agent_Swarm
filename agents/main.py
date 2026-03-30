@@ -235,6 +235,7 @@ class ChatRequest(BaseModel):
     model: str = "default"
     stream: bool = False
     session_id: Optional[str] = None  # conversation ID for multi-turn history
+    memory_enabled: bool = False      # opt-in cross-session memory recall
 
 @app.get("/v1/models")
 async def list_models():
@@ -290,7 +291,7 @@ async def chat_completions(request: ChatRequest):
             import logging
             logger = logging.getLogger("uvicorn")
             try:
-                gen = chat_swarm(last_msg, session_id=request.session_id or "default_session", history=history)
+                gen = chat_swarm(last_msg, session_id=request.session_id or "default_session", history=history, memory_enabled=request.memory_enabled)
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
                 yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':0,'model':request.model,'choices':[{'index':0,'delta':{'content':f'Error: {e}'},'finish_reason':None}]})}\n\n"
@@ -309,10 +310,10 @@ async def chat_completions(request: ChatRequest):
                     msg_type = update.get("type", "response")
                     raw_content = update.get("content", "")
 
-                    # In standard mode, forward status as typed chunks; only yield assistant segments, errors, and status
+                    # In standard mode, forward status/thought as typed chunks;
+                    # only yield assistant segments, errors, status, and thoughts.
                     if is_standard_mode:
                         if msg_type == "status":
-                            # Send status as a typed delta so the UI can render a thinking indicator
                             status_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
@@ -322,8 +323,21 @@ async def chat_completions(request: ChatRequest):
                             }
                             yield f"data: {json.dumps(status_chunk)}\n\n"
                             continue
+
+                        if msg_type == "thought":
+                            thought_chunk = {
+                                "id": "chatcmpl-swarm",
+                                "object": "chat.completion.chunk",
+                                "created": 1234567890,
+                                "model": request.model,
+                                "choices": [{"index": 0, "delta": {"content": raw_content, "type": "thought"}, "finish_reason": None}]
+                            }
+                            yield f"data: {json.dumps(thought_chunk)}\n\n"
+                            continue
+
                         if msg_type not in ["message", "response", "error"]:
                             continue
+
                         content = raw_content
                     else:
                         # Format non-response items as markdown blockquotes for the Swarm UI
@@ -360,7 +374,7 @@ async def chat_completions(request: ChatRequest):
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
     else:
         # Non-streaming (accumulate all rendered output)
-        gen = chat_swarm(last_msg, session_id=request.session_id or "default_session", history=history)
+        gen = chat_swarm(last_msg, session_id=request.session_id or "default_session", history=history, memory_enabled=request.memory_enabled)
         full_resp = ""
         for update in gen:
             if not isinstance(update, dict):
@@ -1832,6 +1846,118 @@ async def list_templates():
     except Exception as e:
         logger.warning(f"Failed to list templates: {e}")
         return {"templates": []}
+
+
+# ---------------------------------------------------------------------------
+# Context Compaction Endpoint
+# ---------------------------------------------------------------------------
+class CompactRequest(BaseModel):
+    messages: List[ChatMessage]
+    model: str = "qwen2.5-coder:14b-instruct-q4_k_m"
+
+@app.post("/v1/chat/compact")
+async def compact_chat(request: CompactRequest):
+    """
+    Summarize a long conversation into [summary_message] + last 3 exchanges.
+    Called by the UI when the user clicks the context meter or auto-compact fires.
+    """
+    from router import get_best_host_for_model
+    import httpx
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    if len(messages) <= 6:
+        return {"messages": messages, "summary": "", "compacted": False}
+
+    history_text = "\n".join(
+        f"{m['role'].upper()}: {m['content'][:500]}" for m in messages[:-3]
+    )
+    summarize_prompt = (
+        "Summarize the following conversation in 3 concise sentences, "
+        "capturing the key tasks, decisions, and context needed to continue:\n\n"
+        f"{history_text}"
+    )
+    try:
+        ollama_host = get_best_host_for_model(request.model)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(f"{ollama_host}/api/generate", json={
+                "model": request.model,
+                "prompt": summarize_prompt,
+                "stream": False,
+            })
+        summary = resp.json().get("response", "").strip()
+    except Exception as e:
+        logger.warning(f"[Compact] Summarization failed: {e}")
+        summary = f"[Conversation context — {len(messages)} messages]"
+
+    compacted = [
+        {"role": "system", "content": f"[Conversation Summary]: {summary}"},
+        *messages[-3:],
+    ]
+    return {"messages": compacted, "summary": summary, "compacted": True}
+
+
+# ---------------------------------------------------------------------------
+# Session Memory Endpoints
+# ---------------------------------------------------------------------------
+class SummarizeSessionRequest(BaseModel):
+    messages: List[ChatMessage]
+    topic: str = "general"
+    model: str = "qwen2.5-coder:14b-instruct-q4_k_m"
+
+@app.post("/v1/chat/summarize-session")
+async def summarize_session(request: SummarizeSessionRequest):
+    """
+    Produce a 3-sentence summary of a completed conversation for cross-session memory.
+    Only called when the user has opted in to session memory.
+    """
+    from router import get_best_host_for_model
+    import httpx
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    if len(messages) < 4:
+        return {"summary": "", "saved": False}
+
+    history_text = "\n".join(
+        f"{m['role'].upper()}: {m['content'][:400]}" for m in messages[:20]
+    )
+    summarize_prompt = (
+        "Summarize this conversation in exactly 3 sentences. "
+        "Focus on: what the user was trying to accomplish, key decisions made, and any important context for future sessions.\n\n"
+        f"{history_text}"
+    )
+    try:
+        ollama_host = get_best_host_for_model(request.model)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(f"{ollama_host}/api/generate", json={
+                "model": request.model,
+                "prompt": summarize_prompt,
+                "stream": False,
+            })
+        summary = resp.json().get("response", "").strip()
+    except Exception as e:
+        logger.warning(f"[SummarizeSession] Failed: {e}")
+        return {"summary": "", "saved": False}
+
+    return {"summary": summary, "saved": False}
+
+
+class SessionSummaryRequest(BaseModel):
+    date_key: str
+    topic: str
+    summary: str
+
+@app.post("/v1/memory/session-summary")
+async def save_session_summary(request: SessionSummaryRequest):
+    """Persist a session summary to skills_memory.json."""
+    from memory_system import memory
+    result = memory.add_session_summary(request.date_key, request.topic, request.summary)
+    return {"status": "ok", "message": result}
+
+
+@app.get("/v1/memory/session-summaries")
+async def get_session_summaries(n: int = 5):
+    """Retrieve the N most recent session summaries."""
+    from memory_system import memory
+    summaries = memory.get_recent_summaries(n=n)
+    return {"summaries": summaries}
 
 
 if __name__ == "__main__":

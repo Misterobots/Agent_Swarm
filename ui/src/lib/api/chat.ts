@@ -8,11 +8,12 @@ export async function* sendChatStream(
   model: string = "swarm-standard",
   signal?: AbortSignal,
   sessionId?: string,
+  memoryEnabled: boolean = false,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true, session_id: sessionId }),
+    body: JSON.stringify({ model, messages, stream: true, session_id: sessionId, memory_enabled: memoryEnabled }),
     signal,
   });
 
@@ -21,6 +22,48 @@ export async function* sendChatStream(
   }
 
   yield* streamSSE(response);
+}
+
+export async function compactChat(
+  messages: Pick<ChatMessage, "role" | "content">[],
+  model: string,
+): Promise<{ messages: Pick<ChatMessage, "role" | "content">[]; summary: string; compacted: boolean }> {
+  const response = await fetch(`${API_BASE}/v1/chat/compact`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, model }),
+  });
+  if (!response.ok) {
+    throw new Error(`Compact API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function summarizeSession(
+  messages: Pick<ChatMessage, "role" | "content">[],
+  topic: string,
+  model: string,
+): Promise<{ summary: string; saved: boolean }> {
+  const response = await fetch(`${API_BASE}/v1/chat/summarize-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, topic, model }),
+  });
+  if (!response.ok) {
+    throw new Error(`Summarize API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function saveSessionSummary(dateKey: string, topic: string, summary: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/v1/memory/session-summary`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ date_key: dateKey, topic, summary }),
+  });
+  if (!response.ok) {
+    throw new Error(`Save summary API error: ${response.status} ${response.statusText}`);
+  }
 }
 
 export async function fetchModels(): Promise<Model[]> {

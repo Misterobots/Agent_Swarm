@@ -3,6 +3,7 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
+  thoughtTrace?: ThoughtEvent[];
 }
 
 export interface Conversation {
@@ -12,6 +13,7 @@ export interface Conversation {
   model: string;
   createdAt: number;
   updatedAt: number;
+  memoryEnabled?: boolean;
 }
 
 export interface ChatCompletionChunk {
@@ -21,7 +23,7 @@ export interface ChatCompletionChunk {
   model: string;
   choices: {
     index: number;
-    delta: { content?: string; role?: string; type?: "content" | "status" };
+    delta: { content?: string; role?: string; type?: "content" | "status" | "thought" };
     finish_reason: string | null;
   }[];
 }
@@ -34,8 +36,13 @@ export interface Model {
 }
 
 export interface StreamEvent {
-  type: "content" | "status";
+  type: "content" | "status" | "thought";
   content: string;
+}
+
+export interface ThoughtEvent {
+  content: string;
+  timestamp: number;
 }
 
 export interface NodeHealth {

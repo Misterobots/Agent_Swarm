@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChatMessage, Conversation } from "@/types/chat";
+import type { ChatMessage, Conversation, ThoughtEvent } from "@/types/chat";
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -23,9 +23,11 @@ interface ChatState {
   createConversation: (model?: string) => string;
   setActiveConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
+  updateConversation: (id: string, patch: Partial<Conversation>) => void;
   addMessage: (conversationId: string, message: Omit<ChatMessage, "id" | "timestamp">) => string;
   updateMessage: (conversationId: string, messageId: string, content: string) => void;
   appendToMessage: (conversationId: string, messageId: string, delta: string) => void;
+  setMessageThoughtTrace: (conversationId: string, messageId: string, thoughts: ThoughtEvent[]) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -69,6 +71,13 @@ export const useChatStore = create<ChatState>()(
                 : state.activeConversationId,
           };
         }),
+
+      updateConversation: (id, patch) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c
+          ),
+        })),
 
       addMessage: (conversationId, message) => {
         const msgId = generateId();
@@ -119,6 +128,20 @@ export const useChatStore = create<ChatState>()(
               messages: c.messages.map((m) =>
                 m.id === messageId ? { ...m, content: m.content + delta } : m
               ),
+            };
+          }),
+        })),
+
+      setMessageThoughtTrace: (conversationId, messageId, thoughts) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, thoughtTrace: thoughts } : m
+              ),
+              updatedAt: Date.now(),
             };
           }),
         })),

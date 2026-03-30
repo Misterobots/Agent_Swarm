@@ -259,13 +259,15 @@ services:
     env_file:
       - ../network.env
     environment:
-      - API_BASE_URL=http://${EXECUTION_NODE_IP:-192.168.2.101}:8008
+      - API_BASE_URL=http://${EXECUTION_NODE_HOST:-execution-node}:8008
       - LANGFUSE_URL=http://${CONTROL_NODE_IP:-192.168.2.102}:3000
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - CONTROL_NODE_IP=${CONTROL_NODE_IP:-192.168.2.102}
       - NEXT_PUBLIC_GATEWAY_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}
       - NEXT_PUBLIC_GRAFANA_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}/grafana
+    extra_hosts:
+      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
     volumes:
       - ../docs:/app/docs:ro
     ports:

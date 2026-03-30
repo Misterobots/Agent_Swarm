@@ -273,10 +273,11 @@ def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None):
         logger.debug(f"[Router] Trace scoring failed: {e}")
 
 
-def chat_swarm(user_input: str, session_id: str = "default_session", history: list = None):
+def chat_swarm(user_input: str, session_id: str = "default_session", history: list = None, memory_enabled: bool = False):
     """
     Generator that yields status updates and final response for UI.
     - history: Optional list of OpenAI-formatted messages [{"role": "user", "content": "..."}]
+    - memory_enabled: If True, inject recent session summaries as system context.
     """
     AGENT_STATE.labels(agent_name="Router").set(2)
     WORKFLOW_STEPS.labels(status="started", agent_type="Router").inc()
@@ -359,6 +360,25 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             clear_context(session_id=session_id)
 
     try:
+        # 1b. Memory Recall — inject prior session summaries as system context
+        if memory_enabled:
+            try:
+                from memory_system import memory as _mem
+                recent = _mem.get_recent_summaries(n=5)
+                if recent:
+                    recall_text = "\n".join(
+                        f"- [{s.get('date', '?')}] {s.get('topic', '')}: {s.get('summary', '')}"
+                        for s in recent
+                    )
+                    recall_msg = {"role": "system", "content": f"[Prior Session Context]\n{recall_text}"}
+                    if history is None:
+                        history = [recall_msg]
+                    else:
+                        history = [recall_msg] + list(history)
+                    yield {"type": "thought", "content": f"→ Memory: Recalled {len(recent)} prior session summaries"}
+            except Exception as _mem_err:
+                logger.debug(f"[Router] Memory recall failed (non-fatal): {_mem_err}")
+
         # 2. Security Check (on the Merged Input)
         yield {"type": "status", "content": "🔒 Security Agent: Scanning input..."}
         security = get_security_agent()
@@ -375,6 +395,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             return # HITL Block
 
         yield {"type": "status", "content": "✅ Security Agent: Input Cleared."}
+        yield {"type": "thought", "content": "→ Security: PASS"}
         WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
 
         # 3. Intent Routing (Neural Upgrade)
@@ -397,6 +418,8 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         
         yield {"type": "log", "content": f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}"}
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
+
+        yield {"type": "thought", "content": f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)"}
 
         if USE_LANGFUSE and langfuse:
             try:
@@ -524,6 +547,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                 devops_input = f"{devops_input}\n\n[Attached Context]:\n{extracted_context}"
 
             yield {"type": "log", "content": f"[DevOps] Routing to MarsRL with infra context."}
+            yield {"type": "thought", "content": f"→ Routing to Architect ({DEVOPS_MODEL}) via MarsRL loop"}
             try:
                 with request_lock(context="text"):
                     for update in mars_loop_stream(devops_input, mars):
@@ -1022,6 +1046,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
 
                 yield {"type": "log", "content": f"[MarsRL] Intent: {intent} | Loop initialized."}
 
+                yield {"type": "thought", "content": f"→ Routing to Architect ({os.getenv('ARCHITECT_MODEL', 'qwen2.5-coder:14b')}) via MarsRL loop"}
                 with request_lock(context="text"):
                     for update in mars_loop_stream(final_input, mars):
                         # Capture MarsLoopResult for performance recording
