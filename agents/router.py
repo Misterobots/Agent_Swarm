@@ -1067,9 +1067,14 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                     yield {"type": "status", "content": f"🚨 Gatekeeper: Missing '{missing_pkg}'"}
                     security = get_security_agent()
                     review = security.review_dependency(missing_pkg)
-                    if review.content == "SAFE":
+                    # Allow only normalized package names (no URL/options/extras markers).
+                    is_valid_pkg = bool(re.fullmatch(r"[A-Za-z0-9_\-]+", missing_pkg))
+                    if review.content == "SAFE" and is_valid_pkg:
                         subprocess.check_call([sys.executable, "-m", "pip", "install", missing_pkg])
                         yield {"type": "status", "content": f"💾 Fixed: Installed '{missing_pkg}'."}
+                    elif not is_valid_pkg:
+                        yield {"type": "error", "content": f"🚫 Security: Blocked invalid package token '{missing_pkg}'"}
+                        return
                     else:
                         yield {"type": "error", "content": f"🚫 Security: Blocked '{missing_pkg}'"}
                         return

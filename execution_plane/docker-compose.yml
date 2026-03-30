@@ -10,7 +10,6 @@ services:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: cadvisor_gpu_node
     hostname: cadvisor-justin
-    privileged: true
     command: []
     devices:
       - /dev/kmsg:/dev/kmsg
@@ -40,6 +39,11 @@ services:
     command: python /app/cadvisor_proxy.py
     ports:
       - "8081:8081"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/metrics', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     restart: unless-stopped
     networks:
       - execution_net
@@ -92,6 +96,12 @@ services:
       - ./training_output:/training_output:ro  # Shared with agent_runtime for model imports
     ports:
       - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
     restart: always
     networks:
       - execution_net
@@ -116,6 +126,12 @@ services:
       - "8100:8000"
     volumes:
       - ../agents/bmo_voice:/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
     networks:
       - execution_net
     labels:
@@ -145,6 +161,12 @@ services:
     volumes:
       - ../services/voice_engine:/app
       - bmo_models:/root/.cache/huggingface # Share cache if possible or use new volume
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8020/docs', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
     networks:
       - execution_net
     labels:
@@ -203,6 +225,12 @@ services:
     command: ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
     ports:
       - "8008:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/models', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
     networks:
       - execution_net
     deploy:
@@ -224,6 +252,12 @@ services:
     restart: always
     ports:
       - "8188:8188"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8188', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     volumes:
       # Mount the User's ComfyUI Install (Core & Custom Nodes)
 

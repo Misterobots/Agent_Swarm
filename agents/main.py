@@ -133,24 +133,35 @@ if os.path.exists("/workspace/delivered_artifacts"):
 # --- Direct File Serving for Voice Samples (StaticFiles mount was unreliable) ---
 from fastapi.responses import FileResponse
 from fastapi import HTTPException
+from pathlib import Path
 
 @app.get("/voice_samples/{filename}")
 async def serve_voice_sample(filename: str):
     """Serve pre-recorded BMO voice samples to the satellite."""
-    sample_dir = "/app/agents/bmo_voice/voice_samples"
-    file_path = os.path.join(sample_dir, filename)
+    sample_dir = Path("/app/agents/bmo_voice/voice_samples").resolve()
+
+    try:
+        requested = (sample_dir / filename).resolve()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Block path traversal outside of sample directory.
+    if sample_dir not in requested.parents and requested != sample_dir:
+        raise HTTPException(status_code=403, detail="Access denied")
     
     # Direct match
-    if os.path.isfile(file_path):
-        return FileResponse(file_path, media_type="audio/wav")
+    if requested.is_file():
+        return FileResponse(str(requested), media_type="audio/wav")
     
     # Case-insensitive fallback
-    if os.path.isdir(sample_dir):
+    if sample_dir.is_dir():
         for f in os.listdir(sample_dir):
             if f.lower() == filename.lower():
-                return FileResponse(os.path.join(sample_dir, f), media_type="audio/wav")
+                candidate = (sample_dir / f).resolve()
+                if sample_dir in candidate.parents and candidate.is_file():
+                    return FileResponse(str(candidate), media_type="audio/wav")
     
-    print(f"⚠️ Voice sample not found: {file_path} (dir exists: {os.path.isdir(sample_dir)})")
+    print(f"⚠️ Voice sample not found: {requested} (dir exists: {sample_dir.is_dir()})")
     raise HTTPException(status_code=404, detail=f"Sample not found: {filename}")
 
 # --- Endpoints ---
