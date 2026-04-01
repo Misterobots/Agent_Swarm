@@ -278,7 +278,7 @@ Execution Notes:
 **Status**: PASSED ✅
 
 ### Week 8 Gate (May 3): Sprint 2 Complete
-- [ ] ADR foundation and 4 seed ADRs published
+- [x] ADR foundation and 4 seed ADRs published
 - [ ] Subsystem deep dives completed
 - [ ] API contract and unified control matrix approved
 - [ ] Incident runbooks and evidence automation spec drafted
