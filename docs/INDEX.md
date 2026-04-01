@@ -132,6 +132,10 @@ Located in [`architecture/`](architecture/):
 |----------|-------------|
 | [Multi-user Propagation Trace](architecture/multi_user_propagation_trace.md) | Current-state ingress-to-storage identity/context path with target-state control deltas |
 | [Cross-user Isolation Test Plan](architecture/cross_user_isolation_test_plan.md) | Executable T1–T5 validation plan for context, memory, preference, and endpoint isolation |
+| [Router Intent and Token Flow Deep Dive](architecture/router_intent_token_flow_deep_dive.md) | Request ingress, endpoint-class policy, intent routing, and token-profile enforcement walkthrough |
+| [MarsRL Inference Verification Deep Dive](architecture/marsrl_inference_verification_deep_dive.md) | Solver-verifier-corrector control loop and inference-time safety verification architecture |
+| [Memory and Preferences Deep Dive](architecture/memory_preferences_subsystem_deep_dive.md) | Owner-scoped context partitioning, memory recall filtering, and preference isolation model |
+| [Skills and Hooks Pipeline Deep Dive](architecture/skills_hooks_pipeline_deep_dive.md) | Skill dispatch path, hook controls, IoT-sensitive safeguards, and audit observability |
 
 ---
 
