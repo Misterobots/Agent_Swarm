@@ -3,6 +3,8 @@
 Snapshot Date: 2026-03-31
 Branch: feature/neural-router
 Pre-Baseline Head: ca6412c
+Baseline Tag: gov-baseline-2026-03-31
+Baseline Commit: 982796a4547566ba9316a90671891cc7c91d9227
 
 ## Closure Summary
 

@@ -11,6 +11,8 @@ Review Due: 2026-04-15
 Source of Truth: docs/INDEX.md
 Related Controls: MAESTRO L6
 Related Evidence: docs/evidence/project_status_snapshot.md
+Baseline Tag: gov-baseline-2026-03-31
+Baseline Commit: 982796a4547566ba9316a90671891cc7c91d9227
 Supersedes: None
 
 ## Purpose
