@@ -2,6 +2,9 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+rule_files:
+  - auth_alert_rules.yml
+
 scrape_configs:
   # R730 node — container-level metrics (CPU, memory, network, disk I/O)
   - job_name: 'cadvisor-r730'

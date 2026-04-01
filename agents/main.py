@@ -2,11 +2,12 @@
 import logging
 import sys
 import os
+import json
 import uuid
 # Ensure agents dir is in path
 if "/app/agents" not in sys.path:
     sys.path.append("/app/agents")
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Header
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
@@ -34,6 +35,7 @@ class TaskResponse(BaseModel): # Added TaskResponse
 
 # --- Security ---
 from security import SpiffeAuthMiddleware, get_spiffe_auth, require_spiffe_id, SpiffeJWTBearer
+from security.authorization_middleware import AuthorizationMiddleware
 from fastapi import Depends
 
 # --- Lifecycle ---
@@ -107,6 +109,10 @@ async def lifespan(app: FastAPI):
 
 # --- App Definition ---
 app = FastAPI(lifespan=lifespan, title="Home AI Lab Swarm API")
+
+# Staged rollout: parse mode logs policy mismatches without blocking,
+# soft/hard modes enforce endpoint-class policy in AuthorizationMiddleware.
+app.add_middleware(AuthorizationMiddleware)
 
 # --- Global Exception Handler (To capture crashes before uvicorn swallows them) ---
 from fastapi import Request
@@ -247,6 +253,32 @@ class ChatRequest(BaseModel):
     stream: bool = False
     session_id: Optional[str] = None  # conversation ID for multi-turn history
     memory_enabled: bool = False      # opt-in cross-session memory recall
+    user_id: Optional[str] = None     # preferred owner key for user-scoped storage
+
+
+def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optional[str]:
+    """Resolve a stable owner identifier from request payload or authenticated context."""
+    if payload_user_id:
+        return payload_user_id
+
+    agent_card = getattr(request.state, "agent_card", None)
+    if not agent_card:
+        return None
+
+    explicit_user_id = getattr(agent_card, "user_id", None)
+    if explicit_user_id:
+        return explicit_user_id
+
+    metadata = getattr(agent_card, "metadata", {}) or {}
+    owner_id = metadata.get("user_id") or metadata.get("owner_id")
+    if owner_id:
+        return owner_id
+
+    token_profile = getattr(request.state, "token_profile", None)
+    if token_profile == "user" and getattr(agent_card, "session_id", None):
+        return f"session:{agent_card.session_id}"
+
+    return None
 
 @app.get("/v1/models")
 async def list_models():
@@ -279,7 +311,7 @@ async def list_models():
         raise
 
 @app.post("/v1/chat/completions")
-async def chat_completions(request: ChatRequest):
+async def chat_completions(request: ChatRequest, http_request: Request):
     """
     Standard Chat API to allow external tools (Open-WebUI, VS Code) to talk to the Swarm.
     """
@@ -295,6 +327,7 @@ async def chat_completions(request: ChatRequest):
     # Check for "Standard Mode" (OpenAI Compatibility)
     # Suppresses internal logs/status updates
     is_standard_mode = request.model.startswith("swarm-") or request.model == "default"
+    owner_id = _resolve_owner_id(request.user_id, http_request)
     
     if request.stream:
         async def stream_generator():
@@ -302,7 +335,13 @@ async def chat_completions(request: ChatRequest):
             import logging
             logger = logging.getLogger("uvicorn")
             try:
-                gen = chat_swarm(last_msg, session_id=request.session_id or "default_session", history=history, memory_enabled=request.memory_enabled)
+                gen = chat_swarm(
+                    last_msg,
+                    session_id=request.session_id or "default_session",
+                    history=history,
+                    memory_enabled=request.memory_enabled,
+                    owner_id=owner_id,
+                )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
                 yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':0,'model':request.model,'choices':[{'index':0,'delta':{'content':f'Error: {e}'},'finish_reason':None}]})}\n\n"
@@ -385,7 +424,13 @@ async def chat_completions(request: ChatRequest):
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
     else:
         # Non-streaming (accumulate all rendered output)
-        gen = chat_swarm(last_msg, session_id=request.session_id or "default_session", history=history, memory_enabled=request.memory_enabled)
+        gen = chat_swarm(
+            last_msg,
+            session_id=request.session_id or "default_session",
+            history=history,
+            memory_enabled=request.memory_enabled,
+            owner_id=owner_id,
+        )
         full_resp = ""
         for update in gen:
             if not isinstance(update, dict):
@@ -1954,20 +1999,23 @@ class SessionSummaryRequest(BaseModel):
     date_key: str
     topic: str
     summary: str
+    owner_id: Optional[str] = None
 
 @app.post("/v1/memory/session-summary")
-async def save_session_summary(request: SessionSummaryRequest):
+async def save_session_summary(request: SessionSummaryRequest, http_request: Request):
     """Persist a session summary to skills_memory.json."""
     from memory_system import memory
-    result = memory.add_session_summary(request.date_key, request.topic, request.summary)
+    owner_id = _resolve_owner_id(request.owner_id, http_request)
+    result = memory.add_session_summary(request.date_key, request.topic, request.summary, owner_id=owner_id)
     return {"status": "ok", "message": result}
 
 
 @app.get("/v1/memory/session-summaries")
-async def get_session_summaries(n: int = 5):
+async def get_session_summaries(n: int = 5, owner_id: Optional[str] = None, http_request: Request = None):
     """Retrieve the N most recent session summaries."""
     from memory_system import memory
-    summaries = memory.get_recent_summaries(n=n)
+    resolved_owner_id = _resolve_owner_id(owner_id, http_request) if http_request is not None else owner_id
+    summaries = memory.get_recent_summaries(n=n, owner_id=resolved_owner_id)
     return {"summaries": summaries}
 
 

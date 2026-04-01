@@ -3,6 +3,12 @@
 > **Back to:** [Documentation Index](../INDEX.md)
 > **See also:** [Design Framework](design_framework.md) · [Security](security.md) · [Troubleshooting](troubleshooting.md)
 
+## Canonical Inventory and Governance References
+
+- [System Component and Service Catalog](../catalog/system_component_service_catalog.md)
+- [Documentation Governance Standard](../governance/documentation_governance_standard.md)
+- [Documentation Gap Register](../governance/documentation_gap_register.md)
+
 **Last Updated**: 2026-03-23 · **Architecture Version**: 3.3
 
 ---

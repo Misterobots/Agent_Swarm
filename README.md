@@ -1,6 +1,6 @@
 # Home AI Lab: Agentic Hive
 
-**Version**: 3.4 (Phase 6 complete) · **Status**: Production · **Updated**: 2026-03-25
+**Version**: 3.4 (Phase 6 complete) · **Status**: Production · **Updated**: 2026-03-31
 
 A self-hosted, distributed multi-agent AI system for home automation, coding, creative media, and voice interaction. All inference runs on-premises — no external AI services.
 
@@ -14,7 +14,14 @@ A self-hosted, distributed multi-agent AI system for home automation, coding, cr
 |----------|-------------|
 | **Users** | [System Overview](docs/user/overview.md) · [How It Works](docs/user/framework.md) · [FAQ](docs/user/faq.md) |
 | **Admins** | [Technical Reference](docs/admin/technical_reference.md) · [Design Framework](docs/admin/design_framework.md) · [Security](docs/admin/security.md) · [Troubleshooting](docs/admin/troubleshooting.md) |
-| **Auditors** | [MAESTRO Compliance](docs/compliance/maestro_compliance_status.md) · [Evidence Trail](docs/evidence/) |
+| **Auditors** | [MAESTRO Compliance](docs/compliance/maestro_compliance_status.md) · [System Catalog](docs/catalog/system_component_service_catalog.md) · [Feature Traceability](docs/compliance/feature_control_traceability_matrix.md) · [Evidence Trail](docs/evidence/) |
+
+### Canonical Security Standards
+
+- [Identity and Token Trust Standard](docs/security/identity_token_trust_standard.md)
+- [Key Lifecycle and Rotation Runbook](docs/security/key_lifecycle_rotation_runbook.md)
+- [Multi-user Identity Scoping Standard](docs/security/multi_user_identity_scoping_standard.md)
+- [Hook Security and Execution Policy](docs/security/hook_security_execution_policy.md)
 
 ---
 

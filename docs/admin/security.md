@@ -3,6 +3,19 @@
 > **Back to:** [Documentation Index](../INDEX.md)
 > **See also:** [Design Framework](design_framework.md) · [MAESTRO Compliance Status](../compliance/maestro_compliance_status.md)
 
+## Canonical Security Standards
+
+Use the following canonical standards for implementation and audit decisions:
+
+- [Identity and Token Trust Standard](../security/identity_token_trust_standard.md)
+- [API Authentication and Claims Contract](../security/api_authentication_contract.md)
+- [API Contract Validation Examples](../security/api_contract_validation_examples.md)
+- [Key Lifecycle and Rotation Runbook](../security/key_lifecycle_rotation_runbook.md)
+- [Key Compromise Incident Runbook](../security/key_compromise_incident_runbook.md)
+- [Key Compromise Incident Checklist](../security/key_compromise_incident_checklist.md)
+- [Multi-user Identity Scoping Standard](../security/multi_user_identity_scoping_standard.md)
+- [Hook Security and Execution Policy](../security/hook_security_execution_policy.md)
+
 **Version**: 3.3 · **Audit Status**: Production (Phase 6) · **Last Updated**: 2026-03-23
 
 ---

@@ -117,3 +117,19 @@ TRAINING_STEP_TIME = Gauge(
     'training_step_time_seconds',
     'Time per training step in seconds',
 )
+
+# ---------------------------------------------------------------------------
+# IoT Sensitive Action Metrics
+# ---------------------------------------------------------------------------
+
+IOT_SENSITIVE_ACTIONS_TOTAL = Counter(
+    'iot_sensitive_actions_total',
+    'Total sensitive IoT actions observed by service layer',
+    ['domain', 'service', 'outcome']
+)
+
+IOT_SENSITIVE_ACTIONS_BLOCKED_TOTAL = Counter(
+    'iot_sensitive_actions_blocked_total',
+    'Total sensitive IoT actions blocked due to missing confirmation',
+    ['domain', 'service']
+)

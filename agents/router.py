@@ -118,6 +118,7 @@ def handle_task_event(event: Event):
     intent = event.payload.get("intent", "DEFAULT") # From Dispatcher
     target_device = event.payload.get("target_device", "auto")
     session_id = event.payload.get("session_id", "default_session")
+    owner_id = event.payload.get("owner_id")
 
     if not user_input:
         return
@@ -130,6 +131,7 @@ def handle_task_event(event: Event):
                     "intent": intent,
                     "target_device": target_device,
                     "session_id": session_id,
+                    "owner_id": owner_id,
                 }
             )
         except Exception as e:
@@ -173,7 +175,7 @@ def handle_task_event(event: Event):
     AGENT_STATE.labels(agent_name="Router").set(1)
 
 # --- JWT-ACE Token Issuance ---
-def _issue_ephemeral_token(intent: str, session_id: str) -> tuple:
+def _issue_ephemeral_token(intent: str, session_id: str, owner_id: str | None = None) -> tuple:
     """
     Issue a JWT-ACE token for the given intent.
 
@@ -205,6 +207,7 @@ def _issue_ephemeral_token(intent: str, session_id: str) -> tuple:
             agent_name=caps["agent_name"],
             activated_capabilities=caps["capabilities"],
             security_level=caps["security_level"],
+            user_id=owner_id,
             session_id=session_id,
             expiry_hours=caps["expiry_hours"],
         )
@@ -273,7 +276,13 @@ def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None):
         logger.debug(f"[Router] Trace scoring failed: {e}")
 
 
-def chat_swarm(user_input: str, session_id: str = "default_session", history: list = None, memory_enabled: bool = False):
+def chat_swarm(
+    user_input: str,
+    session_id: str = "default_session",
+    history: list = None,
+    memory_enabled: bool = False,
+    owner_id: str | None = None,
+):
     """
     Generator that yields status updates and final response for UI.
     - history: Optional list of OpenAI-formatted messages [{"role": "user", "content": "..."}]
@@ -297,7 +306,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                 name="chat_swarm",
                 as_type="agent",
                 input={"message": user_input[:4000]},
-                metadata={"session_id": session_id},
+                metadata={"session_id": session_id, "owner_id": owner_id},
             )
             _lf_ctx.__enter__()
         except Exception as e:
@@ -327,7 +336,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     
     # 1. Load Context (Memory Bridge)
     from context_manager import get_pending_context, clear_context, save_pending_image_clarification
-    pending_ctx = get_pending_context(session_id=session_id)
+    pending_ctx = get_pending_context(session_id=session_id, owner_id=owner_id)
     
     # Check if this is a reply to a clarification
     if pending_ctx:
@@ -337,16 +346,16 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             if len(original_prompt) > 500:
                 logger.warning(f"--- [Router] Discarding stale context ({len(original_prompt)} chars) ---")
                 yield {"type": "log", "content": "[Context Manager] Stale context discarded."}
-                clear_context(session_id=session_id)
+                clear_context(session_id=session_id, owner_id=owner_id)
             else:
                 logger.info(f"--- [Router] Merging Context. Original: '{original_prompt}' + New: '{user_input}' ---")
                 user_input = f"{original_prompt} {user_input}"
                 yield {"type": "log", "content": f"[Context Manager] Context Merged: '{user_input}'"}
-                clear_context(session_id=session_id)
+                clear_context(session_id=session_id, owner_id=owner_id)
             
         elif pending_ctx.get("type") == "art_studio_redirect":
             # This was saved for the Art Studio workspace — clear it, don't merge
-            clear_context(session_id=session_id)
+            clear_context(session_id=session_id, owner_id=owner_id)
 
         elif pending_ctx.get("type") == "ambiguity_resolution":
             original = pending_ctx.get("prompt")
@@ -357,14 +366,14 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             user_input = f"Original Request: '{original}'\nSystem Question: '{question}'\nUser Answer: '{user_input}'"
             
             yield {"type": "log", "content": f"[Context Manager] Ambiguity Resolved. Analying composite input..."}
-            clear_context(session_id=session_id)
+            clear_context(session_id=session_id, owner_id=owner_id)
 
     try:
         # 1b. Memory Recall — inject prior session summaries as system context
         if memory_enabled:
             try:
                 from memory_system import memory as _mem
-                recent = _mem.get_recent_summaries(n=5)
+                recent = _mem.get_recent_summaries(n=5, owner_id=owner_id)
                 if recent:
                     recall_text = "\n".join(
                         f"- [{s.get('date', '?')}] {s.get('topic', '')}: {s.get('summary', '')}"
@@ -423,7 +432,14 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
 
         if USE_LANGFUSE and langfuse:
             try:
-                langfuse.update_current_span(metadata={"intent": intent, "confidence": confidence, "reasoning": reasoning[:200]})
+                langfuse.update_current_span(
+                    metadata={
+                        "intent": intent,
+                        "confidence": confidence,
+                        "reasoning": reasoning[:200],
+                        "owner_id": owner_id,
+                    }
+                )
             except Exception:
                 pass
 
@@ -436,7 +452,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             )
 
         # --- JWT-ACE: Issue ephemeral token for this intent ---
-        ace_token, template_metadata = _issue_ephemeral_token(intent, session_id)
+        ace_token, template_metadata = _issue_ephemeral_token(intent, session_id, owner_id=owner_id)
         if ace_token:
             set_current_token(ace_token) if JWT_ACE_AVAILABLE else None
             yield {"type": "log", "content": f"[JWT-ACE] Token issued for {template_metadata.get('template_id', intent)} v{template_metadata.get('template_version', '1.0')}"}
@@ -475,7 +491,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                 "type": "art_studio_redirect",
                 "intent": intent,
                 "prompt": user_input
-            }, session_id=session_id)
+            }, session_id=session_id, owner_id=owner_id)
             AGENT_STATE.labels(agent_name="Router").set(1)
             return
 
@@ -615,7 +631,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                  "type": "ambiguity_resolution",
                  "prompt": user_input,
                  "question": question
-             }, session_id=session_id)
+             }, session_id=session_id, owner_id=owner_id)
              
              yield {"type": "response", "content": f"🤔 **Ambiguous Request:** {question}"}
              _score_trace(lf_trace, langfuse, 0.7, output=question)
@@ -666,7 +682,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
                  if "CLARIFY:" in review.content:
                      # HITL STOP: Return the clarifying question and EXIT the generator.
                      # SAVE CONTEXT so we remember next time.
-                     save_pending_image_clarification(user_input, session_id=session_id)
+                     save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
                      
                      question = review.content.replace("CLARIFY:", "").strip()
                      yield {"type": "response", "content": f"🎨 **Art Director:** {question}"}

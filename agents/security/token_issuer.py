@@ -55,11 +55,12 @@ class EphemeralAgentCard:
     agent_instance_id: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
     activated_capabilities: List[str] = dataclasses.field(default_factory=list)  # ["file_read", "api_call"]
     security_level: str = "L2_USER"    # L1_PUBLIC, L2_USER, L3_ADMIN, L4_SYSTEM
+    user_id: Optional[str] = None      # Canonical authenticated user owner (for user tokens)
     session_id: Optional[str] = None   # Link to user session
     metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)  # Custom metadata
 
     # Timestamps (UTC)
-    issued_at: datetime = dataclasses.field(default_factory=datetime.utcnow)
+    issued_at: datetime = dataclasses.field(default_factory=lambda: datetime.now(timezone.utc))
     expiry_hours: int = 1  # Default 1 hour TTL
     
     def to_dict(self) -> Dict[str, Any]:
@@ -90,6 +91,7 @@ class EphemeralAgentCardModel(BaseModel):
     agent_instance_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     activated_capabilities: List[str] = Field(default_factory=list)
     security_level: str = "L2_USER"
+    user_id: Optional[str] = None
     session_id: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
     expiry_hours: int = 1
@@ -115,6 +117,7 @@ class TokenIssuer:
         "agent_name": "SecurityValidator_001",
         "activated_capabilities": ["file_read", "api_call"],
         "security_level": "L2_USER",
+        "user_id": "user123",
         "session_id": "user123",
         "metadata": {...}
     }
@@ -169,6 +172,12 @@ class TokenIssuer:
         payload['aud'] = 'home-ai-lab-agents'
         payload['sub'] = card.agent_instance_id
         payload['iat'] = datetime.now(timezone.utc).timestamp()
+
+        # Standardized owner field for user-scoped tokens.
+        if not payload.get('user_id'):
+            metadata_owner = (payload.get('metadata') or {}).get('user_id')
+            if metadata_owner:
+                payload['user_id'] = metadata_owner
         
         # Calculate expiry
         expiry = datetime.now(timezone.utc) + timedelta(hours=card.expiry_hours)
@@ -269,51 +278,122 @@ class TokenValidator:
     
     def validate_token(self, token: str) -> EphemeralAgentCard:
         """
-        Validate JWT token and extract ephemeral agent card.
-        
-        Args:
-            token: JWT token (string)
-            
-        Returns:
-            EphemeralAgentCard with validated claims
-            
-        Raises:
-            jwt.InvalidTokenError: If token is invalid
-            jwt.ExpiredSignatureError: If token is expired
-            ValueError: If payload validation fails
+        Backward-compatible default validator.
+        Treats the token as a user-scoped JWT-ACE token.
         """
-        logger.debug(f"[TokenValidator] Validating token...")
-        
+        return self.validate_user_token(token)
+
+    def validate_user_token(self, token: str) -> EphemeralAgentCard:
+        """Validate a user-scoped JWT-ACE token."""
+        logger.debug("[TokenValidator] Validating user token...")
+
         try:
-            # Try SPIRE verification first
-            if self.spire_client and self.spire_client.is_available:
-                try:
-                    claims = self._verify_with_spire(token)
-                    logger.info(f"[TokenValidator] Token verified with SPIRE")
-                except Exception as e:
-                    logger.warning(f"[TokenValidator] SPIRE verification failed: {e}, trying fallback")
-                    claims = self._verify_with_secret(token)
-            else:
-                claims = self._verify_with_secret(token)
-            
-            # Reconstruct EphemeralAgentCard from claims
+            claims = self._verify_with_secret(token)
+            self._validate_user_claims(claims)
+
             card = EphemeralAgentCard.from_dict(claims)
-            
             logger.info(
-                f"[TokenValidator] Valid token for {card.agent_name} "
+                f"[TokenValidator] Valid user token for {card.agent_name} "
                 f"(capabilities: {card.activated_capabilities})"
             )
             return card
-        
+
         except jwt.ExpiredSignatureError:
-            logger.warning("[TokenValidator] Token has expired")
+            logger.warning("[TokenValidator] User token has expired")
             raise
         except jwt.InvalidTokenError as e:
-            logger.error(f"[TokenValidator] Invalid token: {e}")
+            logger.error(f"[TokenValidator] Invalid user token: {e}")
             raise
         except Exception as e:
-            logger.error(f"[TokenValidator] Token validation failed: {e}")
-            raise ValueError(f"Token validation failed: {e}")
+            logger.error(f"[TokenValidator] User token validation failed: {e}")
+            raise ValueError(f"User token validation failed: {e}")
+
+    def validate_workload_token(self, token: str) -> EphemeralAgentCard:
+        """Validate a workload identity token and normalize it into an ephemeral card."""
+        logger.debug("[TokenValidator] Validating workload token...")
+
+        try:
+            claims = None
+            if self.spire_client and self.spire_client.is_available:
+                try:
+                    claims = self.spire_client.verify_jwt_token(token, "home-ai-lab-agents")
+                    if claims:
+                        logger.info("[TokenValidator] Workload token verified with SPIFFE client")
+                except Exception as e:
+                    logger.warning(f"[TokenValidator] SPIFFE workload verification failed: {e}, trying fallback")
+
+            if claims is None:
+                claims = self._verify_workload_fallback(token)
+
+            self._validate_workload_claims(claims)
+            card = self._build_workload_card(claims)
+            logger.info(
+                f"[TokenValidator] Valid workload token for {card.agent_name} "
+                f"(security_level: {card.security_level})"
+            )
+            return card
+
+        except jwt.ExpiredSignatureError:
+            logger.warning("[TokenValidator] Workload token has expired")
+            raise
+        except jwt.InvalidTokenError as e:
+            logger.error(f"[TokenValidator] Invalid workload token: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"[TokenValidator] Workload token validation failed: {e}")
+            raise ValueError(f"Workload token validation failed: {e}")
+
+    def _validate_user_claims(self, claims: Dict[str, Any]) -> None:
+        """Enforce user-token-specific claim requirements."""
+        if claims.get("iss") != "home-ai-lab-token-issuer":
+            raise jwt.InvalidIssuerError("Unexpected issuer for user token")
+
+        if not claims.get("sub"):
+            raise jwt.InvalidTokenError("User token missing sub claim")
+
+        if not claims.get("user_id") and not (claims.get("metadata") or {}).get("user_id"):
+            logger.warning("[TokenValidator] User token missing explicit user_id claim; using fallback owner derivation")
+
+    def _validate_workload_claims(self, claims: Dict[str, Any]) -> None:
+        """Enforce workload-token-specific claim requirements."""
+        subject = str(claims.get("sub", ""))
+        spiffe_id = str(claims.get("spiffe_id", ""))
+        issuer = str(claims.get("iss", ""))
+
+        if not (subject.startswith("spiffe://") or spiffe_id.startswith("spiffe://")):
+            if "spiffe" not in issuer.lower() and "spire" not in issuer.lower():
+                raise jwt.InvalidTokenError("Workload token missing SPIFFE identity claims")
+
+    def _build_workload_card(self, claims: Dict[str, Any]) -> EphemeralAgentCard:
+        """Normalize workload claims into EphemeralAgentCard for middleware consumers."""
+        workload_id = str(claims.get("spiffe_id") or claims.get("sub") or "unknown-workload")
+        return EphemeralAgentCard(
+            template_id="spiffe_workload",
+            template_version="1.0",
+            agent_name=workload_id,
+            agent_instance_id=workload_id,
+            activated_capabilities=["internal_service"],
+            security_level="L4_SYSTEM",
+            user_id=None,
+            session_id=None,
+            metadata={"token_type": "workload", "claims": claims},
+            expiry_hours=1,
+        )
+
+    def _verify_workload_fallback(self, token: str) -> Dict[str, Any]:
+        """Fallback workload verification path for environments without active SPIFFE verification."""
+        try:
+            claims = jwt.decode(
+                token,
+                self.jwt_secret,
+                algorithms=['HS256', 'RS256'],
+                audience='home-ai-lab-agents'
+            )
+            logger.debug("[TokenValidator] Workload token verified via fallback JWT path")
+            return claims
+        except jwt.InvalidTokenError as e:
+            logger.error(f"[TokenValidator] Workload fallback verification failed: {e}")
+            raise
     
     def _verify_with_secret(self, token: str) -> Dict[str, Any]:
         """Verify JWT with secret key."""

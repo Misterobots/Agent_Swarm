@@ -1,5 +1,14 @@
 # MAESTRO Compliance Status: Agentic Hive
 
+## Canonical Control References
+
+- [Identity and Token Trust Standard](../security/identity_token_trust_standard.md)
+- [Key Lifecycle and Rotation Runbook](../security/key_lifecycle_rotation_runbook.md)
+- [Multi-user Identity Scoping Standard](../security/multi_user_identity_scoping_standard.md)
+- [Hook Security and Execution Policy](../security/hook_security_execution_policy.md)
+- [System Component and Service Catalog](../catalog/system_component_service_catalog.md)
+- [Feature Control Traceability Matrix](feature_control_traceability_matrix.md)
+
 **Date**: 2026-03-21
 **Version**: 3.3 (JWT-ACE + ExpertiseTemplate + GRPO Training Pipeline)
 **Overall Status**: ✅ DEPLOYMENT READY (Production)

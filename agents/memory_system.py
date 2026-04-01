@@ -84,7 +84,7 @@ class MemorySystem:
     def get_all_rules(self) -> Dict:
         return self._load_memory()
 
-    def add_session_summary(self, date_key: str, topic: str, summary: str) -> str:
+    def add_session_summary(self, date_key: str, topic: str, summary: str, owner_id: str | None = None) -> str:
         """
         Persists a short summary of a completed conversation under session_summaries.
         Keeps the 20 most recent entries.
@@ -92,16 +92,21 @@ class MemorySystem:
         data = self._load_memory()
         if "session_summaries" not in data:
             data["session_summaries"] = []
-        entry = {"date": date_key, "topic": topic, "summary": summary}
+        entry = {"date": date_key, "topic": topic, "summary": summary, "owner_id": owner_id}
         data["session_summaries"].insert(0, entry)
         data["session_summaries"] = data["session_summaries"][:20]
         self._save_memory(data)
+        if owner_id:
+            return f"Session summary saved for {date_key} (owner={owner_id})."
         return f"Session summary saved for {date_key}."
 
-    def get_recent_summaries(self, n: int = 5) -> List[Dict]:
-        """Returns the N most recent session summaries."""
+    def get_recent_summaries(self, n: int = 5, owner_id: str | None = None) -> List[Dict]:
+        """Return the N most recent session summaries, optionally filtered by owner."""
         data = self._load_memory()
-        return data.get("session_summaries", [])[:n]
+        summaries = data.get("session_summaries", [])
+        if owner_id:
+            summaries = [entry for entry in summaries if entry.get("owner_id") == owner_id]
+        return summaries[:n]
 
 # precise singleton for import
 memory = MemorySystem()

@@ -3,6 +3,14 @@
 > **Back to:** [Documentation Index](../INDEX.md)
 > **See also:** [Technical Reference](technical_reference.md) · [Security](security.md)
 
+## Canonical Scoping and Trust References
+
+- [Multi-user Identity Scoping Standard](../security/multi_user_identity_scoping_standard.md)
+- [Multi-user Propagation Trace](../architecture/multi_user_propagation_trace.md)
+- [Cross-user Isolation Test Plan](../architecture/cross_user_isolation_test_plan.md)
+- [Identity and Token Trust Standard](../security/identity_token_trust_standard.md)
+- [Hook Security and Execution Policy](../security/hook_security_execution_policy.md)
+
 **Version**: 3.3 · **Status**: Production · **Last Updated**: 2026-03-23
 
 ---

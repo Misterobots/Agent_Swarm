@@ -1,5 +1,12 @@
 # MAESTRO Evaluation: Identity & Trust
 
+## Canonical Standards
+
+- [Identity and Token Trust Standard](../security/identity_token_trust_standard.md)
+- [Key Lifecycle and Rotation Runbook](../security/key_lifecycle_rotation_runbook.md)
+- [Multi-user Identity Scoping Standard](../security/multi_user_identity_scoping_standard.md)
+- [Feature Control Traceability Matrix](feature_control_traceability_matrix.md)
+
 **Component**: Agent Registry, RBAC & SPIFFE/SPIRE Workload Identity
 **Date**: 2026-02-22 (updated 2026-03-17)
 **Status**: ✅ Fully Compliant — JWT-ACE capability gating live; Gateway Node SPIRE enrollment pending

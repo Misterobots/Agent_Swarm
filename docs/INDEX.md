@@ -1,11 +1,21 @@
 # Home AI Lab — Documentation Index
 
-**System**: Agentic Hive v3.3 — Distributed Multi-Agent Swarm
-**Last Updated**: 2026-03-26
+**System**: Agentic Hive v3.4 — Distributed Multi-Agent Swarm
+**Last Updated**: 2026-03-31
 **Architecture Status**: Production (Phase 6 complete, Phase 7 in progress)
 
-> This index is the single entry point for all documentation. Every document links back here.
-> Third-party auditors: start with [Compliance Status](compliance/maestro_compliance_status.md) and [Security](admin/security.md).
+> This index is the canonical entry point for all documentation. Every canonical document must link back here.
+> Third-party auditors: start with [Compliance Status](compliance/maestro_compliance_status.md), [Security](admin/security.md), and [System Catalog](catalog/system_component_service_catalog.md).
+
+---
+
+## Documentation Governance
+
+| Document | Description |
+|----------|-------------|
+| [Documentation Governance Standard](governance/documentation_governance_standard.md) | Canonical document classes, metadata requirements, ownership, and review SLAs |
+| [Documentation Gap Register](governance/documentation_gap_register.md) | Open documentation coverage gaps with severity, owner, and target date |
+| [Sprint Tracking Board](governance/sprint_tracking_board.md) | Centralized tracking of Sprint 1–3 deliverables, owners, targets, and verification gates |
 
 ---
 
@@ -44,6 +54,44 @@
 | [Observability Evaluation](compliance/eval_observability.md) | Langfuse, Prometheus, and Grafana stack audit |
 | [Data Layer Evaluation](compliance/eval_data_layer.md) | PostgreSQL, MinIO, ClickHouse data management audit |
 | [Governance Evaluation](compliance/eval_governance.md) | SPIRE, drift monitoring, output validation audit |
+| [Feature Control Traceability Matrix](compliance/feature_control_traceability_matrix.md) | Feature-to-component-to-control-to-evidence mapping |
+| [Voice Feature Control Mapping](compliance/voice_feature_control_mapping.md) | Voice feature inventory and mapping to controls and evidence |
+| [IoT Feature Control Mapping](compliance/iot_feature_control_mapping.md) | IoT/home-automation feature mapping to controls and evidence |
+
+---
+
+## Security Standards
+
+| Document | Description |
+|----------|-------------|
+| [Identity and Token Trust Standard](security/identity_token_trust_standard.md) | JWT profile separation, validation rigor, and issuer/audience trust model |
+| [API Authentication and Claims Contract](security/api_authentication_contract.md) | Endpoint classes, token profile policy, claims matrix, and validation chain |
+| [API Contract Validation Examples](security/api_contract_validation_examples.md) | Executable request/response examples for endpoint-class and token-profile checks |
+| [Key Lifecycle and Rotation Runbook](security/key_lifecycle_rotation_runbook.md) | Key generation, custody, rotation, rollback, and compromise response |
+| [Key Compromise Incident Runbook](security/key_compromise_incident_runbook.md) | SEV-1 response procedure for key compromise detection, containment, recovery, and evidence logging |
+| [Key Compromise Incident Checklist](security/key_compromise_incident_checklist.md) | One-page on-call checklist for first-hour compromise response |
+| [Multi-user Identity Scoping Standard](security/multi_user_identity_scoping_standard.md) | End-to-end user_id propagation, partitioning, and isolation controls |
+| [Hook Security and Execution Policy](security/hook_security_execution_policy.md) | Hook lifecycle controls, scope enforcement, timeout, and failure isolation |
+
+---
+
+## Architecture Decisions (ADRs)
+
+| Document | Description |
+|----------|-------------|
+| [ADR Index](decisions/ADR_INDEX.md) | Central index and process for Architecture Decision Records |
+| [ADR-001: JWT Profile Separation](decisions/ADR-001_jwt_profile_separation.md) | Strict mutual exclusion between workload and user tokens; endpoint-class routing |
+| [ADR-002: Hook Execution Model](decisions/ADR-002_hook_execution_model.md) | Sync security hooks (fail-closed) vs. async non-security hooks (best-effort) |
+| [ADR-003: User-Scoped Storage](decisions/ADR-003_user_scoped_storage.md) | Composite-keyed storage with hard ownership checks; user_id propagation contract |
+| [ADR-004: MarsRL Inference-Time Verification](decisions/ADR-004_marsrl_inference_verification.md) | Three-stage loop: Solver (generate) → Verifier (validate) → Corrector (fix) |
+
+---
+
+## System Catalog
+
+| Document | Description |
+|----------|-------------|
+| [System Component and Service Catalog](catalog/system_component_service_catalog.md) | Canonical inventory of nodes, services, APIs, data stores, models, and ownership |
 
 ### Audit Evidence Trail
 
@@ -78,6 +126,15 @@ Located in [`architecture/`](architecture/):
 
 ---
 
+## Architecture Deep Dives
+
+| Document | Description |
+|----------|-------------|
+| [Multi-user Propagation Trace](architecture/multi_user_propagation_trace.md) | Current-state ingress-to-storage identity/context path with target-state control deltas |
+| [Cross-user Isolation Test Plan](architecture/cross_user_isolation_test_plan.md) | Executable T1–T5 validation plan for context, memory, preference, and endpoint isolation |
+
+---
+
 ## Active Roadmap
 
 | Document | Description |
@@ -93,4 +150,4 @@ These are **read-only reference** — do not update them. All current content li
 
 ---
 
-*Document Owner: Engineering · Review Cycle: Per major phase · Questions: raise a GitHub issue*
+*Document Owner: Architecture + Compliance · Review Cycle: Monthly (security/compliance), Quarterly (user/admin guides) · Questions: raise a GitHub issue*
