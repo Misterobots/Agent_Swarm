@@ -91,6 +91,24 @@ CONTEXT_WINDOWS: dict[str, int] = {
     "default": 8192,
 }
 COMPACT_AUTO_THRESHOLD = 0.95
+
+# ---------------------------------------------------------------------------
+# LLM Provider Configuration (multi-provider support)
+# ---------------------------------------------------------------------------
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")          # "ollama" | "anthropic"
+ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6-20250514")
+MCP_BRIDGE_ENABLED = os.getenv("MCP_BRIDGE_ENABLED", "false")
+MCP_SERVER_NAME    = os.getenv("MCP_SERVER_NAME", "home-ai-lab")
+MCP_BASE_URL       = os.getenv("MCP_BASE_URL", f"http://{CONTROL_NODE_IP}:8000")
+
+# Admin-only models — only users with security_level >= L3_ADMIN may select these
+ADMIN_ONLY_MODELS: set[str] = {
+    "claude-opus-4-20250514",
+    "claude-sonnet-4-6-20250514",
+    "claude-haiku-3-5-20241022",
+}
+
 TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "5e-6"))
 TRAINING_NUM_EPOCHS          = int(os.getenv("TRAINING_NUM_EPOCHS",      "3"))
 TRAINING_MAX_SEQ_LEN         = int(os.getenv("TRAINING_MAX_SEQ_LEN",    "4096"))

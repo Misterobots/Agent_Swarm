@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0e1117;
-  --foreground: #e4e4e7;
+  --background: #101111;
+  --foreground: #e8e4de;
+  --chat-bg: #0f0f0f;
+  --chat-panel: #151413;
+  --chat-border: #2f2b27;
+  --chat-accent: #cc785c;
 }
 
 @theme inline {
@@ -16,6 +20,20 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Claude-like terminal aesthetic (scoped to chat route containers) */
+[data-route="chat"],
+.chat-shell {
+  background:
+    radial-gradient(1200px 400px at 10% -10%, rgba(204, 120, 92, 0.08), transparent 60%),
+    radial-gradient(900px 300px at 100% 0%, rgba(255, 255, 255, 0.03), transparent 50%),
+    var(--chat-bg);
+}
+
+.chat-shell,
+.chat-shell * {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 /* Custom scrollbar */

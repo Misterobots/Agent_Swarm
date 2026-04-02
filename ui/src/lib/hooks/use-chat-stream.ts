@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { ThoughtEvent } from "@/types/chat";
+import type { ThoughtEvent, ToolCallEvent } from "@/types/chat";
 
 const MODEL_WINDOWS: Record<string, number> = {
   "qwen2.5-coder:14b": 32768,
@@ -43,6 +43,7 @@ export function useChatStream() {
   const [tokenUsage, setTokenUsage] = useState({ used: 0, total: MODEL_WINDOWS.default, pct: 0 });
   const abortRef = useRef<AbortController | null>(null);
   const thoughtTraceRef = useRef<ThoughtEvent[]>([]);
+  const toolCallTraceRef = useRef<ToolCallEvent[]>([]);
 
   const {
     conversations,
@@ -53,6 +54,7 @@ export function useChatStream() {
     addMessage,
     appendToMessage,
     setMessageThoughtTrace,
+    setMessageToolCalls,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -152,6 +154,7 @@ export function useChatStream() {
       setStatusMessage(null);
       setLatestThought(null);
       thoughtTraceRef.current = [];
+      toolCallTraceRef.current = [];
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -163,6 +166,15 @@ export function useChatStream() {
             const thought: ThoughtEvent = { content: event.content, timestamp: Date.now() };
             thoughtTraceRef.current = [...thoughtTraceRef.current, thought];
             setLatestThought(event.content);
+          } else if (event.type === "tool_call") {
+            const toolCall: ToolCallEvent = {
+              tool_name: event.tool_name || "tool",
+              tool_input: event.tool_input,
+              tool_call_id: event.tool_call_id,
+              content: event.content,
+              timestamp: Date.now(),
+            };
+            toolCallTraceRef.current = [...toolCallTraceRef.current, toolCall];
           } else {
             // Clear status once real content arrives
             setStatusMessage(null);
@@ -179,10 +191,14 @@ export function useChatStream() {
         if (thoughtTraceRef.current.length > 0) {
           setMessageThoughtTrace(convId!, assistantId, thoughtTraceRef.current);
         }
+        if (toolCallTraceRef.current.length > 0) {
+          setMessageToolCalls(convId!, assistantId, toolCallTraceRef.current);
+        }
         setIsStreaming(false);
         setStatusMessage(null);
         setLatestThought(null);
         thoughtTraceRef.current = [];
+        toolCallTraceRef.current = [];
         abortRef.current = null;
       }
     },
@@ -195,6 +211,7 @@ export function useChatStream() {
       model,
       isStreaming,
       setMessageThoughtTrace,
+      setMessageToolCalls,
     ]
   );
 

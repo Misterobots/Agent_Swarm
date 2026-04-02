@@ -417,6 +417,7 @@ services:
       - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
       - DEFAULT_WORKSPACE=/config/workspace
       - SWARM_API_KEY=sk-devops-identity
+      - FREE_CODE_ENABLE=false
     volumes:
       - ../:/config/workspace
       - vscode_config_devops:/config
@@ -446,6 +447,7 @@ services:
       - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
       - DEFAULT_WORKSPACE=/config/workspace
       - SWARM_API_KEY=sk-coder-identity
+      - FREE_CODE_ENABLE=true
     volumes:
       - ../user_projects:/config/workspace
       - vscode_config_coding:/config

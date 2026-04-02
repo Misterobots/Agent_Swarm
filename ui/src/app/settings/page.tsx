@@ -4,6 +4,7 @@ import { ModelSelector } from "@/components/chat/model-selector";
 import { useToolsStore } from "@/lib/stores/tools-store";
 import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DASHBOARDS } from "@/components/monitor/dashboard-selector";
+import { useAccess } from "@/lib/hooks/use-access";
 import { Settings } from "lucide-react";
 
 const TOOL_OPTIONS = [
@@ -16,6 +17,13 @@ const TOOL_OPTIONS = [
 export default function SettingsPage() {
   const { activeTab, setActiveTab } = useToolsStore();
   const { activeDashboard, setActiveDashboard } = useMonitorStore();
+  const { isAdmin, loading: accessLoading, securityLevel } = useAccess();
+
+  const modelAccessMessage = accessLoading
+    ? "Checking access level..."
+    : isAdmin
+      ? "Admin access verified. Claude models are available for this session."
+      : `Access level: ${securityLevel || "anonymous"}. Claude models are hidden and non-admin sessions use local-model fallback.`;
 
   return (
     <div className="flex flex-col h-full">
@@ -31,6 +39,9 @@ export default function SettingsPage() {
             <div>
               <label className="text-sm text-zinc-300 mb-2 block">Default Model</label>
               <ModelSelector />
+              <p className="mt-2 text-xs text-zinc-500">
+                {modelAccessMessage}
+              </p>
             </div>
           </section>
 

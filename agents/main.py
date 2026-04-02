@@ -16,6 +16,9 @@ from contextlib import asynccontextmanager
 from metrics import AGENT_STATE
 from prometheus_client import make_asgi_app
 from logger_setup import setup_logger
+from mcp.server import get_mcp_server
+from mcp.schema import MCPRpcRequest
+from mcp.transport import ok_response, error_response, internal_error
 
 logger = setup_logger("Main")
 from dispatcher import dispatcher, Event, EventType
@@ -109,6 +112,7 @@ async def lifespan(app: FastAPI):
 
 # --- App Definition ---
 app = FastAPI(lifespan=lifespan, title="Home AI Lab Swarm API")
+mcp_server = get_mcp_server()
 
 # Staged rollout: parse mode logs policy mismatches without blocking,
 # soft/hard modes enforce endpoint-class policy in AuthorizationMiddleware.
@@ -176,16 +180,44 @@ async def root():
     return {"status": "online", "system": "Home AI Lab Swarm"}
 
 @app.get("/api/v1/identity")
-async def get_my_identity(auth_claims: dict = Depends(SpiffeJWTBearer(auto_error=False))):
+async def get_my_identity(request: Request, auth_claims: dict = Depends(SpiffeJWTBearer(auto_error=False))):
     """
-    Debug endpoint to view current SPIFFE identity and caller identity.
+    Identity self-inspection endpoint.
+    Returns security_level from JWT-ACE token when present, else "anonymous".
+    Public so the UI can call it without a token.
     """
     auth = get_spiffe_auth()
     my_id = auth.get_spiffe_id()
-    
+
+    # Try the middleware-attached agent card first (available when middleware validates)
+    agent_card = getattr(request.state, "agent_card", None)
+
+    # If middleware skipped auth (public endpoint), try manual token extraction
+    if not agent_card:
+        bearer = request.headers.get("Authorization", "")
+        if bearer.startswith("Bearer "):
+            try:
+                from security.token_issuer import get_token_validator
+                validator = get_token_validator()
+                agent_card = validator.validate_token(bearer[7:])
+            except Exception:
+                pass  # Invalid token — fall through to anonymous
+
+    if agent_card:
+        caller = {
+            "agent_name": getattr(agent_card, "agent_name", "unknown"),
+            "security_level": getattr(agent_card, "security_level", "L1_PUBLIC"),
+            "activated_capabilities": getattr(agent_card, "activated_capabilities", []),
+            "user_id": getattr(agent_card, "user_id", None),
+        }
+    elif auth_claims:
+        caller = auth_claims
+    else:
+        caller = "anonymous"
+
     return {
         "my_spiffe_id": my_id,
-        "caller_identity": auth_claims if auth_claims else "anonymous",
+        "caller_identity": caller,
         "spiffe_available": auth.is_available
     }
 
@@ -341,6 +373,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     history=history,
                     memory_enabled=request.memory_enabled,
                     owner_id=owner_id,
+                    model=request.model,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -383,6 +416,27 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                 "choices": [{"index": 0, "delta": {"content": raw_content, "type": "thought"}, "finish_reason": None}]
                             }
                             yield f"data: {json.dumps(thought_chunk)}\n\n"
+                            continue
+
+                        if msg_type == "tool_call":
+                            tool_chunk = {
+                                "id": "chatcmpl-swarm",
+                                "object": "chat.completion.chunk",
+                                "created": 1234567890,
+                                "model": request.model,
+                                "choices": [{
+                                    "index": 0,
+                                    "delta": {
+                                        "content": raw_content,
+                                        "type": "tool_call",
+                                        "tool_name": update.get("tool_name"),
+                                        "tool_input": update.get("tool_input"),
+                                        "tool_call_id": update.get("tool_call_id"),
+                                    },
+                                    "finish_reason": None,
+                                }],
+                            }
+                            yield f"data: {json.dumps(tool_chunk)}\n\n"
                             continue
 
                         if msg_type not in ["message", "response", "error"]:
@@ -430,6 +484,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             history=history,
             memory_enabled=request.memory_enabled,
             owner_id=owner_id,
+            model=request.model,
         )
         full_resp = ""
         for update in gen:
@@ -461,6 +516,46 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             "model": request.model,
             "choices": [{"index": 0, "message": {"role": "assistant", "content": full_resp}, "finish_reason": "stop"}]
         }
+
+
+@app.get("/api/v1/mcp/health")
+async def mcp_health():
+    return mcp_server.health()
+
+
+@app.get("/api/v1/mcp/client-config")
+async def mcp_client_config(request: Request):
+    host = str(request.base_url).rstrip("/")
+    return mcp_server.client_config(host_hint=host)
+
+
+@app.post("/api/v1/mcp/rpc")
+async def mcp_rpc(request: MCPRpcRequest, http_request: Request):
+    try:
+        auth_header = http_request.headers.get("Authorization")
+        result = await mcp_server.handle_rpc(request.method, request.params, auth_header=auth_header)
+        return ok_response(request.id, result).model_dump()
+    except ValueError as e:
+        logger.warning(
+            f"[MCPBridge] Unsupported method",
+            extra={
+                "method": request.method,
+                "request_id": request.id,
+                "params_keys": list((request.params or {}).keys()),
+            },
+        )
+        return error_response(request.id, -32601, str(e)).model_dump()
+    except Exception as e:
+        logger.error(
+            f"[MCPBridge] RPC failure: {e}",
+            extra={
+                "method": request.method,
+                "request_id": request.id,
+                "params_keys": list((request.params or {}).keys()),
+            },
+        )
+        return internal_error(request.id, e, {"method": request.method}).model_dump()
+
 class LogRequest(BaseModel):
     level: str
     message: str

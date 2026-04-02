@@ -4,6 +4,7 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   thoughtTrace?: ThoughtEvent[];
+  toolCalls?: ToolCallEvent[];
 }
 
 export interface Conversation {
@@ -36,8 +37,19 @@ export interface Model {
 }
 
 export interface StreamEvent {
-  type: "content" | "status" | "thought";
+  type: "content" | "status" | "thought" | "tool_call";
   content: string;
+  tool_name?: string;
+  tool_input?: Record<string, unknown>;
+  tool_call_id?: string;
+}
+
+export interface ToolCallEvent {
+  tool_name: string;
+  tool_input?: Record<string, unknown>;
+  tool_call_id?: string;
+  content: string;
+  timestamp: number;
 }
 
 export interface ThoughtEvent {

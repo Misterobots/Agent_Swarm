@@ -21,6 +21,20 @@ from phi.storage.agent.postgres import PgAgentStorage
 from config import AGNO_DB_URL
 
 logger = setup_logger("Router")
+security_audit_logger = setup_logger("SecurityAudit")
+
+# --- Anthropic Provider (admin-only) ---
+try:
+    from providers.anthropic_provider import AnthropicProvider, is_available as anthropic_available, SUPPORTED_MODELS as ANTHROPIC_MODELS
+    from config import ADMIN_ONLY_MODELS, ANTHROPIC_MODEL
+    ANTHROPIC_ENABLED = anthropic_available()
+    if ANTHROPIC_ENABLED:
+        logger.info("[Router] Anthropic provider available (admin-only)")
+except ImportError:
+    ANTHROPIC_ENABLED = False
+    ADMIN_ONLY_MODELS = set()
+    ANTHROPIC_MODEL = ""
+    logger.debug("[Router] Anthropic provider not loaded")
 
 # Shared storage for conversationalist sessions (same pattern as architect_agent)
 _conv_storage = PgAgentStorage(
@@ -276,12 +290,56 @@ def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None):
         logger.debug(f"[Router] Trace scoring failed: {e}")
 
 
+def _is_admin_session(session_id: str, owner_id: str | None) -> bool:
+    """Check if the current session holds L3_ADMIN or higher."""
+    if not JWT_ACE_AVAILABLE:
+        return False
+    try:
+        from security.execution_context import get_current_token
+        from security.token_issuer import get_token_validator
+
+        token = get_current_token()
+        if not token:
+            return False
+
+        validator = get_token_validator()
+        card = validator.validate_token(token)
+        level = str(getattr(card, "security_level", "L1_PUBLIC"))
+        ranks = {
+            "L1_PUBLIC": 1,
+            "L2_USER": 2,
+            "L3_ADMIN": 3,
+            "L4_SYSTEM": 4,
+        }
+        return ranks.get(level, 0) >= ranks["L3_ADMIN"]
+    except Exception:
+        pass
+    return False
+
+
+def _is_anthropic_model(model_name: str) -> bool:
+    """Return True if the requested model is an Anthropic/Claude model."""
+    return model_name in ADMIN_ONLY_MODELS or model_name.startswith("claude-")
+
+
+def _audit_security_event(event_type: str, context: dict[str, object]) -> None:
+    """Emit structured security audit events with contextual fields."""
+    payload = {
+        "event_type": event_type,
+        "component": "router",
+        "source": "chat_swarm",
+        **context,
+    }
+    security_audit_logger.warning(json.dumps(payload, ensure_ascii=True))
+
+
 def chat_swarm(
     user_input: str,
     session_id: str = "default_session",
     history: list = None,
     memory_enabled: bool = False,
     owner_id: str | None = None,
+    model: str | None = None,
 ):
     """
     Generator that yields status updates and final response for UI.
@@ -406,6 +464,66 @@ def chat_swarm(
         yield {"type": "status", "content": "✅ Security Agent: Input Cleared."}
         yield {"type": "thought", "content": "→ Security: PASS"}
         WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
+
+        # --- ANTHROPIC FAST-PATH (admin-only Claude models) ---
+        if model and _is_anthropic_model(model):
+            if not _is_admin_session(session_id, owner_id):
+                yield {"type": "error", "content": "🔒 Claude models require admin privileges. Falling back to local model."}
+                logger.warning(f"[Router] Non-admin tried Anthropic model: {model}")
+                _audit_security_event(
+                    "claude_access_denied",
+                    {
+                        "requested_model": model,
+                        "session_id": session_id,
+                        "owner_id": owner_id,
+                        "reason": "insufficient_security_level",
+                    },
+                )
+                model = None  # Fall through to normal Ollama routing
+            elif ANTHROPIC_ENABLED:
+                yield {"type": "status", "content": f"☁️ Claude ({model}): Generating..."}
+                yield {"type": "thought", "content": f"→ Provider: Anthropic ({model})"}
+                try:
+                    provider = AnthropicProvider(model=model)
+                    api_messages = [{"role": "user", "content": user_input}]
+                    if history:
+                        api_messages = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in history]
+                        api_messages.append({"role": "user", "content": user_input})
+
+                    for chunk in provider.generate_stream(
+                        prompt=user_input,
+                        messages=api_messages,
+                        system="You are Hive Mind, a helpful AI assistant in a self-hosted home lab.",
+                    ):
+                        yield chunk.as_dict()
+
+                    _score_trace(lf_trace, langfuse, 0.9, output="[anthropic stream]")
+                    WORKFLOW_STEPS.labels(status="success", agent_type="Anthropic").inc()
+                except Exception as e:
+                    logger.error(f"[Router] Anthropic provider error: {e}")
+                    yield {"type": "error", "content": f"Claude API error: {e}"}
+                    _score_trace(lf_trace, langfuse, 0.0)
+                finally:
+                    AGENT_STATE.labels(agent_name="Router").set(1)
+                return
+            else:
+                logger.warning(
+                    f"[Router] Claude model requested but provider unavailable: {model}"
+                )
+                _audit_security_event(
+                    "claude_provider_unavailable",
+                    {
+                        "requested_model": model,
+                        "session_id": session_id,
+                        "owner_id": owner_id,
+                        "reason": "provider_not_configured",
+                    },
+                )
+                yield {
+                    "type": "error",
+                    "content": "Claude provider is not configured. Falling back to local model.",
+                }
+                model = None
 
         # 3. Intent Routing (Neural Upgrade)
         from semantic_router import get_semantic_router

@@ -76,4 +76,26 @@ See [Phase Roadmap](docs/PHASE5_PLUS_ROADMAP.md) for Phase 7–9 plans.
 
 ---
 
+## MCP Smoke Test
+
+After restarting `agent_runtime`, run:
+
+```bash
+python scripts/smoke_mcp_bridge.py --base-url http://127.0.0.1:8008
+```
+
+Optional authenticated check:
+
+```bash
+python scripts/smoke_mcp_bridge.py --base-url http://127.0.0.1:8008 --bearer <JWT_TOKEN>
+```
+
+Strict authenticated validation (fails if bearer call is rejected):
+
+```bash
+python scripts/smoke_mcp_bridge.py --base-url http://127.0.0.1:8008 --bearer <JWT_TOKEN> --strict-bearer
+```
+
+---
+
 _Agentic Hive v3.4 · Self-hosted · Private inference · No cloud dependencies_

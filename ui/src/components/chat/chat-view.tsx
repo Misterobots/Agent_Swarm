@@ -9,6 +9,8 @@ import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
 import { Bot, Brain } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { ChatStatusBar } from "./chat-status-bar";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 function usageBarClass(pct: number): string {
   if (pct >= 0.95) return "bg-red-500";
@@ -20,6 +22,7 @@ function usageBarClass(pct: number): string {
 export function ChatView() {
   const { messages, isStreaming, statusMessage, latestThought, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
   const { activeConversationId, activeConversation, updateConversation } = useChatStore();
+  const model = useSettingsStore((s) => s.model);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
 
@@ -35,7 +38,7 @@ export function ChatView() {
   }, [messages, lastMsg?.content, statusMessage]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="chat-shell flex flex-col h-full" data-route="chat">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-800 bg-[#0e1117] px-4 py-2">
         <div className="flex items-center gap-3">
@@ -83,6 +86,13 @@ export function ChatView() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700">
+        {tokenUsage.pct >= 0.95 && (
+          <div className="mx-auto max-w-3xl mt-3 px-4">
+            <div className="rounded-md border border-orange-900/60 bg-orange-950/30 px-3 py-2 text-xs text-orange-200">
+              Context is near capacity. Compact now to preserve response quality.
+            </div>
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-4">
             <div className="w-16 h-16 rounded-2xl bg-violet-900/20 flex items-center justify-center">
@@ -125,6 +135,12 @@ export function ChatView() {
         onSend={sendMessage}
         onStop={stopGeneration}
         isStreaming={isStreaming}
+      />
+      <ChatStatusBar
+        model={activeConv?.model || model}
+        tokenPct={tokenUsage.pct * 100}
+        isStreaming={isStreaming}
+        latestThought={latestThought}
       />
     </div>
   );

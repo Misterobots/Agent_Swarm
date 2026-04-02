@@ -1,5 +1,23 @@
-import type { ChatCompletionChunk, StreamEvent } from "@/types/chat";
+import type { StreamEvent } from "@/types/chat";
 
+export interface ChatCompletionChunk {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: {
+    index: number;
+    delta: {
+      content?: string;
+      role?: string;
+      type?: "content" | "status" | "thought" | "tool_call";
+      tool_name?: string;
+      tool_input?: Record<string, unknown>;
+      tool_call_id?: string;
+    };
+    finish_reason: string | null;
+  }[];
+}
 /**
  * Parse an SSE line from the OpenAI-compatible streaming API.
  * Returns the parsed chunk or null for non-data lines / [DONE].
@@ -43,7 +61,15 @@ export async function* streamSSE(
         const chunk = parseSSELine(line);
         if (chunk) {
           const delta = chunk.choices[0]?.delta;
-          if (delta?.content) {
+          if (delta?.type === "tool_call") {
+            yield {
+              type: "tool_call",
+              content: delta.content || "",
+              tool_name: delta.tool_name,
+              tool_input: delta.tool_input,
+              tool_call_id: delta.tool_call_id,
+            };
+          } else if (delta?.content) {
             yield {
               type: delta.type === "status" || delta.type === "thought" ? delta.type : "content",
               content: delta.content,
@@ -58,7 +84,15 @@ export async function* streamSSE(
       const chunk = parseSSELine(buffer);
       if (chunk) {
         const delta = chunk.choices[0]?.delta;
-        if (delta?.content) {
+        if (delta?.type === "tool_call") {
+          yield {
+            type: "tool_call",
+            content: delta.content || "",
+            tool_name: delta.tool_name,
+            tool_input: delta.tool_input,
+            tool_call_id: delta.tool_call_id,
+          };
+        } else if (delta?.content) {
           yield {
             type: delta.type === "status" || delta.type === "thought" ? delta.type : "content",
             content: delta.content,

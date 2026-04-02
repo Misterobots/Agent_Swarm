@@ -367,6 +367,15 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
         if method.upper() == "POST" and path.startswith("/api/v1/request/") and path.endswith("/status"):
             return self.ENDPOINT_CLASS_ADMIN
 
+        # Identity endpoint is a "who am I?" self-inspection endpoint; public so the
+        # UI can call it without a bearer token (returns "anonymous" in that case).
+        if path == "/api/v1/identity":
+            return self.ENDPOINT_CLASS_PUBLIC
+
+        # MCP bridge is user-facing (CLI clients) and should accept user JWT tokens.
+        if path.startswith("/api/v1/mcp/"):
+            return self.ENDPOINT_CLASS_USER
+
         if path.startswith("/api/v1/"):
             return self.ENDPOINT_CLASS_INTERNAL
 

@@ -216,6 +216,8 @@ services:
       - HOME_CITY=${HOME_CITY:-your area}
       # MarsRL / Secondary inference
       - ROUTER_MODEL=${ROUTER_MODEL:-nemotron-mini}
+      # MCP JSON-RPC bridge
+      - MCP_BRIDGE_ENABLED=true
     volumes:
       - ../agents:/app/agents
       - ../:/workspace

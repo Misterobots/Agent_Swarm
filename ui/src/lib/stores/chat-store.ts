@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChatMessage, Conversation, ThoughtEvent } from "@/types/chat";
+import type { ChatMessage, Conversation, ThoughtEvent, ToolCallEvent } from "@/types/chat";
 
 function generateId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -28,6 +28,7 @@ interface ChatState {
   updateMessage: (conversationId: string, messageId: string, content: string) => void;
   appendToMessage: (conversationId: string, messageId: string, delta: string) => void;
   setMessageThoughtTrace: (conversationId: string, messageId: string, thoughts: ThoughtEvent[]) => void;
+  setMessageToolCalls: (conversationId: string, messageId: string, toolCalls: ToolCallEvent[]) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -140,6 +141,20 @@ export const useChatStore = create<ChatState>()(
               ...c,
               messages: c.messages.map((m) =>
                 m.id === messageId ? { ...m, thoughtTrace: thoughts } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageToolCalls: (conversationId, messageId, toolCalls) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, toolCalls } : m
               ),
               updatedAt: Date.now(),
             };

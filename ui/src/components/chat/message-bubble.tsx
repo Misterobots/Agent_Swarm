@@ -6,6 +6,7 @@ import { MarkdownRenderer } from "@/components/shared/markdown-renderer";
 import { cn } from "@/lib/utils/cn";
 import { Bot, User, Palette, ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { ToolCallBlock } from "./tool-call-block";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -73,6 +74,7 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
                 )}
               </div>
             )}
+            {!!message.toolCalls?.length && <ToolCallBlock toolCalls={message.toolCalls} />}
           </>
         ) : (
           <span className="inline-block w-2 h-4 bg-cyan-400 animate-pulse rounded-sm" />
