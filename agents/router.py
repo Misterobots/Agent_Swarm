@@ -1,4 +1,5 @@
 from phi.agent import Agent, RunResponse
+from phi.model.ollama import Ollama
 from architect_agent import get_architect_agent
 from security_agent import get_security_agent
 
@@ -618,7 +619,6 @@ def chat_swarm(
             yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
             AGENT_STATE.labels(agent_name="Conversationalist").set(2)
 
-            from phi.model.ollama import Ollama
             CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", "qwen2.5:3b"))
             OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
 
@@ -700,7 +700,6 @@ def chat_swarm(
             yield {"type": "status", "content": "📊 Data Analyst: Processing your data request..."}
             AGENT_STATE.labels(agent_name="DataAnalyst").set(2)
 
-            from phi.model.ollama import Ollama
             DATA_MODEL = _resolve_model_for_intent("DATA", os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b"))
             OLLAMA_HOST = get_best_host_for_model(DATA_MODEL)
 
@@ -762,7 +761,6 @@ def chat_swarm(
              yield {"type": "status", "content": "🎨 Art Director: Reviewing your vision..."}
              AGENT_STATE.labels(agent_name="ArtDirector").set(2)
              
-             from phi.model.ollama import Ollama
              # Config — template-driven model selection with health-aware routing
              MODEL_NAME = _resolve_model_for_intent("IMAGE", os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b"))
              OLLAMA_HOST = get_best_host_for_model(MODEL_NAME)
@@ -824,6 +822,9 @@ def chat_swarm(
             
             # Template-driven model selection with health-aware routing
             TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", "qwen3.5:9b"))
+            # Legacy template default can reference models not present in current Ollama catalog.
+            if TECH_MODEL == "qwen3.5:9b":
+                TECH_MODEL = os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b")
             OLLAMA_HOST = get_best_host_for_model(TECH_MODEL)
             
             tech_writer = Agent(
@@ -877,7 +878,6 @@ def chat_swarm(
             yield {"type": "status", "content": "📚 Librarian Agent: Accessing Archives..."}
             AGENT_STATE.labels(agent_name="Librarian").set(2)
             
-            from phi.model.ollama import Ollama
             from agents.config import LIBRARIAN_MODEL
 
             resolved_model = _resolve_model_for_intent("RESEARCH", LIBRARIAN_MODEL)
