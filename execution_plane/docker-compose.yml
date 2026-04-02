@@ -62,7 +62,7 @@ services:
     # pid: "host"
     command: ["-config", "/etc/spire/agent/agent.conf"]
     healthcheck:
-      test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck"]
+      test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck", "-socketPath", "/var/run/spire/agent.sock"]
       interval: 30s
       timeout: 10s
       retries: 3
