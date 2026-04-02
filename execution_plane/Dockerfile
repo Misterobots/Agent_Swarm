@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir \
     phidata \
     ollama \
     openai \
+    anthropic \
     packaging \
     duckduckgo-search \
     fastapi \

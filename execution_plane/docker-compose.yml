@@ -216,6 +216,9 @@ services:
       - HOME_CITY=${HOME_CITY:-your area}
       # MarsRL / Secondary inference
       - ROUTER_MODEL=${ROUTER_MODEL:-nemotron-mini}
+      # Anthropic provider (optional; enabled when API key is supplied)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-6-20250514}
       # MCP JSON-RPC bridge
       - MCP_BRIDGE_ENABLED=true
     volumes:
