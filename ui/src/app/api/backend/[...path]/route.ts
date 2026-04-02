@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60; // Generation uses async polling, only needs short proxy window
+export const maxDuration = 300; // Allow long-running streaming responses
 
 const BACKEND_URL = process.env.API_BASE_URL || "http://localhost:8000";
 
@@ -36,9 +36,11 @@ async function proxyRequest(req: NextRequest) {
     // not JSON, that's fine
   }
 
+  // Chat streaming can legitimately run longer than a minute; keep non-stream calls tighter.
+  const timeoutMs = wantsStream ? 300_000 : 55_000;
   const upstream = await fetch(target, {
     ...init,
-    signal: AbortSignal.timeout(55_000), // Short timeout — generation uses async job polling
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   const isSSE =
@@ -59,6 +61,12 @@ async function proxyRequest(req: NextRequest) {
           }
           controller.enqueue(value);
         } catch (err) {
+          console.error("[api/backend] SSE relay failed", {
+            target,
+            method: req.method,
+            timeoutMs,
+            error: err instanceof Error ? err.message : String(err),
+          });
           controller.error(err);
         }
       },
