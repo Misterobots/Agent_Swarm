@@ -125,7 +125,8 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
             "flex-1 resize-none bg-[var(--chat-panel)] text-[var(--chat-text)] rounded-md px-4 py-3 font-mono",
             "border border-[var(--chat-border)] focus:border-[var(--chat-accent)] focus:outline-none",
             "placeholder:text-[var(--chat-muted)] text-sm leading-relaxed",
-            "scrollbar-thin scrollbar-thumb-zinc-700"
+            "scrollbar-thin scrollbar-thumb-zinc-700",
+            "transition-[border-color,box-shadow] duration-200"
           )}
         />
         {isStreaming ? (

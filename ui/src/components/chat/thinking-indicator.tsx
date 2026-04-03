@@ -69,10 +69,24 @@ interface ThinkingIndicatorProps {
 
 export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndicatorProps) {
   const [verb, setVerb] = useState(pickRandom);
+  const [thinkingPhase, setThinkingPhase] = useState(0);
+
+  const THINKING_PHASES = [
+    "Scanning context",
+    "Planning response",
+    "Composing answer",
+    "Validating details",
+  ];
 
   // Rotate the ambient verb every 3 seconds
   useEffect(() => {
     const id = setInterval(() => setVerb(pickRandom()), 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Rotate the thinking phase label every 1.6s
+  useEffect(() => {
+    const id = setInterval(() => setThinkingPhase((p) => (p + 1) % 4), 1600);
     return () => clearInterval(id);
   }, []);
 
@@ -82,26 +96,32 @@ export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndi
   }, [statusMessage]);
 
   return (
-    <div className="flex gap-3 py-4 px-4 bg-[var(--chat-surface)]">
+    <div className="flex gap-3 py-4 px-4 bg-[var(--chat-surface)] msg-enter">
       <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[color:color-mix(in_srgb,var(--chat-accent-2)_14%,transparent)] border border-[var(--chat-border)] flex items-center justify-center">
         <Bot size={16} className="text-[var(--chat-accent-2)] animate-pulse" />
       </div>
       <div className="flex-1 min-w-0">
-        {/* Real backend status */}
-        {statusMessage && (
-          <p className="text-sm text-[var(--chat-text)] mb-1.5">{statusMessage}</p>
-        )}
-        {latestThought && (
-          <p className="text-xs text-[var(--chat-accent-strong)] font-mono mb-1.5">{latestThought}</p>
-        )}
-        {/* Ambient office verb */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--chat-muted)] italic">{verb}...</span>
+        {/* Thinking phase cycle */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="thinking-word-cycle" key={thinkingPhase}>
+            {THINKING_PHASES[thinkingPhase]}
+          </span>
           <span className="flex gap-0.5">
             <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:0ms]" />
             <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:150ms]" />
             <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:300ms]" />
           </span>
+        </div>
+        {/* Real backend status */}
+        {statusMessage && (
+          <p className="text-sm text-[var(--chat-text)] mb-1.5">{statusMessage}</p>
+        )}
+        {latestThought && (
+          <p className="text-xs text-[var(--chat-accent-strong)] font-mono mb-1.5 thought-stream-text streaming-caret">{latestThought}</p>
+        )}
+        {/* Ambient office verb */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--chat-muted)] italic">{verb}...</span>
         </div>
       </div>
     </div>

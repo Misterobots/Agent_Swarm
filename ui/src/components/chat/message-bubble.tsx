@@ -26,7 +26,7 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
     : "/art-studio";
 
   return (
-    <div className={cn("flex gap-3 py-4 px-4", isUser ? "bg-transparent" : "bg-[var(--chat-surface)]")}>
+    <div className={cn("flex gap-3 py-4 px-4 msg-enter", isUser ? "bg-transparent" : "bg-[var(--chat-surface)]")}>
       <div
         className={cn(
           "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
@@ -79,7 +79,7 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
             {!!message.toolCalls?.length && <ToolCallBlock toolCalls={message.toolCalls} />}
           </>
         ) : (
-          <span className="inline-block w-2 h-4 bg-[var(--chat-accent)] animate-pulse rounded-sm" />
+          <span className="inline-block w-2 h-4 bg-[var(--chat-accent)] animate-pulse rounded-sm streaming-caret" />
         )}
       </div>
     </div>
