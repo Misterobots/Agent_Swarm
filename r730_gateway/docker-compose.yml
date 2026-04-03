@@ -181,10 +181,11 @@ services:
       - GF_LOG_LEVEL=info
       - GF_SERVER_ROOT_URL=http://192.168.2.103/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
-      - GF_SECURITY_ALLOW_EMBEDDING=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_SECURITY_COOKIE_SAMESITE=lax
       - GF_SECURITY_COOKIE_SECURE=true
-      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
       - grafana_data:/var/lib/grafana
       - ./provisioning:/etc/grafana/provisioning:ro
@@ -329,6 +330,7 @@ services:
       - CONTROL_NODE_IP=${CONTROL_NODE_IP:-192.168.2.102}
       - NEXT_PUBLIC_GATEWAY_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}
       - NEXT_PUBLIC_GRAFANA_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}/grafana
+      - GRAFANA_INTERNAL_URL=http://grafana-r730:3000
     extra_hosts:
       - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
     volumes:
