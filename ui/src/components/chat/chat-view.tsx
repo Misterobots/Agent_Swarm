@@ -11,6 +11,7 @@ import { Bot, Brain } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { ThemeSelector } from "./theme-selector";
 
 function usageBarClass(pct: number): string {
   if (pct >= 0.95) return "bg-red-500";
@@ -40,9 +41,10 @@ export function ChatView() {
   return (
     <div className="chat-shell flex flex-col h-full" data-route="chat">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-800 bg-[#0e1117] px-4 py-2">
+      <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-4 py-2">
         <div className="flex items-center gap-3">
           <ModelSelector />
+          <ThemeSelector />
           {activeConversationId && (
             <button
               type="button"
@@ -54,8 +56,8 @@ export function ChatView() {
               className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs border transition-colors",
                 activeConv?.memoryEnabled
-                  ? "bg-cyan-900/30 text-cyan-300 border-cyan-700/60"
-                  : "bg-zinc-900/60 text-zinc-400 border-zinc-700/60"
+                  ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
+                  : "bg-[var(--chat-panel)] text-[var(--chat-muted)] border-[var(--chat-border)]"
               )}
               title="Toggle cross-session memory recall"
             >
@@ -70,7 +72,7 @@ export function ChatView() {
             onClick={() => {
               void compactConversation();
             }}
-            className="w-44 h-2 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700"
+            className="w-44 h-2 rounded-full bg-[var(--chat-panel)] overflow-hidden border border-[var(--chat-border)]"
             title={`Context usage: ${(tokenUsage.pct * 100).toFixed(1)}% (${tokenUsage.used}/${tokenUsage.total}) - Click to compact`}
           >
             <div
@@ -78,7 +80,7 @@ export function ChatView() {
               style={{ width: `${Math.min(100, tokenUsage.pct * 100)}%` }}
             />
           </button>
-          <span className="text-xs text-zinc-400 min-w-[3rem]">
+          <span className="text-xs text-[var(--chat-muted)] min-w-[3rem]">
             {(tokenUsage.pct * 100).toFixed(0)}%
           </span>
         </div>
@@ -88,19 +90,19 @@ export function ChatView() {
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700">
         {tokenUsage.pct >= 0.95 && (
           <div className="mx-auto max-w-3xl mt-3 px-4">
-            <div className="rounded-md border border-orange-900/60 bg-orange-950/30 px-3 py-2 text-xs text-orange-200">
+            <div className="rounded-md border border-[color:color-mix(in_srgb,var(--chat-accent-2)_50%,var(--chat-border))] bg-[color:color-mix(in_srgb,var(--chat-accent-2)_10%,transparent)] px-3 py-2 text-xs text-[var(--chat-text)]">
               Context is near capacity. Compact now to preserve response quality.
             </div>
           </div>
         )}
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-violet-900/20 flex items-center justify-center">
-              <Bot size={32} className="text-violet-400" />
+          <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)] gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-[color:color-mix(in_srgb,var(--chat-accent)_14%,transparent)] flex items-center justify-center border border-[var(--chat-border)]">
+              <Bot size={32} className="text-[var(--chat-accent-strong)]" />
             </div>
             <div className="text-center">
-              <h2 className="text-lg font-medium text-zinc-300 mb-1">Hive Mind</h2>
-              <p className="text-sm text-zinc-500">Send a message to start a conversation</p>
+              <h2 className="text-lg font-medium text-[var(--chat-text)] mb-1">Hive Mind</h2>
+              <p className="text-sm text-[var(--chat-muted)]">Send a message to start a conversation</p>
             </div>
           </div>
         ) : (

@@ -21,17 +21,17 @@ export function Sidebar() {
   const isChat = pathname?.startsWith("/chat");
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a14] border-r border-zinc-800">
+    <div className="flex flex-col h-full bg-[var(--chat-sidebar)] border-r border-[var(--chat-border)]">
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-zinc-800">
-        <h1 className="text-base font-semibold text-cyan-400 tracking-wide">
+      <div className="px-4 py-4 border-b border-[var(--chat-border)]">
+        <h1 className="text-base font-semibold text-[var(--chat-accent-strong)] tracking-wide">
           HIVE MIND
         </h1>
-        <p className="text-[10px] text-zinc-600 mt-0.5">AI Swarm Interface</p>
+        <p className="text-[10px] text-[var(--chat-muted)] mt-0.5">AI Swarm Interface</p>
       </div>
 
       {/* Section Nav */}
-      <nav className="px-2 py-2 border-b border-zinc-800 space-y-0.5">
+      <nav className="px-2 py-2 border-b border-[var(--chat-border)] space-y-0.5">
         {NAV_ITEMS.map((item) => {
           const isActive =
             item.href === "/"
@@ -45,8 +45,8 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
                 isActive
-                  ? "bg-cyan-600/20 text-cyan-400"
-                  : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300"
+                  ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_16%,transparent)] text-[var(--chat-accent-strong)]"
+                  : "text-[var(--chat-muted)] hover:bg-[var(--chat-soft)] hover:text-[var(--chat-text)]"
               )}
             >
               <Icon size={15} className="flex-shrink-0" />
@@ -62,7 +62,7 @@ export function Sidebar() {
           <div className="px-3 py-2">
             <button
               onClick={() => createConversation(model)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 rounded-lg border border-zinc-700 border-dashed hover:border-cyan-600 hover:text-cyan-400 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--chat-text)] rounded-lg border border-[var(--chat-border)] border-dashed hover:border-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)] transition-colors"
             >
               <Plus size={14} />
               New Chat
@@ -77,8 +77,8 @@ export function Sidebar() {
                 className={cn(
                   "group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm mb-0.5 transition-colors",
                   conv.id === activeId
-                    ? "bg-zinc-800/70 text-zinc-200"
-                    : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300"
+                    ? "bg-[var(--chat-soft)] text-[var(--chat-text)]"
+                    : "text-[var(--chat-muted)] hover:bg-[var(--chat-soft)] hover:text-[var(--chat-text)]"
                 )}
               >
                 <MessageSquare size={14} className="flex-shrink-0" />
@@ -88,7 +88,7 @@ export function Sidebar() {
                     e.stopPropagation();
                     deleteConversation(conv.id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all"
+                  className="opacity-0 group-hover:opacity-100 text-[var(--chat-muted)] hover:text-red-400 transition-all"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -102,7 +102,7 @@ export function Sidebar() {
       {!isChat && <div className="flex-1" />}
 
       {/* Node Health (bottom) */}
-      <div className="border-t border-zinc-800 px-1 py-2">
+      <div className="border-t border-[var(--chat-border)] px-1 py-2">
         <NodeStatus />
       </div>
     </div>

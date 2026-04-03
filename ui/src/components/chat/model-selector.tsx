@@ -28,7 +28,7 @@ export function ModelSelector() {
         value={selectedModel}
         onChange={(e) => handleChange(e.target.value)}
         disabled={loading || accessLoading}
-        className="appearance-none bg-[#1a1a2e] text-zinc-300 text-sm border border-zinc-700 rounded-lg pl-3 pr-8 py-1.5 focus:border-cyan-500 focus:outline-none cursor-pointer"
+        className="appearance-none bg-[var(--chat-panel)] text-[var(--chat-text)] text-sm border border-[var(--chat-border)] rounded-lg pl-3 pr-8 py-1.5 focus:border-[var(--chat-accent)] focus:outline-none cursor-pointer"
       >
         {visibleModels.length > 0 ? (
           visibleModels.map((m) => (
@@ -40,7 +40,7 @@ export function ModelSelector() {
           <option value="swarm-standard">swarm-standard</option>
         )}
       </select>
-      <ChevronDown size={14} className="absolute right-2 text-zinc-500 pointer-events-none" />
+      <ChevronDown size={14} className="absolute right-2 text-[var(--chat-muted)] pointer-events-none" />
     </div>
   );
 }

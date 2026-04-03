@@ -1,12 +1,51 @@
 @import "tailwindcss";
 
 :root {
-  --background: #101111;
-  --foreground: #e8e4de;
-  --chat-bg: #0f0f0f;
-  --chat-panel: #151413;
-  --chat-border: #2f2b27;
-  --chat-accent: #cc785c;
+  --background: #0f1217;
+  --foreground: #dce4ee;
+  --chat-bg: #0f141c;
+  --chat-surface: #121822;
+  --chat-sidebar: #111720;
+  --chat-panel: #151d28;
+  --chat-soft: #1c2531;
+  --chat-border: #2a3442;
+  --chat-text: #dce4ee;
+  --chat-muted: #8392a8;
+  --chat-accent: #c97a5e;
+  --chat-accent-strong: #de8d71;
+  --chat-accent-2: #5f96d8;
+}
+
+html[data-theme="slate"] {
+  --background: #0f1318;
+  --foreground: #dde6f0;
+  --chat-bg: #11161d;
+  --chat-surface: #151c25;
+  --chat-sidebar: #131a22;
+  --chat-panel: #18212b;
+  --chat-soft: #202a36;
+  --chat-border: #2f3b4a;
+  --chat-text: #dde6f0;
+  --chat-muted: #8d9caf;
+  --chat-accent: #4ba6c7;
+  --chat-accent-strong: #66bbda;
+  --chat-accent-2: #7a8ce0;
+}
+
+html[data-theme="signal"] {
+  --background: #131516;
+  --foreground: #e3e4e1;
+  --chat-bg: #171a1b;
+  --chat-surface: #1a1e20;
+  --chat-sidebar: #171b1d;
+  --chat-panel: #202527;
+  --chat-soft: #293033;
+  --chat-border: #3a4246;
+  --chat-text: #e3e4e1;
+  --chat-muted: #98a2a5;
+  --chat-accent: #d89a4d;
+  --chat-accent-strong: #ecac5a;
+  --chat-accent-2: #8ba7b3;
 }
 
 @theme inline {
@@ -26,8 +65,8 @@ body {
 [data-route="chat"],
 .chat-shell {
   background:
-    radial-gradient(1200px 400px at 10% -10%, rgba(204, 120, 92, 0.08), transparent 60%),
-    radial-gradient(900px 300px at 100% 0%, rgba(255, 255, 255, 0.03), transparent 50%),
+    radial-gradient(1200px 420px at 8% -14%, color-mix(in srgb, var(--chat-accent) 10%, transparent), transparent 62%),
+    radial-gradient(900px 300px at 100% -8%, rgba(255, 255, 255, 0.02), transparent 48%),
     var(--chat-bg);
 }
 

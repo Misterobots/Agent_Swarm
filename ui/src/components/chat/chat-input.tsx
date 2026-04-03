@@ -98,16 +98,16 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   };
 
   return (
-    <div className="border-t border-[#2e2a27] bg-[#10100f] p-4">
+    <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-4">
       <div className="relative flex items-end gap-2 max-w-3xl mx-auto">
         {isSlash && matches.length > 0 && (
-          <div className="absolute bottom-full mb-2 left-0 right-12 rounded-md border border-[#3b332e] bg-[#11100f] overflow-hidden z-20">
+          <div className="absolute bottom-full mb-2 left-0 right-12 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] overflow-hidden z-20">
             {matches.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setInput(c + " ")}
-                className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-[#1a1917]"
+                className="w-full text-left px-3 py-2 text-xs text-[var(--chat-text)] hover:bg-[var(--chat-soft)]"
               >
                 {c}
               </button>
@@ -122,9 +122,9 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
           placeholder={placeholder || "Send a message..."}
           rows={1}
           className={cn(
-            "flex-1 resize-none bg-[#0f0f0f] text-zinc-200 rounded-md px-4 py-3 font-mono",
-            "border border-[#3b332e] focus:border-[#cc785c] focus:outline-none",
-            "placeholder:text-zinc-500 text-sm leading-relaxed",
+            "flex-1 resize-none bg-[var(--chat-panel)] text-[var(--chat-text)] rounded-md px-4 py-3 font-mono",
+            "border border-[var(--chat-border)] focus:border-[var(--chat-accent)] focus:outline-none",
+            "placeholder:text-[var(--chat-muted)] text-sm leading-relaxed",
             "scrollbar-thin scrollbar-thumb-zinc-700"
           )}
         />
@@ -142,8 +142,8 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
             className={cn(
               "flex-shrink-0 w-10 h-10 rounded-md flex items-center justify-center transition-colors",
               input.trim()
-                ? "bg-[#cc785c] hover:bg-[#d08a71] text-white"
-                : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                ? "bg-[var(--chat-accent)] hover:bg-[var(--chat-accent-strong)] text-white"
+                : "bg-[var(--chat-soft)] text-[var(--chat-muted)] cursor-not-allowed"
             )}
           >
             <Send size={16} />

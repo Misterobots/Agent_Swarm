@@ -82,25 +82,25 @@ export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndi
   }, [statusMessage]);
 
   return (
-    <div className="flex gap-3 py-4 px-4 bg-[#0a0a14]">
-      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-violet-900/40 flex items-center justify-center">
-        <Bot size={16} className="text-violet-400 animate-pulse" />
+    <div className="flex gap-3 py-4 px-4 bg-[var(--chat-surface)]">
+      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[color:color-mix(in_srgb,var(--chat-accent-2)_14%,transparent)] border border-[var(--chat-border)] flex items-center justify-center">
+        <Bot size={16} className="text-[var(--chat-accent-2)] animate-pulse" />
       </div>
       <div className="flex-1 min-w-0">
         {/* Real backend status */}
         {statusMessage && (
-          <p className="text-sm text-zinc-300 mb-1.5">{statusMessage}</p>
+          <p className="text-sm text-[var(--chat-text)] mb-1.5">{statusMessage}</p>
         )}
         {latestThought && (
-          <p className="text-xs text-cyan-400/80 font-mono mb-1.5">{latestThought}</p>
+          <p className="text-xs text-[var(--chat-accent-strong)] font-mono mb-1.5">{latestThought}</p>
         )}
         {/* Ambient office verb */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500 italic">{verb}...</span>
+          <span className="text-xs text-[var(--chat-muted)] italic">{verb}...</span>
           <span className="flex gap-0.5">
-            <span className="w-1 h-1 rounded-full bg-violet-500 animate-bounce [animation-delay:0ms]" />
-            <span className="w-1 h-1 rounded-full bg-violet-500 animate-bounce [animation-delay:150ms]" />
-            <span className="w-1 h-1 rounded-full bg-violet-500 animate-bounce [animation-delay:300ms]" />
+            <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:0ms]" />
+            <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:150ms]" />
+            <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:300ms]" />
           </span>
         </div>
       </div>

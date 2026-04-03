@@ -26,16 +26,18 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
     : "/art-studio";
 
   return (
-    <div className={cn("flex gap-3 py-4 px-4", isUser ? "bg-transparent" : "bg-[#0a0a14]")}>
+    <div className={cn("flex gap-3 py-4 px-4", isUser ? "bg-transparent" : "bg-[var(--chat-surface)]")}>
       <div
         className={cn(
           "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
-          isUser ? "bg-cyan-900/40 text-cyan-400" : "bg-violet-900/40 text-violet-400"
+          isUser
+            ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_16%,transparent)] text-[var(--chat-accent-strong)] border border-[var(--chat-border)]"
+            : "bg-[color:color-mix(in_srgb,var(--chat-accent-2)_14%,transparent)] text-[var(--chat-accent-2)] border border-[var(--chat-border)]"
         )}
       >
         {isUser ? <User size={16} /> : <Bot size={16} />}
       </div>
-      <div className="flex-1 min-w-0 text-zinc-200">
+      <div className="flex-1 min-w-0 text-[var(--chat-text)]">
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : message.content ? (
@@ -44,18 +46,18 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
             {showArtButton && (
               <Link
                 href={artStudioHref}
-                className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors shadow-lg shadow-violet-900/30"
+                className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--chat-accent-2)] hover:brightness-110 text-white text-sm font-medium transition-colors"
               >
                 <Palette size={16} />
                 Open Art Studio
               </Link>
             )}
             {!!message.thoughtTrace?.length && (
-              <div className="mt-3 border border-zinc-800 rounded-lg overflow-hidden">
+              <div className="mt-3 border border-[var(--chat-border)] rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setTraceOpen((v) => !v)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-zinc-300 bg-zinc-900/60 hover:bg-zinc-800/70"
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-[var(--chat-text)] bg-[var(--chat-panel)] hover:bg-[var(--chat-soft)]"
                 >
                   <span>Agent Trace ({message.thoughtTrace.length})</span>
                   <ChevronDown
@@ -64,9 +66,9 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
                   />
                 </button>
                 {traceOpen && (
-                  <div className="px-3 py-2 bg-zinc-950/70">
+                  <div className="px-3 py-2 bg-[color:color-mix(in_srgb,var(--chat-panel)_90%,black)]">
                     {message.thoughtTrace.map((t, idx) => (
-                      <p key={`${t.timestamp}-${idx}`} className="text-xs text-cyan-300/85 font-mono py-0.5">
+                      <p key={`${t.timestamp}-${idx}`} className="text-xs text-[var(--chat-accent-strong)] font-mono py-0.5">
                         [{new Date(t.timestamp).toLocaleTimeString()}] {t.content}
                       </p>
                     ))}
@@ -77,7 +79,7 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
             {!!message.toolCalls?.length && <ToolCallBlock toolCalls={message.toolCalls} />}
           </>
         ) : (
-          <span className="inline-block w-2 h-4 bg-cyan-400 animate-pulse rounded-sm" />
+          <span className="inline-block w-2 h-4 bg-[var(--chat-accent)] animate-pulse rounded-sm" />
         )}
       </div>
     </div>

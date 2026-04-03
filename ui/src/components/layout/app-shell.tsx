@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils/cn";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -11,9 +12,14 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const theme = useSettingsStore((s) => s.theme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   return (
-    <div className="flex h-screen bg-[#0e1117] text-zinc-200">
+    <div className="flex h-screen bg-[var(--background)] text-[var(--foreground)]">
       {/* Sidebar */}
       <div
         className={cn(
@@ -31,7 +37,7 @@ export function AppShell({ children }: AppShellProps) {
         {/* Toggle button */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute top-3 left-2 z-10 p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+          className="absolute top-3 left-2 z-10 p-1.5 rounded-md text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-soft)] transition-colors"
           style={{ left: sidebarOpen ? "17rem" : "0.5rem" }}
         >
           {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
