@@ -200,7 +200,8 @@ services:
       # LAN route: 192.168.2.103/grafana
       - "traefik.http.routers.grafana.rule=PathPrefix(`/grafana`)"
       - "traefik.http.routers.grafana.entrypoints=web"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+        - "traefik.http.routers.grafana.service=grafana"
+        - "traefik.http.services.grafana.loadbalancer.server.port=3000"
       # External route: grafana.shivelymedia.com/grafana (via Cloudflare tunnel)
       # No Authentik - Grafana requires local Grafana authentication.
       - "traefik.http.routers.grafana-ext.rule=Host(`grafana.shivelymedia.com`)"
