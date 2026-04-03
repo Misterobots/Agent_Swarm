@@ -291,6 +291,70 @@ def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None):
         logger.debug(f"[Router] Trace scoring failed: {e}")
 
 
+def _is_explicit_train_request(text: str) -> bool:
+    """Return True only for clear, intentional memory-training instructions."""
+    if not text:
+        return False
+
+    normalized = text.strip().lower()
+    explicit_prefixes = (
+        "learn:",
+        "correction:",
+        "remember that",
+        "remember this rule",
+        "store this rule",
+        "add rule",
+    )
+    if normalized.startswith(explicit_prefixes):
+        return True
+
+    # Structured teaching pattern used by the trainer route.
+    teach_pattern = re.search(
+        r"(?:remember that|correction:|learn:)\s+(.+?)\s+(?:means|is|should be)\s+(.+)",
+        text,
+        re.IGNORECASE,
+    )
+    return bool(teach_pattern)
+
+
+def _extract_constraint_context(history: list | None, user_input: str) -> str:
+    """Extract important user constraints from prior turns for requirement continuity."""
+    if not history:
+        return ""
+
+    keywords = (
+        "constraint",
+        "must",
+        "avoid",
+        "maintenance window",
+        "no-downtime",
+        "no downtime",
+        "requirement",
+    )
+    constraints = []
+    for msg in history:
+        if msg.get("role") != "user":
+            continue
+        content = str(msg.get("content", "")).strip()
+        if not content:
+            continue
+        lowered = content.lower()
+        if any(k in lowered for k in keywords):
+            constraints.append(content)
+
+    if not constraints:
+        return ""
+
+    # Keep only the most recent few constraints to reduce prompt bloat.
+    recent = constraints[-3:]
+    block = "\n".join([f"- {c}" for c in recent])
+    return (
+        "[Active User Constraints - Must Respect]\n"
+        f"{block}\n"
+        "Do not ignore these constraints in the final answer."
+    )
+
+
 def _is_admin_session(session_id: str, owner_id: str | None) -> bool:
     """Check if the current session holds L3_ADMIN or higher."""
     if not JWT_ACE_AVAILABLE:
@@ -537,6 +601,8 @@ def chat_swarm(
         confidence = routing_decision.get("confidence", 0.0)
         reasoning = routing_decision.get("reasoning", "No reasoning provided.")
 
+        constraint_context = _extract_constraint_context(history, user_input)
+
         # --- KEYWORD OVERRIDE: Catch intents the LLM doesn't know about ---
         _lower = user_input.lower()
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
@@ -546,6 +612,18 @@ def chat_swarm(
         
         yield {"type": "log", "content": f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}"}
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
+
+        if intent == "TRAIN" and not _is_explicit_train_request(user_input):
+            logger.info(
+                "[Router] TRAIN intent downgraded to CONVERSATION due to missing explicit training directive. "
+                f"Input preview: {user_input[:120]}"
+            )
+            yield {
+                "type": "log",
+                "content": "[Router] TRAIN intent downgraded to CONVERSATION (missing explicit training directive).",
+            }
+            intent = "CONVERSATION"
+            confidence = max(confidence, 0.75)
 
         yield {"type": "thought", "content": f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)"}
 
@@ -677,6 +755,12 @@ def chat_swarm(
             )
 
             devops_input = f"[DEVOPS TASK] {user_input}"
+            if history_context:
+                devops_input = f"{history_context}\n\n{devops_input}"
+                yield {"type": "log", "content": "[DevOps] Reviewed prior turns for continuity."}
+            if constraint_context:
+                devops_input = f"{constraint_context}\n\n{devops_input}"
+                yield {"type": "log", "content": "[DevOps] Injected active user constraints."}
             if extracted_context:
                 devops_input = f"{devops_input}\n\n[Attached Context]:\n{extracted_context}"
 
@@ -718,9 +802,12 @@ def chat_swarm(
             full_content = ""
             try:
                 final_input = user_input
+                if history_context:
+                    final_input = f"{history_context}\n\n{final_input}"
+                    yield {"type": "log", "content": "[DataAnalyst] Reviewed prior turns for continuity."}
                 if extracted_context:
                     yield {"type": "log", "content": f"[DataAnalyst] Reading attached context ({len(extracted_context)} chars)..."}
-                    final_input = f"{user_input}\n\n[Data Context]:\n{extracted_context}"
+                    final_input = f"{final_input}\n\n[Data Context]:\n{extracted_context}"
 
                 with request_lock(context="text"):
                     response_stream = data_agent.run(final_input, stream=True)
@@ -840,6 +927,9 @@ def chat_swarm(
             
             try:
                 final_input = user_input
+                if history_context:
+                    final_input = f"{history_context}\n\n{final_input}"
+                    yield {"type": "log", "content": "[TechnicalWriter] Reviewed prior turns for continuity."}
                 
                 # Context integration
                 from memory_system import memory
@@ -897,9 +987,12 @@ def chat_swarm(
             
             try:
                 final_input = user_input
+                if history_context:
+                    final_input = f"{history_context}\n\n{final_input}"
+                    yield {"type": "log", "content": "[Librarian] Reviewed prior turns for continuity."}
                 if extracted_context:
                     yield {"type": "log", "content": "[Librarian] Reading Attached RAG Context..."}
-                    final_input = f"{user_input}\n\n[Attached Document Context]:\n{extracted_context}"
+                    final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
                     
                 with request_lock(context="text"):
                     response_stream = researcher.run(final_input, stream=True)
@@ -1155,9 +1248,15 @@ def chat_swarm(
                 code_rules = memory.get_relevant_rules(user_input, "coding_rules")
                 
                 final_input = user_input
+                if history_context:
+                    final_input = f"{history_context}\n\n{final_input}"
+                    yield {"type": "log", "content": "[MarsRL] Reviewed prior turns for continuity."}
+                if constraint_context:
+                    final_input = f"{constraint_context}\n\n{final_input}"
+                    yield {"type": "log", "content": "[MarsRL] Injected active user constraints."}
                 if code_rules:
                     rule_block = "\n".join([f"- {r}" for r in code_rules])
-                    final_input = f"{user_input}\n\n[🧠 MEMORY] Apply these user-taught coding rules:\n{rule_block}"
+                    final_input = f"{final_input}\n\n[🧠 MEMORY] Apply these user-taught coding rules:\n{rule_block}"
                     yield {"type": "log", "content": f"[Memory] Injected {len(code_rules)} coding rules."}
 
                 if extracted_context:
