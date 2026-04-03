@@ -605,6 +605,10 @@ def chat_swarm(
 
         # --- KEYWORD OVERRIDE: Catch intents the LLM doesn't know about ---
         _lower = user_input.lower()
+        if _is_explicit_train_request(user_input) and intent != "TRAIN":
+            intent = "TRAIN"
+            confidence = 0.98
+            reasoning = f"Keyword override: explicit training directive detected in '{user_input[:60]}'"
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
             intent = "ACTION_FIGURE"
             confidence = 0.95
@@ -930,6 +934,9 @@ def chat_swarm(
                 if history_context:
                     final_input = f"{history_context}\n\n{final_input}"
                     yield {"type": "log", "content": "[TechnicalWriter] Reviewed prior turns for continuity."}
+                if constraint_context:
+                    final_input = f"{constraint_context}\n\n{final_input}"
+                    yield {"type": "log", "content": "[TechnicalWriter] Injected active user constraints."}
                 
                 # Context integration
                 from memory_system import memory
@@ -990,6 +997,9 @@ def chat_swarm(
                 if history_context:
                     final_input = f"{history_context}\n\n{final_input}"
                     yield {"type": "log", "content": "[Librarian] Reviewed prior turns for continuity."}
+                if constraint_context:
+                    final_input = f"{constraint_context}\n\n{final_input}"
+                    yield {"type": "log", "content": "[Librarian] Injected active user constraints."}
                 if extracted_context:
                     yield {"type": "log", "content": "[Librarian] Reading Attached RAG Context..."}
                     final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
