@@ -38,9 +38,12 @@ async function proxyRequest(req: NextRequest) {
 
   // Chat streaming can legitimately run longer than a minute; keep non-stream calls tighter.
   const timeoutMs = wantsStream ? 300_000 : 55_000;
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+
   const upstream = await fetch(target, {
     ...init,
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: abortController.signal,
   });
 
   const isSSE =
@@ -51,27 +54,37 @@ async function proxyRequest(req: NextRequest) {
     // Manually read from the upstream and push to a new ReadableStream
     // to avoid compatibility issues with piping between fetch implementations
     const reader = upstream.body.getReader();
+    let cancelled = false;
     const stream = new ReadableStream({
       async pull(controller) {
         try {
           const { done, value } = await reader.read();
-          if (done) {
-            controller.close();
+          if (done || cancelled) {
+            clearTimeout(timeout);
+            try { controller.close(); } catch { /* already closed */ }
             return;
           }
           controller.enqueue(value);
         } catch (err) {
+          clearTimeout(timeout);
+          if (cancelled) return; // Client disconnected — expected, not an error
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("Controller is already closed") || msg.includes("aborted")) {
+            return; // Stream was cancelled by client — suppress noise
+          }
           console.error("[api/backend] SSE relay failed", {
             target,
             method: req.method,
-            timeoutMs,
-            error: err instanceof Error ? err.message : String(err),
+            error: msg,
           });
-          controller.error(err);
+          try { controller.error(err); } catch { /* already closed */ }
         }
       },
       cancel() {
-        reader.cancel();
+        cancelled = true;
+        clearTimeout(timeout);
+        reader.cancel().catch(() => {});
+        abortController.abort(); // Also abort the upstream connection
       },
     });
 
@@ -87,6 +100,7 @@ async function proxyRequest(req: NextRequest) {
   }
 
   // Non-streaming: pipe body directly (preserves binary files like GLB/STL)
+  clearTimeout(timeout);
   const contentType = upstream.headers.get("Content-Type") || "application/json";
   const responseHeaders: Record<string, string> = { "Content-Type": contentType };
   const contentLength = upstream.headers.get("Content-Length");
