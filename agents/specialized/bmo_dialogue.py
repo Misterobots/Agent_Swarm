@@ -28,6 +28,11 @@ class DialogueState:
     last_action: Optional[str] = None      # Last action: "turn_on", "turn_off", "get_state"
     pending_clarification: bool = False     # True if BMO asked a clarifying question
     clarification_context: Optional[str] = None  # What BMO was asking about
+    # Emotional state — influences BMO's tone and face expression
+    mood: str = "happy"                    # happy, curious, playful, concerned, sleepy
+    mood_intensity: float = 0.5            # 0.0 = neutral, 1.0 = strongly in that mood
+    consecutive_errors: int = 0            # Track failures to shift mood to concerned
+    turns_since_topic_change: int = 0      # Boredom/engagement tracking
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +165,10 @@ class DialogueTracker:
         # Update topic
         new_topic = self.classify_topic(user_text)
         if new_topic != "chitchat" or self.state.topic is None:
+            if new_topic != self.state.topic:
+                self.state.turns_since_topic_change = 0
             self.state.topic = new_topic
+        self.state.turns_since_topic_change += 1
 
         # Extract and merge entities
         new_entities = self.extract_entities(user_text)
@@ -173,6 +181,9 @@ class DialogueTracker:
         self.state.pending_clarification = self._is_asking_clarification(assistant_text)
         if self.state.pending_clarification:
             self.state.clarification_context = assistant_text
+
+        # Update mood based on conversation signals
+        self._update_mood(user_text, assistant_text)
 
     def _track_device_action(self, user_text: str, assistant_text: str) -> None:
         """Extract device entity_id and action from the conversation."""
@@ -228,6 +239,90 @@ class DialogueTracker:
         device = _DEVICE_TYPE_PATTERN.search(user_text)
         device_name = device.group(0) if device else "device"
         return f"[Note: The user said '{user_text}' but did not specify which {device_name}. Ask them which room or specific device they mean, in character as BMO.]"
+
+    # ------------------------------------------------------------------
+    # Mood System
+    # ------------------------------------------------------------------
+
+    _POSITIVE_PATTERNS = re.compile(
+        r'\b(thanks|thank you|awesome|great|cool|nice|love|good job|perfect|yay|haha|lol)\b',
+        re.IGNORECASE
+    )
+    _NEGATIVE_PATTERNS = re.compile(
+        r'\b(no|wrong|bad|stop|shut up|annoying|stupid|broken|fix|ugh|error)\b',
+        re.IGNORECASE
+    )
+    _PLAYFUL_PATTERNS = re.compile(
+        r'\b(game|play|joke|story|fun|adventure|sing|dance|pretend|imagine)\b',
+        re.IGNORECASE
+    )
+    _QUESTION_PATTERNS = re.compile(
+        r'\b(what|why|how|tell me about|explain|curious|wonder)\b',
+        re.IGNORECASE
+    )
+
+    def _update_mood(self, user_text: str, assistant_text: str) -> None:
+        """Update BMO's emotional state based on conversation signals."""
+        text = user_text.lower()
+
+        # Check for error indicators in assistant response
+        if "error" in assistant_text.lower() or assistant_text.startswith("Error"):
+            self.state.consecutive_errors += 1
+        else:
+            self.state.consecutive_errors = 0
+
+        # Mood transitions
+        if self.state.consecutive_errors >= 2:
+            self.state.mood = "concerned"
+            self.state.mood_intensity = min(0.8, 0.4 + self.state.consecutive_errors * 0.2)
+        elif self._PLAYFUL_PATTERNS.search(text):
+            self.state.mood = "playful"
+            self.state.mood_intensity = 0.7
+        elif self._POSITIVE_PATTERNS.search(text):
+            self.state.mood = "happy"
+            self.state.mood_intensity = min(1.0, self.state.mood_intensity + 0.2)
+        elif self._NEGATIVE_PATTERNS.search(text):
+            self.state.mood = "concerned"
+            self.state.mood_intensity = 0.5
+        elif self._QUESTION_PATTERNS.search(text):
+            self.state.mood = "curious"
+            self.state.mood_intensity = 0.6
+        else:
+            # Decay toward neutral happy
+            self.state.mood_intensity = max(0.3, self.state.mood_intensity - 0.1)
+            if self.state.mood_intensity <= 0.3:
+                self.state.mood = "happy"
+
+    def get_mood_hint(self) -> str:
+        """Return a system hint about BMO's current emotional state for the LLM."""
+        mood = self.state.mood
+        intensity = self.state.mood_intensity
+
+        if intensity < 0.3:
+            return ""
+
+        hints = {
+            "happy": "BMO is feeling cheerful and upbeat right now.",
+            "curious": "BMO is in a curious, inquisitive mood. Lean into wonder and excitement about learning.",
+            "playful": "BMO is feeling extra playful! Be silly, suggest games, make sound effects.",
+            "concerned": "BMO is a little worried. Be gentle and reassuring, offer to help fix things.",
+            "sleepy": "BMO is feeling sleepy and cozy. Speak softly and warmly.",
+        }
+        hint = hints.get(mood, "")
+        if hint:
+            return f"[Mood: {hint}]"
+        return ""
+
+    def get_face_expression(self) -> str:
+        """Map current mood to a BMO face expression name for the pygame renderer."""
+        mood_to_expression = {
+            "happy": "happy",
+            "curious": "look_up",
+            "playful": "excited",
+            "concerned": "sad",
+            "sleepy": "sleepy",
+        }
+        return mood_to_expression.get(self.state.mood, "normal")
 
     def reset(self) -> None:
         """Reset dialogue state (new session)."""

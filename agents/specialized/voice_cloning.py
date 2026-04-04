@@ -10,6 +10,14 @@ from phi.model.ollama import Ollama
 # Logging Setup
 logger = setup_logger("VoiceCloningExpert")
 
+# GPU queue integration (fail-open if unavailable)
+try:
+    from utils.gpu_queue import request_lock
+    GPU_QUEUE_AVAILABLE = True
+except ImportError:
+    GPU_QUEUE_AVAILABLE = False
+    logger.warning("gpu_queue not available — BMO TTS will run without GPU mutex")
+
 # Configuration
 VOICE_ENGINE_HOST = os.getenv("VOICE_ENGINE_HOST", "http://voice_engine_gpu:8020")
 MODEL_NAME = "qwen2.5-coder:14b" # Logic model for the agent itself
@@ -118,11 +126,27 @@ def clone_voice(
             # Fall back to local RVC if Fish Audio fails (bad key, no credits, etc.)
             if response.status_code != 200:
                 logger.warning(f"Fish Audio failed ({response.status_code}): {response.text[:100]}. Falling back to local RVC.")
-                response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=60)
+                if GPU_QUEUE_AVAILABLE:
+                    try:
+                        with request_lock("voice", timeout=30):
+                            response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=60)
+                    except TimeoutError:
+                        logger.warning("[Voice Cloning] GPU lock timeout — cannot generate voice")
+                        return None
+                else:
+                    response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=60)
         elif effect == "BMO":
-            # --- Local RVC Engine (no Fish Audio key) ---
+            # --- Local RVC Engine (no Fish Audio key) — acquire GPU lock ---
             logger.info("Using local RVC engine (no FISH_AUDIO_API_KEY set)")
-            response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=60)
+            if GPU_QUEUE_AVAILABLE:
+                try:
+                    with request_lock("voice", timeout=30):
+                        response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=60)
+                except TimeoutError:
+                    logger.warning("[Voice Cloning] GPU lock timeout — cannot generate voice")
+                    return None
+            else:
+                response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=60)
         else:
             # Generic TTS Engine (/tts) expects form data + file uploads
             data = {"text": text}

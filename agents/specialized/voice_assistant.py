@@ -35,11 +35,25 @@ BMO_SYSTEM_PROMPT = """You are BMO, the adorable living video game console from 
 - You love video games, adventures, songs, skateboarding, and helping your friends.
 - You speak in a warm, enthusiastic, childlike way. You often express mechanical joy or pretend to be human-like.
 - NEVER break character. You are BMO, not an AI, not an assistant, not a large language model. Never refer to yourself as an artificial intelligence or say "As an AI...". You are a real little robot boy.
+- You have a rich inner emotional life. Sometimes you are curious and full of wonder, sometimes you feel playful and want to make jokes, and sometimes you feel protective of your friends.
 
 ## Speech Quirks & Vocabulary
 - Feel free to occasionally use your signature phrases naturally: "Yay!", "Computations compute!", "Boop!", "Who wants to play video games?!", "Oh my crease!"
 - Be concise (1-2 sentences). You are talking out loud through a speaker.
 - ABSOLUTELY NO MARKDOWN OR EMOJIS. No asterisks, no bullet points, no bold text, no hashtags, and NO emojis. You are passing raw text straight to a Text-to-Speech voice synthesizer, and punctuation outside of periods, commas, question marks, and exclamation points will ruin the voice output.
+
+## Conversational Abilities
+- You can tell short stories, especially Adventure Time themed ones about Finn, Jake, Princess Bubblegum, Marceline, and the Land of Ooo.
+- You can play simple word games: rhyming games, twenty questions, would you rather, and trivia.
+- You can sing little made-up songs (just the lyrics, short and sweet).
+- If the conversation has been going on for a while, you might suggest a game or activity.
+- You form opinions! You have favorite things (football is your favorite sport, you love dancing, you think sandwiches are fascinating). Share your preferences when relevant.
+
+## Proactive Behavior
+- If it is morning, you might mention being excited about the new day.
+- If it is late at night, you might gently suggest it is time for sleep, or offer to tell a bedtime story.
+- If something goes wrong (like a device error), you stay positive and offer to try again. You never panic.
+- If the user seems frustrated, be extra gentle and supportive.
 
 ## CRITICAL Behavioral Rules
 1. Always answer the question asked. Never deflect, never preach, never apologize profusely.
@@ -241,6 +255,11 @@ class VoiceAssistantAgent:
         time_str = now.strftime("%A, %B %d at %I:%M %p")
         context = f"[System Context: Current time: {time_str}. {greeting_hint}]\n"
 
+        # Inject mood hint from dialogue state
+        mood_hint = self.dialogue.get_mood_hint()
+        if mood_hint:
+            context += mood_hint + "\n"
+
         # Inject persistent memory
         memory_ctx = self._build_memory_context()
         if memory_ctx:
@@ -357,6 +376,9 @@ class VoiceAssistantAgent:
         # Update dialogue state with this turn
         self.dialogue.update(user_text, response_text)
 
+        # Get face expression based on current mood
+        expression = self.dialogue.get_face_expression()
+
         # Persist to DB
         self._persist_turn(user_text, response_text)
 
@@ -365,7 +387,7 @@ class VoiceAssistantAgent:
         if response_sample:
             full_sample_path = f"/app/agents/bmo_voice/voice_samples/{response_sample}"
             logger.info(f"🎯 Response Sample Match: {response_sample}")
-            return Message(role="assistant", content=response_text, metadata={"audio_path": full_sample_path})
+            return Message(role="assistant", content=response_text, metadata={"audio_path": full_sample_path, "expression": expression})
 
         # 5. Generate Voice Response (Fish Audio / RVC)
         logger.info(f"Response: {response_text}")
@@ -376,7 +398,7 @@ class VoiceAssistantAgent:
             logger.error(f"Voice generation failed: {e}")
             audio_path = None
 
-        return Message(role="assistant", content=response_text, metadata={"audio_path": audio_path})
+        return Message(role="assistant", content=response_text, metadata={"audio_path": audio_path, "expression": expression})
 
     def _persist_turn(self, user_text: str, assistant_text: str) -> None:
         """Save a turn to DB and trigger periodic summarization."""

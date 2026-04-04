@@ -197,6 +197,9 @@ def request_lock(context: str, timeout: int = 300):
             elif context == "image":
                 # Switching to image -> we need VRAM for Flux/Forge. Dump Ollama.
                 evict_ollama()
+            elif context == "voice":
+                # Switching to voice -> TTS/RVC needs VRAM. Dump ComfyUI (keep Ollama for LLM).
+                evict_comfyui()
             else:
                 logger.warning(f"[GPU Queue] Unknown context '{context}'.")
             
