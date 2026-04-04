@@ -1,0 +1,52 @@
+﻿[
+    {
+        "turn":  1,
+        "intent":  "TRAIN",
+        "reviewed_history":  false,
+        "injected_constraints":  false,
+        "mars":  false,
+        "mentions_mw":  true,
+        "train_override":  false,
+        "downgraded":  true
+    },
+    {
+        "turn":  2,
+        "intent":  "CODE",
+        "reviewed_history":  true,
+        "injected_constraints":  true,
+        "mars":  true,
+        "mentions_mw":  true,
+        "train_override":  false,
+        "downgraded":  false
+    },
+    {
+        "turn":  3,
+        "intent":  "RESEARCH",
+        "reviewed_history":  true,
+        "injected_constraints":  true,
+        "mars":  false,
+        "mentions_mw":  true,
+        "train_override":  false,
+        "downgraded":  false
+    },
+    {
+        "turn":  4,
+        "intent":  "DEVOPS",
+        "reviewed_history":  true,
+        "injected_constraints":  true,
+        "mars":  true,
+        "mentions_mw":  true,
+        "train_override":  false,
+        "downgraded":  false
+    },
+    {
+        "turn":  5,
+        "intent":  "DEVOPS",
+        "reviewed_history":  true,
+        "injected_constraints":  true,
+        "mars":  true,
+        "mentions_mw":  true,
+        "train_override":  false,
+        "downgraded":  false
+    }
+]

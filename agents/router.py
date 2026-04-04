@@ -398,6 +398,81 @@ def _audit_security_event(event_type: str, context: dict[str, object]) -> None:
     security_audit_logger.warning(json.dumps(payload, ensure_ascii=True))
 
 
+# --- Stream Event Helper Functions ---
+def _emit_stream_mode(mode: str) -> dict:
+    """Emit a stream mode indicator (thinking, responding, tool-use, requesting, compacting)."""
+    return {"type": "stream_mode", "streamMode": mode}
+
+
+def _emit_turn_metadata(turn_id: str, agent_name: str, stream_modes: list = None) -> dict:
+    """Emit turn-level metadata for UI turn grouping and navigation."""
+    return {
+        "type": "turn_metadata",
+        "turnId": turn_id,
+        "turnMetadata": {
+            "turnId": turn_id,
+            "agentName": agent_name,
+            "streamModes": stream_modes or [],
+            "toolsInvoked": [],
+            "continuable": True,
+        },
+    }
+
+
+def _emit_turn_boundary(turn_id: str, final_status: str = "completed") -> dict:
+    """Emit a turn boundary marker to help frontend group messages by turn."""
+    return {
+        "type": "turn_boundary",
+        "content": f"[Turn {turn_id} {final_status}]",
+        "turnId": turn_id,
+    }
+
+
+def _emit_tool_start(tool_call_id: str, tool_name: str, tool_input: dict = None) -> dict:
+    """Emit a tool execution start event."""
+    return {
+        "type": "tool_start",
+        "tool_call_id": tool_call_id,
+        "tool_name": tool_name,
+        "tool_input": tool_input or {},
+        "tool_state": "queued",
+    }
+
+
+def _emit_tool_progress(tool_call_id: str, tool_name: str, progress: float = 0, status_msg: str = "") -> dict:
+    """Emit a tool in-progress event."""
+    return {
+        "type": "tool_progress",
+        "tool_call_id": tool_call_id,
+        "tool_name": tool_name,
+        "tool_state": "executing",
+        "tool_progress": min(progress, 100),
+        "content": status_msg,
+    }
+
+
+def _emit_tool_result(tool_call_id: str, tool_name: str, output: str, success: bool = True, artifacts: list = None) -> dict:
+    """Emit a tool result event with optional artifacts."""
+    return {
+        "type": "tool_result",
+        "tool_call_id": tool_call_id,
+        "tool_name": tool_name,
+        "tool_output": output,
+        "tool_state": "completed" if success else "error",
+        "content": output,
+        "artifacts": artifacts or [],
+    }
+
+
+def _emit_continuation_hint(hint_type: str = "auto_continue", reason: str = "") -> dict:
+    """Emit a hint about whether conversation should auto-continue after tool execution."""
+    return {
+        "type": "continuation",
+        "continuationHint": hint_type,
+        "content": reason,
+    }
+
+
 def chat_swarm(
     user_input: str,
     session_id: str = "default_session",
@@ -405,11 +480,19 @@ def chat_swarm(
     memory_enabled: bool = False,
     owner_id: str | None = None,
     model: str | None = None,
+    skill: str | None = None,
+    style: str | None = None,
+    research_mode: bool = False,
+    attachments: list | None = None,
 ):
     """
     Generator that yields status updates and final response for UI.
     - history: Optional list of OpenAI-formatted messages [{"role": "user", "content": "..."}]
     - memory_enabled: If True, inject recent session summaries as system context.
+    - skill: Routing hint to bias intent classification.
+    - style: Response style modifier for the system prompt.
+    - research_mode: If True, forces deep multi-step reasoning via MarsRL.
+    - attachments: File attachments from the UI.
     """
     AGENT_STATE.labels(agent_name="Router").set(2)
     WORKFLOW_STEPS.labels(status="started", agent_type="Router").inc()
@@ -420,6 +503,7 @@ def chat_swarm(
     template_metadata = {}
     route_start_time = time.time()
     lf_trace = None  # Langfuse trace handle (populated below if Langfuse is active)
+    turn_id = f"{session_id}-{int(time.time()*1000)}"
 
     # --- Langfuse top-level trace for all intents (v4 context manager) ---
     _lf_ctx = None
@@ -492,6 +576,8 @@ def chat_swarm(
             clear_context(session_id=session_id, owner_id=owner_id)
 
     try:
+        yield _emit_turn_metadata(turn_id, "Router", ["thinking"])
+        yield _emit_stream_mode("thinking")
         # 1b. Memory Recall — inject prior session summaries as system context
         if memory_enabled:
             try:
@@ -631,6 +717,42 @@ def chat_swarm(
 
         yield {"type": "thought", "content": f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)"}
 
+        # --- SKILL HINT OVERRIDE ---
+        # If the UI sent an explicit skill hint, override intent when confidence is low
+        _skill_to_intent = {
+            "code": "DEVOPS",
+            "devops": "DEVOPS",
+            "data": "DATA",
+            "creative": "IMAGE",
+            "research": "RESEARCH",
+        }
+        if skill and skill in _skill_to_intent and confidence < 0.80:
+            old_intent = intent
+            intent = _skill_to_intent[skill]
+            yield {"type": "thought", "content": f"→ Skill override: {old_intent} → {intent} (skill={skill})"}
+
+        # --- RESEARCH MODE OVERRIDE ---
+        if research_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "TRAIN"):
+            intent = "RESEARCH"
+            yield {"type": "thought", "content": "→ Research mode activated: forcing RESEARCH intent"}
+
+        # --- STYLE SYSTEM PROMPT ---
+        _style_prompts = {
+            "concise": "Respond as concisely as possible. Use bullet points and short sentences.",
+            "explanatory": "Explain your reasoning step-by-step. Be thorough and educational.",
+            "formal": "Respond in a formal, professional tone.",
+            "technical": "Use precise technical language. Include code examples where relevant.",
+            "casual": "Respond in a friendly, casual tone. Keep it conversational.",
+        }
+        _style_instruction = _style_prompts.get(style or "", "")
+        if _style_instruction:
+            style_msg = {"role": "system", "content": f"[Style Instruction] {_style_instruction}"}
+            if history is None:
+                history = [style_msg]
+            else:
+                history = list(history) + [style_msg]
+            yield {"type": "thought", "content": f"→ Style: {style}"}
+
         if USE_LANGFUSE and langfuse:
             try:
                 langfuse.update_current_span(
@@ -698,6 +820,8 @@ def chat_swarm(
 
         # --- ROUTE: CONVERSATION / CASUAL CHAT ---
         if intent == "CONVERSATION":
+            yield _emit_turn_metadata(turn_id, "Hive Mind", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
             AGENT_STATE.labels(agent_name="Conversationalist").set(2)
 
@@ -724,6 +848,7 @@ def chat_swarm(
                     response_stream = conversationalist.run(user_input, stream=True)
                     for chunk in response_stream:
                         if chunk.content:
+                            yield _emit_stream_mode("responding")
                             full_content += chunk.content
                             yield {"type": "message", "content": chunk.content}
                 _score_trace(lf_trace, langfuse, 0.85, output=full_content)
@@ -737,6 +862,8 @@ def chat_swarm(
 
         # --- ROUTE: DEVOPS / INFRASTRUCTURE ---
         if intent == "DEVOPS":
+            yield _emit_turn_metadata(turn_id, "DevOps Engineer", ["thinking", "tool-use", "responding"])
+            yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "🖥️ DevOps Engineer: Analyzing infrastructure task..."}
             AGENT_STATE.labels(agent_name="DevOps").set(2)
 
@@ -771,11 +898,18 @@ def chat_swarm(
             yield {"type": "log", "content": f"[DevOps] Routing to MarsRL with infra context."}
             yield {"type": "thought", "content": f"→ Routing to Architect ({DEVOPS_MODEL}) via MarsRL loop"}
             try:
+                tool_call_id = f"tool-devops-{int(time.time()*1000)}"
+                yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": "DEVOPS", "model": DEVOPS_MODEL})
                 with request_lock(context="text"):
+                    yield _emit_stream_mode("tool-use")
+                    yield _emit_tool_progress(tool_call_id, "marsrl_loop", 25, "Initializing MarsRL loop")
                     for update in mars_loop_stream(devops_input, mars):
                         yield update
+                    yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "MarsRL loop complete")
+                yield _emit_tool_result(tool_call_id, "marsrl_loop", "DevOps plan generated", True)
                 _score_trace(lf_trace, langfuse, 0.9)
             except Exception as e:
+                yield _emit_tool_result(tool_call_id, "marsrl_loop", f"DevOps execution failed: {e}", False)
                 _score_trace(lf_trace, langfuse, 0.0)
                 raise e
 
@@ -785,6 +919,8 @@ def chat_swarm(
 
         # --- ROUTE: DATA ANALYSIS ---
         if intent == "DATA":
+            yield _emit_turn_metadata(turn_id, "Data Analyst", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "📊 Data Analyst: Processing your data request..."}
             AGENT_STATE.labels(agent_name="DataAnalyst").set(2)
 
@@ -818,6 +954,7 @@ def chat_swarm(
                     yield {"type": "status", "content": "📊 Data Analyst: Generating analysis..."}
                     for chunk in response_stream:
                         if chunk.content:
+                            yield _emit_stream_mode("responding")
                             full_content += chunk.content
                             yield {"type": "message", "content": chunk.content}
                 _score_trace(lf_trace, langfuse, 0.85, output=full_content)
@@ -908,6 +1045,8 @@ def chat_swarm(
 
         # --- ROUTE: DOCUMENTATION / TECHNICAL WRITING ---
         if intent == "DOCUMENTATION":
+            yield _emit_turn_metadata(turn_id, "Technical Writer", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "📝 Technical Writer: Reviewing document structure..."}
             AGENT_STATE.labels(agent_name="TechnicalWriter").set(2)
             
@@ -956,6 +1095,7 @@ def chat_swarm(
                     full_content = ""
                     for chunk in response_stream:
                         if chunk.content:
+                            yield _emit_stream_mode("responding")
                             full_content += chunk.content
                             yield {"type": "message", "content": chunk.content}
                 
@@ -972,6 +1112,8 @@ def chat_swarm(
 
         # --- ROUTE: RESEARCH / CHAT ---
         if intent == "RESEARCH":
+            yield _emit_turn_metadata(turn_id, "Librarian", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "📚 Librarian Agent: Accessing Archives..."}
             AGENT_STATE.labels(agent_name="Librarian").set(2)
             
@@ -1010,6 +1152,7 @@ def chat_swarm(
                     full_content = ""
                     for chunk in response_stream:
                         if chunk.content:
+                            yield _emit_stream_mode("responding")
                             full_content += chunk.content
                             yield {"type": "message", "content": chunk.content}
                 
@@ -1200,6 +1343,8 @@ def chat_swarm(
 
         # --- ROUTE: TRAINER (FEEDBACK LOOP) ---
         if intent == "TRAIN":
+            yield _emit_turn_metadata(turn_id, "Memory Controller", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "🧠 Memory Controller: Learning new skill..."}
             from memory_system import memory
             
@@ -1226,6 +1371,8 @@ def chat_swarm(
 
         # --- ROUTE: IOT CONTROLLER (HOME ASSISTANT) ---
         if intent == "IOT_CONTROL":
+            yield _emit_turn_metadata(turn_id, "IoT Controller", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "🏠 IoT Controller: Connecting to Home..."}
             AGENT_STATE.labels(agent_name="IoTController").set(2)
 
@@ -1250,6 +1397,8 @@ def chat_swarm(
         if intent not in ("CONVERSATION", "DEVOPS", "DATA", "AMBIGUOUS", "IMAGE",
                           "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE",
                           "TRAIN", "IOT_CONTROL"):
+            yield _emit_turn_metadata(turn_id, "Architect", ["thinking", "tool-use", "responding"])
+            yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}
             AGENT_STATE.labels(agent_name="Architect").set(2)
 
@@ -1290,16 +1439,24 @@ def chat_swarm(
                 yield {"type": "log", "content": f"[MarsRL] Intent: {intent} | Loop initialized."}
 
                 yield {"type": "thought", "content": f"→ Routing to Architect ({os.getenv('ARCHITECT_MODEL', 'qwen2.5-coder:14b')}) via MarsRL loop"}
+                tool_call_id = f"tool-architect-{int(time.time()*1000)}"
+                yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": intent})
                 with request_lock(context="text"):
+                    yield _emit_stream_mode("tool-use")
+                    yield _emit_tool_progress(tool_call_id, "marsrl_loop", 20, "Solver started")
                     for update in mars_loop_stream(final_input, mars):
                         # Capture MarsLoopResult for performance recording
                         if update.get("type") == "log" and "[MarsRL] Iterations:" in update.get("content", ""):
                             # Extract scores from the summary line for perf recording
                             pass
                         yield update
+                    yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "Loop complete")
+                yield _emit_tool_result(tool_call_id, "marsrl_loop", "Architect response generated", True)
 
             except Exception as e:
                 error_str = str(e)
+                if 'tool_call_id' in locals():
+                    yield _emit_tool_result(tool_call_id, "marsrl_loop", f"Architect loop failed: {error_str}", False)
                 yield {"type": "log", "content": f"[Exception] MarsRL Crash: {error_str}"}
 
                 package_match = re.search(r"No module named '(\w+)'", error_str) or \
@@ -1331,6 +1488,12 @@ def chat_swarm(
         yield {"type": "error", "content": f"🔥 Error: {e}"}
         WORKFLOW_STEPS.labels(status="error", agent_type="Router").inc()
     finally:
+        try:
+            yield _emit_stream_mode("requesting")
+            yield _emit_continuation_hint("await_user", "Turn complete")
+            yield _emit_turn_boundary(turn_id, "completed")
+        except Exception:
+            pass
         AGENT_STATE.labels(agent_name="Router").set(1)
         # Close Langfuse trace context and flush
         if USE_LANGFUSE and langfuse:

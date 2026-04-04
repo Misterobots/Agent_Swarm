@@ -1,0 +1,32 @@
+[
+  {
+    "turn": 1,
+    "intent": "UNKNOWN",
+    "reviewed_history": false,
+    "injected_constraints": false,
+    "mars": false,
+    "mentions_mw": false,
+    "train_override": false,
+    "downgraded": false
+  },
+  {
+    "turn": 2,
+    "intent": "UNKNOWN",
+    "reviewed_history": false,
+    "injected_constraints": false,
+    "mars": false,
+    "mentions_mw": true,
+    "train_override": false,
+    "downgraded": false
+  },
+  {
+    "turn": 3,
+    "intent": "UNKNOWN",
+    "reviewed_history": false,
+    "injected_constraints": false,
+    "mars": false,
+    "mentions_mw": true,
+    "train_override": false,
+    "downgraded": false
+  }
+]

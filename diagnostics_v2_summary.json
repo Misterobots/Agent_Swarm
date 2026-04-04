@@ -1,0 +1,52 @@
+[
+  {
+    "turn": 1,
+    "intent": "CONVERSATION",
+    "downgraded": false,
+    "reviewed_history": false,
+    "injected_constraints": false,
+    "mars": false,
+    "mentions_mw": true,
+    "chars": 737
+  },
+  {
+    "turn": 2,
+    "intent": "DOCUMENTATION",
+    "downgraded": false,
+    "reviewed_history": true,
+    "injected_constraints": false,
+    "mars": false,
+    "mentions_mw": true,
+    "chars": 2568
+  },
+  {
+    "turn": 3,
+    "intent": "RESEARCH",
+    "downgraded": false,
+    "reviewed_history": true,
+    "injected_constraints": false,
+    "mars": false,
+    "mentions_mw": true,
+    "chars": 2485
+  },
+  {
+    "turn": 4,
+    "intent": "DEVOPS",
+    "downgraded": false,
+    "reviewed_history": true,
+    "injected_constraints": true,
+    "mars": true,
+    "mentions_mw": true,
+    "chars": 5595
+  },
+  {
+    "turn": 5,
+    "intent": "DEVOPS",
+    "downgraded": false,
+    "reviewed_history": true,
+    "injected_constraints": true,
+    "mars": true,
+    "mentions_mw": true,
+    "chars": 2716
+  }
+]

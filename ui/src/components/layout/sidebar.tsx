@@ -82,7 +82,14 @@ export function Sidebar() {
                 )}
               >
                 <MessageSquare size={14} className="flex-shrink-0" />
-                <span className="flex-1 truncate">{conv.title}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="block truncate">{conv.title}</span>
+                  {(conv.resumeCheckpoints?.length || conv.lastTurnId) && (
+                    <span className="block text-[10px] text-[var(--chat-muted)] truncate">
+                      {conv.resumeCheckpoints?.length ? `${conv.resumeCheckpoints.length} checkpoints` : "Continuable"}
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

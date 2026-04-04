@@ -7,6 +7,11 @@ const THEMES: Array<{ id: ChatTheme; label: string }> = [
   { id: "ember", label: "Ember" },
   { id: "slate", label: "Slate" },
   { id: "signal", label: "Signal" },
+  { id: "office", label: "Office" },
+  { id: "hacker", label: "Hacker" },
+  { id: "star-trek", label: "Star Trek" },
+  { id: "cyberpunk", label: "Cyberpunk" },
+  { id: "minimal", label: "Minimal" },
 ];
 
 export function ThemeSelector() {

@@ -38,6 +38,12 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
         {isUser ? <User size={16} /> : <Bot size={16} />}
       </div>
       <div className="flex-1 min-w-0 text-[var(--chat-text)]">
+        {message.turnMetadata && !isUser && (
+          <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--chat-muted)]">
+            <span>Turn {message.turnMetadata.turnId.slice(0, 8)}</span>
+            {message.turnMetadata.agentName ? <span>{message.turnMetadata.agentName}</span> : null}
+          </div>
+        )}
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : message.content ? (
@@ -76,7 +82,13 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
                 )}
               </div>
             )}
-            {!!message.toolCalls?.length && <ToolCallBlock toolCalls={message.toolCalls} />}
+            {!!message.toolCalls?.length && (
+              <ToolCallBlock
+                toolCalls={message.toolCalls}
+                toolLifecycle={message.toolLifecycle}
+                toolResults={message.toolResults}
+              />
+            )}
           </>
         ) : (
           <span className="inline-block w-2 h-4 bg-[var(--chat-accent)] animate-pulse rounded-sm streaming-caret" />

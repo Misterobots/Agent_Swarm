@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/lib/hooks/use-chat-stream";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { MessageBubble } from "./message-bubble";
 import { ThinkingIndicator } from "./thinking-indicator";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
+import { InputToolbar } from "./input-toolbar";
 import { Bot, Brain } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { ThemeSelector } from "./theme-selector";
+import type { FileAttachment } from "@/types/chat";
 
 function usageBarClass(pct: number): string {
   if (pct >= 0.95) return "bg-red-500";
@@ -21,11 +23,12 @@ function usageBarClass(pct: number): string {
 }
 
 export function ChatView() {
-  const { messages, isStreaming, statusMessage, latestThought, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
+  const { messages, isStreaming, statusMessage, latestThought, streamMode, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
   const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const model = useSettingsStore((s) => s.model);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
 
   // Show the thinking indicator when streaming and either we have a status
   // message or the assistant message is still empty (waiting for first content)
@@ -119,22 +122,43 @@ export function ChatView() {
                 }
               }
               return (
-                <MessageBubble
-                  key={msg.id}
-                  message={msg}
-                  userPrompt={precedingUserPrompt}
-                />
+                <div key={msg.id}>
+                  {msg.turnMetadata && (
+                    <div className="mx-4 mt-2 text-[10px] uppercase tracking-wider text-[var(--chat-muted)]">
+                      Turn {msg.turnMetadata.turnId.slice(0, 8)}
+                      {msg.turnMetadata.agentName ? ` | ${msg.turnMetadata.agentName}` : ""}
+                      {msg.turnMetadata.streamModes?.length ? ` | ${msg.turnMetadata.streamModes.join(" -> ")}` : ""}
+                    </div>
+                  )}
+                  <MessageBubble message={msg} userPrompt={precedingUserPrompt} />
+                </div>
               );
             })}
-            {showThinking && <ThinkingIndicator statusMessage={statusMessage} latestThought={latestThought} />}
+            {showThinking && (
+              <ThinkingIndicator
+                statusMessage={statusMessage}
+                latestThought={latestThought}
+                streamMode={streamMode}
+              />
+            )}
             <div ref={bottomRef} />
           </div>
         )}
       </div>
 
+      {/* Input Toolbar */}
+      <InputToolbar
+        attachments={attachments}
+        onAttachmentsChange={setAttachments}
+        disabled={isStreaming}
+      />
+
       {/* Input */}
       <ChatInput
-        onSend={sendMessage}
+        onSend={(msg) => {
+          sendMessage(msg, attachments);
+          setAttachments([]);
+        }}
         onStop={stopGeneration}
         isStreaming={isStreaming}
       />

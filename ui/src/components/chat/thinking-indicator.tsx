@@ -62,9 +62,33 @@ function pickRandom(): string {
   return OFFICE_VERBS[Math.floor(Math.random() * OFFICE_VERBS.length)];
 }
 
+/**
+ * Extract agent name from backend status message.
+ * Handles patterns like:
+ * - "🔒 Security Agent: Scanning input..."
+ * - "🧠 Neural Cortex: Analyzing intent..."
+ * - "💬 Hive Mind: Thinking..."
+ */
+function extractAgentName(statusMessage: string | null): string | null {
+  if (!statusMessage) return null;
+  const match = statusMessage.match(/[🔒🧠💬🖥️👤🎨📊🔧🚀]*\s*(\w+(?:\s+\w+)*?):\s/);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Extract the agent action/status from backend message.
+ * e.g., "Scanning input..." from "🔒 Security Agent: Scanning input..."
+ */
+function extractAgentAction(statusMessage: string | null): string | null {
+  if (!statusMessage) return null;
+  const match = statusMessage.match(/:\s*(.+?)\.{0,3}$/);
+  return match ? match[1].trim() : null;
+}
+
 interface ThinkingIndicatorProps {
   statusMessage: string | null;
   latestThought?: string | null;
+  streamMode?: string | null;
 }
 
 export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndicatorProps) {
@@ -90,11 +114,6 @@ export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndi
     return () => clearInterval(id);
   }, []);
 
-  // Pick a fresh verb when the real status changes
-  useEffect(() => {
-    setVerb(pickRandom());
-  }, [statusMessage]);
-
   return (
     <div className="flex gap-3 py-4 px-4 bg-[var(--chat-surface)] msg-enter">
       <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[color:color-mix(in_srgb,var(--chat-accent-2)_14%,transparent)] border border-[var(--chat-border)] flex items-center justify-center">
@@ -103,9 +122,24 @@ export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndi
       <div className="flex-1 min-w-0">
         {/* Thinking phase cycle */}
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="thinking-word-cycle" key={thinkingPhase}>
-            {THINKING_PHASES[thinkingPhase]}
-          </span>
+          {/* Primary display: agent name if available, otherwise generic phase */}
+          {statusMessage ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-[var(--chat-accent-strong)]">
+                {extractAgentName(statusMessage) || THINKING_PHASES[thinkingPhase]}
+              </span>
+              {extractAgentAction(statusMessage) && (
+                <span className="text-xs text-[var(--chat-muted)]">
+                  {extractAgentAction(statusMessage)}
+                </span>
+              )}
+            </div>
+          ) : (
+             <span className="thinking-word-cycle">
+              {THINKING_PHASES[thinkingPhase]}
+            </span>
+          )}
+          {/* Bouncing dots indicator */}
           <span className="flex gap-0.5">
             <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:0ms]" />
             <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:150ms]" />

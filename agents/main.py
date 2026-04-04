@@ -286,6 +286,10 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None  # conversation ID for multi-turn history
     memory_enabled: bool = False      # opt-in cross-session memory recall
     user_id: Optional[str] = None     # preferred owner key for user-scoped storage
+    skill: Optional[str] = None       # routing hint: general|code|devops|data|creative|research|explain
+    style: Optional[str] = None       # response style: default|concise|explanatory|formal|technical|casual
+    research_mode: bool = False       # deep multi-step reasoning mode
+    attachments: Optional[List[dict]] = None  # file attachments [{name, mimeType, data, size}]
 
 
 def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optional[str]:
@@ -374,6 +378,10 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     memory_enabled=request.memory_enabled,
                     owner_id=owner_id,
                     model=request.model,
+                    skill=request.skill,
+                    style=request.style,
+                    research_mode=request.research_mode,
+                    attachments=request.attachments,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -485,6 +493,10 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             memory_enabled=request.memory_enabled,
             owner_id=owner_id,
             model=request.model,
+            skill=request.skill,
+            style=request.style,
+            research_mode=request.research_mode,
+            attachments=request.attachments,
         )
         full_resp = ""
         for update in gen:

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { ThoughtEvent, ToolCallEvent } from "@/types/chat";
+import type { ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, TurnMetadata, StreamMode, FileAttachment } from "@/types/chat";
 
 const MODEL_WINDOWS: Record<string, number> = {
   "qwen2.5-coder:14b": 32768,
@@ -40,10 +40,16 @@ export function useChatStream() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [latestThought, setLatestThought] = useState<string | null>(null);
+  const [streamMode, setStreamMode] = useState<StreamMode | null>(null);
   const [tokenUsage, setTokenUsage] = useState({ used: 0, total: MODEL_WINDOWS.default, pct: 0 });
   const abortRef = useRef<AbortController | null>(null);
   const thoughtTraceRef = useRef<ThoughtEvent[]>([]);
   const toolCallTraceRef = useRef<ToolCallEvent[]>([]);
+  const toolLifecycleRef = useRef<ToolLifecycleEvent[]>([]);
+  const toolResultsRef = useRef<ToolResult[]>([]);
+  const streamModesRef = useRef<StreamMode[]>([]);
+  const turnMetadataRef = useRef<TurnMetadata | null>(null);
+  const continuationHintRef = useRef<"auto_continue" | "await_user" | "compacting" | null>(null);
 
   const {
     conversations,
@@ -55,9 +61,15 @@ export function useChatStream() {
     appendToMessage,
     setMessageThoughtTrace,
     setMessageToolCalls,
+    setMessageToolLifecycle,
+    setMessageToolResults,
+    setMessageTurnMetadata,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
+  const skill = useSettingsStore((s) => s.skill);
+  const style = useSettingsStore((s) => s.style);
+  const researchMode = useSettingsStore((s) => s.researchMode);
 
   useEffect(() => {
     const conv = activeConversation();
@@ -98,7 +110,7 @@ export function useChatStream() {
   );
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, attachments?: FileAttachment[]) => {
       if (!content.trim() || isStreaming) return;
 
       // Ensure we have an active conversation
@@ -141,6 +153,7 @@ export function useChatStream() {
 
       // Create assistant message placeholder
       const assistantId = addMessage(convId, { role: "assistant", content: "" });
+      const turnId = genId();
 
       // Build messages array for the API
       const conv = useChatStore.getState().conversations.find((c) => c.id === convId);
@@ -153,32 +166,95 @@ export function useChatStream() {
       setIsStreaming(true);
       setStatusMessage(null);
       setLatestThought(null);
+      setStreamMode(null);
       thoughtTraceRef.current = [];
       toolCallTraceRef.current = [];
+      toolLifecycleRef.current = [];
+      toolResultsRef.current = [];
+      streamModesRef.current = [];
+      turnMetadataRef.current = null;
+      continuationHintRef.current = null;
+      
       const controller = new AbortController();
       abortRef.current = controller;
 
       try {
-        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled)) {
+        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments)) {
           if (event.type === "status") {
-            setStatusMessage(event.content);
+            setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
-            const thought: ThoughtEvent = { content: event.content, timestamp: Date.now() };
+            const thoughtContent = event.content || "";
+            const thought: ThoughtEvent = { content: thoughtContent, timestamp: Date.now() };
             thoughtTraceRef.current = [...thoughtTraceRef.current, thought];
-            setLatestThought(event.content);
+            setLatestThought(thoughtContent);
           } else if (event.type === "tool_call") {
+            // Legacy tool call format
             const toolCall: ToolCallEvent = {
               tool_name: event.tool_name || "tool",
               tool_input: event.tool_input,
               tool_call_id: event.tool_call_id,
-              content: event.content,
+              content: event.content || "",
               timestamp: Date.now(),
             };
             toolCallTraceRef.current = [...toolCallTraceRef.current, toolCall];
+          } else if (event.type === "tool_start") {
+            const lifecycle: ToolLifecycleEvent = {
+              tool_call_id: event.tool_call_id || "",
+              tool_name: event.tool_name || "tool",
+              state: event.tool_state || "queued",
+              input: event.tool_input,
+              timestamp: Date.now(),
+            };
+            toolLifecycleRef.current = [...toolLifecycleRef.current, lifecycle];
+          } else if (event.type === "tool_progress") {
+            const lifecycle: ToolLifecycleEvent = {
+              tool_call_id: event.tool_call_id || "",
+              tool_name: event.tool_name || "tool",
+              state: event.tool_state || "executing",
+              progress: event.tool_progress || 0,
+              output: event.content,
+              timestamp: Date.now(),
+            };
+            toolLifecycleRef.current = [...toolLifecycleRef.current, lifecycle];
+          } else if (event.type === "tool_result") {
+            const result: ToolResult = {
+              tool_call_id: event.tool_call_id || "",
+              tool_name: event.tool_name || "tool",
+              success: (event.tool_state || "completed") === "completed",
+              output: event.tool_output || event.content || "",
+              artifacts: event.artifacts,
+              timestamp: Date.now(),
+            };
+            toolResultsRef.current = [...toolResultsRef.current, result];
+          } else if (event.type === "stream_mode") {
+            const mode = event.streamMode || "responding";
+            setStreamMode(mode);
+            if (!streamModesRef.current.includes(mode)) {
+              streamModesRef.current = [...streamModesRef.current, mode];
+            }
+          } else if (event.type === "turn_metadata") {
+            const incoming = event.turnMetadata;
+            if (incoming) {
+              turnMetadataRef.current = {
+                turnId: incoming.turnId || event.turnId || turnId,
+                agentName: incoming.agentName,
+                streamModes: streamModesRef.current,
+                toolsInvoked: incoming.toolsInvoked || [],
+                continuable: incoming.continuable !== false,
+                inContextTokens: incoming.inContextTokens,
+                resumeToken: incoming.resumeToken,
+              };
+            }
+          } else if (event.type === "continuation") {
+            continuationHintRef.current = event.continuationHint || "await_user";
+          } else if (event.type === "turn_boundary") {
+            // Marker event for turn boundaries; no-op for now.
+          } else if (event.type === "error") {
+            appendToMessage(convId!, assistantId, `\n\n*Error: ${event.content || "Stream error"}*`);
           } else {
             // Clear status once real content arrives
             setStatusMessage(null);
-            appendToMessage(convId!, assistantId, event.content);
+            appendToMessage(convId!, assistantId, event.content || "");
           }
         }
       } catch (err) {
@@ -188,17 +264,34 @@ export function useChatStream() {
           appendToMessage(convId!, assistantId, "\n\n*Error: Connection failed.*");
         }
       } finally {
+        // Persist collected metadata to store
         if (thoughtTraceRef.current.length > 0) {
           setMessageThoughtTrace(convId!, assistantId, thoughtTraceRef.current);
         }
         if (toolCallTraceRef.current.length > 0) {
           setMessageToolCalls(convId!, assistantId, toolCallTraceRef.current);
         }
+        if (toolLifecycleRef.current.length > 0 && setMessageToolLifecycle) {
+          setMessageToolLifecycle(convId!, assistantId, toolLifecycleRef.current);
+        }
+        if (toolResultsRef.current.length > 0 && setMessageToolResults) {
+          setMessageToolResults(convId!, assistantId, toolResultsRef.current);
+        }
+        if (turnMetadataRef.current && setMessageTurnMetadata) {
+          setMessageTurnMetadata(convId!, assistantId, turnMetadataRef.current);
+        }
+
         setIsStreaming(false);
         setStatusMessage(null);
         setLatestThought(null);
+        setStreamMode(null);
         thoughtTraceRef.current = [];
         toolCallTraceRef.current = [];
+        toolLifecycleRef.current = [];
+        toolResultsRef.current = [];
+        streamModesRef.current = [];
+        turnMetadataRef.current = null;
+        continuationHintRef.current = null;
         abortRef.current = null;
       }
     },
@@ -209,9 +302,15 @@ export function useChatStream() {
       addMessage,
       appendToMessage,
       model,
+      skill,
+      style,
+      researchMode,
       isStreaming,
       setMessageThoughtTrace,
       setMessageToolCalls,
+      setMessageToolLifecycle,
+      setMessageToolResults,
+      setMessageTurnMetadata,
     ]
   );
 
@@ -224,6 +323,7 @@ export function useChatStream() {
     isStreaming,
     statusMessage,
     latestThought,
+    streamMode,
     tokenUsage,
     sendMessage,
     compactConversation,

@@ -1,7 +1,19 @@
-import type { ChatMessage, Model, NodeHealth, StreamEvent } from "@/types/chat";
+import type { ChatMessage, FileAttachment, Model, NodeHealth, Skill, StreamEvent, Style } from "@/types/chat";
 import { streamSSE } from "@/lib/utils/sse-parser";
 
 const API_BASE = "/api/backend";
+
+export interface ChatStreamOptions {
+  messages: Pick<ChatMessage, "role" | "content">[];
+  model?: string;
+  signal?: AbortSignal;
+  sessionId?: string;
+  memoryEnabled?: boolean;
+  skill?: Skill;
+  style?: Style;
+  researchMode?: boolean;
+  attachments?: FileAttachment[];
+}
 
 export async function* sendChatStream(
   messages: Pick<ChatMessage, "role" | "content">[],
@@ -9,11 +21,27 @@ export async function* sendChatStream(
   signal?: AbortSignal,
   sessionId?: string,
   memoryEnabled: boolean = false,
+  skill?: Skill,
+  style?: Style,
+  researchMode?: boolean,
+  attachments?: FileAttachment[],
 ): AsyncGenerator<StreamEvent, void, unknown> {
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    stream: true,
+    session_id: sessionId,
+    memory_enabled: memoryEnabled,
+  };
+  if (skill && skill !== "general") body.skill = skill;
+  if (style && style !== "default") body.style = style;
+  if (researchMode) body.research_mode = true;
+  if (attachments && attachments.length > 0) body.attachments = attachments;
+
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true, session_id: sessionId, memory_enabled: memoryEnabled }),
+    body: JSON.stringify(body),
     signal,
   });
 

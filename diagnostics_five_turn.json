@@ -1,0 +1,47 @@
+[
+  {
+    "turn": 1,
+    "intent": "TRAIN",
+    "reviewed_prior_turns": false,
+    "mars_loop_seen": false,
+    "mentions_maintenance_window": true,
+    "chars": 795,
+    "preview": " > ⏳ _🔒 Security Agent: Scanning input..._   > 🛠️ _[Security Analysis] Algo: Llama-Guard | Output: SAFE_   > ⏳ _✅ Security Agent: Input Cleared._  → Security: PASS > ⏳ _🧠 Neural Cortex: Analyzing intent..._   > 🛠️ _[Router] Intent: TRAI"
+  },
+  {
+    "turn": 2,
+    "intent": "CONVERSATION",
+    "reviewed_prior_turns": false,
+    "mars_loop_seen": false,
+    "mentions_maintenance_window": true,
+    "chars": 1745,
+    "preview": " > ⏳ _🔒 Security Agent: Scanning input..._   > 🛠️ _[Security Analysis] Algo: Llama-Guard | Output: SAFE_   > ⏳ _✅ Security Agent: Input Cleared._  → Security: PASS > ⏳ _🧠 Neural Cortex: Analyzing intent..._   > 🛠️ _[Router] Intent: CONV"
+  },
+  {
+    "turn": 3,
+    "intent": "RESEARCH",
+    "reviewed_prior_turns": false,
+    "mars_loop_seen": false,
+    "mentions_maintenance_window": true,
+    "chars": 2183,
+    "preview": " > ⏳ _🔒 Security Agent: Scanning input..._   > 🛠️ _[Security Analysis] Algo: Llama-Guard | Output: SAFE_   > ⏳ _✅ Security Agent: Input Cleared._  → Security: PASS > ⏳ _🧠 Neural Cortex: Analyzing intent..._   > 🛠️ _[Router] Intent: RESE"
+  },
+  {
+    "turn": 4,
+    "intent": "DEVOPS",
+    "reviewed_prior_turns": false,
+    "mars_loop_seen": true,
+    "mentions_maintenance_window": true,
+    "chars": 4200,
+    "preview": " > ⏳ _🔒 Security Agent: Scanning input..._   > 🛠️ _[Security Analysis] Algo: Llama-Guard | Output: SAFE_   > ⏳ _✅ Security Agent: Input Cleared._  → Security: PASS > ⏳ _🧠 Neural Cortex: Analyzing intent..._   > 🛠️ _[Router] Intent: DEVO"
+  },
+  {
+    "turn": 5,
+    "intent": "CODE",
+    "reviewed_prior_turns": false,
+    "mars_loop_seen": true,
+    "mentions_maintenance_window": true,
+    "chars": 4026,
+    "preview": " > ⏳ _🔒 Security Agent: Scanning input..._   > 🛠️ _[Security Analysis] Algo: Llama-Guard | Output: SAFE_   > ⏳ _✅ Security Agent: Input Cleared._  → Security: PASS > ⏳ _🧠 Neural Cortex: Analyzing intent..._   > 🛠️ _[Router] Intent: CODE"
+  }
+]
