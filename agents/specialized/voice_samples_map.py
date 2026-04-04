@@ -65,6 +65,20 @@ VOICE_SAMPLES_MAP = {
     # Camera
     "camera": "Camera01_camera.wav",
     "beemo is camera": "Camera02_beemoIsCamera.wav",
+    
+    # Conversation Starters / Fillers (for streaming pipeline latency hiding)
+    "hmm": "Conversation_Parade_Interested01.wav",
+    "hmm let me think": "Conversation_Parade_Interested01.wav",
+    "interesting": "Conversation_Parade_Interested01.wav",
+    "oh": "Conversation_Parade_Interested01.wav",
+    "well": "Conversation_Parade_Starter01.wav",
+    "so": "Conversation_Parade_Starter01.wav",
+    "good morning": "Conversation_Parade_Wake01.wav",
+    "wake up": "Conversation_Parade_Wake01.wav",
+    "good night": "Conversation_Parade_Sleep01.wav",
+    "sweet dreams": "Conversation_Parade_Sleep01.wav",
+    "im bored": "Conversation_Parade_Bored01.wav",
+    "whatever": "Conversation_Parade_Random01.wav",
 }
 
 def get_sample_path(text: str) -> str | None:

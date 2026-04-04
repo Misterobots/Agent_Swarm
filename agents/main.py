@@ -9,8 +9,10 @@ if "/workspace" not in sys.path:
     sys.path.insert(0, "/workspace")
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Header
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
+import requests
 import uvicorn
 from contextlib import asynccontextmanager
 from metrics import AGENT_STATE
@@ -249,6 +251,80 @@ async def voice_new_session():
     _voice_agent = None
     agent = get_voice_agent()
     return {"status": "new_session", "session_id": agent.session_id}
+
+@app.post("/v1/voice/stream")
+async def voice_stream(request: VoiceRequest):
+    """
+    Streaming voice endpoint — sentence-pipelined TTS.
+    
+    Pipeline: user text → LLM response → split into sentences →
+    generate TTS for each sentence → stream audio chunks as they complete.
+    
+    First audio chunk arrives after the first sentence is synthesized,
+    not after the entire response. Reduces perceived latency significantly.
+    """
+    import re as _re
+    from fastapi.responses import StreamingResponse
+    from specialized.voice_assistant import Message
+    from specialized.voice_samples_map import get_sample_path, find_sample_in_response
+    
+    agent = get_voice_agent()
+    user_text = request.text.strip()
+    
+    # 1. Check for pre-recorded sample (instant response)
+    sample_path = get_sample_path(user_text)
+    if sample_path:
+        full_path = f"/app/agents/bmo_voice/voice_samples/{sample_path}"
+        agent._persist_turn(user_text, user_text)
+        if os.path.exists(full_path):
+            with open(full_path, "rb") as f:
+                return Response(content=f.read(), media_type="audio/wav")
+    
+    # 2. Get LLM response (non-streaming for now — sentence pipelining happens at TTS level)
+    response_msg = agent.process(Message(role="user", content=user_text))
+    response_text = response_msg.content
+    
+    # 3. Check for sample match in response
+    sample_match = find_sample_in_response(response_text)
+    if sample_match:
+        full_path = f"/app/agents/bmo_voice/voice_samples/{sample_match}"
+        if os.path.exists(full_path):
+            with open(full_path, "rb") as f:
+                audio_data = f.read()
+            return Response(
+                content=audio_data,
+                media_type="audio/wav",
+                headers={"X-BMO-Text": response_text[:200], "X-BMO-Session": agent.session_id},
+            )
+    
+    # 4. Sentence-pipelined TTS: split response, stream each sentence's audio
+    BMO_TTS_URL = os.getenv("BMO_ENGINE_URL", "http://bmo_voice_gpu:8000/speak/stream")
+    
+    def stream_sentences():
+        sentences = _re.split(r'(?<=[.!?])\s+', response_text.strip())
+        sentences = [s for s in sentences if s.strip()]
+        
+        for sentence in sentences:
+            try:
+                resp = requests.post(
+                    BMO_TTS_URL,
+                    params={"text": sentence},
+                    timeout=30,
+                    stream=True,
+                )
+                if resp.status_code == 200:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        if chunk:
+                            yield chunk
+            except Exception as e:
+                logger.warning(f"Sentence TTS failed: {e}")
+                continue
+    
+    return StreamingResponse(
+        stream_sentences(),
+        media_type="audio/wav",
+        headers={"X-BMO-Text": response_text[:200], "X-BMO-Session": agent.session_id},
+    )
 
 # --- OpenAI-Compatible Chat Endpoint (For VS Code Extensions) ---
 class ChatMessage(BaseModel):

@@ -173,12 +173,74 @@ async def speak(background_tasks: BackgroundTasks, text: str = None, file: Uploa
         cleanup_files()
         print(f"UNHANDLED EXCEPTION: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
 
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
+
+@app.post("/speak/stream")
+async def speak_stream(text: str = None, pitch: int = 0, speed: float = 1.0, method: str = "rmvpe"):
+    """
+    Streaming TTS endpoint — yields WAV chunks as they are generated.
+    Splits text into sentences, generates audio for each, and streams
+    each sentence's audio as a chunked response. First audio arrives
+    after the first sentence is synthesized (not the entire text).
+    """
+    from fastapi.responses import StreamingResponse
+    import re as _re
+    import io
+
+    if not text:
+        raise HTTPException(status_code=400, detail="'text' is required.")
+    if pipeline is None:
+        raise HTTPException(status_code=503, detail="Kokoro TTS not loaded.")
+
+    # Split into sentences
+    sentences = _re.split(r'(?<=[.!?])\s+', text.strip())
+    sentences = [s for s in sentences if s.strip()]
+    if not sentences:
+        raise HTTPException(status_code=400, detail="No sentences to speak.")
+
+    def generate_chunks():
+        for sentence in sentences:
+            try:
+                # Generate Kokoro TTS for this sentence
+                generator = pipeline(sentence, voice='af_bella', speed=speed)
+                all_audio = []
+                for gs, ps, audio in generator:
+                    all_audio.append(audio)
+                if not all_audio:
+                    continue
+                full_audio = torch.cat(all_audio, dim=0) if len(all_audio) > 1 else all_audio[0]
+
+                # Save to temp WAV
+                temp_in = f"temp_stream_in_{hash(sentence) & 0xFFFF}.wav"
+                temp_out = f"temp_stream_out_{hash(sentence) & 0xFFFF}.wav"
+                sf.write(temp_in, full_audio.cpu().numpy(), 24000)
+
+                # Run RVC if available
+                if rvc:
+                    try:
+                        rvc.set_params(f0up_key=pitch, f0method=method,
+                                       index_rate=0.75, filter_radius=3, protect=0.33)
+                        rvc.infer_file(temp_in, temp_out)
+                        output_file = temp_out
+                    except Exception:
+                        output_file = temp_in
+                else:
+                    output_file = temp_in
+
+                # Read and yield the audio bytes
+                with open(output_file, "rb") as f:
+                    yield f.read()
+
+                # Cleanup
+                for p in [temp_in, temp_out]:
+                    if os.path.exists(p):
+                        os.remove(p)
+
+            except Exception as e:
+                print(f"Stream chunk error for '{sentence[:30]}': {e}")
+                continue
+
+    return StreamingResponse(generate_chunks(), media_type="audio/wav")
 
 
 @app.post("/listen")
