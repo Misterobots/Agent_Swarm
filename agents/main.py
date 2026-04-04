@@ -221,8 +221,34 @@ async def voice_chat(request: VoiceRequest):
     
     return {
         "text": response_msg.content,
-        "audio_path": response_msg.metadata.get("audio_path") if response_msg.metadata else None
+        "audio_path": response_msg.metadata.get("audio_path") if response_msg.metadata else None,
+        "session_id": agent.session_id,
     }
+
+@app.post("/v1/voice/end_session")
+async def voice_end_session():
+    """
+    End the current BMO voice session — triggers summary + fact extraction.
+    Call when the satellite disconnects or the user says goodbye.
+    """
+    global _voice_agent
+    agent = get_voice_agent()
+    agent.end_session()
+    session_id = agent.session_id
+    _voice_agent = None  # Next request starts a fresh session
+    return {"status": "session_ended", "session_id": session_id}
+
+@app.post("/v1/voice/new_session")
+async def voice_new_session():
+    """
+    Force-start a new BMO session (ends the current one first).
+    """
+    global _voice_agent
+    if _voice_agent is not None:
+        _voice_agent.end_session()
+    _voice_agent = None
+    agent = get_voice_agent()
+    return {"status": "new_session", "session_id": agent.session_id}
 
 # --- OpenAI-Compatible Chat Endpoint (For VS Code Extensions) ---
 class ChatMessage(BaseModel):

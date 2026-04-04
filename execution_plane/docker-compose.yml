@@ -169,9 +169,8 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       # Home Assistant Integration
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
-      # BMO Voice LLM — small 3B model that fits alongside comfyui
-      # Heavy models may OOM when ComfyUI is loaded
-      - BMO_LLM_MODEL=qwen2.5:3b
+      # BMO Voice LLM — 9B model for richer conversation
+      - BMO_LLM_MODEL=qwen3.5:9b
       # BMO Weather location (Open-Meteo, no API key needed)
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}
