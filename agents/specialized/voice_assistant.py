@@ -16,6 +16,7 @@ from specialized.bmo_memory import (
     get_recent_summaries, get_user_profile, update_user_profile,
     cleanup_old_messages,
 )
+from specialized.bmo_dialogue import DialogueTracker
 
 # Setup Logger
 logger = logging.getLogger("VoiceAssistant")
@@ -161,6 +162,9 @@ class VoiceAssistantAgent:
             markdown=False,
         )
 
+        # Dialogue state tracker for multi-turn management
+        self.dialogue = DialogueTracker()
+
         # Run retention cleanup once on init & verify DB connectivity
         try:
             cleanup_old_messages()
@@ -195,12 +199,21 @@ class VoiceAssistantAgent:
         return "\n".join(parts)
 
     def _build_conversation_context(self) -> str:
-        """Build recent conversation turns from DB."""
+        """Build recent conversation turns from DB with smart windowing.
+        
+        Uses dialogue state to decide how many turns to include:
+        - During active multi-turn topic: full window (16 turns)
+        - Chitchat / new topic: shorter window (8 turns)
+        """
         if not MEMORY_AVAILABLE:
             return ""
 
         try:
-            messages = get_recent_messages(self.session_id, limit=CONTEXT_WINDOW)
+            # Smart window size based on dialogue state
+            is_active_topic = self.dialogue.state.topic in ("smart_home", "weather", "news", "time")
+            window = CONTEXT_WINDOW if is_active_topic else CONTEXT_WINDOW // 2
+
+            messages = get_recent_messages(self.session_id, limit=window)
             if not messages:
                 return ""
             lines = []
@@ -307,6 +320,7 @@ class VoiceAssistantAgent:
         self._turn_count = SUMMARIZE_EVERY  # trick the modulo check
         self._maybe_summarize()
         self._turn_count = saved_count
+        self.dialogue.reset()
         logger.info(f"Session {self.session_id} ended ({self._turn_count} turns)")
 
     # ------------------------------------------------------------------
@@ -326,22 +340,34 @@ class VoiceAssistantAgent:
             self._persist_turn(user_text, user_text)
             return Message(role="assistant", content=user_text, metadata={"audio_path": full_sample_path})
 
-        # 2. LLM with Tool Calling (handles HA + general conversation)
-        context = self._build_context(user_text)
+        # 2. Dialogue state: follow-up resolution & clarification check
+        resolved_text = self.dialogue.resolve_context(user_text)
+
+        # Check if BMO should ask for clarification (genuinely ambiguous)
+        if self.dialogue.should_clarify(user_text):
+            clarify_hint = self.dialogue.get_clarification_prompt(user_text)
+            context = self._build_context(clarify_hint)
+        else:
+            context = self._build_context(resolved_text)
+
+        # 3. LLM with Tool Calling (handles HA + general conversation)
         response = self.llm_agent.run(context)
         response_text = response.content
+
+        # Update dialogue state with this turn
+        self.dialogue.update(user_text, response_text)
 
         # Persist to DB
         self._persist_turn(user_text, response_text)
 
-        # 3. Scan LLM response for embedded sample phrases
+        # 4. Scan LLM response for embedded sample phrases
         response_sample = find_sample_in_response(response_text)
         if response_sample:
             full_sample_path = f"/app/agents/bmo_voice/voice_samples/{response_sample}"
             logger.info(f"🎯 Response Sample Match: {response_sample}")
             return Message(role="assistant", content=response_text, metadata={"audio_path": full_sample_path})
 
-        # 4. Generate Voice Response (Fish Audio / RVC)
+        # 5. Generate Voice Response (Fish Audio / RVC)
         logger.info(f"Response: {response_text}")
         audio_path = None
         try:
