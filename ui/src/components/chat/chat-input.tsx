@@ -40,7 +40,7 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   };
 
   return (
-    <div className="border-t border-zinc-800 bg-[#0e1117] p-4">
+    <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-4">
       <div className="flex items-end gap-2 max-w-3xl mx-auto">
         <textarea
           ref={textareaRef}
@@ -50,9 +50,9 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
           placeholder={placeholder || "Send a message..."}
           rows={1}
           className={cn(
-            "flex-1 resize-none bg-[#1a1a2e] text-zinc-200 rounded-xl px-4 py-3",
-            "border border-zinc-700 focus:border-cyan-500 focus:outline-none",
-            "placeholder:text-zinc-500 text-sm leading-relaxed",
+            "flex-1 resize-none bg-[var(--chat-panel)] text-[var(--chat-text)] rounded-xl px-4 py-3",
+            "border border-[var(--chat-border)] focus:border-[var(--chat-accent)] focus:outline-none",
+            "placeholder:text-[var(--chat-muted)] text-sm leading-relaxed",
             "scrollbar-thin scrollbar-thumb-zinc-700"
           )}
         />
@@ -70,8 +70,8 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
             className={cn(
               "flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
               input.trim()
-                ? "bg-cyan-600 hover:bg-cyan-500 text-white"
-                : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                ? "bg-[var(--chat-accent)] hover:brightness-110 text-white"
+                : "bg-[var(--chat-panel)] text-[var(--chat-muted)] cursor-not-allowed"
             )}
           >
             <Send size={16} />

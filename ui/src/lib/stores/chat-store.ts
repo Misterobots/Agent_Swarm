@@ -20,6 +20,7 @@ interface ChatState {
   addMessage: (conversationId: string, message: Omit<ChatMessage, "id" | "timestamp">) => string;
   updateMessage: (conversationId: string, messageId: string, content: string) => void;
   appendToMessage: (conversationId: string, messageId: string, delta: string) => void;
+  updateConversation: (id: string, updates: Partial<Pick<Conversation, "memoryEnabled" | "title" | "model">>) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -115,6 +116,13 @@ export const useChatStore = create<ChatState>()(
               ),
             };
           }),
+        })),
+
+      updateConversation: (id, updates) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === id ? { ...c, ...updates, updatedAt: Date.now() } : c
+          ),
         })),
     }),
     { name: "hive-chats" }

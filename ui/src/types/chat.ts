@@ -1,8 +1,23 @@
+export interface TurnMetadata {
+  turnId: string;
+  agentName?: string;
+  streamModes?: string[];
+}
+
+export interface FileAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
+  turnMetadata?: TurnMetadata;
 }
 
 export interface Conversation {
@@ -12,6 +27,7 @@ export interface Conversation {
   model: string;
   createdAt: number;
   updatedAt: number;
+  memoryEnabled?: boolean;
 }
 
 export interface ChatCompletionChunk {
