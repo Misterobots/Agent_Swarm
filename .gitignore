@@ -39,3 +39,13 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# ML model weights & training artifacts (use Git LFS or external storage)
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.onnx
+training_output/
+execution_plane/training_output/
