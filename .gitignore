@@ -40,7 +40,7 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# ML model weights & training artifacts (use Git LFS or external storage)
+# ML model weights & training artifacts (local to lab only)
 *.gguf
 *.safetensors
 *.pt
@@ -48,4 +48,11 @@ Thumbs.db
 *.bin
 *.onnx
 training_output/
+execution_plane/training_output/
+
+# Training & generated data (local to lab only)
+training_data/
+delivered_artifacts/
+user_projects/
+workspace/
 execution_plane/training_output/
