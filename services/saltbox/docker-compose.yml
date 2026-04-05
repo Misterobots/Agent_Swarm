@@ -1,0 +1,140 @@
+# Saltbox Media Server Stack — R730 (192.168.2.103)
+# Network: saltbox (isolated bridge), ports 80/8443 via Traefik
+# Coexists with AI Lab stack (ai_lab_net) — no shared containers/networks/volumes
+#
+# Saltbox-managed services (installed via `sb install <role>`):
+#   Plex, Sonarr, Radarr, Overseerr, Prowlarr, Jellyfin, qBittorrent, etc.
+#
+# This compose file adds services NOT in the Saltbox role catalog:
+#   - Seafile (cloud storage / file sync)
+#   - Romm (ROM manager + in-browser emulation)
+
+services:
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # SEAFILE — Self-hosted cloud storage & file sync
+  # https://github.com/haiwen/seafile
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  seafile-mysql:
+    image: mariadb:11.3
+    container_name: seafile-mysql
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${SEAFILE_MYSQL_ROOT_PASSWORD}
+      MARIADB_LOG_CONSOLE: "true"
+    volumes:
+      - seafile_mysql_data:/var/lib/mysql
+    networks:
+      - saltbox
+
+  memcached:
+    image: memcached:1.6-alpine
+    container_name: seafile-memcached
+    restart: unless-stopped
+    entrypoint: memcached -m 256
+    networks:
+      - saltbox
+
+  seafile:
+    image: seafileltd/seafile-mc:12.0-latest
+    container_name: seafile
+    restart: unless-stopped
+    depends_on:
+      - seafile-mysql
+      - memcached
+    environment:
+      DB_HOST: seafile-mysql
+      DB_ROOT_PASSWD: ${SEAFILE_MYSQL_ROOT_PASSWORD}
+      SEAFILE_ADMIN_EMAIL: ${SEAFILE_ADMIN_EMAIL}
+      SEAFILE_ADMIN_PASSWORD: ${SEAFILE_ADMIN_PASSWORD}
+      SEAFILE_SERVER_HOSTNAME: ${SEAFILE_HOSTNAME:-seafile.shivelymedia.com}
+      SEAFILE_SERVER_LETSENCRYPT: "false"  # Traefik handles TLS
+      TIME_ZONE: America/Chicago
+    volumes:
+      - seafile_data:/opt/seafile-data
+    ports:
+      - "8082:80"
+    networks:
+      - saltbox
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.seafile.rule=Host(`seafile.shivelymedia.com`)"
+      - "traefik.http.routers.seafile.entrypoints=websecure"
+      - "traefik.http.routers.seafile.tls.certresolver=cfdns"
+      - "traefik.http.services.seafile.loadbalancer.server.port=80"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # ROMM — ROM Manager + in-browser emulation
+  # https://github.com/rommapp/romm
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  romm-db:
+    image: mariadb:11.3
+    container_name: romm-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${ROMM_DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: romm
+      MARIADB_USER: romm
+      MARIADB_PASSWORD: ${ROMM_DB_PASSWORD}
+    volumes:
+      - romm_mysql_data:/var/lib/mysql
+    networks:
+      - saltbox
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      start_interval: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  romm:
+    image: rommapp/romm:latest
+    container_name: romm
+    restart: unless-stopped
+    depends_on:
+      romm-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: romm-db
+      DB_NAME: romm
+      DB_USER: romm
+      DB_PASSWD: ${ROMM_DB_PASSWORD}
+      ROMM_AUTH_SECRET_KEY: ${ROMM_AUTH_SECRET_KEY}
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+      STEAMGRIDDB_API_KEY: ${STEAMGRIDDB_API_KEY:-}
+      ENABLE_RESCAN_ON_FILESYSTEM_CHANGE: "true"
+      RESCAN_ON_FILESYSTEM_CHANGE_DELAY: "5"
+    volumes:
+      - romm_resources:/romm/resources
+      - romm_redis_data:/redis-data
+      - ${ROMM_LIBRARY_PATH:-/mnt/storage/roms}:/romm/library
+      - ${ROMM_ASSETS_PATH:-/mnt/storage/romm-assets}:/romm/assets
+    ports:
+      - "8083:8080"
+    networks:
+      - saltbox
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.romm.rule=Host(`romm.shivelymedia.com`)"
+      - "traefik.http.routers.romm.entrypoints=websecure"
+      - "traefik.http.routers.romm.tls.certresolver=cfdns"
+      - "traefik.http.services.romm.loadbalancer.server.port=8080"
+
+networks:
+  saltbox:
+    external: true
+
+volumes:
+  seafile_mysql_data:
+    driver: local
+  seafile_data:
+    driver: local
+  romm_mysql_data:
+    driver: local
+  romm_resources:
+    driver: local
+  romm_redis_data:
+    driver: local
