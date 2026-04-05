@@ -266,7 +266,19 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
     
     # 1. Load Context (Memory Bridge)
     from context_manager import get_pending_context, clear_context, save_pending_image_clarification
+    from memory_system import memory as _memory_bridge
     pending_ctx = get_pending_context()
+
+    # 1a. Universal Memory Injection — collect ALL relevant rules up front
+    #     so every downstream route (not just MarsRL) benefits.
+    _all_rules = []
+    for _domain in ("coding_rules", "visual_rules", "general_rules"):
+        _all_rules.extend(_memory_bridge.get_relevant_rules(user_input, _domain))
+    _memory_context_block = ""
+    if _all_rules:
+        _deduped = list(dict.fromkeys(_all_rules))
+        _memory_context_block = "\n\n[🧠 MEMORY] Apply these learned rules:\n" + "\n".join(f"- {r}" for r in _deduped)
+        yield {"type": "log", "content": f"[Memory] Loaded {len(_deduped)} rules across all domains."}
     
     # Check if this is a reply to a clarification
     if pending_ctx:
@@ -334,6 +346,13 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         if ace_token:
             set_current_token(ace_token) if JWT_ACE_AVAILABLE else None
             yield {"type": "log", "content": f"[JWT-ACE] Token issued for {template_metadata.get('template_id', intent)} v{template_metadata.get('template_version', '1.0')}"}
+
+        # --- Capability Guard: Set execution context for tool-level access control ---
+        try:
+            from core_tools.capability_guard import set_current_agent, clear_current_agent
+            _CAPABILITY_GUARD = True
+        except ImportError:
+            _CAPABILITY_GUARD = False
 
         route_start_time = time.time()
 
@@ -474,6 +493,7 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             
             from phi.model.ollama import Ollama
             from agents.config import LIBRARIAN_MODEL
+            from core_tools.workspace_search import search_files, search_content, read_workspace_file
 
             resolved_model = _resolve_model_for_intent("RESEARCH", LIBRARIAN_MODEL)
             resolved_host = get_best_host_for_model(resolved_model)
@@ -481,20 +501,25 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             researcher = Agent(
                 name="Librarian",
                 model=Ollama(id=resolved_model, host=resolved_host),
+                tools=[search_files, search_content, read_workspace_file],
                 instructions="""You are the Hive Librarian and Scholar.
                 Your goal is to provide deep historical context, literary analysis, and general knowledge.
                 You are the guardian of facts and culture. Focus on: History, Literature, Philosophy, Science, and Factual Explanations.
-                If the user asks for code, decline and suggest they ask the Architect.
+                You have access to workspace search tools — use them when asked about project files or documentation.
+                If the user asks for code changes, decline and suggest they ask the Architect.
                 If the user asks for images, decline and suggest they ask the Art Director.
                 """,
-                show_tool_calls=False
+                show_tool_calls=False,
+                run_tool_calls=True
             )
             
             try:
                 final_input = user_input
+                if _memory_context_block:
+                    final_input = f"{final_input}{_memory_context_block}"
                 if extracted_context:
                     yield {"type": "log", "content": "[Librarian] Reading Attached RAG Context..."}
-                    final_input = f"{user_input}\n\n[Attached Document Context]:\n{extracted_context}"
+                    final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
                     
                 with request_lock(context="text"):
                     response_stream = researcher.run(final_input, stream=True)
@@ -659,8 +684,11 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
             iot_agent = get_iot_agent()
             
             try:
+                iot_input = user_input
+                if _memory_context_block:
+                    iot_input = f"{iot_input}{_memory_context_block}"
                 yield {"type": "log", "content": f"[IoT] Dispatching: '{user_input}'"}
-                response: RunResponse = iot_agent.run(user_input)
+                response: RunResponse = iot_agent.run(iot_input)
                 yield {"type": "response", "content": response.content}
             except Exception as e:
                 yield {"type": "error", "content": f"IoT Error: {e}"}
@@ -673,16 +701,13 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         else:
             yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}
             AGENT_STATE.labels(agent_name="Architect").set(2)
+            if _CAPABILITY_GUARD:
+                set_current_agent("Code Developer")
 
             try:
-                from memory_system import memory
-                code_rules = memory.get_relevant_rules(user_input, "coding_rules")
-                
                 final_input = user_input
-                if code_rules:
-                    rule_block = "\n".join([f"- {r}" for r in code_rules])
-                    final_input = f"{user_input}\n\n[🧠 MEMORY] Apply these user-taught coding rules:\n{rule_block}"
-                    yield {"type": "log", "content": f"[Memory] Injected {len(code_rules)} coding rules."}
+                if _memory_context_block:
+                    final_input = f"{final_input}{_memory_context_block}"
 
                 if extracted_context:
                     final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
@@ -745,6 +770,12 @@ def chat_swarm(user_input: str, session_id: str = "default_session", history: li
         if JWT_ACE_AVAILABLE:
             try:
                 clear_current_token()
+            except Exception:
+                pass
+        # Clean up capability guard context
+        if _CAPABILITY_GUARD:
+            try:
+                clear_current_agent()
             except Exception:
                 pass
         # Record performance metrics

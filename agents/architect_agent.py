@@ -5,6 +5,7 @@ import os
 
 from tools.file_ops import read_file, write_file, list_dir
 from tools.terminal import run_command
+from core_tools.git_ops import get_current_branch, get_status, get_diff, stage_all, commit_changes, get_branches
 
 from phi.knowledge.combined import CombinedKnowledgeBase
 from phi.vectordb.pgvector import PgVector
@@ -35,8 +36,31 @@ def get_architect_agent(session_id: Optional[str] = None, model_name: Optional[s
     if not AGNO_DB_URL or "dell_wyse_ip" in AGNO_DB_URL:
         knowledge_base = None
     else:
+        from phi.knowledge.text import TextKnowledgeBase
+        from phi.document.reader.text import TextReader
+
+        # Populate with workspace documentation if available
+        doc_sources = []
+        for doc_path in ["/workspace/README.md", "/workspace/walkthrough.md", "/workspace/docs"]:
+            if os.path.exists(doc_path):
+                if os.path.isdir(doc_path):
+                    from phi.knowledge.text import TextKnowledgeBase
+                    # Directory sources will be picked up by the knowledge base
+                    pass
+                else:
+                    doc_sources.append(doc_path)
+
         knowledge_base = CombinedKnowledgeBase(
-            sources=[],
+            sources=[
+                TextKnowledgeBase(
+                    path=doc_sources,
+                    reader=TextReader(),
+                    vector_db=PgVector(
+                        table_name="architect_knowledge",
+                        db_url=AGNO_DB_URL,
+                    ),
+                )
+            ] if doc_sources else [],
             vector_db=PgVector(
                 table_name="architect_knowledge",
                 db_url=AGNO_DB_URL,
@@ -57,7 +81,7 @@ def get_architect_agent(session_id: Optional[str] = None, model_name: Optional[s
         num_history_responses=5,
         description="I am the Architect. I plan, write, and execute code using tools.",
         instructions=ARCHITECT_INSTRUCTIONS,
-        tools=[read_file, write_file, list_dir, run_command],
+        tools=[read_file, write_file, list_dir, run_command, get_current_branch, get_status, get_diff, stage_all, commit_changes, get_branches],
         knowledge=knowledge_base,
         show_tool_calls=False,
         run_tool_calls=True, # Enable NATIVE execution

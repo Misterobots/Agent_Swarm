@@ -75,15 +75,22 @@ class Event:
 
 def detect_intent(input_text: str) -> str:
     """
-    Simple keyword classifier for routing.
-    Duplicated minimal logic to avoid circular dependency with router.py
+    Intent classification for queue routing.
+    Delegates to the semantic router when available, falls back to keywords.
     """
-    text = input_text.lower()
-    if "3d" in text or "forge" in text or ("model" in text and "generate" in text):
-        return "3D"
-    if "image" in text or "picture" in text or "draw" in text or "photo" in text:
-        return "IMAGE"
-    return "DEFAULT"
+    try:
+        from semantic_router import get_semantic_router
+        router_inst = get_semantic_router()
+        decision = router_inst.route(input_text)
+        return decision.get("intent", "DEFAULT")
+    except Exception:
+        # Fallback: lightweight keywords (only used if semantic_router is down)
+        text = input_text.lower()
+        if "3d" in text or "forge" in text:
+            return "3D"
+        if "image" in text or "picture" in text or "draw" in text or "photo" in text:
+            return "IMAGE"
+        return "DEFAULT"
 
 from gpu_allocator import GPUAllocator
 

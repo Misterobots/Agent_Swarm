@@ -464,6 +464,97 @@ async def health_nodes():
     return {"nodes": monitor.get_all_statuses()}
 
 
+# --- RAG Knowledge Ingestion Endpoint ---
+class IngestRequest(BaseModel):
+    text: str
+    metadata: dict = {}
+
+class IngestFileRequest(BaseModel):
+    file_path: str
+
+@app.post("/api/v1/knowledge/ingest")
+async def ingest_knowledge(req: IngestRequest):
+    """
+    Ingest a text document into the Architect's PgVector knowledge base.
+    Splits text into chunks and embeds into the vector DB.
+    """
+    from config import AGNO_DB_URL
+    if not AGNO_DB_URL or "dell_wyse_ip" in AGNO_DB_URL:
+        raise HTTPException(status_code=503, detail="PgVector DB not configured (AGNO_DB_URL)")
+
+    try:
+        from phi.knowledge.text import TextKnowledgeBase
+        from phi.vectordb.pgvector import PgVector
+
+        kb = TextKnowledgeBase(
+            sources=[],
+            vector_db=PgVector(
+                table_name="architect_knowledge",
+                db_url=AGNO_DB_URL,
+            ),
+        )
+        # Use PgVector's insert directly via the knowledge base
+        from phi.document import Document
+        doc = Document(content=req.text, meta_data=req.metadata)
+        kb.vector_db.insert([doc])
+        logger.info(f"[RAG] Ingested document ({len(req.text)} chars)")
+        return {"status": "ingested", "chars": len(req.text), "metadata": req.metadata}
+    except ImportError as e:
+        raise HTTPException(status_code=503, detail=f"RAG dependencies missing: {e}")
+    except Exception as e:
+        logger.error(f"[RAG] Ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/knowledge/ingest_file")
+async def ingest_knowledge_file(req: IngestFileRequest):
+    """
+    Ingest a file from the workspace into the knowledge base.
+    Supports .txt, .md, .py, .json files.
+    """
+    import os as _os
+    file_path = req.file_path
+
+    # Validate path is within workspace
+    workspace_root = "/workspace"
+    resolved = _os.path.realpath(file_path)
+    if not resolved.startswith(workspace_root):
+        raise HTTPException(status_code=403, detail="Path must be within /workspace")
+
+    if not _os.path.isfile(resolved):
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+
+    try:
+        with open(resolved, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
+
+    # Delegate to the text ingestion endpoint logic
+    from config import AGNO_DB_URL
+    if not AGNO_DB_URL or "dell_wyse_ip" in AGNO_DB_URL:
+        raise HTTPException(status_code=503, detail="PgVector DB not configured")
+
+    try:
+        from phi.knowledge.text import TextKnowledgeBase
+        from phi.vectordb.pgvector import PgVector
+        from phi.document import Document
+
+        kb = TextKnowledgeBase(
+            sources=[],
+            vector_db=PgVector(
+                table_name="architect_knowledge",
+                db_url=AGNO_DB_URL,
+            ),
+        )
+        doc = Document(content=content, meta_data={"source": file_path, "type": _os.path.splitext(file_path)[1]})
+        kb.vector_db.insert([doc])
+        logger.info(f"[RAG] Ingested file: {file_path} ({len(content)} chars)")
+        return {"status": "ingested", "file": file_path, "chars": len(content)}
+    except Exception as e:
+        logger.error(f"[RAG] File ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     # If run directly via python, use uvicorn
     import uvicorn
