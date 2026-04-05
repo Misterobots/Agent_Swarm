@@ -1,84 +1,173 @@
-import os
-import sys
-import time
+import torch
 import numpy as np
-import sounddevice as sd
-import soundfile as sf
+import os
+import time
 import requests
-import openwakeword
-from openwakeword.model import Model
+import soundfile as sf
+import sounddevice as sd
 import tempfile
-import threading
-import queue
+import scipy.signal
 import re
+import sys
 import subprocess
-import socket
-from dotenv import load_dotenv
+import threading
+def main():
+    print("--- 🛰️ AI Lab Voice Satellite Online ---")
+    # 1. Load Model
+    print("Loading Wake Word Model...")
+    import openwakeword
+    all_models = openwakeword.get_pretrained_model_paths()
+    if all_models is None:
+        all_models = []
+    local_models = [f for f in os.listdir(".") if f.endswith(".onnx") and any(m in f for m in WAKE_WORD_MODELS)]
+    model_paths = [os.path.abspath(f) for f in local_models]
+    if not model_paths:
+        model_paths = [p for p in all_models if any(m in p for m in WAKE_WORD_MODELS)]
+    if not model_paths:
+        print(f"⚠️ Warning: Could not find model {WAKE_WORD_MODELS} in local directory or built-ins.")
+        print("Falling back to 'hey_jarvis_v0.1' for now so you can use the manual trigger.")
+        model_paths = [p for p in all_models if "hey_jarvis_v0.1" in p]
+        active_models = ["hey_jarvis_v0.1"]
+    else:
+        active_models = WAKE_WORD_MODELS
+    if not model_paths:
+        print("❌ Critical Error: No built-in models found at all.")
+        sys.exit(1)
+    owwModel = Model(wakeword_model_paths=model_paths)
+    print(f"Model Loaded: {[os.path.basename(p) for p in model_paths]}")
+    WW_TO_CHECK = active_models
 
-# --- Global Queues & Sockets ---
-face_queue = queue.Queue()
-udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # 2. Queues & Threads
+    audio_queue = queue.Queue()
+    trigger_queue = queue.Queue()
+    global face_queue
+    face_queue = queue.Queue()
+    threading.Thread(target=face_worker, daemon=True).start()
 
-# --- Configuration ---
-WAKE_WORD_MODELS = ["hey_beeMo"] # Custom BMO model
-SAMPLE_RATE = 16000
-CHUNK_SIZE = 1280 # 80ms
-THRESHOLD = 0.5
-POST_INTERACTION_COOLDOWN = 2.0  # seconds to ignore audio after speaking
+    # 3. State Machine
+    state_machine = BMOStateMachine(update_bmo_face)
+    state_machine.transition("IDLE")
 
-# --- NETWORK CONFIGURATION ---
-# Load from network.env (single source of truth) or environment variable
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-# Try scripts/../network.env (when run from repo) or bmo_client/network.env (when deployed to Pi)
-for _candidate in [os.path.join(_script_dir, "..", "network.env"), os.path.join(_script_dir, "network.env")]:
-    if os.path.exists(_candidate):
-        load_dotenv(_candidate)
-        break
+    def callback(indata, frames, time, status):
+        if status and 'input overflow' not in str(status):
+            print(f"Audio Status: {status}")
+        audio_queue.put(indata.copy())
 
-# Try centralized config first, then env var, then fallback
-HOST_IP = os.getenv("JUSTIN_PC_IP", os.getenv("BMO_HOST_IP", ""))
+    # 4. Keyboard Trigger Thread
+    def keyboard_listener():
+        while True:
+            try:
+                input("\n⌨️ Press ENTER to trigger BMO manually...\n")
+                print("🛠️ DEBUG: Keyboard Input Detected. Sending trigger...")
+                trigger_queue.put("manual")
+            except EOFError:
+                time.sleep(3600)
+    threading.Thread(target=keyboard_listener, daemon=True).start()
 
-if not HOST_IP:
-    print("\n❌ ERROR: HOST_IP could not be determined.")
-    print("Set JUSTIN_PC_IP in network.env or BMO_HOST_IP environment variable.")
-    sys.exit(1)
+    # 5. Detect MIC device and start Main Loop
+    MIC_DEVICE = detect_mic_device()
+    HARDWARE_RATE = 48000
+    HARDWARE_CHUNK = int(CHUNK_SIZE * (HARDWARE_RATE / SAMPLE_RATE))
+    print(f"\n🛰️  Satellite Listening at {HARDWARE_RATE}Hz...")
+    print("⌨️   Trigger: Press ENTER in this terminal.")
+    print("🎙️   Wake Word: 'Hey Jarvis' (or custom hey_bmo.onnx)\n")
+    last_heartbeat = time.time()
 
-print(f"🌐 Host IP: {HOST_IP}")
-
-VOICE_ENGINE_URL = f"http://{HOST_IP}:8020/stt"
-AGENT_URL = f"http://{HOST_IP}:8000/v1/voice/chat"
-
-# --- BMO Face Sync ---
-BMO_FIFO = "/tmp/bmo_cmd.fifo"
-
-def update_bmo_face(expression):
-    """Queue a face expression update (Thread-safe) and broadcast state."""
-    face_queue.put(expression)
-    try:
-        # Broadcast the state change to the Host PC for instant monitoring
-        udp_sock.sendto(f"BMO_STATE:{expression}".encode('utf-8'), (HOST_IP, 8123))
-    except Exception:
-        pass
-
-def face_worker():
-    """Background worker to handle persistent FIFO writes."""
-    print("🎨 Face Worker Thread Started.")
     while True:
-        expression = face_queue.get()
         try:
-            if os.path.exists(BMO_FIFO):
-                # Open the FIFO, write the command, and close it immediately.
-                # This guarantees that bmo_driver reads it immediately without buffering issues.
-                with open(BMO_FIFO, 'w') as f:
-                    f.write(f"face:{expression}\n")
-                    f.flush()
-            else:
-                print(f"⚠️ BMO_FIFO not found at {BMO_FIFO}.")
+            print(f"🛠️ DEBUG: Attempting to open sd.InputStream on Mic {MIC_DEVICE} (This may hang if device is busy)...")
+            with sd.InputStream(samplerate=HARDWARE_RATE, blocksize=HARDWARE_CHUNK, device=MIC_DEVICE, channels=1, callback=callback, dtype='int16', latency='high'):
+                print("🛠️ DEBUG: InputStream SUCCESS! Loop entering active state...")
+                state_machine.transition("IDLE")
+                interacted = False
+                speech_buffer = []
+                THRESHOLD = 0.5  # Placeholder threshold
+                while not interacted:
+                    if time.time() - last_heartbeat > 5:
+                        print(f"🛠️ DEBUG: Main loop is alive. Q sizes: audio={audio_queue.qsize()}, trigger={trigger_queue.qsize()}")
+                        last_heartbeat = time.time()
+                    # 1. Manual/keyboard trigger
+                    while not trigger_queue.empty():
+                        trigger = trigger_queue.get_nowait()
+                        if trigger == "manual":
+                            print("⚡ Manual Trigger Detected!")
+                            state_machine.transition("LISTENING")
+                            interacted = True
+                            break
+                    if interacted: break
+                    # 2. Wake word detection
+                    try:
+                        chunk = audio_queue.get(timeout=0.05)
+                        if audio_queue.qsize() > 5:
+                            continue
+                        processed_chunk = chunk[::3]
+                        if len(processed_chunk.shape) > 1:
+                            processed_chunk = processed_chunk.flatten()
+                        prediction = owwModel.predict(processed_chunk)
+                        for mdl in WW_TO_CHECK:
+                            mdl_raw = mdl.replace(".onnx", "")
+                            score = prediction.get(mdl, prediction.get(mdl_raw, 0))
+                            if score >= THRESHOLD:
+                                print(f"⚡ Wake Word Detected: {mdl_raw}!")
+                                state_machine.transition("WAKE_DETECTED")
+                                play_wake_ping()
+                                time.sleep(0.1)
+                                state_machine.transition("LISTENING")
+                                interacted = True
+                                break
+                        # --- VAD: Buffer speech chunks for later ---
+                        if state_machine.state == "LISTENING":
+                            speech_buffer.append(processed_chunk)
+                            # If speech detected, keep buffering; if silence, stop
+                            if not vad_detect_speech(processed_chunk):
+                                print("[VAD] Silence detected, ending recording.")
+                                interacted = True
+                                break
+                    except queue.Empty:
+                        pass
         except Exception as e:
-            print(f"Face Worker Error: {expression} -> {e}")
-        face_queue.task_done()
-# Note: If accessing from WSL or container, localhost might need adjustment. 
-# Assuming script runs on Host Windows Machine.
+            interacted = False
+            print(f"🛠️ DEBUG: ALSA Error or Busy Device: {e}")
+            print("Tip: Make sure no other program (like bmo_driver.py) is using the microphone.")
+            time.sleep(2)
+        # --- OUTSIDE MIC STREAM ---
+        if 'interacted' not in locals():
+            interacted = False
+        if interacted:
+            state_machine.transition("PROCESSING")
+            wants_reply = handle_interaction()
+            with audio_queue.mutex: audio_queue.queue.clear()
+            with trigger_queue.mutex: trigger_queue.queue.clear()
+            owwModel.reset()
+            if wants_reply:
+                print("❓ BMO asked a question. Triggering continuous conversation...")
+                trigger_queue.put("manual")
+            else:
+                print(f"💤 Cooldown ({POST_INTERACTION_COOLDOWN}s)...")
+                time.sleep(POST_INTERACTION_COOLDOWN)
+                print("\nListening...")
+            state_machine.transition("IDLE")
+            e = None
+            print(f"🛠️ DEBUG: ALSA Error or Busy Device: {e}")
+            print("Tip: Make sure no other program (like bmo_driver.py) is using the microphone.")
+            time.sleep(2)
+        # --- OUTSIDE MIC STREAM ---
+        if 'interacted' not in locals():
+            interacted = False
+        if interacted:
+            state_machine.transition("PROCESSING")
+            wants_reply = handle_interaction()
+            with audio_queue.mutex: audio_queue.queue.clear()
+            with trigger_queue.mutex: trigger_queue.queue.clear()
+            owwModel.reset()
+            if wants_reply:
+                print("❓ BMO asked a question. Triggering continuous conversation...")
+                trigger_queue.put("manual")
+            else:
+                print(f"💤 Cooldown ({POST_INTERACTION_COOLDOWN}s)...")
+                time.sleep(POST_INTERACTION_COOLDOWN)
+                print("\nListening...")
+            state_machine.transition("IDLE")
 
 # Audio Playback
 def generate_silence(duration=1.0, filename="/tmp/silence.wav"):
@@ -298,220 +387,149 @@ def main():
     # Resolve absolute paths for older openwakeword versions
     import openwakeword
     all_models = openwakeword.get_pretrained_model_paths()
-    
-    # Check for local models first
-    local_models = [f for f in os.listdir(".") if f.endswith(".onnx") and any(m in f for m in WAKE_WORD_MODELS)]
-    model_paths = [os.path.abspath(f) for f in local_models]
-    
-    if not model_paths:
-        # Fallback to built-ins
-        model_paths = [p for p in all_models if any(m in p for m in WAKE_WORD_MODELS)]
-    
-    if not model_paths:
-        print(f"⚠️ Warning: Could not find model {WAKE_WORD_MODELS} in local directory or built-ins.")
-        print("Falling back to 'hey_jarvis_v0.1' for now so you can use the manual trigger.")
-        model_paths = [p for p in all_models if "hey_jarvis_v0.1" in p]
-        # Update the active models list to match the fallback
-        active_models = ["hey_jarvis_v0.1"]
-    else:
-        active_models = WAKE_WORD_MODELS
-        
-    if not model_paths:
-        print("❌ Critical Error: No built-in models found at all.")
-        sys.exit(1)
-        
-    owwModel = Model(wakeword_model_paths=model_paths)
-    print(f"Model Loaded: {[os.path.basename(p) for p in model_paths]}")
-    
-    # Use the active models for prediction checks
-    WW_TO_CHECK = active_models
-
-    # 2. Queues & Threads
-    audio_queue = queue.Queue()
-    trigger_queue = queue.Queue()
-    
-    # Start Face worker
-    threading.Thread(target=face_worker, daemon=True).start()
-
-    def callback(indata, frames, time, status):
-        if status and 'input overflow' not in str(status):
-            print(f"Audio Status: {status}")
-        audio_queue.put(indata.copy())
-
-    # 3. Keyboard Trigger Thread
-    def keyboard_listener():
-        while True:
-            try:
-                input("\n⌨️ Press ENTER to trigger BMO manually...\n")
-                print("🛠️ DEBUG: Keyboard Input Detected. Sending trigger...")
-                trigger_queue.put("manual")
-            except EOFError:
-                # Running as a background service without a terminal
-                time.sleep(3600)  # Wait forever without burning CPU
-
-    threading.Thread(target=keyboard_listener, daemon=True).start()
-
-    # 4. Detect MIC device and start Main Loop
-    MIC_DEVICE = detect_mic_device()
-    HARDWARE_RATE = 48000
-    HARDWARE_CHUNK = int(CHUNK_SIZE * (HARDWARE_RATE / SAMPLE_RATE))
-    
-    print(f"\n🛰️  Satellite Listening at {HARDWARE_RATE}Hz...")
-    print("⌨️   Trigger: Press ENTER in this terminal.")
-    print("🎙️   Wake Word: 'Hey Jarvis' (or custom hey_bmo.onnx)\n")
-    update_bmo_face("neutral")
-
-    last_heartbeat = time.time()
+    if all_models is None:
+        all_models = []
+    # 1. Load Wake Word Model
+    print("Loading Wake Word Model...")
     while True:
         try:
             print(f"🛠️ DEBUG: Attempting to open sd.InputStream on Mic {MIC_DEVICE} (This may hang if device is busy)...")
-            # We wrap the listener in a context manager so it stops/releases the mic during interaction
             with sd.InputStream(samplerate=HARDWARE_RATE, blocksize=HARDWARE_CHUNK, device=MIC_DEVICE, channels=1, callback=callback, dtype='int16', latency='high'):
                 print("🛠️ DEBUG: InputStream SUCCESS! Loop entering active state...")
+                state_machine.transition("IDLE")
                 interacted = False
+                speech_buffer = []
+                THRESHOLD = 0.5  # Placeholder threshold
                 while not interacted:
-                    # Loop Heartbeat every 5s
                     if time.time() - last_heartbeat > 5:
                         print(f"🛠️ DEBUG: Main loop is alive. Q sizes: audio={audio_queue.qsize()}, trigger={trigger_queue.qsize()}")
                         last_heartbeat = time.time()
-
-                    # 1. Check for manual/keyboard trigger (High Priority)
+                    # 1. Manual/keyboard trigger
                     while not trigger_queue.empty():
                         trigger = trigger_queue.get_nowait()
                         if trigger == "manual":
                             print("⚡ Manual Trigger Detected!")
-                            update_bmo_face("listening")
+                            state_machine.transition("LISTENING")
                             interacted = True
                             break
                     if interacted: break
-
-                    # 2. Check for audio data (Wake Word)
+                    # 2. Wake word detection
                     try:
-                        # Timeout must be short to keep manual trigger reactive
                         chunk = audio_queue.get(timeout=0.05)
-                        
-                        # Handle potential audio overflow - if the queue is backing up, 
-                        # just skip wake word processing to let it catch up without crashing
                         if audio_queue.qsize() > 5:
-                            # Still take the item out to drain the queue quickly, 
-                            # but skip the expensive prediction step
                             continue
-
-                        # PERFORMANCE OPTIMIZATION: 
-                        # Raspberry Pi chokes on scipy.signal.resample for live 48k audio.
-                        # Since 48000 / 16000 = 3, we simply take every 3rd sample (decimation).
-                        # This is nearly 100x faster than FFT-based resampling.
                         processed_chunk = chunk[::3]
-                        
-                        # Ensure correct shape for ONNX
                         if len(processed_chunk.shape) > 1:
                             processed_chunk = processed_chunk.flatten()
-
                         prediction = owwModel.predict(processed_chunk)
-                    
                         for mdl in WW_TO_CHECK:
-                            # Extract basic name for key check (e.g. 'hey_beeMo' from 'hey_beeMo.onnx')
-                            # Match both raw name and name with extension to be safe
                             mdl_raw = mdl.replace(".onnx", "")
                             score = prediction.get(mdl, prediction.get(mdl_raw, 0))
-                            
                             if score >= THRESHOLD:
                                 print(f"⚡ Wake Word Detected: {mdl_raw}!")
-                                
-                                # 1. Visual Confirmation — "acknowledged" flash
-                                update_bmo_face("acknowledged")
-                                
-                                # 2. Auditory Confirmation — two-tone chime
+                                state_machine.transition("WAKE_DETECTED")
                                 play_wake_ping()
-                                
-                                # 3. Transition to "listening" for recording phase
-                                update_bmo_face("listening")
-                                
-                                # 4. Brief sleep so face_worker thread can push FIFO 
                                 time.sleep(0.1)
-                                
+                                state_machine.transition("LISTENING")
                                 interacted = True
                                 break
-                                
+                        # --- VAD: Buffer speech chunks for later ---
+                        if state_machine.state == "LISTENING":
+                            speech_buffer.append(processed_chunk)
+                            # If speech detected, keep buffering; if silence, stop
+                            if not vad_detect_speech(processed_chunk):
+                                print("[VAD] Silence detected, ending recording.")
+                                interacted = True
+                                break
                     except queue.Empty:
                         pass
+        except Exception as e:
+            interacted = False
+            print(f"🛠️ DEBUG: ALSA Error or Busy Device: {e}")
+            print("Tip: Make sure no other program (like bmo_driver.py) is using the microphone.")
+            time.sleep(2)
+        # --- OUTSIDE MIC STREAM ---
+        if 'interacted' not in locals():
+            interacted = False
+        if interacted:
+            state_machine.transition("PROCESSING")
+            wants_reply = handle_interaction()
+            with audio_queue.mutex: audio_queue.queue.clear()
+            with trigger_queue.mutex: trigger_queue.queue.clear()
+            owwModel.reset()
+            if wants_reply:
+                print("❓ BMO asked a question. Triggering continuous conversation...")
+                trigger_queue.put("manual")
+            else:
+                print(f"💤 Cooldown ({POST_INTERACTION_COOLDOWN}s)...")
+                time.sleep(POST_INTERACTION_COOLDOWN)
+                print("\nListening...")
+            state_machine.transition("IDLE")
+            e = None
+            print(f"🛠️ DEBUG: ALSA Error or Busy Device: {e}")
+            print("Tip: Make sure no other program (like bmo_driver.py) is using the microphone.")
+            time.sleep(2)
+        # --- OUTSIDE MIC STREAM ---
+        if 'interacted' not in locals():
+            interacted = False
+        if interacted:
+            state_machine.transition("PROCESSING")
+            wants_reply = handle_interaction()
+            with audio_queue.mutex: audio_queue.queue.clear()
+            with trigger_queue.mutex: trigger_queue.queue.clear()
+            owwModel.reset()
+            if wants_reply:
+                print("❓ BMO asked a question. Triggering continuous conversation...")
+                trigger_queue.put("manual")
+            else:
+                print(f"💤 Cooldown ({POST_INTERACTION_COOLDOWN}s)...")
+                time.sleep(POST_INTERACTION_COOLDOWN)
+                print("\nListening...")
+            state_machine.transition("IDLE")
+    # (Removed duplicate main loop outside main())
         except Exception as e:
             print(f"🛠️ DEBUG: ALSA Error or Busy Device: {e}")
             print("Tip: Make sure no other program (like bmo_driver.py) is using the microphone.")
             time.sleep(2)
-
         # --- OUTSIDE MIC STREAM ---
+        if 'interacted' not in locals():
+            interacted = False
         if interacted:
+            state_machine.transition("PROCESSING")
             wants_reply = handle_interaction()
-            # Flush queues to ensure we don't process stale audio/triggers
             with audio_queue.mutex: audio_queue.queue.clear()
             with trigger_queue.mutex: trigger_queue.queue.clear()
-            
-            # Reset the wake word model to clear any internal state
             owwModel.reset()
-            
             if wants_reply:
                 print("❓ BMO asked a question. Triggering continuous conversation...")
-                # Instantly queue a manual trigger to loop listening
                 trigger_queue.put("manual")
             else:
-                # Cooldown: wait before listening again to avoid speaker feedback
                 print(f"💤 Cooldown ({POST_INTERACTION_COOLDOWN}s)...")
                 time.sleep(POST_INTERACTION_COOLDOWN)
                 print("\nListening...")
-
-def handle_interaction():
-    # Wait briefly for the listener stream to release the hardware
-    time.sleep(0.3)
-    # Using Hardware Rate for the G933
-    HW_RATE = 48000
-    STT_RATE = 16000
-    duration = 3.8 # Reduced from 5 to decrease latency
-    
-    # Ensure the face is definitely listening while recording
-    update_bmo_face("listening")
-    print(f"🎤 Recording Command ({duration}s)...")
-    
-    recording = sd.rec(int(duration * HW_RATE), samplerate=HW_RATE, channels=1, dtype='int16')
-    sd.wait()
-    
-    # Resample to 16k for the STT engine
-    import scipy.signal
-    num_samples = int(len(recording) * (STT_RATE / HW_RATE))
-    recording_resampled = scipy.signal.resample(recording, num_samples)
-    
-    # Save to temp
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        sf.write(tmp.name, recording_resampled.astype(np.int16), STT_RATE)
-        temp_path = tmp.name
-        
-    print("Sending to STT...")
-    update_bmo_face("thinking")
-    try:
-        with open(temp_path, 'rb') as f:
-            files = {'audio_file': (temp_path, f, 'audio/wav')}
-            response = requests.post(VOICE_ENGINE_URL, files=files)
-            
-        if response.status_code == 200:
-            raw_text = response.json().get("text", "")
-            text = clean_stt_text(raw_text)
-            print(f"📝 Transcribed: {text}")
-            
-            if text:
-                return process_agent_response(text)
+            state_machine.transition("IDLE")
+            if 'e' not in locals():
+                e = "Unknown ALSA error"
+            print(f"🛠️ DEBUG: ALSA Error or Busy Device: {e}")
+            print("Tip: Make sure no other program (like bmo_driver.py) is using the microphone.")
+            time.sleep(2)
+        # --- OUTSIDE MIC STREAM ---
+        if 'interacted' not in locals():
+            interacted = False
+        if interacted:
+            state_machine.transition("PROCESSING")
+            wants_reply = handle_interaction()
+            with audio_queue.mutex: audio_queue.queue.clear()
+            with trigger_queue.mutex: trigger_queue.queue.clear()
+            owwModel.reset()
+            if wants_reply:
+                print("❓ BMO asked a question. Triggering continuous conversation...")
+                trigger_queue.put("manual")
             else:
-                print("No speech detected.")
-                return False
-        else:
-            print(f"STT Error: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"Interaction Error: {e}")
-        return False
-    finally:
-        os.remove(temp_path)
-        update_bmo_face("neutral")
+                print(f"💤 Cooldown ({POST_INTERACTION_COOLDOWN}s)...")
+                time.sleep(POST_INTERACTION_COOLDOWN)
+                print("\nListening...")
+            state_machine.transition("IDLE")
 
 def process_agent_response(text):
     """Sends text to LLM and plays response. Returns True if BMO asked a question."""

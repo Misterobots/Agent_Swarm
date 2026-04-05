@@ -12,43 +12,6 @@ Usage:
     python -m training.grpo_trainer --dataset training_data/grpo_traces.jsonl
 """
 
-# ── Compatibility shims ──────────────────────────────────────────────
-# TRL hard-imports optional backends (vllm, deepspeed, llm_blender) at
-# module level.  When those packages are absent we inject lightweight
-# stubs so the import chain completes without pulling in GPU-heavy deps
-# we don't use for QLoRA GRPO on a single node.
-import sys as _sys, types as _types
-from importlib.machinery import ModuleSpec as _MS
-
-def _mock_package(name, attrs=None):
-    if name not in _sys.modules:
-        mod = _types.ModuleType(name)
-        mod.__spec__ = _MS(name, None, is_package=True)
-        mod.__path__ = []
-        mod.__package__ = name
-        _sys.modules[name] = mod
-    mod = _sys.modules[name]
-    if attrs:
-        for k, v in attrs.items():
-            if not hasattr(mod, k):
-                setattr(mod, k, v)
-
-_Stub = type("_Stub", (), {"__init__": lambda self, *a, **kw: None})
-
-_mock_package("vllm", {"__version__": "0.0.0", "LLM": _Stub, "SamplingParams": _Stub})
-_mock_package("vllm.distributed", {"StatelessProcessGroup": _Stub})
-_mock_package("vllm.distributed.device_communicators")
-_mock_package("vllm.distributed.device_communicators.pynccl", {"PyNcclCommunicator": _Stub})
-_mock_package("vllm.distributed.utils", {"StatelessProcessGroup": _Stub})
-_mock_package("llm_blender")
-_mock_package("deepspeed")
-
-# torch 2.4 lacks FSDPModule (added in 2.6) — stub it for TRL
-import torch.distributed.fsdp as _fsdp_mod
-if not hasattr(_fsdp_mod, "FSDPModule"):
-    _fsdp_mod.FSDPModule = type("FSDPModule", (), {})
-# ─────────────────────────────────────────────────────────────────────
-
 import json
 import os
 import sys
