@@ -40,7 +40,19 @@ export interface ChatCompletionChunk {
     delta: { content?: string; role?: string };
     finish_reason: string | null;
   }[];
+  hive_event?: HiveEvent;
 }
+
+/** Structured event from the Hive backend for rich UI rendering */
+export interface HiveEvent {
+  type: "status" | "log" | "error" | "message" | "response" | "artifact";
+  content: string;
+}
+
+/** Parsed SSE stream event — either content text or a structured hive event */
+export type StreamEvent =
+  | { kind: "content"; text: string }
+  | { kind: "hive"; event: HiveEvent };
 
 export interface Model {
   id: string;

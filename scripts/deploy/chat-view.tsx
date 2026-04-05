@@ -23,15 +23,16 @@ function usageBarClass(pct: number): string {
 }
 
 export function ChatView() {
-  const { messages, isStreaming, statusMessage, latestThought, pipelineSteps, streamMode, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
+  const { messages, isStreaming, statusMessage, latestThought, pipelineSteps, streamPhase, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
   const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const model = useSettingsStore((s) => s.model);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
 
-  // Show the thinking indicator when streaming
   const lastMsg = messages[messages.length - 1];
+  // Show thinking indicator for the entire streaming duration
+  // so users see the full agent pipeline + transition to generating
   const showThinking = isStreaming;
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export function ChatView() {
         ) : (
           <div className="max-w-3xl mx-auto">
             {messages.map((msg, idx) => {
+              // Find the preceding user message for creative-redirect links
               let precedingUserPrompt: string | undefined;
               if (msg.role === "assistant") {
                 for (let i = idx - 1; i >= 0; i--) {
@@ -135,7 +137,7 @@ export function ChatView() {
                 statusMessage={statusMessage}
                 latestThought={latestThought}
                 pipelineSteps={pipelineSteps}
-                streamMode={streamMode}
+                streamPhase={streamPhase}
               />
             )}
             <div ref={bottomRef} />

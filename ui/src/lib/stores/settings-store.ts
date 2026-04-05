@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type ChatTheme = "hive" | "neon" | "ember" | "forest";
+export type ChatTheme = "ember" | "slate" | "signal" | "office" | "hacker" | "star-trek" | "cyberpunk" | "minimal";
 
 interface SettingsState {
   mode: "standard" | "developer";
@@ -17,7 +17,7 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       mode: "standard",
       model: "swarm-standard",
-      theme: "hive",
+      theme: "ember",
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),

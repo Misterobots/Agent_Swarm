@@ -1,4 +1,4 @@
-import type { ChatCompletionChunk } from "@/types/chat";
+import type { ChatCompletionChunk, StreamEvent } from "@/types/chat";
 
 /**
  * Parse an SSE line from the OpenAI-compatible streaming API.
@@ -19,16 +19,31 @@ export function parseSSELine(line: string): ChatCompletionChunk | null {
 }
 
 /**
- * Async generator that reads an SSE response body and yields content deltas.
+ * Async generator that reads an SSE response body and yields structured
+ * StreamEvents. Each event is either:
+ *   - { kind: "content", text } — assistant response text
+ *   - { kind: "hive", event }  — structured pipeline/agent/tool event
  */
 export async function* streamSSE(
   response: Response
-): AsyncGenerator<string, void, unknown> {
+): AsyncGenerator<StreamEvent, void, unknown> {
   const reader = response.body?.getReader();
   if (!reader) return;
 
   const decoder = new TextDecoder();
   let buffer = "";
+
+  function* processChunk(chunk: ChatCompletionChunk) {
+    // Check for structured hive_event first
+    if (chunk.hive_event) {
+      yield { kind: "hive" as const, event: chunk.hive_event };
+    }
+    // Also yield any content delta (for response/message types)
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) {
+      yield { kind: "content" as const, text: content };
+    }
+  }
 
   try {
     while (true) {
@@ -42,8 +57,7 @@ export async function* streamSSE(
       for (const line of lines) {
         const chunk = parseSSELine(line);
         if (chunk) {
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) yield content;
+          yield* processChunk(chunk);
         }
       }
     }
@@ -52,8 +66,7 @@ export async function* streamSSE(
     if (buffer.trim()) {
       const chunk = parseSSELine(buffer);
       if (chunk) {
-        const content = chunk.choices[0]?.delta?.content;
-        if (content) yield content;
+        yield* processChunk(chunk);
       }
     }
   } finally {

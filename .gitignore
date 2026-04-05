@@ -56,3 +56,4 @@ delivered_artifacts/
 user_projects/
 workspace/
 execution_plane/training_output/
+*.mp4

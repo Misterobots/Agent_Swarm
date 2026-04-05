@@ -302,20 +302,24 @@ async def chat_completions(request: ChatRequest):
                     if msg_type not in ["message", "response"]:
                         continue
                     content = raw_content
+                    hive_event = None
                 else:
-                    # Format non-response items as markdown blockquotes for the Swarm UI
-                    if msg_type == "status":
-                        content = f"\n> ⏳ _{raw_content}_\n\n"
-                    elif msg_type == "log":
-                        content = f"\n> 🛠️ _{raw_content}_\n\n"
-                    elif msg_type == "error":
-                        content = f"\n> ❌ **ERROR**: {raw_content}\n\n"
+                    # Build structured hive_event for the Hive UI to render
+                    # rich thinking/tool/agent displays (like Claude Code / Cursor)
+                    hive_event = {"type": msg_type, "content": raw_content}
+                    
+                    if msg_type in ("status", "log", "error"):
+                        # Non-content events: send empty delta.content
+                        # so OpenAI-compat clients ignore them, but Hive UI
+                        # reads hive_event for rich rendering
+                        content = ""
                     else:
                         content = raw_content
                     
-                if content:
+                if content or hive_event:
                     # Strip heartbeat if it leaks through
-                    content = content.replace("\u200B", "")
+                    if content:
+                        content = content.replace("\u200B", "")
                     
                     chunk = {
                         "id": "chatcmpl-swarm",
@@ -324,6 +328,8 @@ async def chat_completions(request: ChatRequest):
                         "model": request.model,
                         "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}]
                     }
+                    if hive_event:
+                        chunk["hive_event"] = hive_event
                     yield f"data: {json.dumps(chunk)}\n\n"
             
             # Finish

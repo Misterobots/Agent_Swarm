@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { Bot, Cpu, Zap, Flame, Terminal, Rocket, Sparkles, Globe } from "lucide-react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import {
+  Bot, Cpu, Zap, Flame, Terminal, Rocket, Sparkles, Globe,
+  ChevronDown, ChevronUp, Shield, Brain, Search, FileText,
+  Palette, Wrench, AlertTriangle, CheckCircle2, Loader2,
+  BookOpen, Home, Cog, Eye,
+} from "lucide-react";
 import { useSettingsStore, type ChatTheme } from "@/lib/stores/settings-store";
-import type { StreamMode } from "@/types/chat";
+import type { PipelineStep } from "@/lib/hooks/use-chat-stream";
 
 /* ── Per-theme thinking word banks ─────────────────────────────────────────── */
 
@@ -64,7 +69,7 @@ const THEMED_VERBS: Record<ChatTheme, string[]> = {
   ],
 };
 
-/* ── Per-theme icons ───────────────────────────────────────────────────────── */
+/* ── Per-theme master icons ────────────────────────────────────────────────── */
 
 const THEME_ICON: Record<ChatTheme, typeof Bot> = {
   ember: Flame,
@@ -77,14 +82,40 @@ const THEME_ICON: Record<ChatTheme, typeof Bot> = {
   minimal: Globe,
 };
 
-/* ── Stream-mode phase labels ──────────────────────────────────────────────── */
+/* ── Agent → icon mapping for pipeline steps ───────────────────────────────── */
 
-const MODE_LABELS: Record<string, string> = {
-  thinking: "Thinking",
-  responding: "Responding",
-  "tool-use": "Using tools",
-  requesting: "Requesting",
-  compacting: "Compacting context",
+const AGENT_ICONS: Record<string, typeof Bot> = {
+  "Security Agent": Shield,
+  "Security Analysis": Shield,
+  "Neural Cortex": Brain,
+  "Router": Search,
+  "Context Manager": Cog,
+  "Memory": Brain,
+  "Memory Controller": Brain,
+  "JWT-ACE": Shield,
+  "Art Director": Palette,
+  "Creative Studio": Palette,
+  "Technical Writer": FileText,
+  "TechnicalWriter": FileText,
+  "Librarian": BookOpen,
+  "Librarian Agent": BookOpen,
+  "Creature Forge": Wrench,
+  "Forge": Wrench,
+  "IoT Controller": Home,
+  "Research": Search,
+  "System": Cog,
+};
+
+function getAgentIcon(agent: string) {
+  return AGENT_ICONS[agent] || Eye;
+}
+
+/* ── Phase labels ──────────────────────────────────────────────────────────── */
+
+const PHASE_LABELS: Record<string, string> = {
+  thinking: "Reasoning",
+  responding: "Generating",
+  idle: "Ready",
 };
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
@@ -93,33 +124,35 @@ function pickRandom(arr: string[]): string {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function extractAgentName(msg: string | null): string | null {
-  if (!msg) return null;
-  const m = msg.match(/[\p{Emoji_Presentation}\p{Emoji}\uFE0F]*\s*(.+?):\s/u);
-  return m ? m[1].trim() : null;
+function elapsed(ts: number): string {
+  const ms = Date.now() - ts;
+  if (ms < 1000) return "just now";
+  return `${(ms / 1000).toFixed(1)}s ago`;
 }
 
-function extractAgentAction(msg: string | null): string | null {
-  if (!msg) return null;
-  const m = msg.match(/:\s*(.+?)\.{0,3}$/);
-  return m ? m[1].trim() : null;
-}
-
-/* ── Component ─────────────────────────────────────────────────────────────── */
+/* ── Component ─────────────────────────────────────────────────────────── */
 
 interface ThinkingIndicatorProps {
   statusMessage: string | null;
   latestThought?: string | null;
-  streamMode?: StreamMode | null;
+  pipelineSteps?: PipelineStep[];
+  streamPhase?: "idle" | "thinking" | "responding";
 }
 
-export function ThinkingIndicator({ statusMessage, latestThought, streamMode }: ThinkingIndicatorProps) {
+export function ThinkingIndicator({
+  statusMessage,
+  latestThought,
+  pipelineSteps = [],
+  streamPhase = "thinking",
+}: ThinkingIndicatorProps) {
   const theme = useSettingsStore((s) => s.theme);
   const verbs = useMemo(() => THEMED_VERBS[theme] || THEMED_VERBS.ember, [theme]);
-  const Icon = THEME_ICON[theme] || Bot;
+  const MasterIcon = THEME_ICON[theme] || Bot;
 
   const [verb, setVerb] = useState(() => pickRandom(verbs));
-  const [dots, setDots] = useState(1);
+  const [expanded, setExpanded] = useState(true);
+  const stepsEndRef = useRef<HTMLDivElement>(null);
+  const startTimeRef = useRef(Date.now());
 
   // Rotate themed verb every 2.8s
   useEffect(() => {
@@ -128,76 +161,166 @@ export function ThinkingIndicator({ statusMessage, latestThought, streamMode }: 
     return () => clearInterval(id);
   }, [verbs]);
 
-  // Animate dots
+  // Reset start time when pipeline starts fresh
   useEffect(() => {
-    const id = setInterval(() => setDots((d) => (d % 3) + 1), 500);
-    return () => clearInterval(id);
-  }, []);
+    if (pipelineSteps.length === 0) {
+      startTimeRef.current = Date.now();
+    }
+  }, [pipelineSteps.length]);
 
-  const modeLabel = streamMode ? MODE_LABELS[streamMode] || streamMode : null;
-  const agentName = extractAgentName(statusMessage);
-  const agentAction = extractAgentAction(statusMessage);
+  // Auto-scroll pipeline steps
+  useEffect(() => {
+    stepsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [pipelineSteps.length]);
+
+  const hasSteps = pipelineSteps.length > 0;
+  const phaseLabel = PHASE_LABELS[streamPhase] || "Processing";
 
   return (
     <div className="thinking-container mx-4 my-3 msg-enter">
-      {/* Main thinking card */}
-      <div className="thinking-card rounded-xl border border-[var(--chat-border)] bg-[var(--chat-surface)] overflow-hidden">
+      <div className="thinking-card rounded-xl border border-[var(--chat-border)] bg-[var(--chat-surface)] overflow-hidden shadow-sm">
 
-        {/* Top bar: mode + agent */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[color:color-mix(in_srgb,var(--chat-border)_60%,transparent)]">
-          <div className="thinking-icon-ring w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Icon size={20} className="thinking-icon-glow" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              {agentName ? (
-                <span className="text-sm font-bold text-[var(--chat-accent-strong)]">{agentName}</span>
-              ) : modeLabel ? (
-                <span className="text-sm font-bold text-[var(--chat-accent-strong)]">{modeLabel}</span>
-              ) : (
-                <span className="text-sm font-bold text-[var(--chat-accent-strong)]">Processing</span>
-              )}
-              {agentAction && (
-                <span className="text-xs text-[var(--chat-muted)] truncate">&mdash; {agentAction}</span>
-              )}
-            </div>
-            {statusMessage && !agentName && (
-              <p className="text-xs text-[var(--chat-muted)] mt-0.5 truncate">{statusMessage}</p>
+        {/* ── Header bar ────────────────────────────────────────────── */}
+        <div className="flex items-center gap-3 px-4 py-2.5">
+          <div className="thinking-icon-ring w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
+            {streamPhase === "thinking" ? (
+              <Loader2 size={16} className="thinking-icon-glow animate-spin" />
+            ) : (
+              <MasterIcon size={16} className="thinking-icon-glow" />
             )}
           </div>
-          {/* Pulse indicator */}
-          <div className="flex items-center gap-1">
-            <span className="thinking-dot w-2 h-2 rounded-full" style={{ animationDelay: "0ms" }} />
-            <span className="thinking-dot w-2 h-2 rounded-full" style={{ animationDelay: "200ms" }} />
-            <span className="thinking-dot w-2 h-2 rounded-full" style={{ animationDelay: "400ms" }} />
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-[var(--chat-accent-strong)]">
+                {phaseLabel}
+              </span>
+              <span className="text-[10px] text-[var(--chat-muted)] font-mono">
+                {verb}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {hasSteps && (
+              <>
+                <span className="text-[10px] font-mono text-[var(--chat-muted)]">
+                  {pipelineSteps.length} step{pipelineSteps.length !== 1 ? "s" : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setExpanded((e) => !e)}
+                  className="p-1 rounded hover:bg-[color:color-mix(in_srgb,var(--chat-accent)_10%,transparent)] text-[var(--chat-muted)] transition-colors"
+                  title={expanded ? "Collapse" : "Expand"}
+                >
+                  {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              </>
+            )}
+            <div className="flex items-center gap-0.5">
+              <span className="thinking-dot w-1.5 h-1.5 rounded-full" style={{ animationDelay: "0ms" }} />
+              <span className="thinking-dot w-1.5 h-1.5 rounded-full" style={{ animationDelay: "200ms" }} />
+              <span className="thinking-dot w-1.5 h-1.5 rounded-full" style={{ animationDelay: "400ms" }} />
+            </div>
           </div>
         </div>
 
-        {/* Themed thinking verb — large and prominent */}
-        <div className="px-4 py-4">
-          <div className="thinking-verb-display flex items-baseline gap-1">
-            <span className="thinking-verb-text text-lg font-semibold tracking-wide">
-              {verb}
-            </span>
-            <span className="text-lg font-semibold text-[var(--chat-accent)] opacity-70">
-              {".".repeat(dots)}
-            </span>
-          </div>
-        </div>
+        {/* ── Pipeline timeline ─────────────────────────────────────── */}
+        {hasSteps && expanded && (
+          <div className="pipeline-timeline border-t border-[color:color-mix(in_srgb,var(--chat-border)_50%,transparent)] max-h-64 overflow-y-auto scrollbar-thin">
+            <div className="px-3 py-2 space-y-0">
+              {pipelineSteps.map((step, idx) => {
+                const isLatest = idx === pipelineSteps.length - 1;
+                const isError = step.type === "error";
+                const StepIcon = getAgentIcon(step.agent);
 
-        {/* Streamed thought — visible and scrollable */}
-        {latestThought && (
-          <div className="px-4 pb-3">
-            <div className="thought-stream rounded-lg border border-[color:color-mix(in_srgb,var(--chat-border)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--chat-bg)_80%,transparent)] p-3 max-h-32 overflow-y-auto scrollbar-thin">
-              <p className="text-sm font-mono text-[var(--chat-text)] leading-relaxed streaming-caret opacity-90">
-                {latestThought}
-              </p>
+                return (
+                  <div
+                    key={step.id}
+                    className="pipeline-step-row flex items-start gap-2.5 py-1.5 relative"
+                  >
+                    {/* Timeline connector line */}
+                    {idx < pipelineSteps.length - 1 && (
+                      <div className="absolute left-[13px] top-[22px] bottom-0 w-px bg-[color:color-mix(in_srgb,var(--chat-border)_70%,transparent)]" />
+                    )}
+
+                    {/* Step icon */}
+                    <div
+                      className={`relative z-10 w-[26px] h-[26px] rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                        isError
+                          ? "bg-red-500/15 text-red-400"
+                          : isLatest
+                          ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_20%,transparent)] text-[var(--chat-accent)]"
+                          : "bg-[color:color-mix(in_srgb,var(--chat-border)_30%,transparent)] text-[var(--chat-muted)]"
+                      }`}
+                    >
+                      {isError ? (
+                        <AlertTriangle size={13} />
+                      ) : isLatest ? (
+                        <StepIcon size={13} className="animate-pulse" />
+                      ) : (
+                        <CheckCircle2 size={13} className="opacity-50" />
+                      )}
+                    </div>
+
+                    {/* Step content */}
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-[11px] font-semibold ${
+                            isError
+                              ? "text-red-400"
+                              : isLatest
+                              ? "text-[var(--chat-accent-strong)]"
+                              : "text-[var(--chat-text)] opacity-60"
+                          }`}
+                        >
+                          {step.agent}
+                        </span>
+                        {step.type === "log" && (
+                          <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[color:color-mix(in_srgb,var(--chat-accent)_8%,transparent)] text-[var(--chat-muted)]">
+                            LOG
+                          </span>
+                        )}
+                      </div>
+                      <p
+                        className={`text-[11px] leading-snug mt-0.5 ${
+                          isLatest
+                            ? "text-[var(--chat-text)] opacity-90"
+                            : "text-[var(--chat-muted)] opacity-70"
+                        }`}
+                      >
+                        {step.action}
+                      </p>
+                    </div>
+
+                    {/* Elapsed time for latest step */}
+                    {isLatest && (
+                      <span className="text-[9px] font-mono text-[var(--chat-muted)] opacity-50 flex-shrink-0 pt-1">
+                        {elapsed(step.timestamp)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              <div ref={stepsEndRef} />
             </div>
           </div>
         )}
 
-        {/* Progress shimmer bar */}
-        <div className="thinking-shimmer h-1 w-full" />
+        {/* ── Collapsed summary ──────────────────────────────────────── */}
+        {hasSteps && !expanded && (
+          <div className="border-t border-[color:color-mix(in_srgb,var(--chat-border)_50%,transparent)] px-4 py-1.5">
+            <span className="text-[10px] text-[var(--chat-muted)] font-mono">
+              {pipelineSteps.length} steps &middot;{" "}
+              {pipelineSteps[pipelineSteps.length - 1]?.agent}:{" "}
+              {pipelineSteps[pipelineSteps.length - 1]?.action}
+            </span>
+          </div>
+        )}
+
+        {/* ── Progress shimmer bar ───────────────────────────────────── */}
+        <div className="thinking-shimmer h-0.5 w-full" />
       </div>
     </div>
   );
