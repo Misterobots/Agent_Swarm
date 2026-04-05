@@ -52,6 +52,7 @@ execution_plane/training_output/
 
 # Training & generated data (local to lab only)
 training_data/
+execution_plane/training_data/
 delivered_artifacts/
 user_projects/
 workspace/
