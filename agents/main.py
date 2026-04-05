@@ -2,9 +2,11 @@
 import logging
 import sys
 import os
-# Ensure agents dir is in path
+# Ensure agents dir and workspace root are in path
 if "/app/agents" not in sys.path:
     sys.path.append("/app/agents")
+if "/workspace" not in sys.path:
+    sys.path.insert(0, "/workspace")
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Header
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
