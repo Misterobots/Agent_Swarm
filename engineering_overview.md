@@ -1,5 +1,9 @@
 # Home AI Lab: Engineering Datasheet
 
+> **⚠️ Deprecated**: This document reflects the Phase 3 Alpha architecture (January 2026).
+> For the current architecture (v3.1, March 2026), see
+> [docs/AGENTIC_HIVE_ARCHITECTURE.md](docs/AGENTIC_HIVE_ARCHITECTURE.md).
+
 **Version**: 1.0 (Phase 3 Alpha)
 **Date**: January 2026
 **Architecture**: Distributed Hybrid Swarm (DHS)
