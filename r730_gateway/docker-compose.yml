@@ -232,6 +232,8 @@ services:
     build:
       context: ../ui
       dockerfile: Dockerfile
+      args:
+        API_BASE_URL: http://192.168.2.101:8008
     image: home-ai-lab/hive-ui:latest
     container_name: hive_ui
     restart: unless-stopped
