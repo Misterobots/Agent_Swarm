@@ -1,0 +1,83 @@
+# Romm — ROM Manager + in-browser emulation
+# Saltbox Custom Container (Traefik Template)
+# Deploy: cd /opt/romm && docker compose up -d
+#
+# Prerequisites:
+#   mkdir -p /opt/romm/{mysql,resources,redis-data}
+#   cp .env.example .env  # then fill in secrets
+
+services:
+  romm-db:
+    image: mariadb:11.3
+    container_name: romm-db
+    hostname: romm-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${ROMM_DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: romm
+      MARIADB_USER: romm
+      MARIADB_PASSWORD: ${ROMM_DB_PASSWORD}
+    volumes:
+      - /opt/romm/mysql:/var/lib/mysql
+    networks:
+      - saltbox
+    labels:
+      com.github.saltbox.saltbox_managed: true
+      diun.enable: true
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      start_interval: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  romm:
+    image: rommapp/romm:latest
+    container_name: romm
+    hostname: romm
+    restart: unless-stopped
+    depends_on:
+      romm-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: romm-db
+      DB_NAME: romm
+      DB_USER: romm
+      DB_PASSWD: ${ROMM_DB_PASSWORD}
+      ROMM_AUTH_SECRET_KEY: ${ROMM_AUTH_SECRET_KEY}
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+      STEAMGRIDDB_API_KEY: ${STEAMGRIDDB_API_KEY:-}
+      ENABLE_RESCAN_ON_FILESYSTEM_CHANGE: "true"
+      RESCAN_ON_FILESYSTEM_CHANGE_DELAY: "5"
+    volumes:
+      - /opt/romm/resources:/romm/resources
+      - /opt/romm/redis-data:/redis-data
+      - /mnt/storage/roms:/romm/library
+      - /mnt/storage/romm-assets:/romm/assets
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - saltbox
+    labels:
+      com.github.saltbox.saltbox_managed: true
+      diun.enable: true
+      traefik.enable: true
+      # HTTPS router (primary)
+      traefik.http.routers.romm.entrypoints: websecure
+      traefik.http.routers.romm.rule: Host(`romm.shivelymedia.com`)
+      traefik.http.routers.romm.service: romm
+      traefik.http.routers.romm.middlewares: globalHeaders@file,secureHeaders@file,robotHeaders@file,cloudflarewarp@docker,authentik@docker
+      traefik.http.routers.romm.tls.certresolver: cfdns
+      traefik.http.routers.romm.tls.options: securetls@file
+      # HTTP router (redirect to HTTPS)
+      traefik.http.routers.romm-http.entrypoints: web
+      traefik.http.routers.romm-http.rule: Host(`romm.shivelymedia.com`)
+      traefik.http.routers.romm-http.service: romm
+      traefik.http.routers.romm-http.middlewares: globalHeaders@file,redirect-to-https@docker,robotHeaders@file,cloudflarewarp@docker,authentik@docker
+      # Service port
+      traefik.http.services.romm.loadbalancer.server.port: "8080"
+
+networks:
+  saltbox:
+    external: true
