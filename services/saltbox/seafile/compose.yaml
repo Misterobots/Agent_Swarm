@@ -1,0 +1,91 @@
+# Seafile — Self-hosted cloud storage & file sync
+# Saltbox Custom Container (Traefik Template)
+# Deploy: cd /opt/seafile && docker compose up -d
+#
+# Prerequisites:
+#   mkdir -p /opt/seafile/{data,server,mysql}
+#   cp .env.example .env  # then fill in secrets
+
+services:
+  seafile-mysql:
+    image: mariadb:11.3
+    container_name: seafile-mysql
+    hostname: seafile-mysql
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${SEAFILE_MYSQL_ROOT_PASSWORD}
+      MARIADB_LOG_CONSOLE: "true"
+    volumes:
+      - /opt/seafile/mysql:/var/lib/mysql
+    networks:
+      - saltbox
+    labels:
+      com.github.saltbox.saltbox_managed: true
+      diun.enable: true
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      start_interval: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  seafile-memcached:
+    image: memcached:1.6-alpine
+    container_name: seafile-memcached
+    hostname: seafile-memcached
+    restart: unless-stopped
+    entrypoint: memcached -m 256
+    networks:
+      - saltbox
+    labels:
+      com.github.saltbox.saltbox_managed: true
+      diun.enable: true
+
+  seafile:
+    image: seafileltd/seafile-mc:12.0-latest
+    container_name: seafile
+    hostname: seafile
+    restart: unless-stopped
+    depends_on:
+      seafile-mysql:
+        condition: service_healthy
+      seafile-memcached:
+        condition: service_started
+    environment:
+      DB_HOST: seafile-mysql
+      DB_ROOT_PASSWD: ${SEAFILE_MYSQL_ROOT_PASSWORD}
+      SEAFILE_ADMIN_EMAIL: ${SEAFILE_ADMIN_EMAIL}
+      SEAFILE_ADMIN_PASSWORD: ${SEAFILE_ADMIN_PASSWORD}
+      SEAFILE_SERVER_HOSTNAME: seafile.shivelymedia.com
+      SEAFILE_SERVER_LETSENCRYPT: "false"
+      JWT_PRIVATE_KEY: ${SEAFILE_JWT_PRIVATE_KEY}
+      TIME_ZONE: America/Chicago
+    volumes:
+      - /opt/seafile/data:/opt/seafile-data
+      - /opt/seafile/server:/opt/seafile
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - saltbox
+    labels:
+      com.github.saltbox.saltbox_managed: true
+      diun.enable: true
+      traefik.enable: true
+      # HTTPS router (primary)
+      traefik.http.routers.seafile.entrypoints: websecure
+      traefik.http.routers.seafile.rule: Host(`seafile.shivelymedia.com`)
+      traefik.http.routers.seafile.service: seafile
+      traefik.http.routers.seafile.middlewares: globalHeaders@file,secureHeaders@file,robotHeaders@file,cloudflarewarp@docker,authentik@docker
+      traefik.http.routers.seafile.tls.certresolver: cfdns
+      traefik.http.routers.seafile.tls.options: securetls@file
+      # HTTP router (redirect to HTTPS)
+      traefik.http.routers.seafile-http.entrypoints: web
+      traefik.http.routers.seafile-http.rule: Host(`seafile.shivelymedia.com`)
+      traefik.http.routers.seafile-http.service: seafile
+      traefik.http.routers.seafile-http.middlewares: globalHeaders@file,redirect-to-https@docker,robotHeaders@file,cloudflarewarp@docker,authentik@docker
+      # Service port
+      traefik.http.services.seafile.loadbalancer.server.port: "80"
+
+networks:
+  saltbox:
+    external: true
