@@ -241,11 +241,17 @@ services:
       - "3200:3000"
     networks:
       - ai_lab_net
+      - saltbox
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
-      - "traefik.http.routers.hive-ui.entrypoints=web"
+      - "traefik.http.routers.hive-ui.rule=Host(`hive.shivelymedia.com`)"
+      - "traefik.http.routers.hive-ui.entrypoints=websecure"
+      - "traefik.http.routers.hive-ui.tls=true"
+      - "traefik.http.routers.hive-ui.tls.certresolver=cfdns"
+      - "traefik.http.routers.hive-ui-http.rule=Host(`hive.shivelymedia.com`)"
+      - "traefik.http.routers.hive-ui-http.entrypoints=web"
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
+      - "traefik.docker.network=saltbox"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # ROUTING CONFIGURATION FOR JUSTIN-PC SERVICES (via Traefik)
@@ -268,6 +274,8 @@ networks:
   ai_lab_net:
     driver: bridge
     name: ai_lab_net
+  saltbox:
+    external: true
 
 volumes:
   spire_agent_data:
