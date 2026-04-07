@@ -15,7 +15,7 @@ export function ModelSelector() {
         value={model}
         onChange={(e) => setModel(e.target.value)}
         disabled={loading}
-        className="appearance-none bg-[#1a1a2e] text-zinc-300 text-sm border border-zinc-700 rounded-lg pl-3 pr-8 py-1.5 focus:border-cyan-500 focus:outline-none cursor-pointer"
+        className="appearance-none bg-[var(--chat-panel)] text-[var(--chat-text)] text-sm border border-[var(--chat-border)] rounded-lg pl-3 pr-8 py-1.5 focus:border-[var(--chat-accent)] focus:outline-none cursor-pointer"
       >
         {models.length > 0 ? (
           models.map((m) => (
@@ -24,7 +24,7 @@ export function ModelSelector() {
             </option>
           ))
         ) : (
-          <option value="swarm-standard">swarm-standard</option>
+          <option value="Home-AI-Swarm">Home-AI-Swarm</option>
         )}
       </select>
       <ChevronDown size={14} className="absolute right-2 text-zinc-500 pointer-events-none" />

@@ -16,7 +16,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       mode: "standard",
-      model: "swarm-standard",
+      model: "Home-AI-Swarm",
       theme: "ember",
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),

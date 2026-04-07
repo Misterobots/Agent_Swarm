@@ -28,6 +28,7 @@ export function ChatView() {
   const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const model = useSettingsStore((s) => s.model);
   const theme = useSettingsStore((s) => s.theme);
+  const mode = useSettingsStore((s) => s.mode);
   const personality = THEME_PERSONALITIES[theme];
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
@@ -47,7 +48,7 @@ export function ChatView() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-4 py-2">
         <div className="flex items-center gap-3">
-          <ModelSelector />
+          {mode === "developer" && <ModelSelector />}
           <ThemeSelector />
           {activeConversationId && (
             <button
