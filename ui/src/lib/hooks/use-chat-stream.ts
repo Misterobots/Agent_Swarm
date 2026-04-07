@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { sendChatStream } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import type { FileAttachment, HiveEvent } from "@/types/chat";
 
 const FIRST_TOKEN_TIMEOUT_MS = 60_000;
@@ -54,6 +55,7 @@ export function useChatStream() {
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
+  const theme = useSettingsStore((s) => s.theme);
 
   const sendMessage = useCallback(
     async (content: string, attachments?: FileAttachment[]) => {
@@ -69,9 +71,16 @@ export function useChatStream() {
       const assistantId = addMessage(convId, { role: "assistant", content: "" });
 
       const conv = useChatStore.getState().conversations.find((c) => c.id === convId);
-      const apiMessages = (conv?.messages || [])
+      const historyMessages = (conv?.messages || [])
         .filter((m) => m.id !== assistantId)
         .map((m) => ({ role: m.role, content: m.content }));
+
+      // Inject theme personality as system prompt at the start of every request
+      const personality = THEME_PERSONALITIES[theme];
+      const apiMessages = [
+        { role: "system" as const, content: personality.systemPrompt },
+        ...historyMessages,
+      ];
 
       setIsStreaming(true);
       setStatusMessage("Initializing pipeline...");
@@ -178,7 +187,7 @@ export function useChatStream() {
         abortRef.current = null;
       }
     },
-    [activeConversationId, createConversation, addMessage, appendToMessage, model, isStreaming]
+    [activeConversationId, createConversation, addMessage, appendToMessage, model, theme, isStreaming]
   );
 
   const stopGeneration = useCallback(() => {

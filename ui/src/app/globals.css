@@ -5,64 +5,233 @@
   --foreground: #e4e4e7;
 }
 
-/* ── Theme: Hive (default – violet/cyan) ── */
+/* ═══════════════════════════════════════════════════════════════
+   THEME SYSTEM — Each theme is a complete visual + structural experience
+   Applied via [data-theme="<name>"] on AppShell wrapper
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Default / Ember — Warm forge aesthetic ───────────────────── */
 .chat-shell,
-[data-theme="hive"] .chat-shell {
-  --chat-bg: #0e1117;
-  --chat-surface: #0e1117;
-  --chat-panel: #1a1a2e;
-  --chat-border: #27272a;
-  --chat-text: #e4e4e7;
-  --chat-muted: #71717a;
-  --chat-accent: #8b5cf6;
-  --chat-accent-strong: #a78bfa;
-  --chat-accent-2: #06b6d4;
-  --chat-thinking: #8b5cf6;
-}
-
-/* ── Theme: Neon ── */
-[data-theme="neon"] .chat-shell {
-  --chat-bg: #0a0a0f;
-  --chat-surface: #0d0d14;
-  --chat-panel: #14142a;
-  --chat-border: #1e1e3a;
-  --chat-text: #e0e0ff;
-  --chat-muted: #6366f1;
-  --chat-accent: #22d3ee;
-  --chat-accent-strong: #67e8f9;
-  --chat-accent-2: #f472b6;
-  --chat-thinking: #22d3ee;
-}
-
-/* ── Theme: Ember ── */
 [data-theme="ember"] .chat-shell {
   --chat-bg: #110e0c;
   --chat-surface: #141110;
   --chat-panel: #1f1714;
   --chat-border: #2a2220;
+  --chat-soft: #1a1512;
   --chat-text: #f5e6db;
   --chat-muted: #a8846c;
   --chat-accent: #f97316;
   --chat-accent-strong: #fb923c;
   --chat-accent-2: #ef4444;
   --chat-thinking: #f97316;
+  --chat-font: inherit;
+  --chat-radius: 0.75rem;
+  --chat-input-radius: 0.75rem;
 }
 
-/* ── Theme: Forest ── */
-[data-theme="forest"] .chat-shell {
-  --chat-bg: #0c1210;
-  --chat-surface: #0e1412;
-  --chat-panel: #152018;
-  --chat-border: #1e2e24;
-  --chat-text: #d4e7dc;
-  --chat-muted: #6b8f7a;
-  --chat-accent: #22c55e;
-  --chat-accent-strong: #4ade80;
-  --chat-accent-2: #a3e635;
-  --chat-thinking: #22c55e;
+/* ── Slate — Cool architectural blue ─────────────────────────── */
+[data-theme="slate"] .chat-shell {
+  --chat-bg: #11161d;
+  --chat-surface: #141a22;
+  --chat-panel: #1a2230;
+  --chat-border: #243044;
+  --chat-soft: #182030;
+  --chat-text: #d4dce8;
+  --chat-muted: #6b839e;
+  --chat-accent: #4ba6c7;
+  --chat-accent-strong: #7ec8e3;
+  --chat-accent-2: #7a8ce0;
+  --chat-thinking: #4ba6c7;
+  --chat-font: inherit;
+  --chat-radius: 0.5rem;
+  --chat-input-radius: 0.5rem;
 }
 
-/* ── Thinking animation ── */
+/* ── Signal — Radio operator gold ────────────────────────────── */
+[data-theme="signal"] .chat-shell {
+  --chat-bg: #171a1b;
+  --chat-surface: #1a1d1f;
+  --chat-panel: #222628;
+  --chat-border: #333839;
+  --chat-soft: #1e2224;
+  --chat-text: #e8dcc8;
+  --chat-muted: #8ba7b3;
+  --chat-accent: #d89a4d;
+  --chat-accent-strong: #e8b56e;
+  --chat-accent-2: #8ba7b3;
+  --chat-thinking: #d89a4d;
+  --chat-font: inherit;
+  --chat-radius: 0.375rem;
+  --chat-input-radius: 0.375rem;
+}
+
+/* ── Office — Professional & clean (light theme) ─────────────── */
+[data-theme="office"] .chat-shell {
+  --chat-bg: #f8f9fa;
+  --chat-surface: #ffffff;
+  --chat-panel: #e9ecef;
+  --chat-border: #ced4da;
+  --chat-soft: #f1f3f5;
+  --chat-text: #212529;
+  --chat-muted: #6c757d;
+  --chat-accent: #2e5090;
+  --chat-accent-strong: #1a73e8;
+  --chat-accent-2: #0d6efd;
+  --chat-thinking: #2e5090;
+  --chat-font: "Segoe UI", system-ui, sans-serif;
+  --chat-radius: 0.5rem;
+  --chat-input-radius: 0.5rem;
+}
+
+/* ── Hacker — Green-on-black terminal ────────────────────────── */
+[data-theme="hacker"] .chat-shell {
+  --chat-bg: #0a0e14;
+  --chat-surface: #0c1018;
+  --chat-panel: #111820;
+  --chat-border: #1a2a1a;
+  --chat-soft: #0e1418;
+  --chat-text: #33ff33;
+  --chat-muted: #1a8c1a;
+  --chat-accent: #39ff14;
+  --chat-accent-strong: #00ff00;
+  --chat-accent-2: #00cc44;
+  --chat-thinking: #39ff14;
+  --chat-font: "Courier New", "Fira Code", monospace;
+  --chat-radius: 0;
+  --chat-input-radius: 0;
+}
+
+/* ── Star Trek — LCARS starship bridge ───────────────────────── */
+[data-theme="star-trek"] .chat-shell {
+  --chat-bg: #000000;
+  --chat-surface: #000000;
+  --chat-panel: #101010;
+  --chat-border: #cc6699;
+  --chat-soft: #0a0a0a;
+  --chat-text: #ff9966;
+  --chat-muted: #cc6699;
+  --chat-accent: #ff9900;
+  --chat-accent-strong: #ffcc66;
+  --chat-accent-2: #9999ff;
+  --chat-thinking: #ff9900;
+  --chat-font: "Arial Narrow", "Antonio", "Trebuchet MS", sans-serif;
+  --chat-radius: 2rem;
+  --chat-input-radius: 2rem;
+}
+
+/* ── Cyberpunk — Neon-soaked future ──────────────────────────── */
+[data-theme="cyberpunk"] .chat-shell {
+  --chat-bg: #0d0221;
+  --chat-surface: #120328;
+  --chat-panel: #1a0540;
+  --chat-border: #3d1466;
+  --chat-soft: #150430;
+  --chat-text: #e0d0ff;
+  --chat-muted: #8b6cc7;
+  --chat-accent: #ff10f0;
+  --chat-accent-strong: #ff44ff;
+  --chat-accent-2: #00ffff;
+  --chat-thinking: #ff10f0;
+  --chat-font: "Rajdhani", "Share Tech Mono", monospace;
+  --chat-radius: 0.25rem;
+  --chat-input-radius: 0.25rem;
+}
+
+/* ── Minimal — Clean & distraction-free (light) ──────────────── */
+[data-theme="minimal"] .chat-shell {
+  --chat-bg: #fafafa;
+  --chat-surface: #ffffff;
+  --chat-panel: #f0f0f0;
+  --chat-border: #e0e0e0;
+  --chat-soft: #f5f5f5;
+  --chat-text: #1a1a1a;
+  --chat-muted: #888888;
+  --chat-accent: #2c2c2c;
+  --chat-accent-strong: #000000;
+  --chat-accent-2: #666666;
+  --chat-thinking: #2c2c2c;
+  --chat-font: "Georgia", serif;
+  --chat-radius: 0.5rem;
+  --chat-input-radius: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STRUCTURAL THEME OVERRIDES — Layout, shape, decoration
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Apply theme font to all chat content */
+.chat-shell {
+  font-family: var(--chat-font);
+  background: var(--chat-bg);
+}
+.chat-shell * {
+  border-radius: inherit;
+}
+
+/* ── Hacker: scanline overlay + CRT glow ─────────────────────── */
+[data-theme="hacker"] .chat-shell {
+  text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+  position: relative;
+}
+[data-theme="hacker"] .chat-shell::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 0, 0.015) 2px,
+    rgba(0, 255, 0, 0.015) 4px
+  );
+  z-index: 50;
+}
+[data-theme="hacker"] .chat-shell input,
+[data-theme="hacker"] .chat-shell textarea {
+  caret-color: #39ff14;
+}
+
+/* ── Star Trek LCARS: distinctive panels ─────────────────────── */
+[data-theme="star-trek"] .chat-shell {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+[data-theme="star-trek"] .chat-shell .lcars-sidebar {
+  border-right: 4px solid #cc6699;
+}
+[data-theme="star-trek"] .chat-shell input,
+[data-theme="star-trek"] .chat-shell textarea {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 2rem;
+}
+
+/* ── Cyberpunk: neon glow + glitch accents ───────────────────── */
+[data-theme="cyberpunk"] .chat-shell {
+  text-shadow: 0 0 2px rgba(255, 16, 240, 0.15);
+}
+[data-theme="cyberpunk"] .chat-shell input,
+[data-theme="cyberpunk"] .chat-shell textarea {
+  border: 1px solid #ff10f0;
+  box-shadow: 0 0 8px rgba(255, 16, 240, 0.2), inset 0 0 8px rgba(0, 255, 255, 0.05);
+}
+
+/* ── Office: clean shadows ───────────────────────────────────── */
+[data-theme="office"] .chat-shell {
+  font-family: var(--chat-font);
+}
+
+/* ── Minimal: prose-like reading experience ──────────────────── */
+[data-theme="minimal"] .chat-shell {
+  font-family: var(--chat-font);
+  line-height: 1.7;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════════ */
+
 @keyframes thinking-pulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
@@ -74,6 +243,19 @@
 .thinking-dot:nth-child(1) { animation: thinking-dot 1.4s 0s infinite; }
 .thinking-dot:nth-child(2) { animation: thinking-dot 1.4s 0.2s infinite; }
 .thinking-dot:nth-child(3) { animation: thinking-dot 1.4s 0.4s infinite; }
+
+/* Theme picker dropdown animation */
+.theme-picker-enter {
+  animation: themePickerIn 0.15s ease-out;
+}
+@keyframes themePickerIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TAILWIND / GLOBAL
+   ═══════════════════════════════════════════════════════════════ */
 
 @theme inline {
   --color-background: var(--background);
@@ -88,20 +270,17 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — theme-aware */
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
 }
-
 .scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: var(--chat-border, #3f3f46);
   border-radius: 3px;
 }
-
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--chat-muted, #52525b);
 }
