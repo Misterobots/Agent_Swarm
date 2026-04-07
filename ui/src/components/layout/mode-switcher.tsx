@@ -16,14 +16,14 @@ export function ModeSwitcher() {
   };
 
   return (
-    <div className="flex bg-zinc-900 rounded-lg p-0.5 gap-0.5">
+    <div className="flex bg-[var(--chat-panel)] rounded-lg p-0.5 gap-0.5">
       <button
         onClick={() => switchTo("standard")}
         className={cn(
           "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
           mode === "standard"
-            ? "bg-cyan-600/20 text-cyan-400"
-            : "text-zinc-500 hover:text-zinc-300"
+            ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_20%,transparent)] text-[var(--chat-accent)]"
+            : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
         )}
       >
         <MessageSquare size={13} />
@@ -34,8 +34,8 @@ export function ModeSwitcher() {
         className={cn(
           "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
           mode === "developer"
-            ? "bg-cyan-600/20 text-cyan-400"
-            : "text-zinc-500 hover:text-zinc-300"
+            ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_20%,transparent)] text-[var(--chat-accent)]"
+            : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
         )}
       >
         <Code2 size={13} />

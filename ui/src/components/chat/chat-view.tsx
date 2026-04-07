@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { ThemeSelector } from "./theme-selector";
+import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import type { FileAttachment } from "@/types/chat";
 
 function usageBarClass(pct: number): string {
@@ -26,6 +27,8 @@ export function ChatView() {
   const { messages, isStreaming, statusMessage, latestThought, pipelineSteps, streamPhase, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
   const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const model = useSettingsStore((s) => s.model);
+  const theme = useSettingsStore((s) => s.theme);
+  const personality = THEME_PERSONALITIES[theme];
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
@@ -102,8 +105,8 @@ export function ChatView() {
               <Bot size={32} className="text-[var(--chat-accent-strong)]" />
             </div>
             <div className="text-center">
-              <h2 className="text-lg font-medium text-[var(--chat-text)] mb-1">Hive Mind</h2>
-              <p className="text-sm text-[var(--chat-muted)]">Send a message to start a conversation</p>
+              <h2 className="text-lg font-medium text-[var(--chat-text)] mb-1">{personality.greeting}</h2>
+              <p className="text-sm text-[var(--chat-muted)]">{personality.subtitle}</p>
             </div>
           </div>
         ) : (
