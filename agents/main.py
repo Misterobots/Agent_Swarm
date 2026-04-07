@@ -8,6 +8,7 @@ if "/app/agents" not in sys.path:
 if "/workspace" not in sys.path:
     sys.path.insert(0, "/workspace")
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
@@ -108,6 +109,15 @@ async def lifespan(app: FastAPI):
 
 # --- App Definition ---
 app = FastAPI(lifespan=lifespan, title="Home AI Lab Swarm API")
+
+# --- CORS Middleware ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins; tighten in production as needed
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- Global Exception Handler (To capture crashes before uvicorn swallows them) ---
 from fastapi import Request
