@@ -574,6 +574,208 @@ async def health_nodes():
     return {"nodes": monitor.get_all_statuses()}
 
 
+# --- Ops Infrastructure Health Endpoint ---
+@app.get("/api/v1/ops/health")
+async def ops_health():
+    """Infrastructure health: Docker containers + control plane service checks."""
+    import subprocess
+    import socket
+    import requests as _requests
+    from config import CONTROL_NODE_IP, LANGFUSE_HOST
+
+    exec_plane = []
+    ctrl_plane = []
+    running_count = 0
+    status_msg = "ONLINE"
+
+    # Execution Plane: Docker Socket
+    try:
+        result = subprocess.run(
+            ["curl", "-s", "--unix-socket", "/var/run/docker.sock",
+             "http://localhost/containers/json"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            containers = json.loads(result.stdout)
+            running_count = len(containers)
+            for c in containers:
+                name = c.get("Names", ["/unknown"])[0].lstrip("/")
+                image = c.get("Image", "unknown").split("/")[-1].split(":")[0]
+                uptime = c.get("Status", "Unknown")
+                exec_plane.append({"name": name, "image": image, "uptime": uptime, "status": "running"})
+        else:
+            status_msg = f"Docker: {result.stderr[:60]}"
+    except Exception as e:
+        status_msg = f"Docker Error: {str(e)[:60]}"
+
+    # Control Plane: HTTP/TCP Health Checks
+    cp_services = [
+        {"name": "Langfuse",      "url": f"{LANGFUSE_HOST}/api/public/health", "port": 3000},
+        {"name": "PostgreSQL",    "url": None, "port": 5432},
+        {"name": "SPIRE Server",  "url": None, "port": 8081},
+        {"name": "MinIO API",     "url": f"http://{CONTROL_NODE_IP}:9190/minio/health/live", "port": 9190},
+        {"name": "MinIO Console", "url": None, "port": 9191},
+    ]
+    for svc in cp_services:
+        try:
+            if svc["url"]:
+                r = _requests.get(svc["url"], timeout=2)
+                alive = r.status_code < 500
+            else:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(2)
+                code = s.connect_ex((CONTROL_NODE_IP, svc["port"]))
+                s.close()
+                alive = code == 0
+            ctrl_plane.append({"name": svc["name"], "port": svc["port"], "healthy": alive})
+        except Exception:
+            ctrl_plane.append({"name": svc["name"], "port": svc["port"], "healthy": False})
+
+    return {
+        "status": status_msg,
+        "running_count": running_count,
+        "execution_plane": exec_plane,
+        "control_plane": ctrl_plane,
+    }
+
+
+# --- Ops Traces Endpoints (Langfuse proxy) ---
+@app.get("/api/v1/ops/traces")
+async def ops_traces(limit: int = 50):
+    """Recent Langfuse traces (proxied from Langfuse API)."""
+    import requests as _requests
+    from config import LANGFUSE_HOST
+    lf_host = LANGFUSE_HOST
+    lf_public = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    lf_secret = os.getenv("LANGFUSE_SECRET_KEY", "")
+    if not lf_public:
+        return {"data": [], "error": "LANGFUSE_PUBLIC_KEY not configured"}
+    try:
+        url = f"{lf_host}/api/public/traces?limit={limit}&orderBy=timestamp.desc"
+        resp = _requests.get(url, auth=(lf_public, lf_secret), timeout=5)
+        if resp.status_code == 200:
+            traces = []
+            for t in resp.json().get("data", []):
+                traces.append({
+                    "id": t.get("id"),
+                    "timestamp": t.get("timestamp"),
+                    "name": t.get("name", "Unknown"),
+                    "input_preview": str(t.get("input", ""))[:120],
+                    "latency": t.get("latency"),
+                    "level": t.get("level", "DEFAULT"),
+                })
+            return {"data": traces}
+        return {"data": [], "error": f"Langfuse HTTP {resp.status_code}"}
+    except Exception as e:
+        return {"data": [], "error": str(e)}
+
+
+@app.get("/api/v1/ops/traces/{trace_id}")
+async def ops_trace_detail(trace_id: str):
+    """Langfuse trace detail + observations (spans)."""
+    import requests as _requests
+    from config import LANGFUSE_HOST
+    lf_host = LANGFUSE_HOST
+    lf_public = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    lf_secret = os.getenv("LANGFUSE_SECRET_KEY", "")
+    if not lf_public:
+        raise HTTPException(status_code=503, detail="LANGFUSE_PUBLIC_KEY not configured")
+    try:
+        trace_resp = _requests.get(
+            f"{lf_host}/api/public/traces/{trace_id}",
+            auth=(lf_public, lf_secret), timeout=5,
+        )
+        trace_data = trace_resp.json() if trace_resp.status_code == 200 else {}
+        obs_resp = _requests.get(
+            f"{lf_host}/api/public/observations?traceId={trace_id}&limit=50",
+            auth=(lf_public, lf_secret), timeout=5,
+        )
+        observations = obs_resp.json().get("data", []) if obs_resp.status_code == 200 else []
+        return {
+            "trace": trace_data,
+            "observations": observations,
+            "langfuse_url": f"{lf_host}/project/default/traces/{trace_id}",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Training Runs Endpoint ---
+@app.get("/api/v1/training/runs")
+async def training_runs_list():
+    """List training run directories from the configured training output directory."""
+    from pathlib import Path as _Path
+    from config import TRAINING_OUTPUT_DIR
+    runs = []
+    base_dir = _Path(TRAINING_OUTPUT_DIR)
+    if base_dir.exists():
+        for run_dir in sorted(base_dir.iterdir(), key=lambda p: p.name, reverse=True):
+            if not run_dir.is_dir():
+                continue
+            config_file = run_dir / "training_config.json"
+            cfg = {}
+            if config_file.exists():
+                try:
+                    with open(config_file) as f:
+                        cfg = json.load(f)
+                except Exception:
+                    pass
+            adapter_ready = (
+                (run_dir / "adapter_model.safetensors").exists()
+                or (run_dir / "adapter_model.bin").exists()
+            )
+            gguf_files = [f.name for f in run_dir.glob("*.gguf")]
+            status = "converted" if gguf_files else ("complete" if adapter_ready else "in_progress")
+            runs.append({
+                "id": run_dir.name,
+                "base_model": cfg.get("base_model", "unknown"),
+                "started_at": cfg.get("started_at"),
+                "num_epochs": cfg.get("num_epochs"),
+                "status": status,
+                "adapter_ready": adapter_ready,
+                "gguf_files": gguf_files,
+            })
+    return {"runs": runs}
+
+
+# --- Model Catalog Endpoint ---
+@app.get("/api/v1/training/catalog")
+async def model_catalog():
+    """
+    Model catalog: Ollama available models on all nodes + local trained GGUF files.
+    Serves as the foundation for the model promotion workflow (GGUF → Ollama import).
+    """
+    import requests as _requests
+    from pathlib import Path as _Path
+    from config import OLLAMA_HOST, SECONDARY_OLLAMA_HOST, TRAINING_OUTPUT_DIR
+    catalog: dict = {"ollama_models": [], "local_gguf": [], "errors": []}
+    for label, host in [("execution-plane", OLLAMA_HOST), ("control-plane", SECONDARY_OLLAMA_HOST)]:
+        try:
+            r = _requests.get(f"{host}/api/tags", timeout=3)
+            if r.status_code == 200:
+                for m in r.json().get("models", []):
+                    catalog["ollama_models"].append({
+                        "name": m.get("name"),
+                        "size_mb": round((m.get("size") or 0) / 1_048_576, 1),
+                        "modified_at": m.get("modified_at"),
+                        "node": label,
+                        "digest": (m.get("digest") or "")[:12],
+                    })
+        except Exception as e:
+            catalog["errors"].append(f"{label}: {str(e)[:80]}")
+    base_dir = _Path(TRAINING_OUTPUT_DIR)
+    if base_dir.exists():
+        for gguf in sorted(base_dir.rglob("*.gguf")):
+            stat = gguf.stat()
+            catalog["local_gguf"].append({
+                "name": gguf.stem,
+                "path": str(gguf.relative_to(base_dir)),
+                "size_mb": round(stat.st_size / 1_048_576, 1),
+                "run_id": gguf.parent.name,
+            })
+    return catalog
+
+
 # --- RAG Knowledge Ingestion Endpoint ---
 class IngestRequest(BaseModel):
     text: str
