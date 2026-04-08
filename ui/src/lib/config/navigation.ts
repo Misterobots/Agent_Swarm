@@ -1,13 +1,17 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Activity,
   Bot,
-  Gavel,
-  Image,
+  GraduationCap,
+  Hammer,
+  ImagePlus,
+  LayoutDashboard,
   MessageSquare,
+  Mic2,
+  Paintbrush,
+  Radar,
+  Scale,
   Settings,
-  Shield,
-  SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -15,6 +19,7 @@ export interface NavigationItem {
   href: string;
   icon: LucideIcon;
   matchPrefixes?: string[];
+  children?: NavigationItem[];
 }
 
 export const primaryNavigation: NavigationItem[] = [
@@ -33,19 +38,45 @@ export const primaryNavigation: NavigationItem[] = [
   {
     label: "Monitoring",
     href: "/monitoring",
-    icon: Activity,
+    icon: Radar,
     matchPrefixes: ["/monitoring"],
   },
   {
     label: "Media",
     href: "/media",
-    icon: Image,
+    icon: Paintbrush,
     matchPrefixes: ["/media"],
+    children: [
+      {
+        label: "Images",
+        href: "/media/images",
+        icon: ImagePlus,
+        matchPrefixes: ["/media/images"],
+      },
+      {
+        label: "Voice",
+        href: "/media/voice",
+        icon: Mic2,
+        matchPrefixes: ["/media/voice"],
+      },
+      {
+        label: "Action Figure",
+        href: "/media/action-figure",
+        icon: Sparkles,
+        matchPrefixes: ["/media/action-figure"],
+      },
+      {
+        label: "Creature Forge",
+        href: "/media/creature-forge",
+        icon: Hammer,
+        matchPrefixes: ["/media/creature-forge"],
+      },
+    ],
   },
   {
     label: "Training",
     href: "/training",
-    icon: SlidersHorizontal,
+    icon: GraduationCap,
     matchPrefixes: ["/training"],
   },
 ];
@@ -54,13 +85,13 @@ export const secondaryNavigation: NavigationItem[] = [
   {
     label: "Control",
     href: "/control",
-    icon: Shield,
+    icon: LayoutDashboard,
     matchPrefixes: ["/control"],
   },
   {
     label: "Governance",
     href: "/governance",
-    icon: Gavel,
+    icon: Scale,
     matchPrefixes: ["/governance"],
   },
 ];

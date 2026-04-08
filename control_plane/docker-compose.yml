@@ -1,6 +1,31 @@
 version: '3.8'
 
 services:
+  # --- Docker Sidecar Probe (read-only container metadata) ---
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: docker-socket-proxy-control
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1
+      - INFO=1
+      - PING=1
+      - VERSION=1
+      - EVENTS=0
+      - POST=0
+      - AUTH=0
+      - BUILD=0
+      - IMAGES=0
+      - NETWORKS=0
+      - VOLUMES=0
+      - SYSTEM=0
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "2375:2375"
+    networks:
+      - swarm_net
+
   # --- Identity Service (SPIRE Server) ---
   spire-server:
     image: ghcr.io/spiffe/spire-server:1.10.1
