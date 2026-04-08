@@ -2,6 +2,7 @@
 import logging
 import sys
 import os
+import json
 # Ensure agents dir and workspace root are in path
 if "/app/agents" not in sys.path:
     sys.path.append("/app/agents")
@@ -475,43 +476,138 @@ async def health_nodes():
 # --- Ops Infrastructure Health Endpoint ---
 @app.get("/api/v1/ops/health")
 async def ops_health():
-    """Infrastructure health: Docker containers + control plane service checks."""
+    """Infrastructure health across cluster nodes + control plane service checks."""
     import subprocess
     import socket
     import requests as _requests
-    from config import CONTROL_NODE_IP, LANGFUSE_HOST
+    from config import CONTROL_NODE_IP, LANGFUSE_HOST, R730_IP, JUSTIN_PC_IP
 
-    exec_plane = []
+    def normalize_containers(raw_containers):
+        parsed = []
+        for c in raw_containers or []:
+            name = c.get("Names", ["/unknown"])
+            if isinstance(name, list):
+                name = (name[0] if name else "unknown").lstrip("/")
+            image_raw = c.get("Image", "unknown")
+            image = image_raw.split("/")[-1].split(":")[0]
+            uptime = c.get("Status", "Unknown")
+            parsed.append({"name": name, "image": image, "uptime": uptime, "status": "running"})
+        return parsed
+
+    def fetch_local_containers():
+        # Try curl first for compatibility with existing containers.
+        try:
+            result = subprocess.run(
+                ["curl", "-s", "--unix-socket", "/var/run/docker.sock", "http://localhost/containers/json"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return normalize_containers(json.loads(result.stdout))
+        except Exception:
+            pass
+
+        # Fallback: native unix-socket HTTP query (no curl dependency).
+        try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            sock.connect("/var/run/docker.sock")
+            request = (
+                "GET /containers/json HTTP/1.1\r\n"
+                "Host: localhost\r\n"
+                "Accept: application/json\r\n"
+                "Connection: close\r\n\r\n"
+            )
+            sock.sendall(request.encode("ascii"))
+
+            chunks = []
+            while True:
+                chunk = sock.recv(8192)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            sock.close()
+
+            raw = b"".join(chunks).decode("utf-8", errors="replace")
+            parts = raw.split("\r\n\r\n", 1)
+            if len(parts) != 2:
+                raise RuntimeError("Malformed docker socket response")
+
+            body = parts[1]
+            if not body.strip():
+                return []
+            return normalize_containers(json.loads(body))
+        except Exception as e:
+            raise RuntimeError(f"Local docker query failed: {str(e)[:80]}")
+
+    def fetch_remote_containers(ip_addr: str):
+        endpoint = f"http://{ip_addr}:2375/containers/json"
+        resp = _requests.get(endpoint, timeout=4)
+        if resp.status_code != 200:
+            raise RuntimeError(f"HTTP {resp.status_code}")
+        return normalize_containers(resp.json())
+
+    def fetch_justin_containers():
+        try:
+            return fetch_local_containers()
+        except Exception:
+            last_error = None
+            for host in [JUSTIN_PC_IP, "host.docker.internal"]:
+                try:
+                    return fetch_remote_containers(host)
+                except Exception as e:
+                    last_error = e
+            raise RuntimeError(str(last_error) if last_error else "Justin-PC container probe failed")
+
+    nodes = []
     ctrl_plane = []
-    running_count = 0
-    status_msg = "ONLINE"
+    degraded_reasons = []
 
-    # Execution Plane: Docker Socket
-    try:
-        result = subprocess.run(
-            ["curl", "-s", "--unix-socket", "/var/run/docker.sock",
-             "http://localhost/containers/json"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            containers = json.loads(result.stdout)
-            running_count = len(containers)
-            for c in containers:
-                name = c.get("Names", ["/unknown"])[0].lstrip("/")
-                image = c.get("Image", "unknown").split("/")[-1].split(":")[0]
-                uptime = c.get("Status", "Unknown")
-                exec_plane.append({"name": name, "image": image, "uptime": uptime, "status": "running"})
-        else:
-            status_msg = f"Docker: {result.stderr[:60]}"
-    except Exception as e:
-        status_msg = f"Docker Error: {str(e)[:60]}"
+    cluster_defs = [
+        {"name": "Justin-PC", "role": "execution", "ip": JUSTIN_PC_IP, "fetch": lambda: fetch_justin_containers()},
+        {"name": "R730", "role": "gateway", "ip": R730_IP, "fetch": lambda: fetch_remote_containers(R730_IP)},
+        {"name": "Control Node", "role": "control", "ip": CONTROL_NODE_IP, "fetch": lambda: fetch_remote_containers(CONTROL_NODE_IP)},
+    ]
+
+    for node in cluster_defs:
+        try:
+            containers = node["fetch"]()
+            nodes.append(
+                {
+                    "name": node["name"],
+                    "role": node["role"],
+                    "ip": node["ip"],
+                    "healthy": True,
+                    "running_count": len(containers),
+                    "containers": containers,
+                    "error": None,
+                }
+            )
+        except Exception as e:
+            nodes.append(
+                {
+                    "name": node["name"],
+                    "role": node["role"],
+                    "ip": node["ip"],
+                    "healthy": False,
+                    "running_count": 0,
+                    "containers": [],
+                    "error": str(e)[:120],
+                }
+            )
+            degraded_reasons.append(f"{node['name']}: {str(e)[:50]}")
+
+    # Backwards-compat fields for existing UI consumers.
+    execution_plane = next((n["containers"] for n in nodes if n["role"] == "execution"), [])
+    running_count = sum(n["running_count"] for n in nodes)
 
     # Control Plane: HTTP/TCP Health Checks
     cp_services = [
-        {"name": "Langfuse",      "url": f"{LANGFUSE_HOST}/api/public/health", "port": 3000},
-        {"name": "PostgreSQL",    "url": None, "port": 5432},
-        {"name": "SPIRE Server",  "url": None, "port": 8081},
-        {"name": "MinIO API",     "url": f"http://{CONTROL_NODE_IP}:9190/minio/health/live", "port": 9190},
+        {"name": "Langfuse", "url": f"{LANGFUSE_HOST}/api/public/health", "port": 3000},
+        {"name": "PostgreSQL", "url": None, "port": 5432},
+        {"name": "SPIRE Server", "url": None, "port": 8081},
+        {"name": "MinIO API", "url": f"http://{CONTROL_NODE_IP}:9190/minio/health/live", "port": 9190},
         {"name": "MinIO Console", "url": None, "port": 9191},
     ]
     for svc in cp_services:
@@ -529,10 +625,17 @@ async def ops_health():
         except Exception:
             ctrl_plane.append({"name": svc["name"], "port": svc["port"], "healthy": False})
 
+    down_control = [svc["name"] for svc in ctrl_plane if not svc["healthy"]]
+    if down_control:
+        degraded_reasons.append(f"Control plane: {', '.join(down_control[:3])}")
+
+    status_msg = "ONLINE" if not degraded_reasons else f"DEGRADED ({'; '.join(degraded_reasons[:3])})"
+
     return {
         "status": status_msg,
         "running_count": running_count,
-        "execution_plane": exec_plane,
+        "nodes": nodes,
+        "execution_plane": execution_plane,
         "control_plane": ctrl_plane,
     }
 
@@ -672,6 +775,236 @@ async def model_catalog():
                 "run_id": gguf.parent.name,
             })
     return catalog
+
+
+# --- Evidence Locker Endpoints ---
+@app.get("/api/v1/ops/evidence/folders")
+async def evidence_folders():
+    """List available evidence folders under /workspace/docs."""
+    from pathlib import Path as _Path
+    docs_root = _Path("/workspace/docs")
+    default_folders = ["specs", "evidence", "compliance", "architecture"]
+
+    if not docs_root.exists():
+        return {"folders": [], "error": "docs directory not found"}
+
+    folders = [
+        p.name for p in docs_root.iterdir() if p.is_dir() and not p.name.startswith(".")
+    ]
+    folders = sorted(set(default_folders + folders))
+    return {"folders": folders}
+
+
+@app.get("/api/v1/ops/evidence/files")
+async def evidence_files(folder: str):
+    """List evidence files for a given docs subfolder."""
+    from pathlib import Path as _Path
+    docs_root = _Path("/workspace/docs")
+    target = (docs_root / folder).resolve()
+
+    if not str(target).startswith(str(docs_root.resolve())):
+        raise HTTPException(status_code=403, detail="Invalid folder path")
+    if not target.exists() or not target.is_dir():
+        return {"files": [], "error": "folder not found"}
+
+    allowed = {".md", ".txt", ".json", ".yaml", ".yml"}
+    files = []
+    for f in sorted(target.iterdir(), key=lambda p: p.name.lower()):
+        if f.is_file() and f.suffix.lower() in allowed:
+            files.append({"name": f.name, "size": f.stat().st_size})
+    return {"files": files}
+
+
+@app.get("/api/v1/ops/evidence/content")
+async def evidence_content(folder: str, filename: str):
+    """Read an evidence file from docs safely."""
+    from pathlib import Path as _Path
+    docs_root = _Path("/workspace/docs").resolve()
+    file_path = (docs_root / folder / filename).resolve()
+
+    if not str(file_path).startswith(str(docs_root)):
+        raise HTTPException(status_code=403, detail="Invalid file path")
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        content = file_path.read_text(encoding="utf-8", errors="replace")
+        return {
+            "name": file_path.name,
+            "folder": folder,
+            "content": content,
+            "content_type": file_path.suffix.lower().lstrip("."),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Media Gallery Endpoint ---
+@app.get("/api/v1/media/gallery")
+async def media_gallery(kind: str = "all"):
+    """
+    List artifacts from /workspace/delivered_artifacts with optional type filtering.
+    kind: all | image | audio | model
+    """
+    from pathlib import Path as _Path
+
+    gallery_dir = _Path("/workspace/delivered_artifacts")
+    if not gallery_dir.exists():
+        return {"items": []}
+
+    image_exts = {".png", ".jpg", ".jpeg", ".webp"}
+    audio_exts = {".wav", ".mp3", ".ogg", ".m4a"}
+    model_exts = {".glb", ".obj", ".3mf"}
+
+    def _include(ext: str) -> bool:
+        if kind == "image":
+            return ext in image_exts
+        if kind == "audio":
+            return ext in audio_exts
+        if kind == "model":
+            return ext in model_exts
+        return ext in image_exts or ext in audio_exts or ext in model_exts
+    items = []
+    for f in sorted(gallery_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if not f.is_file():
+            continue
+        ext = f.suffix.lower()
+        if not _include(ext):
+            continue
+
+        meta = None
+        meta_file = f.with_name(f.name + ".json")
+        if meta_file.exists() and meta_file.is_file():
+            try:
+                meta = json.loads(meta_file.read_text(encoding="utf-8", errors="replace"))
+            except Exception:
+                meta = None
+
+        media_kind = "model"
+        if ext in image_exts:
+            media_kind = "image"
+        elif ext in audio_exts:
+            media_kind = "audio"
+
+        items.append(
+            {
+                "name": f.name,
+                "kind": media_kind,
+                "size_mb": round(f.stat().st_size / 1_048_576, 2),
+                "updated_at": f.stat().st_mtime,
+                "url": f"/delivered_artifacts/{f.name}",
+                "metadata": meta,
+            }
+        )
+
+    return {"items": items}
+
+
+class MediaImageGenerateRequest(BaseModel):
+    prompt: str
+    model_name: str = "auto"
+    cfg: float = 7.0
+    steps: int = 20
+    width: int = 1024
+    height: int = 1024
+    sampler: str = "euler"
+    scheduler: str = "normal"
+    seed: int = -1
+
+
+class MediaForgeGenerateRequest(BaseModel):
+    image_path: str
+    workflow_name: str = "workflow_hunyuan_paint-2.json"
+
+
+@app.get("/api/v1/media/comfyui/status")
+async def media_comfyui_status():
+    """Check ComfyUI availability for media workflows."""
+    import requests as _requests
+
+    comfy_url = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
+    try:
+        resp = _requests.get(f"{comfy_url}/system_stats", timeout=3)
+        return {"healthy": resp.status_code == 200, "host": comfy_url}
+    except Exception as e:
+        return {"healthy": False, "host": comfy_url, "error": str(e)[:120]}
+
+
+@app.get("/api/v1/media/comfyui/checkpoints")
+async def media_comfyui_checkpoints():
+    """List available ComfyUI checkpoints."""
+    try:
+        from specialized.image_gen import list_available_models
+
+        models = list_available_models()
+        return {"models": models}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch checkpoints: {e}")
+
+
+@app.post("/api/v1/media/generate/image")
+async def media_generate_image(req: MediaImageGenerateRequest):
+    """Generate image using Creative Studio toolchain (ComfyUI-backed)."""
+    try:
+        from specialized.image_gen import generate_image
+
+        result = generate_image(
+            prompt=req.prompt,
+            model_name=req.model_name,
+            cfg=req.cfg,
+            steps=req.steps,
+            width=req.width,
+            height=req.height,
+            sampler=req.sampler,
+            scheduler=req.scheduler,
+            seed=req.seed,
+        )
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {e}")
+
+
+@app.post("/api/v1/media/generate/3d")
+async def media_generate_3d(req: MediaForgeGenerateRequest):
+    """Generate 3D model from image via Creature Forge."""
+    try:
+        from specialized.forge_agent import generate_3d_model
+
+        result = generate_3d_model(req.image_path, req.workflow_name)
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"3D generation failed: {e}")
+
+
+class VoiceSpeakRequest(BaseModel):
+    text: str
+    pitch: int = 3
+    method: str = "rmvpe"
+
+
+# --- Training Voice Proxy Endpoint ---
+@app.post("/api/v1/training/voice/speak")
+async def training_voice_speak(req: VoiceSpeakRequest):
+    """Proxy TTS call to the BMO voice service."""
+    import requests as _requests
+
+    bmo_url = os.getenv("BMO_VOICE_URL", "http://bmo_voice_gpu:8000/speak")
+    try:
+        response = _requests.post(
+            bmo_url,
+            params={"text": req.text, "pitch": req.pitch, "method": req.method},
+            timeout=20,
+        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Voice service error: {response.text[:200]}",
+            )
+        return Response(content=response.content, media_type="audio/wav")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Voice proxy failed: {e}")
 
 
 # --- RAG Knowledge Ingestion Endpoint ---

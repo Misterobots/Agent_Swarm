@@ -5,6 +5,16 @@ export interface Container {
   status: string;
 }
 
+export interface ClusterNode {
+  name: string;
+  role: "execution" | "gateway" | "control";
+  ip: string;
+  healthy: boolean;
+  running_count: number;
+  containers: Container[];
+  error?: string | null;
+}
+
 export interface ControlPlaneService {
   name: string;
   port: number;
@@ -14,6 +24,7 @@ export interface ControlPlaneService {
 export interface OpsHealth {
   status: string;
   running_count: number;
+  nodes: ClusterNode[];
   execution_plane: Container[];
   control_plane: ControlPlaneService[];
 }

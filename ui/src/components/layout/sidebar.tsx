@@ -15,6 +15,44 @@ import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, MessageSquare } from "lucide-react";
 
+function HiveLogo() {
+  return (
+    <svg width="28" height="32" viewBox="0 0 28 32" fill="none" className="sidebar-logo">
+      {/* Outer hexagon */}
+      <path
+        d="M14 1L26 8V22L14 29L2 22V8L14 1Z"
+        stroke="var(--chat-accent-strong)"
+        strokeWidth="1.5"
+        fill="color-mix(in srgb, var(--chat-accent) 8%, transparent)"
+      />
+      {/* Inner hexagon */}
+      <path
+        d="M14 7L21 11V19L14 23L7 19V11L14 7Z"
+        stroke="var(--chat-accent)"
+        strokeWidth="0.8"
+        opacity="0.5"
+        fill="none"
+      />
+      {/* Center node */}
+      <circle cx="14" cy="15" r="2.5" fill="var(--chat-accent-strong)" opacity="0.7" />
+      {/* Network lines from center to vertices */}
+      <line x1="14" y1="15" x2="14" y2="7" stroke="var(--chat-accent)" strokeWidth="0.5" opacity="0.3" />
+      <line x1="14" y1="15" x2="21" y2="11" stroke="var(--chat-accent)" strokeWidth="0.5" opacity="0.3" />
+      <line x1="14" y1="15" x2="21" y2="19" stroke="var(--chat-accent)" strokeWidth="0.5" opacity="0.3" />
+      <line x1="14" y1="15" x2="14" y2="23" stroke="var(--chat-accent)" strokeWidth="0.5" opacity="0.3" />
+      <line x1="14" y1="15" x2="7" y2="19" stroke="var(--chat-accent)" strokeWidth="0.5" opacity="0.3" />
+      <line x1="14" y1="15" x2="7" y2="11" stroke="var(--chat-accent)" strokeWidth="0.5" opacity="0.3" />
+      {/* Vertex dots */}
+      <circle cx="14" cy="7" r="1" fill="var(--chat-accent)" opacity="0.5" />
+      <circle cx="21" cy="11" r="1" fill="var(--chat-accent)" opacity="0.5" />
+      <circle cx="21" cy="19" r="1" fill="var(--chat-accent)" opacity="0.5" />
+      <circle cx="14" cy="23" r="1" fill="var(--chat-accent)" opacity="0.5" />
+      <circle cx="7" cy="19" r="1" fill="var(--chat-accent)" opacity="0.5" />
+      <circle cx="7" cy="11" r="1" fill="var(--chat-accent)" opacity="0.5" />
+    </svg>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const conversations = useChatStore((s) => s.conversations);
@@ -26,13 +64,18 @@ export function Sidebar() {
   const showConversations = isConversationRoute(pathname);
 
   return (
-    <div className="flex flex-col h-full bg-[color:color-mix(in_srgb,var(--chat-bg)_85%,black)] border-r border-[var(--chat-border)]">
+    <div className="sidebar-wrapper relative flex flex-col h-full bg-[color:color-mix(in_srgb,var(--chat-bg)_85%,black)] border-r border-[var(--chat-border)]">
       {/* Logo */}
       <div className="px-4 py-4 border-b border-[var(--chat-border)]">
-        <h1 className="text-base font-semibold text-[var(--chat-accent-strong)] tracking-wide">
-          HIVE MIND
-        </h1>
-        <p className="text-[10px] text-[var(--chat-muted)] mt-0.5">AI Swarm Interface</p>
+        <div className="flex items-center gap-3">
+          <HiveLogo />
+          <div>
+            <h1 className="text-base font-semibold text-[var(--chat-accent-strong)] tracking-wide">
+              HIVE MIND
+            </h1>
+            <p className="text-[10px] text-[var(--chat-muted)] mt-0.5">AI Swarm Interface</p>
+          </div>
+        </div>
       </div>
 
       {/* Mode Switcher */}
@@ -43,7 +86,28 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin">
         <SidebarSection title="Workspaces">
           {primaryNavigation.map((item) => (
-            <SidebarNavItem key={item.href} href={item.href} label={item.label} active={isNavigationItemActive(item, pathname)} icon={item.icon} />
+            <div key={item.href}>
+              <SidebarNavItem
+                href={item.href}
+                label={item.label}
+                active={isNavigationItemActive(item, pathname)}
+                icon={item.icon}
+              />
+              {item.children && isNavigationItemActive(item, pathname) && (
+                <div className="mt-1 space-y-0.5 pb-1">
+                  {item.children.map((child) => (
+                    <SidebarNavItem
+                      key={child.href}
+                      href={child.href}
+                      label={child.label}
+                      active={isNavigationItemActive(child, pathname)}
+                      icon={child.icon}
+                      compact
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </SidebarSection>
 
@@ -106,15 +170,26 @@ export function Sidebar() {
           </>
         ) : null}
       </div>
+
+      {/* Status footer */}
+      <div className="px-4 py-3 border-t border-[var(--chat-border)]">
+        <div className="flex items-center gap-2 text-[10px] text-[var(--chat-muted)]">
+          <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-[var(--chat-accent)]" />
+          <span>Swarm Online</span>
+        </div>
+      </div>
     </div>
   );
 }
 
 function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-4">
-      <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chat-muted)]">
-        {title}
+    <div className="mb-5">
+      <div className="flex items-center gap-2 px-3 pb-1.5">
+        <span className="sidebar-section-title text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chat-muted)]">
+          {title}
+        </span>
+        <span className="flex-1 h-px bg-[var(--chat-border)] opacity-50" />
       </div>
       <div className="space-y-0.5">{children}</div>
     </div>
@@ -126,23 +201,29 @@ function SidebarNavItem({
   label,
   active,
   icon: Icon,
+  compact = false,
 }: {
   href: string;
   label: string;
   active: boolean;
   icon: React.ComponentType<{ size?: number; className?: string }>;
+  compact?: boolean;
 }) {
   return (
     <Link
       href={href}
       className={cn(
-        "mx-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+        "relative flex items-center rounded-lg transition-all duration-150",
+        compact ? "mx-4 gap-2 px-3 py-1.5 text-xs" : "mx-2 gap-2.5 px-3 py-2 text-sm",
         active
-          ? "bg-[var(--chat-panel)] text-[var(--chat-text)]"
+          ? "sidebar-active bg-[var(--chat-panel)] text-[var(--chat-text)]"
           : "text-[var(--chat-muted)] hover:bg-[color:color-mix(in_srgb,var(--chat-panel)_50%,transparent)] hover:text-[var(--chat-text)]"
       )}
     >
-      <Icon size={14} className="shrink-0" />
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--chat-accent)]" />
+      )}
+      <Icon size={compact ? 13 : 16} className={cn("shrink-0 transition-colors", active && "text-[var(--chat-accent)]")} />
       <span className="truncate">{label}</span>
     </Link>
   );

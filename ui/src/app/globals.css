@@ -12,7 +12,7 @@
 
 /* ── Default / Ember — Warm forge aesthetic ───────────────────── */
 .chat-shell,
-[data-theme="ember"] .chat-shell {
+[data-theme="ember"] {
   --chat-bg: #110e0c;
   --chat-surface: #141110;
   --chat-panel: #1f1714;
@@ -30,7 +30,7 @@
 }
 
 /* ── Slate — Cool architectural blue ─────────────────────────── */
-[data-theme="slate"] .chat-shell {
+[data-theme="slate"] {
   --chat-bg: #11161d;
   --chat-surface: #141a22;
   --chat-panel: #1a2230;
@@ -48,7 +48,7 @@
 }
 
 /* ── Signal — Radio operator gold ────────────────────────────── */
-[data-theme="signal"] .chat-shell {
+[data-theme="signal"] {
   --chat-bg: #171a1b;
   --chat-surface: #1a1d1f;
   --chat-panel: #222628;
@@ -66,7 +66,7 @@
 }
 
 /* ── Office — Professional & clean (light theme) ─────────────── */
-[data-theme="office"] .chat-shell {
+[data-theme="office"] {
   --chat-bg: #f8f9fa;
   --chat-surface: #ffffff;
   --chat-panel: #e9ecef;
@@ -84,7 +84,7 @@
 }
 
 /* ── Hacker — Green-on-black terminal ────────────────────────── */
-[data-theme="hacker"] .chat-shell {
+[data-theme="hacker"] {
   --chat-bg: #0a0e14;
   --chat-surface: #0c1018;
   --chat-panel: #111820;
@@ -102,7 +102,7 @@
 }
 
 /* ── Star Trek — LCARS starship bridge ───────────────────────── */
-[data-theme="star-trek"] .chat-shell {
+[data-theme="star-trek"] {
   --chat-bg: #000000;
   --chat-surface: #000000;
   --chat-panel: #101010;
@@ -120,7 +120,7 @@
 }
 
 /* ── Cyberpunk — Neon-soaked future ──────────────────────────── */
-[data-theme="cyberpunk"] .chat-shell {
+[data-theme="cyberpunk"] {
   --chat-bg: #0d0221;
   --chat-surface: #120328;
   --chat-panel: #1a0540;
@@ -138,7 +138,7 @@
 }
 
 /* ── Minimal — Clean & distraction-free (light) ──────────────── */
-[data-theme="minimal"] .chat-shell {
+[data-theme="minimal"] {
   --chat-bg: #fafafa;
   --chat-surface: #ffffff;
   --chat-panel: #f0f0f0;
@@ -283,4 +283,96 @@ body {
 }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: var(--chat-muted, #52525b);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SIDEBAR THEME DECORATIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Sidebar logo glow — per theme */
+.sidebar-logo { transition: filter 0.3s ease; }
+
+[data-theme="ember"] .sidebar-logo {
+  filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.35));
+}
+[data-theme="slate"] .sidebar-logo {
+  filter: drop-shadow(0 0 6px rgba(75, 166, 199, 0.3));
+}
+[data-theme="signal"] .sidebar-logo {
+  filter: drop-shadow(0 0 5px rgba(216, 154, 77, 0.35));
+}
+[data-theme="office"] .sidebar-logo {
+  filter: drop-shadow(0 0 4px rgba(46, 80, 144, 0.2));
+}
+[data-theme="hacker"] .sidebar-logo {
+  filter: drop-shadow(0 0 10px rgba(57, 255, 20, 0.6));
+  animation: hacker-logo-pulse 3s ease-in-out infinite;
+}
+[data-theme="star-trek"] .sidebar-logo {
+  filter: drop-shadow(0 0 8px rgba(255, 153, 0, 0.4));
+}
+[data-theme="cyberpunk"] .sidebar-logo {
+  filter: drop-shadow(0 0 10px rgba(255, 16, 240, 0.5)) drop-shadow(0 0 20px rgba(0, 255, 255, 0.2));
+}
+[data-theme="minimal"] .sidebar-logo {
+  filter: none;
+  opacity: 0.7;
+}
+
+@keyframes hacker-logo-pulse {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(57, 255, 20, 0.6)); }
+  50% { filter: drop-shadow(0 0 16px rgba(57, 255, 20, 0.9)); }
+}
+
+/* Active nav accent glow — per theme */
+[data-theme="hacker"] .sidebar-active {
+  text-shadow: 0 0 4px rgba(57, 255, 20, 0.3);
+}
+[data-theme="cyberpunk"] .sidebar-active {
+  box-shadow: inset 0 0 12px rgba(255, 16, 240, 0.1), 0 0 6px rgba(255, 16, 240, 0.1);
+}
+[data-theme="star-trek"] .sidebar-active {
+  border-left: 3px solid #ff9900;
+  border-radius: 0 2rem 2rem 0;
+}
+
+/* Star Trek LCARS sidebar border */
+[data-theme="star-trek"] .sidebar-wrapper {
+  border-right: 4px solid #cc6699;
+}
+[data-theme="star-trek"] .sidebar-section-title {
+  font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* Hacker sidebar: subtle scanlines */
+[data-theme="hacker"] .sidebar-wrapper::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 255, 0, 0.012) 3px,
+    rgba(0, 255, 0, 0.012) 6px
+  );
+  z-index: 1;
+}
+
+/* Cyberpunk sidebar: edge glow */
+[data-theme="cyberpunk"] .sidebar-wrapper {
+  border-right: 1px solid rgba(255, 16, 240, 0.3);
+  box-shadow: inset -1px 0 12px rgba(255, 16, 240, 0.05);
+}
+
+/* Status indicator pulse */
+@keyframes status-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+.sidebar-status-dot {
+  animation: status-pulse 2.5s ease-in-out infinite;
 }

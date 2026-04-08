@@ -1,11 +1,68 @@
-import { Archive } from "lucide-react";
+"use client";
+
+import { Archive, Copy, RefreshCw } from "lucide-react";
+import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { useEffect, useMemo, useState } from "react";
 import {
-  WorkspacePlaceholder,
-  WorkspaceSection,
-  WorkspaceShell,
-} from "@/components/workspace/workspace-shell";
+  fetchEvidenceContent,
+  fetchEvidenceFiles,
+  fetchEvidenceFolders,
+} from "@/lib/api/workspaces";
+import type { EvidenceFile } from "@/types/workspaces";
 
 export default function EvidenceLockerPage() {
+  const [folders, setFolders] = useState<string[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string>("");
+  const [files, setFiles] = useState<EvidenceFile[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string>("");
+  const [content, setContent] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  const folderCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const folder of folders) {
+      counts[folder] = folder === selectedFolder ? files.length : 0;
+    }
+    return counts;
+  }, [folders, files, selectedFolder]);
+
+  async function refreshFolders() {
+    setLoading(true);
+    const nextFolders = await fetchEvidenceFolders();
+    setFolders(nextFolders);
+    if (!selectedFolder && nextFolders.length > 0) {
+      setSelectedFolder(nextFolders[0]);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    refreshFolders();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedFolder) return;
+    fetchEvidenceFiles(selectedFolder).then((data) => {
+      setFiles(data);
+      setSelectedFile(data[0]?.name ?? "");
+    });
+  }, [selectedFolder]);
+
+  useEffect(() => {
+    if (!selectedFolder || !selectedFile) {
+      setContent("");
+      return;
+    }
+    fetchEvidenceContent(selectedFolder, selectedFile).then((data) => {
+      setContent(data?.content ?? "");
+    });
+  }, [selectedFolder, selectedFile]);
+
+  async function copyContent() {
+    if (!content) return;
+    await navigator.clipboard.writeText(content);
+  }
+
   return (
     <WorkspaceShell
       title="Evidence Locker"
@@ -13,10 +70,83 @@ export default function EvidenceLockerPage() {
       icon={Archive}
     >
       <WorkspaceSection title="Document Browser">
-        <WorkspacePlaceholder
-          title="Directory-backed evidence view pending"
-          body="The legacy folder browser for docs/specs/evidence/compliance/architecture can be migrated onto this page without changing the new route structure."
-        />
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-xs text-zinc-500">
+            Source: <span className="font-mono">/workspace/docs</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={copyContent}
+              disabled={!content}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+            >
+              <Copy size={12} /> Copy
+            </button>
+            <button
+              onClick={refreshFolders}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+            >
+              <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-xs text-zinc-400">
+          {selectedFolder ? `${selectedFolder} / ${selectedFile || "(no file selected)"}` : "Select a folder"}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[240px_280px_1fr]">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+            <p className="mb-2 text-xs font-medium text-zinc-400">Folders</p>
+            <div className="space-y-1">
+              {folders.map((folder) => (
+                <button
+                  key={folder}
+                  onClick={() => setSelectedFolder(folder)}
+                  className={`w-full rounded px-2 py-1.5 text-left text-sm ${
+                    selectedFolder === folder
+                      ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent)]"
+                      : "text-zinc-400 hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <span>{folder}</span>
+                  <span className="ml-2 text-[10px] text-zinc-500">({folderCounts[folder] ?? 0})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+            <p className="mb-2 text-xs font-medium text-zinc-400">Files</p>
+            <div className="space-y-1">
+              {files.length === 0 && (
+                <p className="px-2 py-2 text-xs text-zinc-500">No files in folder.</p>
+              )}
+              {files.map((file) => (
+                <button
+                  key={file.name}
+                  onClick={() => setSelectedFile(file.name)}
+                  className={`w-full rounded px-2 py-1.5 text-left ${
+                    selectedFile === file.name
+                      ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent)]"
+                      : "text-zinc-400 hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <p className="truncate text-sm">{file.name}</p>
+                  <p className="text-xs text-zinc-600">{(file.size / 1024).toFixed(1)} KB</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+            <p className="mb-2 text-xs font-medium text-zinc-400">{selectedFile || "File content"}</p>
+            <pre className="max-h-[64vh] overflow-auto whitespace-pre-wrap rounded bg-zinc-950 p-3 font-mono text-xs text-zinc-300">
+              {content || "Select a file to view its contents."}
+            </pre>
+          </div>
+        </div>
       </WorkspaceSection>
     </WorkspaceShell>
   );
