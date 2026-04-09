@@ -333,9 +333,11 @@ def _extract_constraint_context(history: list | None, user_input: str) -> str:
     )
     constraints = []
     for msg in history:
-        if msg.get("role") != "user":
+        _role = msg.get("role", "user") if isinstance(msg, dict) else getattr(msg, "role", "user")
+        if _role != "user":
             continue
-        content = str(msg.get("content", "")).strip()
+        _content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
+        content = str(_content).strip()
         if not content:
             continue
         lowered = content.lower()
@@ -527,8 +529,8 @@ def chat_swarm(
     if history:
         history_context = "\n\n[Previous Conversation History]:\n"
         for msg in history:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
+            role = msg.get("role", "user") if isinstance(msg, dict) else getattr(msg, "role", "user")
+            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
             history_context += f"- {role.upper()}: {content}\n"
     
     # --- RAG CONTEXT INTERCEPTION ---
