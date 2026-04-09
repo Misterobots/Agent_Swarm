@@ -370,6 +370,7 @@ services:
       start_period: 30s
     networks:
       - ai_lab_net
+      - saltbox
     labels:
       - "traefik.enable=true"
       # Internal LAN route (no auth)
@@ -587,6 +588,9 @@ networks:
   ai_lab_net:
     driver: bridge
     name: ai_lab_net
+  saltbox:
+    external: true
+    name: saltbox
 
 volumes:
   spire_agent_data:
