@@ -1,5 +1,7 @@
 # MAESTRO Full Audit: 2026-02-22 (Updated 2026-03-12)
 
+> **Note**: This is a historical audit snapshot from 2026-02-22. Node names have been updated to current logical designations.
+
 **Version**: 3.1.0 (Devstral Purge)
 **Auditor**: Home AI Lab Governance Automation
 **Previous Audit**: 2026-02-22 (v3.0.1)
@@ -11,12 +13,12 @@
 | Property             | Value                                                  |
 | -------------------- | ------------------------------------------------------ |
 | Architecture Version | 3.1 — Qwen 3.5 Standard                                |
-| Nodes                | 3 (Dell Wyse 5070, Justin-PC, Dell R730)               |
-| Primary Solver       | qwen3.5:9b (RTX 5060 Ti 16GB / R730 8GB)                |
-| Router/Orchestrator  | nemotron-orchestrator:8b (Dell R730, RTX 3070 Ti 8GB)  |
-| Safety Verifier      | llama-guard-3:8b (Dell R730)                           |
+| Nodes                | 3 (Control Node, Execution Node, Gateway Node)         |
+| Primary Solver       | qwen3.5:9b (RTX 5060 Ti 16GB / Gateway Node 8GB)        |
+| Router/Orchestrator  | nemotron-orchestrator:8b (Gateway Node, RTX 3070 Ti 8GB)  |
+| Safety Verifier      | llama-guard-3:8b (Gateway Node)                        |
 | Loop Type            | MarsRL Solver → LogicVerifier → Corrector (max 2 iter) |
-| SPIRE Status         | Justin-PC enrolled; Dell R730 pending                  |
+| SPIRE Status         | Execution Node enrolled; Gateway Node pending          |
 | Langfuse             | Operational + process reward scoring active            |
 | Audit Date           | 2026-03-12T23:10:00-05:00                              |
 
@@ -30,7 +32,7 @@
 | Execution containerization | ✅ PASS    | Docker Compose, execution_net bridge                 |
 | GPU allocation documented  | ✅ PASS    | RTX 5060 Ti → Solver; RTX 3070 Ti → Router+Guard    |
 | Non-root containers        | ✅ PASS    | User-namespace remapping active                      |
-| Dell R730 online           | ✅ PASS    | Deployed as secondary inference node                 |
+| Gateway Node online        | ✅ PASS    | Deployed as secondary inference node                 |
 | Text Gen WebUI deployed    | ✅ PASS    | Profile-gated diagnostic; not in request path        |
 
 **Verdict**: ✅ PASS
@@ -57,8 +59,8 @@
 | ---------------------- | ----------- | -------------------------------- |
 | API key auth           | ✅ PASS     | VALID_API_KEYS enforced          |
 | Input sanitization     | ✅ PASS     | llama-guard-3 runs on all inputs |
-| Ollama API (Justin-PC) | ✅ PASS     | Bound to Docker network only     |
-| Ollama API (R730)      | ✅ PASS     | Bound to Tailscale/LAN           |
+| Ollama API (Execution Node) | ✅ PASS     | Bound to Docker network only     |
+| Ollama API (Gateway Node) | ✅ PASS     | Bound to Tailscale/LAN           |
 | Rate limiting          | ⚠️ NOT IMPL | Future enhancement               |
 
 **Verdict**: ✅ PASS
@@ -111,9 +113,9 @@
 
 | Item                  | Status     | Notes                           |
 | --------------------- | ---------- | ------------------------------- |
-| SPIRE server running  | ✅ PASS    | Dell Wyse :8081                 |
-| Justin-PC SPIRE agent | ✅ PASS    | Enrolled, SVIDs active          |
-| Dell R730 SPIRE agent | ⚠️ PENDING | Enrollment in progress          |
+| SPIRE server running  | ✅ PASS    | Control Node :8081              |
+| Execution Node SPIRE agent | ✅ PASS    | Enrolled, SVIDs active          |
+| Gateway Node SPIRE agent | ⚠️ PENDING | Enrollment in progress          |
 
 **Verdict**: ⚠️ PARTIAL — Identity layer stable, enrollment ongoing.
 
@@ -141,5 +143,5 @@
 | ------------------------------------------------------ | ----------------------------------------------------- |
 | Removed `devstral-small-2` from all roles              | Simplified stack; improved consistency                |
 | Consolidated coding on `qwen3.5:9b`                    | Uniform performance across nodes                      |
-| Verified Tailscale endpoints for R730                  | Secure remote access established                      |
+| Verified Tailscale endpoints for Gateway Node          | Secure remote access established                      |
 | Updated `CONNECTION_REFERENCE.md`                      | Clearer routing and endpoint documentation            |

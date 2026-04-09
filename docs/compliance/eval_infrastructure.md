@@ -44,11 +44,11 @@ The physical and virtual foundation of the Agentic Hive. It manages container or
 - **Requirement**: "Large models must not cause system-level instability or thrashing."
 - **Implementation**:
   - `gpu_queue.py` implements a 10GB+ VRAM threshold.
-  - Heavy models (Expert) stay on **Justin-PC (16GB)**.
-  - Light models (Primary Agents) offload to **R730 (8GB)**.
+  - Heavy models (Expert) stay on **Execution Node (16GB)**.
+  - Light models (Primary Agents) offload to **Gateway Node (8GB)**.
 - **Verification**: Verified via `agent-runtime` routing logs on March 12.
 
 ## 4. Residual Risks
 
-- **VRAM Overdraw**: Host-level apps (AnythingLLM) occupy ~9GB of Justin-PC VRAM. Loading the 15GB Expert Solver simultaneously will still result in CPU swapping.
+- **VRAM Overdraw**: Host-level apps (AnythingLLM) occupy ~9GB of Execution Node VRAM. Loading the 15GB Expert Solver simultaneously will still result in CPU swapping.
 - **Docker Socket**: `openhands` requires `/var/run/docker.sock` mount. This is an accepted operational risk for the Sandbox feature.

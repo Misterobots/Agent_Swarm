@@ -12,43 +12,6 @@ Usage:
     python -m training.grpo_trainer --dataset training_data/grpo_traces.jsonl
 """
 
-# ── Compatibility shims ──────────────────────────────────────────────
-# TRL hard-imports optional backends (vllm, deepspeed, llm_blender) at
-# module level.  When those packages are absent we inject lightweight
-# stubs so the import chain completes without pulling in GPU-heavy deps
-# we don't use for QLoRA GRPO on a single node.
-import sys as _sys, types as _types
-from importlib.machinery import ModuleSpec as _MS
-
-def _mock_package(name, attrs=None):
-    if name not in _sys.modules:
-        mod = _types.ModuleType(name)
-        mod.__spec__ = _MS(name, None, is_package=True)
-        mod.__path__ = []
-        mod.__package__ = name
-        _sys.modules[name] = mod
-    mod = _sys.modules[name]
-    if attrs:
-        for k, v in attrs.items():
-            if not hasattr(mod, k):
-                setattr(mod, k, v)
-
-_Stub = type("_Stub", (), {"__init__": lambda self, *a, **kw: None})
-
-_mock_package("vllm", {"__version__": "0.0.0", "LLM": _Stub, "SamplingParams": _Stub})
-_mock_package("vllm.distributed", {"StatelessProcessGroup": _Stub})
-_mock_package("vllm.distributed.device_communicators")
-_mock_package("vllm.distributed.device_communicators.pynccl", {"PyNcclCommunicator": _Stub})
-_mock_package("vllm.distributed.utils", {"StatelessProcessGroup": _Stub})
-_mock_package("llm_blender")
-_mock_package("deepspeed")
-
-# torch 2.4 lacks FSDPModule (added in 2.6) — stub it for TRL
-import torch.distributed.fsdp as _fsdp_mod
-if not hasattr(_fsdp_mod, "FSDPModule"):
-    _fsdp_mod.FSDPModule = type("FSDPModule", (), {})
-# ─────────────────────────────────────────────────────────────────────
-
 import json
 import os
 import sys
@@ -213,7 +176,6 @@ def _update_training_run(
 def train_grpo(
     dataset_path: str,
     config: Optional[GRPOTrainingConfig] = None,
-    resume_from_checkpoint: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run QLoRA GRPO training on a JSONL dataset.
@@ -362,12 +324,8 @@ def train_grpo(
 
     try:
         # Setup output directory
-        if resume_from_checkpoint:
-            run_dir = Path(resume_from_checkpoint).parent
-            logger.info(f"Resuming into existing run dir: {run_dir}")
-        else:
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-            run_dir = Path(config.output_dir) / f"grpo_{timestamp}"
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        run_dir = Path(config.output_dir) / f"grpo_{timestamp}"
         run_dir.mkdir(parents=True, exist_ok=True)
 
         # 4-bit quantization config for QLoRA
@@ -517,11 +475,8 @@ def train_grpo(
             callbacks=callbacks if callbacks else None,
         )
 
-        if resume_from_checkpoint:
-            logger.info(f"Resuming from checkpoint: {resume_from_checkpoint}")
-        else:
-            logger.info("Starting GRPO training...")
-        train_result = trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+        logger.info("Starting GRPO training...")
+        train_result = trainer.train()
 
         # Save LoRA adapter
         adapter_path = str(run_dir / "adapter")
@@ -600,12 +555,6 @@ def main():
         metavar="MINUTES",
         help="Stop training after this many minutes (saves checkpoint every 50 steps)",
     )
-    parser.add_argument(
-        "--resume-from-checkpoint",
-        type=str,
-        default=None,
-        help="Path to a checkpoint directory to resume training from",
-    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(name)s | %(levelname)s | %(message)s")
@@ -619,7 +568,7 @@ def main():
         time_budget_minutes=args.time_budget,
     )
 
-    result = train_grpo(args.dataset, config, resume_from_checkpoint=args.resume_from_checkpoint)
+    result = train_grpo(args.dataset, config)
     print(f"\nTraining complete!")
     print(f"  Adapter: {result['adapter_path']}")
     print(f"  Loss:    {result['metrics'].get('train_loss', 'N/A')}")

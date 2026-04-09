@@ -45,9 +45,9 @@ _load_network_env()
 # Node IPs
 # ---------------------------------------------------------------------------
 HOME_ASSISTANT_IP = os.getenv("HOME_ASSISTANT_IP", "192.168.2.100")
-JUSTIN_PC_IP      = os.getenv("JUSTIN_PC_IP",      "192.168.2.101")
+EXECUTION_NODE_IP  = os.getenv("EXECUTION_NODE_IP", os.getenv("JUSTIN_PC_IP", "192.168.2.101"))
 CONTROL_NODE_IP    = os.getenv("CONTROL_NODE_IP",    "192.168.2.102")
-R730_IP            = os.getenv("R730_IP",            "192.168.2.103")
+GATEWAY_NODE_IP    = os.getenv("GATEWAY_NODE_IP",  os.getenv("R730_IP", "192.168.2.103"))
 IDRAC_IP           = os.getenv("IDRAC_IP",           "192.168.2.104")
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ IDRAC_IP           = os.getenv("IDRAC_IP",           "192.168.2.104")
 AGNO_DB_URL          = os.getenv("AGNO_DB_URL",          f"postgresql://agno:agno_password@{CONTROL_NODE_IP}:5432/agno_memory")
 LANGFUSE_HOST        = os.getenv("LANGFUSE_HOST",        f"http://{CONTROL_NODE_IP}:3000")
 HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTANT_IP}:8123")
-SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{R730_IP}:11434")
+SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{GATEWAY_NODE_IP}:11434")
 OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
 ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "nemotron-mini")
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      "qwen2.5-coder:14b-instruct-q4_k_m")
@@ -65,4 +65,52 @@ LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      "llama3.2:3b")
 # ---------------------------------------------------------------------------
 # ExpertiseTemplate Database (swarm schema in langfuse DB)
 # ---------------------------------------------------------------------------
-TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse_password@{CONTROL_NODE_IP}:5432/langfuse")
+TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse@{CONTROL_NODE_IP}:5432/langfuse")
+
+# ---------------------------------------------------------------------------
+# Training Pipeline Configuration
+# ---------------------------------------------------------------------------
+TRAINING_OUTPUT_DIR          = os.getenv("TRAINING_OUTPUT_DIR",          "/workspace/training_output")
+TRAINING_DATASET_DIR         = os.getenv("TRAINING_DATASET_DIR",         "/workspace/training_data")
+TRAINING_BASE_SOLVER         = os.getenv("TRAINING_BASE_SOLVER",         "Qwen/Qwen2.5-Coder-7B-Instruct")
+TRAINING_BASE_ROUTER         = os.getenv("TRAINING_BASE_ROUTER",         "nvidia/Nemotron-Mini-4B-Instruct")
+TRAINING_LORA_RANK           = int(os.getenv("TRAINING_LORA_RANK",       "16"))
+TRAINING_LORA_ALPHA          = int(os.getenv("TRAINING_LORA_ALPHA",      "32"))
+TRAINING_BATCH_SIZE          = int(os.getenv("TRAINING_BATCH_SIZE",      "1"))
+TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION", "8"))
+
+# ---------------------------------------------------------------------------
+# Context Window Management
+# ---------------------------------------------------------------------------
+CONTEXT_WINDOWS: dict[str, int] = {
+    "qwen2.5-coder:14b": 32768,
+    "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
+    "qwen3.5:9b": 32768,
+    "nemotron-mini": 4096,
+    "llama3.2:3b": 8192,
+    "default": 8192,
+}
+COMPACT_AUTO_THRESHOLD = 0.95
+
+# ---------------------------------------------------------------------------
+# LLM Provider Configuration (multi-provider support)
+# ---------------------------------------------------------------------------
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")          # "ollama" | "anthropic"
+ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6-20250514")
+MCP_BRIDGE_ENABLED = os.getenv("MCP_BRIDGE_ENABLED", "false")
+MCP_SERVER_NAME    = os.getenv("MCP_SERVER_NAME", "home-ai-lab")
+MCP_BASE_URL       = os.getenv("MCP_BASE_URL", f"http://{CONTROL_NODE_IP}:8000")
+
+# Admin-only models — only users with security_level >= L3_ADMIN may select these
+ADMIN_ONLY_MODELS: set[str] = {
+    "claude-opus-4-20250514",
+    "claude-sonnet-4-6-20250514",
+    "claude-haiku-3-5-20241022",
+}
+
+TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "5e-6"))
+TRAINING_NUM_EPOCHS          = int(os.getenv("TRAINING_NUM_EPOCHS",      "3"))
+TRAINING_MAX_SEQ_LEN         = int(os.getenv("TRAINING_MAX_SEQ_LEN",    "4096"))
+TRAINING_WINDOW_START        = int(os.getenv("TRAINING_WINDOW_START",    "2"))   # hour
+TRAINING_WINDOW_END          = int(os.getenv("TRAINING_WINDOW_END",      "6"))   # hour

@@ -1,0 +1,43 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - auth_alert_rules.yml
+
+scrape_configs:
+  # R730 node — container-level metrics (CPU, memory, network, disk I/O)
+  - job_name: 'cadvisor-r730'
+    scrape_interval: 30s
+    scrape_timeout: 25s
+    static_configs:
+      - targets: ['cadvisor-r730:8080']
+        labels:
+          node: 'r730'
+
+  # Justin-PC node — GPU execution plane container metrics
+  - job_name: 'cadvisor-justin'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['192.168.2.101:8081']
+        labels:
+          node: 'justin-pc'
+
+  # Justin-PC — Agent Runtime (custom Prometheus metrics: agent_state, workflow_steps, training_*, ab_test_*)
+  - job_name: 'agent-runtime'
+    metrics_path: /metrics/
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['192.168.2.101:8008']
+        labels:
+          node: 'justin-pc'
+
+  # NOTE: Ollama v0.15.x does not expose /metrics regardless of OLLAMA_METRICS=1.
+  # Re-enable when Ollama adds confirmed Prometheus support:
+  # - job_name: 'ollama-justin'
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ['192.168.2.101:11434']
+
+  # NOTE: Langfuse does not expose a Prometheus /metrics endpoint.
+  # Langfuse observability data is accessed via its API and PostgreSQL-Swarm datasource in Grafana.

@@ -75,22 +75,17 @@ class Event:
 
 def detect_intent(input_text: str) -> str:
     """
-    Intent classification for queue routing.
-    Delegates to the semantic router when available, falls back to keywords.
+    Simple keyword classifier for routing.
+    Duplicated minimal logic to avoid circular dependency with router.py
     """
-    try:
-        from semantic_router import get_semantic_router
-        router_inst = get_semantic_router()
-        decision = router_inst.route(input_text)
-        return decision.get("intent", "DEFAULT")
-    except Exception:
-        # Fallback: lightweight keywords (only used if semantic_router is down)
-        text = input_text.lower()
-        if "3d" in text or "forge" in text:
-            return "3D"
-        if "image" in text or "picture" in text or "draw" in text or "photo" in text:
-            return "IMAGE"
-        return "DEFAULT"
+    text = input_text.lower()
+    if "action figure" in text or "posable" in text or "ball joint" in text or "figurine" in text:
+        return "ACTION_FIGURE"
+    if "3d" in text or "forge" in text or ("model" in text and "generate" in text):
+        return "3D"
+    if "image" in text or "picture" in text or "draw" in text or "photo" in text:
+        return "IMAGE"
+    return "DEFAULT"
 
 from gpu_allocator import GPUAllocator
 
@@ -124,9 +119,10 @@ class Dispatcher:
         
         # Queue Configuration: (Queue Name, Concurrency Limit)
         self.queues = {
-            "queue:3d": 1,      # MAX 1 3D Job (Protect GPU)
-            "queue:image": 2,   # MAX 2 Image Jobs
-            "queue:default": 5  # Chat/Code (Lightweight)
+            "queue:3d": 1,              # MAX 1 3D Job (Protect GPU)
+            "queue:action_figure": 1,   # MAX 1 Action Figure Job (GPU + heavy post-processing)
+            "queue:image": 2,           # MAX 2 Image Jobs
+            "queue:default": 5          # Chat/Code (Lightweight)
         }
         
         # Start Consumers

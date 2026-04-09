@@ -49,6 +49,18 @@ INTENT_CAPABILITY_MAP = {
         "security_level": "L2_USER",
         "expiry_hours": 2,
     },
+    "ACTION_FIGURE": {
+        "agent_name": "Action Figure Forge",
+        "template_id": "action_figure_creator",
+        "capabilities": [
+            "image_generate", "image_upload",
+            "file_read", "file_write",
+            "model_generate",
+            "resource_access",
+        ],
+        "security_level": "L2_USER",
+        "expiry_hours": 2,
+    },
     "RESEARCH": {
         "agent_name": "Librarian",
         "template_id": "librarian",

@@ -102,6 +102,10 @@ def render_artifact(artifact):
          st.success(f"🧊 **3D Model Ready:** `{artifact['name']}`")
          st.caption("Available in Creature Forge Texture Watcher")
 
+    elif artifact["type"] == "action_figure":
+         st.success(f"🦾 **Action Figure Ready:** `{artifact['name']}`")
+         st.caption("Posable STL parts with ball-socket joints — check action_figures/ directory")
+
 # Load CSS
 def load_css(file_name):
     with open(file_name) as f:
@@ -117,8 +121,8 @@ with st.sidebar:
     # Workspace Switcher
     st.subheader("Workspace")
     workspace = st.radio(
-        "Mode", 
-        ["Chat", "Media", "Voice Studio", "Coding", "Prototyping", "Control", "DevOps", "Maker Space", "Governance"],
+        "Mode",
+        ["Chat", "Art Studio", "Voice Studio", "Coding", "Prototyping", "Control", "DevOps", "Maker Space", "Governance", "Documents"],
         label_visibility="collapsed"
     )
     st.session_state.workspace = workspace
@@ -319,12 +323,12 @@ def render_chat_workspace():
         with col2:
             st.markdown("""
             <div class="dashboard-card">
-                <h3>🎨 Creative Studio</h3>
-                <p>Generate Images & 3D Assets</p>
+                <h3>🎨 Art Studio</h3>
+                <p>Images, 3D Models & Action Figures</p>
             </div>
             """, unsafe_allow_html=True)
             if st.button("Open Studio", width="stretch"):
-                st.session_state.quick_action = "Generate an image of..."
+                st.session_state.workspace = "Art Studio"
                 st.rerun()
 
         with col3:
@@ -423,6 +427,14 @@ def render_chat_workspace():
                     trace_logs.append(f"⚙️ {update['content']}")
                     with thought_stream:
                         st.caption(f"⚙️ {update['content']}")
+                elif update["type"] == "workspace_offer":
+                    # Creative intent detected — offer to switch to Art Studio
+                    import json as _json
+                    offer = _json.loads(update["content"]) if isinstance(update["content"], str) else update["content"]
+                    st.session_state._workspace_offer = offer
+                    trace_logs.append(f"🎨 Creative intent detected: {offer.get('intent', 'unknown')}")
+                    # Don't break — let the pipeline continue generating in chat
+                    # The offer will be rendered after the response completes
                 elif update["type"] == "artifact":
                      artifact = update["content"]
                      artifacts.append(artifact)
@@ -507,82 +519,503 @@ def render_chat_workspace():
                         else:
                             st.caption(log)
                 
+                # Art Studio Offer Card (shown after creative intent responses)
+                if "_workspace_offer" in st.session_state and st.session_state._workspace_offer:
+                    offer = st.session_state._workspace_offer
+                    st.markdown("---")
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, rgba(161,140,209,0.2) 0%, rgba(251,194,235,0.2) 100%);
+                                border: 1px solid rgba(161,140,209,0.5); border-radius: 12px; padding: 20px; margin: 10px 0;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                            <span style="font-size: 1.5em;">🎨</span>
+                            <span style="font-size: 1.1em; font-weight: 600; color: #e0e0e0;">Open Art Studio?</span>
+                        </div>
+                        <p style="color: #bbb; margin: 0; font-size: 0.9em;">
+                            Switch to the full Art Studio workspace for advanced generation controls,
+                            3D model preview, gallery management, and export tools.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    col_enter, col_stay = st.columns(2)
+                    with col_enter:
+                        if st.button("🎨 Enter Art Studio", type="primary", key="enter_art_studio"):
+                            # Transfer prompt and intent to art studio
+                            st.session_state.art_studio_prompt = offer["prompt"]
+                            st.session_state.art_studio_intent = offer["intent"]
+                            st.session_state.workspace = "Art Studio"
+                            del st.session_state._workspace_offer
+                            st.rerun()
+                    with col_stay:
+                        if st.button("💬 Stay in Chat", key="stay_in_chat"):
+                            del st.session_state._workspace_offer
+                            st.rerun()
+                    # Don't auto-rerun — wait for user choice
+                    return
+
                 # FINAL STEP: Reset the input field in session state and rerun to clean up live widgets
                 if "user_prompt_input" in st.session_state:
                     st.session_state["user_prompt_input"] = ""
-                
+
                 # Brief pause to show "Mission Complete" then refresh
                 time.sleep(0.5)
                 st.rerun()
 
-def render_media_workspace():
-    # Helper Imports
+def render_art_workspace():
+    """
+    Art Studio — Meshy/Hunyuan3D-style workspace for image, 3D, and action figure generation.
+    Provides generation controls, preview panel, gallery, and export tools.
+    """
     import sys, os, json
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
     from specialized.image_gen import list_available_models
 
-    # --- SIDEBAR CONTROLS ---
+    # --- SESSION STATE DEFAULTS ---
+    if "art_studio_mode" not in st.session_state:
+        st.session_state.art_studio_mode = "Image"
+    if "art_studio_history" not in st.session_state:
+        st.session_state.art_studio_history = []
+    if "art_studio_selected" not in st.session_state:
+        st.session_state.art_studio_selected = None
+
+    # Auto-set mode from workspace offer if redirected from chat
+    if "art_studio_intent" in st.session_state:
+        intent_map = {"IMAGE": "Image", "3D": "3D Model", "ACTION_FIGURE": "Action Figure"}
+        st.session_state.art_studio_mode = intent_map.get(st.session_state.art_studio_intent, "Image")
+        del st.session_state.art_studio_intent
+
+    # Pre-fill prompt from chat redirect (session state or context manager)
+    prefill_prompt = ""
+    if "art_studio_prompt" in st.session_state:
+        prefill_prompt = st.session_state.art_studio_prompt
+        del st.session_state.art_studio_prompt
+    else:
+        # Check context manager for saved art_studio_redirect
+        try:
+            from context_manager import get_pending_context, clear_context
+            ctx = get_pending_context(session_id=st.session_state.get("session_id", "default"))
+            if ctx and ctx.get("type") == "art_studio_redirect":
+                prefill_prompt = ctx.get("prompt", "")
+                redirect_intent = ctx.get("intent", "")
+                if redirect_intent:
+                    intent_map = {"IMAGE": "Image", "3D": "3D Model", "ACTION_FIGURE": "Action Figure"}
+                    st.session_state.art_studio_mode = intent_map.get(redirect_intent, "Image")
+                clear_context(session_id=st.session_state.get("session_id", "default"))
+        except Exception:
+            pass
+
+    # --- SIDEBAR: Generation Controls ---
     with st.sidebar:
-        st.markdown("### 🎛️ Tuning Station")
-        
-        # Dynamic Model List
-        available_models = list_available_models()
-        if not available_models: available_models = ["v1-5-pruned-emaonly.ckpt"]
-        
-        model_name = st.selectbox("Model Checkpoint", available_models)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            cfg = st.slider("CFG Scale", 1.0, 20.0, 7.0, 0.5)
-        with col2:
-             steps = st.slider("Steps", 1, 50, 20, 1)
-             
-        aspect = st.selectbox("Aspect Ratio", ["1:1 (Square)", "16:9 (Cinematic)", "9:16 (Mobile)"])
-        w, h = 1024, 1024
-        if "16:9" in aspect: w, h = 1344, 768
-        elif "9:16" in aspect: w, h = 768, 1344
-        
-        st.caption(f"Resolution: {w}x{h}")
-        
-        with st.expander("🛠️ Advanced Settings"):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                sampler = st.selectbox("Sampler", ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"], index=0)
-            with col_b:
-                scheduler = st.selectbox("Scheduler", ["normal", "karras", "simple", "sgm_uniform"], index=0)
-            
-            seed = st.number_input("Seed (-1 = Random)", value=-1, step=1)
-            
+        st.markdown("### 🎨 Art Studio Controls")
+
+        # Mode Selector (the key switch)
+        mode = st.radio(
+            "Generation Mode",
+            ["Image", "3D Model", "Action Figure"],
+            index=["Image", "3D Model", "Action Figure"].index(st.session_state.art_studio_mode),
+            key="art_mode_radio",
+            horizontal=True
+        )
+        st.session_state.art_studio_mode = mode
+
         st.divider()
-        
+
+        # --- Mode-specific controls ---
+        if mode == "Image":
+            st.markdown("#### Image Settings")
+            available_models = list_available_models()
+            if not available_models:
+                available_models = ["v1-5-pruned-emaonly.ckpt"]
+            model_name = st.selectbox("Model Checkpoint", available_models, key="art_model")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                cfg = st.slider("CFG Scale", 1.0, 20.0, 7.0, 0.5, key="art_cfg")
+            with col2:
+                steps = st.slider("Steps", 1, 50, 20, 1, key="art_steps")
+
+            aspect = st.selectbox("Aspect Ratio", ["1:1 (Square)", "16:9 (Cinematic)", "9:16 (Mobile)"], key="art_aspect")
+            w, h = 1024, 1024
+            if "16:9" in aspect: w, h = 1344, 768
+            elif "9:16" in aspect: w, h = 768, 1344
+            st.caption(f"Resolution: {w}x{h}")
+
+            with st.expander("Advanced Settings"):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    sampler = st.selectbox("Sampler", ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"], key="art_sampler")
+                with col_b:
+                    scheduler = st.selectbox("Scheduler", ["normal", "karras", "simple", "sgm_uniform"], key="art_scheduler")
+                seed = st.number_input("Seed (-1 = Random)", value=-1, step=1, key="art_seed")
+
+        elif mode == "3D Model":
+            st.markdown("#### 3D Generation Settings")
+            workflow_3d = st.selectbox("Pipeline", ["TripoSG (Fast)", "Hunyuan 3D (Textured)"], key="art_3d_pipe")
+            st.caption("TripoSG: ~2 min, untextured GLB")
+            st.caption("Hunyuan: ~8 min, full texture + UV")
+            st.divider()
+            generate_concept = st.checkbox("Auto-generate concept art first", value=True, key="art_3d_concept")
+            st.caption("If disabled, you must provide an image path directly.")
+
+        elif mode == "Action Figure":
+            st.markdown("#### Action Figure Settings")
+            workflow_af = st.selectbox("Base Mesh Pipeline", ["TripoSG (Fast)", "Hunyuan 3D (Textured)"], key="art_af_pipe")
+            target_height = st.slider("Figure Height (mm)", 50, 300, 150, 10, key="art_af_height")
+            clearance = st.slider("Joint Clearance (mm)", 0.1, 0.5, 0.3, 0.05, key="art_af_clearance",
+                                  help="0.3mm for FDM, 0.15mm for resin")
+            st.divider()
+            st.markdown("**Joint Locations**")
+            joints_enabled = {}
+            joint_names = ["neck", "shoulders", "elbows", "wrists", "waist", "hips", "knees"]
+            for jn in joint_names:
+                joints_enabled[jn] = st.checkbox(jn.title(), value=True, key=f"art_af_j_{jn}")
+
+        st.divider()
         with st.expander("📦 Resource Manager"):
-            new_model_url = st.text_input("CivitAI / HuggingFace URL")
-            if st.button("Request Import"):
-                st.info("Dispatcher: Validation Agent engaged (Stub). Checking compatibility...")
+            new_model_url = st.text_input("CivitAI / HuggingFace URL", key="art_import_url")
+            if st.button("Request Import", key="art_import_btn"):
+                st.info("Validation Agent checking compatibility...")
                 time.sleep(1)
                 st.success("Request Queued: Administrator approval required.")
 
-    # --- MAIN GALLERY ---
-    st.markdown("## 🎨 Asset Gallery")
-    
-    if st.button("🔄 Refresh Gallery"): st.rerun()
+    # =========================================================================
+    # MAIN AREA
+    # =========================================================================
+
+    # Header
+    mode_icons = {"Image": "🖼️", "3D Model": "🧊", "Action Figure": "🦾"}
+    st.markdown(f"## {mode_icons.get(mode, '🎨')} Art Studio — {mode} Generator")
+
+    # --- TOP: Prompt Input Bar ---
+    with st.form(key="art_studio_form", clear_on_submit=True):
+        cols = st.columns([7, 1, 1])
+        with cols[0]:
+            user_input = st.text_input(
+                "Describe your creation...",
+                value=prefill_prompt,
+                placeholder="A cyberpunk samurai in neon rain..." if mode == "Image"
+                    else "A dragon warrior character..." if mode == "3D Model"
+                    else "A robot action figure with armor plating...",
+                label_visibility="collapsed",
+                key="art_prompt_input"
+            )
+        with cols[1]:
+            generate_btn = st.form_submit_button(f"{mode_icons.get(mode, '🎨')} Generate")
+        with cols[2]:
+            # Image upload for image-to-3D modes
+            if mode in ["3D Model", "Action Figure"]:
+                upload_btn = st.form_submit_button("📁 Upload Image")
+            else:
+                upload_btn = False
+
+    # Image uploader (outside form for Streamlit compatibility)
+    uploaded_image = None
+    if mode in ["3D Model", "Action Figure"]:
+        uploaded_image = st.file_uploader(
+            "Or upload a source image for direct 3D conversion",
+            type=["png", "jpg", "jpeg", "webp"],
+            key="art_upload_img",
+            label_visibility="collapsed"
+        )
+
+    # --- GENERATION EXECUTION ---
+    if generate_btn and user_input:
+        if mode == "Image":
+            _art_generate_image(user_input, model_name, cfg, steps, w, h, sampler, scheduler, seed)
+        elif mode == "3D Model":
+            wf = "workflow_triposg.json" if "TripoSG" in workflow_3d else "workflow_hunyuan_paint.json"
+            _art_generate_3d(user_input, wf, generate_concept)
+        elif mode == "Action Figure":
+            wf = "workflow_triposg.json" if "TripoSG" in workflow_af else "workflow_hunyuan_paint.json"
+            _art_generate_action_figure(user_input, wf, target_height, clearance, joints_enabled)
+
+    # Handle uploaded image for direct 3D conversion
+    if uploaded_image is not None and mode in ["3D Model", "Action Figure"]:
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_image.name.split('.')[-1]}") as tmp:
+            tmp.write(uploaded_image.getvalue())
+            tmp_path = tmp.name
+        if mode == "3D Model":
+            wf = "workflow_triposg.json" if "TripoSG" in workflow_3d else "workflow_hunyuan_paint.json"
+            _art_generate_3d_from_image(tmp_path, wf)
+        else:
+            wf = "workflow_triposg.json" if "TripoSG" in workflow_af else "workflow_hunyuan_paint.json"
+            _art_generate_action_figure_from_image(tmp_path, wf, target_height, clearance, joints_enabled)
+
+    # --- PREVIEW + GALLERY AREA ---
+    st.markdown("---")
+
+    tab_preview, tab_gallery, tab_3d_gallery, tab_exports = st.tabs(
+        ["👁️ Preview", "🖼️ Image Gallery", "🧊 3D Gallery", "📦 Exports"]
+    )
+
+    with tab_preview:
+        _render_preview_panel()
+
+    with tab_gallery:
+        _render_image_gallery()
+
+    with tab_3d_gallery:
+        _render_3d_gallery()
+
+    with tab_exports:
+        _render_exports_panel()
+
+
+# ============================================================================
+# ART STUDIO: Generation Helpers
+# ============================================================================
+
+def _art_generate_image(prompt, model_name, cfg, steps, w, h, sampler, scheduler, seed):
+    """Direct image generation (bypasses router)."""
+    system_directive = f"""
+    User Request: {prompt}
+    SYSTEM OVERRIDE: Call generate_image with:
+    - model_name='{model_name}'
+    - cfg={cfg}
+    - steps={steps}
+    - width={w}
+    - height={h}
+    - sampler='{sampler}'
+    - scheduler='{scheduler}'
+    - seed={seed if seed != -1 else 'None'}
+    """
+    with st.status("🎨 Generating Image...", expanded=True) as status:
+        st.write(f"Prompt: {prompt}")
+        from specialized.image_gen import get_image_gen_agent
+        agent = get_image_gen_agent()
+        try:
+            response = agent.run(system_directive)
+            st.write(response.content)
+
+            # Track in history
+            st.session_state.art_studio_history.append({
+                "type": "image", "prompt": prompt, "result": response.content,
+                "params": {"model": model_name, "cfg": cfg, "steps": steps}
+            })
+            status.update(label="Generation Complete", state="complete", expanded=False)
+            time.sleep(1)
+            st.rerun()
+        except Exception as e:
+            status.error(f"Generation Failed: {e}")
+
+
+def _art_generate_3d(prompt, workflow_name, auto_concept=True):
+    """3D model generation with optional concept art step."""
+    with st.status("🧊 Generating 3D Model...", expanded=True) as status:
+        st.write(f"Prompt: {prompt}")
+
+        if auto_concept:
+            st.write("Step 1/2: Generating concept art...")
+            from specialized.image_gen import generate_image
+            concept_prompt = f"Concept art for 3d modeling, neutral background: {prompt}"
+            img_result = generate_image(concept_prompt)
+            st.write(f"Concept: {img_result}")
+
+            import re
+            match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
+            if not match:
+                status.error(f"Failed to generate concept art: {img_result}")
+                return
+            image_path = f"/app/comfy_io/output/{match.group(1)}"
+        else:
+            status.error("No image provided. Enable auto-concept or upload an image.")
+            return
+
+        st.write("Step 2/2: Generating 3D mesh...")
+        from specialized.forge_agent import generate_3d_model
+        result = generate_3d_model(image_path, workflow_name)
+        st.write(result)
+
+        st.session_state.art_studio_history.append({
+            "type": "3d_model", "prompt": prompt, "result": result
+        })
+        # Store for preview
+        if "Generated Successfully" in result:
+            mesh_path = result.split(":", 1)[1].strip()
+            st.session_state.art_studio_selected = {"type": "3d_model", "path": mesh_path}
+
+        status.update(label="3D Generation Complete", state="complete", expanded=False)
+        time.sleep(1)
+        st.rerun()
+
+
+def _art_generate_3d_from_image(image_path, workflow_name):
+    """Direct image-to-3D conversion."""
+    with st.status("🧊 Converting Image to 3D...", expanded=True) as status:
+        st.write(f"Source: {image_path}")
+        from specialized.forge_agent import generate_3d_model
+        result = generate_3d_model(image_path, workflow_name)
+        st.write(result)
+
+        st.session_state.art_studio_history.append({
+            "type": "3d_model", "prompt": f"[uploaded image] {image_path}", "result": result
+        })
+        status.update(label="3D Conversion Complete", state="complete", expanded=False)
+        time.sleep(1)
+        st.rerun()
+
+
+def _art_generate_action_figure(prompt, workflow_name, target_height, clearance, joints_enabled):
+    """Full action figure pipeline with custom joint settings."""
+    with st.status("🦾 Generating Action Figure...", expanded=True) as status:
+        st.write(f"Prompt: {prompt}")
+
+        # Step 1: Concept Art (T-Pose)
+        st.write("Step 1/3: Generating T-pose concept art...")
+        from specialized.image_gen import generate_image
+        concept_prompt = (
+            f"T-pose character concept art for 3D action figure, "
+            f"full body front view, neutral gray background, "
+            f"arms extended to sides, symmetrical pose: {prompt}"
+        )
+        img_result = generate_image(concept_prompt)
+        st.write(f"Concept: {img_result}")
+
+        import re
+        match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
+        if not match:
+            status.error(f"Failed to generate concept art: {img_result}")
+            return
+        image_path = f"/app/comfy_io/output/{match.group(1)}"
+
+        # Step 2 & 3: Action Figure Pipeline
+        st.write("Step 2/3: Generating base mesh & segmenting with joints...")
+        from specialized.action_figure_agent import generate_action_figure
+        result = generate_action_figure(image_path, workflow_name)
+        st.write(result)
+
+        st.session_state.art_studio_history.append({
+            "type": "action_figure", "prompt": prompt, "result": result,
+            "params": {"height_mm": target_height, "clearance_mm": clearance}
+        })
+        status.update(label="Action Figure Complete", state="complete", expanded=False)
+        time.sleep(1)
+        st.rerun()
+
+
+def _art_generate_action_figure_from_image(image_path, workflow_name, target_height, clearance, joints_enabled):
+    """Direct image-to-action-figure conversion."""
+    with st.status("🦾 Converting Image to Action Figure...", expanded=True) as status:
+        st.write(f"Source: {image_path}")
+        from specialized.action_figure_agent import generate_action_figure
+        result = generate_action_figure(image_path, workflow_name)
+        st.write(result)
+
+        st.session_state.art_studio_history.append({
+            "type": "action_figure", "prompt": f"[uploaded image]", "result": result
+        })
+        status.update(label="Action Figure Complete", state="complete", expanded=False)
+        time.sleep(1)
+        st.rerun()
+
+
+# ============================================================================
+# ART STUDIO: Preview & Gallery Panels
+# ============================================================================
+
+def _render_preview_panel():
+    """Preview panel for the last generated asset."""
+    import os
+
+    selected = st.session_state.get("art_studio_selected")
+    history = st.session_state.get("art_studio_history", [])
+
+    if not selected and not history:
+        st.info("Generate something to see a preview here.")
+        return
+
+    # Show the last generation result
+    if history:
+        last = history[-1]
+        st.markdown(f"**Last Generation:** `{last['type']}`")
+        st.caption(f"Prompt: {last.get('prompt', 'N/A')}")
+
+        if last["type"] == "image":
+            # Try to extract and show the image
+            import re
+            match = re.search(r"Generated Image: ([\w\.-]+)", last.get("result", ""))
+            if match:
+                img_path = os.path.join("delivered_artifacts", match.group(1))
+                if os.path.exists(img_path):
+                    st.image(img_path, use_container_width=True)
+                    with open(img_path, "rb") as f:
+                        st.download_button("⬇️ Download Image", f, file_name=match.group(1),
+                                           mime="image/png", key="preview_dl_img")
+
+        elif last["type"] == "3d_model":
+            st.success(f"🧊 3D Model Ready")
+            st.code(last.get("result", ""), language="text")
+            # 3D viewer placeholder
+            st.markdown("""
+            <div style="background: #111; border: 1px solid #333; border-radius: 8px;
+                        height: 400px; display: flex; align-items: center; justify-content: center;
+                        color: #666; font-size: 1.2em;">
+                <div style="text-align: center;">
+                    <div style="font-size: 3em; margin-bottom: 10px;">🧊</div>
+                    <div>3D Preview</div>
+                    <div style="font-size: 0.8em; color: #555; margin-top: 5px;">
+                        Download the GLB file and open in your slicer or 3D viewer
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        elif last["type"] == "action_figure":
+            st.success(f"🦾 Action Figure Ready — Posable STL Parts")
+            st.code(last.get("result", ""), language="text")
+            params = last.get("params", {})
+            if params:
+                col1, col2 = st.columns(2)
+                col1.metric("Figure Height", f"{params.get('height_mm', 150)}mm")
+                col2.metric("Joint Clearance", f"{params.get('clearance_mm', 0.3)}mm")
+
+            st.markdown("""
+            <div style="background: #111; border: 1px solid #333; border-radius: 8px;
+                        height: 300px; display: flex; align-items: center; justify-content: center;
+                        color: #666;">
+                <div style="text-align: center;">
+                    <div style="font-size: 3em; margin-bottom: 10px;">🦾</div>
+                    <div>Action Figure Assembly View</div>
+                    <div style="font-size: 0.8em; color: #555; margin-top: 5px;">
+                        Individual STL parts with ball-socket joints<br/>
+                        Check action_figures/ directory for print-ready files
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Generation History Sidebar
+    if len(history) > 1:
+        st.markdown("---")
+        st.markdown("**Generation History**")
+        for i, item in enumerate(reversed(history[-10:])):
+            icon = {"image": "🖼️", "3d_model": "🧊", "action_figure": "🦾"}.get(item["type"], "📦")
+            prompt_preview = item.get("prompt", "")[:50]
+            st.caption(f"{icon} {prompt_preview}...")
+
+
+def _render_image_gallery():
+    """Image gallery with metadata."""
+    import os, json
+
+    if st.button("🔄 Refresh Gallery", key="refresh_img_gallery"):
+        st.rerun()
 
     gallery_path = "delivered_artifacts"
     if not os.path.exists(gallery_path):
         os.makedirs(gallery_path, exist_ok=True)
-        
+
     try:
         images = [f for f in os.listdir(gallery_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
         images.sort(key=lambda x: os.path.getmtime(os.path.join(gallery_path, x)), reverse=True)
-        
+
         if not images:
-             st.info("Gallery is empty. Start creating!")
+            st.info("Gallery is empty. Start creating!")
         else:
             cols = st.columns(4)
             for idx, img_name in enumerate(images):
                 img_path = os.path.join(gallery_path, img_name)
-                
-                # Load Metadata Sidecar
+
                 meta_path = img_path + ".json"
                 meta = {}
                 if os.path.exists(meta_path):
@@ -590,67 +1023,166 @@ def render_media_workspace():
                         meta = json.load(f)
 
                 with cols[idx % 4]:
-                    st.image(img_path, width="stretch")
+                    st.image(img_path, use_container_width=True)
                     st.caption(img_name)
-                    
-                    # Metadata Popover
+
                     if meta:
                         with st.popover("ℹ️ info"):
                             st.markdown(f"**Prompt**: {meta.get('prompt', 'N/A')}")
                             st.markdown(f"**Model**: `{meta.get('model', 'Auto')}`")
                             p = meta.get('params', {})
                             st.caption(f"CFG: {p.get('cfg')} | Steps: {p.get('steps')}")
-                    
-                    with open(img_path, "rb") as f:
-                        st.download_button("⬇️", f, file_name=img_name, key=f"dl_gal_{idx}")
-                        
+
+                    # Use as source for 3D conversion
+                    col_dl, col_use = st.columns(2)
+                    with col_dl:
+                        with open(img_path, "rb") as f:
+                            st.download_button("⬇️", f, file_name=img_name, key=f"dl_gal_{idx}")
+                    with col_use:
+                        if st.button("🧊 To 3D", key=f"to3d_{idx}"):
+                            st.session_state.art_studio_mode = "3D Model"
+                            st.session_state._use_image_path = img_path
+                            st.rerun()
+
     except Exception as e:
         st.error(f"Gallery Error: {e}")
 
-    # --- CHAT OVERLAY ---
+
+def _render_3d_gallery():
+    """Gallery for 3D models and action figure outputs."""
+    import os
+
+    if st.button("🔄 Refresh 3D Gallery", key="refresh_3d_gallery"):
+        st.rerun()
+
+    # Scan for 3D files in output directories
+    output_dirs = [
+        ("ComfyUI Output (3D)", "/app/comfy_io/output/3D"),
+        ("Action Figures", "/app/comfy_io/output/action_figures"),
+    ]
+
+    for section_name, dir_path in output_dirs:
+        st.markdown(f"#### {section_name}")
+        if not os.path.exists(dir_path):
+            st.caption(f"Directory not found: {dir_path}")
+            continue
+
+        files_3d = [f for f in os.listdir(dir_path) if f.lower().endswith(('.glb', '.obj', '.stl', '.3mf'))]
+        files_3d.sort(key=lambda x: os.path.getmtime(os.path.join(dir_path, x)), reverse=True)
+
+        if not files_3d:
+            st.caption("No 3D files found.")
+            continue
+
+        cols = st.columns(3)
+        for idx, fname in enumerate(files_3d):
+            fpath = os.path.join(dir_path, fname)
+            ext = fname.rsplit(".", 1)[-1].upper()
+            size_mb = os.path.getsize(fpath) / (1024 * 1024)
+
+            with cols[idx % 3]:
+                st.markdown(f"""
+                <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px;
+                            padding: 15px; text-align: center; margin-bottom: 10px;">
+                    <div style="font-size: 2.5em; margin-bottom: 8px;">
+                        {"🦾" if "action_fig" in fname else "🧊"}
+                    </div>
+                    <div style="font-weight: 600; color: #e0e0e0; font-size: 0.9em;">{fname}</div>
+                    <div style="color: #888; font-size: 0.75em; margin-top: 4px;">
+                        {ext} &bull; {size_mb:.1f} MB
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                with open(fpath, "rb") as f:
+                    st.download_button(
+                        f"⬇️ Download {ext}",
+                        f, file_name=fname,
+                        key=f"dl_3d_{section_name}_{idx}"
+                    )
+
+    # Also check for manifests
+    manifest_dir = "/app/comfy_io/output/action_figures"
+    if os.path.exists(manifest_dir):
+        manifests = [f for f in os.listdir(manifest_dir) if f.endswith("_manifest.json")]
+        if manifests:
+            st.markdown("#### 📋 Assembly Manifests")
+            for mf in manifests:
+                import json
+                mpath = os.path.join(manifest_dir, mf)
+                with open(mpath, "r") as f:
+                    manifest = json.load(f)
+                with st.expander(f"📋 {mf}"):
+                    st.json(manifest)
+                    st.caption(manifest.get("assembly_notes", ""))
+
+
+def _render_exports_panel():
+    """Export and batch download panel."""
+    import os, zipfile, tempfile
+
+    st.markdown("#### Export Options")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("""
+        <div style="background: rgba(0,100,200,0.1); border: 1px solid rgba(0,100,200,0.3);
+                    border-radius: 8px; padding: 15px;">
+            <h4 style="margin:0;">🖼️ Batch Image Export</h4>
+            <p style="color: #999; font-size: 0.85em;">Download all gallery images as a ZIP</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("📦 Export All Images", key="export_images"):
+            gallery_path = "delivered_artifacts"
+            if os.path.exists(gallery_path):
+                images = [f for f in os.listdir(gallery_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+                if images:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+                        with zipfile.ZipFile(tmp.name, 'w') as zf:
+                            for img in images:
+                                zf.write(os.path.join(gallery_path, img), img)
+                        with open(tmp.name, "rb") as f:
+                            st.download_button("⬇️ Download ZIP", f, file_name="art_studio_images.zip",
+                                               mime="application/zip", key="dl_zip_imgs")
+                else:
+                    st.caption("No images to export.")
+
+    with col2:
+        st.markdown("""
+        <div style="background: rgba(200,100,0,0.1); border: 1px solid rgba(200,100,0,0.3);
+                    border-radius: 8px; padding: 15px;">
+            <h4 style="margin:0;">🦾 Batch 3D Export</h4>
+            <p style="color: #999; font-size: 0.85em;">Download all action figure STLs as a ZIP</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("📦 Export All 3D Files", key="export_3d"):
+            af_dir = "/app/comfy_io/output/action_figures"
+            if os.path.exists(af_dir):
+                stls = [f for f in os.listdir(af_dir) if f.lower().endswith(('.stl', '.glb', '.obj'))]
+                if stls:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+                        with zipfile.ZipFile(tmp.name, 'w') as zf:
+                            for stl in stls:
+                                zf.write(os.path.join(af_dir, stl), stl)
+                        with open(tmp.name, "rb") as f:
+                            st.download_button("⬇️ Download ZIP", f, file_name="action_figures_3d.zip",
+                                               mime="application/zip", key="dl_zip_3d")
+                else:
+                    st.caption("No 3D files to export.")
+            else:
+                st.caption("Action figures directory not found.")
+
+    # Generation log
     st.markdown("---")
-    st.markdown("### 💬 Creative Director")
-    
-    with st.form(key="media_chat_form", clear_on_submit=True):
-        cols = st.columns([8, 1])
-        with cols[0]:
-            user_input = st.text_input("Describe your vision...", placeholder="A cyberpunk city in rain...", label_visibility="collapsed")
-        with cols[1]:
-            submit_button = st.form_submit_button("🎨 Make")
-            
-    if submit_button and user_input:
-        # Explicit Instruction for the Agent logic
-        system_directive = f"""
-        User Request: {user_input}
-        SYSTEM OVERRIDE: Call generate_image with:
-        - model_name='{model_name}'
-        - cfg={cfg}
-        - steps={steps}
-        - width={w}
-        - height={h}
-        - sampler='{sampler}'
-        - scheduler='{scheduler}'
-        - seed={seed if seed != -1 else 'None'}
-        """
-        
-        with st.status("🎨 Creative Studio Active", expanded=True) as status:
-            st.write(f"Sending Task: {user_input}")
-            
-            # BYPASS ROUTER: Direct Agent Call (v2.0)
-            from specialized.image_gen import get_image_gen_agent
-            agent = get_image_gen_agent()
-            
-            try:
-                response = agent.run(system_directive)
-                st.write(response.content)
-                
-                # Check for "Generated Image" in content (tool output usually injected)
-                # Since tool output implies success, we assume good.
-                status.update(label="Generation Complete", state="complete", expanded=False)
-                time.sleep(1) # Allow fs sync
-                st.rerun()
-            except Exception as e:
-                status.error(f"Agent Error: {e}")
+    st.markdown("#### Generation Log")
+    history = st.session_state.get("art_studio_history", [])
+    if not history:
+        st.caption("No generations in this session yet.")
+    else:
+        for i, entry in enumerate(reversed(history[-20:])):
+            icon = {"image": "🖼️", "3d_model": "🧊", "action_figure": "🦾"}.get(entry["type"], "📦")
+            st.caption(f"{icon} **{entry['type']}** — {entry.get('prompt', 'N/A')[:60]}")
 
 def render_voice_workspace():
     st.markdown("## 🎙️ Voice Studio")
@@ -1169,6 +1701,7 @@ def render_control_workspace():
                 elif "[Router]" in content or "[Context Manager]" in content: current_agent = "Router"
                 elif "[Chat Agent]" in content: current_agent = "Chat Agent"
                 elif "[Forge]" in content: current_agent = "Art Director" # Forge is visual
+                elif "[ActionFigureForge]" in content: current_agent = "Art Director"
                 elif "[CreativeStudio]" in content: current_agent = "Art Director"
                 
                 # Fallback keywords (Stricter)
@@ -1399,11 +1932,53 @@ def render_maker_workspace():
             st.info("No simulations found. Ask the agent to 'Simulate an ESP32'.")
 
 
+# --- DOCUMENTS WORKSPACE ---
+def render_documents_workspace():
+    import os
+
+    DOCS_ROOT = os.path.join(os.path.dirname(__file__), "..", "docs")
+
+    def read_doc(rel_path):
+        path = os.path.normpath(os.path.join(DOCS_ROOT, rel_path))
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return f"_Document not found: `{rel_path}`_"
+
+    st.markdown("## 📚 Documentation")
+    st.caption("Home AI Lab v3.3 · All documentation · Use the tabs below to navigate")
+
+    user_tab, admin_tab = st.tabs(["👤 User Guide", "🔧 Admin Reference"])
+
+    with user_tab:
+        ov_tab, fw_tab, faq_tab = st.tabs(["System Overview", "How It Works", "FAQ"])
+        with ov_tab:
+            st.markdown(read_doc("user/overview.md"))
+        with fw_tab:
+            st.markdown(read_doc("user/framework.md"))
+        with faq_tab:
+            st.markdown(read_doc("user/faq.md"))
+
+    with admin_tab:
+        ref_tab, design_tab, sec_tab, ts_tab = st.tabs([
+            "Technical Reference", "Design Framework", "Security", "Troubleshooting"
+        ])
+        with ref_tab:
+            st.markdown(read_doc("admin/technical_reference.md"))
+        with design_tab:
+            st.markdown(read_doc("admin/design_framework.md"))
+        with sec_tab:
+            st.markdown(read_doc("admin/security.md"))
+        with ts_tab:
+            st.markdown(read_doc("admin/troubleshooting.md"))
+
+
 # --- MAIN DISPATCHER ---
 if st.session_state.workspace == "Chat":
     render_chat_workspace()
-elif st.session_state.workspace == "Media":
-    render_media_workspace()
+elif st.session_state.workspace == "Art Studio":
+    render_art_workspace()
 elif st.session_state.workspace == "Voice Studio":
     render_voice_workspace()
 elif st.session_state.workspace == "Coding":
@@ -1418,3 +1993,5 @@ elif st.session_state.workspace == "Maker Space":
     render_maker_workspace()
 elif st.session_state.workspace == "Governance":
     render_governance_workspace()
+elif st.session_state.workspace == "Documents":
+    render_documents_workspace()

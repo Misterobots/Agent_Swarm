@@ -32,17 +32,46 @@
       "model": ["30", 0],
       "image": ["20", 0],
       "seed": "{{SEED}}",
-      "steps": 75,
-      "cfg": 4.0
+      "steps": "{{STEPS}}",
+      "cfg": "{{CFG}}"
     },
     "class_type": "TripoSGInference",
     "_meta": {
       "title": "TripoSG Inference (High Quality)"
     }
   },
-  "110": {
+  "45": {
     "inputs": {
       "trimesh": ["40", 0],
+      "merge_vertices": true,
+      "vertex_count": 50000,
+      "smooth_iter": 2,
+      "align_to_boundaries": true,
+      "triangulate_result": true,
+      "max_facenum": 80000
+    },
+    "class_type": "Hy3DIMRemesh",
+    "_meta": {
+      "title": "Instant Remesh (High Poly)"
+    }
+  },
+  "48": {
+    "inputs": {
+      "trimesh": ["45", 0],
+      "remove_floaters": true,
+      "remove_degenerate_faces": true,
+      "reduce_faces": false,
+      "max_facenum": 80000,
+      "smooth_normals": false
+    },
+    "class_type": "Hy3DPostprocessMesh",
+    "_meta": {
+      "title": "Remove Floating Particles"
+    }
+  },
+  "110": {
+    "inputs": {
+      "trimesh": ["48", 0],
       "filename_prefix": "3D/TripoSG",
       "file_format": "glb",
       "save_file": true

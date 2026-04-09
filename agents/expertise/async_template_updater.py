@@ -118,7 +118,7 @@ class AsyncTemplateUpdater:
                 logger.error(f"[TemplateUpdater] Error processing {template.id}: {e}")
 
     async def _process_template(self, template_id: str, current_version: str):
-        """Process a single template: update metrics, check for version bump."""
+        """Process a single template: update metrics, check for version bump, evaluate A/B tests."""
         summary = self.registry.get_performance_summary(template_id, window_hours=24)
         if not summary or summary.total_invocations == 0:
             return
@@ -152,3 +152,60 @@ class AsyncTemplateUpdater:
                 f"over {total} invocations"
             )
             self.registry.bump_version(template_id)
+
+        # --- A/B Test Auto-Evaluation ---
+        await self._evaluate_ab_tests(template_id)
+
+    async def _evaluate_ab_tests(self, template_id: str):
+        """Check for concluded A/B tests and auto-promote winners."""
+        try:
+            from training.ab_test import get_ab_manager
+        except ImportError:
+            return
+
+        try:
+            ab_mgr = get_ab_manager()
+            active_tests = ab_mgr.get_active_tests()
+
+            for test in active_tests:
+                if test["template_id"] != template_id:
+                    continue
+
+                test_id = test["id"]
+                result = ab_mgr.evaluate_test(test_id)
+
+                if not result.get("ready"):
+                    logger.debug(
+                        f"[TemplateUpdater] A/B test {test_id} not ready: "
+                        f"{result.get('reason', 'insufficient data')}"
+                    )
+                    continue
+
+                winner = result.get("winner")
+                if winner == "candidate":
+                    logger.info(
+                        f"[TemplateUpdater] A/B test {test_id} WINNER: candidate "
+                        f"({result['candidate_model']}) avg={result['candidate_avg']:.3f} "
+                        f"vs base avg={result['base_avg']:.3f} "
+                        f"(improvement={result['improvement']:.1%}, p={result['p_value']:.4f})"
+                    )
+                    ab_mgr.conclude_test(test_id, "candidate")
+                    ab_mgr.promote_candidate(test_id)
+                    self.registry.bump_version(template_id)
+
+                elif winner == "base":
+                    logger.info(
+                        f"[TemplateUpdater] A/B test {test_id} WINNER: base "
+                        f"({result['base_model']}) — candidate underperformed "
+                        f"(improvement={result['improvement']:.1%}, p={result['p_value']:.4f})"
+                    )
+                    ab_mgr.conclude_test(test_id, "base")
+
+                else:
+                    logger.debug(
+                        f"[TemplateUpdater] A/B test {test_id}: no significant difference yet "
+                        f"(p={result['p_value']:.4f})"
+                    )
+
+        except Exception as e:
+            logger.error(f"[TemplateUpdater] A/B test evaluation failed for {template_id}: {e}")

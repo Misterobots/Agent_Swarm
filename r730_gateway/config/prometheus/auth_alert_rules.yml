@@ -1,0 +1,75 @@
+groups:
+  - name: auth-key-compromise
+    interval: 15s
+    rules:
+      - alert: AgentRuntimeMetricsUnavailable
+        expr: up{job="agent-runtime"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: agent-runtime
+          category: availability
+          runbook: docs/security/key_compromise_incident_runbook.md
+        annotations:
+          summary: Agent runtime metrics endpoint is unavailable
+          description: Prometheus cannot scrape the agent-runtime metrics endpoint for 5 minutes. Investigate auth pipeline visibility before ruling out a key compromise.
+
+      - alert: AgentRuntimeAuth401RateSpike
+        expr: increase(http_requests_total{job="agent-runtime",status_code="401"}[5m]) > 100
+        for: 5m
+        labels:
+          severity: critical
+          service: agent-runtime
+          category: auth
+          runbook: docs/security/key_compromise_incident_runbook.md
+        annotations:
+          summary: 401 response spike on agent runtime
+          description: More than 100 HTTP 401 responses were observed on the agent-runtime in 5 minutes. This matches the key-compromise detection threshold in the incident runbook.
+
+      - alert: AgentRuntimeAuth403RateSpike
+        expr: increase(http_requests_total{job="agent-runtime",status_code="403"}[5m]) > 50
+        for: 5m
+        labels:
+          severity: warning
+          service: agent-runtime
+          category: auth
+          runbook: docs/security/key_compromise_incident_runbook.md
+        annotations:
+          summary: 403 response spike on agent runtime
+          description: More than 50 HTTP 403 responses were observed on the agent-runtime in 5 minutes. Review recent auth policy or role/scope changes before escalating.
+
+      - alert: AgentRuntimeRequestVolumeDrop
+        expr: increase(http_requests_total{job="agent-runtime"}[15m]) < 1
+        for: 15m
+        labels:
+          severity: warning
+          service: agent-runtime
+          category: telemetry
+          runbook: docs/security/key_compromise_incident_runbook.md
+        annotations:
+          summary: Agent runtime request volume dropped to zero
+          description: No HTTP requests were observed on the agent-runtime for 15 minutes. Confirm telemetry health before using auth rate metrics for key-compromise triage.
+
+      - alert: AgentRuntimeSensitiveIotActionsBlockedSpike
+        expr: increase(iot_sensitive_actions_blocked_total{job="agent-runtime"}[10m]) > 20
+        for: 10m
+        labels:
+          severity: warning
+          service: agent-runtime
+          category: iot
+          runbook: docs/security/key_compromise_incident_runbook.md
+        annotations:
+          summary: Sensitive IoT actions blocked repeatedly
+          description: More than 20 sensitive IoT actions were blocked in 10 minutes due to missing confirmation. Check for abuse, automation drift, or client UX regressions.
+
+      - alert: AgentRuntimeSensitiveIotUnlockExecuted
+        expr: increase(iot_sensitive_actions_total{job="agent-runtime",domain="lock",service="unlock",outcome=~"executed_.*"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: agent-runtime
+          category: iot
+          runbook: docs/compliance/iot_feature_control_mapping.md
+        annotations:
+          summary: Sensitive lock unlock action executed
+          description: At least one lock unlock action was executed in the last 10 minutes. Validate confirmation and audit context.

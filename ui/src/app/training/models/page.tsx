@@ -2,7 +2,7 @@
 
 import { BookOpen, CheckCircle2, ChevronRight, FlaskConical, RefreshCw, Sparkles } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
-import { fetchModelCatalog, fetchTrainingRuns } from "@/lib/api/training";
+import { fetchModelCatalog, fetchOpsTrainingRuns } from "@/lib/api/training";
 import { useCallback, useEffect, useState } from "react";
 import type { ModelCatalog, TrainingRun } from "@/types/ops";
 
@@ -49,7 +49,7 @@ export default function TrainingModelsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [r, c] = await Promise.all([fetchTrainingRuns(), fetchModelCatalog()]);
+    const [r, c] = await Promise.all([fetchOpsTrainingRuns(), fetchModelCatalog()]);
     setRuns(r);
     setCatalog(c);
     setLoading(false);

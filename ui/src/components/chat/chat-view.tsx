@@ -24,20 +24,21 @@ function usageBarClass(pct: number): string {
 }
 
 export function ChatView() {
-  const { messages, isStreaming, statusMessage, latestThought, pipelineSteps, streamPhase, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
+  const { messages, isStreaming, statusMessage, latestThought, streamMode, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
   const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const model = useSettingsStore((s) => s.model);
   const theme = useSettingsStore((s) => s.theme);
-  const mode = useSettingsStore((s) => s.mode);
   const personality = THEME_PERSONALITIES[theme];
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
 
+  // Show the thinking indicator when streaming and either we have a status
+  // message or the assistant message is still empty (waiting for first content)
   const lastMsg = messages[messages.length - 1];
-  // Show thinking indicator only during the thinking/pipeline phase.
-  // Once content starts streaming (streamPhase === "responding"), collapse it.
-  const showThinking = isStreaming && streamPhase === "thinking";
+  const showThinking =
+    isStreaming &&
+    (statusMessage !== null || (lastMsg?.role === "assistant" && !lastMsg.content));
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -48,7 +49,7 @@ export function ChatView() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-4 py-2">
         <div className="flex items-center gap-3">
-          {mode === "developer" && <ModelSelector />}
+          <ModelSelector />
           <ThemeSelector />
           {activeConversationId && (
             <button
@@ -140,8 +141,7 @@ export function ChatView() {
               <ThinkingIndicator
                 statusMessage={statusMessage}
                 latestThought={latestThought}
-                pipelineSteps={pipelineSteps}
-                streamPhase={streamPhase}
+                streamMode={streamMode}
               />
             )}
             <div ref={bottomRef} />

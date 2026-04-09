@@ -15,19 +15,26 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const newAttachments: FileAttachment[] = files.map((f) => ({
-      id: crypto.randomUUID(),
-      name: f.name,
-      type: f.type,
-      size: f.size,
-      dataUrl: "",
-    }));
-    onAttachmentsChange([...attachments, ...newAttachments]);
+    Promise.all(
+      files.map(
+        (f) =>
+          new Promise<FileAttachment>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64 = (reader.result as string).split(",")[1] ?? "";
+              resolve({ name: f.name, mimeType: f.type, data: base64, size: f.size });
+            };
+            reader.readAsDataURL(f);
+          })
+      )
+    ).then((newAttachments) => {
+      onAttachmentsChange([...attachments, ...newAttachments]);
+    });
     e.target.value = "";
   };
 
-  const removeAttachment = (id: string) => {
-    onAttachmentsChange(attachments.filter((a) => a.id !== id));
+  const removeAttachment = (name: string) => {
+    onAttachmentsChange(attachments.filter((a) => a.name !== name));
   };
 
   if (attachments.length === 0) {
@@ -51,11 +58,11 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
     <div className="flex flex-wrap gap-2 px-4 py-2 max-w-3xl mx-auto w-full">
       {attachments.map((a) => (
         <span
-          key={a.id}
+          key={a.name}
           className="inline-flex items-center gap-1.5 text-xs bg-[var(--chat-panel)] border border-[var(--chat-border)] text-[var(--chat-text)] rounded-md px-2 py-1"
         >
           {a.name}
-          <button type="button" onClick={() => removeAttachment(a.id)} className="hover:text-red-400">
+          <button type="button" onClick={() => removeAttachment(a.name)} className="hover:text-red-400">
             <X size={12} />
           </button>
         </span>

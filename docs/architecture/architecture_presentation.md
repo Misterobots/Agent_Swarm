@@ -36,16 +36,16 @@ The **Agentic Hive** is a decentralized Swarm Intelligence system where role-spe
 
 # 2. Hardware Topology (3 Nodes)
 
-### Control Plane — Dell Wyse 5070 (192.168.2.102)
+### Control Plane — Control Node (<control-node-ip>)
 
 - SPIRE Server, PostgreSQL, Langfuse, ClickHouse, Redis, MinIO
 
-### Primary Inference — Justin-PC (192.168.2.101)
+### Primary Inference — Execution Node (<execution-node-ip>)
 
 - **RTX 5060 Ti (16GB)**: `qwen3.5:9b` — Secondary Solver
 - Docker Execution Plane: agent-runtime, ComfyUI
 
-### Secondary Inference — **Dell PowerEdge R730** (192.168.2.103)
+### Secondary Inference — **Gateway Node** (<gateway-node-ip>)
 
 - **RTX 3070 Ti (8GB)**: `nemotron-orchestrator:8b` — Router & Orchestrator
 - **RTX 3070 Ti (8GB)**: `qwen3.5:9b` — Primary Solver
@@ -76,9 +76,9 @@ User ──▶ Nemotron [Route] ──▶ Qwen 3.5 [Solve] ──▶ LogicVerifi
 
 | Role                      | Model                      | Node      | Why                                                      |
 | ------------------------- | -------------------------- | --------- | -------------------------------------------------------- |
-| **Solver / Corrector**    | `qwen3.5:9b`               | R730 / PC | High efficiency coding model; SOTA performance at 9B.    |
-| **Router / Orchestrator** | `nemotron-orchestrator:8b` | Dell R730 | Purpose-built by NVIDIA for multi-agent coordination.    |
-| **Safety Verifier**       | `llama-guard-3:8b`         | Dell R730 | Dedicated content safety model.                          |
+| **Solver / Corrector**    | `qwen3.5:9b`               | Gateway Node / Execution Node | High efficiency coding model; SOTA performance at 9B.    |
+| **Router / Orchestrator** | `nemotron-orchestrator:8b` | Gateway Node | Purpose-built by NVIDIA for multi-agent coordination.    |
+| **Safety Verifier**       | `llama-guard-3:8b`         | Gateway Node | Dedicated content safety model.                          |
 
 ---
 
@@ -88,4 +88,4 @@ User ──▶ Nemotron [Route] ──▶ Qwen 3.5 [Solve] ──▶ LogicVerifi
 
 **Project Status**: Production (v3.1.0) | **Date**: 2026-03-12
 
-_Next milestone: SPIRE enrollment completion on R730_
+_Next milestone: SPIRE enrollment completion on Gateway Node_

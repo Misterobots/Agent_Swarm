@@ -1,26 +1,41 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChatMessage, Conversation } from "@/types/chat";
+import type {
+  ChatMessage,
+  Conversation,
+  ThoughtEvent,
+  ToolCallEvent,
+  ToolLifecycleEvent,
+  ToolResult,
+  TurnMetadata,
+} from "@/types/chat";
 
 function generateId(): string {
-  return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5");
 }
 
 interface ChatState {
   conversations: Conversation[];
   activeConversationId: string | null;
-
-  // Derived
   activeConversation: () => Conversation | undefined;
-
-  // Actions
   createConversation: (model?: string) => string;
   setActiveConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
+  updateConversation: (id: string, patch: Partial<Conversation>) => void;
   addMessage: (conversationId: string, message: Omit<ChatMessage, "id" | "timestamp">) => string;
   updateMessage: (conversationId: string, messageId: string, content: string) => void;
   appendToMessage: (conversationId: string, messageId: string, delta: string) => void;
-  updateConversation: (id: string, updates: Partial<Pick<Conversation, "memoryEnabled" | "title" | "model">>) => void;
+  setMessageThoughtTrace: (conversationId: string, messageId: string, thoughts: ThoughtEvent[]) => void;
+  setMessageToolCalls: (conversationId: string, messageId: string, toolCalls: ToolCallEvent[]) => void;
+  setMessageToolLifecycle: (conversationId: string, messageId: string, lifecycle: ToolLifecycleEvent[]) => void;
+  setMessageToolResults: (conversationId: string, messageId: string, results: ToolResult[]) => void;
+  setMessageTurnMetadata: (conversationId: string, messageId: string, metadata: TurnMetadata) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -65,6 +80,13 @@ export const useChatStore = create<ChatState>()(
           };
         }),
 
+      updateConversation: (id, patch) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c
+          ),
+        })),
+
       addMessage: (conversationId, message) => {
         const msgId = generateId();
         set((state) => ({
@@ -75,7 +97,6 @@ export const useChatStore = create<ChatState>()(
               id: msgId,
               timestamp: Date.now(),
             };
-            // Auto-title from first user message
             const title =
               c.messages.length === 0 && message.role === "user"
                 ? message.content.slice(0, 40) + (message.content.length > 40 ? "..." : "")
@@ -97,9 +118,7 @@ export const useChatStore = create<ChatState>()(
             if (c.id !== conversationId) return c;
             return {
               ...c,
-              messages: c.messages.map((m) =>
-                m.id === messageId ? { ...m, content } : m
-              ),
+              messages: c.messages.map((m) => (m.id === messageId ? { ...m, content } : m)),
               updatedAt: Date.now(),
             };
           }),
@@ -118,11 +137,72 @@ export const useChatStore = create<ChatState>()(
           }),
         })),
 
-      updateConversation: (id, updates) =>
+      setMessageThoughtTrace: (conversationId, messageId, thoughts) =>
         set((state) => ({
-          conversations: state.conversations.map((c) =>
-            c.id === id ? { ...c, ...updates, updatedAt: Date.now() } : c
-          ),
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, thoughtTrace: thoughts } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageToolCalls: (conversationId, messageId, toolCalls) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) => (m.id === messageId ? { ...m, toolCalls } : m)),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageToolLifecycle: (conversationId, messageId, lifecycle) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, toolLifecycle: lifecycle } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageToolResults: (conversationId, messageId, results) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, toolResults: results } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageTurnMetadata: (conversationId, messageId, metadata) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, turnMetadata: metadata } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
         })),
     }),
     { name: "hive-chats" }

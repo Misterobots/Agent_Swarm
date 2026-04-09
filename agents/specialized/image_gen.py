@@ -18,12 +18,13 @@ def list_available_models() -> list:
     """Queries ComfyUI for all available checkpoints."""
     try:
         url = f"{COMFYUI_HOST}/object_info/CheckpointLoaderSimple"
-        req = requests.get(url, timeout=2)
+        req = requests.get(url, timeout=5)
         if req.status_code == 200:
             return req.json().get('CheckpointLoaderSimple', {}).get('input', {}).get('required', {}).get('ckpt_name', [])[0]
     except Exception as e:
         logger.warning(f"Failed to list models: {e}")
-    return ["v1-5-pruned-emaonly.ckpt"] # Fallback
+    # Fallback to the checkpoint we actually deploy in this stack.
+    return ["sd_xl_turbo_1.0_fp16.safetensors"]
 
 def get_available_checkpoint():
     """Queries ComfyUI for the first available checkpoint."""
@@ -54,7 +55,7 @@ def get_model_params(model_type: str):
     elif model_type == "SDXL":
         return {"cfg": 7.0, "steps": 30, "sampler": "dpmpp_2m", "scheduler": "karras", "width": 1024, "height": 1024}
     else: # SD1.5 Fallback
-        return {"cfg": 7.0, "steps": 25, "sampler": "euler_ancestral", "scheduler": "normal", "width": 512, "height": 512}
+        return {"cfg": 7.0, "steps": 25, "sampler": "euler_ancestral", "scheduler": "normal", "width": 768, "height": 768}
 
 # --- LAYER 4: PROMPT REFINEMENT ---
 def apply_style_heuristics(prompt: str, model_type: str) -> str:
@@ -84,8 +85,10 @@ def refine_prompt(prompt: str, model_type: str) -> str:
 def queue_prompt(prompt_text: str, **kwargs):
     """
     Sends a prompt to ComfyUI with optional manual overrides.
+    Pass negative_prompt kwarg to override the negative conditioning text.
     """
     requested_ckpt = kwargs.get("model_name")
+    negative_prompt_override = kwargs.get("negative_prompt")
     all_ckpts = list_available_models()
     
     ckpt_name = "v1-5-pruned-emaonly.ckpt"
@@ -113,7 +116,10 @@ def queue_prompt(prompt_text: str, **kwargs):
         "height": int(kwargs.get("height", raw_params["height"]))
     }
     
-    final_prompt = refine_prompt(prompt_text, model_type)
+    if kwargs.get("skip_refinement"):
+        final_prompt = prompt_text
+    else:
+        final_prompt = refine_prompt(prompt_text, model_type)
     print(f"--- [ComfyUI] Config: {model_type} | Ckpt: {ckpt_name} | Params: {params} ---")
 
     # 3. Payload
@@ -159,7 +165,10 @@ def queue_prompt(prompt_text: str, **kwargs):
                 "class_type": "CLIPTextEncode",
                 "inputs": {
                     "clip": ["4", 1],
-                    "text": "" if "FLUX" in model_type else "(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation"
+                    "text": negative_prompt_override if negative_prompt_override is not None else (
+                        "" if "FLUX" in model_type else
+                        "(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation"
+                    )
                 }
             },
             "8": {
@@ -203,23 +212,37 @@ def queue_prompt(prompt_text: str, **kwargs):
     print("--- [ComfyUI] Waiting for generation... ---")
     time.sleep(2) 
     
-    for i in range(60): 
+    for i in range(180):  # Up to 3 minutes for model loading + generation
         try:
             history_url = f"{COMFYUI_HOST}/history/{prompt_id}"
-            res = requests.get(history_url)
+            res = requests.get(history_url, timeout=5)
             history = res.json()
-            
+
             if prompt_id in history:
-                outputs = history[prompt_id]['outputs']
+                entry = history[prompt_id]
+                # Check for ComfyUI execution error
+                status_str = entry.get('status', {}).get('status_str', '')
+                if status_str == 'error':
+                    msgs = entry.get('status', {}).get('messages', [])
+                    err_detail = "Unknown ComfyUI error"
+                    for msg in msgs:
+                        if isinstance(msg, list) and msg[0] == 'execution_error':
+                            err_detail = msg[1].get('exception_message', err_detail)
+                            break
+                    return f"Error: ComfyUI execution failed: {err_detail.strip()}"
+                outputs = entry.get('outputs', {})
                 if '9' in outputs:
-                     images = outputs['9']['images']
-                     filename = images[0]['filename']
-                     subfolder = images[0]['subfolder']
-                     return f"Generated Image: {filename} (in {subfolder} output)"
-        except:
-            pass
+                     images = outputs['9'].get('images', [])
+                     if images:
+                         filename = images[0]['filename']
+                         subfolder = images[0].get('subfolder', '')
+                         return f"Generated Image: {filename} (in {subfolder} output)"
+                     return "Error: ComfyUI completed but produced no image output."
+                return "Error: ComfyUI completed but SaveImage node produced no output."
+        except Exception as e:
+            logger.warning(f"Polling error: {e}")
         time.sleep(1)
-        
+
     return "Error: Generation timed out."
 
 # --- LAYER 6: VERIFICATION ---
@@ -284,7 +307,7 @@ def verify_semantics(image_path: str, prompt: str) -> tuple[bool, str]:
     return True, "Semantic Check Skipped (VLM Unavailable)"
 
 def generate_image(
-    prompt: str, 
+    prompt: str,
     model_name: str = "auto",
     cfg: float = 7.0,
     steps: int = 20,
@@ -293,7 +316,9 @@ def generate_image(
     sampler: str = "euler",
     scheduler: str = "normal",
     seed: int = -1,
-    target_device: str = "auto"
+    target_device: str = "auto",
+    negative_prompt: str = None,
+    skip_refinement: bool = False,
 ) -> str:
     """
     Generates an image using ComfyUI. 
@@ -308,18 +333,32 @@ def generate_image(
         scheduler: Scheduler type (normal, karras, etc).
         seed: Random seed (-1 for random).
     """
-    # Pack arguments into a dict for internal use
-    kwargs = {
+    # Pack arguments into a dict for internal use.
+    # When model_name is "auto", omit generation params so queue_prompt's
+    # auto-detection picks the right cfg/steps/sampler for the selected checkpoint.
+    kwargs: dict = {
         "model_name": model_name,
-        "cfg": cfg,
-        "steps": steps,
         "width": width,
         "height": height,
-        "sampler": sampler,
-        "scheduler": scheduler,
         "seed": seed,
-        "target_device": target_device
+        "target_device": target_device,
     }
+    # Always forward explicit non-default overrides so callers can tune params
+    # even in auto-model mode (queue_prompt's auto-detection still applies
+    # model-appropriate defaults for anything not overridden here).
+    if model_name != "auto" or cfg != 7.0:
+        kwargs["cfg"] = cfg
+    if model_name != "auto" or steps != 20:
+        kwargs["steps"] = steps
+    if model_name != "auto" or sampler != "euler":
+        kwargs["sampler"] = sampler
+    if model_name != "auto" or scheduler != "normal":
+        kwargs["scheduler"] = scheduler
+    if skip_refinement:
+        kwargs["skip_refinement"] = True
+
+    if negative_prompt is not None:
+        kwargs["negative_prompt"] = negative_prompt
 
     if target_device != "auto":
         logger.info(f"--- [Creative Studio] Targeted Generation on {target_device} ---")

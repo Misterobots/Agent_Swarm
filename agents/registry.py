@@ -32,7 +32,7 @@ class AgentRegistry:
             role="Full Stack & System Engineer",
             description="Autonomous coding, refactoring, and system architecture specialist.",
             security_level="L3_ADMIN",
-            capabilities=["file_ops.write", "file_ops.read", "terminal.exec", "git.ops", "git.status", "git.branch", "git.commit", "git.diff"],
+            capabilities=["file_ops.write", "file_ops.read", "terminal.exec", "git.ops"],
             endpoint="local://agents.architect_agent"
         ))
 
@@ -84,16 +84,6 @@ class AgentRegistry:
             security_level="L2_USER",
             capabilities=["voice.clone", "voice.speak"],
             endpoint="local://agents.specialized.voice_cloning"
-        ))
-
-        # 7. Librarian (Research Agent)
-        self.register(AgentCard(
-            name="Librarian",
-            role="Research & Knowledge Specialist",
-            description="Workspace search, documentation lookup, and general knowledge Q&A.",
-            security_level="L1_PUBLIC",
-            capabilities=["workspace.search", "workspace.read", "file_ops.read"],
-            endpoint="local://agents.router.librarian"
         ))
 
     def register(self, card: AgentCard):

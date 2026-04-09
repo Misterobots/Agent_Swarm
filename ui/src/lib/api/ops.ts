@@ -1,4 +1,4 @@
-import type { OpsHealth, TraceListResponse, TraceDetail } from "@/types/ops";
+import type { OpsHealth, TraceListResponse, TraceDetail, Observation } from "@/types/ops";
 
 const API_BASE = "/api/backend";
 
@@ -31,5 +31,20 @@ export async function fetchTraceDetail(traceId: string): Promise<TraceDetail | n
     return response.json();
   } catch {
     return null;
+  }
+}
+
+export async function fetchObservations(
+  traceId: string
+): Promise<Observation[]> {
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/v1/ops/traces/${encodeURIComponent(traceId)}/observations?limit=50`
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.observations || [];
+  } catch {
+    return [];
   }
 }

@@ -19,7 +19,12 @@ import os
 from typing import Optional
 import uuid
 
-from .token_issuer import initialize_token_issuer, get_token_issuer
+try:
+    # Package-style import (e.g., python -m)
+    from .token_issuer import initialize_token_issuer, get_token_issuer
+except ImportError:
+    # Script-style import used by container command: uvicorn main:app
+    from token_issuer import initialize_token_issuer, get_token_issuer
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -41,9 +46,13 @@ app = FastAPI(
 async def startup_event():
     """Initialize security system."""
     logger.info("Control Plane Security Service starting...")
+
+    jwt_secret_key = os.getenv('JWT_SECRET_KEY')
+    if not jwt_secret_key:
+        raise RuntimeError("JWT_SECRET_KEY must be set")
     
     config = {
-        'secret_key': os.getenv('JWT_SECRET_KEY', 'change-this-in-production'),
+        'secret_key': jwt_secret_key,
         'algorithm': os.getenv('JWT_ALGORITHM', 'HS256'),
         'expiration_hours': int(os.getenv('JWT_EXPIRATION_HOURS', 24)),
         'db_url': os.getenv('DATABASE_URL', 'postgresql://langfuse:langfuse_password@postgres:5432/langfuse'),

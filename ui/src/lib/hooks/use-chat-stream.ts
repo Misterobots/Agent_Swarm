@@ -1,201 +1,321 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { sendChatStream } from "@/lib/api/chat";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
-import type { FileAttachment, HiveEvent } from "@/types/chat";
+import type { ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, TurnMetadata, StreamMode, FileAttachment } from "@/types/chat";
 
-const FIRST_TOKEN_TIMEOUT_MS = 60_000;
-const STREAM_TIMEOUT_MS = 180_000;
+const MODEL_WINDOWS: Record<string, number> = {
+  "qwen2.5-coder:14b": 32768,
+  "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
+  "qwen3.5:9b": 32768,
+  "nemotron-mini": 4096,
+  "llama3.2:3b": 8192,
+  "default": 8192,
+};
 
-/** A single step in the agent pipeline displayed in the ThinkingIndicator */
-export interface PipelineStep {
-  id: number;
-  type: HiveEvent["type"];
-  agent: string;
-  action: string;
-  timestamp: number;
+const AUTO_COMPACT_THRESHOLD = 0.95;
+
+function tokenEstimate(text: string): number {
+  return Math.max(1, Math.floor(text.length / 4));
 }
 
-/** Parse a raw hive_event content string into agent + action */
-function parseAgentStep(raw: string): { agent: string; action: string } {
-  // Strip leading emojis
-  let s = raw.replace(/^[\p{Emoji_Presentation}\p{Emoji}\uFE0F\u200D]+\s*/gu, "");
-  // Handle [Bracket] tags: "[Router] Intent: ..." → agent: "Router", action: "Intent: ..."
-  const bracketMatch = s.match(/^\[(.+?)\]\s*(.*)/);
-  if (bracketMatch) {
-    return { agent: bracketMatch[1], action: bracketMatch[2] };
-  }
-  // Handle "Agent Name: action..."
-  const colonIdx = s.indexOf(":");
-  if (colonIdx > 0 && colonIdx < 40) {
-    return { agent: s.slice(0, colonIdx).trim(), action: s.slice(colonIdx + 1).trim() };
-  }
-  return { agent: "System", action: s };
+function messageTokenEstimate(messages: Array<{ content: string }>): number {
+  return messages.reduce((acc, m) => acc + tokenEstimate(m.content || "") + 4, 0);
+}
+
+function getTokenUsage(messages: Array<{ content: string }>, model: string) {
+  const used = messageTokenEstimate(messages);
+  const total = MODEL_WINDOWS[model] ?? MODEL_WINDOWS.default;
+  return { used, total, pct: total > 0 ? used / total : 0 };
+}
+
+function genId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export function useChatStream() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [latestThought, setLatestThought] = useState<string | null>(null);
-  const [pipelineSteps, setPipelineSteps] = useState<PipelineStep[]>([]);
-  const [streamPhase, setStreamPhase] = useState<"idle" | "thinking" | "responding">("idle");
-  const [tokenUsage, setTokenUsage] = useState({ used: 0, total: 128000, pct: 0 });
+  const [streamMode, setStreamMode] = useState<StreamMode | null>(null);
+  const [tokenUsage, setTokenUsage] = useState({ used: 0, total: MODEL_WINDOWS.default, pct: 0 });
   const abortRef = useRef<AbortController | null>(null);
-  const stepIdRef = useRef(0);
+  const thoughtTraceRef = useRef<ThoughtEvent[]>([]);
+  const toolCallTraceRef = useRef<ToolCallEvent[]>([]);
+  const toolLifecycleRef = useRef<ToolLifecycleEvent[]>([]);
+  const toolResultsRef = useRef<ToolResult[]>([]);
+  const streamModesRef = useRef<StreamMode[]>([]);
+  const turnMetadataRef = useRef<TurnMetadata | null>(null);
+  const continuationHintRef = useRef<"auto_continue" | "await_user" | "compacting" | null>(null);
 
   const {
+    conversations,
     activeConversationId,
     activeConversation,
     createConversation,
+    updateConversation,
     addMessage,
     appendToMessage,
+    setMessageThoughtTrace,
+    setMessageToolCalls,
+    setMessageToolLifecycle,
+    setMessageToolResults,
+    setMessageTurnMetadata,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
-  const theme = useSettingsStore((s) => s.theme);
+  const skill = useSettingsStore((s) => s.skill);
+  const style = useSettingsStore((s) => s.style);
+  const researchMode = useSettingsStore((s) => s.researchMode);
+
+  useEffect(() => {
+    const conv = activeConversation();
+    const convModel = conv?.model || model;
+    const usage = getTokenUsage(conv?.messages || [], convModel);
+    setTokenUsage(usage);
+  }, [conversations, activeConversation, model]);
+
+  const compactConversation = useCallback(
+    async (conversationId?: string) => {
+      const convId = conversationId || activeConversationId;
+      if (!convId) return false;
+
+      const conv = useChatStore.getState().conversations.find((c) => c.id === convId);
+      if (!conv || conv.messages.length === 0) return false;
+
+      const apiMessages = conv.messages.map((m) => ({ role: m.role, content: m.content }));
+      const result = await compactChat(apiMessages, conv.model || model);
+      if (!result.compacted) return false;
+
+      const baseTs = Date.now();
+      updateConversation(convId, {
+        messages: result.messages.map((m, idx) => ({
+          id: genId(),
+          role: m.role,
+          content: m.content,
+          timestamp: baseTs + idx,
+        })),
+      });
+
+      addMessage(convId, {
+        role: "assistant",
+        content: "Context compacted to keep conversation quality high.",
+      });
+      return true;
+    },
+    [activeConversationId, addMessage, model, updateConversation]
+  );
 
   const sendMessage = useCallback(
     async (content: string, attachments?: FileAttachment[]) => {
       if (!content.trim() || isStreaming) return;
-      void attachments;
 
+      // Ensure we have an active conversation
       let convId = activeConversationId;
       if (!convId) {
+        const prevState = useChatStore.getState();
+        const prev = prevState.conversations.find((c) => c.id === prevState.activeConversationId);
+        if (prev && prev.memoryEnabled && prev.messages.length >= 8) {
+          try {
+            const summaryResp = await summarizeSession(
+              prev.messages.map((m) => ({ role: m.role, content: m.content })),
+              prev.title || "general",
+              prev.model || model
+            );
+            if (summaryResp.summary) {
+              const dateKey = new Date().toISOString().slice(0, 10);
+              await saveSessionSummary(dateKey, prev.title || "general", summaryResp.summary);
+            }
+          } catch {
+            // Memory persistence is best-effort.
+          }
+        }
         convId = createConversation(model);
       }
 
-      addMessage(convId, { role: "user", content });
-      const assistantId = addMessage(convId, { role: "assistant", content: "" });
-
-      const conv = useChatStore.getState().conversations.find((c) => c.id === convId);
-      const historyMessages = (conv?.messages || [])
-        .filter((m) => m.id !== assistantId)
-        .map((m) => ({ role: m.role, content: m.content }));
-
-      // Inject theme personality as system prompt at the start of every request
-      const personality = THEME_PERSONALITIES[theme];
-      const apiMessages = [
-        { role: "system" as const, content: personality.systemPrompt },
-        ...historyMessages,
-      ];
-
-      setIsStreaming(true);
-      setStatusMessage("Initializing pipeline...");
-      setStreamPhase("thinking");
-      setLatestThought(null);
-      setPipelineSteps([]);
-      stepIdRef.current = 0;
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      let receivedAnyContent = false;
-
-      const firstTokenTimer = setTimeout(() => {
-        if (!receivedAnyContent) {
-          setStatusMessage("Model is taking longer than usual...");
-        }
-      }, FIRST_TOKEN_TIMEOUT_MS);
-
-      const streamTimer = setTimeout(() => {
-        controller.abort("stream-timeout");
-      }, STREAM_TIMEOUT_MS);
-
-      try {
-        let totalTokens = 0;
-
-        for await (const event of sendChatStream(apiMessages, model, controller.signal)) {
-          if (event.kind === "hive") {
-            // Structured pipeline event from the backend
-            const { type, content: raw } = event.event;
-
-            if (type === "status" || type === "log") {
-              const { agent, action } = parseAgentStep(raw);
-              const step: PipelineStep = {
-                id: ++stepIdRef.current,
-                type,
-                agent,
-                action,
-                timestamp: Date.now(),
-              };
-              setPipelineSteps((prev) => [...prev, step]);
-              setStatusMessage(`${agent}: ${action}`);
-              setLatestThought(action);
-            } else if (type === "error") {
-              const { agent, action } = parseAgentStep(raw);
-              const step: PipelineStep = {
-                id: ++stepIdRef.current,
-                type: "error",
-                agent,
-                action,
-                timestamp: Date.now(),
-              };
-              setPipelineSteps((prev) => [...prev, step]);
-              setStatusMessage(`Error: ${raw}`);
-            }
-            // artifact events are handled via content below
-          } else if (event.kind === "content") {
-            // Actual assistant response text
-            const text = event.text;
-            if (text.replace(/\s/g, "").length > 0) {
-              if (!receivedAnyContent) {
-                receivedAnyContent = true;
-                setStreamPhase("responding");
-                setStatusMessage(null);
-              }
-              appendToMessage(convId!, assistantId, text);
-              totalTokens += text.length / 4;
-            }
+      const beforeConv = useChatStore.getState().conversations.find((c) => c.id === convId);
+      if (beforeConv) {
+        const beforeUsage = getTokenUsage(beforeConv.messages, beforeConv.model || model);
+        if (beforeUsage.pct >= AUTO_COMPACT_THRESHOLD) {
+          try {
+            await compactConversation(convId);
+          } catch {
+            // If compact fails, continue with normal flow.
           }
         }
+      }
 
-        setTokenUsage((prev) => {
-          const used = Math.min(prev.total, Math.round(prev.used + totalTokens));
-          return { ...prev, used, pct: used / prev.total };
-        });
+      // Add user message
+      addMessage(convId, { role: "user", content });
 
-        if (!receivedAnyContent) {
-          appendToMessage(
-            convId!,
-            assistantId,
-            "*No response content was returned by the backend. Please retry or switch model.*"
-          );
+      // Create assistant message placeholder
+      const assistantId = addMessage(convId, { role: "assistant", content: "" });
+      const turnId = genId();
+
+      // Build messages array for the API
+      const conv = useChatStore.getState().conversations.find((c) => c.id === convId);
+      const apiMessages = (conv?.messages || [])
+        .filter((m) => m.id !== assistantId)
+        .map((m) => ({ role: m.role, content: m.content }));
+      const memoryEnabled = conv?.memoryEnabled ?? false;
+
+      // Stream response
+      setIsStreaming(true);
+      setStatusMessage(null);
+      setLatestThought(null);
+      setStreamMode(null);
+      thoughtTraceRef.current = [];
+      toolCallTraceRef.current = [];
+      toolLifecycleRef.current = [];
+      toolResultsRef.current = [];
+      streamModesRef.current = [];
+      turnMetadataRef.current = null;
+      continuationHintRef.current = null;
+      
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments)) {
+          if (event.type === "status") {
+            setStatusMessage(event.content || null);
+          } else if (event.type === "thought") {
+            const thoughtContent = event.content || "";
+            const thought: ThoughtEvent = { content: thoughtContent, timestamp: Date.now() };
+            thoughtTraceRef.current = [...thoughtTraceRef.current, thought];
+            setLatestThought(thoughtContent);
+          } else if (event.type === "tool_call") {
+            // Legacy tool call format
+            const toolCall: ToolCallEvent = {
+              tool_name: event.tool_name || "tool",
+              tool_input: event.tool_input,
+              tool_call_id: event.tool_call_id,
+              content: event.content || "",
+              timestamp: Date.now(),
+            };
+            toolCallTraceRef.current = [...toolCallTraceRef.current, toolCall];
+          } else if (event.type === "tool_start") {
+            const lifecycle: ToolLifecycleEvent = {
+              tool_call_id: event.tool_call_id || "",
+              tool_name: event.tool_name || "tool",
+              state: event.tool_state || "queued",
+              input: event.tool_input,
+              timestamp: Date.now(),
+            };
+            toolLifecycleRef.current = [...toolLifecycleRef.current, lifecycle];
+          } else if (event.type === "tool_progress") {
+            const lifecycle: ToolLifecycleEvent = {
+              tool_call_id: event.tool_call_id || "",
+              tool_name: event.tool_name || "tool",
+              state: event.tool_state || "executing",
+              progress: event.tool_progress || 0,
+              output: event.content,
+              timestamp: Date.now(),
+            };
+            toolLifecycleRef.current = [...toolLifecycleRef.current, lifecycle];
+          } else if (event.type === "tool_result") {
+            const result: ToolResult = {
+              tool_call_id: event.tool_call_id || "",
+              tool_name: event.tool_name || "tool",
+              success: (event.tool_state || "completed") === "completed",
+              output: event.tool_output || event.content || "",
+              artifacts: event.artifacts,
+              timestamp: Date.now(),
+            };
+            toolResultsRef.current = [...toolResultsRef.current, result];
+          } else if (event.type === "stream_mode") {
+            const mode = event.streamMode || "responding";
+            setStreamMode(mode);
+            if (!streamModesRef.current.includes(mode)) {
+              streamModesRef.current = [...streamModesRef.current, mode];
+            }
+          } else if (event.type === "turn_metadata") {
+            const incoming = event.turnMetadata;
+            if (incoming) {
+              turnMetadataRef.current = {
+                turnId: incoming.turnId || event.turnId || turnId,
+                agentName: incoming.agentName,
+                streamModes: streamModesRef.current,
+                toolsInvoked: incoming.toolsInvoked || [],
+                continuable: incoming.continuable !== false,
+                inContextTokens: incoming.inContextTokens,
+                resumeToken: incoming.resumeToken,
+              };
+            }
+          } else if (event.type === "continuation") {
+            continuationHintRef.current = event.continuationHint || "await_user";
+          } else if (event.type === "turn_boundary") {
+            // Marker event for turn boundaries; no-op for now.
+          } else if (event.type === "error") {
+            appendToMessage(convId!, assistantId, `\n\n*Error: ${event.content || "Stream error"}*`);
+          } else {
+            // Clear status once real content arrives
+            setStatusMessage(null);
+            appendToMessage(convId!, assistantId, event.content || "");
+          }
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-          const timedOut = controller.signal.reason === "stream-timeout";
-          if (timedOut) {
-            appendToMessage(
-              convId!,
-              assistantId,
-              "\n\n*Error: response timed out after 3 minutes. Please retry or use a smaller prompt.*"
-            );
-          }
+          // User cancelled
         } else {
           appendToMessage(convId!, assistantId, "\n\n*Error: Connection failed.*");
         }
       } finally {
-        clearTimeout(firstTokenTimer);
-        clearTimeout(streamTimer);
+        // Persist collected metadata to store
+        if (thoughtTraceRef.current.length > 0) {
+          setMessageThoughtTrace(convId!, assistantId, thoughtTraceRef.current);
+        }
+        if (toolCallTraceRef.current.length > 0) {
+          setMessageToolCalls(convId!, assistantId, toolCallTraceRef.current);
+        }
+        if (toolLifecycleRef.current.length > 0 && setMessageToolLifecycle) {
+          setMessageToolLifecycle(convId!, assistantId, toolLifecycleRef.current);
+        }
+        if (toolResultsRef.current.length > 0 && setMessageToolResults) {
+          setMessageToolResults(convId!, assistantId, toolResultsRef.current);
+        }
+        if (turnMetadataRef.current && setMessageTurnMetadata) {
+          setMessageTurnMetadata(convId!, assistantId, turnMetadataRef.current);
+        }
+
         setIsStreaming(false);
         setStatusMessage(null);
         setLatestThought(null);
-        setStreamPhase("idle");
-        // Keep pipelineSteps visible — cleared on next send
+        setStreamMode(null);
+        thoughtTraceRef.current = [];
+        toolCallTraceRef.current = [];
+        toolLifecycleRef.current = [];
+        toolResultsRef.current = [];
+        streamModesRef.current = [];
+        turnMetadataRef.current = null;
+        continuationHintRef.current = null;
         abortRef.current = null;
       }
     },
-    [activeConversationId, createConversation, addMessage, appendToMessage, model, theme, isStreaming]
+    [
+      activeConversationId,
+      compactConversation,
+      createConversation,
+      addMessage,
+      appendToMessage,
+      model,
+      skill,
+      style,
+      researchMode,
+      isStreaming,
+      setMessageThoughtTrace,
+      setMessageToolCalls,
+      setMessageToolLifecycle,
+      setMessageToolResults,
+      setMessageTurnMetadata,
+    ]
   );
 
   const stopGeneration = useCallback(() => {
     abortRef.current?.abort();
-  }, []);
-
-  const compactConversation = useCallback(async () => {
-    // Placeholder for future context compaction logic
   }, []);
 
   return {
@@ -203,8 +323,7 @@ export function useChatStream() {
     isStreaming,
     statusMessage,
     latestThought,
-    pipelineSteps,
-    streamPhase,
+    streamMode,
     tokenUsage,
     sendMessage,
     compactConversation,

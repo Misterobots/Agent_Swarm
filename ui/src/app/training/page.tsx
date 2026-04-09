@@ -7,7 +7,7 @@ import {
   WorkspaceSection,
   WorkspaceShell,
 } from "@/components/workspace/workspace-shell";
-import { fetchModelCatalog, fetchTrainingRuns } from "@/lib/api/training";
+import { fetchModelCatalog, fetchOpsTrainingRuns } from "@/lib/api/training";
 import { useEffect, useState } from "react";
 
 export default function TrainingPage() {
@@ -16,7 +16,7 @@ export default function TrainingPage() {
   const [catalogCount, setCatalogCount] = useState(0);
 
   useEffect(() => {
-    Promise.all([fetchTrainingRuns(), fetchModelCatalog()]).then(([runs, catalog]) => {
+    Promise.all([fetchOpsTrainingRuns(), fetchModelCatalog()]).then(([runs, catalog]) => {
       setRunsCount(runs.length);
       setGgufCount(catalog.local_gguf.length);
       setCatalogCount(catalog.ollama_models.length);

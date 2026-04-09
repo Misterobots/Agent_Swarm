@@ -2,6 +2,13 @@
 .env
 .env.*
 *.secret
+network.env
+.continue/config.json
+
+# SPIRE private keys and CSRs (certs are OK to commit)
+**/config/spire/certs/*.key
+**/config/spire/certs/*.csr
+**/config/spire/certs/*.srl
 
 # Python
 __pycache__/
@@ -20,6 +27,18 @@ venv/
 # Logs
 *.log
 logs/
+auth_dump.txt
+provider_info.txt
+comfy_logs.txt
+comfy_logs2.txt
+comfy_debug.log
+comfy_tail.log
+comfyui_latest.log
+agents/error_log.txt
+agents/error_log2.txt
+agents/logs.txt
+execution_plane/spire_connect_logs.txt
+execution_plane/spire_logs.txt
 
 # IDES
 .vscode/
@@ -28,9 +47,24 @@ logs/
 # Claude Code
 .claude/
 
+# Context sessions (ephemeral per-session state)
+agents/swarm_context.json
+agents/context_sessions/
+
 # Backups
 *.backup.*
 backups/
+migration_backup_*/
+
+# Large binaries / models / media (use LFS or external storage)
+*.iso
+*.zip
+*.pth
+*.mp4
+*.wav
+*.png
+*.index
+delivered_artifacts/
 
 # Node
 node_modules/
@@ -40,20 +74,10 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# ML model weights & training artifacts (local to lab only)
-*.gguf
-*.safetensors
-*.pt
-*.pth
-*.bin
-*.onnx
+# Training Artifacts
 training_output/
-execution_plane/training_output/
-
-# Training & generated data (local to lab only)
 training_data/
-delivered_artifacts/
-user_projects/
-workspace/
 execution_plane/training_output/
-*.mp4
+execution_plane/training_data/
+*.safetensors
+*.gguf

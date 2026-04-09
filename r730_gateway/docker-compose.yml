@@ -1,7 +1,7 @@
 # R730 Gateway & Ops Hub Docker Compose
 # Routing handled by Saltbox's Traefik (connected to ai_lab_net externally)
 # Hosts: Monitoring (Prometheus, Loki, Grafana), Logging, Ollama, Open-WebUI
-# Compute services (Ollama, BMO Voice, ComfyUI, etc.) remain on Justin-PC @ 192.168.2.101
+# Compute services (Ollama, BMO Voice, ComfyUI, etc.) remain on the Execution Node
 
 services:
   # Docker Sidecar Probe - exposes read-only container metadata for central monitoring
@@ -43,7 +43,7 @@ services:
       - spire_agent_data:/run/spire/agent
       - spire_socket:/var/run/spire
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: ["-config", "/etc/spire/agent/agent.conf", "-joinToken", "${SPIRE_R730_JOIN_TOKEN}"]
+    command: ["-config", "/etc/spire/agent/agent.conf"]
     healthcheck:
       test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck", "-socketPath", "/var/run/spire/agent.sock"]
       interval: 30s
@@ -72,6 +72,10 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=90d'  # Keep 3 months of metrics
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
+      - "${CONTROL_NODE_HOST:-control-node}:${CONTROL_NODE_IP:-192.168.2.102}"
     networks:
       - ai_lab_net
     labels:
@@ -79,6 +83,54 @@ services:
       - "traefik.http.routers.prometheus.rule=PathPrefix(`/prometheus`)"
       - "traefik.http.routers.prometheus.entrypoints=web"
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager-r730
+    hostname: alertmanager-r730
+    restart: unless-stopped
+    volumes:
+      - ./config/alertmanager:/etc/alertmanager
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    environment:
+      - ALERT_SMTP_HOST=${ALERT_SMTP_HOST:-smtp.zoho.com}
+      - ALERT_SMTP_PORT=${ALERT_SMTP_PORT:-587}
+      - ALERT_SMTP_USERNAME=${ALERT_SMTP_USERNAME:-Admin@Graceful-Tech.com}
+      - ALERT_SMTP_PASSWORD=${ALERT_SMTP_PASSWORD:-CHANGE_ME_APP_PASSWORD}
+      - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM:-Admin@Graceful-Tech.com}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-Justin@shivelymail.com}
+      - NTFY_ALERT_TOPIC=${NTFY_ALERT_TOPIC:-home-ai-alerts}
+      - NTFY_ALERT_TOKEN=${NTFY_ALERT_TOKEN:-tk_12345678901234567890123456789}
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.rule=PathPrefix(`/alertmanager`)"
+      - "traefik.http.routers.alertmanager.entrypoints=web"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter-r730
+    hostname: blackbox-exporter-r730
+    restart: unless-stopped
+    volumes:
+      - ./config/blackbox:/etc/blackbox_exporter:ro
+    ports:
+      - "9115:9115"
+    command:
+      - '--config.file=/etc/blackbox_exporter/blackbox.yml'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
+      - "${CONTROL_NODE_HOST:-control-node}:${CONTROL_NODE_IP:-192.168.2.102}"
+    networks:
+      - ai_lab_net
 
   loki:
     image: grafana/loki:latest
@@ -117,6 +169,10 @@ services:
     container_name: cadvisor-r730
     hostname: cadvisor-r730
     restart: unless-stopped
+    command:
+      - --housekeeping_interval=30s      # Reduce collection frequency (default 1s)
+      - --docker_only=true               # Only monitor Docker containers, skip host metrics
+      - --disable_metrics=udp,tcp,advtcp,sched,hugetlb,referenced_memory,resctrl,process
     ports:
       - "8888:8080"  # Use 8888 to avoid conflict with Traefik dashboard @ 8080
     volumes:
@@ -148,6 +204,13 @@ services:
       - GF_SECURITY_SECRET_KEY=${GF_SECURITY_SECRET_KEY}
       - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=
       - GF_LOG_LEVEL=info
+      - GF_SERVER_ROOT_URL=http://192.168.2.103/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_SECURITY_COOKIE_SAMESITE=lax
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
       - grafana_data:/var/lib/grafana
       - ./provisioning:/etc/grafana/provisioning:ro
@@ -155,13 +218,23 @@ services:
     depends_on:
       - prometheus
       - loki
+      - alertmanager
     networks:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
+      # LAN route: 192.168.2.103/grafana
       - "traefik.http.routers.grafana.rule=PathPrefix(`/grafana`)"
       - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.routers.grafana.service=grafana"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      # External route: grafana.shivelymedia.com/grafana (via Cloudflare tunnel)
+      # No Authentik - Grafana requires local Grafana authentication.
+      - "traefik.http.routers.grafana-ext.rule=Host(`grafana.shivelymedia.com`)"
+      - "traefik.http.routers.grafana-ext.entrypoints=web"
+      - "traefik.http.routers.grafana-ext.priority=20"
+      - "traefik.http.routers.grafana-ext.service=grafana-ext"
+      - "traefik.http.services.grafana-ext.loadbalancer.server.port=3000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # TASK QUEUE & PERSISTENCE
@@ -177,6 +250,11 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes  # Enable AOF persistence
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - ai_lab_net
     # No Traefik labels — Redis accessed directly on port 6379, not via reverse proxy
@@ -207,6 +285,7 @@ services:
       - OLLAMA_FLASH_ATTENTION=1
       - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_KEEP_ALIVE=10m
+      - OLLAMA_METRICS=1               # Expose /metrics for Prometheus scraping
     volumes:
       - ollama_models:/root/.ollama
     ports:
@@ -241,6 +320,12 @@ services:
       - open-webui_data:/app/backend/data
     ports:
       - "3000:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
     networks:
       - ai_lab_net
     labels:
@@ -257,52 +342,251 @@ services:
     build:
       context: ../ui
       dockerfile: Dockerfile
-      args:
-        API_BASE_URL: http://192.168.2.101:8008
     image: home-ai-lab/hive-ui:latest
     container_name: hive_ui
     restart: unless-stopped
+    env_file:
+      - ../network.env
     environment:
-      - API_BASE_URL=http://192.168.2.101:8008
+      - API_BASE_URL=http://${EXECUTION_NODE_HOST:-execution-node}:8008
+      - LANGFUSE_URL=http://${CONTROL_NODE_IP:-192.168.2.102}:3000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - CONTROL_NODE_IP=${CONTROL_NODE_IP:-192.168.2.102}
+      - NEXT_PUBLIC_GATEWAY_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}
+      - NEXT_PUBLIC_GRAFANA_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}/grafana
+      - GRAFANA_INTERNAL_URL=http://grafana-r730:3000
+    extra_hosts:
+      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
+    volumes:
+      - ../docs:/app/docs:ro
     ports:
       - "3200:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - ai_lab_net
-      - saltbox
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.hive-ui.rule=Host(`hive.shivelymedia.com`)"
-      - "traefik.http.routers.hive-ui.entrypoints=websecure"
-      - "traefik.http.routers.hive-ui.tls=true"
-      - "traefik.http.routers.hive-ui.tls.certresolver=cfdns"
-      - "traefik.http.routers.hive-ui-http.rule=Host(`hive.shivelymedia.com`)"
-      - "traefik.http.routers.hive-ui-http.entrypoints=web"
+      # Internal LAN route (no auth)
+      - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
+      - "traefik.http.routers.hive-ui.entrypoints=web"
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
-      - "traefik.docker.network=saltbox"
+      # External HTTPS route: hive.shivelymedia.com (behind Authentik)
+      - "traefik.http.routers.hive-ext.rule=Host(`hive.shivelymedia.com`)"
+      - "traefik.http.routers.hive-ext.entrypoints=websecure"
+      - "traefik.http.routers.hive-ext.priority=20"
+      - "traefik.http.routers.hive-ext.tls=true"
+      - "traefik.http.routers.hive-ext.tls.certresolver=cfdns"
+      - "traefik.http.routers.hive-ext.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.hive-ext.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.hive-ext.tls.options=securetls@file"
+      - "traefik.http.routers.hive-ext.service=hive-ext"
+      - "traefik.http.routers.hive-ext.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@docker"
+      - "traefik.http.services.hive-ext.loadbalancer.server.port=3000"
+      # External HTTP route: redirect + Authentik (Cloudflare forwards here on port 80)
+      - "traefik.http.routers.hive-ext-http.rule=Host(`hive.shivelymedia.com`)"
+      - "traefik.http.routers.hive-ext-http.entrypoints=web"
+      - "traefik.http.routers.hive-ext-http.priority=20"
+      - "traefik.http.routers.hive-ext-http.service=hive-ext-http"
+      - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
+      - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
-  # ROUTING CONFIGURATION FOR JUSTIN-PC SERVICES (via Traefik)
+  # IDENTITY — Authentik SSO is now managed by Saltbox (Phase 8B)
+  # Container names: authentik, authentik-worker, authentik-postgres
+  # Network: saltbox (Traefik bridges both saltbox and ai_lab_net)
   # ═══════════════════════════════════════════════════════════════════════════════
-  # 
-  # Justin-PC containers (comfyui, bmo-voice, agent-runtime, etc.) are NOT defined here.
-  # Instead, Traefik discovers them via Docker API from Justin-PC.
-  #
-  # For local testing or specific routing, uncomment below and configure labels:
-  #
-  # Example routing to Justin-PC services:
-  # - Agent Runtime: traefik rule = PathPrefix(`/swarm`)  → justin-pc:8008
-  # - ComfyUI:       traefik rule = PathPrefix(`/comfy`)  → justin-pc:8188
-  # - OpenHands:     traefik rule = PathPrefix(`/hands`)  → justin-pc:3000
-  #
-  # These are configured via docker-compose labels on Justin-PC containers
-  # and auto-discovered by Traefik.
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # DEVELOPMENT TOOLS (migrated from Justin-PC, Phase 8)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  # OPENHANDS - AI Development Agent (v1.5)
+  openhands:
+    image: docker.openhands.dev/openhands/openhands:1.5
+    container_name: openhands_sandbox
+    restart: unless-stopped
+    environment:
+      - AGENT_SERVER_IMAGE_REPOSITORY=ghcr.io/openhands/agent-server
+      - AGENT_SERVER_IMAGE_TAG=1.12.0-python
+      - LOG_ALL_EVENTS=true
+    ports:
+      - "3002:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - openhands_data:/.openhands
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openhands.rule=PathPrefix(`/hands`)"
+      - "traefik.http.routers.openhands.entrypoints=web"
+      - "traefik.http.routers.openhands.middlewares=strip-hands,authentik@docker"
+      - "traefik.http.middlewares.strip-hands.stripprefix.prefixes=/hands"
+      - "traefik.http.services.openhands.loadbalancer.server.port=3000"
+
+  # VS CODE SERVER (DevOps - Full Access, Protected by Authentik SSO)
+  agent_ide_devops:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: agent_ide_devops
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PASSWORD=${VSCODE_PASSWORD}
+      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
+      - DEFAULT_WORKSPACE=/config/workspace
+      - SWARM_API_KEY=sk-devops-identity
+      - FREE_CODE_ENABLE=false
+    volumes:
+      - ../:/config/workspace
+      - vscode_config_devops:/config
+      - ../execution_plane/init_ide:/custom-cont-init.d:ro
+    ports:
+      - "8445:8443"  # 8443 used by Saltbox/Traefik on R730
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ide-devops.rule=PathPrefix(`/devops`)"
+      - "traefik.http.routers.ide-devops.entrypoints=web"
+      - "traefik.http.routers.ide-devops.middlewares=strip-devops,authentik@docker"
+      - "traefik.http.middlewares.strip-devops.stripprefix.prefixes=/devops"
+      - "traefik.http.services.ide-devops.loadbalancer.server.port=8443"
+
+  # VS CODE SERVER (Coding - Restricted Sandbox, Protected by Authentik SSO)
+  agent_ide_coding:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: agent_ide_coding
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PASSWORD=${VSCODE_PASSWORD}
+      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
+      - DEFAULT_WORKSPACE=/config/workspace
+      - SWARM_API_KEY=sk-coder-identity
+      - FREE_CODE_ENABLE=true
+    volumes:
+      - ../user_projects:/config/workspace
+      - vscode_config_coding:/config
+      - ../execution_plane/init_ide:/custom-cont-init.d:ro
+    ports:
+      - "8444:8443"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ide-coding.rule=PathPrefix(`/code`)"
+      - "traefik.http.routers.ide-coding.entrypoints=web"
+      - "traefik.http.routers.ide-coding.middlewares=strip-code,authentik@docker"
+      - "traefik.http.middlewares.strip-code.stripprefix.prefixes=/code"
+      - "traefik.http.services.ide-coding.loadbalancer.server.port=8443"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # OPS PORTAL — Admin Dashboard (migrated from Justin-PC, Phase 8)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  ops-portal:
+    image: home-ai-lab/agent-runtime:latest
+    container_name: ops_portal
+    restart: unless-stopped
+    user: "0"
+    env_file:
+      - ../network.env
+    environment:
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+    volumes:
+      - ../agents:/app/agents
+      - ../docs:/app/docs
+      - ../:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    command: ["streamlit", "run", "agents/ops_dashboard.py", "--server.port=8502", "--server.address=0.0.0.0"]
+    ports:
+      - "8502:8502"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8502/_stcore/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ops-portal.rule=PathPrefix(`/ops`)"
+      - "traefik.http.routers.ops-portal.entrypoints=web"
+      - "traefik.http.routers.ops-portal.middlewares=strip-ops,authentik@docker"
+      - "traefik.http.middlewares.strip-ops.stripprefix.prefixes=/ops"
+      - "traefik.http.services.ops-portal.loadbalancer.server.port=8502"
+
+  ntfy:
+    image: binwiederhier/ntfy:latest
+    container_name: ntfy-r730
+    hostname: ntfy
+    restart: unless-stopped
+    init: true
+    command: ["serve"]
+    environment:
+      - TZ=Etc/UTC
+      - NTFY_BASE_URL=${NTFY_BASE_URL:-https://notify.shivelymedia.com}
+      - NTFY_LISTEN_HTTP=:80
+      - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
+      - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
+      - NTFY_AUTH_DEFAULT_ACCESS=deny-all
+      - NTFY_AUTH_USERS=${NTFY_ADMIN_USER:-ntfyadmin}:${NTFY_ADMIN_PASSWORD_HASH:-$$2a$$10$$YLiO8U21sX1uhZamTLJXHuxgVC0Z/GKISibrKCLohPgtG7yIxSk4C}:admin
+      - NTFY_AUTH_TOKENS=${NTFY_ADMIN_USER:-ntfyadmin}:${NTFY_ALERT_TOKEN:-tk_12345678901234567890123456789}:alertmanager
+      - NTFY_BEHIND_PROXY=true
+      - NTFY_ENABLE_LOGIN=true
+      - NTFY_ENABLE_METRICS=true
+      - NTFY_UPSTREAM_BASE_URL=https://ntfy.sh
+    volumes:
+      - ntfy_data:/var/lib/ntfy
+    ports:
+      - "8086:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --tries=1 http://localhost:80/v1/health -O - | grep -Eo '\"healthy\"\\s*:\\s*true' || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ntfy.rule=Host(`notify.shivelymedia.com`)"
+      - "traefik.http.routers.ntfy.entrypoints=websecure"
+      - "traefik.http.routers.ntfy.priority=20"
+      - "traefik.http.routers.ntfy.tls=true"
+      - "traefik.http.routers.ntfy.tls.certresolver=cfdns"
+      - "traefik.http.routers.ntfy.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.ntfy.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.ntfy.tls.options=securetls@file"
+      - "traefik.http.routers.ntfy.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file"
+      - "traefik.http.services.ntfy.loadbalancer.server.port=80"
+      - "traefik.http.routers.ntfy-http.rule=Host(`notify.shivelymedia.com`)"
+      - "traefik.http.routers.ntfy-http.entrypoints=web"
+      - "traefik.http.routers.ntfy-http.priority=20"
+      - "traefik.http.routers.ntfy-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file"
+      - "traefik.http.routers.ntfy-http.service=ntfy"
 
 networks:
   ai_lab_net:
     driver: bridge
     name: ai_lab_net
-  saltbox:
-    external: true
 
 volumes:
   spire_agent_data:
@@ -311,13 +595,25 @@ volumes:
     driver: local
   prometheus_data:
     driver: local
+  alertmanager_data:
+    driver: local
   loki_data:
     driver: local
   grafana_data:
     driver: local
   redis_data:
     driver: local
+  ntfy_data:
+    driver: local
   ollama_models:
     driver: local
   open-webui_data:
+    driver: local
+  # Authentik volumes removed — now managed by Saltbox (Phase 8B)
+  openhands_data:
+    driver: local
+  # Code Servers (migrated from Justin-PC)
+  vscode_config_devops:
+    driver: local
+  vscode_config_coding:
     driver: local

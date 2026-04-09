@@ -21,13 +21,95 @@ COMFY_INPUT_DIR = "/app/comfy_io/input"
 COMFY_OUTPUT_DIR = "/app/comfy_io/output"
 TEMPLATE_DIR = "/app/agents/templates"
 
-def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.json") -> str:
+# Default TripoSG quality settings
+_DEFAULT_STEPS = 100
+_DEFAULT_CFG = 5.0
+
+
+def prepare_image_for_3d(image_path: str) -> str:
+    """
+    Prepare an image for 3D generation by removing the background
+    and compositing the subject onto a black background.
+
+    TripoSG interprets white/bright areas as solid mass, so the subject
+    must be isolated against black (0,0,0) for clean geometry.
+
+    Returns path to the prepared image, or None if preparation fails
+    (caller should fall back to original image).
+    """
+    try:
+        from PIL import Image
+        import numpy as np
+
+        img = Image.open(image_path).convert("RGBA")
+
+        # Try rembg for high-quality background removal
+        try:
+            from rembg import remove
+            img_nobg = remove(img)
+        except ImportError:
+            # Fallback: simple white-background threshold removal
+            data = np.array(img)
+            # Identify near-white pixels (R>240, G>240, B>240)
+            white_mask = (data[:, :, 0] > 240) & (data[:, :, 1] > 240) & (data[:, :, 2] > 240)
+            data[white_mask, 3] = 0  # Set alpha to transparent
+            img_nobg = Image.fromarray(data)
+
+        # Isolate the single largest subject (handles duplicate characters)
+        try:
+            import cv2
+            alpha = np.array(img_nobg)[:, :, 3]
+            _, thresh = cv2.threshold(alpha, 30, 255, cv2.THRESH_BINARY)
+            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if len(contours) > 1:
+                largest = max(contours, key=cv2.contourArea)
+                mask = np.zeros_like(alpha)
+                cv2.drawContours(mask, [largest], -1, 255, cv2.FILLED)
+                nobg_data = np.array(img_nobg)
+                nobg_data[mask == 0, 3] = 0
+                # Crop to bounding box of largest subject with padding
+                x, y, w, h = cv2.boundingRect(largest)
+                pad = max(w, h) // 20  # 5% padding
+                x0 = max(0, x - pad)
+                y0 = max(0, y - pad)
+                x1 = min(nobg_data.shape[1], x + w + pad)
+                y1 = min(nobg_data.shape[0], y + h + pad)
+                cropped = nobg_data[y0:y1, x0:x1]
+                # Resize to square (TripoSG expects square input)
+                side = max(cropped.shape[0], cropped.shape[1])
+                square = np.zeros((side, side, 4), dtype=np.uint8)
+                oy = (side - cropped.shape[0]) // 2
+                ox = (side - cropped.shape[1]) // 2
+                square[oy:oy+cropped.shape[0], ox:ox+cropped.shape[1]] = cropped
+                img_nobg = Image.fromarray(square).resize((1024, 1024), Image.LANCZOS)
+                logger.info(f"--- [Forge] Isolated largest subject from {len(contours)} contours ---")
+        except Exception as e:
+            logger.warning(f"[Forge] Subject isolation skipped: {e}")
+
+        # Composite onto solid black background
+        black_bg = Image.new("RGBA", img_nobg.size, (0, 0, 0, 255))
+        composite = Image.alpha_composite(black_bg, img_nobg)
+        result = composite.convert("RGB")
+
+        # Save alongside original
+        base, ext = os.path.splitext(image_path)
+        prepared_path = f"{base}_3d_prep{ext}"
+        result.save(prepared_path, quality=95)
+        logger.info(f"--- [Forge] Prepared image for 3D: {prepared_path} ---")
+        return prepared_path
+
+    except Exception as e:
+        logger.warning(f"[Forge] Image preparation failed (using original): {e}")
+        return None
+
+def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.json", quality_overrides: dict = None) -> str:
     """
     Takes an input image, copies it to ComfyUI input, and triggers a 3D generation workflow.
     
     Args:
         image_path (str): Path to the source 2D image (e.g., from ImageGen agent).
         workflow_name (str): Name of the JSON workflow file template.
+        quality_overrides (dict): Optional overrides for workflow params (e.g. {"steps": 75, "cfg": 5.0}).
         
     Returns:
         str: Path to the generated 3D model (GLB/OBJ).
@@ -69,6 +151,11 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
     # 4. Inject Image and Seed into Workflow
     import random
     seed_value = random.randint(1, 1000000000000)
+    steps_value = _DEFAULT_STEPS
+    cfg_value = _DEFAULT_CFG
+    if quality_overrides:
+        steps_value = quality_overrides.get("steps", steps_value)
+        cfg_value = quality_overrides.get("cfg", cfg_value)
     
     def recursive_replace(obj):
         if isinstance(obj, dict):
@@ -81,11 +168,17 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
             if "{{INPUT_IMAGE}}" in obj:
                 return obj.replace("{{INPUT_IMAGE}}", unique_filename)
             if "{{SEED}}" in obj:
-                # If the string is EXACTLY {{SEED}}, return int.
-                # If part of string, replace and return string.
                 if obj == "{{SEED}}":
                     return seed_value
                 return obj.replace("{{SEED}}", str(seed_value))
+            if "{{STEPS}}" in obj:
+                if obj == "{{STEPS}}":
+                    return int(steps_value)
+                return obj.replace("{{STEPS}}", str(int(steps_value)))
+            if "{{CFG}}" in obj:
+                if obj == "{{CFG}}":
+                    return float(cfg_value)
+                return obj.replace("{{CFG}}", str(cfg_value))
         return obj
 
     # Apply replacement to the entire workflow structure
@@ -97,8 +190,8 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
     
     try:
         url = f"{COMFYUI_HOST}/prompt"
-        req = requests.post(url, json=payload)
-        
+        req = requests.post(url, json=payload, timeout=30)
+
         if req.status_code != 200:
             return f"Error form ComfyUI (Status {req.status_code}): {req.text}"
             
@@ -114,22 +207,34 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
         return f"Error connecting to ComfyUI API: {e}"
 
     # 6. Poll for Result
-    logger.info("--- [Forge] Waiting for 3D generation (Max 20 Minutes)... ---")
+    logger.info("--- [Forge] Waiting for 3D generation (Max 30 Minutes)... ---")
     time.sleep(5) 
     
-    timeout_seconds = 1800 # 30 Minutes (Increased from 20)
+    timeout_seconds = 1800 # 30 Minutes
     start_time = time.time()
+    lost_count = 0
     
     while (time.time() - start_time) < timeout_seconds:
         try:
             # Check History (Did it finish?)
             history_url = f"{COMFYUI_HOST}/history/{prompt_id}"
-            res = requests.get(history_url)
+            res = requests.get(history_url, timeout=10)
             history = res.json()
             
             if prompt_id in history:
+                entry = history[prompt_id]
+                status_str = entry.get('status', {}).get('status_str', '')
+                if status_str == 'error':
+                    msgs = entry.get('status', {}).get('messages', [])
+                    err_detail = "Unknown ComfyUI error"
+                    for msg in msgs:
+                        if isinstance(msg, list) and msg[0] == 'execution_error':
+                            err_detail = msg[1].get('exception_message', err_detail)
+                            break
+                    return f"Error: ComfyUI 3D generation failed: {err_detail.strip()}"
+
                 logger.info("--- [Forge] Generation Complete. Parsing outputs... ---")
-                outputs = history[prompt_id]['outputs']
+                outputs = entry.get('outputs', {})
                 
                 # Robust Output Finding (Ported from hybridService.ts)
                 for node_id, node_output in outputs.items():
@@ -145,20 +250,28 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
                             elif isinstance(val, dict): found_files.append(val)
                             
                     for item in found_files:
+                        # Handle dict items (e.g. SaveImage nodes)
                         if isinstance(item, dict) and 'filename' in item:
                             fname = item['filename']
-                            # Look for 3D extensions
-                            if fname.endswith('.glb') or fname.endswith('.obj') or fname.endswith('.3mf'):
-                                full_path = os.path.join(COMFY_OUTPUT_DIR, item.get('subfolder', ''), fname)
-                                logger.info(f"--- [Forge] Found 3D Model: {full_path} ---")
-                                return f"3D Model Generated Successfully: {full_path}"
+                            subfolder = item.get('subfolder', '')
+                        # Handle string items (e.g. SaveTrimesh glb_path)
+                        elif isinstance(item, str):
+                            fname = item
+                            subfolder = ''
+                        else:
+                            continue
+                        # Look for 3D extensions
+                        if fname.endswith('.glb') or fname.endswith('.obj') or fname.endswith('.3mf'):
+                            full_path = os.path.join(COMFY_OUTPUT_DIR, subfolder, fname)
+                            logger.info(f"--- [Forge] Found 3D Model: {full_path} ---")
+                            return f"3D Model Generated Successfully: {full_path}"
                                 
                 return "Error: Generation finished but no 3D model file (.glb/.obj) was found in outputs."
 
             # Check Queue (Is it still running?)
             # This prevents premature timeouts if the queue is deep or processing is slow
             queue_url = f"{COMFYUI_HOST}/queue"
-            q_res = requests.get(queue_url)
+            q_res = requests.get(queue_url, timeout=10)
             q_data = q_res.json()
             
             # Queue data format: { "queue_pending": [...], "queue_running": [...] }
@@ -171,17 +284,17 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
                 pass
             
             if not is_pending and not is_running:
-                # It's not in history, not in pending, not in running.
-                # Did it fail silently? Or just moved to history in the split second between calls?
-                # We'll give it a few more retries before declaring lost.
-                pass
+                # Not in history, queue, or running — may be lost
+                lost_count += 1
+                if lost_count > 5:
+                    return "Error: ComfyUI job disappeared from queue without producing output."
 
             time.sleep(5)
         except Exception as e:
-            logger.info(f"Polling error: {e}")
+            logger.warning(f"Polling error: {e}")
             time.sleep(5)
-            
-    return "Error: 3D Generation operation timed out after 20 minutes."
+
+    return "Error: 3D Generation timed out after 30 minutes."
 
 def get_forge_agent():
     return Agent(
