@@ -373,6 +373,7 @@ services:
       - saltbox
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=saltbox"
       # Internal LAN route (no auth)
       - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
       - "traefik.http.routers.hive-ui.entrypoints=web"
