@@ -28,30 +28,30 @@ export function TrainingStatusPanel() {
 
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-medium text-zinc-400">Training Pipeline</h2>
+      <h2 className="text-sm font-medium text-[var(--chat-muted)]">Training Pipeline</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Dataset Size */}
-        <div className="border border-zinc-800 rounded-lg p-3">
+        <div className="border border-[var(--chat-border)] rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Database size={14} className="text-cyan-500" />
-            <span className="text-xs text-zinc-500">Training Data</span>
+            <Database size={14} className="text-[var(--chat-accent)]" />
+            <span className="text-xs text-[var(--chat-muted)]">Training Data</span>
           </div>
-          <p className="text-lg font-semibold text-zinc-200">{totalData}</p>
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-lg font-semibold text-[var(--chat-text)]">{totalData}</p>
+          <p className="text-[10px] text-[var(--chat-muted)]">
             {status.dataset_size.exported} exported · {status.dataset_size.synthetic} synthetic · {status.dataset_size.curated ?? 0} curated
           </p>
         </div>
 
         {/* Last Run */}
-        <div className="border border-zinc-800 rounded-lg p-3">
+        <div className="border border-[var(--chat-border)] rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
             <FlaskConical size={14} className="text-violet-500" />
-            <span className="text-xs text-zinc-500">Last Run</span>
+            <span className="text-xs text-[var(--chat-muted)]">Last Run</span>
           </div>
           {lastRun ? (
             <>
-              <p className="text-sm font-medium text-zinc-200">{lastRun.run_type}</p>
-              <p className="text-[10px] text-zinc-600">
+              <p className="text-sm font-medium text-[var(--chat-text)]">{lastRun.run_type}</p>
+              <p className="text-[10px] text-[var(--chat-muted)]">
                 <span
                   className={cn(
                     lastRun.status === "completed" && "text-emerald-400",
@@ -66,28 +66,28 @@ export function TrainingStatusPanel() {
               </p>
             </>
           ) : (
-            <p className="text-sm text-zinc-600">No runs yet</p>
+            <p className="text-sm text-[var(--chat-muted)]">No runs yet</p>
           )}
         </div>
 
         {/* A/B Tests */}
-        <div className="border border-zinc-800 rounded-lg p-3">
+        <div className="border border-[var(--chat-border)] rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
             <GitCompare size={14} className="text-amber-500" />
-            <span className="text-xs text-zinc-500">A/B Tests</span>
+            <span className="text-xs text-[var(--chat-muted)]">A/B Tests</span>
           </div>
-          <p className="text-lg font-semibold text-zinc-200">{status.active_ab_tests}</p>
-          <p className="text-[10px] text-zinc-600">active</p>
+          <p className="text-lg font-semibold text-[var(--chat-text)]">{status.active_ab_tests}</p>
+          <p className="text-[10px] text-[var(--chat-muted)]">active</p>
         </div>
 
         {/* Model Versions */}
-        <div className="border border-zinc-800 rounded-lg p-3">
+        <div className="border border-[var(--chat-border)] rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
             <Box size={14} className="text-emerald-500" />
-            <span className="text-xs text-zinc-500">Model Versions</span>
+            <span className="text-xs text-[var(--chat-muted)]">Model Versions</span>
           </div>
-          <p className="text-lg font-semibold text-zinc-200">{status.model_versions.length}</p>
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-lg font-semibold text-[var(--chat-text)]">{status.model_versions.length}</p>
+          <p className="text-[10px] text-[var(--chat-muted)]">
             {status.model_versions.filter((m) => m.status === "promoted").length} promoted
           </p>
         </div>
@@ -96,7 +96,7 @@ export function TrainingStatusPanel() {
       {activeRun && (
         <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg px-3 py-2">
           <p className="text-[11px] text-amber-300 font-medium">Training active</p>
-          <p className="text-[10px] text-zinc-500">
+          <p className="text-[10px] text-[var(--chat-muted)]">
             {activeRun.run_id ? `Run #${activeRun.run_id}` : "Run pending"}
             {activeRun.run_type ? ` · ${activeRun.run_type}` : ""}
             {activeRun.started_at ? ` · started ${new Date(activeRun.started_at).toLocaleTimeString()}` : ""}

@@ -22,15 +22,15 @@ export function WorkspaceShell({
   children,
 }: WorkspaceShellProps) {
   return (
-    <div className="flex h-full flex-col bg-[#0b0f15] text-zinc-100">
-      <div className="border-b border-zinc-800 bg-[#0e1117] px-6 py-5">
+    <div className="flex h-full flex-col bg-[var(--chat-bg)] text-[var(--chat-text)]">
+      <div className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-6 py-5">
         <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-cyan-900/60 bg-cyan-950/40 p-2 text-cyan-300">
+          <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--chat-accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--chat-accent)_10%,transparent)] p-2 text-[var(--chat-accent)]">
             <Icon size={18} />
           </div>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-zinc-100">{title}</h1>
-            <p className="mt-1 text-sm text-zinc-400">{description}</p>
+            <h1 className="text-lg font-semibold tracking-tight text-[var(--chat-text)]">{title}</h1>
+            <p className="mt-1 text-sm text-[var(--chat-muted)]">{description}</p>
           </div>
         </div>
       </div>
@@ -52,8 +52,8 @@ export function WorkspaceSection({
   return (
     <section className="mb-8">
       <div className="mb-3">
-        <h2 className="text-sm font-medium text-zinc-200">{title}</h2>
-        {description ? <p className="mt-1 text-xs text-zinc-500">{description}</p> : null}
+        <h2 className="text-sm font-medium text-[var(--chat-text)]">{title}</h2>
+        {description ? <p className="mt-1 text-xs text-[var(--chat-muted)]">{description}</p> : null}
       </div>
       {children}
     </section>
@@ -68,16 +68,16 @@ export function WorkspaceLinkCard({ title, description, href }: WorkspaceLinkCar
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 transition-colors hover:border-cyan-700/60 hover:bg-zinc-900"
+      className="group rounded-2xl border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4 transition-colors hover:border-[var(--chat-accent)] hover:bg-[var(--chat-surface)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
-          <p className="mt-2 text-sm leading-6 text-zinc-400">{description}</p>
+          <h3 className="text-sm font-medium text-[var(--chat-text)]">{title}</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--chat-muted)]">{description}</p>
         </div>
         <ArrowRight
           size={16}
-          className="mt-0.5 shrink-0 text-zinc-600 transition-colors group-hover:text-cyan-400"
+          className="mt-0.5 shrink-0 text-[var(--chat-muted)] transition-colors group-hover:text-[var(--chat-accent)]"
         />
       </div>
     </Link>
@@ -92,9 +92,9 @@ export function WorkspacePlaceholder({
   body: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-900/40 p-5">
-      <h3 className="text-sm font-medium text-zinc-200">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-zinc-400">{body}</p>
+    <div className="rounded-2xl border border-dashed border-[var(--chat-border)] bg-[var(--chat-panel)] p-5">
+      <h3 className="text-sm font-medium text-[var(--chat-text)]">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[var(--chat-muted)]">{body}</p>
     </div>
   );
 }

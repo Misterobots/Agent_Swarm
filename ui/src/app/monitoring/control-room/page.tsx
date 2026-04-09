@@ -43,44 +43,44 @@ export default function ControlRoomPage() {
           <button
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)] disabled:opacity-50"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-            <p className="text-xs text-zinc-500">System Status</p>
-            <p className="mt-1 text-sm font-medium text-zinc-200">{health?.status ?? "Unknown"}</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
+            <p className="text-xs text-[var(--chat-muted)]">System Status</p>
+            <p className="mt-1 text-sm font-medium text-[var(--chat-text)]">{health?.status ?? "Unknown"}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-            <p className="text-xs text-zinc-500">Running Containers</p>
-            <p className="mt-1 text-sm font-medium text-zinc-200">{health?.running_count ?? 0}</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
+            <p className="text-xs text-[var(--chat-muted)]">Running Containers</p>
+            <p className="mt-1 text-sm font-medium text-[var(--chat-text)]">{health?.running_count ?? 0}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-            <p className="text-xs text-zinc-500">Unhealthy Services</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
+            <p className="text-xs text-[var(--chat-muted)]">Unhealthy Services</p>
             <p className="mt-1 text-sm font-medium text-red-400">{unhealthy.length}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-            <p className="text-xs text-zinc-500">Pending Approvals</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
+            <p className="text-xs text-[var(--chat-muted)]">Pending Approvals</p>
             <p className="mt-1 text-sm font-medium text-amber-400">{pending.length}</p>
           </div>
         </div>
       </WorkspaceSection>
 
       <WorkspaceSection title="Maintenance Queue">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+        <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
           {pending.length === 0 ? (
-            <p className="text-sm text-zinc-500">No pending governance requests.</p>
+            <p className="text-sm text-[var(--chat-muted)]">No pending governance requests.</p>
           ) : (
             <ul className="space-y-2">
               {pending.slice(0, 8).map((req) => (
-                <li key={req.id} className="rounded border border-zinc-800 bg-zinc-950/40 p-2.5">
-                  <p className="text-xs text-zinc-300">
-                    <span className="font-mono text-zinc-500">{req.id}</span> · {req.type} · {req.status}
+                <li key={req.id} className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2.5">
+                  <p className="text-xs text-[var(--chat-text)]">
+                    <span className="font-mono text-[var(--chat-muted)]">{req.id}</span> · {req.type} · {req.status}
                   </p>
-                  <p className="mt-1 text-xs text-zinc-400">{req.description}</p>
+                  <p className="mt-1 text-xs text-[var(--chat-muted)]">{req.description}</p>
                 </li>
               ))}
             </ul>
@@ -107,10 +107,10 @@ export default function ControlRoomPage() {
               cmd: "GET /api/v1/health/nodes",
             },
           ].map((card) => (
-            <div key={card.title} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <p className="text-sm font-medium text-zinc-200">{card.title}</p>
-              <p className="mt-1 text-xs text-zinc-500">{card.body}</p>
-              <code className="mt-2 block rounded bg-zinc-950 px-2 py-1 text-xs text-zinc-400">
+            <div key={card.title} className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
+              <p className="text-sm font-medium text-[var(--chat-text)]">{card.title}</p>
+              <p className="mt-1 text-xs text-[var(--chat-muted)]">{card.body}</p>
+              <code className="mt-2 block rounded bg-[var(--chat-bg)] px-2 py-1 text-xs text-[var(--chat-muted)]">
                 {card.cmd}
               </code>
             </div>

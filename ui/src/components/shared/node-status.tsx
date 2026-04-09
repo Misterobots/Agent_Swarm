@@ -21,7 +21,7 @@ export function NodeStatus() {
   const healthyCount = nodes.filter((n) => n.healthy).length;
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-500">
+    <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--chat-muted)]">
       <Activity size={12} />
       <span>
         {healthyCount}/{nodes.length} nodes

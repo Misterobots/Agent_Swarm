@@ -13,9 +13,9 @@ interface MetricCardProps {
 
 export function MetricCard({ label, value, delta, icon: Icon, status = "ok" }: MetricCardProps) {
   return (
-    <div className="bg-[#1a1a2e] border border-zinc-800 rounded-lg p-4">
+    <div className="bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg p-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-zinc-500 uppercase tracking-wide">{label}</span>
+        <span className="text-xs text-[var(--chat-muted)] uppercase tracking-wide">{label}</span>
         <Icon
           size={16}
           className={cn(
@@ -25,9 +25,9 @@ export function MetricCard({ label, value, delta, icon: Icon, status = "ok" }: M
           )}
         />
       </div>
-      <div className="text-2xl font-semibold text-zinc-100">{value}</div>
+      <div className="text-2xl font-semibold text-[var(--chat-text)]">{value}</div>
       {delta && (
-        <div className="text-xs text-zinc-500 mt-1">{delta}</div>
+        <div className="text-xs text-[var(--chat-muted)] mt-1">{delta}</div>
       )}
     </div>
   );

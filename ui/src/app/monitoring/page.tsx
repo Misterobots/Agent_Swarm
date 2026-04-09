@@ -52,7 +52,7 @@ export default function MonitoringPage() {
           <button
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)] disabled:opacity-50"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
@@ -62,9 +62,9 @@ export default function MonitoringPage() {
           {CLUSTER_ORDER.map((cluster) => {
             const node = health?.nodes?.find((n) => n.role === cluster.role || n.name === cluster.name);
             return (
-              <div key={cluster.name} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+              <div key={cluster.name} className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-zinc-200">{cluster.name}</p>
+                  <p className="text-sm font-medium text-[var(--chat-text)]">{cluster.name}</p>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
                       node?.healthy ? "bg-emerald-950/50 text-emerald-300" : "bg-red-950/50 text-red-300"
@@ -73,9 +73,9 @@ export default function MonitoringPage() {
                     {node ? (node.healthy ? "ONLINE" : "DEGRADED") : "UNKNOWN"}
                   </span>
                 </div>
-                <p className="mt-1 font-mono text-xs text-zinc-500">{cluster.ip}</p>
-                <p className="mt-3 text-xs text-zinc-500">Running Containers</p>
-                <p className="text-xl font-semibold text-zinc-100">{node?.running_count ?? 0}</p>
+                <p className="mt-1 font-mono text-xs text-[var(--chat-muted)]">{cluster.ip}</p>
+                <p className="mt-3 text-xs text-[var(--chat-muted)]">Running Containers</p>
+                <p className="text-xl font-semibold text-[var(--chat-text)]">{node?.running_count ?? 0}</p>
                 {node?.error && <p className="mt-2 text-xs text-red-400">{node.error}</p>}
               </div>
             );
@@ -113,23 +113,23 @@ export default function MonitoringPage() {
 
       <WorkspaceSection title="Operational Snapshot">
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Cluster Containers</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-200">{health?.running_count ?? 0}</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Cluster Containers</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">{health?.running_count ?? 0}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Unhealthy Services</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Unhealthy Services</p>
             <p className="mt-1 text-xl font-semibold text-red-400">{unhealthyServices}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Pending Governance</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Pending Governance</p>
             <p className="mt-1 text-xl font-semibold text-amber-400">{pending}</p>
           </div>
         </div>
       </WorkspaceSection>
 
       <WorkspaceSection title="Inference Nodes - Ollama Status">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
+        <div className="rounded-2xl border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
           <NodeStatus />
         </div>
       </WorkspaceSection>

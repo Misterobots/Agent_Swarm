@@ -55,29 +55,29 @@ function ObservationRow({ obs }: { obs: Observation }) {
     : "";
 
   return (
-    <div className="rounded-lg border border-zinc-800 text-sm">
+    <div className="rounded-lg border border-[var(--chat-border)] text-sm">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-zinc-800/40"
+        className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-[var(--chat-surface)]"
       >
         <span className="mt-0.5 shrink-0">{icon}</span>
-        <span className="flex-1 text-xs text-zinc-300">
-          <span className="font-mono text-zinc-500 mr-1.5">[{obs.type?.toUpperCase()}]</span>
+        <span className="flex-1 text-xs text-[var(--chat-text)]">
+          <span className="font-mono text-[var(--chat-muted)] mr-1.5">[{obs.type?.toUpperCase()}]</span>
           {obs.name}
-          {duration && <span className="text-zinc-500">{duration}</span>}
+          {duration && <span className="text-[var(--chat-muted)]">{duration}</span>}
           {obs.model && (
-            <span className="ml-2 font-mono text-xs text-cyan-500">· {obs.model}</span>
+            <span className="ml-2 font-mono text-xs text-[var(--chat-accent)]">· {obs.model}</span>
           )}
-          {tok && <span className="ml-2 text-zinc-500">· {tok}</span>}
+          {tok && <span className="ml-2 text-[var(--chat-muted)]">· {tok}</span>}
         </span>
       </button>
 
       {open && (
-        <div className="border-t border-zinc-800 px-3 py-3 space-y-3">
+        <div className="border-t border-[var(--chat-border)] px-3 py-3 space-y-3">
           {obs.input != null && (
             <div>
-              <p className="mb-1 text-xs font-medium text-zinc-400">Input / Prompt</p>
-              <pre className="overflow-x-auto rounded bg-zinc-900 px-3 py-2 text-xs text-zinc-300 whitespace-pre-wrap max-h-48">
+              <p className="mb-1 text-xs font-medium text-[var(--chat-muted)]">Input / Prompt</p>
+              <pre className="overflow-x-auto rounded bg-[var(--chat-bg)] px-3 py-2 text-xs text-[var(--chat-text)] whitespace-pre-wrap max-h-48">
                 {typeof obs.input === "string"
                   ? obs.input
                   : JSON.stringify(obs.input, null, 2)}
@@ -86,8 +86,8 @@ function ObservationRow({ obs }: { obs: Observation }) {
           )}
           {obs.output != null && (
             <div>
-              <p className="mb-1 text-xs font-medium text-zinc-400">Output / Response</p>
-              <pre className="overflow-x-auto rounded bg-zinc-900 px-3 py-2 text-xs text-zinc-300 whitespace-pre-wrap max-h-48">
+              <p className="mb-1 text-xs font-medium text-[var(--chat-muted)]">Output / Response</p>
+              <pre className="overflow-x-auto rounded bg-[var(--chat-bg)] px-3 py-2 text-xs text-[var(--chat-text)] whitespace-pre-wrap max-h-48">
                 {typeof obs.output === "string"
                   ? obs.output
                   : JSON.stringify(obs.output, null, 2)}
@@ -96,8 +96,8 @@ function ObservationRow({ obs }: { obs: Observation }) {
           )}
           {obs.metadata != null && (
             <div>
-              <p className="mb-1 text-xs font-medium text-zinc-400">Metadata</p>
-              <pre className="overflow-x-auto rounded bg-zinc-900 px-3 py-2 text-xs text-zinc-500 whitespace-pre-wrap max-h-32">
+              <p className="mb-1 text-xs font-medium text-[var(--chat-muted)]">Metadata</p>
+              <pre className="overflow-x-auto rounded bg-[var(--chat-bg)] px-3 py-2 text-xs text-[var(--chat-muted)] whitespace-pre-wrap max-h-32">
                 {JSON.stringify(obs.metadata, null, 2)}
               </pre>
             </div>
@@ -128,7 +128,7 @@ function TraceInspector({
   }, [traceId]);
 
   if (loading) {
-    return <p className="py-6 text-center text-sm text-zinc-500">Loading trace detail…</p>;
+    return <p className="py-6 text-center text-sm text-[var(--chat-muted)]">Loading trace detail…</p>;
   }
   if (!detail) {
     return <p className="py-6 text-center text-sm text-red-400">Failed to load trace detail.</p>;
@@ -139,21 +139,21 @@ function TraceInspector({
   return (
     <div className="space-y-4">
       {/* Trace metadata card */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3">
+      <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs sm:grid-cols-4">
-            <span className="text-zinc-500">Name</span>
-            <span className="col-span-1 text-zinc-200 font-medium">
+            <span className="text-[var(--chat-muted)]">Name</span>
+            <span className="col-span-1 text-[var(--chat-text)] font-medium">
               {String(trace.name ?? "—")}
             </span>
-            <span className="text-zinc-500">Status</span>
-            <span className="col-span-1 text-zinc-200">{String(trace.level ?? "DEFAULT")}</span>
-            <span className="text-zinc-500">Latency</span>
-            <span className="col-span-1 text-zinc-200">
+            <span className="text-[var(--chat-muted)]">Status</span>
+            <span className="col-span-1 text-[var(--chat-text)]">{String(trace.level ?? "DEFAULT")}</span>
+            <span className="text-[var(--chat-muted)]">Latency</span>
+            <span className="col-span-1 text-[var(--chat-text)]">
               {fmtLatency(typeof trace.latency === "number" ? trace.latency : null)}
             </span>
-            <span className="text-zinc-500">Timestamp</span>
-            <span className="col-span-1 text-zinc-200">
+            <span className="text-[var(--chat-muted)]">Timestamp</span>
+            <span className="col-span-1 text-[var(--chat-text)]">
               {fmtTs(typeof trace.timestamp === "string" ? trace.timestamp : null)}
             </span>
           </div>
@@ -162,16 +162,16 @@ function TraceInspector({
               href={langfuseUrl ?? detail.langfuse_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex shrink-0 items-center gap-1 text-xs text-cyan-500 hover:text-cyan-300"
+              className="flex shrink-0 items-center gap-1 text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)]"
             >
               Langfuse <ExternalLink size={12} />
             </a>
           )}
         </div>
         {trace.input != null && (
-          <div className="mt-3 border-t border-zinc-800 pt-3">
-            <p className="mb-1 text-xs font-medium text-zinc-400">Root Input</p>
-            <pre className="overflow-x-auto rounded bg-zinc-950 px-3 py-2 text-xs text-zinc-300 whitespace-pre-wrap max-h-32">
+          <div className="mt-3 border-t border-[var(--chat-border)] pt-3">
+            <p className="mb-1 text-xs font-medium text-[var(--chat-muted)]">Root Input</p>
+            <pre className="overflow-x-auto rounded bg-[var(--chat-bg)] px-3 py-2 text-xs text-[var(--chat-text)] whitespace-pre-wrap max-h-32">
               {typeof trace.input === "string"
                 ? trace.input
                 : JSON.stringify(trace.input, null, 2)}
@@ -182,11 +182,11 @@ function TraceInspector({
 
       {/* Observations */}
       <div>
-        <p className="mb-2 text-xs font-medium text-zinc-400">
+        <p className="mb-2 text-xs font-medium text-[var(--chat-muted)]">
           Observations ({observations.length} span{observations.length !== 1 ? "s" : ""})
         </p>
         {observations.length === 0 ? (
-          <p className="text-xs text-zinc-500">No observations recorded for this trace.</p>
+          <p className="text-xs text-[var(--chat-muted)]">No observations recorded for this trace.</p>
         ) : (
           <div className="space-y-1.5">
             {observations.map((obs) => (
@@ -241,20 +241,20 @@ export default function SwarmObserverPage() {
         <div className="relative flex-1">
           <Search
             size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--chat-muted)] pointer-events-none"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Filter by trace name, ID, or content…"
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-2 pl-8 pr-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-cyan-700 focus:outline-none"
+            className="w-full rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] py-2 pl-8 pr-3 text-sm text-[var(--chat-text)] placeholder:text-[var(--chat-muted)] focus:border-[var(--chat-accent)] focus:outline-none"
           />
         </div>
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 transition-colors hover:text-zinc-200 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] transition-colors hover:text-[var(--chat-text)] disabled:opacity-50"
         >
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           Refresh
@@ -271,23 +271,23 @@ export default function SwarmObserverPage() {
       <WorkspaceSection
         title={`Trace Feed${filtered.length !== traces.length ? ` — ${filtered.length} of ${traces.length}` : ` — ${traces.length} traces`}`}
       >
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="overflow-x-auto rounded-lg border border-[var(--chat-border)]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-900/80">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">
+              <tr className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)]">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">
                   Agent / Name
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 hidden sm:table-cell">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] hidden sm:table-cell">
                   Input Preview
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 w-24">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] w-24">
                   Latency
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 w-20">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] w-20">
                   Level
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 w-32 hidden md:table-cell">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] w-32 hidden md:table-cell">
                   Timestamp
                 </th>
               </tr>
@@ -295,13 +295,13 @@ export default function SwarmObserverPage() {
             <tbody>
               {loading && traces.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-[var(--chat-muted)]">
                     Loading traces…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-[var(--chat-muted)]">
                     {error
                       ? "Langfuse unreachable — check LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY."
                       : "No traces match your filter."}
@@ -312,17 +312,17 @@ export default function SwarmObserverPage() {
                   <tr
                     key={t.id}
                     onClick={() => setSelected(selected?.id === t.id ? null : t)}
-                    className={`cursor-pointer border-b border-zinc-800/50 transition-colors ${
+                    className={`cursor-pointer border-b border-[var(--chat-border)] transition-colors ${
                       selected?.id === t.id
-                        ? "bg-zinc-800/60"
-                        : "hover:bg-zinc-800/30"
+                        ? "bg-[var(--chat-surface)]"
+                        : "hover:bg-[var(--chat-surface)]"
                     }`}
                   >
-                    <td className="px-4 py-2.5 text-xs font-medium text-zinc-200">{t.name}</td>
-                    <td className="px-4 py-2.5 text-xs text-zinc-500 hidden sm:table-cell max-w-xs truncate">
+                    <td className="px-4 py-2.5 text-xs font-medium text-[var(--chat-text)]">{t.name}</td>
+                    <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)] hidden sm:table-cell max-w-xs truncate">
                       {t.input_preview || "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-xs font-mono text-zinc-400">
+                    <td className="px-4 py-2.5 text-xs font-mono text-[var(--chat-muted)]">
                       {fmtLatency(t.latency)}
                     </td>
                     <td className="px-4 py-2.5">
@@ -332,7 +332,7 @@ export default function SwarmObserverPage() {
                         {t.level}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-zinc-500 hidden md:table-cell">
+                    <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)] hidden md:table-cell">
                       {fmtTs(t.timestamp)}
                     </td>
                   </tr>

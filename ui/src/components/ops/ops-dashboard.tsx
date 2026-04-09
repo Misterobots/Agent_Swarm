@@ -20,15 +20,15 @@ export function OpsDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-200">Infrastructure Dashboard</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <h1 className="text-lg font-semibold text-[var(--chat-text)]">Infrastructure Dashboard</h1>
+          <p className="text-xs text-[var(--chat-muted)] mt-0.5">
             {health ? `Status: ${health.status}` : "Loading..."}
           </p>
         </div>
         <button
           onClick={refresh}
           disabled={loading}
-          className="p-2 rounded-lg text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+          className="p-2 rounded-lg text-[var(--chat-muted)] hover:text-[var(--chat-accent)] hover:bg-[var(--chat-panel)] transition-colors disabled:opacity-50"
         >
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
@@ -75,7 +75,7 @@ export function OpsDashboard() {
 
       {/* Alerts */}
       <div>
-        <h2 className="text-sm font-medium text-zinc-400 mb-3">Recent Alerts</h2>
+        <h2 className="text-sm font-medium text-[var(--chat-muted)] mb-3">Recent Alerts</h2>
         <AlertBanner services={controlPlane} nodes={nodes} />
       </div>
     </div>

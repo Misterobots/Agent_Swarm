@@ -32,8 +32,8 @@ export function DashboardSelector({ active, onSelect }: DashboardSelectorProps) 
           className={cn(
             "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
             active === d.uid
-              ? "bg-cyan-600/20 text-cyan-400"
-              : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+              ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent)]"
+              : "text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-panel)]"
           )}
         >
           {d.label}

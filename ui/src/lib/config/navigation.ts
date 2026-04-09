@@ -1,6 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
+  BarChart3,
   Bot,
+  FileText,
   GraduationCap,
   Hammer,
   ImagePlus,
@@ -11,6 +14,7 @@ import {
   Radar,
   Scale,
   Settings,
+  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
@@ -40,6 +44,44 @@ export const primaryNavigation: NavigationItem[] = [
     href: "/monitoring",
     icon: Radar,
     matchPrefixes: ["/monitoring"],
+    children: [
+      {
+        label: "Dashboard",
+        href: "/monitoring/dashboard",
+        icon: Activity,
+        matchPrefixes: ["/monitoring/dashboard"],
+      },
+      {
+        label: "Grafana",
+        href: "/monitoring/grafana",
+        icon: BarChart3,
+        matchPrefixes: ["/monitoring/grafana"],
+      },
+      {
+        label: "Swarm Observer",
+        href: "/monitoring/swarm-observer",
+        icon: Radar,
+        matchPrefixes: ["/monitoring/swarm-observer"],
+      },
+      {
+        label: "Traces",
+        href: "/monitoring/traces",
+        icon: Activity,
+        matchPrefixes: ["/monitoring/traces"],
+      },
+      {
+        label: "Control Room",
+        href: "/monitoring/control-room",
+        icon: ShieldCheck,
+        matchPrefixes: ["/monitoring/control-room"],
+      },
+      {
+        label: "Evidence Locker",
+        href: "/monitoring/evidence-locker",
+        icon: FileText,
+        matchPrefixes: ["/monitoring/evidence-locker"],
+      },
+    ],
   },
   {
     label: "Media",
@@ -83,10 +125,10 @@ export const primaryNavigation: NavigationItem[] = [
 
 export const secondaryNavigation: NavigationItem[] = [
   {
-    label: "Control",
-    href: "/control",
+    label: "Operations",
+    href: "/operations",
     icon: LayoutDashboard,
-    matchPrefixes: ["/control"],
+    matchPrefixes: ["/operations"],
   },
   {
     label: "Governance",

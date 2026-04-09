@@ -32,7 +32,7 @@ export function MonitorHub() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-[#0a0a14]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--chat-border)] bg-[var(--chat-surface)]">
         <DashboardSelector active={activeDashboard} onSelect={(uid) => {
           setActiveDashboard(uid);
           setLoading(true);
@@ -41,7 +41,7 @@ export function MonitorHub() {
           href={fullUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-500 hover:text-cyan-400 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-accent)] transition-colors"
         >
           Open full Grafana
           <ExternalLink size={12} />
@@ -51,10 +51,10 @@ export function MonitorHub() {
       {/* Grafana iframe */}
       <div className="relative flex-1">
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a14]">
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--chat-bg)]">
             <div className="flex flex-col items-center gap-3">
-              <Loader2 size={24} className="text-cyan-400 animate-spin" />
-              <span className="text-sm text-zinc-500">Loading {activeLabel}...</span>
+              <Loader2 size={24} className="text-[var(--chat-accent)] animate-spin" />
+              <span className="text-sm text-[var(--chat-muted)]">Loading {activeLabel}...</span>
             </div>
           </div>
         )}

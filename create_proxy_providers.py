@@ -15,7 +15,7 @@ print(f"Using auth flow: {auth_flow.name if auth_flow else 'None'}")
 services = [
     {"name": "Agent UI", "slug": "agent-ui", "external_host": "http://localhost:8501", "internal_host": "http://agent_ui:8501"},
     {"name": "ComfyUI", "slug": "comfyui", "external_host": "http://localhost:8188", "internal_host": "http://comfyui_gpu:8188"},
-    {"name": "OpenHands", "slug": "openhands", "external_host": "http://localhost:3000", "internal_host": "http://openhands_sandbox:3000"},
+    {"name": "OpenHands", "slug": "openhands", "external_host": "http://localhost:3002", "internal_host": "http://openhands_sandbox:3000"},
 ]
 
 for svc in services:

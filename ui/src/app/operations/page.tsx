@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { RefreshCw, Shield, TerminalSquare } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { OpsDashboard } from "@/components/ops/ops-dashboard";
 import { useEffect, useMemo, useState } from "react";
 import { fetchOpsHealth } from "@/lib/api/ops";
 import { fetchGovernanceRequests } from "@/lib/api/workspaces";
 import type { OpsHealth } from "@/types/ops";
 import type { GovernanceRequest } from "@/types/workspaces";
 
-export default function ControlPage() {
+export default function OperationsPage() {
   const [health, setHealth] = useState<OpsHealth | null>(null);
   const [requests, setRequests] = useState<GovernanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,10 +35,16 @@ export default function ControlPage() {
 
   return (
     <WorkspaceShell
-      title="Control"
-      description="Administrative control surface for runtime operations and managed actions."
+      title="Operations"
+      description="Infrastructure dashboard, administrative controls, and runtime operations."
       icon={Shield}
     >
+      {/* ── Ops Dashboard Section ──────────────────────────────────── */}
+      <WorkspaceSection title="Infrastructure Overview">
+        <OpsDashboard />
+      </WorkspaceSection>
+
+      {/* ── Admin Surface ──────────────────────────────────────────── */}
       <WorkspaceSection title="Admin Surface">
         <div className="mb-4 flex justify-end">
           <button
@@ -64,6 +71,7 @@ export default function ControlPage() {
         </div>
       </WorkspaceSection>
 
+      {/* ── Node Container Summary ─────────────────────────────────── */}
       <WorkspaceSection title="Node Container Summary" description="Quick view of container counts by cluster node.">
         <div className="grid gap-3 md:grid-cols-3">
           {(health?.nodes ?? []).map((node) => (
@@ -77,6 +85,7 @@ export default function ControlPage() {
         </div>
       </WorkspaceSection>
 
+      {/* ── Control-Plane Services ─────────────────────────────────── */}
       <WorkspaceSection title="Control-Plane Services">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {health?.control_plane.map((svc) => (
@@ -89,6 +98,7 @@ export default function ControlPage() {
         </div>
       </WorkspaceSection>
 
+      {/* ── Pending Governance Queue ───────────────────────────────── */}
       <WorkspaceSection title="Pending Governance Queue">
         <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
           {pending.length === 0 ? (
@@ -108,6 +118,7 @@ export default function ControlPage() {
         </div>
       </WorkspaceSection>
 
+      {/* ── Action Runbooks ────────────────────────────────────────── */}
       <WorkspaceSection title="Action Runbooks" description="Display-first command references. Inline execution can be added next.">
         <div className="grid gap-3 md:grid-cols-3">
           {[
@@ -136,6 +147,7 @@ export default function ControlPage() {
         </div>
       </WorkspaceSection>
 
+      {/* ── Quick Links ────────────────────────────────────────────── */}
       <WorkspaceSection title="Quick Links">
         <div className="mt-1 grid gap-3 md:grid-cols-4">
           <Link href="/monitoring/control-room" className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3 hover:border-[var(--chat-accent)]">

@@ -11,13 +11,13 @@ interface ServiceGridProps {
 
 export function ServiceGrid({ title, services, nodes }: ServiceGridProps) {
   return (
-    <div className="bg-[#1a1a2e] border border-zinc-800 rounded-lg overflow-hidden">
-      <div className="px-4 py-3 border-b border-zinc-800">
-        <h3 className="text-sm font-medium text-zinc-300">{title}</h3>
+    <div className="bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg overflow-hidden">
+      <div className="px-4 py-3 border-b border-[var(--chat-border)]">
+        <h3 className="text-sm font-medium text-[var(--chat-text)]">{title}</h3>
       </div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-xs text-zinc-500 border-b border-zinc-800/50">
+          <tr className="text-xs text-[var(--chat-muted)] border-b border-[var(--chat-border)]">
             <th className="text-left px-4 py-2 font-medium">Service</th>
             <th className="text-left px-4 py-2 font-medium">Status</th>
             <th className="text-right px-4 py-2 font-medium">Port</th>
@@ -25,8 +25,8 @@ export function ServiceGrid({ title, services, nodes }: ServiceGridProps) {
         </thead>
         <tbody>
           {services?.map((svc) => (
-            <tr key={svc.name} className="border-b border-zinc-800/30 last:border-0">
-              <td className="px-4 py-2 text-zinc-300">{svc.name}</td>
+            <tr key={svc.name} className="border-b border-[var(--chat-border)] last:border-0">
+              <td className="px-4 py-2 text-[var(--chat-text)]">{svc.name}</td>
               <td className="px-4 py-2">
                 <span className="flex items-center gap-2">
                   <span
@@ -43,12 +43,12 @@ export function ServiceGrid({ title, services, nodes }: ServiceGridProps) {
                   </span>
                 </span>
               </td>
-              <td className="px-4 py-2 text-right text-zinc-500">{svc.port}</td>
+              <td className="px-4 py-2 text-right text-[var(--chat-muted)]">{svc.port}</td>
             </tr>
           ))}
           {nodes?.map((node) => (
-            <tr key={node.ip} className="border-b border-zinc-800/30 last:border-0">
-              <td className="px-4 py-2 text-zinc-300">{node.name}</td>
+            <tr key={node.ip} className="border-b border-[var(--chat-border)] last:border-0">
+              <td className="px-4 py-2 text-[var(--chat-text)]">{node.name}</td>
               <td className="px-4 py-2">
                 <span className="flex items-center gap-2">
                   <span
@@ -65,7 +65,7 @@ export function ServiceGrid({ title, services, nodes }: ServiceGridProps) {
                   </span>
                 </span>
               </td>
-              <td className="px-4 py-2 text-right text-zinc-500">{node.role}</td>
+              <td className="px-4 py-2 text-right text-[var(--chat-muted)]">{node.role}</td>
             </tr>
           ))}
         </tbody>

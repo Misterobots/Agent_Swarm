@@ -85,11 +85,11 @@ export default function GovernancePage() {
       icon={Gavel}
     >
       <WorkspaceSection title="Create Governance Request" description="Uses X-Swarm-Source key from UI environment.">
-        <div className="grid gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 md:grid-cols-[180px_1fr_180px_auto]">
+        <div className="grid gap-3 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4 md:grid-cols-[180px_1fr_180px_auto]">
           <select
             value={newType}
             onChange={(e) => setNewType(e.target.value as GovernanceRequest["type"])}
-            className="rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+            className="rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
           >
             {(["PACKAGE", "MODEL", "PERMISSION", "FEATURE", "OTHER"] as const).map((type) => (
               <option key={type} value={type}>{type}</option>
@@ -99,13 +99,13 @@ export default function GovernancePage() {
             value={newDescription}
             onChange={(e) => setNewDescription(e.target.value)}
             placeholder="Describe the request (install package, model promotion, permission, etc.)"
-            className="rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+            className="rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
           />
           <input
             value={newUser}
             onChange={(e) => setNewUser(e.target.value)}
             placeholder="User"
-            className="rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+            className="rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
           />
           <button
             onClick={submitRequest}
@@ -127,7 +127,7 @@ export default function GovernancePage() {
                 className={`rounded-full border px-3 py-1 text-xs ${
                   statusFilter === status
                     ? "border-[var(--chat-accent)] bg-[color:color-mix(in_srgb,var(--chat-accent)_16%,transparent)] text-[var(--chat-accent)]"
-                    : "border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-zinc-300"
+                    : "border-[var(--chat-border)] bg-[var(--chat-panel)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
                 }`}
               >
                 {status} ({statusCounts[status]})
@@ -136,48 +136,48 @@ export default function GovernancePage() {
           )}
           <button
             onClick={load}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200"
+            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="overflow-x-auto rounded-lg border border-[var(--chat-border)]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-900/80">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">ID</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">Type</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">Description</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">User</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">Status</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">When</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">Actions</th>
+              <tr className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)]">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">ID</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Type</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Description</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">User</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Status</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">When</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading && filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">Loading governance queue...</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-[var(--chat-muted)]">Loading governance queue...</td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">No governance requests found.</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-[var(--chat-muted)]">No governance requests found.</td>
                 </tr>
               ) : (
                 filtered.flatMap((req) => {
                   const rows = [
                     <tr
                       key={req.id}
-                      className="border-b border-zinc-800/50 align-top hover:bg-zinc-800/30 cursor-pointer"
+                      className="border-b border-[var(--chat-border)] align-top hover:bg-[var(--chat-surface)] cursor-pointer"
                       onClick={() => setExpandedId((prev) => (prev === req.id ? null : req.id))}
                     >
-                      <td className="px-4 py-2.5 font-mono text-xs text-zinc-300">{req.id}</td>
-                      <td className="px-4 py-2.5 text-xs text-zinc-400">{req.type}</td>
-                      <td className="px-4 py-2.5 text-xs text-zinc-200 max-w-[320px] truncate">{req.description}</td>
-                      <td className="px-4 py-2.5 text-xs text-zinc-500">{req.user}</td>
-                      <td className="px-4 py-2.5 text-xs text-zinc-300">{req.status}</td>
-                      <td className="px-4 py-2.5 text-xs text-zinc-500">{relativeTime(req.timestamp)}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-[var(--chat-text)]">{req.id}</td>
+                      <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)]">{req.type}</td>
+                      <td className="px-4 py-2.5 text-xs text-[var(--chat-text)] max-w-[320px] truncate">{req.description}</td>
+                      <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)]">{req.user}</td>
+                      <td className="px-4 py-2.5 text-xs text-[var(--chat-text)]">{req.status}</td>
+                      <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)]">{relativeTime(req.timestamp)}</td>
                       <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
                         <div className="flex flex-wrap gap-1">
                           <button onClick={() => setStatus(req.id, "APPROVED")} className="rounded border border-emerald-800/80 bg-emerald-950/30 px-2 py-1 text-xs text-emerald-400">Approve</button>
@@ -190,18 +190,18 @@ export default function GovernancePage() {
 
                   if (expandedId === req.id) {
                     rows.push(
-                      <tr key={`${req.id}-expanded`} className="border-b border-zinc-800/50 bg-zinc-950/40">
+                      <tr key={`${req.id}-expanded`} className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)]">
                         <td colSpan={7} className="px-4 py-3">
-                          <p className="text-xs text-zinc-300">{req.description}</p>
-                          <p className="mt-2 text-[11px] text-zinc-500">{new Date(req.timestamp).toLocaleString()}</p>
+                          <p className="text-xs text-[var(--chat-text)]">{req.description}</p>
+                          <p className="mt-2 text-[11px] text-[var(--chat-muted)]">{new Date(req.timestamp).toLocaleString()}</p>
                           {req.assessment_notes?.length > 0 ? (
                             <div className="mt-3 space-y-1">
                               {req.assessment_notes.map((note, idx) => (
-                                <p key={`${req.id}-note-${idx}`} className="rounded bg-zinc-900 px-2 py-1 text-xs text-zinc-400">{note}</p>
+                                <p key={`${req.id}-note-${idx}`} className="rounded bg-[var(--chat-panel)] px-2 py-1 text-xs text-[var(--chat-muted)]">{note}</p>
                               ))}
                             </div>
                           ) : (
-                            <p className="mt-2 text-xs text-zinc-500">No assessment notes yet.</p>
+                            <p className="mt-2 text-xs text-[var(--chat-muted)]">No assessment notes yet.</p>
                           )}
                         </td>
                       </tr>
