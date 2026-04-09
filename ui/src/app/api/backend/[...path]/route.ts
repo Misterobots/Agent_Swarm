@@ -4,12 +4,14 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300; // Allow long-running streaming responses
 
-const BACKEND_URL = process.env.API_BASE_URL || "http://localhost:8000";
+function getBackendUrl() {
+  return process.env.API_BASE_URL || "http://localhost:8000";
+}
 
 async function proxyRequest(req: NextRequest) {
   const url = new URL(req.url);
   const backendPath = url.pathname.replace(/^\/api\/backend/, "");
-  const target = `${BACKEND_URL}${backendPath}${url.search}`;
+  const target = `${getBackendUrl()}${backendPath}${url.search}`;
 
   const headers = new Headers();
   headers.set("Content-Type", req.headers.get("Content-Type") || "application/json");

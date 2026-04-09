@@ -4,8 +4,12 @@ import { createConnection } from "net";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL = process.env.API_BASE_URL || "http://localhost:8000";
-const CONTROL_IP = process.env.CONTROL_NODE_IP || "control-node";
+function getBackendUrl() {
+  return process.env.API_BASE_URL || "http://localhost:8000";
+}
+function getControlIp() {
+  return process.env.CONTROL_NODE_IP || "control-node";
+}
 
 interface ServiceCheck {
   name: string;
@@ -56,7 +60,7 @@ export async function GET() {
   // Fetch node health from backend
   let nodes = [];
   try {
-    const res = await fetch(`${BACKEND_URL}/api/v1/health/nodes`, {
+    const res = await fetch(`${getBackendUrl()}/api/v1/health/nodes`, {
       signal: AbortSignal.timeout(5000),
     });
     if (res.ok) {
@@ -73,9 +77,9 @@ export async function GET() {
       const start = Date.now();
       let healthy: boolean;
       if (svc.httpPath) {
-        healthy = await checkHTTP(CONTROL_IP, svc.port, svc.httpPath);
+        healthy = await checkHTTP(getControlIp(), svc.port, svc.httpPath);
       } else {
-        healthy = await checkTCP(CONTROL_IP, svc.port);
+        healthy = await checkTCP(getControlIp(), svc.port);
       }
       return {
         name: svc.name,
