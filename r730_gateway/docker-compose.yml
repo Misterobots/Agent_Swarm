@@ -376,6 +376,7 @@ services:
       # Internal LAN route (no auth)
       - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
       - "traefik.http.routers.hive-ui.entrypoints=web"
+      - "traefik.http.routers.hive-ui.service=hive-ui"
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
       # External HTTPS route: hive.shivelymedia.com (behind Authentik)
       - "traefik.http.routers.hive-ext.rule=Host(`hive.shivelymedia.com`)"
