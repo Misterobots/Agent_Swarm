@@ -114,6 +114,17 @@ INTENT_CAPABILITY_MAP = {
         "security_level": "L3_ADMIN",
         "expiry_hours": 2,
     },
+    "VISION": {
+        "agent_name": "Vision Analyst",
+        "template_id": "vision_analyst",
+        "capabilities": [
+            "image_read",
+            "model_generate",
+            "file_read",
+        ],
+        "security_level": "L1_PUBLIC",
+        "expiry_hours": 1,
+    },
 }
 
 # Safe default for unknown or AMBIGUOUS intents

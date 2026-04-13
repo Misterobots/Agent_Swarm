@@ -15,6 +15,7 @@ import subprocess
 import re
 import os
 import json
+import requests
 from dispatcher import Event, EventType
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock, get_best_host_for_model
@@ -155,7 +156,34 @@ def handle_task_event(event: Event):
     logger.info(f"--- [Router] Processing Async Event: {user_input} (Intent: {intent}) ---")
 
     try:
-        if intent == "IMAGE":
+        if intent == "VISION":
+            # Direct Route to VLM for image analysis
+            logger.info(f"[Router] Routing to Vision Analyst (moondream)")
+            # Vision requires image data in the payload; without it, log and skip
+            image_data = event.payload.get("image_data")
+            if not image_data:
+                logger.info("[Vision] No image data attached to async task — skipping VLM call")
+                # Fall through to Orchestrator for a text-based response
+                from teams import get_orchestrator
+                orchestrator = get_orchestrator()
+                response = orchestrator.run(user_input)
+                logger.info(f"[Orchestrator] Final Response: {response.content}")
+            else:
+                vision_host = get_best_host_for_model("moondream:latest")
+                payload = {
+                    "model": "moondream:latest",
+                    "prompt": user_input,
+                    "images": [image_data],
+                    "stream": False
+                }
+                res = requests.post(f"{vision_host}/api/generate", json=payload, timeout=120)
+                if res.status_code == 200:
+                    analysis = res.json().get("response", "No analysis returned.")
+                    logger.info(f"[Vision] Analysis: {analysis}")
+                else:
+                    logger.error(f"[Vision] VLM returned status {res.status_code}")
+
+        elif intent == "IMAGE":
             # Direct Route to Creative Team / Image Gen
             from specialized.image_gen import generate_image
             logger.info(f"[Router] Routing to Image Gen (Device: {target_device})")
@@ -784,6 +812,70 @@ def chat_swarm(
 
         route_start_time = time.time()
 
+        # --- ROUTE: VISION (Image Analysis via VLM) ---
+        # Must be checked BEFORE CREATIVE_INTENTS to prevent "what do you see
+        # in this image?" from being redirected to the Art Studio.
+        if intent == "VISION":
+            yield _emit_turn_metadata(turn_id, "Vision Analyst", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
+            yield {"type": "status", "content": "👁️ Vision Analyst: Analyzing image..."}
+            AGENT_STATE.labels(agent_name="VisionAnalyst").set(2)
+
+            VISION_MODEL = "moondream:latest"
+            VISION_HOST = get_best_host_for_model(VISION_MODEL)
+
+            try:
+                # Extract base64 image from attachments if present
+                image_data = None
+                if extracted_context:
+                    # Check if extracted_context contains base64 image data
+                    b64_match = re.search(r'data:image/[^;]+;base64,([A-Za-z0-9+/=]+)', extracted_context)
+                    if b64_match:
+                        image_data = b64_match.group(1)
+                    elif extracted_context.startswith("/9j/") or extracted_context.startswith("iVBOR"):
+                        # Raw base64 without data URI prefix
+                        image_data = extracted_context
+
+                if not image_data:
+                    yield {"type": "response", "content": (
+                        "👁️ **Vision Analyst**\n\n"
+                        "I can analyze images, but I don't see one attached to your message. "
+                        "Please upload an image and ask your question again."
+                    )}
+                    _score_trace(lf_trace, langfuse, 0.5)
+                    AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
+                    return
+
+                vlm_prompt = user_input
+                if history_context:
+                    vlm_prompt = f"{history_context}\n\n{vlm_prompt}"
+
+                payload = {
+                    "model": VISION_MODEL,
+                    "prompt": vlm_prompt,
+                    "images": [image_data],
+                    "stream": False
+                }
+
+                yield _emit_stream_mode("responding")
+                res = requests.post(f"{VISION_HOST}/api/generate", json=payload, timeout=120)
+                if res.status_code == 200:
+                    analysis = res.json().get("response", "No analysis returned.")
+                    yield {"type": "response", "content": f"👁️ **Vision Analyst**\n\n{analysis}"}
+                    _score_trace(lf_trace, langfuse, 0.9, output=analysis)
+                else:
+                    yield {"type": "error", "content": f"Vision model returned status {res.status_code}"}
+                    _score_trace(lf_trace, langfuse, 0.0)
+
+            except Exception as e:
+                logger.error(f"[Vision] Analysis failed: {e}", exc_info=True)
+                yield {"type": "error", "content": f"Vision analysis failed: {e}"}
+                _score_trace(lf_trace, langfuse, 0.0)
+
+            AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
+            WORKFLOW_STEPS.labels(status="success", agent_type="VisionAnalyst").inc()
+            return
+
         # --- ART WORKSPACE OFFER (for creative intents) ---
         # Creative intents redirect to the Art Studio workspace instead of
         # running heavy generation pipelines inline in chat.
@@ -1398,7 +1490,7 @@ def chat_swarm(
         # Only fall through to MarsRL if no specialized route handled this intent
         if intent not in ("CONVERSATION", "DEVOPS", "DATA", "AMBIGUOUS", "IMAGE",
                           "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE",
-                          "TRAIN", "IOT_CONTROL"):
+                          "TRAIN", "IOT_CONTROL", "VISION"):
             yield _emit_turn_metadata(turn_id, "Architect", ["thinking", "tool-use", "responding"])
             yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}

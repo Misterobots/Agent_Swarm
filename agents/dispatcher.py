@@ -83,6 +83,16 @@ def detect_intent(input_text: str) -> str:
         return "ACTION_FIGURE"
     if "3d" in text or "forge" in text or ("model" in text and "generate" in text):
         return "3D"
+    # VISION must be checked BEFORE IMAGE — "what do you see in this image?"
+    # is asking to ANALYZE, not GENERATE.
+    vision_phrases = [
+        "what do you see", "describe this image", "analyze this image",
+        "what is in this picture", "read this screenshot", "ocr",
+        "what's happening in this photo", "look at this", "what's in this image",
+        "identify this", "describe this picture", "analyze this photo",
+    ]
+    if any(phrase in text for phrase in vision_phrases):
+        return "VISION"
     if "image" in text or "picture" in text or "draw" in text or "photo" in text:
         return "IMAGE"
     return "DEFAULT"
