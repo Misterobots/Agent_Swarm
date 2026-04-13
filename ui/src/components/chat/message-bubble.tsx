@@ -7,17 +7,21 @@ import { cn } from "@/lib/utils/cn";
 import { Bot, User, Palette, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { ToolCallBlock } from "./tool-call-block";
+import { MessageActions } from "./message-actions";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   userPrompt?: string;
+  onEditMessage?: (content: string) => void;
+  onRetryMessage?: () => void;
+  onBranchMessage?: () => void;
 }
 
 function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
 }
 
-export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
+export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessage, onBranchMessage }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -26,7 +30,14 @@ export function MessageBubble({ message, userPrompt }: MessageBubbleProps) {
     : "/art-studio";
 
   return (
-    <div className={cn("flex gap-3 py-4 px-4 msg-enter", isUser ? "bg-transparent" : "bg-[var(--chat-surface)]")}>
+    <div className={cn("group relative flex gap-3 py-4 px-4 msg-enter", isUser ? "bg-transparent" : "bg-[var(--chat-surface)]")}>
+      <MessageActions
+        content={message.content}
+        isUser={isUser}
+        onEdit={isUser && onEditMessage ? () => onEditMessage(message.content) : undefined}
+        onRetry={isUser && onRetryMessage ? onRetryMessage : undefined}
+        onBranch={onBranchMessage}
+      />
       <div
         className={cn(
           "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",

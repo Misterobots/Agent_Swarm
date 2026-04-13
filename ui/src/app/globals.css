@@ -376,3 +376,45 @@ body {
 .sidebar-status-dot {
   animation: status-pulse 2.5s ease-in-out infinite;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 3: Message Actions, Away Summary, Thinking Word Cycle
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Message enter animation */
+.msg-enter {
+  animation: msgFadeIn 0.2s ease-out;
+}
+@keyframes msgFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Away summary banner slide-in */
+.away-banner-enter {
+  animation: awayBannerIn 0.3s ease-out;
+}
+@keyframes awayBannerIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Streaming caret blink */
+.streaming-caret::after {
+  content: "▊";
+  animation: caretBlink 1s step-end infinite;
+  color: var(--chat-accent);
+}
+@keyframes caretBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Thinking word cycle fade */
+.thinking-word-cycle {
+  animation: wordFade 1.6s ease-in-out infinite;
+}
+@keyframes wordFade {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}

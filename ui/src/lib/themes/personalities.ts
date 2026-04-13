@@ -19,6 +19,69 @@ export interface ThemePersonality {
   userLabel: string;
 }
 
+/**
+ * Theme-specific ambient verbs shown in the thinking indicator.
+ * Each list matches the personality/vibe of its theme.
+ */
+export const THEME_AMBIENT_VERBS: Record<ChatTheme, string[]> = {
+  ember: [
+    "Stoking the forge", "Tempering the response", "Hammering out details",
+    "Heating the crucible", "Shaping the alloy", "Drawing the wire",
+    "Quenching the blade", "Bellows pumping", "Smelting insights",
+    "Annealing the answer", "Folding the steel", "Sparks flying",
+    "Casting the mold", "Polishing the edge", "Firing the kiln",
+  ],
+  slate: [
+    "Drafting the blueprint", "Surveying the foundation", "Laying the groundwork",
+    "Aligning the grid", "Checking the specs", "Reviewing schematics",
+    "Calculating load-bearing", "Pouring the foundation", "Measuring twice",
+    "Squaring the corners", "Consulting the plans", "Reinforcing the structure",
+    "Leveling the site", "Inspecting the framework", "Sealing the joints",
+  ],
+  signal: [
+    "Scanning frequencies", "Decoding transmission", "Tuning the receiver",
+    "Acquiring signal lock", "Filtering noise", "Boosting gain",
+    "Running sweep", "Checking bandwidth", "Triangulating source",
+    "Encrypting channel", "Relaying message", "Parsing intercept",
+    "Calibrating antenna", "Verifying cipher", "Logging signal",
+  ],
+  office: [
+    "Briefing the team", "Brewing a fresh pot", "Checking the schedule",
+    "Circulating memos", "Clearing the inbox", "Collating reports",
+    "Consulting the handbook", "Coordinating departments", "Cross-referencing files",
+    "Delegating tasks", "Drafting a proposal", "Filing paperwork",
+    "Getting sign-off", "Reviewing the dossier", "Scheduling a sync",
+  ],
+  hacker: [
+    "Probing the stack", "Injecting shellcode", "Traversing the heap",
+    "Spoofing headers", "Cracking the hash", "Pivoting laterally",
+    "Dumping memory", "Enumerating services", "Fuzzing inputs",
+    "Escalating privileges", "Sniffing packets", "Reverse engineering",
+    "Patching the binary", "Obfuscating payload", "Tunneling through",
+  ],
+  "star-trek": [
+    "Running diagnostic", "Scanning sector", "Analyzing telemetry",
+    "Computing trajectory", "Modulating shields", "Accessing database",
+    "Cross-referencing logs", "Calibrating sensors", "Processing query",
+    "Consulting Federation records", "Routing through subprocessor",
+    "Verifying stardate", "Engaging subroutine", "Compiling report",
+    "Querying LCARS", "Rerouting power",
+  ],
+  cyberpunk: [
+    "Jacking into the Net", "Parsing ICE layers", "Running daemon",
+    "Decrypting datastream", "Querying black market DB", "Flatline recovery",
+    "Spiking the mainframe", "Ghost protocol active", "Wetware sync",
+    "Neural handshake", "Burning through firewalls", "Chrome plating the output",
+    "Ripping the data", "Boosting the signal", "Compiling exploit",
+  ],
+  minimal: [
+    "Thinking", "Considering", "Composing", "Reflecting",
+    "Gathering thoughts", "Weighing options", "Preparing",
+    "Pondering", "Formulating", "Assembling", "Arranging",
+    "Distilling", "Simplifying", "Focusing", "Refining",
+  ],
+};
+
 export const THEME_PERSONALITIES: Record<ChatTheme, ThemePersonality> = {
   ember: {
     systemPrompt:

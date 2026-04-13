@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useChatStream } from "@/lib/hooks/use-chat-stream";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { MessageBubble } from "./message-bubble";
@@ -8,12 +8,16 @@ import { ThinkingIndicator } from "./thinking-indicator";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
 import { InputToolbar } from "./input-toolbar";
+import { UltraplanToggle } from "./ultraplan-toggle";
+import { UltrathinkToggle } from "./ultrathink-toggle";
+import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
 import { Bot, Brain } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { ThemeSelector } from "./theme-selector";
 import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
+import { useBuddyStore } from "@/lib/stores/buddy-store";
 import type { FileAttachment } from "@/types/chat";
 
 function usageBarClass(pct: number): string {
@@ -32,6 +36,8 @@ export function ChatView() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
+  const buddyReact = useBuddyStore((s) => s.react);
+  const { awayEvents, pushEvent, dismiss: dismissAway } = useAwaySummary();
 
   // Show the thinking indicator when streaming and either we have a status
   // message or the assistant message is still empty (waiting for first content)
@@ -44,6 +50,35 @@ export function ChatView() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, lastMsg?.content, statusMessage]);
 
+  // Buddy reactions on stream events
+  const prevStreamingRef = useRef(false);
+  useEffect(() => {
+    if (isStreaming && !prevStreamingRef.current) {
+      buddyReact("message_sent");
+      pushEvent("message", "Message sent to agents");
+    }
+    if (!isStreaming && prevStreamingRef.current) {
+      buddyReact("response_received");
+      pushEvent("message", "Response received");
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming, buddyReact, pushEvent]);
+
+  // Message action handlers
+  const handleEditMessage = useCallback((content: string) => {
+    // Pre-fill input by sending a new message with the edited content
+    // (The ChatInput will be focused with the content to edit)
+    sendMessage(content);
+  }, [sendMessage]);
+
+  const handleRetryMessage = useCallback((messageIndex: number) => {
+    // Find the user message at that index and re-send
+    const msg = messages[messageIndex];
+    if (msg?.role === "user") {
+      sendMessage(msg.content);
+    }
+  }, [messages, sendMessage]);
+
   return (
     <div className="chat-shell flex flex-col h-full" data-route="chat">
       {/* Header */}
@@ -51,6 +86,8 @@ export function ChatView() {
         <div className="flex items-center gap-3">
           <ModelSelector />
           <ThemeSelector />
+          <UltraplanToggle />
+          <UltrathinkToggle />
           {activeConversationId && (
             <button
               type="button"
@@ -101,6 +138,7 @@ export function ChatView() {
             </div>
           </div>
         )}
+        <AwaySummaryBanner events={awayEvents} onDismiss={dismissAway} />
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)] gap-4">
             <div className="w-16 h-16 rounded-2xl bg-[color:color-mix(in_srgb,var(--chat-accent)_14%,transparent)] flex items-center justify-center border border-[var(--chat-border)]">
@@ -133,7 +171,12 @@ export function ChatView() {
                       {msg.turnMetadata.streamModes?.length ? ` | ${msg.turnMetadata.streamModes.join(" -> ")}` : ""}
                     </div>
                   )}
-                  <MessageBubble message={msg} userPrompt={precedingUserPrompt} />
+                  <MessageBubble
+                    message={msg}
+                    userPrompt={precedingUserPrompt}
+                    onEditMessage={handleEditMessage}
+                    onRetryMessage={() => handleRetryMessage(idx)}
+                  />
                 </div>
               );
             })}

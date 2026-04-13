@@ -12,6 +12,8 @@ export interface ChatStreamOptions {
   skill?: Skill;
   style?: Style;
   researchMode?: boolean;
+  ultraplanMode?: boolean;
+  ultrathinkMode?: boolean;
   attachments?: FileAttachment[];
 }
 
@@ -25,6 +27,8 @@ export async function* sendChatStream(
   style?: Style,
   researchMode?: boolean,
   attachments?: FileAttachment[],
+  ultraplanMode?: boolean,
+  ultrathinkMode?: boolean,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -36,6 +40,8 @@ export async function* sendChatStream(
   if (skill && skill !== "general") body.skill = skill;
   if (style && style !== "default") body.style = style;
   if (researchMode) body.research_mode = true;
+  if (ultraplanMode) body.ultraplan_mode = true;
+  if (ultrathinkMode) body.ultrathink_mode = true;
   if (attachments && attachments.length > 0) body.attachments = attachments;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {

@@ -11,12 +11,16 @@ interface SettingsState {
   skill: Skill;
   style: Style;
   researchMode: boolean;
+  ultraplanMode: boolean;
+  ultrathinkMode: boolean;
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
   setSkill: (skill: Skill) => void;
   setStyle: (style: Style) => void;
   setResearchMode: (on: boolean) => void;
+  setUltraplanMode: (on: boolean) => void;
+  setUltrathinkMode: (on: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -28,12 +32,16 @@ export const useSettingsStore = create<SettingsState>()(
       skill: "general",
       style: "default",
       researchMode: false,
+      ultraplanMode: false,
+      ultrathinkMode: false,
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),
       setSkill: (skill) => set({ skill }),
       setStyle: (style) => set({ style }),
       setResearchMode: (researchMode) => set({ researchMode }),
+      setUltraplanMode: (ultraplanMode) => set({ ultraplanMode }),
+      setUltrathinkMode: (ultrathinkMode) => set({ ultrathinkMode }),
     }),
     { name: "hive-settings" }
   )

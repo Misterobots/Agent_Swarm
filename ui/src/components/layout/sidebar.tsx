@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChatStore } from "@/lib/stores/chat-store";
@@ -13,7 +14,8 @@ import {
 } from "@/lib/config/navigation";
 import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
-import { Plus, Trash2, MessageSquare } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Search, X } from "lucide-react";
+import { BuddyWidget } from "@/components/buddy/buddy-widget";
 
 function HiveLogo() {
   return (
@@ -62,6 +64,17 @@ export function Sidebar() {
   const deleteConversation = useChatStore((s) => s.deleteConversation);
   const model = useSettingsStore((s) => s.model);
   const showConversations = isConversationRoute(pathname);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations;
+    const q = searchQuery.toLowerCase();
+    return conversations.filter(
+      (conv) =>
+        conv.title.toLowerCase().includes(q) ||
+        conv.messages.some((m) => m.content.toLowerCase().includes(q))
+    );
+  }, [conversations, searchQuery]);
 
   return (
     <div className="sidebar-wrapper relative flex flex-col h-full bg-[color:color-mix(in_srgb,var(--chat-bg)_85%,black)] border-r border-[var(--chat-border)]">
@@ -135,13 +148,38 @@ export function Sidebar() {
               </button>
             </div>
 
-            <SidebarSection title="Chat History">
-              {conversations.length === 0 ? (
+            {/* Quick Search */}
+            {conversations.length > 1 && (
+              <div className="px-3 pb-2">
+                <div className="relative">
+                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--chat-muted)]" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search chats..."
+                    className="w-full pl-7 pr-7 py-1.5 text-xs rounded-md bg-[var(--chat-panel)] border border-[var(--chat-border)] text-[var(--chat-text)] placeholder:text-[var(--chat-muted)] focus:border-[var(--chat-accent)] focus:outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <SidebarSection title={searchQuery ? `Results (${filteredConversations.length})` : "Chat History"}>
+              {filteredConversations.length === 0 ? (
                 <p className="px-3 py-2 text-xs text-[var(--chat-muted)]">
-                  Start a conversation to pin chat history here.
+                  {searchQuery ? "No matching conversations." : "Start a conversation to pin chat history here."}
                 </p>
               ) : (
-                conversations.map((conv) => (
+                filteredConversations.map((conv) => (
                   <div
                     key={conv.id}
                     onClick={() => setActive(conv.id)}
@@ -170,6 +208,9 @@ export function Sidebar() {
           </>
         ) : null}
       </div>
+
+      {/* Buddy companion */}
+      <BuddyWidget />
 
       {/* Status footer */}
       <div className="px-4 py-3 border-t border-[var(--chat-border)]">
