@@ -124,6 +124,77 @@ class MCPBridgeServer:
                     "required": ["skill_name"],
                 },
             ),
+            # Phase 5: Remote & Multi-Node
+            MCPToolDescriptor(
+                name="hive.remote.exec",
+                description="Execute a command on a remote host via SSH.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "host": {"type": "string", "description": "Target host name (justin-pc, control-plane, r730)"},
+                        "command": {"type": "string", "description": "Shell command to execute"},
+                        "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 60},
+                    },
+                    "required": ["host", "command"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.bridge.submit",
+                description="Submit an async task to a remote Hive node.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "target_node": {"type": "string", "description": "Target node name"},
+                        "task": {"type": "string", "description": "Task description"},
+                        "intent": {"type": "string", "description": "Optional intent override"},
+                    },
+                    "required": ["target_node", "task"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.bridge.proxy",
+                description="Proxy an API request to a remote Hive node.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "target_node": {"type": "string", "description": "Target node name"},
+                        "method": {"type": "string", "description": "HTTP method (GET, POST, etc.)"},
+                        "path": {"type": "string", "description": "API path (e.g. /v1/models)"},
+                        "json_body": {"type": "object", "description": "Optional JSON body"},
+                    },
+                    "required": ["target_node", "method", "path"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.daemon.list",
+                description="List registered daemon workers.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "state_filter": {"type": "string", "description": "Filter by state (pending, running, stopped, failed)"},
+                    },
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.workflow.run",
+                description="List or inspect workflow executions.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {"type": "string", "description": "Optional workflow ID to inspect"},
+                    },
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.trigger.list",
+                description="List registered triggers (cron, interval, once).",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "type_filter": {"type": "string", "description": "Filter by type (cron, interval, once)"},
+                    },
+                },
+            ),
         ]
 
     def health(self) -> dict[str, Any]:

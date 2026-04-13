@@ -1,0 +1,22 @@
+{
+  "workflow_id": "wf-bc6f24d4",
+  "name": "conditional",
+  "state": "completed",
+  "steps": [
+    {
+      "name": "cond",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "skipped",
+      "result": null,
+      "error": null,
+      "started_at": null,
+      "completed_at": null
+    }
+  ],
+  "context_keys": [],
+  "created_at": 1776111909.3781006,
+  "completed_at": 1776111909.3781767,
+  "error": null,
+  "context": {}
+}

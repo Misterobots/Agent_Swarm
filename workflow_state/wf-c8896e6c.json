@@ -1,0 +1,46 @@
+{
+  "workflow_id": "wf-c8896e6c",
+  "name": "context",
+  "state": "completed",
+  "steps": [
+    {
+      "name": "produce",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "completed",
+      "result": {
+        "shared_key": 42
+      },
+      "error": null,
+      "started_at": 1776111909.3832273,
+      "completed_at": 1776111909.383252
+    },
+    {
+      "name": "consume",
+      "depends_on": [
+        "produce"
+      ],
+      "timeout": 300,
+      "state": "completed",
+      "result": {
+        "consumed": 42
+      },
+      "error": null,
+      "started_at": 1776111909.3832774,
+      "completed_at": 1776111909.3832939
+    }
+  ],
+  "context_keys": [
+    "seed",
+    "shared_key",
+    "consumed"
+  ],
+  "created_at": 1776111909.3831408,
+  "completed_at": 1776111909.383311,
+  "error": null,
+  "context": {
+    "seed": true,
+    "shared_key": 42,
+    "consumed": 42
+  }
+}

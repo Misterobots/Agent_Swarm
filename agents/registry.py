@@ -32,7 +32,7 @@ class AgentRegistry:
             role="Full Stack & System Engineer",
             description="Autonomous coding, refactoring, and system architecture specialist.",
             security_level="L3_ADMIN",
-            capabilities=["file_ops.write", "file_ops.read", "terminal.exec", "terminal.classify", "terminal.parse", "git.ops", "browser.fetch", "browser.search", "skill_exec"],
+            capabilities=["file_ops.write", "file_ops.read", "terminal.exec", "terminal.classify", "terminal.parse", "git.ops", "browser.fetch", "browser.search", "skill_exec", "remote_exec", "bridge_submit", "bridge_proxy", "workflow_exec"],
             endpoint="local://agents.architect_agent"
         ))
 
@@ -62,7 +62,7 @@ class AgentRegistry:
             role="Compliance Officer",
             description="Enforces MAESTRO protocols and file guards.",
             security_level="L4_SYSTEM",
-            capabilities=["audit.scan", "process.kill", "terminal.classify", "terminal.parse"],
+            capabilities=["audit.scan", "process.kill", "terminal.classify", "terminal.parse", "daemon_manage", "trigger_manage"],
             endpoint="local://agents.security_agent"
         ))
 

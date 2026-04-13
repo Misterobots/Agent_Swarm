@@ -1,0 +1,28 @@
+{
+  "workflow_id": "wf-9c2c867e",
+  "name": "conditional-run",
+  "state": "completed",
+  "steps": [
+    {
+      "name": "cond",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "completed",
+      "result": {
+        "ok": true
+      },
+      "error": null,
+      "started_at": 1776111909.3735,
+      "completed_at": 1776111909.3735166
+    }
+  ],
+  "context_keys": [
+    "ok"
+  ],
+  "created_at": 1776111909.3734322,
+  "completed_at": 1776111909.373535,
+  "error": null,
+  "context": {
+    "ok": true
+  }
+}

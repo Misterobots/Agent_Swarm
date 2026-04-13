@@ -1,0 +1,22 @@
+{
+  "workflow_id": "wf-f319814e",
+  "name": "fail",
+  "state": "failed",
+  "steps": [
+    {
+      "name": "s",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "failed",
+      "result": null,
+      "error": "x",
+      "started_at": 1776111909.4206922,
+      "completed_at": 1776111909.4207158
+    }
+  ],
+  "context_keys": [],
+  "created_at": 1776111909.420617,
+  "completed_at": null,
+  "error": "Step 's' failed: x",
+  "context": {}
+}

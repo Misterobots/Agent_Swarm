@@ -1,0 +1,22 @@
+{
+  "workflow_id": "wf-6d46c250",
+  "name": "x",
+  "state": "completed",
+  "steps": [
+    {
+      "name": "s",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "completed",
+      "result": {},
+      "error": null,
+      "started_at": 1776111932.69022,
+      "completed_at": 1776111932.6902363
+    }
+  ],
+  "context_keys": [],
+  "created_at": 1776111932.6901078,
+  "completed_at": 1776111932.6902504,
+  "error": null,
+  "context": {}
+}

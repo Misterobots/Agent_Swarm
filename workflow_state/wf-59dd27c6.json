@@ -1,0 +1,34 @@
+{
+  "workflow_id": "wf-59dd27c6",
+  "name": "deps",
+  "state": "failed",
+  "steps": [
+    {
+      "name": "a",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "failed",
+      "result": null,
+      "error": "fail",
+      "started_at": 1776111932.7402658,
+      "completed_at": 1776111932.7402818
+    },
+    {
+      "name": "b",
+      "depends_on": [
+        "a"
+      ],
+      "timeout": 300,
+      "state": "pending",
+      "result": null,
+      "error": null,
+      "started_at": null,
+      "completed_at": null
+    }
+  ],
+  "context_keys": [],
+  "created_at": 1776111932.7402303,
+  "completed_at": null,
+  "error": "Step 'a' failed: fail",
+  "context": {}
+}

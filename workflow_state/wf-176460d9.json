@@ -1,0 +1,44 @@
+{
+  "workflow_id": "wf-176460d9",
+  "name": "simple",
+  "state": "completed",
+  "steps": [
+    {
+      "name": "a",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "completed",
+      "result": {
+        "a_done": true
+      },
+      "error": null,
+      "started_at": 1776111932.7318614,
+      "completed_at": 1776111932.7318773
+    },
+    {
+      "name": "b",
+      "depends_on": [
+        "a"
+      ],
+      "timeout": 300,
+      "state": "completed",
+      "result": {
+        "b_done": true
+      },
+      "error": null,
+      "started_at": 1776111932.7318919,
+      "completed_at": 1776111932.731904
+    }
+  ],
+  "context_keys": [
+    "a_done",
+    "b_done"
+  ],
+  "created_at": 1776111932.7318249,
+  "completed_at": 1776111932.7319157,
+  "error": null,
+  "context": {
+    "a_done": true,
+    "b_done": true
+  }
+}

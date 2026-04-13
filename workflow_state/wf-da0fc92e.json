@@ -1,0 +1,45 @@
+{
+  "workflow_id": "wf-da0fc92e",
+  "name": "parallel",
+  "state": "completed",
+  "steps": [
+    {
+      "name": "a",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "completed",
+      "result": {},
+      "error": null,
+      "started_at": 1776111909.4261112,
+      "completed_at": 1776111909.4261782
+    },
+    {
+      "name": "b",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "completed",
+      "result": {},
+      "error": null,
+      "started_at": 1776111909.4263556,
+      "completed_at": 1776111909.4263873
+    },
+    {
+      "name": "c",
+      "depends_on": [
+        "a",
+        "b"
+      ],
+      "timeout": 300,
+      "state": "completed",
+      "result": {},
+      "error": null,
+      "started_at": 1776111909.426564,
+      "completed_at": 1776111909.426598
+    }
+  ],
+  "context_keys": [],
+  "created_at": 1776111909.4257858,
+  "completed_at": 1776111909.4266238,
+  "error": null,
+  "context": {}
+}

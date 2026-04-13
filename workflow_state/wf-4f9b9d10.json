@@ -1,0 +1,40 @@
+{
+  "workflow_id": "wf-4f9b9d10",
+  "name": "rollback",
+  "state": "rolled_back",
+  "steps": [
+    {
+      "name": "a",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "completed",
+      "result": {
+        "a": true
+      },
+      "error": null,
+      "started_at": 1776111909.432026,
+      "completed_at": 1776111909.4320467
+    },
+    {
+      "name": "b",
+      "depends_on": [
+        "a"
+      ],
+      "timeout": 300,
+      "state": "failed",
+      "result": null,
+      "error": "b fails",
+      "started_at": 1776111909.4320674,
+      "completed_at": 1776111909.4320831
+    }
+  ],
+  "context_keys": [
+    "a"
+  ],
+  "created_at": 1776111909.431969,
+  "completed_at": null,
+  "error": "Step 'b' failed: b fails",
+  "context": {
+    "a": true
+  }
+}

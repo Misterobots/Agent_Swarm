@@ -1,0 +1,11 @@
+{
+  "workflow_id": "wf-45aa6659",
+  "name": "empty",
+  "state": "completed",
+  "steps": [],
+  "context_keys": [],
+  "created_at": 1776111909.3936253,
+  "completed_at": 1776111909.3936827,
+  "error": null,
+  "context": {}
+}

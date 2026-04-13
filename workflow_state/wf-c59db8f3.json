@@ -1,0 +1,30 @@
+{
+  "workflow_id": "wf-c59db8f3",
+  "name": "seeded",
+  "state": "completed",
+  "steps": [
+    {
+      "name": "check",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "completed",
+      "result": {
+        "checked": true
+      },
+      "error": null,
+      "started_at": 1776111932.7045996,
+      "completed_at": 1776111932.7046158
+    }
+  ],
+  "context_keys": [
+    "seed",
+    "checked"
+  ],
+  "created_at": 1776111932.704559,
+  "completed_at": 1776111932.7046313,
+  "error": null,
+  "context": {
+    "seed": true,
+    "checked": true
+  }
+}

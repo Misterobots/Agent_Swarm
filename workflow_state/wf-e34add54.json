@@ -1,0 +1,22 @@
+{
+  "workflow_id": "wf-e34add54",
+  "name": "conditional",
+  "state": "completed",
+  "steps": [
+    {
+      "name": "cond",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "skipped",
+      "result": null,
+      "error": null,
+      "started_at": null,
+      "completed_at": null
+    }
+  ],
+  "context_keys": [],
+  "created_at": 1776111932.6813312,
+  "completed_at": 1776111932.681396,
+  "error": null,
+  "context": {}
+}

@@ -107,11 +107,40 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Skill loader init failed (non-fatal): {e}")
 
+        # 5. Initialize Daemon Registry (Phase 5 — persistent background workers)
+        daemon_reg = None
+        try:
+            from daemon_registry import get_daemon_registry
+            daemon_reg = get_daemon_registry()
+            logger.info(f"Daemon Registry initialized: {daemon_reg.count()} workers")
+        except ImportError as e:
+            logger.warning(f"Daemon registry not available: {e}")
+        except Exception as e:
+            logger.warning(f"Daemon registry init failed (non-fatal): {e}")
+
+        # 6. Initialize Trigger Scheduler (Phase 5 — cron/interval/once triggers)
+        trigger_sched = None
+        try:
+            from trigger_scheduler import get_trigger_scheduler
+            trigger_sched = get_trigger_scheduler()
+            trigger_sched.start()
+            logger.info(f"Trigger Scheduler started: {trigger_sched.count()} triggers")
+        except ImportError as e:
+            logger.warning(f"Trigger scheduler not available: {e}")
+        except Exception as e:
+            logger.warning(f"Trigger scheduler init failed (non-fatal): {e}")
+
         print("DEBUG: Startup Complete. Yielding...")
         logger.info("Swarm Engine Online. Waiting for events...")
         yield
         # Shutdown
         logger.info("Shutting down Swarm Engine...")
+        if trigger_sched:
+            trigger_sched.stop()
+            logger.info("Trigger Scheduler stopped")
+        if daemon_reg:
+            daemon_reg.stop_all()
+            logger.info("Daemon Registry stopped")
         if template_updater:
             await template_updater.stop()
             logger.info("Async Template Updater stopped")
@@ -725,6 +754,85 @@ async def health_nodes():
     from inference.node_health import get_node_monitor
     monitor = get_node_monitor()
     return {"nodes": monitor.get_all_statuses()}
+
+
+# ---------------------------------------------------------------------------
+#  Phase 5: Remote & Multi-Node API
+# ---------------------------------------------------------------------------
+
+class RemoteExecRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    host: str
+    command: str
+    timeout: int = 60
+
+class BridgeTaskRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    target_node: str
+    task: str
+    intent: Optional[str] = None
+
+class BridgeProxyRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    target_node: str
+    method: str = "GET"
+    path: str = "/"
+    json_body: Optional[dict] = None
+
+@app.post("/api/v1/remote/exec")
+async def remote_exec(req: RemoteExecRequest):
+    """Execute a command on a remote host via SSH."""
+    from utils.remote_executor import get_remote_executor
+    executor = get_remote_executor()
+    result = executor.execute(req.host, req.command, timeout=req.timeout)
+    return result.to_dict()
+
+@app.get("/api/v1/remote/hosts")
+async def remote_hosts():
+    """List all configured remote hosts."""
+    from utils.remote_executor import get_remote_executor
+    return {"hosts": get_remote_executor().list_hosts()}
+
+@app.post("/api/v1/bridge/submit")
+async def bridge_submit(req: BridgeTaskRequest):
+    """Submit a task to a remote Hive node."""
+    from utils.bridge import get_bridge
+    result = get_bridge().submit_task(req.target_node, req.task, intent=req.intent)
+    return result
+
+@app.post("/api/v1/bridge/proxy")
+async def bridge_proxy(req: BridgeProxyRequest):
+    """Proxy a request to a remote Hive node."""
+    from utils.bridge import get_bridge
+    result = get_bridge().proxy_request(req.target_node, req.method, req.path, json_body=req.json_body)
+    return result
+
+@app.get("/api/v1/bridge/nodes")
+async def bridge_nodes():
+    """List bridge nodes with health status."""
+    from utils.bridge import get_bridge
+    bridge = get_bridge()
+    return {"nodes": bridge.list_nodes(), "health": bridge.check_all_health()}
+
+@app.get("/api/v1/bridge/jobs")
+async def bridge_jobs(status: Optional[str] = None):
+    """List bridge jobs."""
+    from utils.bridge import get_bridge
+    return {"jobs": get_bridge().list_jobs(status_filter=status)}
+
+@app.get("/api/v1/daemon/workers")
+async def daemon_workers(state: Optional[str] = None):
+    """List daemon workers."""
+    from daemon_registry import get_daemon_registry
+    reg = get_daemon_registry()
+    return {"workers": reg.list_workers(state_filter=state), "count": reg.count()}
+
+@app.get("/api/v1/trigger/list")
+async def trigger_list(trigger_type: Optional[str] = None):
+    """List triggers."""
+    from trigger_scheduler import get_trigger_scheduler
+    sched = get_trigger_scheduler()
+    return {"triggers": sched.list_triggers(type_filter=trigger_type), "count": sched.count(), "running": sched.is_running}
 
 
 # ---------------------------------------------------------------------------

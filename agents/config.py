@@ -114,6 +114,21 @@ BROWSER_TIMEOUT        = int(os.getenv("BROWSER_TIMEOUT", "15"))
 BROWSER_DOMAIN_ALLOWLIST = os.getenv("BROWSER_DOMAIN_ALLOWLIST", "")
 BASH_CLASSIFIER_ENABLED = os.getenv("BASH_CLASSIFIER_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
 
+# ---------------------------------------------------------------------------
+# Remote & Multi-Node Configuration (Phase 5)
+# ---------------------------------------------------------------------------
+SSH_DEFAULT_TIMEOUT    = int(os.getenv("SSH_DEFAULT_TIMEOUT", "60"))
+SSH_CONNECT_TIMEOUT    = int(os.getenv("SSH_CONNECT_TIMEOUT", "10"))
+SSH_KEY_PATH           = os.getenv("SSH_KEY_PATH", os.path.expanduser("~/.ssh/id_ed25519"))
+SSH_USER               = os.getenv("SSH_USER", "misterobots")
+BRIDGE_ENABLED         = os.getenv("BRIDGE_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+BRIDGE_TIMEOUT         = int(os.getenv("BRIDGE_TIMEOUT", "30"))
+DAEMON_MAX_WORKERS     = int(os.getenv("DAEMON_MAX_WORKERS", "20"))
+DAEMON_ENABLED         = os.getenv("DAEMON_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+TRIGGER_ENABLED        = os.getenv("TRIGGER_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+TRIGGER_TICK_INTERVAL  = int(os.getenv("TRIGGER_TICK_INTERVAL", "15"))
+WORKFLOW_STATE_DIR     = os.getenv("WORKFLOW_STATE_DIR", "/workspace/workflow_state")
+
 # Admin-only models — only users with security_level >= L3_ADMIN may select these
 ADMIN_ONLY_MODELS: set[str] = {
     "claude-opus-4-20250514",

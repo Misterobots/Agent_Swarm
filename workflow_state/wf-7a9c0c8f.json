@@ -1,0 +1,22 @@
+{
+  "workflow_id": "wf-7a9c0c8f",
+  "name": "failing",
+  "state": "failed",
+  "steps": [
+    {
+      "name": "fail",
+      "depends_on": [],
+      "timeout": 300,
+      "state": "failed",
+      "result": null,
+      "error": "intentional failure",
+      "started_at": 1776111932.7359061,
+      "completed_at": 1776111932.7359219
+    }
+  ],
+  "context_keys": [],
+  "created_at": 1776111932.7358732,
+  "completed_at": null,
+  "error": "Step 'fail' failed: intentional failure",
+  "context": {}
+}
