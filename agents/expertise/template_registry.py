@@ -212,6 +212,17 @@ _SEED_TEMPLATES = [
         "capabilities": ["api_call", "model_generate"],
         "security_level": "L2_USER",
     },
+    {
+        "id": "coordinator",
+        "name": "Coordinator",
+        "description": "Multi-worker orchestration: decompose, research, synthesize, implement, verify.",
+        "intent": "COORDINATE",
+        "system_prompt": None,
+        "capabilities": ["model_generate", "file_read", "file_write", "terminal_exec",
+                          "terminal_read", "api_call", "resource_access"],
+        "security_level": "L3_ADMIN",
+        "default_model": "qwen3:14b",
+    },
 ]
 
 

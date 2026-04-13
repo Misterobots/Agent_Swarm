@@ -202,6 +202,20 @@ def handle_task_event(event: Event):
                  response = generate_image(f"Concept art for 3d modeling: {user_input}", target_device=target_device)
              logger.info(f"[3D] Concept Art Result: {response}")
              # trigger forge here if implemented
+
+        elif intent == "COORDINATE":
+            # Multi-worker orchestration via Coordinator Mode
+            from coordinator import coordinate_task
+            logger.info(f"[Router] Routing to Coordinator Mode (async path)")
+            for update in coordinate_task(
+                user_input=user_input,
+                session_id=session_id,
+                owner_id=owner_id,
+            ):
+                if update.get("type") == "response":
+                    logger.info(f"[Coordinator] Final: {update['content'][:200]}")
+                elif update.get("type") == "error":
+                    logger.error(f"[Coordinator] Error: {update['content']}")
              
         else:
             # Default: Orchestrator with session persistence
@@ -876,6 +890,44 @@ def chat_swarm(
             WORKFLOW_STEPS.labels(status="success", agent_type="VisionAnalyst").inc()
             return
 
+        # --- ROUTE: COORDINATE (Multi-Worker Orchestration) ---
+        if intent == "COORDINATE":
+            yield _emit_turn_metadata(turn_id, "Coordinator", ["thinking", "tool-use", "responding"])
+            yield _emit_stream_mode("thinking")
+            yield {"type": "status", "content": "🧩 Coordinator Mode: Initializing multi-worker orchestration..."}
+            AGENT_STATE.labels(agent_name="Coordinator").set(2)
+
+            try:
+                from coordinator import coordinate_task
+
+                tool_call_id = f"tool-coordinator-{int(time.time()*1000)}"
+                yield _emit_tool_start(tool_call_id, "coordinate_task", {"intent": "COORDINATE"})
+                yield _emit_stream_mode("tool-use")
+
+                for update in coordinate_task(
+                    user_input=user_input,
+                    session_id=session_id,
+                    owner_id=owner_id,
+                    history_context=history_context,
+                    extracted_context=extracted_context,
+                    ace_token=ace_token,
+                    template_metadata=template_metadata,
+                ):
+                    yield update
+
+                yield _emit_tool_result(tool_call_id, "coordinate_task", "Coordination complete", True)
+                _score_trace(lf_trace, langfuse, 0.9)
+            except Exception as e:
+                logger.error(f"[Coordinator] Failed: {e}", exc_info=True)
+                if 'tool_call_id' in locals():
+                    yield _emit_tool_result(tool_call_id, "coordinate_task", f"Coordination failed: {e}", False)
+                yield {"type": "error", "content": f"Coordination failed: {e}"}
+                _score_trace(lf_trace, langfuse, 0.0)
+
+            AGENT_STATE.labels(agent_name="Coordinator").set(1)
+            WORKFLOW_STEPS.labels(status="success", agent_type="Coordinator").inc()
+            return
+
         # --- ART WORKSPACE OFFER (for creative intents) ---
         # Creative intents redirect to the Art Studio workspace instead of
         # running heavy generation pipelines inline in chat.
@@ -1490,7 +1542,7 @@ def chat_swarm(
         # Only fall through to MarsRL if no specialized route handled this intent
         if intent not in ("CONVERSATION", "DEVOPS", "DATA", "AMBIGUOUS", "IMAGE",
                           "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE",
-                          "TRAIN", "IOT_CONTROL", "VISION"):
+                          "TRAIN", "IOT_CONTROL", "VISION", "COORDINATE"):
             yield _emit_turn_metadata(turn_id, "Architect", ["thinking", "tool-use", "responding"])
             yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}

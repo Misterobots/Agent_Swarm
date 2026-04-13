@@ -16,7 +16,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Install PyTorch Nightly (CUDA 12.8 compatible) for RTX 5060 Ti (sm_120)
-RUN pip3 install "numpy<2.0" --pre torch torchvision torchaudio --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu128 --extra-index-url https://pypi.org/simple
+# Pin versions to avoid pip resolution loop with --force-reinstall on nightly index
+RUN pip3 install "numpy<2.0" --index-url https://pypi.org/simple && \
+    pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt

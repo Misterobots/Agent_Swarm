@@ -39,6 +39,7 @@ class SemanticRouter:
             11. **IOT_CONTROL**: Turning on/off smart home devices, lights, sending raw commands to home automation. (Keywords: "turn on", "lights", "temperature", "unlock", "scene", "home assistant")
             12. **IOT_DEV**: Developing firmware, simulating circuits, or raw MQTT backend development. (Keywords: "simulate", "wokwi", "flash esp32", "compile firmware", "mqtt", "arduino")
             13. **VISION**: Analyzing, describing, or answering questions about an existing image or screenshot. The user is asking the AI to LOOK AT an image they provide, NOT to generate a new one. (Keywords: "what do you see", "describe this image", "analyze this image", "what is in this picture", "read this screenshot", "OCR", "identify", "what's happening in this photo", "look at this")
+            14. **COORDINATE**: The user is requesting a complex, multi-step task that requires decomposition into subtasks, parallel research, synthesis of findings, and coordinated implementation. This is NOT for simple one-shot requests — only for tasks that genuinely need multiple workers collaborating. (Keywords: "plan and build", "coordinate", "multi-step", "build a full", "design and implement", "create a complete", "end-to-end", "full stack", "set up a system")
 
             OUTPUT FORMAT CHECKLIST (JSON ONLY):
             {

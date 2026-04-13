@@ -12,17 +12,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-# Update pip first
 RUN pip3 install --upgrade pip
-
-# Install Qwen-TTS and core libraries
-# Install Qwen-TTS and core libraries
-RUN pip3 install qwen-tts modelscope funasr
 
 WORKDIR /app
 
-# Install PyTorch Nightly (CUDA 12.8 compatible) for RTX 5060 Ti support
-RUN pip3 install "numpy<2.0" --pre torch torchvision torchaudio --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu128 --extra-index-url https://pypi.org/simple
+# Install PyTorch Nightly FIRST (CUDA 12.8 for RTX 5060 Ti) so ABI is set
+RUN pip3 install "numpy<2.0" --index-url https://pypi.org/simple && \
+    pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+
+# Install Qwen-TTS AFTER PyTorch nightly (--no-deps to keep nightly torchaudio)
+RUN pip3 install --no-deps qwen-tts && \
+    pip3 install modelscope funasr
 
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt

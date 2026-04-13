@@ -23,5 +23,17 @@ route:
 
 receivers:
   - name: "default-receiver"
+    email_configs:
+      - to: 'Justin@shivelymail.com'
+        from: 'Admin@Graceful-Tech.com'
+        smarthost: 'smtp.zoho.com:587'
+        auth_username: 'Admin@Graceful-Tech.com'
+        auth_identity: 'Admin@Graceful-Tech.com'
+        auth_password: 'Lindsey520!'
+        require_tls: true
+        send_resolved: true
+    webhook_configs:
+      - url: 'https://notify.shivelymedia.com/home-ai-alerts'
+        send_resolved: true
 
 inhibit_rules: []

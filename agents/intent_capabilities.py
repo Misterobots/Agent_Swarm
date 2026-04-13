@@ -125,6 +125,19 @@ INTENT_CAPABILITY_MAP = {
         "security_level": "L1_PUBLIC",
         "expiry_hours": 1,
     },
+    "COORDINATE": {
+        "agent_name": "Coordinator",
+        "template_id": "coordinator",
+        "capabilities": [
+            "model_generate",
+            "file_read", "file_write",
+            "terminal_exec", "terminal_read",
+            "api_call",
+            "resource_access",
+        ],
+        "security_level": "L3_ADMIN",
+        "expiry_hours": 4,
+    },
 }
 
 # Safe default for unknown or AMBIGUOUS intents

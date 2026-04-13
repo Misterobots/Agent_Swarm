@@ -16,15 +16,10 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async rewrites() {
-    const backendUrl = process.env.API_BASE_URL || "http://localhost:8000";
-    return [
-      {
-        source: "/api/backend/:path*",
-        destination: `${backendUrl}/:path*`,
-      },
-    ];
-  },
+  // Backend proxying is handled by the API route at
+  // src/app/api/backend/[...path]/route.ts which reads API_BASE_URL at runtime.
+  // A next.config rewrite would bake the URL at build time, causing misrouting
+  // in containerized deployments where the env var is set at runtime.
 };
 
 export default nextConfig;

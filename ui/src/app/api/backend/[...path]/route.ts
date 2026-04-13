@@ -43,10 +43,28 @@ async function proxyRequest(req: NextRequest) {
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), timeoutMs);
 
-  const upstream = await fetch(target, {
-    ...init,
-    signal: abortController.signal,
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      ...init,
+      signal: abortController.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[api/backend] Backend unreachable", { target, error: msg });
+    return new Response(
+      JSON.stringify({
+        error: "Backend unreachable",
+        detail: msg,
+        target,
+      }),
+      {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
 
   const isSSE =
     upstream.headers.get("content-type")?.includes("text/event-stream") ||

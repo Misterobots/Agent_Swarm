@@ -18,7 +18,7 @@ services:
     # pid: "host"
     command: ["-config", "/etc/spire/agent/agent.conf", "-joinToken", "${SPIRE_JOIN_TOKEN}"]
     healthcheck:
-      test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck", "-socketPath", "/var/run/spire/agent.sock"]
+      test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -41,10 +41,11 @@ services:
               count: all
               capabilities: [ gpu ]
     environment:
-      # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
+      # Swarm GPU Mutex allows full 16GB VRAM use by unloading ComfyUI on-demand
+      - OLLAMA_GPU_OVERHEAD=512MiB     # Reserve 512MB for CUDA driver headroom
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
-      - OLLAMA_NUM_PARALLEL=2          # Concurrent requests across 2 GPUs
-      - OLLAMA_KEEP_ALIVE=30m          # Keep expert models hot (32GB total VRAM)
+      - OLLAMA_NUM_PARALLEL=1          # One request at a time (home lab)
+      - OLLAMA_KEEP_ALIVE=5m           # Evict models from VRAM after 5min idle
     volumes:
       - ollama_models:/root/.ollama
     ports:
@@ -189,13 +190,13 @@ services:
       - "8008:8000"
     networks:
       - execution_net
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     labels:
       # Labels for SPIRE workload attestation
       - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/runtime"
@@ -216,8 +217,8 @@ services:
       - /c/Users/panca/Documents/ComfyUI/ComfyUI/output:/home/runner/ComfyUI/output
     environment:
       # Yanwk Boot Args
-      - CLI_ARGS=--listen 0.0.0.0 --port 8188 --preview-method auto --cuda-device 1
-      - NVIDIA_VISIBLE_DEVICES=1        # GPU 1 dedicated to image generation
+      - CLI_ARGS=--listen 0.0.0.0 --port 8188 --preview-method auto
+      - NVIDIA_VISIBLE_DEVICES=all
 
 
     command:
@@ -267,7 +268,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['1']
+              count: all
               capabilities: [gpu]
     networks:
       execution_net:
@@ -457,8 +458,8 @@ services:
       - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
       - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
       # CRITICAL: Tell Authentik its external-facing hostname for OIDC discovery
-      - AUTHENTIK_HOST=http://192.168.2.101:9000
-      - AUTHENTIK_HOST_BROWSER=http://192.168.2.101:9000
+      - AUTHENTIK_HOST=http://localhost:9000
+      - AUTHENTIK_HOST_BROWSER=http://localhost:9000
     volumes:
       - ./config/authentik/media:/media
       - ./config/authentik/custom-templates:/templates

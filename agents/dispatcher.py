@@ -93,6 +93,14 @@ def detect_intent(input_text: str) -> str:
     ]
     if any(phrase in text for phrase in vision_phrases):
         return "VISION"
+    # COORDINATE — explicit multi-step / orchestration triggers
+    coordinate_phrases = [
+        "plan and build", "plan and implement", "coordinate:", "multi-step:",
+        "design and implement", "create a complete", "build a full",
+        "end-to-end", "set up a system", "full stack",
+    ]
+    if any(phrase in text for phrase in coordinate_phrases):
+        return "COORDINATE"
     if "image" in text or "picture" in text or "draw" in text or "photo" in text:
         return "IMAGE"
     return "DEFAULT"
