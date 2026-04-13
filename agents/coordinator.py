@@ -32,6 +32,22 @@ from utils.gpu_queue import request_lock, get_best_host_for_model
 
 logger = setup_logger("Coordinator")
 
+# --- MemPalace team memory (graceful fallback if unavailable) ---
+def _team_store(team_id: str, key: str, value: str, author: str = "coordinator"):
+    try:
+        from mempalace_client import mempalace
+        mempalace.team_store(team_id, key, value, author_agent=author)
+    except Exception as e:
+        logger.debug(f"[Coordinator] Team memory store failed (non-fatal): {e}")
+
+
+def _team_clear(team_id: str):
+    try:
+        from mempalace_client import mempalace
+        mempalace.team_clear(team_id)
+    except Exception as e:
+        logger.debug(f"[Coordinator] Team memory clear failed (non-fatal): {e}")
+
 # --- Scratchpad Root ---
 SCRATCHPAD_ROOT = Path(__file__).parent / "scratchpad"
 
@@ -466,6 +482,13 @@ def coordinate_task(
                             "type": "message",
                             "content": f"✅ Research worker **{role}** completed\n\n",
                         }
+                        # Store worker finding in team memory
+                        _team_store(
+                            session.coordination_id,
+                            f"research_{role}_{worker_id}",
+                            result[:2000] if result else "",
+                            author=role,
+                        )
                     except Exception as e:
                         yield {
                             "type": "log",
@@ -486,6 +509,9 @@ def coordinate_task(
         with request_lock(context="text"):
             synthesis = _synthesize_findings(all_findings, user_input)
         session.write_to_scratchpad("01_synthesis.md", f"# Synthesis\n\n{synthesis}")
+
+        # Persist synthesis to team memory for cross-coordination recall
+        _team_store(session.coordination_id, "synthesis", synthesis)
 
         yield {"type": "message", "content": f"**🧠 Synthesis Complete**\n\n{synthesis}\n\n"}
         yield {"type": "log", "content": f"[Coordinator] Synthesis: {len(synthesis)} chars"}
@@ -573,6 +599,9 @@ def coordinate_task(
         )
 
         yield {"type": "message", "content": f"**🔍 Verification**\n\n{verify_result}\n\n"}
+
+        # Store verification in team memory
+        _team_store(session.coordination_id, "verification", verify_result, author="verifier")
 
         # === FINAL SUMMARY ===
         total_workers = len(session.workers)

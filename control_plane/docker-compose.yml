@@ -81,7 +81,7 @@ services:
 
   # --- Langfuse Database (PostgreSQL) ---
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: postgres
     env_file:
       - .env
@@ -103,6 +103,39 @@ services:
 
 
 
+
+  # --- MemPalace Memory Service ---
+  mempalace:
+    build:
+      context: ./mempalace
+      dockerfile: Dockerfile
+    container_name: mempalace
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+      - ../network.env
+    environment:
+      - MEMPALACE_DB_USER=${LANGFUSE_DB_USER}
+      - MEMPALACE_DB_PASSWORD=${LANGFUSE_DB_PASSWORD}
+      - MEMPALACE_DB_HOST=postgres
+      - MEMPALACE_DB_PORT=5432
+      - MEMPALACE_DB_NAME=${LANGFUSE_DB_NAME}
+      - OLLAMA_HOST=http://192.168.2.101:11434
+      - EMBED_MODEL=nomic-embed-text
+      - EXTRACT_MODEL=nemotron-mini
+      - LOG_LEVEL=INFO
+    ports:
+      - "8200:8200"
+    networks:
+      - swarm_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # --- Langfuse Observability ---
   clickhouse:
@@ -235,6 +268,7 @@ networks:
 
 volumes:
   pg_data:
+  mempalace_data:
   spire_data:
   clickhouse_data:
   minio_data:

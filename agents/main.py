@@ -354,6 +354,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     from fastapi.responses import StreamingResponse
     from router import chat_swarm
     import json
+    import asyncio
 
     # Extract history (all but the last message), convert Pydantic models to dicts
     history = [{"role": m.role, "content": m.content} for m in request.messages[:-1]]
@@ -390,6 +391,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 return
 
             update_count = 0
+            response_parts = []  # Collect response text for memory extraction
             try:
                 for update in gen:
                     update_count += 1
@@ -466,6 +468,10 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         # Strip heartbeat if it leaks through
                         content = content.replace("\u200B", "")
 
+                        # Collect response text for memory extraction
+                        if msg_type in ("response", "message"):
+                            response_parts.append(raw_content)
+
                         chunk = {
                             "id": "chatcmpl-swarm",
                             "object": "chat.completion.chunk",
@@ -480,6 +486,28 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':0,'model':request.model,'choices':[{'index':0,'delta':{'content':err_msg},'finish_reason':None}]})}\n\n"
 
             logger.info(f"[Stream] Completed with {update_count} updates")
+
+            # Background memory extraction (fire-and-forget)
+            if request.memory_enabled and response_parts:
+                try:
+                    response_text = "".join(response_parts)
+                    conversation = f"User: {last_msg}\nAssistant: {response_text}"
+                    logger.info(f"[MemPalace] Scheduling extraction ({len(response_text)} chars, owner={owner_id})")
+
+                    async def _bg_extract(conv, oid):
+                        try:
+                            from mempalace_client import mempalace
+                            result = await asyncio.to_thread(
+                                mempalace.extract, conv, owner_id=oid
+                            )
+                            logger.info(f"[MemPalace] Extraction complete: {len(result)} memories stored")
+                        except Exception as exc:
+                            logger.warning(f"[MemPalace] Background extraction failed: {exc}")
+
+                    asyncio.get_event_loop().create_task(_bg_extract(conversation[:8000], owner_id))
+                except Exception as e:
+                    logger.warning(f"[MemPalace] Failed to schedule extraction: {e}")
+
             # Finish
             yield "data: [DONE]\n\n"
 
@@ -520,7 +548,25 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         
         # Strip heartbeat
         full_resp = full_resp.replace("\u200B", "")
-        
+
+        # Background memory extraction (non-streaming path)
+        if request.memory_enabled and full_resp.strip():
+            try:
+                conversation = f"User: {last_msg}\nAssistant: {full_resp}"
+                logger.info(f"[MemPalace] Scheduling extraction (non-stream, {len(full_resp)} chars, owner={owner_id})")
+
+                async def _bg_extract_ns(conv, oid):
+                    try:
+                        from mempalace_client import mempalace
+                        result = await asyncio.to_thread(mempalace.extract, conv, owner_id=oid)
+                        logger.info(f"[MemPalace] Extraction complete: {len(result)} memories stored")
+                    except Exception as exc:
+                        logger.warning(f"[MemPalace] Background extraction failed: {exc}")
+
+                asyncio.get_event_loop().create_task(_bg_extract_ns(conversation[:8000], owner_id))
+            except Exception as e:
+                logger.warning(f"[MemPalace] Failed to schedule extraction: {e}")
+
         return {
             "id": "chatcmpl-swarm",
             "object": "chat.completion",

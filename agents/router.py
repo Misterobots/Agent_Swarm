@@ -641,6 +641,25 @@ def chat_swarm(
             except Exception as _mem_err:
                 logger.debug(f"[Router] Memory recall failed (non-fatal): {_mem_err}")
 
+        # 1c. MemPalace Semantic Recall — inject relevant memories from vector store
+        if memory_enabled:
+            try:
+                from mempalace_client import mempalace as _mp
+                relevant = _mp.search(user_input, owner_id=owner_id, limit=5)
+                if relevant:
+                    # Filter by similarity score (>0.5 = meaningfully relevant)
+                    strong = [m for m in relevant if (m.get("score") or 0) > 0.5]
+                    if strong:
+                        semantic_text = "\n".join(f"- {m['content']}" for m in strong)
+                        mp_msg = {"role": "system", "content": f"[Relevant Memories]\n{semantic_text}"}
+                        if history is None:
+                            history = [mp_msg]
+                        else:
+                            history.append(mp_msg)
+                        yield {"type": "thought", "content": f"→ MemPalace: {len(strong)} relevant memories recalled"}
+            except Exception as _mp_err:
+                logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
+
         # 2. Security Check (on the Merged Input)
         yield {"type": "status", "content": "🔒 Security Agent: Scanning input..."}
         security = get_security_agent()
@@ -1511,6 +1530,19 @@ def chat_swarm(
                 rule = match.group(2).strip()
                 
             result = memory.add_rule(domain, keyword, rule)
+
+            # Also store in MemPalace as a procedural memory
+            try:
+                from mempalace_client import mempalace as _mp
+                _mp.store(
+                    content=f"{keyword}: {rule}",
+                    memory_type="procedural",
+                    domain=domain.replace("_rules", ""),
+                    owner_id=owner_id,
+                )
+            except Exception:
+                pass
+
             yield {"type": "response", "content": f"🧠 **Learned**: {result}"}
             _score_trace(lf_trace, langfuse, 1.0, output=result)
             return
