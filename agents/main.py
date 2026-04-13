@@ -97,6 +97,16 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Template system init failed (non-fatal): {e}")
 
+        # 4. Initialize Skill Registry (Phase 4 — Superpowers skills)
+        try:
+            from skill_loader import initialize_skills
+            skill_count = initialize_skills()
+            logger.info(f"Skill Registry initialized: {skill_count} skills loaded")
+        except ImportError as e:
+            logger.warning(f"Skill loader not available: {e}")
+        except Exception as e:
+            logger.warning(f"Skill loader init failed (non-fatal): {e}")
+
         print("DEBUG: Startup Complete. Yielding...")
         logger.info("Swarm Engine Online. Waiting for events...")
         yield

@@ -32,6 +32,16 @@ class MCPToolDescriptor(BaseModel):
     input_schema: Dict[str, Any]
 
 
+class MCPSkillDescriptor(BaseModel):
+    name: str
+    description: str
+    category: str
+    version: str = "1.0"
+    tags: List[str] = []
+    min_security_level: str = "L2_USER"
+    triggers: Dict[str, Any] = {}
+
+
 class MCPClientConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
     mcpServers: Dict[str, Dict[str, Any]]

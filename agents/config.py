@@ -105,6 +105,15 @@ MCP_BRIDGE_ENABLED = os.getenv("MCP_BRIDGE_ENABLED", "false")
 MCP_SERVER_NAME    = os.getenv("MCP_SERVER_NAME", "home-ai-lab")
 MCP_BASE_URL       = os.getenv("MCP_BASE_URL", f"http://{CONTROL_NODE_IP}:8000")
 
+# ---------------------------------------------------------------------------
+# Skills & Tools Configuration (Phase 4)
+# ---------------------------------------------------------------------------
+SKILLS_ENABLED         = os.getenv("SKILLS_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+BROWSER_MAX_CONTENT_BYTES = int(os.getenv("BROWSER_MAX_CONTENT_BYTES", str(512 * 1024)))
+BROWSER_TIMEOUT        = int(os.getenv("BROWSER_TIMEOUT", "15"))
+BROWSER_DOMAIN_ALLOWLIST = os.getenv("BROWSER_DOMAIN_ALLOWLIST", "")
+BASH_CLASSIFIER_ENABLED = os.getenv("BASH_CLASSIFIER_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+
 # Admin-only models — only users with security_level >= L3_ADMIN may select these
 ADMIN_ONLY_MODELS: set[str] = {
     "claude-opus-4-20250514",

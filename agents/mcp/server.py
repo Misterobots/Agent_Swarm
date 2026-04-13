@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict, List
 
 from logger_setup import setup_logger
-from mcp.schema import MCPToolDescriptor, MCPClientConfig
+from mcp.schema import MCPToolDescriptor, MCPSkillDescriptor, MCPClientConfig
 from mcp.tool_hooks import ToolHookRegistry
 
 logger = setup_logger("MCPBridge")
@@ -68,6 +68,62 @@ class MCPBridgeServer:
                     "required": ["command"],
                 },
             ),
+            MCPToolDescriptor(
+                name="hive.browser.fetch",
+                description="Fetch a web page and return its text content.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to fetch"},
+                    },
+                    "required": ["url"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.browser.search",
+                description="Search the web and return results.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query"},
+                    },
+                    "required": ["query"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.bash.classify",
+                description="Classify a bash command for safety risk level.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "command": {"type": "string", "description": "Bash command to classify"},
+                    },
+                    "required": ["command"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.bash.parse",
+                description="Parse a bash command into structural components (AST).",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "command": {"type": "string", "description": "Bash command to parse"},
+                    },
+                    "required": ["command"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.skill.run",
+                description="Execute a registered skill by name.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "skill_name": {"type": "string", "description": "Name of the skill to execute"},
+                        "input": {"type": "string", "description": "Input data for the skill"},
+                    },
+                    "required": ["skill_name"],
+                },
+            ),
         ]
 
     def health(self) -> dict[str, Any]:
@@ -79,6 +135,15 @@ class MCPBridgeServer:
 
     def list_tools(self) -> list[dict[str, Any]]:
         return [t.model_dump() for t in self._tools]
+
+    def list_skills(self) -> list[dict[str, Any]]:
+        """Return all registered skills from the SkillRegistry."""
+        try:
+            from skill_registry import skill_registry
+            return skill_registry.to_mcp_descriptors()
+        except ImportError:
+            logger.debug("[MCPBridge] SkillRegistry not available")
+            return []
 
     def client_config(self, host_hint: str | None = None) -> dict[str, Any]:
         base = (host_hint or self.base_url).rstrip("/")
@@ -97,6 +162,9 @@ class MCPBridgeServer:
         """Handle minimal MCP methods with safe, non-breaking behavior."""
         if method == "tools/list":
             return {"tools": self.list_tools()}
+
+        if method == "skills/list":
+            return {"skills": self.list_skills()}
 
         if method == "tools/call":
             tool_name = params.get("name")
