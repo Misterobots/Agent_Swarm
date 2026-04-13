@@ -129,6 +129,17 @@ TRIGGER_ENABLED        = os.getenv("TRIGGER_ENABLED", "true").lower() in {"1", "
 TRIGGER_TICK_INTERVAL  = int(os.getenv("TRIGGER_TICK_INTERVAL", "15"))
 WORKFLOW_STATE_DIR     = os.getenv("WORKFLOW_STATE_DIR", "/workspace/workflow_state")
 
+# ---------------------------------------------------------------------------
+# OpenClaude gRPC Configuration (Phase 6)
+# ---------------------------------------------------------------------------
+GRPC_SERVER_HOST       = os.getenv("GRPC_SERVER_HOST", GATEWAY_NODE_IP)
+GRPC_SERVER_PORT       = int(os.getenv("GRPC_SERVER_PORT", "50051"))
+GRPC_GATEWAY_ENABLED   = os.getenv("GRPC_GATEWAY_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+GRPC_TIMEOUT           = int(os.getenv("GRPC_TIMEOUT", "120"))
+GRPC_MAX_WORKERS       = int(os.getenv("GRPC_MAX_WORKERS", "4"))
+GRPC_AUTH_ENABLED      = os.getenv("GRPC_AUTH_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+GRPC_AUTH_CACHE_TTL    = int(os.getenv("GRPC_AUTH_CACHE_TTL", "300"))
+
 # Admin-only models — only users with security_level >= L3_ADMIN may select these
 ADMIN_ONLY_MODELS: set[str] = {
     "claude-opus-4-20250514",

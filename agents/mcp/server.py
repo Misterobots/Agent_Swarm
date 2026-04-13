@@ -195,6 +195,41 @@ class MCPBridgeServer:
                     },
                 },
             ),
+            # Phase 6: OpenClaude gRPC
+            MCPToolDescriptor(
+                name="hive.grpc.infer",
+                description="Run inference via the OpenClaude gRPC gateway with auto model routing.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "prompt": {"type": "string", "description": "The prompt to send"},
+                        "model": {"type": "string", "description": "Explicit model name (auto-routes if empty)"},
+                        "intent": {"type": "string", "description": "Routing hint: CODE, GENERAL, RESEARCH, VISION"},
+                    },
+                    "required": ["prompt"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.grpc.classify",
+                description="Classify the intent of a prompt using the router model.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "prompt": {"type": "string", "description": "Prompt to classify"},
+                    },
+                    "required": ["prompt"],
+                },
+            ),
+            MCPToolDescriptor(
+                name="hive.grpc.models",
+                description="List models available across all Ollama nodes.",
+                input_schema={"type": "object", "properties": {}},
+            ),
+            MCPToolDescriptor(
+                name="hive.grpc.health",
+                description="Health check of the OpenClaude gRPC inference gateway.",
+                input_schema={"type": "object", "properties": {}},
+            ),
         ]
 
     def health(self) -> dict[str, Any]:

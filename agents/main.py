@@ -835,6 +835,50 @@ async def trigger_list(trigger_type: Optional[str] = None):
     return {"triggers": sched.list_triggers(type_filter=trigger_type), "count": sched.count(), "running": sched.is_running}
 
 
+# --- Phase 6: OpenClaude gRPC Gateway REST Endpoints ---
+
+class GrpcInferRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    prompt: str
+    model: str = ""
+    intent: str = ""
+    max_tokens: int = 0
+    temperature: float = 0.7
+    session_id: str = ""
+    history: Optional[List[dict]] = None
+
+@app.post("/api/v1/grpc/infer")
+async def grpc_infer(req: GrpcInferRequest):
+    """Run inference via the OpenClaude gRPC gateway (REST proxy)."""
+    from grpc.client import get_grpc_client
+    client = get_grpc_client()
+    result = client.infer(
+        prompt=req.prompt, model=req.model, intent=req.intent,
+        max_tokens=req.max_tokens, temperature=req.temperature,
+        session_id=req.session_id, history=req.history,
+    )
+    return result
+
+@app.post("/api/v1/grpc/classify")
+async def grpc_classify(req: TaskRequest):
+    """Classify prompt intent via the OpenClaude gRPC gateway."""
+    from grpc.client import get_grpc_client
+    client = get_grpc_client()
+    return client.classify(prompt=req.task)
+
+@app.get("/api/v1/grpc/models")
+async def grpc_models():
+    """List models available across all Ollama nodes via gRPC gateway."""
+    from grpc.client import get_grpc_client
+    return {"models": get_grpc_client().list_models()}
+
+@app.get("/api/v1/grpc/health")
+async def grpc_health():
+    """Health check of the OpenClaude gRPC inference gateway."""
+    from grpc.client import get_grpc_client
+    return get_grpc_client().health_check()
+
+
 # ---------------------------------------------------------------------------
 #  Training Pipeline API
 # ---------------------------------------------------------------------------

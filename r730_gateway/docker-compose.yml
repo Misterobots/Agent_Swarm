@@ -400,6 +400,66 @@ services:
       - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
+  # OPENCLAUDE gRPC INFERENCE GATEWAY (Phase 6)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  openclaude-grpc:
+    build:
+      context: ..
+      dockerfile: agents/grpc/Dockerfile
+    image: home-ai-lab/openclaude-grpc:latest
+    container_name: openclaude_grpc
+    hostname: openclaude-grpc
+    restart: unless-stopped
+    env_file:
+      - ../network.env
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - SECONDARY_OLLAMA_HOST=http://${EXECUTION_NODE_IP:-192.168.2.101}:11434
+      - ROUTER_MODEL=${ROUTER_MODEL:-nemotron-mini}
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen2.5-coder:14b-instruct-q4_k_m}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-llama3.2:3b}
+      - GRPC_PORT=50051
+      - GRPC_MAX_WORKERS=4
+      - GRPC_AUTH_ENABLED=${GRPC_AUTH_ENABLED:-true}
+      - AUTHENTIK_URL=${AUTHENTIK_URL:-http://authentik:9000}
+    ports:
+      - "50051:50051"
+    depends_on:
+      ollama:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=3)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      # gRPC uses HTTP/2, Traefik routes via h2c for internal LAN
+      - "traefik.http.routers.openclaude-grpc.rule=PathPrefix(`/grpc`)"
+      - "traefik.http.routers.openclaude-grpc.entrypoints=web"
+      - "traefik.http.services.openclaude-grpc.loadbalancer.server.port=50051"
+      - "traefik.http.services.openclaude-grpc.loadbalancer.server.scheme=h2c"
+      # External HTTPS route: grpc.shivelymedia.com (behind Authentik)
+      - "traefik.http.routers.openclaude-ext.rule=Host(`grpc.shivelymedia.com`)"
+      - "traefik.http.routers.openclaude-ext.entrypoints=websecure"
+      - "traefik.http.routers.openclaude-ext.tls=true"
+      - "traefik.http.routers.openclaude-ext.tls.certresolver=cfdns"
+      - "traefik.http.routers.openclaude-ext.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.openclaude-ext.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.openclaude-ext.middlewares=globalHeaders@file,secureHeaders@file,authentik@docker"
+      - "traefik.http.services.openclaude-ext.loadbalancer.server.port=50051"
+      - "traefik.http.services.openclaude-ext.loadbalancer.server.scheme=h2c"
+      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/openclaude-grpc"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
   # IDENTITY — Authentik SSO is now managed by Saltbox (Phase 8B)
   # Container names: authentik, authentik-worker, authentik-postgres
   # Network: saltbox (Traefik bridges both saltbox and ai_lab_net)

@@ -38,6 +38,11 @@ class ToolHookRegistry:
             "hive.daemon.list": ToolHook("daemon_manage", "L2_USER", self._handle_daemon_list),
             "hive.workflow.run": ToolHook("workflow_exec", "L3_ADMIN", self._handle_workflow_run),
             "hive.trigger.list": ToolHook("trigger_manage", "L2_USER", self._handle_trigger_list),
+            # Phase 6: OpenClaude gRPC
+            "hive.grpc.infer": ToolHook("grpc_infer", "L2_USER", self._handle_grpc_infer),
+            "hive.grpc.classify": ToolHook("grpc_classify", "L2_USER", self._handle_grpc_classify),
+            "hive.grpc.models": ToolHook("grpc_infer", "L1_PUBLIC", self._handle_grpc_models),
+            "hive.grpc.health": ToolHook("grpc_infer", "L1_PUBLIC", self._handle_grpc_health),
         }
 
     def names(self) -> list[str]:
@@ -223,3 +228,37 @@ class ToolHookRegistry:
         triggers = get_trigger_scheduler().list_triggers(type_filter=type_filter)
         import json
         return {"isError": False, "content": [{"type": "text", "text": json.dumps(triggers, indent=2, default=str)}]}
+
+    # --- Phase 6: OpenClaude gRPC handlers ---
+
+    @staticmethod
+    def _handle_grpc_infer(args: dict[str, Any]) -> dict[str, Any]:
+        from grpc.client import get_grpc_client
+        prompt = str(args.get("prompt", ""))
+        model = str(args.get("model", ""))
+        intent = str(args.get("intent", ""))
+        result = get_grpc_client().infer(prompt=prompt, model=model, intent=intent)
+        import json
+        return {"isError": bool(result.get("error")), "content": [{"type": "text", "text": json.dumps(result, indent=2)}]}
+
+    @staticmethod
+    def _handle_grpc_classify(args: dict[str, Any]) -> dict[str, Any]:
+        from grpc.client import get_grpc_client
+        prompt = str(args.get("prompt", ""))
+        result = get_grpc_client().classify(prompt=prompt)
+        import json
+        return {"isError": False, "content": [{"type": "text", "text": json.dumps(result, indent=2)}]}
+
+    @staticmethod
+    def _handle_grpc_models(args: dict[str, Any]) -> dict[str, Any]:
+        from grpc.client import get_grpc_client
+        models = get_grpc_client().list_models()
+        import json
+        return {"isError": False, "content": [{"type": "text", "text": json.dumps(models, indent=2)}]}
+
+    @staticmethod
+    def _handle_grpc_health(args: dict[str, Any]) -> dict[str, Any]:
+        from grpc.client import get_grpc_client
+        health = get_grpc_client().health_check()
+        import json
+        return {"isError": False, "content": [{"type": "text", "text": json.dumps(health, indent=2)}]}

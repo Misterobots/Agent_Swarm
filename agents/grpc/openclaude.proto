@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package openclaude.v1;
+
+// OpenClaude Inference Service
+// Provides model routing and inference for the Hive platform.
+// Deployed on R730 gateway behind Traefik with Authentik auth.
+service InferenceService {
+  // Synchronous inference — blocks until complete
+  rpc Infer(InferRequest) returns (InferResponse);
+
+  // Streaming inference — server streams token chunks
+  rpc InferStream(InferRequest) returns (stream InferChunk);
+
+  // Intent classification — determine routing for a prompt
+  rpc Classify(ClassifyRequest) returns (ClassifyResponse);
+
+  // List models available across all nodes
+  rpc ListModels(Empty) returns (ModelList);
+
+  // Health check
+  rpc HealthCheck(Empty) returns (HealthStatus);
+}
+
+message ChatMessage {
+  string role = 1;
+  string content = 2;
+}
+
+message InferRequest {
+  string prompt = 1;
+  string model = 2;                    // explicit model or empty for auto-routing
+  string intent = 3;                   // routing hint: CODE, GENERAL, VISION, etc.
+  int32 max_tokens = 4;
+  float temperature = 5;
+  string session_id = 6;
+  repeated ChatMessage history = 7;
+  string auth_token = 8;              // OAuth2 bearer token for Authentik validation
+}
+
+message InferResponse {
+  string content = 1;
+  string model_used = 2;
+  string node = 3;
+  int32 tokens_used = 4;
+  float duration_ms = 5;
+  string intent_detected = 6;
+}
+
+message InferChunk {
+  string content = 1;
+  bool done = 2;
+  string model_used = 3;
+  int32 tokens_used = 4;
+}
+
+message ClassifyRequest {
+  string prompt = 1;
+}
+
+message ClassifyResponse {
+  string intent = 1;
+  float confidence = 2;
+  string suggested_model = 3;
+  string suggested_node = 4;
+}
+
+message ModelInfo {
+  string name = 1;
+  string role = 2;                    // "router", "code", "general", "vision", "research"
+  int32 context_window = 3;
+  bool available = 4;
+  string node = 5;
+}
+
+message ModelList {
+  repeated ModelInfo models = 1;
+}
+
+message HealthStatus {
+  string status = 1;                  // "healthy", "degraded", "unhealthy"
+  map<string, bool> nodes = 2;
+  int64 uptime_seconds = 3;
+  int32 models_available = 4;
+}
+
+message Empty {}
