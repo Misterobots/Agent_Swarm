@@ -81,3 +81,6 @@ execution_plane/training_output/
 execution_plane/training_data/
 *.safetensors
 *.gguf
+
+# Runtime workflow state
+workflow_state/

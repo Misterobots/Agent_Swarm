@@ -14,6 +14,10 @@ export function OpsDashboard() {
   const controlPlane = health?.control_plane || [];
   const healthyNodes = nodes.filter((n) => n.healthy).length;
   const healthyServices = controlPlane.filter((s) => s.healthy).length;
+  const totalChecks = nodes.length + controlPlane.length;
+  const healthyChecks = healthyNodes + healthyServices;
+  const compliancePct = totalChecks > 0 ? Math.round((healthyChecks / totalChecks) * 100) : 0;
+  const totalContainers = health?.running_count ?? 0;
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -49,18 +53,18 @@ export function OpsDashboard() {
           status={healthyServices === controlPlane.length ? "ok" : "warn"}
         />
         <MetricCard
-          label="Compliance"
-          value="92%"
-          delta="+4% vs baseline"
+          label="Service Health"
+          value={`${compliancePct}%`}
+          delta={`${healthyChecks}/${totalChecks} checks passing`}
           icon={Shield}
-          status="ok"
+          status={compliancePct === 100 ? "ok" : compliancePct >= 50 ? "warn" : "error"}
         />
         <MetricCard
-          label="Uptime"
-          value="99.2%"
-          delta="30-day rolling"
+          label="Containers"
+          value={totalContainers}
+          delta="running across cluster"
           icon={Clock}
-          status="ok"
+          status={totalContainers > 0 ? "ok" : "error"}
         />
       </div>
 

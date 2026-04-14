@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 
 const TABS = [
-  { label: "Dashboard", href: "/ops" },
-  { label: "Traces", href: "/ops/traces" },
+  { label: "Dashboard", href: "/operations" },
+  { label: "Traces", href: "/monitoring/traces" },
 ] as const;
 
 export default function OpsLayout({ children }: { children: React.ReactNode }) {
@@ -17,8 +17,8 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
       {/* Tab Bar */}
       <div className="flex border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-4">
         {TABS.map((tab) => {
-          const active = tab.href === "/ops"
-            ? pathname === "/ops"
+          const active = tab.href === "/operations"
+            ? pathname === "/operations"
             : pathname.startsWith(tab.href);
 
           return (

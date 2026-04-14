@@ -15,10 +15,15 @@ export default function ControlRoomPage() {
 
   async function load() {
     setLoading(true);
-    const [h, r] = await Promise.all([fetchOpsHealth(), fetchGovernanceRequests()]);
-    setHealth(h);
-    setRequests(r);
-    setLoading(false);
+    try {
+      const [h, r] = await Promise.all([fetchOpsHealth(), fetchGovernanceRequests()]);
+      setHealth(h);
+      setRequests(r);
+    } catch (err) {
+      console.error("[ControlRoom] Failed to load data:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {

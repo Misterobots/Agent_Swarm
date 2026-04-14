@@ -28,12 +28,17 @@ export default function EvidenceLockerPage() {
 
   async function refreshFolders() {
     setLoading(true);
-    const nextFolders = await fetchEvidenceFolders();
-    setFolders(nextFolders);
-    if (!selectedFolder && nextFolders.length > 0) {
-      setSelectedFolder(nextFolders[0]);
+    try {
+      const nextFolders = await fetchEvidenceFolders();
+      setFolders(nextFolders);
+      if (!selectedFolder && nextFolders.length > 0) {
+        setSelectedFolder(nextFolders[0]);
+      }
+    } catch (err) {
+      console.error("[EvidenceLocker] Failed to load folders:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => {

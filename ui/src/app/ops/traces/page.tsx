@@ -1,5 +1,5 @@
-import { TraceBrowser } from "@/components/ops/trace-browser";
+import { redirect } from "next/navigation";
 
 export default function TracesPage() {
-  return <TraceBrowser />;
+  redirect("/monitoring/traces");
 }

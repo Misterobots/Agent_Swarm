@@ -22,7 +22,9 @@ export default function MediaPage() {
         setAudioCount(audio.length);
         setComfyHealthy(Boolean(comfy?.healthy));
       }
-    );
+    ).catch((err) => {
+      console.error("[Media] Failed to load media data:", err);
+    });
   }, []);
 
   return (

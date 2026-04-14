@@ -26,10 +26,15 @@ export default function MonitoringPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [healthData, requests] = await Promise.all([fetchOpsHealth(), fetchGovernanceRequests()]);
-    setHealth(healthData);
-    setPending(requests.filter((r) => r.status === "PENDING" || r.status === "ASSESSING").length);
-    setLoading(false);
+    try {
+      const [healthData, requests] = await Promise.all([fetchOpsHealth(), fetchGovernanceRequests()]);
+      setHealth(healthData);
+      setPending(requests.filter((r) => r.status === "PENDING" || r.status === "ASSESSING").length);
+    } catch (err) {
+      console.error("[Monitoring] Failed to load health data:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {

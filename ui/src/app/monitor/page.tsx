@@ -1,5 +1,5 @@
-import { MonitorHub } from "@/components/monitor/monitor-hub";
+import { redirect } from "next/navigation";
 
 export default function MonitorPage() {
-  return <MonitorHub />;
+  redirect("/monitoring/grafana");
 }

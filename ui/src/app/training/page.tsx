@@ -20,6 +20,8 @@ export default function TrainingPage() {
       setRunsCount(runs.length);
       setGgufCount(catalog.local_gguf.length);
       setCatalogCount(catalog.ollama_models.length);
+    }).catch((err) => {
+      console.error("[Training] Failed to load training data:", err);
     });
   }, []);
 
