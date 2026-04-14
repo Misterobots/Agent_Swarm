@@ -146,6 +146,8 @@ services:
       - CLICKHOUSE_DB=${LANGFUSE_DB_NAME}
       - CLICKHOUSE_USER=${LANGFUSE_DB_USER}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+    ports:
+      - "8123:8123"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     networks:
