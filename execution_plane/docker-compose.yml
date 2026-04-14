@@ -184,6 +184,9 @@ services:
       - C:/Users/panca/Documents/ComfyUI/ComfyUI/input:/app/comfy_io/input
       - //var/run/docker.sock:/var/run/docker.sock:ro
       - spire_socket:/var/run/spire:ro  # Mount SPIRE socket (read-only)
+    # Grant read access to Docker socket (GID 0 on Windows Docker Desktop)
+    group_add:
+      - "0"
     command: ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
     ports:
       - "8008:8000"
