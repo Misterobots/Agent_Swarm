@@ -5,10 +5,10 @@ import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DashboardSelector, DASHBOARDS } from "./dashboard-selector";
 import { ExternalLink, Loader2 } from "lucide-react";
 
-// Grafana is always accessed through the Next.js server-side proxy at
-// /api/grafana.  This works on LAN and external domains alike — the browser
-// never needs to reach Grafana directly.
-const GRAFANA_PROXY = "/api/grafana";
+// Grafana is loaded directly via the /grafana sub-path.  Traefik routes
+// /grafana on both LAN and external domains straight to the Grafana
+// container, preserving Grafana's SPA client-side routing.
+const GRAFANA_PROXY = "/grafana";
 
 // External link for "Open full Grafana" (direct access outside the iframe)
 const GRAFANA_DIRECT = "http://192.168.2.103:3001/grafana";

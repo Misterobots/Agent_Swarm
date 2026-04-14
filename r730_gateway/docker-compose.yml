@@ -235,6 +235,13 @@ services:
       - "traefik.http.routers.grafana-ext.priority=20"
       - "traefik.http.routers.grafana-ext.service=grafana-ext"
       - "traefik.http.services.grafana-ext.loadbalancer.server.port=3000"
+      # Hive domain route: hive.shivelymedia.com/grafana/* → Grafana direct
+      # Needed so the iframe in the Monitoring page bypasses Next.js proxy
+      - "traefik.http.routers.grafana-hive.rule=Host(`hive.shivelymedia.com`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-hive.entrypoints=websecure"
+      - "traefik.http.routers.grafana-hive.priority=30"
+      - "traefik.http.routers.grafana-hive.tls=true"
+      - "traefik.http.routers.grafana-hive.service=grafana"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # TASK QUEUE & PERSISTENCE
