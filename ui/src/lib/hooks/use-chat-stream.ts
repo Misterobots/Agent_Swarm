@@ -262,6 +262,14 @@ export function useChatStream() {
             continuationHintRef.current = event.continuationHint || "await_user";
           } else if (event.type === "turn_boundary") {
             // Marker event for turn boundaries; no-op for now.
+          } else if (event.type === "log") {
+            // Internal pipeline diagnostics (security scan results, routing
+            // decisions, etc.).  Route into thought trace so they appear in
+            // the expandable thought panel, NOT as visible message content.
+            const logContent = event.content || "";
+            const thought: ThoughtEvent = { content: logContent, timestamp: Date.now() };
+            thoughtTraceRef.current = [...thoughtTraceRef.current, thought];
+            setLatestThought(logContent);
           } else if (event.type === "error") {
             appendToMessage(convId!, assistantId, `\n\n*Error: ${event.content || "Stream error"}*`);
           } else {

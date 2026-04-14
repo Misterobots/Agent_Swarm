@@ -82,7 +82,7 @@ export interface ToolResult {
  * Enriched stream event supporting tool lifecycle, continuity, and UI state.
  */
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
+  type: "content" | "status" | "thought" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
   content?: string;
   
   // Tool lifecycle

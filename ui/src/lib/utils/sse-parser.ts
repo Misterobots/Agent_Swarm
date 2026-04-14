@@ -10,7 +10,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
+      type?: "content" | "status" | "thought" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
       tool_name?: string;
       tool_input?: Record<string, unknown>;
       tool_call_id?: string;
@@ -147,10 +147,14 @@ export async function* streamSSE(
               tool_call_id: delta.tool_call_id,
             };
           }
-          // Standard content/status/thought (backward compatible)
+          // Standard content/status/thought/log (backward compatible)
           else if (delta.content) {
+            const knownTypes = ["status", "thought", "log", "error"] as const;
+            const mappedType = (knownTypes as readonly string[]).includes(delta.type || "")
+              ? (delta.type as "status" | "thought" | "log" | "error")
+              : "content";
             yield {
-              type: delta.type === "status" || delta.type === "thought" ? delta.type : "content",
+              type: mappedType,
               content: delta.content,
             };
           }
@@ -237,8 +241,12 @@ export async function* streamSSE(
               tool_call_id: delta.tool_call_id,
             };
           } else if (delta.content) {
+            const knownTypes = ["status", "thought", "log", "error"] as const;
+            const mappedType = (knownTypes as readonly string[]).includes(delta.type || "")
+              ? (delta.type as "status" | "thought" | "log" | "error")
+              : "content";
             yield {
-              type: delta.type === "status" || delta.type === "thought" ? delta.type : "content",
+              type: mappedType,
               content: delta.content,
             };
           } else if (delta.type === "error") {

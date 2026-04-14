@@ -493,11 +493,20 @@ async def chat_completions(request: ChatRequest, http_request: Request):
 
                         content = raw_content
                     else:
-                        # Format non-response items as markdown blockquotes for the Swarm UI
-                        if msg_type == "status":
-                            content = f"\n> ⏳ _{raw_content}_\n\n"
-                        elif msg_type == "log":
-                            content = f"\n> 🛠️ _{raw_content}_\n\n"
+                        # Non-standard mode: still send status/thought/log as
+                        # typed chunks so the React UI can route them to the
+                        # ThinkingIndicator / thought-trace instead of
+                        # rendering them as message text.
+                        if msg_type in ("status", "thought", "log"):
+                            typed_chunk = {
+                                "id": "chatcmpl-swarm",
+                                "object": "chat.completion.chunk",
+                                "created": 1234567890,
+                                "model": request.model,
+                                "choices": [{"index": 0, "delta": {"content": raw_content, "type": msg_type}, "finish_reason": None}]
+                            }
+                            yield f"data: {json.dumps(typed_chunk)}\n\n"
+                            continue
                         elif msg_type == "error":
                             content = f"\n> ❌ **ERROR**: {raw_content}\n\n"
                         else:
@@ -576,10 +585,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 if msg_type in ["message", "response"]:
                     full_resp += raw_content
             else:
-                if msg_type == "status":
-                    full_resp += f"\n> ⏳ _{raw_content}_\n\n"
-                elif msg_type == "log":
-                    full_resp += f"\n> 🛠️ _{raw_content}_\n\n"
+                if msg_type in ("status", "thought", "log"):
+                    continue  # skip pipeline chatter in non-stream response
                 elif msg_type == "error":
                     full_resp += f"\n> ❌ **ERROR**: {raw_content}\n\n"
                 else:
