@@ -25,6 +25,7 @@ export interface NavigationItem {
   icon: LucideIcon;
   matchPrefixes?: string[];
   children?: NavigationItem[];
+  adminOnly?: boolean;
 }
 
 export const primaryNavigation: NavigationItem[] = [
@@ -45,6 +46,7 @@ export const primaryNavigation: NavigationItem[] = [
     href: "/monitoring",
     icon: Radar,
     matchPrefixes: ["/monitoring"],
+    adminOnly: true,
     children: [
       {
         label: "Dashboard",
@@ -127,6 +129,7 @@ export const primaryNavigation: NavigationItem[] = [
     href: "/training",
     icon: GraduationCap,
     matchPrefixes: ["/training"],
+    adminOnly: true,
   },
 ];
 
@@ -136,12 +139,14 @@ export const secondaryNavigation: NavigationItem[] = [
     href: "/operations",
     icon: LayoutDashboard,
     matchPrefixes: ["/operations"],
+    adminOnly: true,
   },
   {
     label: "Governance",
     href: "/governance",
     icon: Scale,
     matchPrefixes: ["/governance"],
+    adminOnly: true,
   },
 ];
 

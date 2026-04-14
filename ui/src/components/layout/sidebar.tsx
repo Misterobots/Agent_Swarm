@@ -16,6 +16,7 @@ import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, MessageSquare, Search, X } from "lucide-react";
 import { BuddyWidget } from "@/components/buddy/buddy-widget";
+import { useAccess } from "@/lib/hooks/use-access";
 
 function HiveLogo() {
   return (
@@ -63,8 +64,18 @@ export function Sidebar() {
   const createConversation = useChatStore((s) => s.createConversation);
   const deleteConversation = useChatStore((s) => s.deleteConversation);
   const model = useSettingsStore((s) => s.model);
+  const { isAdmin } = useAccess();
   const showConversations = isConversationRoute(pathname);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const visiblePrimary = useMemo(() =>
+    primaryNavigation.filter((item) => !item.adminOnly || isAdmin),
+    [isAdmin]
+  );
+  const visibleSecondary = useMemo(() =>
+    secondaryNavigation.filter((item) => !item.adminOnly || isAdmin),
+    [isAdmin]
+  );
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
@@ -98,7 +109,7 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin">
         <SidebarSection title="Workspaces">
-          {primaryNavigation.map((item) => (
+          {visiblePrimary.map((item) => (
             <div key={item.href}>
               <SidebarNavItem
                 href={item.href}
@@ -124,11 +135,13 @@ export function Sidebar() {
           ))}
         </SidebarSection>
 
-        <SidebarSection title="Operations">
-          {secondaryNavigation.map((item) => (
-            <SidebarNavItem key={item.href} href={item.href} label={item.label} active={isNavigationItemActive(item, pathname)} icon={item.icon} />
-          ))}
-        </SidebarSection>
+        {visibleSecondary.length > 0 && (
+          <SidebarSection title="Operations">
+            {visibleSecondary.map((item) => (
+              <SidebarNavItem key={item.href} href={item.href} label={item.label} active={isNavigationItemActive(item, pathname)} icon={item.icon} />
+            ))}
+          </SidebarSection>
+        )}
 
         <SidebarSection title="Preferences">
           {utilityNavigation.map((item) => (

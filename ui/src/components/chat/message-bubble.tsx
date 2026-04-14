@@ -85,12 +85,6 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
         {isUser ? <User size={16} /> : <Bot size={16} />}
       </div>
       <div className="flex-1 min-w-0 text-[var(--chat-text)]">
-        {message.turnMetadata && !isUser && (
-          <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--chat-muted)]">
-            <span>Turn {message.turnMetadata.turnId.slice(0, 8)}</span>
-            {message.turnMetadata.agentName ? <span>{message.turnMetadata.agentName}</span> : null}
-          </div>
-        )}
         {verification && !isUser && (
           <div
             className={cn(
@@ -126,14 +120,14 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
                 Open Art Studio
               </Link>
             )}
-            {!!message.thoughtTrace?.length && (
+            {(!!message.thoughtTrace?.length || message.turnMetadata) && (
               <div className="mt-3 border border-[var(--chat-border)] rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setTraceOpen((v) => !v)}
                   className="w-full flex items-center justify-between px-3 py-2 text-xs text-[var(--chat-text)] bg-[var(--chat-panel)] hover:bg-[var(--chat-soft)]"
                 >
-                  <span>Agent Trace ({message.thoughtTrace.length})</span>
+                  <span>Agent Trace{message.thoughtTrace?.length ? ` (${message.thoughtTrace.length})` : ""}</span>
                   <ChevronDown
                     size={14}
                     className={cn("transition-transform", traceOpen ? "rotate-180" : "")}
@@ -141,7 +135,13 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
                 </button>
                 {traceOpen && (
                   <div className="px-3 py-2 bg-[var(--chat-soft)]">
-                    {message.thoughtTrace.map((t, idx) => (
+                    {message.turnMetadata && (
+                      <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--chat-muted)]">
+                        <span>Turn {message.turnMetadata.turnId.slice(0, 8)}</span>
+                        {message.turnMetadata.agentName ? <span>{message.turnMetadata.agentName}</span> : null}
+                      </div>
+                    )}
+                    {message.thoughtTrace?.map((t, idx) => (
                       <p key={`${t.timestamp}-${idx}`} className="text-xs text-[var(--chat-accent-strong)] font-mono py-0.5">
                         [{new Date(t.timestamp).toLocaleTimeString()}] {t.content}
                       </p>
