@@ -14,7 +14,7 @@ import {
 } from "@/lib/config/navigation";
 import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
-import { Plus, Trash2, MessageSquare, Search, X } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User } from "lucide-react";
 import { BuddyWidget } from "@/components/buddy/buddy-widget";
 import { useAccess } from "@/lib/hooks/use-access";
 
@@ -64,7 +64,7 @@ export function Sidebar() {
   const createConversation = useChatStore((s) => s.createConversation);
   const deleteConversation = useChatStore((s) => s.deleteConversation);
   const model = useSettingsStore((s) => s.model);
-  const { isAdmin } = useAccess();
+  const { isAdmin, authenticated, displayName } = useAccess();
   const showConversations = isConversationRoute(pathname);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -225,8 +225,36 @@ export function Sidebar() {
       {/* Buddy companion */}
       <BuddyWidget />
 
-      {/* Status footer */}
-      <div className="px-4 py-3 border-t border-[var(--chat-border)]">
+      {/* User & status footer */}
+      <div className="px-4 py-3 border-t border-[var(--chat-border)] space-y-2">
+        {authenticated ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <User size={14} className="flex-shrink-0 text-[var(--chat-accent)]" />
+              <span className="text-xs text-[var(--chat-text)] truncate">{displayName}</span>
+              {isAdmin && (
+                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-[color:color-mix(in_srgb,var(--chat-accent)_15%,transparent)] text-[var(--chat-accent)]">
+                  Admin
+                </span>
+              )}
+            </div>
+            <a
+              href="https://auth.shivelymedia.com/flows/-/default/invalidation/"
+              className="flex items-center gap-1 text-[10px] text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
+              title="Sign out"
+            >
+              <LogOut size={12} />
+            </a>
+          </div>
+        ) : (
+          <a
+            href="https://auth.shivelymedia.com/"
+            className="flex items-center gap-2 text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)] transition-colors"
+          >
+            <LogIn size={14} />
+            <span>Sign in</span>
+          </a>
+        )}
         <div className="flex items-center gap-2 text-[10px] text-[var(--chat-muted)]">
           <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-[var(--chat-accent)]" />
           <span>Swarm Online</span>

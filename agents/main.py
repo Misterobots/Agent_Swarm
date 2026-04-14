@@ -222,13 +222,34 @@ async def root():
 async def get_my_identity(request: Request, auth_claims: dict = Depends(SpiffeJWTBearer(auto_error=False))):
     """
     Identity self-inspection endpoint.
-    Returns security_level from JWT-ACE token when present, else "anonymous".
+    Returns caller identity from Authentik headers (preferred), JWT-ACE token, or anonymous.
     Public so the UI can call it without a token.
     """
     auth = get_spiffe_auth()
     my_id = auth.get_spiffe_id()
 
-    # Try the middleware-attached agent card first (available when middleware validates)
+    # Priority 1: Authentik forward-auth headers (set by Traefik)
+    authentik_user = request.headers.get("X-authentik-username")
+    if authentik_user:
+        groups_raw = request.headers.get("X-authentik-groups", "")
+        groups = [g.strip() for g in groups_raw.split("|") if g.strip()]
+        is_admin = "admins" in groups
+        caller = {
+            "username": authentik_user,
+            "email": request.headers.get("X-authentik-email", ""),
+            "name": request.headers.get("X-authentik-name", authentik_user),
+            "uid": request.headers.get("X-authentik-uid", ""),
+            "groups": groups,
+            "security_level": "L3_ADMIN" if is_admin else "L2_USER",
+            "auth_source": "authentik",
+        }
+        return {
+            "my_spiffe_id": my_id,
+            "caller_identity": caller,
+            "spiffe_available": auth.is_available,
+        }
+
+    # Priority 2: Try the middleware-attached agent card (JWT-ACE)
     agent_card = getattr(request.state, "agent_card", None)
 
     # If middleware skipped auth (public endpoint), try manual token extraction

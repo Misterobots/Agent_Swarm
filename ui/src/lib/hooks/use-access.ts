@@ -4,23 +4,42 @@ import { useEffect, useState } from "react";
 
 const API_BASE = "/api/backend";
 
-interface IdentityResponse {
-  caller_identity?: {
-    security_level?: string;
-    [key: string]: unknown;
-  } | string;
+interface CallerIdentity {
+  security_level?: string;
+  username?: string;
+  email?: string;
+  name?: string;
+  groups?: string[];
+  auth_source?: string;
+  [key: string]: unknown;
 }
 
-function parseSecurityLevel(payload: IdentityResponse): string {
+interface IdentityResponse {
+  caller_identity?: CallerIdentity | string;
+}
+
+function parseIdentity(payload: IdentityResponse) {
   const caller = payload?.caller_identity;
-  if (!caller || typeof caller === "string") return "";
-  const level = caller.security_level;
-  return typeof level === "string" ? level.toUpperCase() : "";
+  if (!caller || typeof caller === "string") {
+    return { securityLevel: "", username: "", displayName: "", email: "", authenticated: false };
+  }
+  const level = typeof caller.security_level === "string" ? caller.security_level.toUpperCase() : "";
+  return {
+    securityLevel: level,
+    username: caller.username || "",
+    displayName: caller.name || caller.username || "",
+    email: caller.email || "",
+    authenticated: !!caller.auth_source,
+  };
 }
 
 export function useAccess() {
   const [loading, setLoading] = useState(true);
-  const [securityLevel, setSecurityLevel] = useState<string>("");
+  const [securityLevel, setSecurityLevel] = useState("");
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -28,16 +47,21 @@ export function useAccess() {
     fetch(`${API_BASE}/api/v1/identity`)
       .then(async (resp) => {
         if (!resp.ok) return null;
-        const data = (await resp.json()) as IdentityResponse;
-        return parseSecurityLevel(data);
+        return (await resp.json()) as IdentityResponse;
       })
-      .then((level) => {
-        if (!mounted) return;
-        setSecurityLevel(level || "");
+      .then((data) => {
+        if (!mounted || !data) return;
+        const id = parseIdentity(data);
+        setSecurityLevel(id.securityLevel);
+        setUsername(id.username);
+        setDisplayName(id.displayName);
+        setEmail(id.email);
+        setAuthenticated(id.authenticated);
       })
       .catch(() => {
         if (!mounted) return;
         setSecurityLevel("");
+        setAuthenticated(false);
       })
       .finally(() => {
         if (!mounted) return;
@@ -53,5 +77,9 @@ export function useAccess() {
     loading,
     securityLevel,
     isAdmin: securityLevel === "L3_ADMIN" || securityLevel === "L4_SYSTEM",
+    username,
+    displayName,
+    email,
+    authenticated,
   };
 }

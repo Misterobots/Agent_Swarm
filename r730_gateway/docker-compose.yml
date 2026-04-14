@@ -374,9 +374,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=saltbox"
-      # Internal LAN route (no auth)
+      # Internal LAN route (with Authentik auth)
       - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
       - "traefik.http.routers.hive-ui.entrypoints=web"
+      - "traefik.http.routers.hive-ui.middlewares=authentik@docker"
       - "traefik.http.routers.hive-ui.service=hive-ui"
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
       # External HTTPS route: hive.shivelymedia.com (behind Authentik)
