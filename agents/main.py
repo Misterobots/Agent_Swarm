@@ -2401,10 +2401,10 @@ async def ops_health():
             sock.settimeout(5)
             sock.connect("/var/run/docker.sock")
             request = (
-                "GET /containers/json HTTP/1.1\r\n"
+                "GET /containers/json HTTP/1.0\r\n"
                 "Host: localhost\r\n"
                 "Accept: application/json\r\n"
-                "Connection: close\r\n\r\n"
+                "\r\n"
             )
             sock.sendall(request.encode("ascii"))
             chunks = []
