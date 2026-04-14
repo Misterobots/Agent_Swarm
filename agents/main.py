@@ -130,6 +130,26 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Trigger scheduler init failed (non-fatal): {e}")
 
+        # 7. Clean up orphaned training runs (status='running' but server restarted)
+        try:
+            from config import TEMPLATE_DB_URL
+            import psycopg2
+            conn = psycopg2.connect(TEMPLATE_DB_URL)
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE swarm.training_runs SET status='failed', "
+                "error_message='Interrupted by server restart', completed_at=NOW() "
+                "WHERE status='running'"
+            )
+            cleaned = cur.rowcount
+            conn.commit()
+            cur.close()
+            conn.close()
+            if cleaned:
+                logger.warning(f"Cleaned up {cleaned} orphaned training run(s) stuck in 'running' state")
+        except Exception as e:
+            logger.warning(f"Training run cleanup failed (non-fatal): {e}")
+
         print("DEBUG: Startup Complete. Yielding...")
         logger.info("Swarm Engine Online. Waiting for events...")
         yield
