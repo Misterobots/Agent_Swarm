@@ -2344,7 +2344,7 @@ async def ops_health():
     import subprocess
     import socket
     import requests as _requests
-    from config import CONTROL_NODE_IP, LANGFUSE_HOST, R730_IP, JUSTIN_PC_IP
+    from config import CONTROL_NODE_IP, LANGFUSE_HOST, GATEWAY_NODE_IP, EXECUTION_NODE_IP
 
     def normalize_containers(raw_containers):
         parsed = []
@@ -2409,7 +2409,7 @@ async def ops_health():
             return fetch_local_containers()
         except Exception:
             last_error = None
-            for host in [JUSTIN_PC_IP, "host.docker.internal"]:
+            for host in [EXECUTION_NODE_IP, "host.docker.internal"]:
                 try:
                     return fetch_remote_containers(host)
                 except Exception as e:
@@ -2421,8 +2421,8 @@ async def ops_health():
     degraded_reasons = []
 
     cluster_defs = [
-        {"name": "Justin-PC", "role": "execution", "ip": JUSTIN_PC_IP, "fetch": lambda: fetch_justin_containers()},
-        {"name": "R730", "role": "gateway", "ip": R730_IP, "fetch": lambda: fetch_remote_containers(R730_IP)},
+        {"name": "Justin-PC", "role": "execution", "ip": EXECUTION_NODE_IP, "fetch": lambda: fetch_justin_containers()},
+        {"name": "R730", "role": "gateway", "ip": GATEWAY_NODE_IP, "fetch": lambda: fetch_remote_containers(GATEWAY_NODE_IP)},
         {"name": "Control Node", "role": "control", "ip": CONTROL_NODE_IP, "fetch": lambda: fetch_remote_containers(CONTROL_NODE_IP)},
     ]
 
@@ -2793,6 +2793,122 @@ async def knowledge_ingest():
 async def knowledge_ingest_file():
     """Ingest file content into the knowledge base (RAG)."""
     return {"status": "accepted", "message": "File ingestion endpoint ready"}
+
+
+# ---------------------------------------------------------------------------
+# Service Health Check + Restart Endpoints
+# ---------------------------------------------------------------------------
+
+SERVICE_REGISTRY = [
+    # R730 Gateway services
+    {"id": "grafana",      "name": "Grafana",        "node": "R730",         "ip": "192.168.2.103", "port": 3001, "container": "grafana-r730",      "health_url": "http://192.168.2.103:3001/grafana/api/health"},
+    {"id": "prometheus",   "name": "Prometheus",      "node": "R730",         "ip": "192.168.2.103", "port": 9091, "container": "prometheus-r730",   "health_url": "http://192.168.2.103:9091/prometheus/-/healthy"},
+    {"id": "loki",         "name": "Loki",            "node": "R730",         "ip": "192.168.2.103", "port": 3100, "container": "loki-r730",         "health_url": "http://192.168.2.103:3100/ready"},
+    {"id": "alertmanager", "name": "Alertmanager",    "node": "R730",         "ip": "192.168.2.103", "port": 9093, "container": "alertmanager-r730", "health_url": "http://192.168.2.103:9093/alertmanager/-/healthy"},
+    {"id": "cadvisor",     "name": "cAdvisor",        "node": "R730",         "ip": "192.168.2.103", "port": 8888, "container": "cadvisor-r730",     "health_url": None},
+    {"id": "ollama-r730",  "name": "Ollama (R730)",   "node": "R730",         "ip": "192.168.2.103", "port": 11434,"container": "ollama-r730",       "health_url": "http://192.168.2.103:11434/"},
+    {"id": "redis-r730",   "name": "Redis (R730)",    "node": "R730",         "ip": "192.168.2.103", "port": 6379, "container": "redis-r730",        "health_url": None},
+    # Control Node services
+    {"id": "langfuse",     "name": "Langfuse",        "node": "Control Node", "ip": "192.168.2.102", "port": 3000, "container": "langfuse-web",      "health_url": "http://192.168.2.102:3000/api/public/health"},
+    {"id": "postgres",     "name": "PostgreSQL",      "node": "Control Node", "ip": "192.168.2.102", "port": 5432, "container": "postgres",          "health_url": None},
+    {"id": "clickhouse",   "name": "ClickHouse",      "node": "Control Node", "ip": "192.168.2.102", "port": 8123, "container": "clickhouse",        "health_url": "http://192.168.2.102:8123/ping"},
+    {"id": "minio",        "name": "MinIO",           "node": "Control Node", "ip": "192.168.2.102", "port": 9190, "container": "minio",             "health_url": "http://192.168.2.102:9190/minio/health/live"},
+    {"id": "redis-ctrl",   "name": "Redis (Control)", "node": "Control Node", "ip": "192.168.2.102", "port": 6379, "container": "redis",             "health_url": None},
+    {"id": "spire",        "name": "SPIRE Server",    "node": "Control Node", "ip": "192.168.2.102", "port": 8081, "container": "spire-server",      "health_url": None},
+    {"id": "mempalace",    "name": "MemPalace",       "node": "Control Node", "ip": "192.168.2.102", "port": 8200, "container": "mempalace",         "health_url": "http://192.168.2.102:8200/health"},
+    # Execution Node services
+    {"id": "ollama-exec",  "name": "Ollama (Exec)",   "node": "Justin-PC",    "ip": "192.168.2.101", "port": 11434,"container": "ollama",            "health_url": "http://192.168.2.101:11434/"},
+]
+
+NODE_DOCKER_SOCKETS = {
+    "R730":         "http://192.168.2.103:2375",
+    "Control Node": "http://192.168.2.102:2375",
+    "Justin-PC":    "http://192.168.2.101:2375",
+}
+
+
+@app.get("/api/v1/ops/services")
+async def ops_service_checks():
+    """Deep connectivity check for every registered service."""
+    import socket
+    import time
+    import requests as _requests
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def check_one(svc: dict) -> dict:
+        result = {
+            "id": svc["id"], "name": svc["name"], "node": svc["node"],
+            "ip": svc["ip"], "port": svc["port"], "container": svc["container"],
+            "healthy": False, "latency_ms": None, "detail": "",
+        }
+        t0 = time.time()
+        try:
+            if svc["health_url"]:
+                r = _requests.get(svc["health_url"], timeout=4)
+                result["healthy"] = r.status_code < 500
+                result["detail"] = f"HTTP {r.status_code}"
+            else:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(3)
+                code = s.connect_ex((svc["ip"], svc["port"]))
+                s.close()
+                result["healthy"] = code == 0
+                result["detail"] = "TCP open" if code == 0 else f"TCP refused (code {code})"
+        except _requests.exceptions.ConnectTimeout:
+            result["detail"] = "Connect timeout"
+        except _requests.exceptions.ConnectionError as e:
+            result["detail"] = f"Connection error: {str(e)[:80]}"
+        except Exception as e:
+            result["detail"] = str(e)[:100]
+        result["latency_ms"] = round((time.time() - t0) * 1000)
+        return result
+
+    results = []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(check_one, svc): svc for svc in SERVICE_REGISTRY}
+        for fut in as_completed(futures):
+            results.append(fut.result())
+
+    node_order = {"R730": 0, "Control Node": 1, "Justin-PC": 2}
+    results.sort(key=lambda r: (node_order.get(r["node"], 99), r["name"]))
+
+    healthy_count = sum(1 for r in results if r["healthy"])
+    return {
+        "services": results,
+        "summary": {
+            "total": len(results),
+            "healthy": healthy_count,
+            "unhealthy": len(results) - healthy_count,
+        },
+    }
+
+
+@app.post("/api/v1/ops/services/{service_id}/restart")
+async def ops_service_restart(service_id: str):
+    """Restart a specific service container via Docker API."""
+    import requests as _requests
+
+    svc = next((s for s in SERVICE_REGISTRY if s["id"] == service_id), None)
+    if not svc:
+        raise HTTPException(status_code=404, detail=f"Unknown service: {service_id}")
+
+    docker_url = NODE_DOCKER_SOCKETS.get(svc["node"])
+    if not docker_url:
+        raise HTTPException(status_code=500, detail=f"No docker socket configured for node {svc['node']}")
+
+    container = svc["container"]
+    try:
+        resp = _requests.post(f"{docker_url}/containers/{container}/restart?t=10", timeout=30)
+        if resp.status_code == 204:
+            return {"status": "restarted", "service": svc["name"], "node": svc["node"], "container": container}
+        elif resp.status_code == 404:
+            raise HTTPException(status_code=404, detail=f"Container '{container}' not found on {svc['node']}")
+        else:
+            raise HTTPException(status_code=502, detail=f"Docker API returned {resp.status_code}: {resp.text[:200]}")
+    except _requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=502, detail=f"Cannot reach Docker socket proxy on {svc['node']} ({docker_url})")
+    except _requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail=f"Restart timed out for {container} on {svc['node']}")
 
 
 if __name__ == "__main__":

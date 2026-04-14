@@ -6,7 +6,7 @@ import { DashboardSelector, DASHBOARDS } from "./dashboard-selector";
 import { ExternalLink, Loader2 } from "lucide-react";
 
 // LAN Grafana URL (baked at build time)
-const GRAFANA_LAN = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://192.168.2.103/grafana";
+const GRAFANA_LAN = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://192.168.2.103:3001/grafana";
 // External Grafana URL — served via Cloudflare tunnel + Traefik
 const GRAFANA_EXT = "https://grafana.shivelymedia.com/grafana";
 

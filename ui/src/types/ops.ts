@@ -98,6 +98,23 @@ export interface ModelCatalog {
   errors: string[];
 }
 
+export interface ServiceCheck {
+  id: string;
+  name: string;
+  node: string;
+  ip: string;
+  port: number;
+  container: string;
+  healthy: boolean;
+  latency_ms: number | null;
+  detail: string;
+}
+
+export interface ServiceCheckResponse {
+  services: ServiceCheck[];
+  summary: { total: number; healthy: number; unhealthy: number };
+}
+
 // NR ops types (used by monitoring components)
 export interface ServiceStatus {
   name: string;

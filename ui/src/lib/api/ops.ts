@@ -1,4 +1,4 @@
-import type { OpsHealth, TraceListResponse, TraceDetail, Observation } from "@/types/ops";
+import type { OpsHealth, TraceListResponse, TraceDetail, Observation, ServiceCheckResponse } from "@/types/ops";
 
 const API_BASE = "/api/backend";
 
@@ -46,5 +46,28 @@ export async function fetchObservations(
     return data.observations || [];
   } catch {
     return [];
+  }
+}
+
+export async function fetchServiceChecks(): Promise<ServiceCheckResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/ops/services`);
+    if (!response.ok) return { services: [], summary: { total: 0, healthy: 0, unhealthy: 0 } };
+    return response.json();
+  } catch {
+    return { services: [], summary: { total: 0, healthy: 0, unhealthy: 0 } };
+  }
+}
+
+export async function restartService(serviceId: string): Promise<{ status: string; detail?: string }> {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/ops/services/${encodeURIComponent(serviceId)}/restart`, {
+      method: "POST",
+    });
+    const data = await response.json();
+    if (!response.ok) return { status: "error", detail: data.detail || `HTTP ${response.status}` };
+    return { status: "restarted" };
+  } catch (e) {
+    return { status: "error", detail: String(e) };
   }
 }
