@@ -83,7 +83,7 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
                   />
                 </button>
                 {traceOpen && (
-                  <div className="px-3 py-2 bg-[color:color-mix(in_srgb,var(--chat-panel)_90%,black)]">
+                  <div className="px-3 py-2 bg-[var(--chat-soft)]">
                     {message.thoughtTrace.map((t, idx) => (
                       <p key={`${t.timestamp}-${idx}`} className="text-xs text-[var(--chat-accent-strong)] font-mono py-0.5">
                         [{new Date(t.timestamp).toLocaleTimeString()}] {t.content}

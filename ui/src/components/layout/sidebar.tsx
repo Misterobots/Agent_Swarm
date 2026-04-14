@@ -77,7 +77,7 @@ export function Sidebar() {
   }, [conversations, searchQuery]);
 
   return (
-    <div className="sidebar-wrapper relative flex flex-col h-full bg-[color:color-mix(in_srgb,var(--chat-bg)_85%,black)] border-r border-[var(--chat-border)]">
+    <div className="sidebar-wrapper relative flex flex-col h-full bg-[color:color-mix(in_srgb,var(--chat-bg)_85%,var(--chat-surface))] border-r border-[var(--chat-border)]">
       {/* Logo */}
       <div className="px-4 py-4 border-b border-[var(--chat-border)]">
         <div className="flex items-center gap-3">

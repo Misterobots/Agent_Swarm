@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils/cn";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
@@ -13,6 +13,11 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const theme = useSettingsStore((s) => s.theme);
+
+  // Sync data-theme to <html> so body/root-level styles are also theme-aware
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   return (
     <div data-theme={theme} className="flex h-screen bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
