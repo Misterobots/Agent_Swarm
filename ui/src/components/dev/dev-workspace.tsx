@@ -6,16 +6,16 @@ import { FileCode2, Terminal } from "lucide-react";
 
 function EditorPlaceholder() {
   return (
-    <div className="flex flex-col h-full bg-[#0e1117]">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-800 text-xs text-zinc-500">
+    <div className="flex flex-col h-full bg-[var(--chat-bg)]">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--chat-border)] text-xs text-[var(--chat-muted)]">
         <FileCode2 size={13} />
         <span>Editor</span>
       </div>
-      <div className="flex-1 flex items-center justify-center text-zinc-600">
+      <div className="flex-1 flex items-center justify-center text-[var(--chat-muted)]">
         <div className="text-center">
-          <FileCode2 size={40} className="mx-auto mb-3 text-zinc-700" />
-          <p className="text-sm font-medium text-zinc-500">Editor Pane</p>
-          <p className="text-xs text-zinc-600 mt-1">Monaco integration — coming soon</p>
+          <FileCode2 size={40} className="mx-auto mb-3 text-[var(--chat-muted)]" />
+          <p className="text-sm font-medium text-[var(--chat-muted)]">Editor Pane</p>
+          <p className="text-xs text-[var(--chat-muted)] mt-1">Monaco integration — coming soon</p>
         </div>
       </div>
     </div>
@@ -24,15 +24,15 @@ function EditorPlaceholder() {
 
 function TerminalPlaceholder() {
   return (
-    <div className="flex flex-col h-full bg-[#0a0a14]">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-800 text-xs text-zinc-500">
+    <div className="flex flex-col h-full bg-[var(--chat-bg)]">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--chat-border)] text-xs text-[var(--chat-muted)]">
         <Terminal size={13} />
         <span>Terminal</span>
       </div>
-      <div className="flex-1 flex items-center justify-center text-zinc-600">
+      <div className="flex-1 flex items-center justify-center text-[var(--chat-muted)]">
         <div className="text-center">
-          <Terminal size={32} className="mx-auto mb-2 text-zinc-700" />
-          <p className="text-xs text-zinc-600">xterm.js integration — coming soon</p>
+          <Terminal size={32} className="mx-auto mb-2 text-[var(--chat-muted)]" />
+          <p className="text-xs text-[var(--chat-muted)]">xterm.js integration — coming soon</p>
         </div>
       </div>
     </div>
@@ -47,7 +47,7 @@ export function DevWorkspace() {
         <ChatView />
       </Panel>
 
-      <Separator className="w-1 bg-zinc-800 hover:bg-cyan-600 transition-colors" />
+      <Separator className="w-1 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors" />
 
       {/* Right side: editor + terminal stacked */}
       <Panel defaultSize="65%" minSize="30%">
@@ -57,7 +57,7 @@ export function DevWorkspace() {
             <EditorPlaceholder />
           </Panel>
 
-          <Separator className="h-1 bg-zinc-800 hover:bg-cyan-600 transition-colors" />
+          <Separator className="h-1 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors" />
 
           {/* Terminal pane */}
           <Panel defaultSize="35%" minSize="15%">

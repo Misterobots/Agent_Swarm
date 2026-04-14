@@ -182,7 +182,7 @@ export default function GovernancePage() {
                         <div className="flex flex-wrap gap-1">
                           <button onClick={() => setStatus(req.id, "APPROVED")} className="rounded border border-emerald-800/80 bg-emerald-950/30 px-2 py-1 text-xs text-emerald-400">Approve</button>
                           <button onClick={() => setStatus(req.id, "REJECTED")} className="rounded border border-red-900/80 bg-red-950/30 px-2 py-1 text-xs text-red-400">Reject</button>
-                          <button onClick={() => setStatus(req.id, "COMPLETED")} className="rounded border border-cyan-900/80 bg-cyan-950/30 px-2 py-1 text-xs text-cyan-400">Complete</button>
+                          <button onClick={() => setStatus(req.id, "COMPLETED")} className="rounded border border-[var(--chat-accent)]/40 bg-[var(--chat-accent)]/10 px-2 py-1 text-xs text-[var(--chat-accent)]">Complete</button>
                         </div>
                       </td>
                     </tr>,

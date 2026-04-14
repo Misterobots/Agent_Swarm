@@ -60,17 +60,17 @@ export function DocsView() {
   const docs = audience === "user" ? USER_DOCS : ADMIN_DOCS;
 
   return (
-    <div className="flex h-full bg-[#0d0d1a] text-zinc-100">
+    <div className="flex h-full bg-[var(--chat-bg)] text-[var(--chat-text)]">
       {/* Sidebar */}
-      <div className="w-56 flex-shrink-0 border-r border-zinc-800 flex flex-col">
+      <div className="w-56 flex-shrink-0 border-r border-[var(--chat-border)] flex flex-col">
         {/* Audience tabs */}
-        <div className="flex border-b border-zinc-800">
+        <div className="flex border-b border-[var(--chat-border)]">
           <button
             onClick={() => handleAudienceChange("user")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors ${
               audience === "user"
-                ? "text-cyan-400 border-b-2 border-cyan-400"
-                : "text-zinc-500 hover:text-zinc-300"
+                ? "text-[var(--chat-accent)] border-b-2 border-[var(--chat-accent)]"
+                : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
             }`}
           >
             <User size={13} />
@@ -80,8 +80,8 @@ export function DocsView() {
             onClick={() => handleAudienceChange("admin")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors ${
               audience === "admin"
-                ? "text-cyan-400 border-b-2 border-cyan-400"
-                : "text-zinc-500 hover:text-zinc-300"
+                ? "text-[var(--chat-accent)] border-b-2 border-[var(--chat-accent)]"
+                : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
             }`}
           >
             <Shield size={13} />
@@ -97,19 +97,19 @@ export function DocsView() {
               onClick={() => setActiveKey(doc.key)}
               className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors text-left ${
                 activeKey === doc.key
-                  ? "bg-[#1a1a2e] text-cyan-300 border-r-2 border-cyan-400"
-                  : "text-zinc-400 hover:bg-[#161625] hover:text-zinc-200"
+                  ? "bg-[var(--chat-panel)] text-[var(--chat-accent)] border-r-2 border-[var(--chat-accent)]"
+                  : "text-[var(--chat-muted)] hover:bg-[var(--chat-surface)] hover:text-[var(--chat-text)]"
               }`}
             >
               <span>{doc.label}</span>
-              {activeKey === doc.key && <ChevronRight size={13} className="text-cyan-500" />}
+              {activeKey === doc.key && <ChevronRight size={13} className="text-[var(--chat-accent)]" />}
             </button>
           ))}
         </nav>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-zinc-800">
-          <div className="flex items-center gap-2 text-zinc-600 text-xs">
+        <div className="px-4 py-3 border-t border-[var(--chat-border)]">
+          <div className="flex items-center gap-2 text-[var(--chat-muted)] text-xs">
             <BookOpen size={12} />
             <span>Agentic Hive v3.3</span>
           </div>
@@ -120,7 +120,7 @@ export function DocsView() {
       <div className="flex-1 overflow-y-auto">
         {loading && (
           <div className="flex items-center justify-center h-full">
-            <Loader2 size={24} className="animate-spin text-cyan-500" />
+            <Loader2 size={24} className="animate-spin text-[var(--chat-accent)]" />
           </div>
         )}
         {error && !loading && (

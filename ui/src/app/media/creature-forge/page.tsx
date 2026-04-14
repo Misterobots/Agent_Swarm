@@ -67,23 +67,23 @@ export default function CreatureForgePage() {
       icon={Hammer}
     >
       <WorkspaceSection title="2D to 3D Conversion">
-        <div className="grid gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 md:grid-cols-2">
+        <div className="grid gap-3 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs text-zinc-400">Source Image Path</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">Source Image Path</label>
             <input
               value={imagePath}
               onChange={(e) => setImagePath(e.target.value)}
               placeholder="/workspace/delivered_artifacts/ComfyUI_action_figure_001.png"
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-zinc-400">Workflow Template</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">Workflow Template</label>
             <select
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             >
               {WORKFLOWS.map((workflow) => (
                 <option key={workflow.name} value={workflow.name}>
@@ -91,7 +91,7 @@ export default function CreatureForgePage() {
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className="mt-2 text-xs text-[var(--chat-muted)]">
               {WORKFLOWS.find((w) => w.name === workflowName)?.description}
             </p>
           </div>
@@ -109,17 +109,17 @@ export default function CreatureForgePage() {
             </button>
           </div>
 
-          {result && <p className="md:col-span-2 rounded bg-zinc-950 px-3 py-2 text-xs text-zinc-300">{result}</p>}
+          {result && <p className="md:col-span-2 rounded bg-[var(--chat-bg)] px-3 py-2 text-xs text-[var(--chat-text)]">{result}</p>}
         </div>
       </WorkspaceSection>
 
       <WorkspaceSection title="Workflow Catalog">
         <div className="grid gap-3 md:grid-cols-3">
           {WORKFLOWS.map((workflow) => (
-            <div key={workflow.name} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <p className="text-sm font-medium text-zinc-200">{workflow.label}</p>
-              <p className="mt-1 text-xs text-zinc-500">{workflow.description}</p>
-              <code className="mt-2 block rounded bg-zinc-950 px-2 py-1 text-[11px] text-zinc-400">{workflow.name}</code>
+            <div key={workflow.name} className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
+              <p className="text-sm font-medium text-[var(--chat-text)]">{workflow.label}</p>
+              <p className="mt-1 text-xs text-[var(--chat-muted)]">{workflow.description}</p>
+              <code className="mt-2 block rounded bg-[var(--chat-bg)] px-2 py-1 text-[11px] text-[var(--chat-muted)]">{workflow.name}</code>
             </div>
           ))}
         </div>
@@ -129,22 +129,22 @@ export default function CreatureForgePage() {
         <div className="mb-3 flex justify-end">
           <button
             onClick={load}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
           >
             <RefreshCw size={12} /> Refresh
           </button>
         </div>
 
         {recentMedia.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-500">No 3D artifacts detected in delivered artifacts yet.</p>
+          <p className="py-8 text-center text-sm text-[var(--chat-muted)]">No 3D artifacts detected in delivered artifacts yet.</p>
         ) : (
           <div className="space-y-2">
             {recentMedia.map((item) => (
-              <div key={item.name} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <div key={item.name} className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">{item.name}</p>
-                    <p className="text-xs text-zinc-500">{new Date(item.updated_at * 1000).toLocaleString()}</p>
+                    <p className="text-sm font-medium text-[var(--chat-text)]">{item.name}</p>
+                    <p className="text-xs text-[var(--chat-muted)]">{new Date(item.updated_at * 1000).toLocaleString()}</p>
                   </div>
                   <a href={item.url} download={item.name} className="text-xs text-[var(--chat-accent)]">
                     Download

@@ -27,7 +27,7 @@ export function TraceDetail({ traceId, onClose }: TraceDetailProps) {
 
   if (!data) {
     return (
-      <div className="border-t border-zinc-800 p-6 text-center text-zinc-500 text-sm">
+      <div className="border-t border-[var(--chat-border)] p-6 text-center text-[var(--chat-muted)] text-sm">
         Loading trace...
       </div>
     );
@@ -37,38 +37,38 @@ export function TraceDetail({ traceId, onClose }: TraceDetailProps) {
   const langfuseUrl = data.langfuse_url || `${window.location.protocol}//${window.location.hostname}:3000/trace/${traceId}`;
 
   return (
-    <div className="border-t border-cyan-800/50 bg-[#0f0f1a]">
+    <div className="border-t border-[var(--chat-accent)]/50 bg-[var(--chat-bg)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--chat-border)]">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-zinc-200">{String(trace.name ?? traceId)}</span>
+          <span className="text-sm font-medium text-[var(--chat-text)]">{String(trace.name ?? traceId)}</span>
           {trace.latency != null && (
-            <span className="text-xs text-zinc-500">{Number(trace.latency).toFixed(2)}s</span>
+            <span className="text-xs text-[var(--chat-muted)]">{Number(trace.latency).toFixed(2)}s</span>
           )}
           <a
             href={langfuseUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-cyan-600 hover:text-cyan-400"
+            className="text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)]"
           >
             <ExternalLink size={12} />
           </a>
         </div>
-        <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300">
+        <button onClick={onClose} className="text-[var(--chat-muted)] hover:text-[var(--chat-text)]">
           <X size={16} />
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800">
+      <div className="flex border-b border-[var(--chat-border)]">
         {(["input", "output", "metadata"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 text-xs font-medium transition-colors ${
               activeTab === tab
-                ? "text-cyan-400 border-b-2 border-cyan-400"
-                : "text-zinc-500 hover:text-zinc-300"
+                ? "text-[var(--chat-accent)] border-b-2 border-[var(--chat-accent)]"
+                : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
             }`}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -78,7 +78,7 @@ export function TraceDetail({ traceId, onClose }: TraceDetailProps) {
 
       {/* Tab Content */}
       <div className="px-4 py-3 max-h-48 overflow-y-auto">
-        <pre className="text-xs text-zinc-300 whitespace-pre-wrap">
+        <pre className="text-xs text-[var(--chat-text)] whitespace-pre-wrap">
           {activeTab === "input" && JSON.stringify(trace.input, null, 2)}
           {activeTab === "output" && JSON.stringify(trace.output, null, 2)}
           {activeTab === "metadata" && JSON.stringify(trace.metadata, null, 2)}
@@ -87,8 +87,8 @@ export function TraceDetail({ traceId, onClose }: TraceDetailProps) {
 
       {/* Observations */}
       {observations.length > 0 && (
-        <div className="px-4 py-3 border-t border-zinc-800 space-y-2">
-          <h3 className="text-xs font-medium text-zinc-400 mb-2">
+        <div className="px-4 py-3 border-t border-[var(--chat-border)] space-y-2">
+          <h3 className="text-xs font-medium text-[var(--chat-muted)] mb-2">
             Observations ({observations.length})
           </h3>
           {observations.map((obs) => (

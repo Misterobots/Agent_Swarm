@@ -29,21 +29,21 @@ export default function MediaImagesPage() {
     >
       <WorkspaceSection title="Delivered Artifact Gallery">
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-[var(--chat-muted)]">
             Source: <span className="font-mono">/workspace/delivered_artifacts</span>
           </p>
           <button
             onClick={load}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
         </div>
 
         {loading && images.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-500">Loading image artifacts...</p>
+          <p className="py-8 text-center text-sm text-[var(--chat-muted)]">Loading image artifacts...</p>
         ) : images.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-500">
+          <p className="py-8 text-center text-sm text-[var(--chat-muted)]">
             No image artifacts found yet. Generate images to populate this gallery.
           </p>
         ) : (
@@ -51,7 +51,7 @@ export default function MediaImagesPage() {
             {images.map((item) => {
               const params = (item.metadata?.params as Record<string, unknown> | undefined) ?? {};
               return (
-                <article key={item.name} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50">
+                <article key={item.name} className="overflow-hidden rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)]">
                   <img
                     src={item.url}
                     alt={item.name}
@@ -59,15 +59,15 @@ export default function MediaImagesPage() {
                     loading="lazy"
                   />
                   <div className="space-y-1 p-3">
-                    <p className="truncate text-sm font-medium text-zinc-200">{item.name}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="truncate text-sm font-medium text-[var(--chat-text)]">{item.name}</p>
+                    <p className="text-xs text-[var(--chat-muted)]">
                       {(item.size_mb ?? 0).toFixed(2)} MB · {new Date(item.updated_at * 1000).toLocaleString()}
                     </p>
                     {typeof item.metadata?.prompt === "string" && (
-                      <p className="line-clamp-2 text-xs text-zinc-400">{item.metadata.prompt}</p>
+                      <p className="line-clamp-2 text-xs text-[var(--chat-muted)]">{item.metadata.prompt}</p>
                     )}
                     {(Boolean(params.cfg) || Boolean(params.steps) || Boolean(item.metadata?.model)) && (
-                      <p className="text-xs text-zinc-600">
+                      <p className="text-xs text-[var(--chat-muted)]">
                         {item.metadata?.model ? `Model: ${String(item.metadata.model)} · ` : ""}
                         {params.cfg ? `CFG: ${String(params.cfg)} · ` : ""}
                         {params.steps ? `Steps: ${String(params.steps)}` : ""}
@@ -76,7 +76,7 @@ export default function MediaImagesPage() {
                     <a
                       href={item.url}
                       download={item.name}
-                      className="inline-block pt-1 text-xs text-cyan-500 hover:text-cyan-300"
+                      className="inline-block pt-1 text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)]"
                     >
                       Download
                     </a>

@@ -35,16 +35,16 @@ export function EditorPane() {
   }, [editorLanguage]);
 
   return (
-    <div className="flex flex-col h-full bg-[#0e1117]">
+    <div className="flex flex-col h-full bg-[var(--chat-bg)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--chat-border)]">
+        <div className="flex items-center gap-2 text-xs text-[var(--chat-muted)]">
           <FileCode2 size={13} />
           <span>Editor</span>
           <select
             value={editorLanguage}
             onChange={(e) => useDevStore.getState().setEditorLanguage(e.target.value)}
-            className="ml-2 bg-zinc-900 border border-zinc-800 rounded px-2 py-0.5 text-xs text-zinc-400 focus:outline-none focus:border-cyan-800"
+            className="ml-2 bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-2 py-0.5 text-xs text-[var(--chat-muted)] focus:outline-none focus:border-[var(--chat-accent)]/40"
           >
             <option value="python">Python</option>
             <option value="typescript">TypeScript</option>
@@ -59,14 +59,14 @@ export function EditorPane() {
         <div className="flex items-center gap-1">
           <button
             onClick={handleCopy}
-            className="p-1.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)] transition-colors"
             title="Copy to clipboard"
           >
             <Copy size={13} />
           </button>
           <button
             onClick={handleDownload}
-            className="p-1.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)] transition-colors"
             title="Download file"
           >
             <Download size={13} />

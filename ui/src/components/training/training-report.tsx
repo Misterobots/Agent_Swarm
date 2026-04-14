@@ -31,7 +31,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-4 text-zinc-500 text-sm">
+      <div className="flex items-center gap-2 py-4 text-[var(--chat-muted)] text-sm">
         <Loader2 size={14} className="animate-spin" />
         Generating report...
       </div>
@@ -40,7 +40,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
 
   if (!report) {
     return (
-      <p className="text-sm text-zinc-500 py-4">
+      <p className="text-sm text-[var(--chat-muted)] py-4">
         Report unavailable for this run.
       </p>
     );
@@ -88,7 +88,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
             ? "Training Failed"
             : "Training In Progress"}
         </span>
-        <span className="text-zinc-500 ml-auto text-xs">
+        <span className="text-[var(--chat-muted)] ml-auto text-xs">
           Run #{report.run_id} &middot; {report.run_type}
         </span>
       </div>
@@ -108,31 +108,31 @@ export function TrainingReportView({ runId }: { runId: number }) {
 
       {/* Timing */}
       <Section
-        icon={<Clock size={14} className="text-cyan-500" />}
+        icon={<Clock size={14} className="text-[var(--chat-accent)]" />}
         title="Timing"
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Stat
             label="Total Wall Clock"
-            value={t.total_wall_clock_sec ? formatDuration(t.total_wall_clock_sec) : "—"}
+            value={t.total_wall_clock_sec ? formatDuration(t.total_wall_clock_sec) : "â€”"}
           />
           <Stat
             label="Active Training"
-            value={t.active_training_sec ? formatDuration(t.active_training_sec) : "—"}
+            value={t.active_training_sec ? formatDuration(t.active_training_sec) : "â€”"}
           />
           <Stat
             label="Overhead"
-            value={t.overhead_sec ? formatDuration(t.overhead_sec) : "—"}
+            value={t.overhead_sec ? formatDuration(t.overhead_sec) : "â€”"}
             detail={t.overhead_note}
           />
           <Stat
             label="Started"
-            value={t.started_at ? new Date(t.started_at).toLocaleString() : "—"}
+            value={t.started_at ? new Date(t.started_at).toLocaleString() : "â€”"}
           />
         </div>
         {t.overhead_sec != null && t.total_wall_clock_sec != null && t.total_wall_clock_sec > 0 && (
           <div className="mt-2">
-            <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-zinc-800">
+            <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-[var(--chat-surface)]">
               <div
                 className="bg-cyan-500 rounded-l-full"
                 style={{
@@ -141,14 +141,14 @@ export function TrainingReportView({ runId }: { runId: number }) {
                 title="Active training"
               />
               <div
-                className="bg-zinc-600 rounded-r-full"
+                className="bg-[var(--chat-surface)] rounded-r-full"
                 style={{
                   width: `${(t.overhead_sec / t.total_wall_clock_sec) * 100}%`,
                 }}
                 title="Overhead (model load + dataset prep)"
               />
             </div>
-            <div className="flex justify-between mt-1 text-[10px] text-zinc-600">
+            <div className="flex justify-between mt-1 text-[10px] text-[var(--chat-muted)]">
               <span>Training ({Math.round(((t.active_training_sec ?? 0) / t.total_wall_clock_sec) * 100)}%)</span>
               <span>Overhead ({Math.round((t.overhead_sec / t.total_wall_clock_sec) * 100)}%)</span>
             </div>
@@ -162,11 +162,11 @@ export function TrainingReportView({ runId }: { runId: number }) {
         title="Dataset"
       >
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Stat label="Total Samples" value={d.total_samples?.toLocaleString() ?? "—"} />
-          <Stat label="Training Examples" value={d.training_examples?.toLocaleString() ?? "—"} />
+          <Stat label="Total Samples" value={d.total_samples?.toLocaleString() ?? "â€”"} />
+          <Stat label="Training Examples" value={d.training_examples?.toLocaleString() ?? "â€”"} />
           <Stat
             label="Source"
-            value={d.path ? d.path.split("/").pop() ?? "—" : "—"}
+            value={d.path ? d.path.split("/").pop() ?? "â€”" : "â€”"}
           />
         </div>
       </Section>
@@ -177,15 +177,15 @@ export function TrainingReportView({ runId }: { runId: number }) {
         title="Model"
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Stat label="Base Model" value={m.base_model ?? "—"} className="col-span-2" />
+          <Stat label="Base Model" value={m.base_model ?? "â€”"} className="col-span-2" />
           <Stat
             label="Trainable Parameters"
-            value={m.trainable_params ? formatNumber(m.trainable_params) : "—"}
+            value={m.trainable_params ? formatNumber(m.trainable_params) : "â€”"}
             detail={m.trainable_pct ? `${m.trainable_pct}% of ${formatNumber(m.total_params ?? 0)} total` : undefined}
           />
           <Stat
             label="Total Parameters"
-            value={m.total_params ? formatNumber(m.total_params) : "—"}
+            value={m.total_params ? formatNumber(m.total_params) : "â€”"}
           />
         </div>
       </Section>
@@ -211,25 +211,25 @@ export function TrainingReportView({ runId }: { runId: number }) {
       {/* Results */}
       {isCompleted && (
         <Section
-          icon={<TrendingDown size={14} className="text-cyan-500" />}
+          icon={<TrendingDown size={14} className="text-[var(--chat-accent)]" />}
           title="Results"
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Stat
               label="Final Loss"
-              value={r.final_loss != null ? r.final_loss.toFixed(4) : "—"}
+              value={r.final_loss != null ? r.final_loss.toFixed(4) : "â€”"}
             />
             <Stat
               label="Samples/sec"
-              value={r.train_samples_per_second ? r.train_samples_per_second.toFixed(2) : "—"}
+              value={r.train_samples_per_second ? r.train_samples_per_second.toFixed(2) : "â€”"}
             />
             <Stat
               label="Steps/sec"
-              value={r.train_steps_per_second ? r.train_steps_per_second.toFixed(2) : "—"}
+              value={r.train_steps_per_second ? r.train_steps_per_second.toFixed(2) : "â€”"}
             />
             <Stat
               label="Adapter"
-              value={r.adapter_path ? r.adapter_path.split("/").pop() ?? "—" : "—"}
+              value={r.adapter_path ? r.adapter_path.split("/").pop() ?? "â€”" : "â€”"}
               detail={r.adapter_path ?? undefined}
             />
           </div>
@@ -246,7 +246,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
             <Stat label="Version" value={dep.model_version.version_tag} />
             <Stat
               label="Ollama Model"
-              value={dep.model_version.ollama_model_name ?? "—"}
+              value={dep.model_version.ollama_model_name ?? "â€”"}
             />
             <Stat
               label="Status"
@@ -255,7 +255,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
                   className={cn(
                     dep.model_version.status === "promoted" && "text-emerald-400",
                     dep.model_version.status === "ab_testing" && "text-amber-400",
-                    dep.model_version.status === "candidate" && "text-cyan-400"
+                    dep.model_version.status === "candidate" && "text-[var(--chat-accent)]"
                   )}
                 >
                   {dep.model_version.status}
@@ -299,7 +299,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
               value={`${dep.ab_test.result_count} samples`}
               detail={
                 dep.ab_test.candidate_avg_score != null
-                  ? `Candidate: ${dep.ab_test.candidate_avg_score.toFixed(3)} vs Base: ${dep.ab_test.base_avg_score?.toFixed(3) ?? "—"}`
+                  ? `Candidate: ${dep.ab_test.candidate_avg_score.toFixed(3)} vs Base: ${dep.ab_test.base_avg_score?.toFixed(3) ?? "â€”"}`
                   : undefined
               }
             />
@@ -309,7 +309,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
 
       {/* No deployment yet */}
       {isCompleted && !dep.model_version && (
-        <div className="border border-zinc-800 rounded-lg p-3 text-xs text-zinc-500">
+        <div className="border border-[var(--chat-border)] rounded-lg p-3 text-xs text-[var(--chat-muted)]">
           Adapter saved but not yet converted to GGUF or loaded into Ollama.
           Run the conversion step to deploy this model for A/B testing.
         </div>

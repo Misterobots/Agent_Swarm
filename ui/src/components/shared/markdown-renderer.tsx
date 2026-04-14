@@ -16,7 +16,7 @@ const components: Components = {
 
     if (isInline) {
       return (
-        <code className="bg-[#1a1a2e] text-cyan-300 px-1.5 py-0.5 rounded text-sm" {...props}>
+        <code className="bg-[var(--chat-soft)] text-[var(--chat-accent)] px-1.5 py-0.5 rounded text-sm" {...props}>
           {children}
         </code>
       );
@@ -31,7 +31,7 @@ const components: Components = {
   table({ children }) {
     return (
       <div className="overflow-x-auto my-3">
-        <table className="min-w-full border-collapse border border-zinc-700 text-sm">
+        <table className="min-w-full border-collapse border border-[var(--chat-border)] text-sm">
           {children}
         </table>
       </div>
@@ -39,14 +39,14 @@ const components: Components = {
   },
   th({ children }) {
     return (
-      <th className="border border-zinc-700 bg-[#1a1a2e] px-3 py-2 text-left text-zinc-300">
+      <th className="border border-[var(--chat-border)] bg-[var(--chat-soft)] px-3 py-2 text-left text-[var(--chat-text)]">
         {children}
       </th>
     );
   },
   td({ children }) {
     return (
-      <td className="border border-zinc-700 px-3 py-2 text-zinc-400">
+      <td className="border border-[var(--chat-border)] px-3 py-2 text-[var(--chat-muted)]">
         {children}
       </td>
     );

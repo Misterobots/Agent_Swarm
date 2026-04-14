@@ -6,12 +6,12 @@ import { fetchModelCatalog, fetchOpsTrainingRuns } from "@/lib/api/training";
 import { useCallback, useEffect, useState } from "react";
 import type { ModelCatalog, TrainingRun } from "@/types/ops";
 
-// ── helpers ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function RunStatusBadge({ status }: { status: TrainingRun["status"] }) {
   const map = {
     in_progress: "text-yellow-400 border-yellow-900/60 bg-yellow-950/30",
     complete: "text-emerald-400 border-emerald-900/60 bg-emerald-950/20",
-    converted: "text-cyan-400 border-cyan-900/60 bg-cyan-950/20",
+    converted: "text-[var(--chat-accent)] border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/8",
   } as const;
   const label = {
     in_progress: "In Progress",
@@ -27,9 +27,9 @@ function RunStatusBadge({ status }: { status: TrainingRun["status"] }) {
 
 function NodeBadge({ node }: { node: string }) {
   return node === "execution-plane" ? (
-    <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-400">Exec</span>
+    <span className="rounded bg-[var(--chat-panel)] px-1.5 py-0.5 text-xs text-[var(--chat-muted)]">Exec</span>
   ) : (
-    <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-cyan-500">Ctrl</span>
+    <span className="rounded bg-[var(--chat-panel)] px-1.5 py-0.5 text-xs text-[var(--chat-accent)]">Ctrl</span>
   );
 }
 
@@ -37,7 +37,7 @@ function fmtSize(mb: number) {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
 }
 
-// ── page ─────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ page Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 export default function TrainingModelsPage() {
   const [runs, setRuns] = useState<TrainingRun[]>([]);
   const [catalog, setCatalog] = useState<ModelCatalog>({
@@ -73,7 +73,7 @@ export default function TrainingModelsPage() {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 transition-colors hover:text-zinc-200 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] transition-colors hover:text-[var(--chat-text)] disabled:opacity-50"
         >
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           Refresh
@@ -85,19 +85,19 @@ export default function TrainingModelsPage() {
         title="Training Runs"
         description="QLoRA/GRPO runs from agents/training/grpo_trainer.py stored in the training output directory."
       >
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="overflow-x-auto rounded-lg border border-[var(--chat-border)]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-900/80">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">Run ID</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">
+              <tr className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)]">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Run ID</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">
                   Base Model
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 hidden sm:table-cell">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] hidden sm:table-cell">
                   Started
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">Status</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 hidden md:table-cell">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Status</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] hidden md:table-cell">
                   GGUF Files
                 </th>
               </tr>
@@ -105,28 +105,28 @@ export default function TrainingModelsPage() {
             <tbody>
               {loading && runs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
-                    Loading training runs…
+                  <td colSpan={5} className="px-4 py-8 text-center text-[var(--chat-muted)]">
+                    Loading training runsÃ¢â‚¬Â¦
                   </td>
                 </tr>
               ) : runs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-[var(--chat-muted)]">
                     No training runs found in{" "}
                     <code className="text-xs">TRAINING_OUTPUT_DIR</code>. Run{" "}
                     <code className="text-xs">
-                      python -m training.grpo_trainer --dataset …
+                      python -m training.grpo_trainer --dataset Ã¢â‚¬Â¦
                     </code>{" "}
                     to start one.
                   </td>
                 </tr>
               ) : (
                 runs.map((run) => (
-                  <tr key={run.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-200">{run.id}</td>
-                    <td className="px-4 py-2.5 text-xs text-zinc-400">{run.base_model}</td>
-                    <td className="px-4 py-2.5 text-xs text-zinc-500 hidden sm:table-cell">
-                      {run.started_at ?? "—"}
+                  <tr key={run.id} className="border-b border-[var(--chat-border)] hover:bg-[var(--chat-surface)]">
+                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--chat-text)]">{run.id}</td>
+                    <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)]">{run.base_model}</td>
+                    <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)] hidden sm:table-cell">
+                      {run.started_at ?? "Ã¢â‚¬â€"}
                     </td>
                     <td className="px-4 py-2.5">
                       <RunStatusBadge status={run.status} />
@@ -135,13 +135,13 @@ export default function TrainingModelsPage() {
                       {run.gguf_files.length > 0 ? (
                         <ul className="space-y-0.5">
                           {run.gguf_files.map((f) => (
-                            <li key={f} className="font-mono text-xs text-cyan-400">
+                            <li key={f} className="font-mono text-xs text-[var(--chat-accent)]">
                               {f}
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <span className="text-xs text-zinc-600">—</span>
+                        <span className="text-xs text-[var(--chat-muted)]">Ã¢â‚¬â€</span>
                       )}
                     </td>
                   </tr>
@@ -155,7 +155,7 @@ export default function TrainingModelsPage() {
       {/* Training pipeline quick-ref */}
       <WorkspaceSection
         title="Training Pipeline"
-        description="CLI commands to advance a run through the full GRPO → GGUF → Ollama pipeline."
+        description="CLI commands to advance a run through the full GRPO Ã¢â€ â€™ GGUF Ã¢â€ â€™ Ollama pipeline."
       >
         <div className="grid gap-3 sm:grid-cols-3">
           {[
@@ -167,7 +167,7 @@ export default function TrainingModelsPage() {
             {
               step: "2. Convert to GGUF",
               cmd: "python -m training.convert_gguf --adapter training_output/<run>/adapter",
-              color: "border-cyan-900/60 bg-cyan-950/20",
+              color: "border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/8",
             },
             {
               step: "3. A/B Test",
@@ -176,8 +176,8 @@ export default function TrainingModelsPage() {
             },
           ].map(({ step, cmd, color }) => (
             <div key={step} className={`rounded-lg border p-3 ${color}`}>
-              <p className="mb-2 text-xs font-semibold text-zinc-300">{step}</p>
-              <code className="block text-xs text-zinc-400 break-all">{cmd}</code>
+              <p className="mb-2 text-xs font-semibold text-[var(--chat-text)]">{step}</p>
+              <code className="block text-xs text-[var(--chat-muted)] break-all">{cmd}</code>
             </div>
           ))}
         </div>
@@ -187,29 +187,29 @@ export default function TrainingModelsPage() {
       {catalog.local_gguf.length > 0 && (
         <WorkspaceSection
           title="Local GGUF Files"
-          description="Converted models in the training output directory — ready for Ollama import."
+          description="Converted models in the training output directory Ã¢â‚¬â€ ready for Ollama import."
         >
-          <div className="overflow-x-auto rounded-lg border border-zinc-800">
+          <div className="overflow-x-auto rounded-lg border border-[var(--chat-border)]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-900/80">
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">Model</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">
+                <tr className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)]">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Model</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">
                     Run ID
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">Size</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 hidden md:table-cell">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Size</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] hidden md:table-cell">
                     Path
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {catalog.local_gguf.map((g) => (
-                  <tr key={g.path} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-200">{g.name}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-500">{g.run_id}</td>
-                    <td className="px-4 py-2.5 text-xs text-zinc-400">{fmtSize(g.size_mb)}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 hidden md:table-cell">
+                  <tr key={g.path} className="border-b border-[var(--chat-border)] hover:bg-[var(--chat-surface)]">
+                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--chat-text)]">{g.name}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--chat-muted)]">{g.run_id}</td>
+                    <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)]">{fmtSize(g.size_mb)}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--chat-muted)] hidden md:table-cell">
                       {g.path}
                     </td>
                   </tr>
@@ -220,20 +220,20 @@ export default function TrainingModelsPage() {
         </WorkspaceSection>
       )}
 
-      {/* Model Catalog — Ollama */}
+      {/* Model Catalog Ã¢â‚¬â€ Ollama */}
       <WorkspaceSection
-        title="Model Catalog — Deployed (Ollama)"
+        title="Model Catalog Ã¢â‚¬â€ Deployed (Ollama)"
         description="Live models available across both inference nodes. Future: promote a GGUF here via ollama create."
       >
         {catalog.errors.length > 0 && (
           <div className="mb-3 rounded-lg border border-yellow-900/60 bg-yellow-950/30 px-4 py-2 text-xs text-yellow-400">
-            {catalog.errors.join(" · ")}
+            {catalog.errors.join(" Ã‚Â· ")}
           </div>
         )}
         {loading && catalog.ollama_models.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">Querying Ollama nodes…</p>
+          <p className="py-6 text-center text-sm text-[var(--chat-muted)]">Querying Ollama nodesÃ¢â‚¬Â¦</p>
         ) : catalog.ollama_models.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">
+          <p className="py-6 text-center text-sm text-[var(--chat-muted)]">
             No Ollama models found (nodes may be offline or OLLAMA_HOST unconfigured).
           </p>
         ) : (
@@ -245,23 +245,23 @@ export default function TrainingModelsPage() {
               .filter(({ models }) => models.length > 0)
               .map(({ label, models }) => (
                 <div key={label}>
-                  <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                  <p className="mb-2 text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wide">
                     {label}
                   </p>
-                  <div className="overflow-x-auto rounded-lg border border-zinc-800">
+                  <div className="overflow-x-auto rounded-lg border border-[var(--chat-border)]">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-zinc-800 bg-zinc-900/80">
-                          <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                        <tr className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)]">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-[var(--chat-muted)]">
                             Model
                           </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-[var(--chat-muted)]">
                             Size
                           </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400 hidden md:table-cell">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-[var(--chat-muted)] hidden md:table-cell">
                             Digest
                           </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400 hidden sm:table-cell">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-[var(--chat-muted)] hidden sm:table-cell">
                             Modified
                           </th>
                         </tr>
@@ -270,21 +270,21 @@ export default function TrainingModelsPage() {
                         {models.map((m) => (
                           <tr
                             key={`${m.node}-${m.name}`}
-                            className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
+                            className="border-b border-[var(--chat-border)] hover:bg-[var(--chat-surface)]"
                           >
-                            <td className="px-4 py-2 font-mono text-xs text-zinc-200">
+                            <td className="px-4 py-2 font-mono text-xs text-[var(--chat-text)]">
                               {m.name}
                             </td>
-                            <td className="px-4 py-2 text-xs text-zinc-400">
+                            <td className="px-4 py-2 text-xs text-[var(--chat-muted)]">
                               {fmtSize(m.size_mb)}
                             </td>
-                            <td className="px-4 py-2 font-mono text-xs text-zinc-600 hidden md:table-cell">
+                            <td className="px-4 py-2 font-mono text-xs text-[var(--chat-muted)] hidden md:table-cell">
                               {m.digest}
                             </td>
-                            <td className="px-4 py-2 text-xs text-zinc-500 hidden sm:table-cell">
+                            <td className="px-4 py-2 text-xs text-[var(--chat-muted)] hidden sm:table-cell">
                               {m.modified_at
                                 ? new Date(m.modified_at).toLocaleDateString()
-                                : "—"}
+                                : "Ã¢â‚¬â€"}
                             </td>
                           </tr>
                         ))}
@@ -302,14 +302,14 @@ export default function TrainingModelsPage() {
         title="Model Promotion (Planned)"
         description="Promote a trained GGUF into the live Ollama catalog and trigger A/B traffic splitting."
       >
-        <div className="rounded-lg border border-dashed border-zinc-700 bg-zinc-900/30 px-5 py-6 text-center">
-          <Sparkles size={20} className="mx-auto mb-2 text-zinc-600" />
-          <p className="text-sm font-medium text-zinc-400">Model promotion workflow</p>
-          <p className="mt-1 text-xs text-zinc-600 max-w-sm mx-auto">
+        <div className="rounded-lg border border-dashed border-[var(--chat-border)] bg-[var(--chat-panel)] px-5 py-6 text-center">
+          <Sparkles size={20} className="mx-auto mb-2 text-[var(--chat-muted)]" />
+          <p className="text-sm font-medium text-[var(--chat-muted)]">Model promotion workflow</p>
+          <p className="mt-1 text-xs text-[var(--chat-muted)] max-w-sm mx-auto">
             Once a GGUF file exists and an expertise template is configured, a promotion button
             will appear here to run{" "}
-            <code className="text-zinc-500">ollama create</code> and start an A/B test via{" "}
-            <code className="text-zinc-500">training.ab_test</code>.
+            <code className="text-[var(--chat-muted)]">ollama create</code> and start an A/B test via{" "}
+            <code className="text-[var(--chat-muted)]">training.ab_test</code>.
           </p>
         </div>
       </WorkspaceSection>

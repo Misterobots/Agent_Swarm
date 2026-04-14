@@ -24,7 +24,7 @@ function usageBarClass(pct: number): string {
   if (pct >= 0.95) return "bg-red-500";
   if (pct >= 0.85) return "bg-orange-500";
   if (pct >= 0.7) return "bg-amber-500";
-  return "bg-zinc-500";
+  return "bg-[var(--chat-muted)]";
 }
 
 export function ChatView() {

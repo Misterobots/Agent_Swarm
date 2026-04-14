@@ -169,9 +169,9 @@ export function ArtGenerator() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left: Controls / Joint Editor Panel */}
-      <div className="w-72 border-r border-zinc-800 bg-[#0a0a14] flex flex-col overflow-y-auto">
+      <div className="w-72 border-r border-[var(--chat-border)] bg-[var(--chat-bg)] flex flex-col overflow-y-auto">
         {showJointEditor ? (
-          <Suspense fallback={<div className="p-4 text-zinc-500 text-sm">Loading editor...</div>}>
+          <Suspense fallback={<div className="p-4 text-[var(--chat-muted)] text-sm">Loading editor...</div>}>
             <JointEditor
               meshPath={editorMeshPath}
               onSegmentComplete={handleSegmentComplete}
@@ -181,8 +181,8 @@ export function ArtGenerator() {
         ) : (
           <>
             <div className="p-4">
-              <h2 className="text-sm font-semibold text-zinc-300 mb-3">Generation Mode</h2>
-              <div className="flex gap-1 bg-zinc-900 rounded-lg p-1">
+              <h2 className="text-sm font-semibold text-[var(--chat-text)] mb-3">Generation Mode</h2>
+              <div className="flex gap-1 bg-[var(--chat-panel)] rounded-lg p-1">
                 {MODES.map((m) => (
                   <button
                     key={m.key}
@@ -191,7 +191,7 @@ export function ArtGenerator() {
                       "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-md text-xs font-medium transition-all",
                       mode === m.key
                         ? "bg-violet-600 text-white shadow-lg"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                        : "text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)]"
                     )}
                   >
                     <m.icon size={14} />
@@ -201,7 +201,7 @@ export function ArtGenerator() {
               </div>
             </div>
 
-            <div className="border-t border-zinc-800" />
+            <div className="border-t border-[var(--chat-border)]" />
 
             <div className="p-4 flex-1">
               {mode === "image" && <ImageControls models={models} />}
@@ -216,7 +216,7 @@ export function ArtGenerator() {
       <div className="flex-1 flex flex-col">
         {/* Prompt Bar (hidden when joint editor is open) */}
         {!showJointEditor && (
-          <div className="border-b border-zinc-800 bg-[#0e1117] p-4">
+          <div className="border-b border-[var(--chat-border)] bg-[var(--chat-bg)] p-4">
             <div className="flex gap-3 max-w-4xl mx-auto">
               <input
                 type="text"
@@ -230,7 +230,7 @@ export function ArtGenerator() {
                     ? "A dragon warrior character..."
                     : "A robot action figure with armor plating..."
                 }
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500 transition-colors"
+                className="flex-1 bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-4 py-2.5 text-sm text-[var(--chat-text)] placeholder:text-[var(--chat-muted)] focus:outline-none focus:border-violet-500 transition-colors"
                 disabled={isGenerating}
               />
               <button
@@ -239,7 +239,7 @@ export function ArtGenerator() {
                 className={cn(
                   "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all",
                   isGenerating
-                    ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
+                    ? "bg-[var(--chat-surface)] text-[var(--chat-muted)] cursor-not-allowed"
                     : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30"
                 )}
               >
@@ -258,7 +258,7 @@ export function ArtGenerator() {
         <div className="flex-1 overflow-hidden">
           {showJointEditor ? (
             <Suspense fallback={
-              <div className="flex items-center justify-center h-full text-zinc-500">
+              <div className="flex items-center justify-center h-full text-[var(--chat-muted)]">
                 <Loader2 size={24} className="animate-spin mr-2" />
                 Loading 3D viewer...
               </div>
@@ -268,16 +268,16 @@ export function ArtGenerator() {
           ) : (
             <div className="h-full overflow-y-auto p-6">
               {history.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-4">
+                <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)] gap-4">
                   <div className="w-20 h-20 rounded-2xl bg-violet-900/20 flex items-center justify-center">
                     <Sparkles size={36} className="text-violet-400" />
                   </div>
                   <div className="text-center">
-                    <h2 className="text-lg font-medium text-zinc-300 mb-1">Art Studio</h2>
-                    <p className="text-sm text-zinc-500">
+                    <h2 className="text-lg font-medium text-[var(--chat-text)] mb-1">Art Studio</h2>
+                    <p className="text-sm text-[var(--chat-muted)]">
                       Describe what you want to create and hit Generate
                     </p>
-                    <p className="text-xs text-zinc-600 mt-2">
+                    <p className="text-xs text-[var(--chat-muted)] mt-2">
                       Image generation, 3D models, and posable action figures
                     </p>
                   </div>

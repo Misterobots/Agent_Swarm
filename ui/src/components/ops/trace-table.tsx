@@ -12,7 +12,7 @@ interface TraceTableProps {
 export function TraceTable({ traces, selectedId, onSelect }: TraceTableProps) {
   if (traces.length === 0) {
     return (
-      <div className="text-center py-12 text-zinc-500 text-sm">
+      <div className="text-center py-12 text-[var(--chat-muted)] text-sm">
         No traces found
       </div>
     );
@@ -22,7 +22,7 @@ export function TraceTable({ traces, selectedId, onSelect }: TraceTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-xs text-zinc-500 border-b border-zinc-800">
+          <tr className="text-xs text-[var(--chat-muted)] border-b border-[var(--chat-border)]">
             <th className="text-left px-4 py-2 font-medium">ID</th>
             <th className="text-left px-4 py-2 font-medium">Agent</th>
             <th className="text-left px-4 py-2 font-medium">Input</th>
@@ -36,20 +36,20 @@ export function TraceTable({ traces, selectedId, onSelect }: TraceTableProps) {
               key={t.id}
               onClick={() => onSelect(t.id)}
               className={cn(
-                "border-b border-zinc-800/30 cursor-pointer transition-colors",
+                "border-b border-[var(--chat-border)]/30 cursor-pointer transition-colors",
                 t.id === selectedId
-                  ? "bg-cyan-900/20"
-                  : "hover:bg-zinc-800/30"
+                  ? "bg-[var(--chat-accent)]/15"
+                  : "hover:bg-[var(--chat-surface)]"
               )}
             >
-              <td className="px-4 py-2 font-mono text-xs text-zinc-400">
+              <td className="px-4 py-2 font-mono text-xs text-[var(--chat-muted)]">
                 {t.id.slice(0, 8)}
               </td>
-              <td className="px-4 py-2 text-zinc-300">{t.name}</td>
-              <td className="px-4 py-2 text-zinc-500 truncate max-w-xs">
+              <td className="px-4 py-2 text-[var(--chat-text)]">{t.name}</td>
+              <td className="px-4 py-2 text-[var(--chat-muted)] truncate max-w-xs">
                 {t.input_preview}
               </td>
-              <td className="px-4 py-2 text-right text-zinc-400">
+              <td className="px-4 py-2 text-right text-[var(--chat-muted)]">
                 {t.latency !== null ? `${t.latency.toFixed(2)}s` : "—"}
               </td>
               <td className="px-4 py-2 text-center">

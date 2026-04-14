@@ -82,17 +82,17 @@ export function JointEditor({ meshPath, onSegmentComplete, onBack }: JointEditor
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-zinc-800">
+      <div className="p-4 border-b border-[var(--chat-border)]">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-zinc-300">Place Joints</h2>
+          <h2 className="text-sm font-semibold text-[var(--chat-text)]">Place Joints</h2>
           <button
             onClick={onBack}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
           >
-            ← Back
+            â† Back
           </button>
         </div>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-[var(--chat-muted)]">
           Select a joint type, then click on the model to place it.
         </p>
       </div>
@@ -111,8 +111,8 @@ export function JointEditor({ meshPath, onSegmentComplete, onBack }: JointEditor
                 isActive
                   ? "bg-violet-600/30 border border-violet-500 text-white"
                   : isPlaced
-                  ? "bg-zinc-800/50 text-zinc-300 hover:bg-zinc-800"
-                  : "text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300",
+                  ? "bg-[var(--chat-surface)] text-[var(--chat-text)] hover:bg-[var(--chat-surface)]"
+                  : "text-[var(--chat-muted)] hover:bg-[var(--chat-surface)] hover:text-[var(--chat-text)]",
               )}
               onClick={() => setActiveJoint(isActive ? null : (name as JointName))}
             >
@@ -120,7 +120,7 @@ export function JointEditor({ meshPath, onSegmentComplete, onBack }: JointEditor
               <span
                 className={cn(
                   "w-2.5 h-2.5 rounded-full flex-shrink-0",
-                  JOINT_COLORS[name] || "bg-zinc-500",
+                  JOINT_COLORS[name] || "bg-[var(--chat-muted)]",
                 )}
               />
 
@@ -136,7 +136,7 @@ export function JointEditor({ meshPath, onSegmentComplete, onBack }: JointEditor
                       e.stopPropagation();
                       removeJoint(name);
                     }}
-                    className="text-zinc-600 hover:text-red-400 transition-colors"
+                    className="text-[var(--chat-muted)] hover:text-red-400 transition-colors"
                   >
                     <X size={14} />
                   </button>
@@ -150,15 +150,15 @@ export function JointEditor({ meshPath, onSegmentComplete, onBack }: JointEditor
       </div>
 
       {/* Actions */}
-      <div className="p-4 border-t border-zinc-800 space-y-2">
-        <div className="flex items-center justify-between text-xs text-zinc-500 mb-2">
+      <div className="p-4 border-t border-[var(--chat-border)] space-y-2">
+        <div className="flex items-center justify-between text-xs text-[var(--chat-muted)] mb-2">
           <span>
             {placedJoints.length} / {JOINT_TYPES.length} joints placed
           </span>
           {placedJoints.length > 0 && (
             <button
               onClick={clearJoints}
-              className="flex items-center gap-1 text-zinc-500 hover:text-red-400 transition-colors"
+              className="flex items-center gap-1 text-[var(--chat-muted)] hover:text-red-400 transition-colors"
             >
               <RotateCcw size={12} />
               Clear all
@@ -173,7 +173,7 @@ export function JointEditor({ meshPath, onSegmentComplete, onBack }: JointEditor
             "w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
             placedJoints.length >= 2 && !segmenting
               ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30"
-              : "bg-zinc-800 text-zinc-500 cursor-not-allowed",
+              : "bg-[var(--chat-surface)] text-[var(--chat-muted)] cursor-not-allowed",
           )}
         >
           {segmenting ? (
@@ -189,7 +189,7 @@ export function JointEditor({ meshPath, onSegmentComplete, onBack }: JointEditor
           )}
         </button>
 
-        <p className="text-[10px] text-zinc-600 text-center">
+        <p className="text-[10px] text-[var(--chat-muted)] text-center">
           Place at least 2 joints. More joints = more parts.
         </p>
       </div>

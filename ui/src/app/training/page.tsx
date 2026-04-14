@@ -49,17 +49,17 @@ export default function TrainingPage() {
 
       <WorkspaceSection title="Live Training Snapshot">
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Training Runs</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-200">{runsCount}</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Training Runs</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">{runsCount}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Local GGUF Models</p>
-            <p className="mt-1 text-xl font-semibold text-cyan-300">{ggufCount}</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Local GGUF Models</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--chat-accent)]">{ggufCount}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Ollama Catalog Entries</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-200">{catalogCount}</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Ollama Catalog Entries</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">{catalogCount}</p>
           </div>
         </div>
       </WorkspaceSection>

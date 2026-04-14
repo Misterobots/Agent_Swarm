@@ -23,14 +23,14 @@ const TOOLS: ToolDefinition[] = [
     label: "IDE (DevOps)",
     icon: Code2,
     path: `${GATEWAY}:8445`,
-    description: "VS Code — Full Access",
+    description: "VS Code â€” Full Access",
   },
   {
     id: "ide-coding",
     label: "IDE (Coding)",
     icon: Laptop,
     path: `${GATEWAY}:8444`,
-    description: "VS Code — Sandbox",
+    description: "VS Code â€” Sandbox",
   },
   {
     id: "open-webui",
@@ -49,7 +49,7 @@ export function ToolLauncher() {
   return (
     <div className="flex flex-col h-full">
       {/* Tab Bar */}
-      <div className="flex items-center border-b border-zinc-800 bg-[#0a0a14] px-4">
+      <div className="flex items-center border-b border-[var(--chat-border)] bg-[var(--chat-bg)] px-4">
         <div className="flex flex-1 overflow-x-auto">
           {TOOLS.map((tool) => (
             <ToolTab
@@ -64,7 +64,7 @@ export function ToolLauncher() {
           href={iframeUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-2 text-xs text-zinc-500 hover:text-cyan-400 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-accent)] transition-colors"
         >
           Open in new tab
           <ExternalLink size={12} />

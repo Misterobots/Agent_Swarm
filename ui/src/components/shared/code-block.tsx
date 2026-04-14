@@ -21,11 +21,11 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
 
   return (
     <div className="relative group my-3 rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between bg-[#1a1a2e] px-4 py-1.5 text-xs text-zinc-400">
+      <div className="flex items-center justify-between bg-[var(--chat-soft)] px-4 py-1.5 text-xs text-[var(--chat-muted)]">
         <span>{language || "text"}</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+          className="flex items-center gap-1 hover:text-[var(--chat-accent)] transition-colors"
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
           {copied ? "Copied" : "Copy"}
@@ -37,7 +37,7 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
         customStyle={{
           margin: 0,
           borderRadius: 0,
-          background: "#0d0d1a",
+          background: "var(--chat-bg)",
           fontSize: "0.85rem",
         }}
       >

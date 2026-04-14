@@ -27,7 +27,7 @@ export function ModelSelector() {
           <option value="Home-AI-Swarm">Home-AI-Swarm</option>
         )}
       </select>
-      <ChevronDown size={14} className="absolute right-2 text-zinc-500 pointer-events-none" />
+      <ChevronDown size={14} className="absolute right-2 text-[var(--chat-muted)] pointer-events-none" />
     </div>
   );
 }

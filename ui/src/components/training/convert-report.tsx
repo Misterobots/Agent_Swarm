@@ -43,7 +43,7 @@ export function ConvertReportView({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-4 text-zinc-500 text-sm">
+      <div className="flex items-center gap-2 py-4 text-[var(--chat-muted)] text-sm">
         <Loader2 size={14} className="animate-spin" />
         Converting model...
       </div>
@@ -52,7 +52,7 @@ export function ConvertReportView({
 
   if (!report) {
     return (
-      <p className="text-sm text-zinc-500 py-4">
+      <p className="text-sm text-[var(--chat-muted)] py-4">
         Conversion report unavailable.
       </p>
     );
@@ -138,7 +138,7 @@ export function ConvertReportView({
           {/* Timing bar */}
           {t.total_sec != null && t.total_sec > 0 && (
             <div className="mt-2">
-              <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-zinc-800">
+              <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-[var(--chat-surface)]">
                 {t.merge_sec != null && (
                   <div
                     className="bg-cyan-500"
@@ -163,7 +163,7 @@ export function ConvertReportView({
                   />
                 )}
               </div>
-              <div className="flex gap-3 mt-1 text-[10px] text-zinc-600">
+              <div className="flex gap-3 mt-1 text-[10px] text-[var(--chat-muted)]">
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-cyan-500" /> Merge
                 </span>

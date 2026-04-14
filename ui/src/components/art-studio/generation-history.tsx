@@ -29,7 +29,7 @@ export function GenerationHistory({ entries }: { entries: GenerationEntry[] }) {
               entry.status === "generating"
                 ? "border-violet-700/50 bg-violet-950/20"
                 : entry.status === "complete"
-                ? "border-zinc-800 bg-[#0a0a14]"
+                ? "border-[var(--chat-border)] bg-[var(--chat-bg)]"
                 : "border-red-900/50 bg-red-950/10"
             )}
           >
@@ -56,7 +56,7 @@ export function GenerationHistory({ entries }: { entries: GenerationEntry[] }) {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-medium text-zinc-400">
+                  <span className="text-xs font-medium text-[var(--chat-muted)]">
                     {MODE_LABELS[entry.mode]}
                   </span>
                   {entry.status === "complete" && (
@@ -65,19 +65,19 @@ export function GenerationHistory({ entries }: { entries: GenerationEntry[] }) {
                   {entry.status === "error" && (
                     <XCircle size={12} className="text-red-500" />
                   )}
-                  <span className="text-[10px] text-zinc-600 ml-auto">
+                  <span className="text-[10px] text-[var(--chat-muted)] ml-auto">
                     {new Date(entry.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
 
-                <p className="text-sm text-zinc-300 mb-2">{entry.prompt}</p>
+                <p className="text-sm text-[var(--chat-text)] mb-2">{entry.prompt}</p>
 
                 {entry.result && (
                   <div
                     className={cn(
                       "rounded-lg p-3 text-xs font-mono",
                       entry.status === "complete"
-                        ? "bg-zinc-900/50 text-zinc-400"
+                        ? "bg-[var(--chat-panel)] text-[var(--chat-muted)]"
                         : "bg-red-950/30 text-red-400"
                     )}
                   >
@@ -87,10 +87,10 @@ export function GenerationHistory({ entries }: { entries: GenerationEntry[] }) {
 
                 {entry.status === "generating" && (
                   <div className="flex items-center gap-2 mt-2">
-                    <div className="h-1 flex-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-1 flex-1 bg-[var(--chat-surface)] rounded-full overflow-hidden">
                       <div className="h-full bg-violet-500 rounded-full animate-pulse w-2/3" />
                     </div>
-                    <span className="text-[10px] text-zinc-500">Processing...</span>
+                    <span className="text-[10px] text-[var(--chat-muted)]">Processing...</span>
                   </div>
                 )}
               </div>

@@ -51,12 +51,12 @@ export function TerminalPane() {
       fitAddonRef.current = fitAddon;
 
       // Welcome message
-      term.writeln("\x1b[36m╔══════════════════════════════════╗\x1b[0m");
-      term.writeln("\x1b[36m║\x1b[0m   Hive Mind — Dev Terminal       \x1b[36m║\x1b[0m");
-      term.writeln("\x1b[36m╚══════════════════════════════════╝\x1b[0m");
+      term.writeln("\x1b[36mâ•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—\x1b[0m");
+      term.writeln("\x1b[36mâ•‘\x1b[0m   Hive Mind â€” Dev Terminal       \x1b[36mâ•‘\x1b[0m");
+      term.writeln("\x1b[36mâ•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\x1b[0m");
       term.writeln("");
 
-      // Local echo — for now, just echo input back as a scratch terminal
+      // Local echo â€” for now, just echo input back as a scratch terminal
       let line = "";
       term.write("\x1b[32m$ \x1b[0m");
 
@@ -64,7 +64,7 @@ export function TerminalPane() {
         if (data === "\r") {
           term.writeln("");
           if (line.trim()) {
-            term.writeln(`\x1b[33m→ local echo: ${line}\x1b[0m`);
+            term.writeln(`\x1b[33mâ†’ local echo: ${line}\x1b[0m`);
           }
           line = "";
           term.write("\x1b[32m$ \x1b[0m");
@@ -105,11 +105,11 @@ export function TerminalPane() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a14]">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-800 text-xs text-zinc-500">
+    <div className="flex flex-col h-full bg-[var(--chat-bg)]">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--chat-border)] text-xs text-[var(--chat-muted)]">
         <TerminalIcon size={13} />
         <span>Terminal</span>
-        <span className="text-zinc-700 ml-auto">local echo</span>
+        <span className="text-[var(--chat-muted)] ml-auto">local echo</span>
       </div>
       <div ref={containerRef} className="flex-1 px-1 py-1" />
     </div>

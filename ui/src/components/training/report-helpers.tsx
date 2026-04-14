@@ -15,7 +15,7 @@ export function Section({
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         {icon}
-        <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+        <h3 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider">
           {title}
         </h3>
       </div>
@@ -37,9 +37,9 @@ export function Stat({
 }) {
   return (
     <div className={className}>
-      <p className="text-[10px] text-zinc-600 mb-0.5">{label}</p>
-      <p className="text-sm font-mono text-zinc-200">{value}</p>
-      {detail && <p className="text-[10px] text-zinc-600 mt-0.5">{detail}</p>}
+      <p className="text-[10px] text-[var(--chat-muted)] mb-0.5">{label}</p>
+      <p className="text-sm font-mono text-[var(--chat-text)]">{value}</p>
+      {detail && <p className="text-[10px] text-[var(--chat-muted)] mt-0.5">{detail}</p>}
     </div>
   );
 }
@@ -99,7 +99,7 @@ export function StatusBanner({
       >
         {label}
       </span>
-      {detail && <span className="text-zinc-500 ml-auto text-xs">{detail}</span>}
+      {detail && <span className="text-[var(--chat-muted)] ml-auto text-xs">{detail}</span>}
     </div>
   );
 }

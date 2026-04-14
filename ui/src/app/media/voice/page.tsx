@@ -29,17 +29,17 @@ export default function MediaVoicePage() {
     >
       <WorkspaceSection title="Voice Artifact Surface">
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-xs text-zinc-500">Recent generated audio artifacts</p>
+          <p className="text-xs text-[var(--chat-muted)]">Recent generated audio artifacts</p>
           <div className="flex items-center gap-2">
             <button
               onClick={load}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
             >
               <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
             </button>
             <Link
               href="/training/voice"
-              className="rounded-lg border border-cyan-900/70 bg-cyan-950/30 px-3 py-2 text-xs text-cyan-300"
+              className="rounded-lg border border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/10 px-3 py-2 text-xs text-[var(--chat-accent)]"
             >
               Open Voice Calibration
             </Link>
@@ -47,21 +47,21 @@ export default function MediaVoicePage() {
         </div>
 
         {audioItems.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">
+          <p className="py-6 text-center text-sm text-[var(--chat-muted)]">
             No audio artifacts in delivered_artifacts yet.
           </p>
         ) : (
           <div className="space-y-2">
             {audioItems.map((item) => (
-              <div key={item.name} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <div key={item.name} className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">{item.name}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-sm font-medium text-[var(--chat-text)]">{item.name}</p>
+                    <p className="text-xs text-[var(--chat-muted)]">
                       {item.size_mb.toFixed(2)} MB · {new Date(item.updated_at * 1000).toLocaleString()}
                     </p>
                   </div>
-                  <a href={item.url} download={item.name} className="text-xs text-cyan-500 hover:text-cyan-300">
+                  <a href={item.url} download={item.name} className="text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)]">
                     Download
                   </a>
                 </div>

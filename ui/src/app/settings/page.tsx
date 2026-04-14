@@ -27,19 +27,19 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 border-b border-zinc-800 bg-[#0e1117] px-4 py-3">
-        <Settings size={18} className="text-zinc-400" />
-        <h1 className="text-sm font-medium text-zinc-300">Settings</h1>
+      <div className="flex items-center gap-2 border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-4 py-3">
+        <Settings size={18} className="text-[var(--chat-muted)]" />
+        <h1 className="text-sm font-medium text-[var(--chat-text)]">Settings</h1>
       </div>
       <div className="flex-1 overflow-y-auto p-6 max-w-2xl">
         <div className="space-y-8">
           {/* Chat */}
           <section>
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Chat</h2>
+            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Chat</h2>
             <div>
-              <label className="text-sm text-zinc-300 mb-2 block">Default Model</label>
+              <label className="text-sm text-[var(--chat-text)] mb-2 block">Default Model</label>
               <ModelSelector />
-              <p className="mt-2 text-xs text-zinc-500">
+              <p className="mt-2 text-xs text-[var(--chat-muted)]">
                 {modelAccessMessage}
               </p>
             </div>
@@ -47,13 +47,13 @@ export default function SettingsPage() {
 
           {/* Tools */}
           <section>
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Tools</h2>
+            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Tools</h2>
             <div>
-              <label className="text-sm text-zinc-300 mb-2 block">Default Tool Tab</label>
+              <label className="text-sm text-[var(--chat-text)] mb-2 block">Default Tool Tab</label>
               <select
                 value={activeTab}
                 onChange={(e) => setActiveTab(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-cyan-800"
+                className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
               >
                 {TOOL_OPTIONS.map((t) => (
                   <option key={t.id} value={t.id}>{t.label}</option>
@@ -64,13 +64,13 @@ export default function SettingsPage() {
 
           {/* Monitor */}
           <section>
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Monitor</h2>
+            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Monitor</h2>
             <div>
-              <label className="text-sm text-zinc-300 mb-2 block">Default Dashboard</label>
+              <label className="text-sm text-[var(--chat-text)] mb-2 block">Default Dashboard</label>
               <select
                 value={activeDashboard}
                 onChange={(e) => setActiveDashboard(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-cyan-800"
+                className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
               >
                 {DASHBOARDS.map((d) => (
                   <option key={d.uid} value={d.uid}>{d.label}</option>
@@ -81,8 +81,8 @@ export default function SettingsPage() {
 
           {/* About */}
           <section>
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">About</h2>
-            <div className="space-y-2 text-sm text-zinc-500">
+            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">About</h2>
+            <div className="space-y-2 text-sm text-[var(--chat-muted)]">
               <p>Hive Mind Workspace v1.0</p>
               <p>Backend: {process.env.NEXT_PUBLIC_API_BASE_URL || "Agent Runtime"}</p>
             </div>

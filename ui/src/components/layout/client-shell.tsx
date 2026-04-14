@@ -7,8 +7,8 @@ const AppShell = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-screen items-center justify-center bg-[#0e1117]">
-        <div className="text-cyan-400 text-sm animate-pulse">Loading...</div>
+      <div className="flex h-screen items-center justify-center bg-[var(--chat-bg)]">
+        <div className="text-[var(--chat-accent)] text-sm animate-pulse">Loading...</div>
       </div>
     ),
   }

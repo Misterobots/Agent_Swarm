@@ -61,16 +61,16 @@ export default function MediaPage() {
 
       <WorkspaceSection title="Current Library Snapshot">
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Image Artifacts</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-200">{imagesCount}</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Image Artifacts</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">{imagesCount}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Audio Artifacts</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-200">{audioCount}</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Audio Artifacts</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">{audioCount}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">ComfyUI</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">ComfyUI</p>
             <p className={`mt-1 text-xl font-semibold ${comfyHealthy ? "text-emerald-400" : "text-red-400"}`}>
               {comfyHealthy ? "Online" : "Offline"}
             </p>

@@ -22,44 +22,44 @@ export function ObservationItem({ observation: obs }: ObservationItemProps) {
     : null;
 
   return (
-    <div className="border border-zinc-800/50 rounded-lg overflow-hidden">
+    <div className="border border-[var(--chat-border)]/50 rounded-lg overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-800/30 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--chat-surface)] transition-colors"
       >
         {expanded ? (
-          <ChevronDown size={14} className="text-zinc-500" />
+          <ChevronDown size={14} className="text-[var(--chat-muted)]" />
         ) : (
-          <ChevronRight size={14} className="text-zinc-500" />
+          <ChevronRight size={14} className="text-[var(--chat-muted)]" />
         )}
         <span
           className={cn(
             "px-1.5 py-0.5 rounded text-[10px] font-mono",
             obs.type === "GENERATION"
               ? "bg-violet-900/30 text-violet-400"
-              : "bg-zinc-800 text-zinc-400"
+              : "bg-[var(--chat-surface)] text-[var(--chat-muted)]"
           )}
         >
           {obs.type}
         </span>
-        <span className="text-zinc-300 flex-1 truncate">{obs.name}</span>
+        <span className="text-[var(--chat-text)] flex-1 truncate">{obs.name}</span>
         {duration && (
-          <span className="text-xs text-zinc-500">{duration}s</span>
+          <span className="text-xs text-[var(--chat-muted)]">{duration}s</span>
         )}
         {obs.model && (
-          <span className="text-xs text-cyan-600">{obs.model}</span>
+          <span className="text-xs text-[var(--chat-accent)]">{obs.model}</span>
         )}
         {tokens && (
-          <span className="text-xs text-zinc-600">{tokens}</span>
+          <span className="text-xs text-[var(--chat-muted)]">{tokens}</span>
         )}
       </button>
 
       {expanded && (
-        <div className="border-t border-zinc-800/50 px-4 py-3 space-y-3 text-xs">
+        <div className="border-t border-[var(--chat-border)]/50 px-4 py-3 space-y-3 text-xs">
           {obs.input != null && (
             <div>
-              <div className="text-zinc-500 mb-1 font-medium">Input</div>
-              <pre className="bg-[#0a0a14] p-2 rounded text-zinc-300 overflow-x-auto max-h-40 overflow-y-auto">
+              <div className="text-[var(--chat-muted)] mb-1 font-medium">Input</div>
+              <pre className="bg-[var(--chat-bg)] p-2 rounded text-[var(--chat-text)] overflow-x-auto max-h-40 overflow-y-auto">
                 {typeof obs.input === "string"
                   ? obs.input
                   : JSON.stringify(obs.input, null, 2)}
@@ -68,8 +68,8 @@ export function ObservationItem({ observation: obs }: ObservationItemProps) {
           )}
           {obs.output != null && (
             <div>
-              <div className="text-zinc-500 mb-1 font-medium">Output</div>
-              <pre className="bg-[#0a0a14] p-2 rounded text-zinc-300 overflow-x-auto max-h-40 overflow-y-auto">
+              <div className="text-[var(--chat-muted)] mb-1 font-medium">Output</div>
+              <pre className="bg-[var(--chat-bg)] p-2 rounded text-[var(--chat-text)] overflow-x-auto max-h-40 overflow-y-auto">
                 {typeof obs.output === "string"
                   ? obs.output
                   : JSON.stringify(obs.output, null, 2)}
@@ -77,7 +77,7 @@ export function ObservationItem({ observation: obs }: ObservationItemProps) {
             </div>
           )}
           {obs.usage?.totalCost != null && (
-            <div className="text-zinc-500">
+            <div className="text-[var(--chat-muted)]">
               Cost: ${obs.usage.totalCost.toFixed(4)}
             </div>
           )}

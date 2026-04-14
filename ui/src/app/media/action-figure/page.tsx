@@ -75,24 +75,24 @@ export default function ActionFigurePage() {
       icon={Sparkles}
     >
       <WorkspaceSection title="Generator">
-        <div className="grid gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 md:grid-cols-2">
+        <div className="grid gap-3 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs text-zinc-400">Prompt</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">Prompt</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={3}
               placeholder="Create a sci-fi mech pilot action figure with articulated elbows and premium packaging"
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-zinc-400">Checkpoint</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">Checkpoint</label>
             <select
               value={modelName}
               onChange={(e) => setModelName(e.target.value)}
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             >
               {models.map((model) => (
                 <option key={model} value={model}>
@@ -103,7 +103,7 @@ export default function ActionFigurePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-zinc-400">CFG</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">CFG</label>
             <input
               type="number"
               min={1}
@@ -111,28 +111,28 @@ export default function ActionFigurePage() {
               step={0.5}
               value={cfg}
               onChange={(e) => setCfg(Number(e.target.value))}
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-zinc-400">Steps</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">Steps</label>
             <input
               type="number"
               min={2}
               max={80}
               value={steps}
               onChange={(e) => setSteps(Number(e.target.value))}
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-zinc-400">Sampler</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">Sampler</label>
             <select
               value={sampler}
               onChange={(e) => setSampler(e.target.value)}
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             >
               {SAMPLERS.map((name) => (
                 <option key={name} value={name}>
@@ -143,11 +143,11 @@ export default function ActionFigurePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-zinc-400">Scheduler</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">Scheduler</label>
             <select
               value={scheduler}
               onChange={(e) => setScheduler(e.target.value)}
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             >
               {SCHEDULERS.map((name) => (
                 <option key={name} value={name}>
@@ -170,7 +170,7 @@ export default function ActionFigurePage() {
             </button>
           </div>
 
-          {result && <p className="md:col-span-2 rounded bg-zinc-950 px-3 py-2 text-xs text-zinc-300">{result}</p>}
+          {result && <p className="md:col-span-2 rounded bg-[var(--chat-bg)] px-3 py-2 text-xs text-[var(--chat-text)]">{result}</p>}
         </div>
       </WorkspaceSection>
 
@@ -178,22 +178,22 @@ export default function ActionFigurePage() {
         <div className="mb-3 flex justify-end">
           <button
             onClick={load}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
           >
             <RefreshCw size={12} /> Refresh
           </button>
         </div>
 
         {gallery.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-500">No action-figure artifacts found yet.</p>
+          <p className="py-8 text-center text-sm text-[var(--chat-muted)]">No action-figure artifacts found yet.</p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {gallery.map((item) => (
-              <article key={item.name} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50">
+              <article key={item.name} className="overflow-hidden rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)]">
                 <img src={item.url} alt={item.name} className="h-48 w-full object-cover" loading="lazy" />
                 <div className="space-y-1 p-3">
-                  <p className="truncate text-sm font-medium text-zinc-200">{item.name}</p>
-                  <p className="text-xs text-zinc-500">{new Date(item.updated_at * 1000).toLocaleString()}</p>
+                  <p className="truncate text-sm font-medium text-[var(--chat-text)]">{item.name}</p>
+                  <p className="text-xs text-[var(--chat-muted)]">{new Date(item.updated_at * 1000).toLocaleString()}</p>
                   <a href={item.url} download={item.name} className="inline-block text-xs text-[var(--chat-accent)]">
                     Download
                   </a>

@@ -32,8 +32,8 @@ export default function TrainingVoicePage() {
     >
       <WorkspaceSection title="Calibration Workspace">
         <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <p className="text-xs text-zinc-500">Pitch Shift (Semitones)</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Pitch Shift (Semitones)</p>
             <input
               type="range"
               min={-12}
@@ -42,13 +42,13 @@ export default function TrainingVoicePage() {
               onChange={(e) => setPitch(Number(e.target.value))}
               className="mt-2 w-full"
             />
-            <p className="mt-1 text-sm font-medium text-zinc-200">{pitch}</p>
+            <p className="mt-1 text-sm font-medium text-[var(--chat-text)]">{pitch}</p>
 
-            <p className="mt-4 text-xs text-zinc-500">Inference Method</p>
+            <p className="mt-4 text-xs text-[var(--chat-muted)]">Inference Method</p>
             <select
               value={method}
               onChange={(e) => setMethod(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="mt-1 w-full rounded-lg border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             >
               <option value="rmvpe">rmvpe</option>
               <option value="pm">pm</option>
@@ -58,34 +58,34 @@ export default function TrainingVoicePage() {
             <button
               onClick={onGenerate}
               disabled={!canGenerate}
-              className="mt-4 w-full rounded-lg border border-cyan-900/70 bg-cyan-950/30 px-3 py-2 text-sm text-cyan-300 disabled:opacity-50"
+              className="mt-4 w-full rounded-lg border border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/10 px-3 py-2 text-sm text-[var(--chat-accent)] disabled:opacity-50"
             >
               {loading ? "Synthesizing..." : "Generate Audio"}
             </button>
           </div>
 
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-            <p className="text-xs text-zinc-500">Test Phrase</p>
+          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)]/40 p-4">
+            <p className="text-xs text-[var(--chat-muted)]">Test Phrase</p>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={6}
-              className="mt-1 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200"
+              className="mt-1 w-full rounded-lg border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             />
             {audioUrl ? (
-              <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-                <p className="mb-2 text-xs text-zinc-500">Generated Audio</p>
+              <div className="mt-4 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-bg)] p-3">
+                <p className="mb-2 text-xs text-[var(--chat-muted)]">Generated Audio</p>
                 <audio src={audioUrl} controls className="w-full" />
                 <a
                   href={audioUrl}
                   download={`bmo_pitch_${pitch}.wav`}
-                  className="mt-2 inline-block text-xs text-cyan-500 hover:text-cyan-300"
+                  className="mt-2 inline-block text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)]"
                 >
                   Download WAV
                 </a>
               </div>
             ) : (
-              <p className="mt-4 text-xs text-zinc-500">Generate audio to preview calibration output.</p>
+              <p className="mt-4 text-xs text-[var(--chat-muted)]">Generate audio to preview calibration output.</p>
             )}
           </div>
         </div>

@@ -148,14 +148,14 @@ export function TrainingLauncher() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <Rocket size={20} className="text-violet-400" />
-          <h1 className="text-lg font-semibold text-zinc-100">
+          <h1 className="text-lg font-semibold text-[var(--chat-text)]">
             Launch Training Run
           </h1>
         </div>
 
         {/* Run Type Selection */}
         <div className="space-y-3">
-          <label className="text-sm font-medium text-zinc-400">Run Type</label>
+          <label className="text-sm font-medium text-[var(--chat-muted)]">Run Type</label>
           <div className="grid gap-3">
             {RUN_TYPES.map((rt) => {
               const Icon = rt.icon;
@@ -167,27 +167,27 @@ export function TrainingLauncher() {
                   className={cn(
                     "flex items-start gap-3 p-4 rounded-lg border text-left transition-colors",
                     selected
-                      ? "border-cyan-500/50 bg-cyan-500/5"
-                      : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                      ? "border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/5"
+                      : "border-[var(--chat-border)] hover:border-[var(--chat-border)] bg-transparent"
                   )}
                 >
                   <Icon
                     size={18}
                     className={cn(
                       "mt-0.5 shrink-0",
-                      selected ? "text-cyan-400" : "text-zinc-600"
+                      selected ? "text-[var(--chat-accent)]" : "text-[var(--chat-muted)]"
                     )}
                   />
                   <div>
                     <p
                       className={cn(
                         "text-sm font-medium",
-                        selected ? "text-cyan-300" : "text-zinc-300"
+                        selected ? "text-[var(--chat-accent)]" : "text-[var(--chat-text)]"
                       )}
                     >
                       {rt.label}
                     </p>
-                    <p className="text-xs text-zinc-600 mt-0.5">{rt.desc}</p>
+                    <p className="text-xs text-[var(--chat-muted)] mt-0.5">{rt.desc}</p>
                   </div>
                 </button>
               );
@@ -195,17 +195,17 @@ export function TrainingLauncher() {
           </div>
         </div>
 
-        {/* Template Filter — for Full Pipeline, Export, and Curated */}
+        {/* Template Filter ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â for Full Pipeline, Export, and Curated */}
         {(runType === "full_pipeline" || runType === "export" || runType === "curated") && templates.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Filter size={14} className="text-cyan-500" />
-              <label className="text-sm font-medium text-zinc-400">
+              <Filter size={14} className="text-[var(--chat-accent)]" />
+              <label className="text-sm font-medium text-[var(--chat-muted)]">
                 Train Toward Agent
               </label>
-              <span className="text-xs text-zinc-600">(optional)</span>
+              <span className="text-xs text-[var(--chat-muted)]">(optional)</span>
             </div>
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-[var(--chat-muted)]">
               {runType === "curated"
                 ? "Select an agent to auto-suggest the most relevant datasets for improving that agent\u2019s capabilities."
                 : "Filter exported traces to only include data from a specific agent template. This focuses training on improving that agent\u2019s capabilities."}
@@ -216,21 +216,21 @@ export function TrainingLauncher() {
                 className={cn(
                   "flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
                   selectedTemplate === null
-                    ? "border-cyan-500/40 bg-cyan-500/5"
-                    : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                    ? "border-[var(--chat-accent)]/20 bg-[var(--chat-accent)]/5"
+                    : "border-[var(--chat-border)] hover:border-[var(--chat-border)] bg-transparent"
                 )}
               >
                 <div className={cn(
                   "mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
-                  selectedTemplate === null ? "border-cyan-500 bg-cyan-500" : "border-zinc-700"
+                  selectedTemplate === null ? "border-[var(--chat-accent)] bg-cyan-500" : "border-[var(--chat-border)]"
                 )}>
                   {selectedTemplate === null && <div className="w-2 h-2 rounded-full bg-white" />}
                 </div>
                 <div>
-                  <p className={cn("text-sm font-medium", selectedTemplate === null ? "text-cyan-300" : "text-zinc-300")}>
+                  <p className={cn("text-sm font-medium", selectedTemplate === null ? "text-[var(--chat-accent)]" : "text-[var(--chat-text)]")}>
                     All Agents
                   </p>
-                  <p className="text-xs text-zinc-600 mt-0.5">Use traces from every agent template</p>
+                  <p className="text-xs text-[var(--chat-muted)] mt-0.5">Use traces from every agent template</p>
                 </div>
               </button>
               {templates.map((t) => {
@@ -242,21 +242,21 @@ export function TrainingLauncher() {
                     className={cn(
                       "flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
                       selected
-                        ? "border-cyan-500/40 bg-cyan-500/5"
-                        : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                        ? "border-[var(--chat-accent)]/20 bg-[var(--chat-accent)]/5"
+                        : "border-[var(--chat-border)] hover:border-[var(--chat-border)] bg-transparent"
                     )}
                   >
                     <div className={cn(
                       "mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
-                      selected ? "border-cyan-500 bg-cyan-500" : "border-zinc-700"
+                      selected ? "border-[var(--chat-accent)] bg-cyan-500" : "border-[var(--chat-border)]"
                     )}>
                       {selected && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
                     <div>
-                      <p className={cn("text-sm font-medium", selected ? "text-cyan-300" : "text-zinc-300")}>
+                      <p className={cn("text-sm font-medium", selected ? "text-[var(--chat-accent)]" : "text-[var(--chat-text)]")}>
                         {t.id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                       </p>
-                      <p className="text-xs text-zinc-600 mt-0.5">
+                      <p className="text-xs text-[var(--chat-muted)] mt-0.5">
                         {t.intent} &middot; {t.default_model}
                       </p>
                     </div>
@@ -272,10 +272,10 @@ export function TrainingLauncher() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <ShieldCheck size={14} className="text-emerald-500" />
-              <label className="text-sm font-medium text-zinc-400">
+              <label className="text-sm font-medium text-[var(--chat-muted)]">
                 Select Datasets
               </label>
-              <span className="text-xs text-zinc-600">
+              <span className="text-xs text-[var(--chat-muted)]">
                 (all samples are security-scanned before training)
               </span>
             </div>
@@ -292,8 +292,8 @@ export function TrainingLauncher() {
                       checked
                         ? "border-emerald-500/40 bg-emerald-500/5"
                         : isRecommended
-                          ? "border-cyan-500/20 bg-cyan-500/5 hover:border-cyan-500/30"
-                          : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                          ? "border-[var(--chat-accent)]/15 bg-[var(--chat-accent)]/5 hover:border-[var(--chat-accent)]/20"
+                          : "border-[var(--chat-border)] hover:border-[var(--chat-border)] bg-transparent"
                     )}
                   >
                     <div
@@ -301,7 +301,7 @@ export function TrainingLauncher() {
                         "mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0",
                         checked
                           ? "border-emerald-500 bg-emerald-500"
-                          : "border-zinc-700"
+                          : "border-[var(--chat-border)]"
                       )}
                     >
                       {checked && (
@@ -312,20 +312,20 @@ export function TrainingLauncher() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className={cn("text-sm font-medium", checked ? "text-emerald-300" : "text-zinc-300")}>
+                        <p className={cn("text-sm font-medium", checked ? "text-emerald-300" : "text-[var(--chat-text)]")}>
                           {ds.key}
                         </p>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--chat-surface)] text-[var(--chat-muted)]">
                           {ds.category}
                         </span>
                         {isRecommended && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--chat-accent)]/10 text-[var(--chat-accent)] border border-[var(--chat-accent)]/15">
                             Recommended
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-600 mt-0.5">{ds.description}</p>
-                      <p className="text-[10px] text-zinc-700 mt-0.5">
+                      <p className="text-xs text-[var(--chat-muted)] mt-0.5">{ds.description}</p>
+                      <p className="text-[10px] text-[var(--chat-muted)] mt-0.5">
                         HF: {ds.hf_id} &middot; default: {ds.default_max.toLocaleString()} samples
                       </p>
                     </div>
@@ -342,9 +342,9 @@ export function TrainingLauncher() {
                 placeholder="Max samples per dataset..."
                 value={maxSamples}
                 onChange={(e) => setMaxSamples(e.target.value)}
-                className="w-56 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/50"
+                className="w-56 bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-3 py-2 text-sm text-[var(--chat-text)] placeholder:text-[var(--chat-muted)] focus:outline-none focus:border-emerald-500/50"
               />
-              <span className="text-xs text-zinc-600">per dataset (blank = default)</span>
+              <span className="text-xs text-[var(--chat-muted)]">per dataset (blank = default)</span>
             </div>
           </div>
         )}
@@ -354,11 +354,11 @@ export function TrainingLauncher() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-violet-400" />
-              <label className="text-sm font-medium text-zinc-400">
+              <label className="text-sm font-medium text-[var(--chat-muted)]">
                 Generation Target
               </label>
             </div>
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-[var(--chat-muted)]">
               Generates diverse tool-use problems (code, file ops, IoT, research)
               using local Ollama, scores them with the reward function, and keeps
               only high-quality trajectories. All output is security-scanned before training.
@@ -368,9 +368,9 @@ export function TrainingLauncher() {
                 type="number"
                 value={syntheticTarget}
                 onChange={(e) => setSyntheticTarget(e.target.value)}
-                className="w-32 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-violet-500/50"
+                className="w-32 bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-violet-500/50"
               />
-              <span className="text-xs text-zinc-600">
+              <span className="text-xs text-[var(--chat-muted)]">
                 trajectories (default 552, per ToolOrchestra research)
               </span>
             </div>
@@ -381,12 +381,12 @@ export function TrainingLauncher() {
         {runType !== "export" && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Clock size={14} className="text-zinc-500" />
-              <label className="text-sm font-medium text-zinc-400">
+              <Clock size={14} className="text-[var(--chat-muted)]" />
+              <label className="text-sm font-medium text-[var(--chat-muted)]">
                 Training Time Budget
               </label>
             </div>
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-[var(--chat-muted)]">
               Time budget controls active training only. Total wall-clock time
               also includes model loading (~10-70 min depending on cache) and
               dataset preparation. Estimates shown assume a 7B model on the
@@ -405,14 +405,14 @@ export function TrainingLauncher() {
                     className={cn(
                       "px-3 py-2 rounded-lg border transition-colors text-left",
                       isSelected
-                        ? "border-cyan-500/50 bg-cyan-500/10"
-                        : "border-zinc-800 hover:border-zinc-700 bg-transparent"
+                        ? "border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/10"
+                        : "border-[var(--chat-border)] hover:border-[var(--chat-border)] bg-transparent"
                     )}
                   >
-                    <span className={cn("text-xs font-medium block", isSelected ? "text-cyan-300" : "text-zinc-400")}>
+                    <span className={cn("text-xs font-medium block", isSelected ? "text-[var(--chat-accent)]" : "text-[var(--chat-muted)]")}>
                       {preset.label}
                     </span>
-                    <span className="text-[10px] text-zinc-600 block mt-0.5">
+                    <span className="text-[10px] text-[var(--chat-muted)] block mt-0.5">
                       {preset.estimate}
                     </span>
                   </button>
@@ -429,15 +429,15 @@ export function TrainingLauncher() {
                   const val = parseFloat(e.target.value);
                   setTimeBudget(val > 0 ? val : null);
                 }}
-                className="w-48 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-cyan-500/50"
+                className="w-48 bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-3 py-2 text-sm text-[var(--chat-text)] placeholder:text-[var(--chat-muted)] focus:outline-none focus:border-[var(--chat-accent)]"
               />
-              <span className="text-xs text-zinc-600">minutes (training only)</span>
+              <span className="text-xs text-[var(--chat-muted)]">minutes (training only)</span>
             </div>
             {timeBudget && (
-              <p className="text-xs text-zinc-600">
+              <p className="text-xs text-[var(--chat-muted)]">
                 Training stops after {timeBudget} min of active training.
                 Checkpoints saved every 50 steps. Estimated total time:{" "}
-                <span className="text-zinc-400">
+                <span className="text-[var(--chat-muted)]">
                   {timeBudget + 10}&ndash;{timeBudget + 70} min
                 </span>{" "}
                 (including model load + dataset prep).
@@ -451,43 +451,43 @@ export function TrainingLauncher() {
           <div className="space-y-3">
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+              className="text-xs text-[var(--chat-muted)] hover:text-[var(--chat-muted)] transition-colors"
             >
               {showAdvanced ? "Hide" : "Show"} advanced options
             </button>
             {showAdvanced && (
-              <div className="grid grid-cols-3 gap-4 border border-zinc-800 rounded-lg p-4">
+              <div className="grid grid-cols-3 gap-4 border border-[var(--chat-border)] rounded-lg p-4">
                 <div>
-                  <label className="text-xs text-zinc-600 block mb-1">
+                  <label className="text-xs text-[var(--chat-muted)] block mb-1">
                     LoRA Rank
                   </label>
                   <input
                     type="number"
                     value={loraRank}
                     onChange={(e) => setLoraRank(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-cyan-500/50"
+                    className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-3 py-1.5 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-600 block mb-1">
+                  <label className="text-xs text-[var(--chat-muted)] block mb-1">
                     Learning Rate
                   </label>
                   <input
                     type="text"
                     value={learningRate}
                     onChange={(e) => setLearningRate(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-cyan-500/50"
+                    className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-3 py-1.5 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-600 block mb-1">
+                  <label className="text-xs text-[var(--chat-muted)] block mb-1">
                     Epochs
                   </label>
                   <input
                     type="number"
                     value={epochs}
                     onChange={(e) => setEpochs(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-cyan-500/50"
+                    className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-3 py-1.5 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
                   />
                 </div>
               </div>
@@ -502,8 +502,8 @@ export function TrainingLauncher() {
           className={cn(
             "w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-colors",
             launching
-              ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-              : "bg-cyan-600 hover:bg-cyan-500 text-white"
+              ? "bg-[var(--chat-surface)] text-[var(--chat-muted)] cursor-not-allowed"
+              : "bg-[var(--chat-accent)] hover:bg-[var(--chat-accent-strong)] text-white"
           )}
         >
           {launching ? (

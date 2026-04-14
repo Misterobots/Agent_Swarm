@@ -15,20 +15,20 @@ export function ToolIframe({ url, label }: ToolIframeProps) {
   return (
     <div className="relative flex-1">
       {loading && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a14]">
+        <div className="absolute inset-0 flex items-center justify-center bg-[var(--chat-bg)]">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 size={24} className="text-cyan-400 animate-spin" />
-            <span className="text-sm text-zinc-500">Loading {label}...</span>
+            <Loader2 size={24} className="text-[var(--chat-accent)] animate-spin" />
+            <span className="text-sm text-[var(--chat-muted)]">Loading {label}...</span>
           </div>
         </div>
       )}
 
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a14]">
+        <div className="absolute inset-0 flex items-center justify-center bg-[var(--chat-bg)]">
           <div className="flex flex-col items-center gap-3">
             <AlertTriangle size={24} className="text-red-400" />
             <span className="text-sm text-red-300">Failed to load {label}</span>
-            <span className="text-xs text-zinc-500">The service may be unavailable or blocking iframe embedding.</span>
+            <span className="text-xs text-[var(--chat-muted)]">The service may be unavailable or blocking iframe embedding.</span>
           </div>
         </div>
       )}

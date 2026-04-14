@@ -12,11 +12,11 @@ interface ToolCallBlockProps {
 
 function getStateBadge(state?: string) {
   const badges: Record<string, { icon: string; label: string; color: string }> = {
-    completed: { icon: "✓", label: "Done", color: "text-green-500" },
+    completed: { icon: "âœ“", label: "Done", color: "text-green-500" },
     executing: { icon: "...", label: "Running", color: "text-yellow-500" },
     queued: { icon: "o", label: "Queued", color: "text-blue-500" },
     error: { icon: "!", label: "Error", color: "text-red-500" },
-    cancelled: { icon: "x", label: "Cancelled", color: "text-zinc-500" },
+    cancelled: { icon: "x", label: "Cancelled", color: "text-[var(--chat-muted)]" },
   };
   return badges[state || "queued"] || badges.queued;
 }
@@ -53,8 +53,8 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
   }
 
   return (
-    <div className="mt-3 rounded-md border border-[#3b332e] bg-[#11100f] overflow-hidden">
-      <div className="px-3 py-2 border-b border-[#2a2521] text-xs uppercase tracking-wider text-[#cc9a84]">
+    <div className="mt-3 rounded-md border border-[var(--chat-border)] bg-[var(--chat-bg)] overflow-hidden">
+      <div className="px-3 py-2 border-b border-[var(--chat-border)] text-xs uppercase tracking-wider text-[#cc9a84]">
         Tool Calls ({toolCalls.length})
       </div>
       <div className="divide-y divide-[#2a2521]">
@@ -77,7 +77,7 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
               </div>
 
               {typeof stateEvent?.progress === "number" && (
-                <div className="w-full h-1.5 rounded bg-[#1e1b18] overflow-hidden">
+                <div className="w-full h-1.5 rounded bg-[var(--chat-surface)] overflow-hidden">
                   <div
                     className="h-full bg-[var(--chat-accent-2)]"
                     style={{ width: `${Math.max(0, Math.min(100, stateEvent.progress))}%` }}
@@ -86,11 +86,11 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
               )}
 
               {result?.output ? (
-                <div className="text-xs text-zinc-300 max-h-40 overflow-y-auto bg-[#1a1917] p-1.5 rounded whitespace-pre-wrap">
+                <div className="text-xs text-[var(--chat-text)] max-h-40 overflow-y-auto bg-[var(--chat-soft)] p-1.5 rounded whitespace-pre-wrap">
                   {result.output}
                 </div>
               ) : t.content ? (
-                <p className="text-xs text-zinc-300">{t.content}</p>
+                <p className="text-xs text-[var(--chat-text)]">{t.content}</p>
               ) : null}
 
               {result?.artifacts?.length ? (
@@ -101,7 +101,7 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
                     return (
                       <div
                         key={artifact.id}
-                        className="rounded border border-[#2a2521] bg-[#1a1917] p-2"
+                        className="rounded border border-[var(--chat-border)] bg-[var(--chat-soft)] p-2"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[11px] text-[#d9b8a7] truncate">
@@ -146,7 +146,7 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
               ) : null}
 
               {t.tool_input ? (
-                <pre className="text-xs text-zinc-400 overflow-x-auto whitespace-pre-wrap bg-[#1a1917] p-1.5 rounded">
+                <pre className="text-xs text-[var(--chat-muted)] overflow-x-auto whitespace-pre-wrap bg-[var(--chat-soft)] p-1.5 rounded">
                   {JSON.stringify(t.tool_input, null, 2)}
                 </pre>
               ) : null}

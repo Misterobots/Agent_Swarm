@@ -24,16 +24,16 @@ export function ThreeDControls() {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+      <h3 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider">
         3D Generation
       </h3>
 
       <label className="block">
-        <span className="text-xs text-zinc-500">Pipeline</span>
+        <span className="text-xs text-[var(--chat-muted)]">Pipeline</span>
         <select
           value={threeDSettings.workflow}
           onChange={(e) => setThreeDSettings({ workflow: e.target.value })}
-          className="mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-violet-500"
+          className="mt-1 w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-md px-3 py-1.5 text-sm text-[var(--chat-text)] focus:outline-none focus:border-violet-500"
         >
           {WORKFLOWS.map((w) => (
             <option key={w.value} value={w.value}>{w.label}</option>
@@ -42,11 +42,11 @@ export function ThreeDControls() {
       </label>
 
       <label className="block">
-        <span className="text-xs text-zinc-500">Quality</span>
+        <span className="text-xs text-[var(--chat-muted)]">Quality</span>
         <select
           value={threeDSettings.quality}
           onChange={(e) => setThreeDSettings({ quality: e.target.value as "fast" | "balanced" | "high" })}
-          className="mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-violet-500"
+          className="mt-1 w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-md px-3 py-1.5 text-sm text-[var(--chat-text)] focus:outline-none focus:border-violet-500"
         >
           {QUALITY_OPTS.map((q) => (
             <option key={q.value} value={q.value}>{q.label}</option>
@@ -55,11 +55,11 @@ export function ThreeDControls() {
       </label>
 
       <label className="block">
-        <span className="text-xs text-zinc-500">Source Adherence</span>
+        <span className="text-xs text-[var(--chat-muted)]">Source Adherence</span>
         <select
           value={threeDSettings.sourceAdherence}
           onChange={(e) => setThreeDSettings({ sourceAdherence: e.target.value as "low" | "medium" | "high" })}
-          className="mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-violet-500"
+          className="mt-1 w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-md px-3 py-1.5 text-sm text-[var(--chat-text)] focus:outline-none focus:border-violet-500"
         >
           {ADHERENCE_OPTS.map((a) => (
             <option key={a.value} value={a.value}>{a.label}</option>
@@ -67,7 +67,7 @@ export function ThreeDControls() {
         </select>
       </label>
 
-      <p className="text-xs text-zinc-600">
+      <p className="text-xs text-[var(--chat-muted)]">
         Quality controls inference steps. Source adherence controls how closely
         the 3D geometry follows the input image (higher = stricter match).
       </p>
@@ -77,12 +77,12 @@ export function ThreeDControls() {
           type="checkbox"
           checked={threeDSettings.autoConcept}
           onChange={(e) => setThreeDSettings({ autoConcept: e.target.checked })}
-          className="rounded border-zinc-700 bg-zinc-900 text-violet-500 focus:ring-violet-500"
+          className="rounded border-[var(--chat-border)] bg-[var(--chat-panel)] text-violet-500 focus:ring-violet-500"
         />
-        <span className="text-xs text-zinc-400">Auto-generate concept art first</span>
+        <span className="text-xs text-[var(--chat-muted)]">Auto-generate concept art first</span>
       </label>
 
-      <p className="text-xs text-zinc-600">
+      <p className="text-xs text-[var(--chat-muted)]">
         When enabled, the system creates optimized concept art from your prompt
         before converting to 3D. The image is preprocessed with background
         removal for cleaner geometry.

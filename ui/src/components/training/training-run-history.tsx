@@ -41,7 +41,7 @@ export function TrainingRunHistory() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-zinc-500">
+      <div className="flex-1 flex items-center justify-center text-[var(--chat-muted)]">
         Loading run history...
       </div>
     );
@@ -51,13 +51,13 @@ export function TrainingRunHistory() {
     <div className="flex-1 overflow-auto p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <History size={20} className="text-cyan-400" />
-          <h1 className="text-lg font-semibold text-zinc-100">Run History</h1>
-          <span className="text-xs text-zinc-600">{runs.length} runs</span>
+          <History size={20} className="text-[var(--chat-accent)]" />
+          <h1 className="text-lg font-semibold text-[var(--chat-text)]">Run History</h1>
+          <span className="text-xs text-[var(--chat-muted)]">{runs.length} runs</span>
         </div>
         <button
           onClick={refresh}
-          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
         >
           <RefreshCw size={12} />
           Refresh
@@ -65,17 +65,17 @@ export function TrainingRunHistory() {
       </div>
 
       {runs.length === 0 ? (
-        <div className="border border-zinc-800 rounded-lg p-8 text-center">
-          <p className="text-zinc-500">No training runs recorded yet.</p>
-          <p className="text-xs text-zinc-600 mt-1">
+        <div className="border border-[var(--chat-border)] rounded-lg p-8 text-center">
+          <p className="text-[var(--chat-muted)]">No training runs recorded yet.</p>
+          <p className="text-xs text-[var(--chat-muted)] mt-1">
             Launch a run from the Launch tab to get started.
           </p>
         </div>
       ) : (
-        <div className="border border-zinc-800 rounded-lg overflow-hidden">
+        <div className="border border-[var(--chat-border)] rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-zinc-600 border-b border-zinc-800 bg-[#0a0a14]">
+              <tr className="text-xs text-[var(--chat-muted)] border-b border-[var(--chat-border)] bg-[var(--chat-bg)]">
                 <th className="text-left p-3 font-medium w-8"></th>
                 <th className="text-left p-3 font-medium">ID</th>
                 <th className="text-left p-3 font-medium">Type</th>
@@ -108,24 +108,24 @@ export function TrainingRunHistory() {
                 return (
                   <Fragment key={run.id}>
                     <tr
-                      className="border-b border-zinc-800/50 hover:bg-zinc-800/20 cursor-pointer"
+                      className="border-b border-[var(--chat-border)] hover:bg-[var(--chat-surface)] cursor-pointer"
                       onClick={() =>
                         setExpandedId(expanded ? null : run.id)
                       }
                     >
-                      <td className="p-3 text-zinc-600">
+                      <td className="p-3 text-[var(--chat-muted)]">
                         {expanded ? (
                           <ChevronUp size={14} />
                         ) : (
                           <ChevronDown size={14} />
                         )}
                       </td>
-                      <td className="p-3 text-zinc-400 font-mono text-xs">
+                      <td className="p-3 text-[var(--chat-muted)] font-mono text-xs">
                         #{run.id}
                       </td>
-                      <td className="p-3 text-zinc-300">{run.run_type}</td>
-                      <td className="p-3 text-zinc-400 truncate max-w-[180px]">
-                        {run.target_model ?? "—"}
+                      <td className="p-3 text-[var(--chat-text)]">{run.run_type}</td>
+                      <td className="p-3 text-[var(--chat-muted)] truncate max-w-[180px]">
+                        {run.target_model ?? "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
                       </td>
                       <td className="p-3">
                         <span
@@ -138,26 +138,26 @@ export function TrainingRunHistory() {
                             run.status === "running" &&
                               "bg-amber-500/10 text-amber-400",
                             run.status === "pending" &&
-                              "bg-zinc-500/10 text-zinc-400"
+                              "bg-[var(--chat-muted)]/10 text-[var(--chat-muted)]"
                           )}
                         >
                           {run.status}
                         </span>
                       </td>
-                      <td className="p-3 text-right text-zinc-400">
-                        {run.dataset_size ?? "—"}
+                      <td className="p-3 text-right text-[var(--chat-muted)]">
+                        {run.dataset_size ?? "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
                       </td>
-                      <td className="p-3 text-right text-zinc-500 text-xs">
+                      <td className="p-3 text-right text-[var(--chat-muted)] text-xs">
                         {new Date(run.started_at).toLocaleString()}
                       </td>
-                      <td className="p-3 text-right text-zinc-400 text-xs">
+                      <td className="p-3 text-right text-[var(--chat-muted)] text-xs">
                         {duration != null
                           ? `${formatDuration(duration)}${run.status === "running" ? " (live)" : ""}`
-                          : "—"}
+                          : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
                       </td>
                     </tr>
                     {expanded && (
-                      <tr className="bg-zinc-900/50">
+                      <tr className="bg-[var(--chat-panel)]">
                         <td colSpan={8} className="p-4">
                           <TrainingReportView runId={run.id} />
                           {run.status === "completed" &&
@@ -278,8 +278,8 @@ function RunActions({ runId }: { runId: number }) {
   return (
     <div className="mt-4 space-y-3">
       {/* Divider */}
-      <div className="border-t border-zinc-800 pt-3">
-        <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">
+      <div className="border-t border-[var(--chat-border)] pt-3">
+        <p className="text-[10px] text-[var(--chat-muted)] uppercase tracking-wider mb-2">
           Actions
         </p>
       </div>
@@ -290,18 +290,18 @@ function RunActions({ runId }: { runId: number }) {
           {!showConvertForm ? (
             <button
               onClick={() => setShowConvertForm(true)}
-              className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg border border-[var(--chat-accent)]/20 text-[var(--chat-accent)] hover:bg-[var(--chat-accent)]/10 transition-colors"
             >
               <Package size={14} />
               Convert to Ollama Model
             </button>
           ) : (
-            <div className="border border-zinc-800 rounded-lg p-3 space-y-3">
-              <p className="text-xs text-zinc-400 font-medium">
+            <div className="border border-[var(--chat-border)] rounded-lg p-3 space-y-3">
+              <p className="text-xs text-[var(--chat-muted)] font-medium">
                 Convert to Ollama Model
               </p>
               <div>
-                <label className="text-[10px] text-zinc-600 block mb-1">
+                <label className="text-[10px] text-[var(--chat-muted)] block mb-1">
                   System Prompt (optional)
                 </label>
                 <input
@@ -309,19 +309,19 @@ function RunActions({ runId }: { runId: number }) {
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   placeholder="e.g. You are a helpful coding assistant..."
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-300 placeholder-zinc-600"
+                  className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-2 py-1.5 text-xs text-[var(--chat-text)] placeholder-zinc-600"
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleConvert}
-                  className="px-3 py-1.5 text-xs rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+                  className="px-3 py-1.5 text-xs rounded bg-cyan-500/20 text-[var(--chat-accent)] hover:bg-[var(--chat-accent-strong)]/30 transition-colors"
                 >
                   Start Conversion
                 </button>
                 <button
                   onClick={() => setShowConvertForm(false)}
-                  className="px-3 py-1.5 text-xs rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+                  className="px-3 py-1.5 text-xs rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
                 >
                   Cancel
                 </button>
@@ -352,19 +352,19 @@ function RunActions({ runId }: { runId: number }) {
               Deploy for A/B Testing
             </button>
           ) : (
-            <div className="border border-zinc-800 rounded-lg p-3 space-y-3">
-              <p className="text-xs text-zinc-400 font-medium">
+            <div className="border border-[var(--chat-border)] rounded-lg p-3 space-y-3">
+              <p className="text-xs text-[var(--chat-muted)] font-medium">
                 Deploy for A/B Testing
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-[10px] text-zinc-600 block mb-1">
+                  <label className="text-[10px] text-[var(--chat-muted)] block mb-1">
                     Template
                   </label>
                   <select
                     value={selectedTemplate}
                     onChange={(e) => setSelectedTemplate(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-300"
+                    className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-2 py-1.5 text-xs text-[var(--chat-text)]"
                   >
                     {templates.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -374,7 +374,7 @@ function RunActions({ runId }: { runId: number }) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-zinc-600 block mb-1">
+                  <label className="text-[10px] text-[var(--chat-muted)] block mb-1">
                     Traffic Split
                   </label>
                   <select
@@ -382,7 +382,7 @@ function RunActions({ runId }: { runId: number }) {
                     onChange={(e) =>
                       setTrafficSplit(parseFloat(e.target.value))
                     }
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-300"
+                    className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-2 py-1.5 text-xs text-[var(--chat-text)]"
                   >
                     <option value={0.1}>10% candidate</option>
                     <option value={0.2}>20% candidate</option>
@@ -391,7 +391,7 @@ function RunActions({ runId }: { runId: number }) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-zinc-600 block mb-1">
+                  <label className="text-[10px] text-[var(--chat-muted)] block mb-1">
                     Min Invocations
                   </label>
                   <input
@@ -400,7 +400,7 @@ function RunActions({ runId }: { runId: number }) {
                     onChange={(e) =>
                       setMinInvocations(parseInt(e.target.value) || 100)
                     }
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-300"
+                    className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-2 py-1.5 text-xs text-[var(--chat-text)]"
                   />
                 </div>
               </div>
@@ -420,7 +420,7 @@ function RunActions({ runId }: { runId: number }) {
                 </button>
                 <button
                   onClick={() => setShowDeployForm(false)}
-                  className="px-3 py-1.5 text-xs rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+                  className="px-3 py-1.5 text-xs rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
                 >
                   Cancel
                 </button>

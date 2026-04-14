@@ -37,7 +37,7 @@ export function DeployReportView({ runId }: { runId: number }) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-4 text-zinc-500 text-sm">
+      <div className="flex items-center gap-2 py-4 text-[var(--chat-muted)] text-sm">
         <Loader2 size={14} className="animate-spin" />
         Loading deploy report...
       </div>
@@ -46,7 +46,7 @@ export function DeployReportView({ runId }: { runId: number }) {
 
   if (!report || report.status === "not_deployed") {
     return (
-      <p className="text-sm text-zinc-500 py-4">
+      <p className="text-sm text-[var(--chat-muted)] py-4">
         Model not yet deployed for A/B testing.
       </p>
     );
@@ -64,7 +64,7 @@ export function DeployReportView({ runId }: { runId: number }) {
         status={isConcluded ? "completed" : isActive ? "running" : "pending"}
         label={
           isConcluded
-            ? `A/B Test Concluded${test?.winner ? ` — ${test.winner} won` : ""}`
+            ? `A/B Test Concluded${test?.winner ? ` â€” ${test.winner} won` : ""}`
             : isActive
             ? "A/B Test Active"
             : "A/B Test Pending"
@@ -95,7 +95,7 @@ export function DeployReportView({ runId }: { runId: number }) {
               value={
                 test.traffic_split != null
                   ? `${(test.traffic_split * 100).toFixed(0)}% candidate`
-                  : "—"
+                  : "â€”"
               }
             />
           </div>
@@ -105,7 +105,7 @@ export function DeployReportView({ runId }: { runId: number }) {
       {/* Live Results */}
       {results && (
         <Section
-          icon={<BarChart3 size={14} className="text-cyan-500" />}
+          icon={<BarChart3 size={14} className="text-[var(--chat-accent)]" />}
           title="Results"
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -114,7 +114,7 @@ export function DeployReportView({ runId }: { runId: number }) {
               value={
                 results.candidate_avg_score != null
                   ? results.candidate_avg_score.toFixed(4)
-                  : "—"
+                  : "â€”"
               }
               detail={`${results.n_candidate} samples`}
             />
@@ -123,7 +123,7 @@ export function DeployReportView({ runId }: { runId: number }) {
               value={
                 results.base_avg_score != null
                   ? results.base_avg_score.toFixed(4)
-                  : "—"
+                  : "â€”"
               }
               detail={`${results.n_base} samples`}
             />
@@ -137,14 +137,14 @@ export function DeployReportView({ runId }: { runId: number }) {
                         ? "text-emerald-400"
                         : results.improvement_pct < 0
                         ? "text-red-400"
-                        : "text-zinc-400"
+                        : "text-[var(--chat-muted)]"
                     )}
                   >
                     {results.improvement_pct > 0 ? "+" : ""}
                     {results.improvement_pct.toFixed(2)}%
                   </span>
                 ) : (
-                  "—"
+                  "â€”"
                 )
               }
             />
@@ -156,14 +156,14 @@ export function DeployReportView({ runId }: { runId: number }) {
                     className={cn(
                       results.p_value < 0.05
                         ? "text-emerald-400"
-                        : "text-zinc-400"
+                        : "text-[var(--chat-muted)]"
                     )}
                   >
                     {results.p_value.toFixed(4)}
                     {results.p_value < 0.05 && " (significant)"}
                   </span>
                 ) : (
-                  "—"
+                  "â€”"
                 )
               }
             />
@@ -172,7 +172,7 @@ export function DeployReportView({ runId }: { runId: number }) {
           {/* Progress bar */}
           {test && results.total_samples >= 0 && (
             <div className="mt-3">
-              <div className="flex justify-between text-[10px] text-zinc-600 mb-1">
+              <div className="flex justify-between text-[10px] text-[var(--chat-muted)] mb-1">
                 <span>
                   {results.total_samples} / {test.min_invocations} samples
                 </span>
@@ -186,7 +186,7 @@ export function DeployReportView({ runId }: { runId: number }) {
                   %
                 </span>
               </div>
-              <div className="h-2 rounded-full overflow-hidden bg-zinc-800">
+              <div className="h-2 rounded-full overflow-hidden bg-[var(--chat-surface)]">
                 <div
                   className={cn(
                     "h-full rounded-full transition-all",
@@ -229,7 +229,7 @@ export function DeployReportView({ runId }: { runId: number }) {
       )}
 
       {isActive && results && results.total_samples === 0 && (
-        <div className="border border-zinc-800 rounded-lg p-3 text-xs text-zinc-500">
+        <div className="border border-[var(--chat-border)] rounded-lg p-3 text-xs text-[var(--chat-muted)]">
           <AlertTriangle size={12} className="inline mr-1 text-amber-400" />
           Collecting data... Results will appear as chat requests are routed
           through this template.
