@@ -50,11 +50,13 @@ interface ThinkingIndicatorProps {
   streamMode?: string | null;
 }
 
-export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndicatorProps) {
+export function ThinkingIndicator({ statusMessage, latestThought, streamMode }: ThinkingIndicatorProps) {
   const theme = useSettingsStore((s) => s.theme) as ChatTheme;
   const verbs = THEME_AMBIENT_VERBS[theme] ?? THEME_AMBIENT_VERBS.ember;
   const [verb, setVerb] = useState(() => pickRandom(verbs));
   const [thinkingPhase, setThinkingPhase] = useState(0);
+
+  const isCompacting = streamMode === "compacting";
 
   const THINKING_PHASES = [
     "Scanning context",
@@ -84,6 +86,20 @@ export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndi
         <Bot size={16} className="text-[var(--chat-accent-2)] animate-pulse" />
       </div>
       <div className="flex-1 min-w-0">
+        {/* Compacting override — shown when context window is being summarized */}
+        {isCompacting ? (
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-sm font-semibold text-[var(--chat-accent-2)]">
+              Compacting context
+            </span>
+            <span className="flex gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:0ms]" />
+              <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:150ms]" />
+              <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:300ms]" />
+            </span>
+          </div>
+        ) : (
+        <>
         {/* Line 1: Real agent status (stripped of emojis) */}
         <div className="flex items-center gap-2 mb-1.5">
           {agentName ? (
@@ -117,6 +133,8 @@ export function ThinkingIndicator({ statusMessage, latestThought }: ThinkingIndi
         <div className="flex items-center gap-2">
           <span className="text-xs text-[var(--chat-muted)] italic">{verb}...</span>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

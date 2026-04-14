@@ -88,25 +88,36 @@ export function useChatStream() {
       const conv = useChatStore.getState().conversations.find((c) => c.id === convId);
       if (!conv || conv.messages.length === 0) return false;
 
-      const apiMessages = conv.messages.map((m) => ({ role: m.role, content: m.content }));
-      const result = await compactChat(apiMessages, conv.model || model);
-      if (!result.compacted) return false;
+      // Show compacting indicator
+      setStreamMode("compacting");
+      setStatusMessage("Compacting context...");
+      setIsStreaming(true);
 
-      const baseTs = Date.now();
-      updateConversation(convId, {
-        messages: result.messages.map((m, idx) => ({
-          id: genId(),
-          role: m.role,
-          content: m.content,
-          timestamp: baseTs + idx,
-        })),
-      });
+      try {
+        const apiMessages = conv.messages.map((m) => ({ role: m.role, content: m.content }));
+        const result = await compactChat(apiMessages, conv.model || model);
+        if (!result.compacted) return false;
 
-      addMessage(convId, {
-        role: "assistant",
-        content: "Context compacted to keep conversation quality high.",
-      });
-      return true;
+        const baseTs = Date.now();
+        updateConversation(convId, {
+          messages: result.messages.map((m, idx) => ({
+            id: genId(),
+            role: m.role,
+            content: m.content,
+            timestamp: baseTs + idx,
+          })),
+        });
+
+        addMessage(convId, {
+          role: "assistant",
+          content: "Context compacted to keep conversation quality high.",
+        });
+        return true;
+      } finally {
+        setStreamMode(null);
+        setStatusMessage(null);
+        setIsStreaming(false);
+      }
     },
     [activeConversationId, addMessage, model, updateConversation]
   );

@@ -1,13 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { ChatMessage } from "@/types/chat";
 import { MarkdownRenderer } from "@/components/shared/markdown-renderer";
 import { cn } from "@/lib/utils/cn";
-import { Bot, User, Palette, ChevronDown } from "lucide-react";
+import { Bot, User, Palette, ChevronDown, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
 import Link from "next/link";
 import { ToolCallBlock } from "./tool-call-block";
 import { MessageActions } from "./message-actions";
+
+interface VerificationBadge {
+  passed: boolean;
+  score: number;
+  iterations: number;
+  correctorUsed: boolean;
+}
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -28,6 +35,35 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
   const artStudioHref = userPrompt
     ? `/art-studio?prompt=${encodeURIComponent(userPrompt)}`
     : "/art-studio";
+
+  // Extract MarsRL verification info from thought trace
+  const verification = useMemo((): VerificationBadge | null => {
+    const thoughts = message.thoughtTrace;
+    if (!thoughts || thoughts.length === 0) return null;
+
+    let passed = false;
+    let score = 0;
+    let iterations = 0;
+    let correctorUsed = false;
+    let hasVerifier = false;
+
+    for (const t of thoughts) {
+      const c = t.content;
+      // Match "→ Verifier: PASS (score: 0.85)" or "→ Verifier: FAIL (score: 0.40)"
+      const match = c.match(/Verifier:\s*(PASS|FAIL)\s*\(score:\s*([\d.]+)\)/i);
+      if (match) {
+        hasVerifier = true;
+        iterations++;
+        passed = match[1].toUpperCase() === "PASS";
+        score = parseFloat(match[2]);
+      }
+      if (/Corrector engaged/i.test(c) || /Correcting response/i.test(c)) {
+        correctorUsed = true;
+      }
+    }
+    if (!hasVerifier) return null;
+    return { passed, score, iterations, correctorUsed };
+  }, [message.thoughtTrace]);
 
   return (
     <div className={cn("group relative flex gap-3 py-4 px-4 msg-enter", isUser ? "bg-transparent" : "bg-[var(--chat-surface)]")}>
@@ -53,6 +89,27 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
           <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--chat-muted)]">
             <span>Turn {message.turnMetadata.turnId.slice(0, 8)}</span>
             {message.turnMetadata.agentName ? <span>{message.turnMetadata.agentName}</span> : null}
+          </div>
+        )}
+        {verification && !isUser && (
+          <div
+            className={cn(
+              "mb-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium",
+              verification.passed
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-400"
+            )}
+            title={`MarsRL Verification: ${verification.passed ? "Passed" : "Failed"} (score: ${verification.score.toFixed(2)}, ${verification.iterations} round${verification.iterations > 1 ? "s" : ""}${verification.correctorUsed ? ", corrector used" : ""})`}
+          >
+            {verification.passed ? (
+              <ShieldCheck size={12} />
+            ) : verification.score >= 0.4 ? (
+              <ShieldAlert size={12} />
+            ) : (
+              <ShieldX size={12} />
+            )}
+            <span>Verified {verification.score.toFixed(2)}</span>
+            {verification.correctorUsed && <span className="opacity-60">• corrected</span>}
           </div>
         )}
         {isUser ? (
