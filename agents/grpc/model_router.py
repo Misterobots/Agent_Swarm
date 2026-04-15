@@ -6,7 +6,7 @@ intent classification to the optimal (model, Ollama node) pair, then
 executes inference via Ollama's HTTP API.
 
 Model assignments (from config.py):
-    nemotron-mini           → intent classification (router)
+    nemotron-orchestrator:8b → intent classification (router)
     qwen2.5-coder:14b      → code generation
     qwen3:14b              → general reasoning
     llama3.2:3b            → research / lightweight tasks
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configuration (read from env, with defaults matching config.py)
 # ---------------------------------------------------------------------------
-ROUTER_MODEL = os.getenv("ROUTER_MODEL", "nemotron-mini")
+ROUTER_MODEL = os.getenv("ROUTER_MODEL", "nemotron-orchestrator:8b")
 CODE_MODEL = os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b-instruct-q4_k_m")
 GENERAL_MODEL = os.getenv("COORDINATOR_MODEL", "qwen3:14b")
 RESEARCH_MODEL = os.getenv("LIBRARIAN_MODEL", "llama3.2:3b")
@@ -64,6 +64,7 @@ CONTEXT_WINDOWS: Dict[str, int] = {
     "qwen2.5-coder:14b": 32768,
     "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
     "qwen3:14b": 40960,
+    "nemotron-orchestrator:8b": 32768,
     "nemotron-mini": 4096,
     "llama3.2:3b": 8192,
     "moondream:latest": 2048,
@@ -160,7 +161,7 @@ class ModelRouter:
     Flow:
         1. If explicit model given → find node with that model
         2. If intent given → map to model via INTENT_MODEL_MAP
-        3. If neither → classify intent via nemotron-mini, then route
+        3. If neither → classify intent via nemotron-orchestrator:8b, then route
     """
 
     def __init__(
@@ -188,7 +189,7 @@ class ModelRouter:
 
     def classify_intent(self, prompt: str) -> ClassificationResult:
         """
-        Classify the intent of a prompt using the router model (nemotron-mini).
+        Classify the intent of a prompt using the router model (nemotron-orchestrator:8b).
         Returns the detected intent, confidence, and suggested model + node.
         """
         classification_prompt = (

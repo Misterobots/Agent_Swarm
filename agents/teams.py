@@ -14,7 +14,7 @@ from corrector_agent import get_corrector
 # Configuration
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")          # Justin-PC (Solver/Corrector)
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", OLLAMA_HOST)  # Dell R730 (Router/Orchestrator)
-ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", "nemotron-mini")
+ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", "nemotron-orchestrator:8b")
 
 # --- 1. CODING TEAM ---
 def get_coding_team():

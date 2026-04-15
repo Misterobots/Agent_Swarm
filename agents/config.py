@@ -59,7 +59,7 @@ MEMPALACE_URL        = os.getenv("MEMPALACE_URL",        f"http://{CONTROL_NODE_
 HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTANT_IP}:8123")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{GATEWAY_NODE_IP}:11434")
 OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
-ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "nemotron-mini")
+ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "nemotron-orchestrator:8b")
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      "qwen2.5-coder:14b-instruct-q4_k_m")
 COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    "qwen3:14b")
 LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      "llama3.2:3b")
@@ -89,6 +89,7 @@ CONTEXT_WINDOWS: dict[str, int] = {
     "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
     "qwen3.5:9b": 32768,
     "qwen3:14b": 40960,
+    "nemotron-orchestrator:8b": 32768,
     "nemotron-mini": 4096,
     "llama3.2:3b": 8192,
     "default": 8192,

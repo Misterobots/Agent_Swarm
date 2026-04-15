@@ -328,6 +328,29 @@ def train_grpo(
         run_dir = Path(config.output_dir) / f"grpo_{timestamp}"
         run_dir.mkdir(parents=True, exist_ok=True)
 
+        # Write training_config.json so the filesystem catalog endpoint can read it
+        training_config_data = {
+            "run_id": str(run_dir.name),
+            "base_model": config.base_model,
+            "started_at": datetime.utcnow().isoformat() + "Z",
+            "num_epochs": config.num_epochs,
+            "lora_rank": config.lora_rank,
+            "lora_alpha": config.lora_alpha,
+            "batch_size": config.batch_size,
+            "dataset_path": config.dataset_path,
+        }
+        try:
+            import json as _json
+            (run_dir / "training_config.json").write_text(
+                _json.dumps(training_config_data, indent=2)
+            )
+        except Exception as _cfg_err:
+            logger.warning(
+                "Failed to write training_config.json: %s",
+                _cfg_err,
+                exc_info=True,
+            )
+
         # 4-bit quantization config for QLoRA
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
