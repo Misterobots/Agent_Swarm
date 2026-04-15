@@ -1,0 +1,60 @@
+﻿Loading https://hive.shivelymedia.com ...
+  Landed on: https://auth.shivelymedia.com/if/flow/default-authentication-flow/?client_id=MKvrxkBZTCV2MkXYqxiGBpHAN5Khjd7SP3jwTEBk&redirect_uri=https%3A%2F%2Fhive.shivelymedia.com%2Foutpost.goauthentik.io%2Fcallback%3FX-authentik-auth-callback%3Dtrue&response_type=code&scope=profile+entitlements+openid+ak_proxy+email&state=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnb2F1dGhlbnRpay5pby9vdXRwb3N0L01LdnJ4a0JaVENWMk1rWFlxeGlHQnBIQU41S2hqZDdTUDNqd1RFQmsiLCJzaWQiOiJXSURRUkFUM1pWSFJPRE1ZV1YzWkZKUVpGNFJFUUYyQVdFRTJVUkU2SEJaV1FCRkpNUTRBIiwic3RhdGUiOiI0UnExY1pMaFFWOER6Ymhvdm5vVlhHSDlSdXFpUzhHQ2pJVWZEbko5RWljIiwicmVkaXJlY3QiOiJodHRwczovL2hpdmUuc2hpdmVseW1lZGlhLmNvbS8ifQ.k2L12U0_jef6lQfz1GbF7Kvb_AYGfXpWkhI2qJlLkcI&next=%2Fapplication%2Fo%2Fauthorize%2F%3Fclient_id%3DMKvrxkBZTCV2MkXYqxiGBpHAN5Khjd7SP3jwTEBk%26redirect_uri%3Dhttps%253A%252F%252Fhive.shivelymedia.com%252Foutpost.goauthentik.io%252Fcallback%253FX-authentik-auth-callback%253Dtrue%26response_type%3Dcode%26scope%3Dprofile%2Bentitlements%2Bopenid%2Bak_proxy%2Bemail%26state%3DeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnb2F1dGhlbnRpay5pby9vdXRwb3N0L01LdnJ4a0JaVENWMk1rWFlxeGlHQnBIQU41S2hqZDdTUDNqd1RFQmsiLCJzaWQiOiJXSURRUkFUM1pWSFJPRE1ZV1YzWkZKUVpGNFJFUUYyQVdFRTJVUkU2SEJaV1FCRkpNUTRBIiwic3RhdGUiOiI0UnExY1pMaFFWOER6Ymhvdm5vVlhHSDlSdXFpUzhHQ2pJVWZEbko5RWljIiwicmVkaXJlY3QiOiJodHRwczovL2hpdmUuc2hpdmVseW1lZGlhLmNvbS8ifQ.k2L12U0_jef6lQfz1GbF7Kvb_AYGfXpWkhI2qJlLkcI
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\00_authentik_login.png
+  Logging in to Authentik...
+  Logged in! Now at: https://hive.shivelymedia.com/
+
+[home] https://hive.shivelymedia.com/
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\home.png
+  Redirected to: https://hive.shivelymedia.com/chat
+
+[chat] https://hive.shivelymedia.com/chat
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\chat.png
+
+[media] https://hive.shivelymedia.com/media
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\media.png
+
+[developer] https://hive.shivelymedia.com/developer
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\developer.png
+
+[settings] https://hive.shivelymedia.com/settings
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\settings.png
+
+[monitoring] https://hive.shivelymedia.com/monitoring
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\monitoring.png
+
+[training] https://hive.shivelymedia.com/training
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\training.png
+
+[operations] https://hive.shivelymedia.com/operations
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\operations.png
+
+[governance] https://hive.shivelymedia.com/governance
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\governance.png
+
+[sidebar] Capturing sidebar...
+  Saved: C:\Users\panca\Documents\Github\Agent_Swarm\scripts\..\docs\screenshots\sidebar.png
+uv : Traceback (most recent call last):
+At line:1 char:62
++ ... "jcknows1"; uv run --with playwright python C:\Users\panca\Documents\ ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last) 
+   ::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File 
+"C:\Users\panca\Documents\Github\Agent_Swarm\scripts\screenshot_audit.py", 
+line 119, in <module>
+    run()
+    ~~~^^
+  File 
+"C:\Users\panca\Documents\Github\Agent_Swarm\scripts\screenshot_audit.py", 
+line 116, in run
+    print(f"\n\u2705 Screenshots saved to {OUT_DIR}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\panca\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-no
+ne\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in 
+position 2: character maps to <undefined>

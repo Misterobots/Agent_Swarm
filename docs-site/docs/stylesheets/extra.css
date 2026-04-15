@@ -1,0 +1,12 @@
+/* Agent Swarm docs — custom overrides */
+
+/* Slightly tighter line height for readability */
+.md-typeset {
+  line-height: 1.7;
+}
+
+/* Accent colour for admonition titles */
+.md-typeset .admonition.tip > .admonition-title,
+.md-typeset details.tip > summary {
+  background-color: rgba(0, 200, 200, 0.1);
+}

@@ -22,7 +22,7 @@ WORKDIR /workspace
 RUN chown dev:dev /workspace
 
 USER dev
-RUN python3 -m pip install --user --no-cache-dir \
+RUN python3 -m pip install --user --no-cache-dir --break-system-packages \
     requests httpx rich ipython
 
 CMD ["/bin/bash"]

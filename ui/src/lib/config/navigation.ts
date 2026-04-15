@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BarChart3,
+  BookOpen,
   Bot,
   FileText,
   GraduationCap,
@@ -151,6 +152,12 @@ export const secondaryNavigation: NavigationItem[] = [
 ];
 
 export const utilityNavigation: NavigationItem[] = [
+  {
+    label: "Documentation",
+    href: "/docs",
+    icon: BookOpen,
+    matchPrefixes: ["/docs"],
+  },
   {
     label: "Settings",
     href: "/settings",

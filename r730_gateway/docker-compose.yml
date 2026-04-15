@@ -668,6 +668,35 @@ services:
       - "traefik.http.routers.ntfy-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file"
       - "traefik.http.routers.ntfy-http.service=ntfy"
 
+  # ── Documentation Site ──────────────────────────────────────────
+  docs-site:
+    build:
+      context: ../docs-site
+      dockerfile: Dockerfile
+    container_name: docs-site
+    hostname: docs-site
+    restart: unless-stopped
+    networks:
+      - ai_lab_net
+      - saltbox
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=saltbox"
+      # LAN route
+      - "traefik.http.routers.docs.rule=PathPrefix(`/docs-site`)"
+      - "traefik.http.routers.docs.entrypoints=web"
+      - "traefik.http.routers.docs.middlewares=docs-strip"
+      - "traefik.http.routers.docs.service=docs"
+      - "traefik.http.services.docs.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.docs-strip.stripprefix.prefixes=/docs-site"
+      # External HTTPS route (hive.shivelymedia.com/docs-site)
+      - "traefik.http.routers.docs-hive.rule=Host(`hive.shivelymedia.com`) && PathPrefix(`/docs-site`)"
+      - "traefik.http.routers.docs-hive.entrypoints=websecure"
+      - "traefik.http.routers.docs-hive.priority=30"
+      - "traefik.http.routers.docs-hive.tls=true"
+      - "traefik.http.routers.docs-hive.middlewares=docs-strip"
+      - "traefik.http.routers.docs-hive.service=docs"
+
 networks:
   ai_lab_net:
     driver: bridge
