@@ -2,12 +2,17 @@
 
 import { useRef, useCallback } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { FileCode2, Copy, Download } from "lucide-react";
+import { FileCode2, Copy, Download, Bot } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { useModels } from "@/lib/hooks/use-models";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 export function EditorPane() {
   const { editorContent, editorLanguage, setEditorContent } = useDevStore();
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const { models, loading: modelsLoading } = useModels();
+  const model = useSettingsStore((s) => s.model);
+  const setModel = useSettingsStore((s) => s.setModel);
 
   const handleMount: OnMount = (editor) => {
     editorRef.current = editor;
@@ -56,7 +61,26 @@ export function EditorPane() {
             <option value="dockerfile">Dockerfile</option>
           </select>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* Model selector */}
+          <div className="flex items-center gap-1">
+            <Bot size={13} className="text-[var(--chat-muted)]" />
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={modelsLoading}
+              className="bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-2 py-0.5 text-xs text-[var(--chat-muted)] focus:outline-none focus:border-[var(--chat-accent)]/40 max-w-[160px]"
+            >
+              {models.length > 0 ? (
+                models.map((m) => (
+                  <option key={m.id} value={m.id}>{m.id}</option>
+                ))
+              ) : (
+                <option value="Home-AI-Swarm">Home-AI-Swarm</option>
+              )}
+            </select>
+          </div>
+          <div className="w-px h-4 bg-[var(--chat-border)]" />
           <button
             onClick={handleCopy}
             className="p-1.5 rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)] transition-colors"
@@ -71,6 +95,7 @@ export function EditorPane() {
           >
             <Download size={13} />
           </button>
+        </div>
         </div>
       </div>
 
