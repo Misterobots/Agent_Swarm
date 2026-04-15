@@ -406,6 +406,20 @@ services:
       - "traefik.http.routers.hive-ext-http.service=hive-ext-http"
       - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
       - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
+      # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
+      # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://hive.shivelymedia.com/ws/terminal
+      - "traefik.http.routers.terminal-ws.rule=PathPrefix(`/ws/terminal`)"
+      - "traefik.http.routers.terminal-ws.entrypoints=web"
+      - "traefik.http.routers.terminal-ws.priority=30"
+      - "traefik.http.routers.terminal-ws.service=terminal-ws"
+      - "traefik.http.routers.terminal-ws.middlewares=authentik@docker"
+      - "traefik.http.services.terminal-ws.loadbalancer.server.url=http://${EXECUTION_NODE_HOST:-execution-node}:8008"
+      - "traefik.http.routers.terminal-ws-ext.rule=Host(`hive.shivelymedia.com`) && PathPrefix(`/ws/terminal`)"
+      - "traefik.http.routers.terminal-ws-ext.entrypoints=websecure"
+      - "traefik.http.routers.terminal-ws-ext.priority=30"
+      - "traefik.http.routers.terminal-ws-ext.tls=true"
+      - "traefik.http.routers.terminal-ws-ext.service=terminal-ws"
+      - "traefik.http.routers.terminal-ws-ext.middlewares=globalHeaders@file,authentik@docker"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # OPENCLAUDE gRPC INFERENCE GATEWAY (Phase 6)

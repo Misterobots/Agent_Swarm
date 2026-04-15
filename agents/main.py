@@ -2963,3 +2963,103 @@ if __name__ == "__main__":
     # If run directly via python, use uvicorn
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# ---------------------------------------------------------------------------
+# DEV TERMINAL — WebSocket proxy to dev-sandbox container (Phase 1B)
+# ---------------------------------------------------------------------------
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+@app.websocket("/ws/terminal")
+async def terminal_ws(websocket: WebSocket):
+    """
+    WebSocket terminal: opens a shell inside the dev-sandbox container and
+    pipes stdin/stdout/stderr bidirectionally.
+    Requires X-authentik-uid header (passed as query param ?uid=... because
+    browsers cannot set custom WS headers).
+    """
+    import asyncio
+    import docker as docker_sdk
+
+    uid = websocket.query_params.get("uid", "").strip()
+    if not uid:
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+
+    await websocket.accept()
+
+    try:
+        client = docker_sdk.from_env()
+        try:
+            container = client.containers.get("dev_sandbox")
+        except docker_sdk.errors.NotFound:
+            await websocket.send_text("\r\n\x1b[31mdev-sandbox container not found. Is it running?\x1b[0m\r\n")
+            await websocket.close(code=4002, reason="Sandbox unavailable")
+            return
+
+        # Create exec instance: bash login shell
+        exec_id = client.api.exec_create(
+            container.id,
+            cmd=["/bin/bash", "-l"],
+            stdin=True,
+            stdout=True,
+            stderr=True,
+            tty=True,
+            environment={"TERM": "xterm-256color"},
+        )
+        sock = client.api.exec_start(exec_id["Id"], detach=False, tty=True, socket=True)
+        # Unwrap the underlying socket
+        raw_sock = sock._sock if hasattr(sock, "_sock") else sock
+        raw_sock.setblocking(False)
+
+        loop = asyncio.get_event_loop()
+
+        async def forward_output():
+            """Read from container PTY → send to WebSocket."""
+            while True:
+                try:
+                    data = await loop.run_in_executor(None, raw_sock.recv, 4096)
+                    if not data:
+                        break
+                    await websocket.send_bytes(data)
+                except (OSError, BlockingIOError):
+                    await asyncio.sleep(0.01)
+                except Exception:
+                    break
+
+        async def forward_input():
+            """Read from WebSocket → write to container PTY."""
+            while True:
+                try:
+                    msg = await websocket.receive()
+                    if "bytes" in msg:
+                        raw_sock.sendall(msg["bytes"])
+                    elif "text" in msg:
+                        # Resize event: {"type":"resize","cols":N,"rows":N}
+                        try:
+                            cmd = json.loads(msg["text"])
+                            if cmd.get("type") == "resize":
+                                client.api.exec_resize(
+                                    exec_id["Id"],
+                                    height=cmd.get("rows", 24),
+                                    width=cmd.get("cols", 80),
+                                )
+                        except Exception:
+                            raw_sock.sendall(msg["text"].encode())
+                except WebSocketDisconnect:
+                    break
+                except Exception:
+                    break
+
+        await asyncio.gather(forward_output(), forward_input())
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.error(f"terminal_ws error for uid={uid}: {e}", exc_info=True)
+        try:
+            await websocket.send_text(f"\r\n\x1b[31mTerminal error: {e}\x1b[0m\r\n")
+            await websocket.close(code=1011)
+        except Exception:
+            pass

@@ -135,6 +135,19 @@ services:
       - "traefik.http.middlewares.strip-hands.stripprefix.prefixes=/hands"
       - "traefik.http.services.openhands.loadbalancer.server.port=3000"
 
+  # DEV SANDBOX - Isolated container for browser-based terminal (Phase 1B)
+  dev-sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev-sandbox
+    image: home-ai-lab/dev-sandbox:latest
+    container_name: dev_sandbox
+    restart: unless-stopped
+    volumes:
+      - dev_sandbox_workspace:/workspace
+    networks:
+      - execution_net
+
   # AGENT RUNTIME - Custom Python Environment for Agno Agents
   agent-runtime:
     build:
@@ -574,3 +587,4 @@ volumes:
   tgw_models:
   tgw_loras:
   tgw_presets:
+  dev_sandbox_workspace:
