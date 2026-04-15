@@ -72,9 +72,22 @@ export function EditorPane() {
               className="bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-2 py-0.5 text-xs text-[var(--chat-muted)] focus:outline-none focus:border-[var(--chat-accent)]/40 max-w-[160px]"
             >
               {models.length > 0 ? (
-                models.map((m) => (
-                  <option key={m.id} value={m.id}>{m.id}</option>
-                ))
+                <>
+                  {models.filter(m => !m.id.startsWith("github/")).length > 0 && (
+                    <optgroup label="Local">
+                      {models.filter(m => !m.id.startsWith("github/")).map((m) => (
+                        <option key={m.id} value={m.id}>{m.id}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {models.filter(m => m.id.startsWith("github/")).length > 0 && (
+                    <optgroup label="GitHub">
+                      {models.filter(m => m.id.startsWith("github/")).map((m) => (
+                        <option key={m.id} value={m.id}>{m.id.replace("github/", "")}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </>
               ) : (
                 <option value="Home-AI-Swarm">Home-AI-Swarm</option>
               )}

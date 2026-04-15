@@ -397,31 +397,37 @@ def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optio
     return None
 
 @app.get("/v1/models")
-async def list_models():
+async def list_models(request: Request):
     """
-    Mock OpenAI /v1/models endpoint so Open-WebUI can verify the connection.
+    OpenAI-compatible /v1/models.
+    Returns local swarm models + GitHub Models if the user has a connected account.
     """
-    logger.info("--- [DEBUG] /v1/models requested ---")
     import time
     try:
-        # Check if we are shutting down immediately
-        return {
-            "object": "list",
-            "data": [
-                {
-                    "id": "swarm-standard",
-                    "object": "model",
-                    "created": int(time.time()),
-                    "owned_by": "MarsRL"
-                },
-                {
-                    "id": "Home-AI-Swarm",
-                    "object": "model",
-                    "created": int(time.time()),
-                    "owned_by": "MarsRL"
-                }
-            ]
-        }
+        base_models = [
+            {"id": "swarm-standard",  "object": "model", "created": int(time.time()), "owned_by": "MarsRL"},
+            {"id": "Home-AI-Swarm",   "object": "model", "created": int(time.time()), "owned_by": "MarsRL"},
+        ]
+
+        # Append GitHub Models if this user has a connected token
+        uid = request.headers.get("X-authentik-uid", "").strip()
+        if uid:
+            try:
+                from github_oauth import get_token
+                from providers.github_models_provider import GITHUB_MODELS
+                if get_token(uid):
+                    for m in GITHUB_MODELS:
+                        base_models.append({
+                            "id": m["id"],
+                            "object": "model",
+                            "created": int(time.time()),
+                            "owned_by": "github",
+                            "context_window": m.get("context"),
+                        })
+            except Exception as e:
+                logger.warning(f"list_models: could not fetch GitHub models: {e}")
+
+        return {"object": "list", "data": base_models}
     except Exception as e:
         logger.error(f"Error in list_models: {e}")
         raise
@@ -435,6 +441,44 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     from router import chat_swarm
     import json
     import asyncio
+
+    # Route GitHub Models requests directly to the GitHubModelsProvider
+    if request.model.startswith("github/"):
+        uid = http_request.headers.get("X-authentik-uid", "").strip()
+        if not uid:
+            raise HTTPException(status_code=401, detail="GitHub Models requires an authenticated Authentik session")
+        try:
+            from providers.github_models_provider import GitHubModelsProvider
+        except ImportError as e:
+            raise HTTPException(status_code=503, detail=f"GitHub Models provider unavailable: {e}")
+
+        msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+        provider = GitHubModelsProvider(user_id=uid, model=request.model)
+
+        if request.stream:
+            async def github_stream():
+                import time
+                for chunk in provider.generate_stream(msgs):
+                    sse = {
+                        "id": "chatcmpl-github",
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": request.model,
+                        "choices": [{"index": 0, "delta": {"content": chunk.content, "type": chunk.type}, "finish_reason": None}],
+                    }
+                    yield f"data: {json.dumps(sse)}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(github_stream(), media_type="text/event-stream")
+        else:
+            chunk = provider.generate(msgs)
+            import time
+            return {
+                "id": "chatcmpl-github",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": chunk.content}, "finish_reason": "stop"}],
+            }
 
     # Extract history (all but the last message), convert Pydantic models to dicts
     history = [{"role": m.role, "content": m.content} for m in request.messages[:-1]]
@@ -2963,6 +3007,179 @@ if __name__ == "__main__":
     # If run directly via python, use uvicorn
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# ---------------------------------------------------------------------------
+# GITHUB OAUTH — Device Flow endpoints (Phase 1C)
+# ---------------------------------------------------------------------------
+
+class _DeviceAuthResponse(BaseModel):
+    device_code: str
+    user_code: str
+    verification_uri: str
+    expires_in: int
+    interval: int
+
+class _DevicePollRequest(BaseModel):
+    device_code: str
+
+
+@app.post("/api/v1/github/device-authorize")
+async def github_device_authorize(http_request: Request):
+    """
+    Step 1: Initiate GitHub Device Flow.
+    Returns user_code, verification_uri, device_code for the frontend to display.
+    """
+    import urllib.request as _ur
+    import urllib.parse as _up
+
+    client_id = os.getenv("GITHUB_OAUTH_CLIENT_ID", "")
+    if not client_id:
+        raise HTTPException(status_code=503, detail="GITHUB_OAUTH_CLIENT_ID not configured")
+
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    payload = _up.urlencode({"client_id": client_id, "scope": "read:user"}).encode()
+    req = _ur.Request(
+        "https://github.com/login/device/code",
+        data=payload,
+        headers={"Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with _ur.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        logger.error(f"github_device_authorize: upstream error: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"GitHub API error: {e}")
+
+    if "error" in data:
+        raise HTTPException(status_code=400, detail=data.get("error_description", data["error"]))
+
+    return {
+        "device_code": data["device_code"],
+        "user_code": data["user_code"],
+        "verification_uri": data["verification_uri"],
+        "expires_in": data.get("expires_in", 900),
+        "interval": data.get("interval", 5),
+    }
+
+
+@app.post("/api/v1/github/device-poll")
+async def github_device_poll(body: _DevicePollRequest, http_request: Request):
+    """
+    Step 2: Poll GitHub for Device Flow completion.
+    On success, fetches github username and stores encrypted token.
+    Returns {status: 'pending'|'authorized'|'error', username?: str}
+    """
+    import urllib.request as _ur
+    import urllib.parse as _up
+
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    client_id = os.getenv("GITHUB_OAUTH_CLIENT_ID", "")
+    if not client_id:
+        raise HTTPException(status_code=503, detail="GITHUB_OAUTH_CLIENT_ID not configured")
+
+    payload = _up.urlencode({
+        "client_id": client_id,
+        "device_code": body.device_code,
+        "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+    }).encode()
+    req = _ur.Request(
+        "https://github.com/login/oauth/access_token",
+        data=payload,
+        headers={"Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with _ur.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        logger.error(f"github_device_poll: upstream error: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"GitHub API error: {e}")
+
+    error = data.get("error")
+    if error == "authorization_pending":
+        return {"status": "pending"}
+    if error == "slow_down":
+        return {"status": "pending", "slow_down": True}
+    if error:
+        return {"status": "error", "message": data.get("error_description", error)}
+
+    access_token = data.get("access_token")
+    if not access_token:
+        return {"status": "error", "message": "No access_token in response"}
+
+    # Fetch GitHub username
+    user_req = _ur.Request(
+        "https://api.github.com/user",
+        headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+    )
+    try:
+        with _ur.urlopen(user_req, timeout=10) as resp:
+            user_data = json.loads(resp.read())
+        github_username = user_data.get("login", "unknown")
+    except Exception as e:
+        logger.warning(f"github_device_poll: could not fetch username: {e}")
+        github_username = "unknown"
+
+    # Store encrypted token
+    try:
+        from github_oauth import upsert_token
+        upsert_token(
+            user_id=uid,
+            github_username=github_username,
+            access_token=access_token,
+            scopes=data.get("scope", "read:user"),
+        )
+    except Exception as e:
+        logger.error(f"github_device_poll: token storage failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to store token: {e}")
+
+    return {"status": "authorized", "username": github_username}
+
+
+@app.get("/api/v1/github/status")
+async def github_status(http_request: Request):
+    """Return whether the current user has a connected GitHub account."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        from github_oauth import get_token
+        record = get_token(uid)
+    except Exception as e:
+        logger.error(f"github_status error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if not record:
+        return {"connected": False}
+    return {
+        "connected": True,
+        "username": record.github_username,
+        "scopes": record.scopes,
+        "connected_at": record.created_at.isoformat() if record.created_at else None,
+    }
+
+
+@app.delete("/api/v1/github/disconnect")
+async def github_disconnect(http_request: Request):
+    """Remove the stored GitHub token for the current user."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        from github_oauth import delete_token
+        deleted = delete_token(uid)
+    except Exception as e:
+        logger.error(f"github_disconnect error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"disconnected": deleted}
 
 
 # ---------------------------------------------------------------------------

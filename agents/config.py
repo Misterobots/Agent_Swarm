@@ -115,6 +115,13 @@ BROWSER_DOMAIN_ALLOWLIST = os.getenv("BROWSER_DOMAIN_ALLOWLIST", "")
 BASH_CLASSIFIER_ENABLED = os.getenv("BASH_CLASSIFIER_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
 
 # ---------------------------------------------------------------------------
+# GitHub OAuth — Device Flow (Phase 1C)
+# ---------------------------------------------------------------------------
+GITHUB_OAUTH_CLIENT_ID = os.getenv("GITHUB_OAUTH_CLIENT_ID", "")
+# 32-byte Fernet key (base64url). Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+TOKEN_ENCRYPTION_KEY   = os.getenv("TOKEN_ENCRYPTION_KEY", "")
+
+# ---------------------------------------------------------------------------
 # Remote & Multi-Node Configuration (Phase 5)
 # ---------------------------------------------------------------------------
 SSH_DEFAULT_TIMEOUT    = int(os.getenv("SSH_DEFAULT_TIMEOUT", "60"))
