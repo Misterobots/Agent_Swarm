@@ -168,3 +168,126 @@ class GitHubModelsProvider:
         except Exception as e:
             logger.error(f"github_models stream error: {e}", exc_info=True)
             yield StreamChunk(type="error", content=f"GitHub Models error: {e}")
+
+    # -----------------------------------------------------------------------
+    # Phase 2 — Agentic loop with tool calling
+    # -----------------------------------------------------------------------
+
+    async def generate_stream_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        tool_executor,          # async (name: str, args: dict) -> str
+        max_iterations: int = 10,
+    ):
+        """
+        Async generator — implements the model → tool call → result → model loop.
+
+        Yields StreamChunk objects (same shape used throughout the pipeline).
+        The caller serialises them to SSE.
+
+        tool_executor signature:
+            async def execute(name: str, arguments: dict) -> str
+        """
+        import urllib.request
+        import uuid as _uuid
+
+        iteration = 0
+        current_messages = list(messages)
+
+        while iteration < max_iterations:
+            iteration += 1
+
+            payload: dict = {
+                "model": _model_name(self.model),
+                "messages": current_messages,
+                "tools": tools,
+                "tool_choice": "auto",
+                "max_tokens": 4096,
+                "temperature": 0.2,      # lower temp for coding tasks
+                "stream": False,          # non-streaming so we can inspect tool_calls
+            }
+
+            req = urllib.request.Request(
+                f"{INFERENCE_BASE}/chat/completions",
+                data=json.dumps(payload).encode(),
+                headers=self._headers(),
+                method="POST",
+            )
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                # Run blocking HTTP in executor to avoid blocking the event loop
+                def _http_call():
+                    with urllib.request.urlopen(req, timeout=60) as resp:
+                        return json.loads(resp.read())
+
+                body = await loop.run_in_executor(None, _http_call)
+            except Exception as e:
+                logger.error(f"github_models tool-call HTTP error (iter {iteration}): {e}", exc_info=True)
+                yield StreamChunk(type="error", content=f"GitHub Models error: {e}")
+                return
+
+            choice = body["choices"][0]
+            finish_reason = choice.get("finish_reason", "stop")
+            message = choice.get("message", {})
+            tool_calls = message.get("tool_calls") or []
+            content_text = message.get("content") or ""
+
+            # Add assistant message (with or without tool_calls) to history
+            current_messages.append(message)
+
+            if not tool_calls:
+                # No more tool calls — stream the final assistant text and exit
+                if content_text:
+                    # Yield in smallish chunks so the UI streams smoothly
+                    CHUNK_SIZE = 80
+                    for i in range(0, len(content_text), CHUNK_SIZE):
+                        yield StreamChunk(type="content", content=content_text[i:i + CHUNK_SIZE])
+                return
+
+            # ---- Execute each tool call ----
+            for tc in tool_calls:
+                call_id = tc.get("id") or str(_uuid.uuid4())
+                fn = tc.get("function", {})
+                tool_name = fn.get("name", "")
+                try:
+                    tool_args = json.loads(fn.get("arguments", "{}"))
+                except json.JSONDecodeError:
+                    tool_args = {}
+
+                yield StreamChunk(
+                    type="tool_start",
+                    content=f"Using tool: {tool_name}",
+                    tool_name=tool_name,
+                    tool_input=tool_args,
+                    tool_call_id=call_id,
+                )
+
+                # Execute (may wait for user approval inside tool_executor)
+                tool_result = await tool_executor(call_id, tool_name, tool_args)
+
+                yield StreamChunk(
+                    type="tool_result",
+                    content=tool_result,
+                    tool_name=tool_name,
+                    tool_call_id=call_id,
+                )
+
+                # Append tool result back to the conversation
+                current_messages.append({
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": tool_result,
+                })
+
+            if finish_reason == "stop":
+                # Model said stop even though there were tool calls — shouldn't happen,
+                # but treat it as done.
+                return
+
+        # Max iterations guard
+        yield StreamChunk(
+            type="error",
+            content=f"Agentic loop exceeded {max_iterations} iterations — stopping.",
+        )

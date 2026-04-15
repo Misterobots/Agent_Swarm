@@ -29,6 +29,7 @@ export async function* sendChatStream(
   attachments?: FileAttachment[],
   ultraplanMode?: boolean,
   ultrathinkMode?: boolean,
+  devMode?: boolean,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -43,6 +44,7 @@ export async function* sendChatStream(
   if (ultraplanMode) body.ultraplan_mode = true;
   if (ultrathinkMode) body.ultrathink_mode = true;
   if (attachments && attachments.length > 0) body.attachments = attachments;
+  if (devMode) body.dev_mode = true;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",

@@ -36,6 +36,7 @@ interface ChatState {
   setMessageToolLifecycle: (conversationId: string, messageId: string, lifecycle: ToolLifecycleEvent[]) => void;
   setMessageToolResults: (conversationId: string, messageId: string, results: ToolResult[]) => void;
   setMessageTurnMetadata: (conversationId: string, messageId: string, metadata: TurnMetadata) => void;
+  setMessagePendingApprovals: (conversationId: string, messageId: string, approvals: import("@/types/chat").ToolApprovalEvent[]) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -201,6 +202,19 @@ export const useChatStore = create<ChatState>()(
                 m.id === messageId ? { ...m, turnMetadata: metadata } : m
               ),
               updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessagePendingApprovals: (conversationId, messageId, approvals) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, pendingApprovals: approvals } : m
+              ),
             };
           }),
         })),

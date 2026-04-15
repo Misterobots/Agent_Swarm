@@ -104,6 +104,14 @@ export async function* streamSSE(
               tool_state: "completed",
               artifacts: delta.artifacts as any,
             };
+          } else if (delta.type === "tool_approval_needed") {
+            yield {
+              type: "tool_approval_needed",
+              content: delta.content || `Approval required: ${delta.tool_name}`,
+              tool_name: delta.tool_name,
+              tool_call_id: delta.tool_call_id,
+              tool_input: delta.tool_input,
+            };
           }
           // Stream state events (new)
           else if (delta.type === "stream_mode") {

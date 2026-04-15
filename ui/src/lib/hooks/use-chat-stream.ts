@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, TurnMetadata, StreamMode, FileAttachment } from "@/types/chat";
+import type { ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment } from "@/types/chat";
 
 const MODEL_WINDOWS: Record<string, number> = {
   "qwen2.5-coder:14b": 32768,
@@ -36,7 +36,10 @@ function genId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function useChatStream() {
+export function useChatStream(options?: {
+  devMode?: boolean;
+  onToolResult?: (toolName: string, toolInput: Record<string, unknown>, output: string) => void;
+}) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [latestThought, setLatestThought] = useState<string | null>(null);
@@ -47,6 +50,7 @@ export function useChatStream() {
   const toolCallTraceRef = useRef<ToolCallEvent[]>([]);
   const toolLifecycleRef = useRef<ToolLifecycleEvent[]>([]);
   const toolResultsRef = useRef<ToolResult[]>([]);
+  const pendingApprovalsRef = useRef<ToolApprovalEvent[]>([]);
   const streamModesRef = useRef<StreamMode[]>([]);
   const turnMetadataRef = useRef<TurnMetadata | null>(null);
   const continuationHintRef = useRef<"auto_continue" | "await_user" | "compacting" | null>(null);
@@ -64,6 +68,7 @@ export function useChatStream() {
     setMessageToolLifecycle,
     setMessageToolResults,
     setMessageTurnMetadata,
+    setMessagePendingApprovals,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -184,6 +189,7 @@ export function useChatStream() {
       toolCallTraceRef.current = [];
       toolLifecycleRef.current = [];
       toolResultsRef.current = [];
+      pendingApprovalsRef.current = [];
       streamModesRef.current = [];
       turnMetadataRef.current = null;
       continuationHintRef.current = null;
@@ -192,7 +198,7 @@ export function useChatStream() {
       abortRef.current = controller;
 
       try {
-        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode)) {
+        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
@@ -239,6 +245,33 @@ export function useChatStream() {
               timestamp: Date.now(),
             };
             toolResultsRef.current = [...toolResultsRef.current, result];
+            // Editor sync callback for write_file results
+            if (options?.onToolResult && event.tool_name) {
+              options.onToolResult(
+                event.tool_name,
+                (event.tool_input as Record<string, unknown>) || {},
+                event.tool_output || event.content || "",
+              );
+            }
+            // Remove corresponding pending approval (if it was deferred to here)
+            const resolvedId = event.tool_call_id;
+            if (resolvedId) {
+              pendingApprovalsRef.current = pendingApprovalsRef.current.filter(
+                (a) => a.tool_call_id !== resolvedId
+              );
+              setMessagePendingApprovals(convId!, assistantId, pendingApprovalsRef.current);
+            }
+          } else if (event.type === "tool_approval_needed") {
+            // Live-update the message with new pending approval so the UI can
+            // show the Approve/Deny card immediately while streaming is paused.
+            const approval = {
+              tool_call_id: event.tool_call_id || "",
+              tool_name: event.tool_name || "tool",
+              tool_input: event.tool_input,
+              timestamp: Date.now(),
+            } satisfies ToolApprovalEvent;
+            pendingApprovalsRef.current = [...pendingApprovalsRef.current, approval];
+            setMessagePendingApprovals(convId!, assistantId, pendingApprovalsRef.current);
           } else if (event.type === "stream_mode") {
             const mode = event.streamMode || "responding";
             setStreamMode(mode);
@@ -301,6 +334,11 @@ export function useChatStream() {
         if (turnMetadataRef.current && setMessageTurnMetadata) {
           setMessageTurnMetadata(convId!, assistantId, turnMetadataRef.current);
         }
+        // Clear any remaining pending approvals (stream ended — no more waiting)
+        if (pendingApprovalsRef.current.length > 0) {
+          setMessagePendingApprovals(convId!, assistantId, []);
+          pendingApprovalsRef.current = [];
+        }
 
         setIsStreaming(false);
         setStatusMessage(null);
@@ -334,6 +372,7 @@ export function useChatStream() {
       setMessageToolLifecycle,
       setMessageToolResults,
       setMessageTurnMetadata,
+      setMessagePendingApprovals,
     ]
   );
 

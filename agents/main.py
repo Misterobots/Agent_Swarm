@@ -370,6 +370,164 @@ class ChatRequest(BaseModel):
     style: Optional[str] = None       # response style: default|concise|explanatory|formal|technical|casual
     research_mode: bool = False       # deep multi-step reasoning mode
     attachments: Optional[List[dict]] = None  # file attachments [{name, mimeType, data, size}]
+    dev_mode: bool = False            # Phase 2: enable AI agentic coding tools in dev workspace
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Tool approval store (in-process, single asyncio event loop)
+# ---------------------------------------------------------------------------
+
+import asyncio as _asyncio
+
+# Per-call approval state: call_id -> asyncio.Event (set when decision arrives)
+_approval_events: dict[str, _asyncio.Event] = {}
+# Per-call decision: call_id -> True (approved) | False (denied)
+_approval_decisions: dict[str, bool] = {}
+
+# Per-user auto-approve rules:
+#   key = uid, value = set of tool names (or "all") that are auto-approved
+# "session" scope lives here (cleared on restart).
+# "workspace" scope is persisted to a simple JSON file on the same volume.
+_session_auto_approve: dict[str, set[str]] = {}
+
+_WORKSPACE_AUTO_APPROVE_FILE = "/workspace/.hivecode_auto_approve.json"
+
+
+def _load_workspace_auto_approve() -> dict[str, list[str]]:
+    """Load workspace-scoped auto-approve rules from the JSON file, if present."""
+    try:
+        import json as _json
+        with open(_WORKSPACE_AUTO_APPROVE_FILE, "r") as f:
+            return _json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_workspace_auto_approve(data: dict[str, list[str]]) -> None:
+    try:
+        import json as _json
+        with open(_WORKSPACE_AUTO_APPROVE_FILE, "w") as f:
+            _json.dump(data, f)
+    except Exception as e:
+        logger.warning(f"[dev_mode] Could not save workspace auto-approve rules: {e}")
+
+
+def _is_auto_approved(uid: str, tool_name: str) -> bool:
+    """Return True if the tool is auto-approved for this user (session or workspace)."""
+    session_rules = _session_auto_approve.get(uid, set())
+    if "all" in session_rules or tool_name in session_rules:
+        return True
+    workspace_rules = _load_workspace_auto_approve()
+    ws_set = set(workspace_rules.get(uid, []))
+    return "all" in ws_set or tool_name in ws_set
+
+
+def _apply_auto_approve(uid: str, tool_name: str, scope: str) -> None:
+    """Persist an auto-approve rule for a user+tool at the given scope."""
+    if scope == "session":
+        _session_auto_approve.setdefault(uid, set()).add(tool_name)
+    elif scope == "workspace":
+        data = _load_workspace_auto_approve()
+        existing = set(data.get(uid, []))
+        existing.add(tool_name)
+        data[uid] = list(existing)
+        _save_workspace_auto_approve(data)
+    elif scope == "all_session":
+        _session_auto_approve.setdefault(uid, set()).add("all")
+    elif scope == "all_workspace":
+        data = _load_workspace_auto_approve()
+        existing = set(data.get(uid, []))
+        existing.add("all")
+        data[uid] = list(existing)
+        _save_workspace_auto_approve(data)
+
+
+# ---------------------------------------------------------------------------
+# Dev tool definitions (OpenAI function calling format)
+# ---------------------------------------------------------------------------
+
+DEV_TOOL_DEFINITIONS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read the contents of a file from the dev sandbox workspace.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path relative to /workspace (e.g. 'src/app.py')",
+                    }
+                },
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "Write or overwrite a file in the dev sandbox workspace.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path relative to /workspace",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Complete new content for the file",
+                    },
+                },
+                "required": ["path", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_directory",
+            "description": "List the contents of a directory in the dev sandbox workspace.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Directory path relative to /workspace (default: '.')",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_command",
+            "description": (
+                "Execute a shell command in the dev sandbox. "
+                "The sandbox has Python 3, Node.js 20, git, and common build tools. "
+                "Use this to run tests, install packages, build projects, etc."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "Bash command to execute",
+                    },
+                    "cwd": {
+                        "type": "string",
+                        "description": "Working directory relative to /workspace (optional)",
+                    },
+                },
+                "required": ["command"],
+            },
+        },
+    },
+]
 
 
 def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optional[str]:
@@ -395,6 +553,69 @@ def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optio
         return f"session:{agent_card.session_id}"
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Tool approval endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/dev/approve/{call_id}")
+async def approve_tool_call(call_id: str, http_request: Request):
+    """
+    Approve a pending tool call from the AI agent.
+    Optional JSON body: {"auto": "none" | "session" | "workspace"}
+    """
+    try:
+        body = await http_request.json()
+    except Exception:
+        body = {}
+    auto_scope = body.get("auto", "none")
+    tool_name = body.get("tool_name", "")
+    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+
+    if auto_scope != "none" and tool_name:
+        _apply_auto_approve(uid, tool_name, auto_scope)
+
+    _approval_decisions[call_id] = True
+    event = _approval_events.pop(call_id, None)
+    if event:
+        event.set()
+    logger.info(f"[dev_approve] call_id={call_id} uid={uid} auto={auto_scope} approved")
+    return {"ok": True}
+
+
+@app.post("/api/v1/dev/deny/{call_id}")
+async def deny_tool_call(call_id: str, http_request: Request):
+    """Deny a pending tool call from the AI agent."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    _approval_decisions[call_id] = False
+    event = _approval_events.pop(call_id, None)
+    if event:
+        event.set()
+    logger.info(f"[dev_approve] call_id={call_id} uid={uid} denied")
+    return {"ok": True}
+
+
+@app.get("/api/v1/dev/auto-approve")
+async def get_auto_approve_rules(http_request: Request):
+    """Return the current auto-approve rules for the calling user."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    session_rules = list(_session_auto_approve.get(uid, set()))
+    ws_data = _load_workspace_auto_approve()
+    workspace_rules = ws_data.get(uid, [])
+    return {"session": session_rules, "workspace": workspace_rules}
+
+
+@app.delete("/api/v1/dev/auto-approve")
+async def clear_auto_approve_rules(http_request: Request):
+    """Clear all auto-approve rules for the calling user (session + workspace)."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    _session_auto_approve.pop(uid, None)
+    ws_data = _load_workspace_auto_approve()
+    ws_data.pop(uid, None)
+    _save_workspace_auto_approve(ws_data)
+    return {"ok": True}
+
 
 @app.get("/v1/models")
 async def list_models(request: Request):
@@ -458,6 +679,94 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         if request.stream:
             async def github_stream():
                 import time
+
+                # --- Phase 2: agentic dev mode ---
+                if request.dev_mode:
+                    from prompts.hivecode import HIVECODE_SYSTEM_PROMPT
+                    from tools.sandbox_ops import execute_tool as _sandbox_execute
+
+                    # Prepend HiveCode system prompt
+                    dev_msgs = [{"role": "system", "content": HIVECODE_SYSTEM_PROMPT}] + msgs
+
+                    async def _tool_executor(call_id: str, tool_name: str, args: dict) -> str:
+                        """Wraps sandbox execution with optional approval gate."""
+                        if not _is_auto_approved(uid, tool_name):
+                            # Emit approval-needed event first
+                            approval_event = {
+                                "id": "chatcmpl-github",
+                                "object": "chat.completion.chunk",
+                                "created": int(time.time()),
+                                "model": request.model,
+                                "choices": [{
+                                    "index": 0,
+                                    "delta": {
+                                        "type": "tool_approval_needed",
+                                        "tool_call_id": call_id,
+                                        "tool_name": tool_name,
+                                        "tool_input": args,
+                                        "content": f"Approval required: {tool_name}",
+                                    },
+                                    "finish_reason": None,
+                                }],
+                            }
+                            # We can't yield from a non-generator coroutine, so we
+                            # store the event data for the outer loop to pick up.
+                            _pending_tool_approvals[call_id] = approval_event
+                            # Create an asyncio.Event for this call
+                            event = _asyncio.Event()
+                            _approval_events[call_id] = event
+                            try:
+                                await _asyncio.wait_for(event.wait(), timeout=120.0)
+                            except _asyncio.TimeoutError:
+                                _approval_decisions.pop(call_id, None)
+                                return f"Tool {tool_name!r} approval timed out after 120 s — skipped."
+                            approved = _approval_decisions.pop(call_id, False)
+                            if not approved:
+                                return f"Tool {tool_name!r} was denied by the user."
+                        # Execute in thread executor to avoid blocking the event loop
+                        import asyncio as _aio
+                        loop = _aio.get_event_loop()
+                        result = await loop.run_in_executor(None, _sandbox_execute, tool_name, args)
+                        return result
+
+                    # Dict for the outer generator to flush approval-needed events before waiting
+                    _pending_tool_approvals: dict[str, dict] = {}
+
+                    async for chunk in provider.generate_stream_with_tools(
+                        dev_msgs, DEV_TOOL_DEFINITIONS, _tool_executor
+                    ):
+                        # First flush any pending approval event for the same call_id
+                        if chunk.type == "tool_start" and chunk.tool_call_id in _pending_tool_approvals:
+                            # Not needed yet — approval events are emitted from within _tool_executor
+                            pass
+                        # Flush stored approval-needed event if present
+                        for pending_id, pending_sse in list(_pending_tool_approvals.items()):
+                            yield f"data: {json.dumps(pending_sse)}\n\n"
+                            del _pending_tool_approvals[pending_id]
+
+                        # Build SSE for this chunk
+                        delta: dict = {"type": chunk.type, "content": chunk.content}
+                        if chunk.tool_name:
+                            delta["tool_name"] = chunk.tool_name
+                        if chunk.tool_input is not None:
+                            delta["tool_input"] = chunk.tool_input
+                        if chunk.tool_call_id:
+                            delta["tool_call_id"] = chunk.tool_call_id
+                        if chunk.type == "tool_result":
+                            delta["tool_output"] = chunk.content
+
+                        sse = {
+                            "id": "chatcmpl-github",
+                            "object": "chat.completion.chunk",
+                            "created": int(time.time()),
+                            "model": request.model,
+                            "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
+                        }
+                        yield f"data: {json.dumps(sse)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                # --- Standard (non-agentic) GitHub Models streaming ---
                 for chunk in provider.generate_stream(msgs):
                     sse = {
                         "id": "chatcmpl-github",

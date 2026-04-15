@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/cn";
 import { Bot, User, Palette, ChevronDown, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
 import Link from "next/link";
 import { ToolCallBlock } from "./tool-call-block";
+import { ToolApprovalCard } from "./tool-approval-card";
 import { MessageActions } from "./message-actions";
 
 interface VerificationBadge {
@@ -22,13 +23,15 @@ interface MessageBubbleProps {
   onEditMessage?: (content: string) => void;
   onRetryMessage?: () => void;
   onBranchMessage?: () => void;
+  onApprove?: (callId: string, toolName: string, scope: "once" | "session" | "workspace") => void;
+  onDeny?: (callId: string) => void;
 }
 
 function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
 }
 
-export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessage, onBranchMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -156,6 +159,18 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
                 toolLifecycle={message.toolLifecycle}
                 toolResults={message.toolResults}
               />
+            )}
+            {!!message.pendingApprovals?.length && onApprove && onDeny && (
+              <div className="space-y-2">
+                {message.pendingApprovals.map((approval) => (
+                  <ToolApprovalCard
+                    key={approval.tool_call_id}
+                    approval={approval}
+                    onApprove={onApprove}
+                    onDeny={onDeny}
+                  />
+                ))}
+              </div>
             )}
           </>
         ) : (

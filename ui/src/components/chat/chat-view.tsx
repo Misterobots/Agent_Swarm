@@ -29,11 +29,37 @@ function usageBarClass(pct: number): string {
 }
 
 export function ChatView({ showDevContext = false }: { showDevContext?: boolean }) {
-  const { messages, isStreaming, statusMessage, latestThought, streamMode, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
-  const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const selectedText = useDevStore((s) => s.selectedText);
   const editorLanguage = useDevStore((s) => s.editorLanguage);
+  const activeFile = useDevStore((s) => s.activeFile);
+  const agentEnabled = useDevStore((s) => s.agentEnabled);
+  const editorSyncEnabled = useDevStore((s) => s.editorSyncEnabled);
+  const setEditorContent = useDevStore((s) => s.setEditorContent);
+  const setActiveFile = useDevStore((s) => s.setActiveFile);
   const clearSelectedText = useDevStore((s) => s.setSelectedText);
+
+  // Editor sync: called when AI writes a file
+  const handleToolResult = useCallback(
+    (toolName: string, toolInput: Record<string, unknown>, _output: string) => {
+      if (!editorSyncEnabled) return;
+      if (toolName !== "write_file") return;
+      const writtenPath = (toolInput.path as string) || "";
+      const writtenContent = (toolInput.content as string) || "";
+      if (!writtenPath) return;
+      if (activeFile && writtenPath !== activeFile && !activeFile.endsWith(writtenPath)) return;
+      setEditorContent(writtenContent);
+      if (!activeFile) setActiveFile(writtenPath);
+    },
+    [editorSyncEnabled, activeFile, setEditorContent, setActiveFile]
+  );
+
+  const devMode = showDevContext && agentEnabled;
+
+  const { messages, isStreaming, statusMessage, latestThought, streamMode, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream({
+    devMode,
+    onToolResult: devMode ? handleToolResult : undefined,
+  });
+  const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const model = useSettingsStore((s) => s.model);
   const theme = useSettingsStore((s) => s.theme);
   const personality = THEME_PERSONALITIES[theme];
@@ -70,18 +96,40 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
 
   // Message action handlers
   const handleEditMessage = useCallback((content: string) => {
-    // Pre-fill input by sending a new message with the edited content
-    // (The ChatInput will be focused with the content to edit)
     sendMessage(content);
   }, [sendMessage]);
 
   const handleRetryMessage = useCallback((messageIndex: number) => {
-    // Find the user message at that index and re-send
     const msg = messages[messageIndex];
     if (msg?.role === "user") {
       sendMessage(msg.content);
     }
   }, [messages, sendMessage]);
+
+  // Tool approval handlers (dev mode only)
+  const handleApprove = useCallback(
+    async (callId: string, toolName: string, scope: "once" | "session" | "workspace") => {
+      const autoMap: Record<string, string> = { session: "session", workspace: "workspace", once: "none" };
+      try {
+        await fetch(`/api/backend/api/v1/dev/approve/${callId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ auto: autoMap[scope], tool_name: toolName }),
+        });
+      } catch (e) {
+        console.error("[ChatView] approve failed", e);
+      }
+    },
+    []
+  );
+
+  const handleDeny = useCallback(async (callId: string) => {
+    try {
+      await fetch(`/api/backend/api/v1/dev/deny/${callId}`, { method: "POST" });
+    } catch (e) {
+      console.error("[ChatView] deny failed", e);
+    }
+  }, []);
 
   return (
     <div className="chat-shell flex flex-col h-full" data-route="chat">
@@ -180,6 +228,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                     userPrompt={precedingUserPrompt}
                     onEditMessage={handleEditMessage}
                     onRetryMessage={() => handleRetryMessage(idx)}
+                    onApprove={devMode ? handleApprove : undefined}
+                    onDeny={devMode ? handleDeny : undefined}
                   />
                 </div>
               );
