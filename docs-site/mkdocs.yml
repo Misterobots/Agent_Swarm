@@ -1,6 +1,5 @@
 site_name: Agent Swarm Documentation
 site_description: Documentation library for the Home AI Lab Agentic Hive — a self-hosted, distributed multi-agent AI system.
-site_url: https://misterobots.github.io/Agent_Swarm/
 repo_url: https://github.com/Misterobots/Agent_Swarm
 repo_name: Misterobots/Agent_Swarm
 edit_uri: edit/main/docs-site/docs/
