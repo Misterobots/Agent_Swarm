@@ -119,7 +119,6 @@ export function EditorPane() {
             <Download size={13} />
           </button>
         </div>
-        </div>
       </div>
 
       {/* Monaco Editor */}
