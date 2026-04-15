@@ -10,7 +10,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
+      type?: "content" | "status" | "thought" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
       tool_name?: string;
       tool_input?: Record<string, unknown>;
       tool_call_id?: string;
