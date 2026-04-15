@@ -7,7 +7,7 @@ const API_BASE = "/api/backend";
 
 interface GitHubStatus {
   connected: boolean;
-  github_username: string | null;
+  username: string | null;
 }
 
 interface DeviceAuthResponse {
@@ -21,7 +21,7 @@ interface DeviceAuthResponse {
 type FlowState = "idle" | "pending" | "polling" | "connected" | "error";
 
 export function GitHubConnect() {
-  const [status, setStatus] = useState<GitHubStatus>({ connected: false, github_username: null });
+  const [status, setStatus] = useState<GitHubStatus>({ connected: false, username: null });
   const [flowState, setFlowState] = useState<FlowState>("idle");
   const [userCode, setUserCode] = useState("");
   const [verificationUri, setVerificationUri] = useState("");
@@ -90,15 +90,16 @@ export function GitHubConnect() {
         body: JSON.stringify({ device_code: code }),
       });
       const data = await res.json();
-      if (res.ok && data.connected) {
+      if (data.status === "authorized") {
         stopPolling();
-        setStatus({ connected: true, github_username: data.github_username });
+        setStatus({ connected: true, username: data.username });
         setFlowState("connected");
-      } else if (data.error === "authorization_pending" || data.error === "slow_down") {
+      } else if (data.status === "pending") {
         // still waiting — keep polling
-      } else if (data.error === "expired_token" || data.error === "access_denied") {
+      } else if (data.status === "error" || !res.ok) {
         stopPolling();
-        setErrorMsg(data.error === "access_denied" ? "Access denied by user." : "Device code expired. Please try again.");
+        const msg = data.message || data.detail || "Authorization failed.";
+        setErrorMsg(msg.includes("access_denied") ? "Access denied by user." : msg.includes("expired") ? "Device code expired. Please try again." : msg);
         setFlowState("error");
       }
     } catch (err) {
@@ -124,7 +125,7 @@ export function GitHubConnect() {
   async function disconnect() {
     try {
       await fetch(`${API_BASE}/api/v1/github/disconnect`, { method: "DELETE" });
-      setStatus({ connected: false, github_username: null });
+      setStatus({ connected: false, username: null });
       setFlowState("idle");
     } catch (err) {
       console.error("[GitHubConnect] disconnect error:", err);
@@ -152,7 +153,7 @@ export function GitHubConnect() {
           <CheckCircle2 size={16} className="text-green-500" />
           <Github size={15} className="text-[var(--chat-text)]" />
           <span className="text-[var(--chat-text)]">Connected as</span>
-          <span className="font-medium text-[var(--chat-text)]">@{status.github_username}</span>
+          <span className="font-medium text-[var(--chat-text)]">@{status.username}</span>
         </div>
         <button
           onClick={disconnect}
