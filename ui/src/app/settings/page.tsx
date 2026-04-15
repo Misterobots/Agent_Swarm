@@ -1,6 +1,7 @@
 "use client";
 
 import { ModelSelector } from "@/components/chat/model-selector";
+import { GitHubConnect } from "@/components/settings/github-connect";
 import { useToolsStore } from "@/lib/stores/tools-store";
 import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DASHBOARDS } from "@/components/monitor/dashboard-selector";
@@ -43,6 +44,15 @@ export default function SettingsPage() {
                 {modelAccessMessage}
               </p>
             </div>
+          </section>
+
+          {/* Connected Accounts */}
+          <section>
+            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Connected Accounts</h2>
+            <GitHubConnect />
+            <p className="mt-2 text-xs text-[var(--chat-muted)]">
+              Connect your GitHub account to access GitHub Models (GPT-4o, Claude, Llama, and more) directly in the chat and editor.
+            </p>
           </section>
 
           {/* Tools */}

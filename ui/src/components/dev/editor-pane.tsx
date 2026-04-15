@@ -9,6 +9,7 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 
 export function EditorPane() {
   const { editorContent, editorLanguage, setEditorContent } = useDevStore();
+  const setSelectedText = useDevStore((s) => s.setSelectedText);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const { models, loading: modelsLoading } = useModels();
   const model = useSettingsStore((s) => s.model);
@@ -17,6 +18,15 @@ export function EditorPane() {
   const handleMount: OnMount = (editor) => {
     editorRef.current = editor;
     editor.focus();
+    editor.onDidChangeCursorSelection(() => {
+      const selection = editor.getSelection();
+      if (selection && !selection.isEmpty()) {
+        const text = editor.getModel()?.getValueInRange(selection) ?? "";
+        setSelectedText(text);
+      } else {
+        setSelectedText("");
+      }
+    });
   };
 
   const handleCopy = useCallback(() => {

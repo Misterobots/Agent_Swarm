@@ -10,7 +10,7 @@ export function DevWorkspace() {
     <Group orientation="horizontal" className="h-full">
       {/* Chat pane */}
       <Panel defaultSize="35%" minSize="25%">
-        <ChatView />
+        <ChatView showDevContext />
       </Panel>
 
       <Separator className="w-1 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors" />

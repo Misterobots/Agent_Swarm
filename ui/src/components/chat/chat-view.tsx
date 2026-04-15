@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useChatStream } from "@/lib/hooks/use-chat-stream";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { useDevStore } from "@/lib/stores/dev-store";
 import { MessageBubble } from "./message-bubble";
 import { ThinkingIndicator } from "./thinking-indicator";
 import { ChatInput } from "./chat-input";
@@ -11,7 +12,7 @@ import { InputToolbar } from "./input-toolbar";
 import { UltraplanToggle } from "./ultraplan-toggle";
 import { UltrathinkToggle } from "./ultrathink-toggle";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
-import { Bot, Brain } from "lucide-react";
+import { Bot, Brain, Code2, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { useSettingsStore } from "@/lib/stores/settings-store";
@@ -27,9 +28,12 @@ function usageBarClass(pct: number): string {
   return "bg-[var(--chat-muted)]";
 }
 
-export function ChatView() {
+export function ChatView({ showDevContext = false }: { showDevContext?: boolean }) {
   const { messages, isStreaming, statusMessage, latestThought, streamMode, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream();
   const { activeConversationId, activeConversation, updateConversation } = useChatStore();
+  const selectedText = useDevStore((s) => s.selectedText);
+  const editorLanguage = useDevStore((s) => s.editorLanguage);
+  const clearSelectedText = useDevStore((s) => s.setSelectedText);
   const model = useSettingsStore((s) => s.model);
   const theme = useSettingsStore((s) => s.theme);
   const personality = THEME_PERSONALITIES[theme];
@@ -199,10 +203,30 @@ export function ChatView() {
         disabled={isStreaming}
       />
 
+      {/* Code context chip (dev workspace only) */}
+      {showDevContext && selectedText && (
+        <div className="mx-4 mb-1 flex items-start gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs">
+          <Code2 size={12} className="mt-0.5 shrink-0 text-[var(--chat-accent)]" />
+          <span className="flex-1 truncate text-[var(--chat-muted)]">
+            Selected: <span className="text-[var(--chat-text)] font-mono">{selectedText.slice(0, 80)}{selectedText.length > 80 ? "…" : ""}</span>
+          </span>
+          <button
+            onClick={() => clearSelectedText("")}
+            className="shrink-0 text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
+            title="Clear selection context"
+          >
+            <X size={11} />
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <ChatInput
         onSend={(msg) => {
-          sendMessage(msg, attachments);
+          const context = showDevContext && selectedText
+            ? `\`\`\`${editorLanguage}\n${selectedText}\n\`\`\`\n\n${msg}`
+            : msg;
+          sendMessage(context, attachments);
           setAttachments([]);
         }}
         onStop={stopGeneration}
