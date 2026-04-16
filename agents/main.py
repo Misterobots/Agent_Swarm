@@ -1617,9 +1617,28 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
 
     async def _run_training():
         import asyncio
+        _early_run_id = None
         try:
             _active_training["status"] = "running"
             _active_training["started_at"] = datetime.utcnow().isoformat()
+
+            # Create a DB row immediately so the run is visible in history
+            try:
+                from training.grpo_trainer import _record_training_run
+                _early_run_id = _record_training_run(
+                    run_type=req.run_type or "training",
+                    target_model=req.base_model or "pending",
+                    dataset_path=req.dataset_path or "pending",
+                    dataset_size=0,
+                    status="running",
+                    config={"run_type": req.run_type, "time_budget_minutes": req.time_budget_minutes},
+                )
+                if _early_run_id:
+                    _active_training["run_id"] = _early_run_id
+                    logger.info(f"[Training] Created DB row {_early_run_id} for run_type={req.run_type}")
+            except Exception as db_err:
+                logger.warning(f"[Training] Failed to create early DB row: {db_err}")
+
             if req.run_type == "export":
                 # Export traces only
                 from training.export_traces import TraceExporter
@@ -1627,6 +1646,13 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                 count = await asyncio.to_thread(
                     exporter.export_dataset, template_id=req.template_id
                 )
+                # Mark the export-only run as completed in DB
+                if _early_run_id:
+                    try:
+                        from training.grpo_trainer import _update_training_run
+                        _update_training_run(_early_run_id, "completed", metrics={"traces_exported": count})
+                    except Exception:
+                        pass
                 _active_training["status"] = "idle"
                 logger.info(f"Export complete: {count} traces")
 
@@ -1662,7 +1688,7 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                     learning_rate=req.learning_rate or TRAINING_LEARNING_RATE,
                     num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
                 )
-                result = await asyncio.to_thread(train_grpo, output_path, cfg)
+                result = await asyncio.to_thread(train_grpo, output_path, cfg, _early_run_id)
                 _active_training["run_id"] = result.get("run_id")
                 _active_training["status"] = "idle"
 
@@ -1705,7 +1731,7 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                     learning_rate=req.learning_rate or TRAINING_LEARNING_RATE,
                     num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
                 )
-                result = await asyncio.to_thread(train_grpo, dataset_path, cfg)
+                result = await asyncio.to_thread(train_grpo, dataset_path, cfg, _early_run_id)
                 _active_training["run_id"] = result.get("run_id")
                 _active_training["status"] = "idle"
 
@@ -1737,7 +1763,7 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                     learning_rate=req.learning_rate or TRAINING_LEARNING_RATE,
                     num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
                 )
-                result = await asyncio.to_thread(train_grpo, datasets_found[0], cfg)
+                result = await asyncio.to_thread(train_grpo, datasets_found[0], cfg, _early_run_id)
                 _active_training["run_id"] = result.get("run_id")
                 _active_training["status"] = "idle"
 
@@ -1765,13 +1791,21 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                     learning_rate=req.learning_rate or TRAINING_LEARNING_RATE,
                     num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
                 )
-                result = await asyncio.to_thread(train_grpo, dataset, cfg)
+                result = await asyncio.to_thread(train_grpo, dataset, cfg, _early_run_id)
                 _active_training["run_id"] = result.get("run_id")
                 _active_training["status"] = "idle"
 
         except Exception as e:
             logger.error(f"Background training failed: {e}", exc_info=True)
+            # Mark the early DB row as failed so it doesn't stay 'running' forever
+            if _early_run_id:
+                try:
+                    from training.grpo_trainer import _update_training_run
+                    _update_training_run(_early_run_id, "failed", error=str(e))
+                except Exception as db_err:
+                    logger.warning(f"[Training] Failed to mark DB row {_early_run_id} as failed: {db_err}")
             _active_training["status"] = "idle"
+            _active_training["run_id"] = None
 
     background_tasks.add_task(_run_training)
     return {"status": "started", "run_type": req.run_type, "time_budget_minutes": req.time_budget_minutes}
@@ -1782,6 +1816,13 @@ async def training_cancel():
     """Force-cancel a stuck training run by resetting the in-memory lock."""
     prev_status = _active_training["status"]
     prev_run_id = _active_training["run_id"]
+    # Mark DB row as cancelled if one exists
+    if prev_run_id:
+        try:
+            from training.grpo_trainer import _update_training_run
+            _update_training_run(prev_run_id, "failed", error="Cancelled by user")
+        except Exception:
+            pass
     _active_training["status"] = "idle"
     _active_training["run_id"] = None
     _active_training["started_at"] = None

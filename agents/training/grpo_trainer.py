@@ -176,9 +176,15 @@ def _update_training_run(
 def train_grpo(
     dataset_path: str,
     config: Optional[GRPOTrainingConfig] = None,
+    existing_run_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Run QLoRA GRPO training on a JSONL dataset.
+
+    Args:
+        existing_run_id: If provided, reuse this DB row instead of creating
+            a new one.  The caller (main.py) creates the row early so the
+            run is visible in the history immediately.
 
     Returns dict with: adapter_path, metrics, run_id
     """
@@ -312,15 +318,24 @@ def train_grpo(
 
     reward_fn = MarsRewardFunction()
 
-    # Record training run start
-    run_id = _record_training_run(
-        run_type="training",
-        target_model=config.base_model,
-        dataset_path=dataset_path,
-        dataset_size=len(trajectories),
-        status="running",
-        config=config.to_dict(),
-    )
+    # Record training run start (or reuse row created by main.py)
+    if existing_run_id:
+        run_id = existing_run_id
+        # Update the early row with actual dataset details now that we know them
+        _update_training_run(
+            run_id, "running",
+            metrics={"dataset_path": dataset_path, "dataset_size": len(trajectories),
+                     "target_model": config.base_model},
+        )
+    else:
+        run_id = _record_training_run(
+            run_type="training",
+            target_model=config.base_model,
+            dataset_path=dataset_path,
+            dataset_size=len(trajectories),
+            status="running",
+            config=config.to_dict(),
+        )
 
     try:
         # Setup output directory
@@ -337,7 +352,7 @@ def train_grpo(
             "lora_rank": config.lora_rank,
             "lora_alpha": config.lora_alpha,
             "batch_size": config.batch_size,
-            "dataset_path": config.dataset_path,
+            "dataset_path": dataset_path,
         }
         try:
             import json as _json
