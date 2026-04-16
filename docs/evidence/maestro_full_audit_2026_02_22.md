@@ -145,3 +145,34 @@
 | Consolidated coding on `qwen3.5:9b`                    | Uniform performance across nodes                      |
 | Verified Tailscale endpoints for Gateway Node          | Secure remote access established                      |
 | Updated `CONNECTION_REFERENCE.md`                      | Clearer routing and endpoint documentation            |
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | MAESTRO audit framework |
+| `agents/config.py` | Configuration | Model routing config (Devstral removed, Qwen 3.5 9B primary) |
+| `docs/CONNECTION_REFERENCE.md` | Documentation | Updated endpoint docs |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-22 | AI-Copilot | MAESTRO v3.1.0 Devstral Purge audit — Qwen 3.5 9B consolidated |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. Records the Devstral-to-Qwen consolidation decision.

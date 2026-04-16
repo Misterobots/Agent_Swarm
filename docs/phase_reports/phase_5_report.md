@@ -184,3 +184,54 @@ All routes prerendered (static)
 git checkout phase-4-complete   # Previous milestone
 ```
 No infrastructure changes in Phase 5 — purely Python modules, test files, and config. No volumes, compose files, or environment changes to restore.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/utils/remote_executor.py` | Implementation | SSH remote execution |
+| `agents/utils/bridge.py` | Implementation | Cross-machine bridge relay |
+| `agents/daemon_registry.py` | Implementation | Daemon worker registry |
+| `agents/workflow_engine.py` | Implementation | DAG workflow engine with rollback |
+| `agents/trigger_scheduler.py` | Implementation | Cron/interval/one-shot triggers |
+| `agents/main.py` | Implementation | 8 new REST endpoints |
+| Commit `8be0a24` | VCS | Phase 5 merge commit |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-10 | AI-Copilot | Initial Phase 5 report — Remote & multi-node |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+This is a **historical phase report**. Update only if:
+
+- Remote executor or bridge protocol changes.
+- New workflow engine features are added.
+- A rollback to this phase is executed.
+
+---
+
+## Verification
+
+| Claim | How to Verify |
+|-------|---------------|
+| 8 new endpoints exist | `GET /docs` → verify new endpoints in OpenAPI spec |
+| Remote executor works | Execute a simple command on a remote node → verify output |
+| Workflow DAG runs | Submit a multi-step workflow → verify all steps execute in order |

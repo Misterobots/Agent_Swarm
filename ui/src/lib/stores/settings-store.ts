@@ -13,6 +13,7 @@ interface SettingsState {
   researchMode: boolean;
   ultraplanMode: boolean;
   ultrathinkMode: boolean;
+  autoFeedPlan: boolean;
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
@@ -21,6 +22,7 @@ interface SettingsState {
   setResearchMode: (on: boolean) => void;
   setUltraplanMode: (on: boolean) => void;
   setUltrathinkMode: (on: boolean) => void;
+  setAutoFeedPlan: (on: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -34,6 +36,7 @@ export const useSettingsStore = create<SettingsState>()(
       researchMode: false,
       ultraplanMode: false,
       ultrathinkMode: false,
+      autoFeedPlan: false,
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),
@@ -42,6 +45,7 @@ export const useSettingsStore = create<SettingsState>()(
       setResearchMode: (researchMode) => set({ researchMode }),
       setUltraplanMode: (ultraplanMode) => set({ ultraplanMode }),
       setUltrathinkMode: (ultrathinkMode) => set({ ultrathinkMode }),
+      setAutoFeedPlan: (autoFeedPlan) => set({ autoFeedPlan }),
     }),
     { name: "hive-settings" }
   )

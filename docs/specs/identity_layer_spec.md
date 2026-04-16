@@ -111,3 +111,68 @@ JWT-ACE extends the identity layer from static API keys to per-request ephemeral
 - `agents/security/execution_context.py` — Thread-local token storage
 - `agents/intent_capabilities.py` — Intent-to-capability mapping
 - `agents/router.py` — Token issuance integration point
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/security/token_issuer.py` | Implementation | TokenIssuer, EphemeralAgentCard, JWT signing |
+| `agents/security/capability_gate.py` | Implementation | CapabilityValidator, @CapabilityRequired decorator |
+| `agents/security/execution_context.py` | Implementation | Thread-local token storage |
+| `agents/intent_capabilities.py` | Implementation | Intent-to-capability mapping (8 intents) |
+| `agents/main.py` | Implementation | API key validation, middleware |
+| [RFC 7519 — JWT](https://tools.ietf.org/html/rfc7519) | Standard | JSON Web Token specification |
+| [SPIFFE](https://spiffe.io/) | Standard | Workload identity framework |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-17 | AI-Copilot | v2.0 — Added JWT-ACE, capability gating, security levels |
+| 2026-02-15 | AI-Copilot | v1.0 — Initial identity layer specification |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Adding New Security Levels
+
+1. Add the level constant to `token_issuer.py`.
+2. Define which capabilities it grants.
+3. Update the Security Levels table in Section 5.5.
+
+### Adding New Intent Mappings
+
+1. Add the intent to `intent_capabilities.py` with its security level and capability set.
+2. Update the Intent-to-Capability Mapping in Section 5.6.
+3. Update the router in `agents/router.py` to detect the new intent.
+
+---
+
+## Functionality Testing
+
+### Automated Tests
+
+| Test File | What It Covers |
+|-----------|---------------|
+| `tests/test_security.py` | JWT issuance, capability validation, security level transitions |
+| `tests/test_intent_capabilities.py` | Intent-to-capability mapping correctness |
+
+### Manual Verification
+
+1. **API key validation**: Send a request with an invalid API key → verify 401 response.
+2. **JWT issuance**: Send a valid request → verify Agent Trace shows JWT-ACE token issued.
+3. **Capability gating**: Attempt to call a tool outside the token's capability set → verify it is blocked.

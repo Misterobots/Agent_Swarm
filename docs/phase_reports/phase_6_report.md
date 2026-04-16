@@ -155,3 +155,54 @@ test_grpc_client.py        — 20 passed
 ```
 
 Full regression: **508 passed**, 16 failed (all pre-existing in test_mars_loop, test_training_pipeline, test_voice_cloning, test_openai_compat, test_authorization_middleware — none in Phase 6).
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/grpc/openclaude.proto` | Definition | gRPC protobuf service definition |
+| `agents/grpc/model_router.py` | Implementation | Intent-based model routing |
+| `agents/grpc/server.py` | Implementation | gRPC inference server |
+| `agents/grpc/client.py` | Implementation | gRPC client library |
+| `agents/grpc/interceptors.py` | Implementation | OAuth2 auth interceptors |
+| `agents/grpc/Dockerfile` | Infrastructure | gRPC server container |
+| `r730_gateway/docker-compose.yml` | Infrastructure | Traefik + gRPC deployment |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-15 | AI-Copilot | Initial Phase 6 report — OpenClaude gRPC |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+This is a **historical phase report**. Update only if:
+
+- gRPC proto schema changes (regenerate stubs).
+- Model routing logic is updated.
+- A rollback to this phase is executed.
+
+---
+
+## Verification
+
+| Claim | How to Verify |
+|-------|---------------|
+| gRPC server healthy | `grpcurl -plaintext localhost:50051 grpc.health.v1.Health/Check` |
+| Traefik routes gRPC | `curl https://grpc.shivelymedia.com` → verify TLS + routing |
+| 508 tests pass | `pytest tests/ -q` → verify pass count |

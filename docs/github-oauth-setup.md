@@ -320,3 +320,47 @@ Content-Type: application/json
 | Phase 1D tag | `checkpoint-phase1d` |
 | Backend container | `agent_runtime` on Justin-PC (192.168.2.101) |
 | UI container | `hive-ui` on R730 (192.168.2.103) |
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `network.env` | Configuration | OAuth env vars (GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET) |
+| `agents/github_oauth.py` | Implementation | OAuth callback handler |
+| `swarm.github_oauth_tokens` | Database | Token storage table (in `langfuse` DB) |
+| [GitHub OAuth Apps](https://docs.github.com/en/apps/oauth-apps) | External | OAuth App documentation |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-01 | AI-Copilot | Initial GitHub OAuth setup guide |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Rotate `GITHUB_CLIENT_SECRET` annually or upon suspicion of compromise.
+- Update callback URLs if the R730 IP or domain changes.
+- Update the DB table schema if additional OAuth scopes are needed.
+
+---
+
+## Functionality Testing
+
+| Step | Expected Result |
+|------|----------------|
+| Click "Sign in with GitHub" in Hive UI | Redirects to GitHub authorization page |
+| Authorize the app | Callback returns to Hive UI, user session created |
+| Check DB | `SELECT * FROM swarm.github_oauth_tokens` shows new row |

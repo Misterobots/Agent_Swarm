@@ -100,3 +100,44 @@ These scores double as a **training dataset** for future GRPO fine-tuning of loc
 | 2026-02-22 | **v3.0** | MarsRL loop, 3-node topology, Qwen + Nemotron |
 
 Full audit evidence: [`docs/evidence/`](evidence/)
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | MAESTRO governance framework |
+| `docs/evidence/` | Evidence | Audit artifacts, drift analyses |
+| `agents/mars_loop.py` | Implementation | MarsRL scoring pipeline |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-10 | AI-Copilot | Initial governance walkthrough |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when new governance layers or compliance checks are added.
+- Link to new audit evidence files as they are created.
+
+---
+
+## Functionality Testing
+
+| Claim | How to Verify |
+|-------|---------------|
+| Governance active | Run a MAESTRO drift scan → verify compliance score |
+| Audit trail exists | Check `docs/evidence/` for recent audit files |

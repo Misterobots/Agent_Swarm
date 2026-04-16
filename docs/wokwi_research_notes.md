@@ -29,3 +29,34 @@
   - `create_project(name, board_type="esp32")`
   - `add_part(part_id, x, y)`
   - `connect_wires(source, target)`
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `docs/specs/wokwi_integration_spec.md` | Specification | Full Wokwi integration spec (built from this research) |
+| `core_tools/wokwi_ops.py` | Implementation | Simulation operations tool |
+| [Wokwi](https://wokwi.com/) | External | Hardware simulation platform |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-20 | AI-Copilot | Initial Wokwi research notes |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **research document**. The findings were formalized in `docs/specs/wokwi_integration_spec.md`. Update this file only if new research is conducted.

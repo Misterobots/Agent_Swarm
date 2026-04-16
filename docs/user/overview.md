@@ -89,4 +89,64 @@ The current system is running **Version 3.4** (Phase 6 complete):
 
 ---
 
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|-----------|
+| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
+| `execution_plane/docker-compose.yml` | Infrastructure | Execution Node (GPU + agent runtime) |
+| `control_plane/docker-compose.yml` | Infrastructure | Control Node (Langfuse, SPIRE, PostgreSQL) |
+| `ui/src/app/` | Implementation | Hive Mind UI workspace routing |
+| `agents/main.py` | Implementation | Agent runtime API entry point |
+| `docs/INDEX.md` | Documentation | Master documentation index |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|---------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-08 | AI-Copilot | Updated for Phase 6 features (training pipeline) |
+| 2026-02-20 | AI-Copilot | Initial system overview created |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Updating Service URLs Table
+
+When service ports or URLs change, update the "How Do I Access It?" table. Cross-reference `r730_gateway/docker-compose.yml` for current port mappings.
+
+### Updating Workspaces Table
+
+When new workspaces are added to the UI, add a row to the Workspaces table. Cross-reference `ui/src/app/` for the current workspace routes.
+
+### Version & Phase Status
+
+Update the "System Status" section after each phase milestone. Check off completed features and note known gaps.
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **Service accessibility**: For each URL in the access table, verify it loads correctly from a browser on the home network.
+2. **Workspace navigation**: Click through each workspace in the sidebar → verify each loads without errors.
+3. **Tailscale access**: Connect via Tailscale from an external network → verify all services are reachable.
+4. **Privacy check**: Run `tcpdump` or Wireshark on the Gateway Node → verify no outbound AI API calls during inference.
+
+---
+
 *For technical details, see [Admin: Design Framework](../admin/design_framework.md) · [Back to Index](../INDEX.md)*

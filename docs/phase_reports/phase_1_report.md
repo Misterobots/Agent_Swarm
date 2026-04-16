@@ -81,3 +81,51 @@ Simple CONVERSATION intent tested — routes correctly, no regression.
 ## Next Phase
 
 Phase 2: Memory Integration (MemPalace on Control Node)
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/coordinator.py` | Implementation | Multi-worker orchestration, LLM synthesis |
+| `agents/semantic_router.py` | Implementation | Coordinator mode intent detection |
+| `agents/config.py` | Configuration | Coordinator mode settings |
+| `agents/expertise/template_registry.py` | Implementation | Expertise template system |
+| Git tag `phase-1-complete` | VCS | Phase 1 baseline snapshot |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-03 | AI-Copilot | Initial Phase 1 report — Coordinator Mode |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+This is a **historical phase report**. Update only if:
+
+- A rollback to this phase is executed (document the reason and outcome).
+- Coordinator mode logic is significantly refactored.
+
+---
+
+## Verification
+
+| Claim | How to Verify |
+|-------|---------------|
+| Coordinator mode activates | Send a multi-step prompt → confirm parallel workers spawn |
+| LLM synthesis works | Check coordinator output → confirm merged response from workers |
+| Git tag exists | `git tag -l phase-1-complete` |

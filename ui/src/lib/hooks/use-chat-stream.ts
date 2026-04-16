@@ -206,6 +206,10 @@ export function useChatStream(options?: {
             const thought: ThoughtEvent = { content: thoughtContent, timestamp: Date.now() };
             thoughtTraceRef.current = [...thoughtTraceRef.current, thought];
             setLatestThought(thoughtContent);
+          } else if (event.type === "plan") {
+            // Plan mode: stream plan content as visible message text
+            setStatusMessage(null);
+            appendToMessage(convId!, assistantId, event.content || "");
           } else if (event.type === "tool_call") {
             // Legacy tool call format
             const toolCall: ToolCallEvent = {

@@ -165,4 +165,69 @@ The **Grafana Agent Activity dashboard** (`http://<gateway-node-ip>:3001`) shows
 
 ---
 
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|-----------|
+| `agents/router.py` | Implementation | MarsRL loop, Solver/Verifier/Corrector pipeline |
+| `agents/main.py` | Implementation | FastAPI entry point, JWT-ACE middleware |
+| `agents/mars_loop.py` | Implementation | MarsRL scoring and iteration logic |
+| `agents/governance.py` | Implementation | Governance checks and Langfuse integration |
+| `agents/metrics.py` | Implementation | Prometheus metrics export |
+| `agents/security_scanner.py` | Implementation | llama-guard safety screening |
+| `training/grpo_trainer.py` | Implementation | GRPO fine-tuning pipeline |
+| `training/export_traces.py` | Implementation | Langfuse trace export for training |
+| [MarsRL paper concept](https://arxiv.org/abs/2501.14492) | Research | Inference-time verification loop design |
+| [SPIFFE/SPIRE](https://spiffe.io/) | Standard | Zero-trust workload identity |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|---------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-10 | AI-Copilot | Initial framework document created |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Updating Agent Table
+
+When agents are added or models are swapped, update the agents table in the "The Agents" section. Cross-reference `agents/router.py` for the current model assignments.
+
+### Updating Security Layer Diagram
+
+The 6-layer security stack (`L4–L7`) is defined inline. When new security layers are added (e.g., rate limiting, WAF), add a new `L` entry to the ASCII diagram.
+
+### Updating Training Pipeline Description
+
+The training flow is described in "How Your Conversations Improve the System." When training parameters or thresholds change, update:
+- The score threshold (currently `≥ 0.80`)
+- The A/B test criteria (currently `>5%` improvement, `p < 0.05`, `min 100 invocations`)
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **MarsRL loop**: Send a coding request → verify the trace in Langfuse shows Solver → Verifier → (optional Corrector) stages.
+2. **Capability gating**: Verify in the Agent Trace that a JWT-ACE token is issued with specific capabilities.
+3. **Safety screening**: Send a borderline request → verify llama-guard blocks it with a SAFE/UNSAFE verdict in the trace.
+4. **Quality scoring**: Check Grafana Agent Activity dashboard for live quality score distribution.
+
+---
+
 *For security details, see [Admin: Security](../admin/security.md) · [Back to Index](../INDEX.md)*

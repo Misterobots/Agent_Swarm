@@ -165,3 +165,56 @@ git checkout phase-3-complete   # Previous milestone
 # Or: git checkout 928bbf5
 ```
 No infrastructure changes in Phase 4 — purely Python modules and tests. No volumes, compose files, or environment changes to restore.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/skill_registry.py` | Implementation | MCP skill registry |
+| `agents/skill_loader.py` | Implementation | Superpowers skill loader |
+| `agents/tools/web_browser.py` | Implementation | Web browser tool (SSRF protection) |
+| `agents/tools/bash_classifier.py` | Implementation | 4-tier bash risk classifier |
+| `agents/tools/bash_parser.py` | Implementation | Tree-sitter bash parser |
+| `agents/mcp/schema.py` | Implementation | MCP schema definitions |
+| `agents/mcp/server.py` | Implementation | MCP server (9 tools) |
+| `agents/mcp/tool_hooks.py` | Implementation | MCP tool hooks |
+| Commit `0d30b40` | VCS | Phase 4 merge commit |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-01 | AI-Copilot | Initial Phase 4 report — MCP & Skill Registry |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+This is a **historical phase report**. Update only if:
+
+- MCP tool count changes significantly.
+- Bash classifier tiers are updated.
+- A rollback to this phase is executed.
+
+---
+
+## Verification
+
+| Claim | How to Verify |
+|-------|---------------|
+| MCP server has 9 tools | `GET /mcp/tools` → verify 9 entries |
+| Bash classifier works | Submit a dangerous command → verify it's classified as CRITICAL |
+| SSRF protection active | Attempt internal IP in web_browser → verify blocked |

@@ -694,3 +694,36 @@ async def write_file(path, content, agent_token):
 4. **Phase 3**: Hardening (revocation list, HITL reward tokens)
 
 **Next Step**: Answer Part 8 design questions, then proceed with implementation.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/security/token_issuer.py` | Implementation | JWT-ACE token issuance (implemented from this research) |
+| `agents/security/capability_gate.py` | Implementation | Capability validation |
+| `agents/security/execution_context.py` | Implementation | Thread-local token storage |
+| [RFC 7519 — JWT](https://tools.ietf.org/html/rfc7519) | Standard | JSON Web Token specification |
+| [SPIFFE](https://spiffe.io/) | Standard | Workload identity framework |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-20 | AI-Copilot | JWT-ACE research and architecture spec |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **research document**. The design questions in Part 8 have been answered during Phase 5 implementation. See `docs/specs/identity_layer_spec.md` for the final specification.

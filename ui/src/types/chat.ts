@@ -82,7 +82,7 @@ export interface ToolResult {
  * Enriched stream event supporting tool lifecycle, continuity, and UI state.
  */
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
   content?: string;
   
   // Tool lifecycle
@@ -144,7 +144,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_metadata" | "continuation";
+      type?: "content" | "status" | "thought" | "plan" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_metadata" | "continuation";
       tool_name?: string;
       tool_input?: Record<string, unknown>;
       tool_call_id?: string;

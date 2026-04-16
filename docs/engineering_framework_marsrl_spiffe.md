@@ -125,3 +125,46 @@ The combination of MarsRL and MAESTRO-SPIFFE lays the foundation for "Phase 3" s
 1.  **Resilience**: The MarsRL loop ensures that as the swarm scales and takes on more complex automation tasks across the home, it can self-correct logic and syntax errors autonomously.
 2.  **Security boundaries**: As specialized agents (like the IoT Controller or DevOps IDE) execute high-privilege actions, SPIFFE authentication ensures that only cryptographically attested components can trigger them. A compromised container cannot simply extract a static API key to escalate privileges.
 3.  **Data Flywheel**: The Langfuse process rewards linked to specific SPIFFE identities allow for nuanced auditing and targeted fine-tuning of the models running within the swarm.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/mars_loop.py` | Implementation | MarsRL inference execution pipeline |
+| `agents/verify_spiffe.py` | Implementation | SPIFFE identity verification |
+| `agents/governance.py` | Implementation | MAESTRO compliance layer |
+| [SPIFFE](https://spiffe.io/) | Standard | Workload identity framework |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-15 | AI-Copilot | Initial engineering framework document |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when the MarsRL pipeline adds new stages.
+- Update when the SPIFFE trust domain or registration entries change.
+- Update the Data Flywheel section when new Langfuse metrics are introduced.
+
+---
+
+## Functionality Testing
+
+| Claim | How to Verify |
+|-------|---------------|
+| MarsRL loop operational | Check Langfuse for `mars_loop` traces with solver/verifier/corrector spans |
+| SPIFFE identity valid | `docker exec spire-agent spire-agent healthcheck` → healthy |

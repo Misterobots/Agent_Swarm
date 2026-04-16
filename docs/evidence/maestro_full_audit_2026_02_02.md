@@ -73,3 +73,33 @@ A comprehensive audit of the Home AI Lab swarm against the **CSA MAESTRO Framewo
 ## 4. Verdict
 
 **Approved for internal testing**, but **BLOCKED for External Access** until Layer 3 (Secrets) and Layer 5 (Root User) are remediation.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | MAESTRO 7-layer audit framework |
+| `docs/evidence/maestro_full_audit_2026_02_08.md` | Follow-up | Next audit iteration (fixed secrets + root issues) |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-02 | AI-Copilot | First MAESTRO full audit — approved internal, blocked external |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. The blockers identified here (Secrets L3, Root User L5) were resolved in the [2026-02-08 audit](maestro_full_audit_2026_02_08.md).

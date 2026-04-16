@@ -283,6 +283,10 @@ def _check_capability(agent_card: Any, required: str, fallback: Optional[str]) -
     """
     Check if agent has required capability.
     
+    Validates against both the card's activated_capabilities AND the
+    active scope from execution context (if set).  The active scope
+    narrows what the card is allowed to do on this specific intent.
+    
     Args:
         agent_card: EphemeralAgentCard instance
         required: Required capability name
@@ -297,16 +301,28 @@ def _check_capability(agent_card: Any, required: str, fallback: Optional[str]) -
     
     capabilities = agent_card.activated_capabilities or []
     
-    # Check required capability
-    if required in capabilities:
-        return True
-    
-    # Check fallback capability (if provided)
-    if fallback and fallback in capabilities:
-        logger.debug(f"[CapabilityGate] Using fallback capability {fallback}")
-        return True
-    
-    return False
+    # Check card-level capability
+    card_ok = required in capabilities or (fallback is not None and fallback in capabilities)
+    if not card_ok:
+        return False
+
+    # Check against active scope (if set).
+    try:
+        from security.execution_context import get_active_scope
+        scope = get_active_scope()
+    except ImportError:
+        scope = None
+
+    if scope is not None:
+        scope_ok = required in scope or (fallback is not None and fallback in scope)
+        if not scope_ok:
+            logger.debug(
+                f"[CapabilityGate] Capability '{required}' present in card but "
+                f"not in active scope {scope}"
+            )
+            return False
+
+    return True
 
 
 def _audit_denied_access(

@@ -128,3 +128,35 @@ SELECT id, name, intent, security_level FROM swarm.expertise_templates;
 ## Verdict
 
 Phase 5 is **DEPLOYED AND OPERATIONAL**. All code committed, tests passing, container running, database seeded. The system is ready for production use with graceful fallbacks if any component fails.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/security/token_issuer.py` | Implementation | JWT-ACE token issuance |
+| `agents/security/capability_gate.py` | Implementation | Capability validation |
+| `agents/expertise/template_registry.py` | Implementation | ExpertiseTemplate DB seeding |
+| `agents/main.py` | Implementation | Phase 5 API endpoints |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-03-17 | AI-Copilot | Phase 5 JWT-ACE deployment audit — all components operational |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. Confirms Phase 5 JWT-ACE deployment status as of audit date.

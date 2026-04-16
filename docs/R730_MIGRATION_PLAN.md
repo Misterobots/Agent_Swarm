@@ -722,3 +722,34 @@ docker-compose logs traefik | grep "error\|ERROR"
 **Timeline**: 3-4 hours total (including testing)  
 **Downtime**: ~10 minutes (monitoring blind spot during cutover)  
 **Early wins**: Immediate Justin-PC storage relief, reduced CPU contention with ComfyUI
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `docs/MIGRATION_EXECUTION_CHECKLIST.md` | Documentation | Execution checklist (companion to this plan) |
+| `execution_plane/docker-compose.yml` | Infrastructure | Justin-PC compose (source) |
+| `r730_gateway/docker-compose.yml` | Infrastructure | R730 compose (destination) |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-03-10 | AI-Copilot | R730 migration planning document |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **completed planning document**. Migration was executed via `MIGRATION_EXECUTION_CHECKLIST.md`. Retain as reference for understanding the rationale behind the topology change.

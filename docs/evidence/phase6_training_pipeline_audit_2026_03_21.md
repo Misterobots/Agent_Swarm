@@ -207,3 +207,35 @@ All trajectories structurally valid.
 Phase 6 is **DEPLOYED AND OPERATIONAL**. All code committed, dashboards provisioned, schema applied, monitoring live. The training pipeline is code-complete and ready for its first execution once the training-runtime Docker image is built on Execution Node.
 
 **Testing Plan**: See [TESTING_PLAN_PHASE6.md](../TESTING_PLAN_PHASE6.md) for comprehensive test matrix (31 unit tests, 14 integration tests, 8 system tests, 6 compliance tests, 5 performance tests).
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/grpc/server.py` | Implementation | OpenClaude gRPC inference server |
+| `agents/training/grpo_trainer.py` | Implementation | GRPO training pipeline |
+| `config/grafana/dashboards/` | Infrastructure | Provisioned training dashboards |
+| `r730_gateway/docker-compose.yml` | Infrastructure | Training service deployment |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-03-21 | AI-Copilot | Phase 6 training pipeline audit — code-complete, monitoring live |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. Cross-references TESTING_PLAN_PHASE6.md for the comprehensive test matrix.

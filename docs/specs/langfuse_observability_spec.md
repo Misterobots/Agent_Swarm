@@ -108,3 +108,64 @@ Traces are tagged with `session_id` and `origin_agent` to enable filtering by wo
 - **Langfuse**: User account required for UI access
 - **ClickHouse**: Internal network only, cluster mode disabled
 - **Encryption**: Data-at-rest encryption via ENCRYPTION_KEY
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `control_plane/docker-compose.yml` | Infrastructure | Langfuse, ClickHouse, PostgreSQL, Redis, MinIO service definitions |
+| `agents/governance.py` | Implementation | @observe decorators, trace generation |
+| `agents/mars_loop.py` | Implementation | MarsRL scoring and process reward logging |
+| [Langfuse Docs](https://langfuse.com/docs) | External | Official Langfuse documentation |
+| [ClickHouse](https://clickhouse.com/docs) | External | OLAP database for trace storage |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-09 | AI-Copilot | v1.0 — Initial Langfuse deployment specification |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Upgrading Langfuse
+
+1. Update the Langfuse image tag in `control_plane/docker-compose.yml`.
+2. Check the [Langfuse changelog](https://langfuse.com/changelog) for breaking changes.
+3. Run `docker compose pull langfuse-web && docker compose up -d langfuse-web`.
+
+### Managing ClickHouse Storage
+
+1. ClickHouse stores all trace data. Monitor disk usage on the Control Node.
+2. For cleanup, use ClickHouse TTL policies or manual data deletion for old traces.
+
+### Adding New MarsRL Metrics
+
+1. Define the metric in `agents/mars_loop.py` where rewards are logged.
+2. Add the metric to the MarsRL Process Rewards table in Section 7.
+3. Update Grafana dashboards if visualization is needed.
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **Health check**: `curl http://<control-node-ip>:3000/api/public/health` → should return 200.
+2. **Trace ingestion**: Send a chat request → verify a new trace appears in the Langfuse UI within 5 seconds.
+3. **MarsRL scores**: Check that `solver_score`, `verifier_round_N`, and `final_quality` appear in the trace metadata.
+4. **Security**: Verify Redis requires password authentication and ClickHouse is not exposed externally.

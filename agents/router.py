@@ -46,9 +46,12 @@ _conv_storage = PgAgentStorage(
 
 # --- JWT-ACE Integration ---
 try:
-    from intent_capabilities import get_capabilities_for_intent
-    from security.token_issuer import EphemeralAgentCard, get_token_issuer
-    from security.execution_context import set_current_token, clear_current_token
+    from intent_capabilities import get_capabilities_for_intent, get_session_capabilities
+    from security.token_issuer import EphemeralAgentCard, get_token_issuer, derive_child_card
+    from security.execution_context import (
+        set_current_token, clear_current_token,
+        set_active_scope, clear_active_scope,
+    )
     JWT_ACE_AVAILABLE = True
     logger.info("[Router] JWT-ACE capability gating enabled")
 except ImportError as e:
@@ -292,6 +295,63 @@ def _issue_ephemeral_token(intent: str, session_id: str, owner_id: str | None = 
         return None, {}
 
 
+def _issue_session_card(session_id: str, owner_id: str | None = None) -> tuple:
+    """
+    Issue a session-level JWT-ACE card with the **union** of all intent
+    capabilities.  Per-intent narrowing is handled via ``set_active_scope()``.
+
+    Returns:
+        (token_str, card, metadata_dict)  or  (None, None, {})  on failure
+    """
+    if not JWT_ACE_AVAILABLE:
+        return None, None, {}
+
+    try:
+        session_caps = get_session_capabilities()
+
+        template_version = "1.0"
+        if TEMPLATES_AVAILABLE:
+            try:
+                registry = get_template_registry()
+                tv = registry.get_template_version(session_caps["template_id"], "latest")
+                if tv:
+                    template_version = tv.version
+            except Exception:
+                pass
+
+        card = EphemeralAgentCard(
+            template_id=session_caps["template_id"],
+            template_version=template_version,
+            agent_name=session_caps["agent_name"],
+            activated_capabilities=session_caps["capabilities"],
+            security_level=session_caps["security_level"],
+            user_id=owner_id,
+            session_id=session_id,
+            expiry_hours=session_caps["expiry_hours"],
+        )
+
+        issuer = get_token_issuer()
+        token = issuer.issue_token(card)
+
+        metadata = {
+            "template_id": session_caps["template_id"],
+            "template_version": template_version,
+            "agent_instance_id": card.agent_instance_id,
+            "token_capabilities": session_caps["capabilities"],
+        }
+
+        logger.info(
+            f"[JWT-ACE] Session card issued for {session_id} "
+            f"({len(session_caps['capabilities'])} capabilities, "
+            f"level {session_caps['security_level']})"
+        )
+        return token, card, metadata
+
+    except Exception as e:
+        logger.warning(f"[JWT-ACE] Session card issuance failed (non-fatal): {e}")
+        return None, None, {}
+
+
 def _record_performance(intent: str, template_metadata: dict, result_data: dict):
     """Record execution performance for template evolution."""
     if not TEMPLATES_AVAILABLE or not template_metadata.get("template_id"):
@@ -517,6 +577,27 @@ def _emit_continuation_hint(hint_type: str = "auto_continue", reason: str = "") 
     }
 
 
+def _parse_think_tags(text: str):
+    """Parse streaming text that may contain <think>...</think> blocks.
+    
+    Yields (type, content) tuples where type is 'thought' or 'message'.
+    Handles partial tags across chunk boundaries via a simple state machine.
+    """
+    import re
+    # Split on think tags, preserving them
+    parts = re.split(r'(<think>|</think>)', text)
+    in_think = False
+    for part in parts:
+        if part == '<think>':
+            in_think = True
+            continue
+        elif part == '</think>':
+            in_think = False
+            continue
+        if part:
+            yield ("thought" if in_think else "message", part)
+
+
 def chat_swarm(
     user_input: str,
     session_id: str = "default_session",
@@ -527,6 +608,8 @@ def chat_swarm(
     skill: str | None = None,
     style: str | None = None,
     research_mode: bool = False,
+    ultraplan_mode: bool = False,
+    ultrathink_mode: bool = False,
     attachments: list | None = None,
 ):
     """
@@ -536,6 +619,8 @@ def chat_swarm(
     - skill: Routing hint to bias intent classification.
     - style: Response style modifier for the system prompt.
     - research_mode: If True, forces deep multi-step reasoning via MarsRL.
+    - ultraplan_mode: If True, decompose task into plan only — no execution.
+    - ultrathink_mode: If True, use deeper reasoning with visible chain-of-thought.
     - attachments: File attachments from the UI.
     """
     AGENT_STATE.labels(agent_name="Router").set(2)
@@ -544,6 +629,7 @@ def chat_swarm(
 
     # JWT-ACE state (initialized here so finally block can always access them)
     ace_token = None
+    ace_card = None  # EphemeralAgentCard for this session
     template_metadata = {}
     route_start_time = time.time()
     lf_trace = None  # Langfuse trace handle (populated below if Langfuse is active)
@@ -563,6 +649,13 @@ def chat_swarm(
         except Exception as e:
             _lf_ctx = None
             logger.debug(f"[Router] Trace creation failed: {e}")
+
+    # --- JWT-ACE: Issue session-level card (broad capabilities) ---
+    if JWT_ACE_AVAILABLE:
+        ace_token, ace_card, template_metadata = _issue_session_card(session_id, owner_id)
+        if ace_token:
+            set_current_token(ace_token)
+            yield {"type": "log", "content": f"[JWT-ACE] Session card issued ({template_metadata.get('template_id', 'session_agent')})"}
 
     # --- HISTORY CONVERSION ---
     # PHI Agents use their own storage/history, but we can seed it or pass it.
@@ -799,6 +892,80 @@ def chat_swarm(
             intent = "RESEARCH"
             yield {"type": "thought", "content": "→ Research mode activated: forcing RESEARCH intent"}
 
+        # --- ULTRAPLAN MODE: Plan-Only (no execution) ---
+        if ultraplan_mode:
+            yield _emit_turn_metadata(turn_id, "Planner", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
+            yield {"type": "status", "content": "📋 Planner: Decomposing task..."}
+            yield {"type": "thought", "content": "→ UltraPlan mode: generating plan only (no execution)"}
+
+            PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", "qwen3.5:9b"))
+            OLLAMA_HOST = get_best_host_for_model(PLAN_MODEL)
+
+            plan_system_prompt = (
+                "You are a task planning agent. Your ONLY job is to analyze the user's request "
+                "and produce a structured execution plan. You must NOT execute any steps.\n\n"
+                "Output format:\n"
+                "## Plan: [Brief title]\n\n"
+                "**Goal**: [One sentence summary of what the user wants]\n\n"
+                "**Steps**:\n"
+                "1. **[Step Name]** — [Description of what this step does]\n"
+                "   - Dependencies: [none | step numbers this depends on]\n"
+                "   - Agent: [which specialist would handle this: Code Developer, Art Director, Librarian, etc.]\n"
+                "2. **[Step Name]** — [Description]\n"
+                "   ...\n\n"
+                "**Estimated Complexity**: [Low | Medium | High]\n"
+                "**Notes**: [Any caveats, risks, or alternative approaches]\n\n"
+                "IMPORTANT: Output ONLY the plan. Do NOT execute, implement, or produce any code/content. "
+                "The user will review this plan and decide whether to proceed."
+            )
+
+            if ultrathink_mode:
+                plan_system_prompt += (
+                    "\n\nBefore writing the plan, think deeply about the request. "
+                    "Consider edge cases, dependencies, and potential issues. "
+                    "Show your reasoning process wrapped in <think>...</think> tags before the plan."
+                )
+
+            planner = Agent(
+                name="Planner",
+                model=Ollama(id=PLAN_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+                session_id=session_id,
+                instructions=plan_system_prompt,
+                show_tool_calls=False,
+            )
+
+            try:
+                with request_lock(context="text"):
+                    yield _emit_stream_mode("responding")
+                    response_stream = planner.run(user_input, stream=True)
+                    for chunk in response_stream:
+                        if chunk.content:
+                            yield {"type": "plan", "content": chunk.content}
+            except Exception as e:
+                yield {"type": "error", "content": f"Plan generation failed: {e}"}
+                logger.error(f"[Router] UltraPlan failed: {e}", exc_info=True)
+
+            WORKFLOW_STEPS.labels(status="success", agent_type="Planner").inc()
+            AGENT_STATE.labels(agent_name="Router").set(1)
+            return
+
+        # --- ULTRATHINK MODE: Inject chain-of-thought system prompt ---
+        if ultrathink_mode:
+            think_instruction = (
+                "[Deep Reasoning Mode] Think through this problem step-by-step before answering. "
+                "Show your reasoning process: identify the key aspects, consider alternatives, "
+                "evaluate tradeoffs, and then provide your final answer. "
+                "Wrap your internal reasoning in <think>...</think> tags. "
+                "After the thinking block, provide your clear final response."
+            )
+            think_msg = {"role": "system", "content": think_instruction}
+            if history is None:
+                history = [think_msg]
+            else:
+                history = list(history) + [think_msg]
+            yield {"type": "thought", "content": "→ UltraThink: deep reasoning mode activated"}
+
         # --- STYLE SYSTEM PROMPT ---
         _style_prompts = {
             "concise": "Respond as concisely as possible. Use bullet points and short sentences.",
@@ -837,11 +1004,17 @@ def chat_swarm(
                 scores=[{"name": "routing_confidence", "value": confidence}]
             )
 
-        # --- JWT-ACE: Issue ephemeral token for this intent ---
-        ace_token, template_metadata = _issue_ephemeral_token(intent, session_id, owner_id=owner_id)
-        if ace_token:
-            set_current_token(ace_token) if JWT_ACE_AVAILABLE else None
-            yield {"type": "log", "content": f"[JWT-ACE] Token issued for {template_metadata.get('template_id', intent)} v{template_metadata.get('template_version', '1.0')}"}
+        # --- JWT-ACE: Set active scope for this intent ---
+        if JWT_ACE_AVAILABLE:
+            intent_caps = get_capabilities_for_intent(intent)
+            set_active_scope(intent_caps.get("capabilities", []))
+            yield {"type": "log", "content": f"[JWT-ACE] Active scope set for {intent_caps.get('template_id', intent)} ({len(intent_caps.get('capabilities', []))} caps)"}
+            # Preserve per-intent metadata for performance recording
+            template_metadata.update({
+                "template_id": intent_caps.get("template_id", template_metadata.get("template_id")),
+                "template_version": template_metadata.get("template_version", "1.0"),
+                "intent_capabilities": intent_caps.get("capabilities", []),
+            })
 
         route_start_time = time.time()
 
@@ -1687,6 +1860,7 @@ def chat_swarm(
         # Clean up JWT-ACE execution context
         if JWT_ACE_AVAILABLE:
             try:
+                clear_active_scope()
                 clear_current_token()
             except Exception:
                 pass

@@ -206,3 +206,45 @@ Distance, reverb, model string mismatches, or the confidence threshold is too st
    ```python
    THRESHOLD = 0.4  # Lowered from 0.5 to make it more sensitive
    ```
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `voice_satellite.py` | Implementation | Wake word, audio pipeline, confidence threshold |
+| `hey_beeMo.onnx` | Model | Custom wake word model |
+| `bmo_client/` | Implementation | BMO client codebase |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-01 | AI-Copilot | Initial BMO troubleshooting guide |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Add new troubleshooting entries when recurring issues are reported.
+- Update threshold values if the wake word model is retrained.
+
+---
+
+## Functionality Testing
+
+| Issue Category | Quick Test |
+|---------------|------------|
+| Microphone | `arecord -d 3 test.wav && aplay test.wav` |
+| Wake word | Say "Hey BMO" from 1m distance |
+| Audio playback | `speaker-test -t wav` |

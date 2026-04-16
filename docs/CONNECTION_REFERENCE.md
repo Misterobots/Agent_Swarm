@@ -108,3 +108,46 @@ For off-site access, use your Tailscale IP addresses or MagicDNS names instead o
 > Use `tailscale status` on any node to find the specific IP or hostname. Ensure **MagicDNS** is enabled in your Tailscale admin console for the shortest URLs.
 >
 > **Recommended**: Connect via R730 gateway (`dell-r730.tail-xxxx.ts.net:80`) for all services unless you need direct access to compute node.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `network.env` | Configuration | All node IPs and service ports |
+| `r730_gateway/docker-compose.yml` | Infrastructure | Traefik reverse proxy rules |
+| Tailscale admin console | External | Remote access machine names |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-01 | AI-Copilot | Initial connection reference |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update whenever a service port changes or a new service is deployed.
+- Update Tailscale machine names if devices are re-registered.
+- Cross-reference `network.env` to ensure IPs stay in sync.
+
+---
+
+## Functionality Testing
+
+| Endpoint | Quick Test |
+|----------|------------|
+| Hive UI | `curl -s -o /dev/null -w '%{http_code}' http://192.168.2.103:3200` → 200 |
+| Agent Runtime | `curl http://192.168.2.103:8008/health` → 200 |
+| Grafana | `curl http://192.168.2.103:3001` → 200 |

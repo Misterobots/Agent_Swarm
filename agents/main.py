@@ -369,6 +369,8 @@ class ChatRequest(BaseModel):
     skill: Optional[str] = None       # routing hint: general|code|devops|data|creative|research|explain
     style: Optional[str] = None       # response style: default|concise|explanatory|formal|technical|casual
     research_mode: bool = False       # deep multi-step reasoning mode
+    ultraplan_mode: bool = False       # plan-only mode: decompose task, no execution
+    ultrathink_mode: bool = False      # deep reasoning with visible chain-of-thought
     attachments: Optional[List[dict]] = None  # file attachments [{name, mimeType, data, size}]
     dev_mode: bool = False            # Phase 2: enable AI agentic coding tools in dev workspace
 
@@ -815,6 +817,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     skill=request.skill,
                     style=request.style,
                     research_mode=request.research_mode,
+                    ultraplan_mode=request.ultraplan_mode,
+                    ultrathink_mode=request.ultrathink_mode,
                     attachments=request.attachments,
                 )
             except Exception as e:
@@ -825,6 +829,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
 
             update_count = 0
             response_parts = []  # Collect response text for memory extraction
+            _in_think_block = False  # Track <think> tag state across chunks
             try:
                 for update in gen:
                     update_count += 1
@@ -835,6 +840,48 @@ async def chat_completions(request: ChatRequest, http_request: Request):
 
                     msg_type = update.get("type", "response")
                     raw_content = update.get("content", "")
+
+                    # --- UltraThink: parse <think>...</think> tags in message/response chunks ---
+                    if request.ultrathink_mode and msg_type in ("message", "response") and raw_content:
+                        import re
+                        parts = re.split(r'(<think>|</think>)', raw_content)
+                        sub_updates = []
+                        for part in parts:
+                            if part == '<think>':
+                                _in_think_block = True
+                                continue
+                            elif part == '</think>':
+                                _in_think_block = False
+                                continue
+                            if part:
+                                sub_updates.append(("thought" if _in_think_block else msg_type, part))
+                        if not sub_updates:
+                            continue
+                        # Process each sub-chunk through the normal pipeline
+                        for sub_type, sub_content in sub_updates:
+                            _update = dict(update)
+                            _update["type"] = sub_type
+                            _update["content"] = sub_content
+                            # Re-assign for the rest of the loop iteration
+                            msg_type = sub_type
+                            raw_content = sub_content
+
+                            # Yield the sub-chunk (duplicated logic for think sub-chunks)
+                            if sub_type == "thought":
+                                thought_chunk = {
+                                    "id": "chatcmpl-swarm",
+                                    "object": "chat.completion.chunk",
+                                    "created": 1234567890,
+                                    "model": request.model,
+                                    "choices": [{"index": 0, "delta": {"content": sub_content, "type": "thought"}, "finish_reason": None}]
+                                }
+                                yield f"data: {json.dumps(thought_chunk)}\n\n"
+                            else:
+                                # Fall through to normal content handling below
+                                break
+                        else:
+                            # All sub-chunks were thoughts, skip normal processing
+                            continue
 
                     # In standard mode, forward status/thought as typed chunks;
                     # only yield assistant segments, errors, status, and thoughts.
@@ -859,6 +906,17 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                 "choices": [{"index": 0, "delta": {"content": raw_content, "type": "thought"}, "finish_reason": None}]
                             }
                             yield f"data: {json.dumps(thought_chunk)}\n\n"
+                            continue
+
+                        if msg_type == "plan":
+                            plan_chunk = {
+                                "id": "chatcmpl-swarm",
+                                "object": "chat.completion.chunk",
+                                "created": 1234567890,
+                                "model": request.model,
+                                "choices": [{"index": 0, "delta": {"content": raw_content, "type": "plan"}, "finish_reason": None}]
+                            }
+                            yield f"data: {json.dumps(plan_chunk)}\n\n"
                             continue
 
                         if msg_type == "tool_call":
@@ -891,7 +949,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         # typed chunks so the React UI can route them to the
                         # ThinkingIndicator / thought-trace instead of
                         # rendering them as message text.
-                        if msg_type in ("status", "thought", "log"):
+                        if msg_type in ("status", "thought", "log", "plan"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
@@ -966,6 +1024,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             skill=request.skill,
             style=request.style,
             research_mode=request.research_mode,
+            ultraplan_mode=request.ultraplan_mode,
+            ultrathink_mode=request.ultrathink_mode,
             attachments=request.attachments,
         )
         full_resp = ""
@@ -1304,6 +1364,85 @@ class TrainingStartRequest(BaseModel):
 
 # In-memory tracking for the active training background task
 _active_training: dict = {"run_id": None, "status": "idle", "started_at": None, "task": None}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Buddy companion endpoints
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/v1/buddy")
+async def buddy_get_state():
+    """Get the current buddy state (XP, level, streak, achievements)."""
+    try:
+        from buddy_service import get_state, get_achievements
+        state = get_state()
+        achievements = get_achievements()
+        return {**state, "achievements": achievements}
+    except Exception as exc:
+        logger.warning(f"[Buddy] get_state failed: {exc}")
+        return {"error": str(exc)}
+
+
+@app.put("/v1/buddy")
+async def buddy_save_state(request: Request):
+    """Persist the full buddy state from the UI."""
+    try:
+        from buddy_service import save_state
+        body = await request.json()
+        result = save_state(body)
+        return result
+    except Exception as exc:
+        logger.warning(f"[Buddy] save_state failed: {exc}")
+        return {"error": str(exc)}
+
+
+@app.post("/v1/buddy/xp")
+async def buddy_award_xp(request: Request):
+    """Award XP for an event and return updated level info."""
+    try:
+        from buddy_service import award_xp
+        body = await request.json()
+        event = body.get("event", "message_sent")
+        result = award_xp(event)
+        return result
+    except Exception as exc:
+        logger.warning(f"[Buddy] award_xp failed: {exc}")
+        return {"error": str(exc)}
+
+
+@app.get("/v1/buddy/habits")
+async def buddy_get_habits():
+    """Get user habit summary for the last 7 days."""
+    try:
+        from buddy_service import get_habits_summary
+        return get_habits_summary()
+    except Exception as exc:
+        logger.warning(f"[Buddy] get_habits failed: {exc}")
+        return {"error": str(exc)}
+
+
+@app.get("/v1/buddy/tip")
+async def buddy_get_tip(context: str = "general"):
+    """Get a contextual tip based on buddy state and context."""
+    try:
+        from buddy_service import get_state, get_contextual_tip
+        state = get_state()
+        tip = get_contextual_tip(state, context=context)
+        return {"tip": tip}
+    except Exception as exc:
+        logger.warning(f"[Buddy] get_tip failed: {exc}")
+        return {"tip": None, "error": str(exc)}
+
+
+@app.get("/v1/buddy/achievements")
+async def buddy_get_achievements():
+    """Get all earned achievements."""
+    try:
+        from buddy_service import get_achievements
+        return {"achievements": get_achievements()}
+    except Exception as exc:
+        logger.warning(f"[Buddy] get_achievements failed: {exc}")
+        return {"achievements": [], "error": str(exc)}
 
 
 @app.get("/v1/training/status")

@@ -132,3 +132,54 @@ git checkout 344df70   # Previous commit (Phase 2 test suite)
 # Or: git checkout phase-2-complete tag
 ```
 No infrastructure changes in Phase 3 — purely frontend code. No volumes, compose files, or environment changes to restore.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `ui/src/components/chat/ultraplan-toggle.tsx` | Implementation | UltraPlan toggle |
+| `ui/src/components/chat/ultrathink-toggle.tsx` | Implementation | UltraThink toggle |
+| `ui/src/components/chat/message-actions.tsx` | Implementation | Message hover actions |
+| `ui/src/components/chat/away-summary.tsx` | Implementation | Away summary banner |
+| `ui/src/components/buddy/buddy-widget.tsx` | Implementation | Buddy companion widget |
+| `ui/src/lib/stores/buddy-store.ts` | State | Buddy persistent state |
+| Commit `8bd8278` | VCS | Phase 3 merge commit |
+| Rollback `344df70` | VCS | Pre-Phase 3 rollback point |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-15 | AI-Copilot | Initial Phase 3 report — Hive UI features |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+This is a **historical phase report**. Update only if:
+
+- Any of the 6 UI features are significantly refactored.
+- A rollback to this phase is executed.
+
+---
+
+## Verification
+
+| Claim | How to Verify |
+|-------|---------------|
+| UltraPlan toggle works | Open Hive UI → toggle Plan Mode → verify extended thinking output |
+| Buddy widget renders | Open Hive UI → verify Buddy avatar visible in chat |
+| Away summary appears | Leave tab for 60s → return → verify summary banner |

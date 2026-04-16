@@ -572,3 +572,34 @@ docker network inspect ai_lab_net | grep -A10 "Containers"
 **Risk Level**: Low (you have full backups)  
 **Rollback Time**: 15-20 minutes if needed  
 **Expected Benefit**: 50-75GB freed on Justin-PC, -20% CPU load
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `execution_plane/docker-compose.yml` | Infrastructure | Justin-PC compose (post-migration) |
+| `r730_gateway/docker-compose.yml` | Infrastructure | R730 compose (received monitoring services) |
+| `migration_backup_20260314_163149/` | Backup | Pre-migration backup artifacts |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-03-14 | AI-Copilot | Migration execution checklist |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **one-time execution checklist**. The migration has been completed. Retain as a reference for future migrations or rollbacks.

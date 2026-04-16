@@ -42,7 +42,8 @@ RUN pip install --no-cache-dir \
     soundfile \
     opencv-python-headless \
     streamlit-monaco \
-    redis
+    redis \
+    mempalace
 
 # Install SPIFFE SDK, Langfuse, and JWT-ACE dependencies
 RUN pip install --no-cache-dir \

@@ -91,3 +91,34 @@ A comprehensive re-audit following the **Langfuse Observability Platform** deplo
 ## 5. Verdict
 
 **Approved for Production Usage**. The system now includes comprehensive LLM observability via Langfuse, enabling full trace auditing, debugging, and compliance monitoring.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | MAESTRO audit framework |
+| `control_plane/docker-compose.yml` | Infrastructure | Langfuse service definitions |
+| `docs/evidence/maestro_full_audit_2026_02_08.md` | Prior audit | Previous iteration |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-09 | AI-Copilot | MAESTRO audit — Langfuse observability added, production approved |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. Langfuse trace auditing confirmed operational.

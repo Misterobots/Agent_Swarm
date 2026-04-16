@@ -185,4 +185,60 @@ Write-Host "  docker compose -f execution_plane/docker-compose.yml up -d spire-a
 
 ---
 
-_Last Updated: 2026-02-08_
+_Last Updated: 2026-04-16_
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `execution_plane/config/spire/agent.conf` | Configuration | SPIRE agent configuration (trust domain, server address, plugins) |
+| `execution_plane/docker-compose.yml` | Infrastructure | spire-agent container definition and volumes |
+| `control_plane/docker-compose.yml` | Infrastructure | spire-server container definition |
+| `scripts/reset-spire-agent.ps1` | Operations | Quick recovery script |
+| [SPIFFE/SPIRE Docs](https://spiffe.io/docs/) | External | Official SPIRE documentation |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-08 | AI-Copilot | Initial SPIRE agent troubleshooting guide |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### When to Update This Document
+
+- After changing SPIRE server/agent versions.
+- After changing the trust domain or attestation method.
+- After adding new workload registrations.
+
+### Adding New Troubleshooting Entries
+
+1. Add a new numbered section under "Common Issues".
+2. Include: Symptom, Probable Cause, Solution (with shell commands).
+3. Update the Quick Recovery Script if the new issue requires recovery steps.
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **Agent health**: `docker exec spire-agent spire-agent healthcheck` → should report healthy.
+2. **Server health**: `docker exec spire-server spire-server healthcheck` → should report healthy.
+3. **SVID fetch**: Run the Python test command from Verification Commands → should return a valid SPIFFE ID.
+4. **Recovery script**: Run `scripts/reset-spire-agent.ps1` → verify agent comes back healthy with a fresh token.

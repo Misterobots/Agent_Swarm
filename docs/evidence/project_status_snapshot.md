@@ -39,3 +39,34 @@ Baseline Commit: 982796a4547566ba9316a90671891cc7c91d9227
 
 - Residual items listed in closure packets are non-blocking and deferred to subsequent sprint work.
 - This snapshot records governance closure state and verification posture at the point of baseline capture.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | Governance framework |
+| `config/grafana/` | Infrastructure | Prometheus rules, Grafana dashboards |
+| `tests/` | Testing | Test suite referenced for pass counts |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-03-31 | AI-Copilot | Governance baseline snapshot captured |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. Captures governance closure state at baseline. Future snapshots should be created as new files, not edits to this one.

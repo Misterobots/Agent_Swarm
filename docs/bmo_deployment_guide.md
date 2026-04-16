@@ -160,3 +160,46 @@ If the script runs but doesn't play audio (only saves it):
     cd ~/bmo_client
     source venv/bin/activate
     ```
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `bmo_client/` | Implementation | BMO Voice client source |
+| `network.env` | Configuration | Backend API URLs |
+| `voice_satellite.py` | Implementation | Wake word listener, audio pipeline |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-01 | AI-Copilot | Initial BMO deployment guide |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when BMO hardware requirements change (e.g., new microphone HAT).
+- Update when backend API endpoints change (update `network.env` instructions).
+- Update when new Python dependencies are required.
+
+---
+
+## Functionality Testing
+
+| Step | Expected Result |
+|------|----------------|
+| Say "Hey BMO" | Wake word triggers, audio capture begins |
+| Ask a question | Backend processes query, TTS plays response |
+| Run `arecord -d 3 test.wav && aplay test.wav` | Mic + speaker hardware verified |

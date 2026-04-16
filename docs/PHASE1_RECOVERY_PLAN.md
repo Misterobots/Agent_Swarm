@@ -176,3 +176,33 @@ Once all services are running:
 3. ✅ Add Loki datasource
 4. ✅ Create dashboards for Justin-PC and R730
 5. ✅ Configure log scraping from both nodes
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `r730_gateway/docker-compose.yml` | Infrastructure | Grafana, Prometheus, Loki on R730 |
+| `config/grafana/` | Configuration | Datasource and dashboard definitions |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-08 | AI-Copilot | Phase 1 recovery plan for monitoring stack |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **completed recovery plan**. All 5 items resolved. Retain as reference for future monitoring stack issues.

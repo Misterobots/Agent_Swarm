@@ -32,3 +32,33 @@ No critical "Drift" events (unauthorized architectural changes) were detected. T
 ## 4. Verification
 
 The `source-of-truth.json` has been updated with the latest file counts and timestamps.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | MAESTRO L6 drift scanning engine |
+| `config/source-of-truth.json` | Data | Baseline file counts and timestamps |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-08 | AI-Copilot | Original drift analysis — 88% compliance |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. Do not modify the original analysis. Append corrections or follow-ups as new sections below the original content.

@@ -91,3 +91,52 @@ Two-layer classification failure:
 ## Next Phase
 
 **Phase 1: Coordinator Mode** — Hybrid Python orchestration + LLM synthesis for multi-worker task coordination.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/semantic_router.py` | Implementation | VISION intent classification fix |
+| `agents/intent_capabilities.py` | Implementation | Intent-to-capability mapping for VLM |
+| `agents/router.py` | Implementation | VLM pipeline routing |
+| `agents/dispatcher.py` | Implementation | Task dispatching with vision support |
+| Git tag `phase-0-complete` | VCS | Phase 0 baseline snapshot |
+| Commit `96a2e36` | VCS | Phase 0 merge commit |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-01 | AI-Copilot | Initial Phase 0 report — VLM pipeline and VISION fix |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+This is a **historical phase report**. Update only if:
+
+- A rollback to this phase is executed (document the reason and outcome).
+- Post-phase bugs are discovered that trace back to changes made here.
+
+---
+
+## Verification
+
+| Claim | How to Verify |
+|-------|---------------|
+| VISION intent routes to VLM | Send an image-analysis prompt → confirm moondream model is invoked |
+| moondream model available | `curl http://<ollama-host>:11434/api/tags` → confirm `moondream:latest` listed |
+| Git tag exists | `git tag -l phase-0-complete` |

@@ -376,3 +376,82 @@ Try reducing the learning rate (e.g., from 5e-6 to 1e-6), increasing epochs, or 
 
 **Out of VRAM during training**
 Reduce LoRA rank (try 8), reduce batch size (configured in `config.py`), or set a shorter sequence length. QLoRA 4-bit quantization is already enabled to minimize VRAM usage.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|-----------|
+| `training/grpo_trainer.py` | Implementation | GRPO training loop with QLoRA |
+| `training/export_traces.py` | Implementation | Langfuse → JSONL trace export |
+| `training/dataset_curator.py` | Implementation | HuggingFace download, format conversion, security scanning |
+| `training/synthetic_gen.py` | Implementation | Synthetic trajectory generation via Ollama |
+| `training/security_scanner.py` | Implementation | Poison/injection detection for training data |
+| `training/model_converter.py` | Implementation | LoRA merge → GGUF → Ollama import |
+| `training/ab_test_manager.py` | Implementation | A/B test deployment and statistical evaluation |
+| `ui/src/app/training/page.tsx` | Implementation | Training UI page with Overview/History/Launch tabs |
+| `ui/src/stores/trainingStore.ts` | Implementation | Client-side training state and polling |
+| [GRPO (DeepSeek)](https://arxiv.org/abs/2402.03300) | Research | Group Relative Policy Optimization algorithm |
+| [QLoRA](https://arxiv.org/abs/2305.14314) | Research | Quantized Low-Rank Adaptation for efficient fine-tuning |
+| [ToolOrchestra](https://arxiv.org/abs/2407.04329) | Research | Minimum viable sample count for tool-use training |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|---------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-24 | AI-Copilot | Added curated datasets, synthetic generation, and A/B testing sections |
+| 2026-03-10 | AI-Copilot | Initial training guide created |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Adding New Curated Datasets
+
+1. Add the dataset key and HuggingFace path to `training/dataset_curator.py` in the `AVAILABLE_DATASETS` dict.
+2. Add format conversion logic if the dataset uses a non-ShareGPT format.
+3. Update the Available Datasets table in this guide.
+4. Restart the agent runtime to pick up the new dataset list.
+
+### Tuning Training Defaults
+
+1. Default hyperparameters (LoRA rank, learning rate, epochs) are in `training/grpo_trainer.py` and `agents/config.py`.
+2. The quality score threshold for training candidates (currently `0.80`) is in `training/export_traces.py`.
+3. The A/B test significance threshold (currently `p < 0.05`) is in `training/ab_test_manager.py`.
+
+### Updating Security Scanner Rules
+
+1. Detection patterns are in `training/security_scanner.py`.
+2. Add new patterns to the `PATTERNS` dict for new attack types.
+3. Test with known-good and known-bad samples before deploying.
+
+---
+
+## Functionality Testing
+
+### Automated Tests
+
+| Test File | What It Covers |
+|-----------|----------------|
+| `tests/test_training.py` | Training API endpoints, run lifecycle, status polling |
+| `tests/test_security_scanner.py` | Poison detection, injection patterns, quality filtering |
+
+### Manual Verification
+
+1. **Export Only**: Run an export → verify JSONL file is created with correct format.
+2. **Curated pipeline**: Select a small dataset (max 100 samples) → verify download, scan, and training complete without errors.
+3. **Security scanner**: Inject a known-bad sample into a dataset → verify it appears in the `_rejected.jsonl` file.
+4. **Model conversion**: After training, click Convert → verify the model appears in `ollama list`.
+5. **A/B Testing**: Deploy a candidate → verify traffic split in Langfuse traces → verify statistical test runs after min invocations.

@@ -69,3 +69,45 @@ Select the `Home-AI-Swarm` or `default` model from the dropdown at the top of th
 - **Code/Technical Requests**: Automatically routed to `qwen3.5:9b` (Primary Solver/Corrector) running right here on the R730. This ensures maximum speed by avoiding VRAM bottlenecks on the desktop.
 - **Expert Tasks**: Large codebase analysis uses the Primary Solver `qwen3.5:9b` model.
 - **Image/3D**: Routed to ComfyUI on Justin-PC's 16GB GPU.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway compose with OpenWebUI + Ollama |
+| `network.env` | Configuration | Node IPs, ports |
+| `agents/config.py` | Configuration | Intent-based routing rules |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-01 | AI-Copilot | Initial R730 gateway setup guide |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when new models are deployed on the gateway.
+- Update routing rules when new intent types are handled.
+
+---
+
+## Functionality Testing
+
+| Step | Expected Result |
+|------|----------------|
+| `curl http://192.168.2.103:8080` | OpenWebUI responds |
+| Send text prompt via gateway | Routed to Ollama on R730 |
+| Send image generation prompt | Routed to ComfyUI on Justin-PC |

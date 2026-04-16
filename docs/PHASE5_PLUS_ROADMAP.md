@@ -768,3 +768,37 @@ Q3 2026 (July - September)
 **Document Version**: 3.0
 **Status**: Phase 6 Complete, Phase 7 Planning
 **Last Updated**: March 21, 2026
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `docs/phase_reports/` | Documentation | Completed phase reports (0–6) |
+| `agents/main.py` | Implementation | Latest API endpoints |
+| `agents/grpc/` | Implementation | Phase 6 gRPC server |
+| `agents/training/` | Implementation | Phase 6 training pipeline |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide |
+| 2026-03-21 | AI-Copilot | Phase 6 (GRPO) marked complete, Phase 7 planning |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Mark phases as complete with links to their phase reports.
+- Add new phases as they are planned.
+- Update "Last Updated" date when modifying.

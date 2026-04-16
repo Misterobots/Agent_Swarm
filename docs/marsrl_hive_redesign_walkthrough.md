@@ -185,3 +185,45 @@ After deploying, verify in **Langfuse** (http://192.168.2.102:3000):
 ---
 
 _Version 3.1 | 2026-03-12 | Qwen 3.5 9B Loop + Dell R730 Topology_
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/mars_loop.py` | Implementation | MarsRL Solver → Verifier → Corrector pipeline |
+| `agents/config.py` | Configuration | Model routing to qwen3.5:9b |
+| `control_plane/docker-compose.yml` | Infrastructure | Langfuse for trace observability |
+| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway and Traefik routing |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-12 | AI-Copilot | v3.1 — MarsRL Hive redesign walkthrough |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when the primary model changes from Qwen 3.5 9B.
+- Update when node topology or Langfuse trace names change.
+
+---
+
+## Functionality Testing
+
+| Claim | How to Verify |
+|-------|---------------|
+| MarsRL pipeline works | Send complex prompt → check Langfuse for `mars_loop` trace with 3 spans |
+| Qwen 3.5 9B active | `curl http://<ollama>:11434/api/tags` → confirm `qwen3.5:9b` |

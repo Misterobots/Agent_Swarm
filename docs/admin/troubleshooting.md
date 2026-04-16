@@ -411,4 +411,64 @@ If Authentik is healthy but blocking, the provider configuration may need updati
 
 ---
 
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/main.py` | Implementation | Health check endpoints, startup error messages |
+| `agents/router.py` | Implementation | Chat pipeline errors, MarsRL loop failures |
+| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node services, Traefik, Grafana, Prometheus |
+| `execution_plane/docker-compose.yml` | Infrastructure | agent-runtime, Ollama, ComfyUI, training containers |
+| `control_plane/docker-compose.yml` | Infrastructure | SPIRE, Langfuse, PostgreSQL, Redis |
+| `config/grafana/` | Infrastructure | Dashboard JSON definitions |
+| `config/prometheus/` | Infrastructure | Scrape targets and alert rules |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-20 | AI-Copilot | Added training pipeline, voice/BMO, and GPU troubleshooting sections |
+| 2026-02-28 | AI-Copilot | Initial troubleshooting guide created |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Adding New Troubleshooting Entries
+
+1. Add a new numbered section following the existing format: symptom, checks (with shell commands), and a causes/fixes table.
+2. Group by subsystem (Agent Runtime, Monitoring, Identity, etc.).
+3. Include the exact error message or UI symptom users will see.
+4. Provide both the diagnostic command and the fix command.
+
+### Keeping Log Queries Current
+
+- When container names or log formats change, update the Loki queries in Section 10.
+- When new services are added, add corresponding log query examples.
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **Quick diagnostics**: Run each command in Section 0 → verify they return valid output.
+2. **Restart resilience**: Restart a key container (agent-runtime) → verify the troubleshooting steps correctly diagnose and fix the outage.
+3. **Log query accuracy**: Run each Loki query → verify it returns relevant log lines from the last 24 hours.
+
+---
+
 *For security-related issues, see [Security](security.md) · [Back to Index](../INDEX.md)*

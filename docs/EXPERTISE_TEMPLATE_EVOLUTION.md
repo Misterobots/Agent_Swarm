@@ -726,3 +726,46 @@ For each ExpertiseTemplate:
 ---
 
 **Next Step**: Implement Phase 0–2 now, then quarterly fine-tuning in Phase 3.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/expertise/template_registry.py` | Implementation | ExpertiseTemplateRegistry, DB operations |
+| `agents/security/token_issuer.py` | Implementation | JWT-ACE token with expertise embedding |
+| `agents/mars_loop.py` | Implementation | MarsRL scoring for template evolution |
+| `config/grafana/dashboards/` | Infrastructure | Expertise evolution dashboards |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-15 | AI-Copilot | Multi-level RL architecture for expertise template evolution |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when new expertise domains are added to the template registry.
+- Update when the RL reward structure changes.
+- Update architectural diagrams when new template versioning strategies are introduced.
+
+---
+
+## Functionality Testing
+
+| Claim | How to Verify |
+|-------|---------------|
+| Templates seeded | Query PostgreSQL → `SELECT count(*) FROM expertise_templates` → 7+ |
+| Template versioning | Create template v1, evolve it → verify v2 created with lineage |

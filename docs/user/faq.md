@@ -93,4 +93,63 @@ If you just deployed or restarted services, metrics take up to 15 seconds to app
 
 ---
 
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|-----------|
+| `agents/router.py` | Implementation | Intent routing, MarsRL loop, capability gating |
+| `agents/main.py` | Implementation | FastAPI entry point, health check endpoints |
+| `ui/src/stores/chatStore.ts` | Implementation | Chat state, connection status, stream handling |
+| `r730_gateway/docker-compose.yml` | Infrastructure | Service definitions, port mappings |
+| `config/grafana/` | Infrastructure | Dashboard JSON definitions |
+| [Langfuse Docs](https://langfuse.com/docs) | External | Trace viewer usage reference |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|---------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-15 | AI-Copilot | Initial FAQ document created |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Adding New FAQ Entries
+
+1. Add the new Q&A under the appropriate section heading (General Usage or Errors & Issues).
+2. Use the existing format: `**Q: Question?**` followed by a blank line and the answer.
+3. If the answer references a specific admin guide, link to it.
+4. Update the INDEX.md if new sections are added.
+
+### Keeping Answers Current
+
+- When service ports, URLs, or model names change, grep this file for the old values and update.
+- When new features ship, check if any "Can I..." questions need revised answers.
+- When known error messages change, update the Errors & Issues section.
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **Link integrity**: Verify all `[links](path)` resolve to existing files.
+2. **Accuracy**: For each Q&A, verify the described behavior matches the current system by testing it.
+3. **Completeness**: After each release, review user-reported issues and add FAQ entries for common patterns.
+
+---
+
 *For admin-level issues, see [Troubleshooting](../admin/troubleshooting.md) · [Back to Index](../INDEX.md)*

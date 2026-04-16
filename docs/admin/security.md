@@ -307,4 +307,77 @@ Evidence files: see [`docs/evidence/`](../evidence/) for all point-in-time audit
 
 ---
 
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `docs/security/identity_token_trust_standard.md` | Standard | JWT-ACE token format and trust chain |
+| `docs/security/api_authentication_contract.md` | Standard | API key validation and claims |
+| `docs/security/key_lifecycle_rotation_runbook.md` | Runbook | Key rotation procedures |
+| `docs/security/hook_security_execution_policy.md` | Policy | Hook execution sandboxing rules |
+| `agents/main.py` | Implementation | JWT-ACE middleware, API key validation |
+| `agents/security_scanner.py` | Implementation | llama-guard safety screening |
+| `agents/governance.py` | Implementation | Drift detection and governance checks |
+| [SPIFFE/SPIRE](https://spiffe.io/) | Standard | Zero-trust workload identity |
+| [RFC 7519 — JWT](https://tools.ietf.org/html/rfc7519) | Standard | JSON Web Token specification |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-23 | AI-Copilot | Updated to v3.3 with Authentik SSO and open security items |
+| 2026-03-10 | AI-Copilot | Added JWT-ACE and MarsRL security sections |
+| 2026-02-20 | AI-Copilot | Initial security reference created |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### When to Update This Document
+
+- After any security-related code change (JWT issuance, key rotation, SPIRE enrollment).
+- After closing an Open Security Item — move it from the open items table to a "Resolved" section.
+- After adding new security layers or changing the trust model.
+
+### Key Rotation Procedure
+
+Refer to [`key_lifecycle_rotation_runbook.md`](../security/key_lifecycle_rotation_runbook.md) for step-by-step instructions.
+
+### Incident Response
+
+Refer to [`key_compromise_incident_runbook.md`](../security/key_compromise_incident_runbook.md) and the [`checklist`](../security/key_compromise_incident_checklist.md).
+
+---
+
+## Functionality Testing
+
+### Automated Tests
+
+| Test File | What It Covers |
+|-----------|---------------|
+| `tests/test_security.py` | JWT-ACE issuance, API key validation, capability gating |
+| `tests/test_governance.py` | Drift detection, safety screening |
+
+### Manual Verification
+
+1. **JWT-ACE**: Issue a request → check Agent Trace → verify JWT was issued with correct capabilities.
+2. **SPIRE**: Run `docker exec spire-agent spire-agent api fetch x509` → verify valid SVID returned.
+3. **Safety screening**: Send a borderline prompt → verify llama-guard verdict appears in trace.
+4. **Open items audit**: Review each open security item and confirm mitigation status is accurate.
+
+---
+
 *For compliance evidence, see [MAESTRO Status](../compliance/maestro_compliance_status.md) · [Back to Index](../INDEX.md)*

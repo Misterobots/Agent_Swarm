@@ -125,3 +125,35 @@ volumes:
 networks:
   execution_net:
     driver: bridge
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `execution_plane/docker-compose.yml` | Infrastructure | Actual compose file for Justin-PC |
+| `network.env` | Configuration | Node IPs, environment variables |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide |
+| 2026-03-14 | AI-Copilot | Post-migration compose reference (monitoring offloaded to R730) |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when services are added or removed from Justin-PC.
+- Cross-reference with `execution_plane/docker-compose.yml` to ensure this reference matches reality.
+- Update volume list when new persistent storage is added.

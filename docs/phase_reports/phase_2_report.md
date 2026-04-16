@@ -140,3 +140,52 @@ The initial extraction failed because nemotron-mini occasionally returns malform
 | nemotron-mini | Justin-PC Ollama :11434 | Memory extraction from conversations |
 | qwen3:14b | Justin-PC Ollama :11434 | Coordinator decomposition/synthesis |
 | llama3.2:3b | R730 Ollama :11434 | Librarian (research/devops tasks) |
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `control_plane/mempalace/` | Implementation | MemPalace microservice (Dockerfile, app/) |
+| `agents/mempalace_client.py` | Implementation | MemPalace client library |
+| `control_plane/docker-compose.yml` | Infrastructure | MemPalace, pgvector service definitions |
+| `agents/config.py` | Configuration | MemPalace endpoint settings |
+| Git tag `phase-2-complete` | VCS | Phase 2 baseline snapshot |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-06 | AI-Copilot | Initial Phase 2 report — MemPalace memory integration |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+This is a **historical phase report**. Update only if:
+
+- MemPalace architecture changes significantly (e.g., new embedding model or storage backend).
+- A rollback to this phase is executed.
+
+---
+
+## Verification
+
+| Claim | How to Verify |
+|-------|---------------|
+| MemPalace responds | `curl http://<control-node>:8100/health` → 200 OK |
+| pgvector operational | Connect to PostgreSQL → `SELECT * FROM pg_extension WHERE extname='vector'` |
+| Embedding works | Store a memory → retrieve by semantic query → verify recall |
+| Git tag exists | `git tag -l phase-2-complete` |

@@ -80,3 +80,57 @@ Wires two components together (e.g., `esp:D2` to `led1:DIN`).
 
 - **No Web Uploads**: Simulation files remain local to the `execution_plane`.
 - **Sandboxing**: Code execution happens in the user's VS Code instance (Wokwi Extension) or constrained browser session, not on the Agent Runtime itself.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `core_tools/wokwi_ops.py` | Implementation | Simulation creation, part management, pin wiring |
+| `workspace/simulations/` | Data | Generated diagram.json and firmware files |
+| [Wokwi](https://wokwi.com/) | External | Hardware simulation platform |
+| [ESPHome](https://esphome.io/) | External | Physical device flashing framework |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-02-20 | AI-Copilot | v1.0 — Initial Wokwi integration specification |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Adding New Board Types
+
+1. Add the board definition to `wokwi_ops.py` in the `BOARD_TYPES` dict.
+2. Update `diagram.json` schema if the board has unique pin layouts.
+3. Test with a sample simulation before deploying.
+
+### Adding New Components
+
+1. Refer to the [Wokwi parts catalog](https://docs.wokwi.com/parts/wokwi-led) for supported parts.
+2. Add component templates to `wokwi_ops.py` if custom defaults are needed.
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **Create simulation**: Call `create_simulation('test', 'esp32')` → verify `workspace/simulations/test/diagram.json` is created.
+2. **Add parts**: Call `add_part(...)` → verify the part appears in `diagram.json`.
+3. **Pin wiring**: Call `connect_pin(...)` → verify connections array in `diagram.json`.
+4. **Security**: Verify simulation files stay local — no outbound network calls during simulation.

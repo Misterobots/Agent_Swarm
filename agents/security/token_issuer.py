@@ -27,6 +27,7 @@ Usage:
 import jwt
 import os
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List, Any
 import dataclasses
@@ -48,6 +49,11 @@ class EphemeralAgentCard:
     """
     Runtime identity for ephemeral agents.
     Embedded in JWT claims for capability-based access control.
+
+    Lifecycle:
+        - Session cards: issued once per session with broad capabilities.
+        - Child cards: derived from a parent card for sub-agent workers.
+          Capabilities are always a subset of the parent's.
     """
     template_id: str                    # Reference to ExpertiseTemplate
     template_version: str              # "1.3", "2.0", etc.
@@ -57,6 +63,7 @@ class EphemeralAgentCard:
     security_level: str = "L2_USER"    # L1_PUBLIC, L2_USER, L3_ADMIN, L4_SYSTEM
     user_id: Optional[str] = None      # Canonical authenticated user owner (for user tokens)
     session_id: Optional[str] = None   # Link to user session
+    parent_id: Optional[str] = None    # Parent card agent_instance_id (for child cards)
     metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)  # Custom metadata
 
     # Timestamps (UTC)
@@ -93,8 +100,87 @@ class EphemeralAgentCardModel(BaseModel):
     security_level: str = "L2_USER"
     user_id: Optional[str] = None
     session_id: Optional[str] = None
+    parent_id: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
     expiry_hours: int = 1
+
+
+# Security-level ordering used by derive_child_card.
+_SECURITY_LEVEL_ORDER = ["L1_PUBLIC", "L2_USER", "L3_ADMIN", "L4_SYSTEM"]
+
+
+def derive_child_card(
+    parent_card: EphemeralAgentCard,
+    child_template_id: str,
+    child_agent_name: str,
+    child_capabilities: List[str],
+    child_security_level: str = "L2_USER",
+    task_description: Optional[str] = None,
+    expiry_hours: Optional[int] = None,
+) -> EphemeralAgentCard:
+    """
+    Derive a child agent card from a parent card.
+
+    Enforces:
+        - Child capabilities ⊆ parent capabilities (intersection applied).
+        - Child security_level ≤ parent security_level (capped).
+        - parent_id links to parent's agent_instance_id.
+
+    Args:
+        parent_card: The parent EphemeralAgentCard.
+        child_template_id: Template ID for the child agent.
+        child_agent_name: Display name for the child agent.
+        child_capabilities: Requested capabilities (will be intersected with parent).
+        child_security_level: Requested security level (will be capped).
+        task_description: Optional description stored in child metadata.
+        expiry_hours: TTL for child card.  Defaults to parent's remaining TTL.
+
+    Returns:
+        A new EphemeralAgentCard linked to the parent.
+    """
+    # Intersect capabilities — child can never exceed parent.
+    parent_caps = set(parent_card.activated_capabilities or [])
+    effective_caps = [c for c in child_capabilities if c in parent_caps]
+
+    # Cap security level.
+    parent_idx = _SECURITY_LEVEL_ORDER.index(parent_card.security_level) \
+        if parent_card.security_level in _SECURITY_LEVEL_ORDER else 1
+    child_idx = _SECURITY_LEVEL_ORDER.index(child_security_level) \
+        if child_security_level in _SECURITY_LEVEL_ORDER else 1
+    effective_level = _SECURITY_LEVEL_ORDER[min(parent_idx, child_idx)]
+
+    # Build child metadata.
+    child_metadata = {
+        "parent_template_id": parent_card.template_id,
+    }
+    if task_description:
+        child_metadata["task_description"] = task_description
+
+    # Default expiry: parent's remaining hours (at least 1).
+    if expiry_hours is None:
+        elapsed = (datetime.now(timezone.utc) - parent_card.issued_at).total_seconds() / 3600
+        remaining = max(1, parent_card.expiry_hours - int(elapsed))
+        expiry_hours = remaining
+
+    child = EphemeralAgentCard(
+        template_id=child_template_id,
+        template_version=parent_card.template_version,
+        agent_name=child_agent_name,
+        activated_capabilities=effective_caps,
+        security_level=effective_level,
+        user_id=parent_card.user_id,
+        session_id=parent_card.session_id,
+        parent_id=parent_card.agent_instance_id,
+        expiry_hours=expiry_hours,
+        metadata=child_metadata,
+    )
+
+    logger.info(
+        f"[TokenIssuer] Derived child card {child.agent_instance_id} "
+        f"from parent {parent_card.agent_instance_id} "
+        f"(caps: {len(effective_caps)}/{len(child_capabilities)}, level: {effective_level})"
+    )
+    return child
 
 
 # ============================================================================
@@ -248,7 +334,13 @@ class TokenValidator:
     """
     Validates JWT tokens and extracts ephemeral agent capability claims.
     Verifies token signature and expiry.
+
+    Includes an in-memory validation cache (LRU, 60 s TTL) to avoid
+    repeated cryptographic verification of the same token on rapid requests.
     """
+
+    _CACHE_MAX = 128
+    _CACHE_TTL_S = 60
     
     def __init__(self, spire_enabled: bool = True, jwt_secret: Optional[str] = None):
         """
@@ -264,6 +356,9 @@ class TokenValidator:
             "EPHEMERAL_AGENT_JWT_SECRET",
             "dev-insecure-secret-key-change-in-production"
         )
+
+        # Validation cache: token_hash → (EphemeralAgentCard, cached_at)
+        self._cache: Dict[str, tuple] = {}
         
         # Initialize SPIRE client
         self.spire_client = None
@@ -276,12 +371,50 @@ class TokenValidator:
             except ImportError as e:
                 logger.warning(f"[TokenValidator] SPIRE client not available: {e}")
     
+    # ------------------------------------------------------------------
+    # Cache helpers
+    # ------------------------------------------------------------------
+
+    def _cache_key(self, token: str) -> str:
+        """Derive a cache key from token (first+last 16 chars + length)."""
+        return f"{token[:16]}:{token[-16:]}:{len(token)}"
+
+    def _cache_get(self, token: str) -> Optional[EphemeralAgentCard]:
+        key = self._cache_key(token)
+        entry = self._cache.get(key)
+        if entry is None:
+            return None
+        card, cached_at = entry
+        if (time.time() - cached_at) > self._CACHE_TTL_S:
+            del self._cache[key]
+            return None
+        return card
+
+    def _cache_put(self, token: str, card: EphemeralAgentCard) -> None:
+        key = self._cache_key(token)
+        # Evict oldest entries if over capacity.
+        if len(self._cache) >= self._CACHE_MAX:
+            oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
+            del self._cache[oldest_key]
+        self._cache[key] = (card, time.time())
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
     def validate_token(self, token: str) -> EphemeralAgentCard:
         """
         Backward-compatible default validator.
         Treats the token as a user-scoped JWT-ACE token.
+        Uses validation cache to avoid repeated signature verification.
         """
-        return self.validate_user_token(token)
+        cached = self._cache_get(token)
+        if cached is not None:
+            logger.debug("[TokenValidator] Cache hit")
+            return cached
+        card = self.validate_user_token(token)
+        self._cache_put(token, card)
+        return card
 
     def validate_user_token(self, token: str) -> EphemeralAgentCard:
         """Validate a user-scoped JWT-ACE token."""

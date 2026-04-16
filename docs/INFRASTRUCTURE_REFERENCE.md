@@ -352,3 +352,48 @@ docker-compose -f docker-compose-monitoring-fixed.yml restart
 ---
 
 **Version**: 1.0 | **Architecture**: 3.1 (Post-Phase 4) | **Last Updated**: March 15, 2026
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `network.env` | Configuration | Node IPs, service ports |
+| `execution_plane/docker-compose.yml` | Infrastructure | Justin-PC services |
+| `control_plane/docker-compose.yml` | Infrastructure | Control Node services |
+| `r730_gateway/docker-compose.yml` | Infrastructure | R730 gateway services |
+| `config/grafana/` | Infrastructure | Prometheus rules, Grafana dashboards |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-15 | AI-Copilot | v1.0 — Full infrastructure reference (Post-Phase 4) |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when hardware changes (new memory, storage, GPUs).
+- Update when new Docker services are added or ports change.
+- Cross-reference `network.env` for IP consistency.
+
+---
+
+## Functionality Testing
+
+| Check | Command |
+|-------|--------|
+| All nodes reachable | `ping 192.168.2.101 && ping 192.168.2.102 && ping 192.168.2.103` |
+| Docker services | `docker ps --format 'table {{.Names}}\t{{.Status}}'` on each node |
+| Prometheus targets | Grafana → Explore → `up` query |

@@ -88,3 +88,50 @@ Pass threshold: score ≥ 0.60
 **Version**: 3.1.0
 **Status**: Production
 **Date**: 2026-03-12
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/main.py` | Implementation | FastAPI runtime, MarsRL endpoint |
+| `agents/mars_loop.py` | Implementation | Solver → Verifier → Corrector pipeline |
+| `agents/config.py` | Configuration | Model routing, node IPs |
+| `agents/governance.py` | Implementation | MAESTRO compliance layer |
+| `control_plane/docker-compose.yml` | Infrastructure | Control Plane services |
+| `execution_plane/docker-compose.yml` | Infrastructure | Execution Plane services |
+| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway services |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-12 | AI-Copilot | v3.1 — Qwen 3.5 9B standardization, Dell R730 topology |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+- Update when the node topology changes (new nodes, IP changes).
+- Update when the model lineup changes (new default model).
+- Update architectural diagrams when new planes or services are added.
+
+---
+
+## Functionality Testing
+
+| Claim | How to Verify |
+|-------|---------------|
+| MarsRL loop operational | POST to `/chat` with a complex prompt → verify Solver → Verifier → Corrector in Langfuse traces |
+| 3-node connectivity | Ping all 3 node IPs from any node → verify reachability |
+| All services running | `docker ps` on each node → verify expected containers |

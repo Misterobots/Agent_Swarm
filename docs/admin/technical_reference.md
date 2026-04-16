@@ -282,4 +282,74 @@ Key `.env` files:
 
 ---
 
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `network.env` | Configuration | All IP addresses and node roles |
+| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
+| `execution_plane/docker-compose.yml` | Infrastructure | Execution Node services |
+| `control_plane/docker-compose.yml` | Infrastructure | Control Node services |
+| `config/prometheus/prometheus.yml` | Configuration | Scrape targets and intervals |
+| `config/grafana/provisioning/dashboards/` | Configuration | Dashboard JSON definitions |
+| `agents/main.py` | Implementation | API endpoint definitions |
+| `agents/metrics.py` | Implementation | Custom Prometheus metrics |
+
+</details>
+
+---
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
+| 2026-03-23 | AI-Copilot | Updated to v3.3 with training pipeline and PostgreSQL schema |
+| 2026-02-20 | AI-Copilot | Initial technical reference created |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### When IPs or Ports Change
+
+1. Update `network.env` with new IP addresses.
+2. Update the Network Topology table in Section 1.
+3. Update `docker-compose.yml` files if port mappings change.
+4. Update Prometheus scrape targets in `config/prometheus/prometheus.yml`.
+
+### When Services Are Added
+
+1. Add the service to the appropriate node's Service Inventory table.
+2. Add its port to the UI URLs table if it has a web interface.
+3. Add a Prometheus scrape target if it exposes metrics.
+4. Add Loki log labels if it produces structured logs.
+
+### Keeping Environment Variables Current
+
+- After adding new env vars, add them to the Environment Variables table in Section 10.
+- Never commit `.env` files — document the variable names and purposes only.
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **Network connectivity**: Ping each node IP from the Gateway Node.
+2. **Service health**: `curl` each API endpoint listed in Section 3 → verify 200 responses.
+3. **Prometheus targets**: Check `http://<gateway-node-ip>:9091/targets` → all should show UP.
+4. **Grafana dashboards**: Open each dashboard listed in Section 6 → verify data is flowing.
+5. **PostgreSQL schema**: Connect to the swarm database → verify all tables listed in Section 7 exist.
+
+---
+
 *See also: [Design Framework](design_framework.md) · [Security](security.md) · [Back to Index](../INDEX.md)*

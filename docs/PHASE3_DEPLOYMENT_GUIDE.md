@@ -157,3 +157,33 @@ docker-compose ps"
 ```
 
 (Remember to copy new compose file first!)
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `execution_plane/docker-compose.yml` | Infrastructure | Post-Phase 3 Justin-PC compose |
+| `migration_backup_20260314_163149/` | Backup | Pre-migration compose backup |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-03-14 | AI-Copilot | Phase 3 deployment guide — Traefik + monitoring offloaded |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **completed deployment guide**. Migration has been executed. Retain as reference for understanding the service topology change.

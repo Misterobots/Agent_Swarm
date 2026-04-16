@@ -56,3 +56,33 @@ The infrastructure has been tested and verified operational:
 - Langfuse UI: http://192.168.2.102:3000 ✅
 - MinIO Console: http://192.168.2.102:9191 ✅
 - All health checks passing ✅
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | MAESTRO L6 drift scanning engine |
+| `control_plane/docker-compose.yml` | Infrastructure | Langfuse services verified in this analysis |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-09 | AI-Copilot | Post-Langfuse drift analysis — security improvements verified |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. Do not modify the original analysis.

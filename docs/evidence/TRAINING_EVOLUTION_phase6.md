@@ -56,3 +56,34 @@ During the training pipeline validation, several massive upgrades were made to t
 
 ## Final Status
 Phase 6 is completely validated. The Hive UI can observe training metrics precisely, the pipeline safely fits within the GPU limits without OOMs, and all generated knowledge traces are seamlessly extracted.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/training/grpo_trainer.py` | Implementation | GRPO training pipeline |
+| `config/grafana/dashboards/` | Infrastructure | Training metric dashboards (PostgreSQL, cAdvisor) |
+| `r730_gateway/docker-compose.yml` | Infrastructure | cAdvisor GPU telemetry service |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-03-21 | AI-Copilot | Training evolution validation — dashboards, GPU limits, knowledge traces |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. Documents the Phase 6 training pipeline validation journey including Grafana dashboard fixes and GPU memory management.

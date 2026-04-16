@@ -26,3 +26,33 @@ The code itself is healthy.
 ## 3. Sample Evidence
 *   `agents/router.py:408`: `logger.error(f"Security... {e}")` -> **Valid**
 *   `agents/ui.py:554`: `st.error(f"Gallery Error: {e}")` -> **Valid**
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | Drift pattern scanning engine |
+| `config/source-of-truth.json` | Data | Approved pattern baseline |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-02 | AI-Copilot | Error analysis — 984 patterns are valid logger/error patterns |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. The conclusion (approve discovered patterns) should be referenced when reviewing future drift scan results.

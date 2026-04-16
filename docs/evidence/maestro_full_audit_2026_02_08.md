@@ -76,3 +76,34 @@ A comprehensive re-audit of the Home AI Lab swarm following the **SPIRE Identity
 ## 4. Verdict
 
 **Approved for Production Usage**. The implementation of SPIRE provides a robust cryptographic identity layer, mitigating the risk of unauthorized lateral movement within the swarm.
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|----------|
+| `agents/governance.py` | Implementation | MAESTRO 7-layer audit framework |
+| `execution_plane/config/spire/` | Infrastructure | SPIRE agent/server configs verified |
+| `docs/evidence/maestro_full_audit_2026_02_02.md` | Prior audit | Previous iteration (blockers now resolved) |
+
+</details>
+
+<details>
+<summary><strong>Changelog</strong> (click to expand)</summary>
+
+| Date | Author | Changes |
+|------|--------|--------|
+| 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
+| 2026-02-08 | AI-Copilot | MAESTRO audit — SPIRE enforced, approved for production |
+
+</details>
+
+---
+
+## Maintenance Notes
+
+This is a **point-in-time evidence artifact**. SPIRE identity verification confirmed production-ready.

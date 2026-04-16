@@ -32,6 +32,16 @@ from utils.gpu_queue import request_lock, get_best_host_for_model
 
 logger = setup_logger("Coordinator")
 
+# --- JWT-ACE child card derivation (graceful fallback if unavailable) ---
+try:
+    from security.token_issuer import (
+        EphemeralAgentCard, get_token_issuer, get_token_validator, derive_child_card,
+    )
+    from security.execution_context import set_current_token, get_current_token
+    _JWT_AVAILABLE = True
+except ImportError:
+    _JWT_AVAILABLE = False
+
 # --- MemPalace team memory (graceful fallback if unavailable) ---
 def _team_store(team_id: str, key: str, value: str, author: str = "coordinator"):
     try:
@@ -245,14 +255,27 @@ def _synthesize_findings(findings: str, original_task: str) -> str:
 # Worker execution
 # ---------------------------------------------------------------------------
 
-def _run_worker(session: CoordinatorSession, worker_id: str, agent: Agent, prompt: str) -> str:
+def _run_worker(
+    session: CoordinatorSession,
+    worker_id: str,
+    agent: Agent,
+    prompt: str,
+    child_token: str | None = None,
+) -> str:
     """
     Execute a single worker agent synchronously.
     Called from thread pool for parallel execution.
+
+    If a *child_token* is provided (derived from the coordinator's session card),
+    it is set as the current execution-context token for this thread.
     """
     worker = session.workers[worker_id]
     worker.state = WorkerState.RUNNING
     worker.started_at = time.time()
+
+    # Set child JWT for this worker thread
+    if child_token and _JWT_AVAILABLE:
+        set_current_token(child_token)
 
     try:
         if worker.cancel_flag.is_set():
@@ -336,6 +359,47 @@ def _get_agent_for_role(role: str, session_id: str = None) -> Agent:
         # Default: architect agent
         from architect_agent import get_architect_agent
         return get_architect_agent(session_id=session_id)
+
+
+# Role → capability mapping for child card derivation.
+_ROLE_CAPS: dict[str, list[str]] = {
+    "architect": ["file_read", "file_write", "terminal_exec", "terminal_read", "model_generate", "git_read", "git_write"],
+    "coder": ["file_read", "file_write", "terminal_exec", "terminal_read", "model_generate", "git_read"],
+    "devops": ["file_read", "file_write", "terminal_exec", "terminal_read", "api_call", "resource_access"],
+    "analyst": ["model_generate", "api_call", "file_read"],
+    "researcher": ["model_generate", "api_call", "file_read"],
+    "verifier": ["model_generate", "file_read"],
+}
+
+
+def _derive_worker_token(
+    parent_token: str | None,
+    role: str,
+    task_description: str,
+) -> str | None:
+    """Derive a child JWT-ACE token for a coordinator worker.
+
+    Returns the signed child JWT string, or None if JWT is unavailable.
+    """
+    if not _JWT_AVAILABLE or not parent_token:
+        return None
+    try:
+        validator = get_token_validator()
+        parent_card = validator.validate_token(parent_token)
+        caps = _ROLE_CAPS.get(role.lower(), ["model_generate", "file_read"])
+        child_card = derive_child_card(
+            parent_card,
+            child_template_id=f"coordinator_worker_{role.lower()}",
+            child_agent_name=f"Worker:{role}",
+            child_capabilities=caps,
+            child_security_level="L2_USER",
+            task_description=task_description,
+        )
+        issuer = get_token_issuer()
+        return issuer.issue_token(child_card)
+    except Exception as e:
+        logger.warning(f"[Coordinator] Child card derivation failed (non-fatal): {e}")
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +505,9 @@ def coordinate_task(
                     worker_id = session.register_worker(role, task_text, "research")
                     agent = _get_agent_for_role(role, session_id=session_id)
 
+                    # Derive a child JWT card for this worker
+                    child_token = _derive_worker_token(ace_token, role, task_text)
+
                     # Build worker prompt with context
                     worker_prompt = (
                         f"[Research Task {i+1}/{len(research_tasks)}]\n{task_text}"
@@ -449,7 +516,8 @@ def coordinate_task(
                         worker_prompt += f"\n\n[Available Context]:\n{extracted_context}"
 
                     future = pool.submit(
-                        _run_worker, session, worker_id, agent, worker_prompt
+                        _run_worker, session, worker_id, agent, worker_prompt,
+                        child_token=child_token,
                     )
                     futures[future] = (worker_id, role, task_text)
                     yield {
@@ -551,7 +619,10 @@ def coordinate_task(
                 ),
             }
 
-            result = _run_worker(session, worker_id, agent, impl_prompt)
+            result = _run_worker(
+                session, worker_id, agent, impl_prompt,
+                child_token=_derive_worker_token(ace_token, role, task_text),
+            )
             impl_results[worker_id] = result
 
             worker = session.workers[worker_id]
@@ -592,7 +663,10 @@ def coordinate_task(
             "verifier", "Final verification", "verification"
         )
         verifier = _get_agent_for_role("verifier")
-        verify_result = _run_worker(session, verify_worker_id, verifier, verify_prompt)
+        verify_result = _run_worker(
+            session, verify_worker_id, verifier, verify_prompt,
+            child_token=_derive_worker_token(ace_token, "verifier", "Final verification"),
+        )
 
         session.write_to_scratchpad(
             "99_verification.md", f"# Verification\n\n{verify_result}"

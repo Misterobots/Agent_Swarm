@@ -161,3 +161,35 @@ def get_capabilities_for_intent(intent: str) -> dict:
         Dict with agent_name, template_id, capabilities, security_level, expiry_hours
     """
     return INTENT_CAPABILITY_MAP.get(intent, DEFAULT_CAPABILITIES)
+
+
+def get_session_capabilities() -> dict:
+    """
+    Return a *session-level* capability profile suitable for a long-lived
+    agent card that spans multiple intents.
+
+    The capability set is the **union** of all known intent capabilities,
+    the security level is the highest defined, and the expiry is the longest.
+    Per-intent narrowing happens via active_scope in the execution context.
+    """
+    all_caps: set[str] = set()
+    max_level = "L1_PUBLIC"
+    max_expiry = 1
+    level_order = ["L1_PUBLIC", "L2_USER", "L3_ADMIN", "L4_SYSTEM"]
+
+    for profile in INTENT_CAPABILITY_MAP.values():
+        all_caps.update(profile.get("capabilities", []))
+        lvl = profile.get("security_level", "L1_PUBLIC")
+        if lvl in level_order and level_order.index(lvl) > level_order.index(max_level):
+            max_level = lvl
+        exp = profile.get("expiry_hours", 1)
+        if exp > max_expiry:
+            max_expiry = exp
+
+    return {
+        "agent_name": "SessionAgent",
+        "template_id": "session_agent",
+        "capabilities": sorted(all_caps),
+        "security_level": max_level,
+        "expiry_hours": max_expiry,
+    }
