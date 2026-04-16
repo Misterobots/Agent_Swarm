@@ -66,6 +66,8 @@ migration_backup_*/
 !docs/screenshots/*.png
 !docs/assets/screenshots/*.png
 !docs/assets/*.png
+!docs-site/docs/assets/**/*.png
+!docs-site/docs/assets/*.png
 *.index
 delivered_artifacts/
 

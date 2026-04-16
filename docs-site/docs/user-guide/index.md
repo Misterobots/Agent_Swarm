@@ -20,3 +20,54 @@ Feature-by-feature guides for everything Agent Swarm can do. Each page covers wh
 | **Training** | Model fine-tuning pipeline | [Training Interface](training-interface.md) |
 | **Governance** | Approval workflow for sensitive ops | [Governance Requests](governance-requests.md) |
 | **Settings** | Preferences and model selection | [Settings](settings.md) |
+
+---
+
+## Source References
+
+<details>
+<summary><strong>Source of Truth â€” Canonical Files</strong> (click to expand)</summary>
+
+| Source | Type | Relevance |
+|--------|------|-----------|
+| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
+| `execution_plane/docker-compose.yml` | Infrastructure | Execution Node (GPU + agent runtime) |
+| `control_plane/docker-compose.yml` | Infrastructure | Control Node (Langfuse, SPIRE, PostgreSQL) |
+| `ui/src/app/` | Implementation | Hive Mind UI workspace routing |
+| `agents/main.py` | Implementation | Agent runtime API entry point |
+| `docs/INDEX.md` | Documentation | Master documentation index |
+
+</details>
+
+---
+
+## Maintenance & Update Guide
+
+### Updating Service URLs Table
+
+When service ports or URLs change, update the "How Do I Access It?" table. Cross-reference `r730_gateway/docker-compose.yml` for current port mappings.
+
+### Updating Workspaces Table
+
+When new workspaces are added to the UI, add a row to the Workspaces table. Cross-reference `ui/src/app/` for the current workspace routes.
+
+### Version & Phase Status
+
+Update the "System Status" section after each phase milestone. Check off completed features and note known gaps.
+
+---
+
+---
+
+## Functionality Testing
+
+### Manual Verification
+
+1. **Service accessibility**: For each URL in the access table, verify it loads correctly from a browser on the home network.
+2. **Workspace navigation**: Click through each workspace in the sidebar ? verify each loads without errors.
+3. **Tailscale access**: Connect via Tailscale from an external network ? verify all services are reachable.
+4. **Privacy check**: Run `tcpdump` or Wireshark on the Gateway Node ? verify no outbound AI API calls during inference.
+
+---
+
+*For technical details, see Admin: Design Framework · [Back to Index](../index.md)*

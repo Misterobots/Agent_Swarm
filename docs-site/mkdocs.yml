@@ -137,6 +137,8 @@ nav:
     - Training Interface: user-guide/training-interface.md
     - Governance Requests: user-guide/governance-requests.md
     - Settings: user-guide/settings.md
+    - Buddy Companion: user-guide/buddy.md
+    - Plan & Think Modes: user-guide/plan-think.md
   - Architecture:
     - architecture/index.md
     - Topology: architecture/topology.md
@@ -146,6 +148,13 @@ nav:
     - Agent System: architecture/agent-system.md
     - Memory System: architecture/memory-system.md
     - Observability: architecture/observability.md
+    - Deep Dives:
+      - "JWT-ACE Cards": architecture/jwt-ace-deep-dive.md
+      - "MarsRL Verification": architecture/marsrl-deep-dive.md
+      - "MemPalace Integration": architecture/mempalace-deep-dive.md
+      - "Memory & Preferences": architecture/memory-preferences-deep-dive.md
+      - "Router Intent Flow": architecture/router-intent-deep-dive.md
+      - "Skills & Hooks": architecture/skills-hooks-deep-dive.md
     - Decisions:
       - architecture/decisions/index.md
       - "ADR-001: JWT Profiles": architecture/decisions/adr-001-jwt-profiles.md
