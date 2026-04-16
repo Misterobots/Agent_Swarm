@@ -699,7 +699,7 @@ async def write_file(path, content, agent_token):
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -712,7 +712,7 @@ async def write_file(path, content, agent_token):
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

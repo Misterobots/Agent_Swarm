@@ -325,7 +325,7 @@ Content-Type: application/json
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -337,7 +337,7 @@ Content-Type: application/json
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

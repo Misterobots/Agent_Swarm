@@ -86,7 +86,7 @@ Phase 2: Memory Integration (MemPalace on Control Node)
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -101,7 +101,7 @@ Phase 2: Memory Integration (MemPalace on Control Node)
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

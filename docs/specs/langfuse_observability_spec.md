@@ -113,7 +113,7 @@ Traces are tagged with `session_id` and `origin_agent` to enable filtering by wo
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -128,7 +128,7 @@ Traces are tagged with `session_id` and `origin_agent` to enable filtering by wo
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

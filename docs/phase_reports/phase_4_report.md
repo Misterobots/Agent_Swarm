@@ -170,7 +170,7 @@ No infrastructure changes in Phase 4 — purely Python modules and tests. No vol
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -189,7 +189,7 @@ No infrastructure changes in Phase 4 — purely Python modules and tests. No vol
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

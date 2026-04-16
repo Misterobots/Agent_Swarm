@@ -105,7 +105,7 @@ Full audit evidence: [`docs/evidence/`](evidence/)
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -116,7 +116,7 @@ Full audit evidence: [`docs/evidence/`](evidence/)
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

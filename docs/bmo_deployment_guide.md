@@ -165,7 +165,7 @@ If the script runs but doesn't play audio (only saves it):
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -176,7 +176,7 @@ If the script runs but doesn't play audio (only saves it):
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

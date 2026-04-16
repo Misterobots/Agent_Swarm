@@ -133,7 +133,7 @@ Phase 5 is **DEPLOYED AND OPERATIONAL**. All code committed, tests passing, cont
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -145,7 +145,7 @@ Phase 5 is **DEPLOYED AND OPERATIONAL**. All code committed, tests passing, cont
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

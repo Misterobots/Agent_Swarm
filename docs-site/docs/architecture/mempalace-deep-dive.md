@@ -38,7 +38,7 @@ Documents the integration of the official [MemPalace](https://github.com/mempala
 
 This table documents what was adopted from the official MemPalace library and what was customized for the Hive.
 
-<details>
+<details markdown>
 <summary><strong>View full changelog table</strong> (click to expand)</summary>
 
 | Feature | MemPalace Library (v3.3.0) | Hive Implementation | Delta |
@@ -60,7 +60,7 @@ This table documents what was adopted from the official MemPalace library and wh
 
 ## Architecture Overview
 
-<details>
+<details markdown>
 <summary><strong>Architecture Diagram</strong> (click to expand)</summary>
 
 ```
@@ -132,7 +132,7 @@ Wings are derived from agent names:
 
 The `MemPalaceClient` singleton (`agents/mempalace_client.py`) exposes this interface:
 
-<details>
+<details markdown>
 <summary><strong>Full Client API — Individual Memory</strong> (click to expand)</summary>
 
 | Method | Signature | Description |
@@ -145,7 +145,7 @@ The `MemPalaceClient` singleton (`agents/mempalace_client.py`) exposes this inte
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Full Client API — Snapshots</strong> (click to expand)</summary>
 
 | Method | Signature | Description |
@@ -155,7 +155,7 @@ The `MemPalaceClient` singleton (`agents/mempalace_client.py`) exposes this inte
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Full Client API — Team Memory (KnowledgeGraph)</strong> (click to expand)</summary>
 
 | Method | Signature | Description |
@@ -247,7 +247,7 @@ No operation raises an exception to callers.
 
 ## Migration from v1 (HTTP Client)
 
-<details>
+<details markdown>
 <summary><strong>Migration Comparison Table</strong> (click to expand)</summary>
 
 | Aspect | v1 (Old) | v2 (Current) |
@@ -367,7 +367,7 @@ print(f'Found {len(results)} result(s) - PASS')
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth</strong> (click to expand)</summary>
 
 | Component | File |

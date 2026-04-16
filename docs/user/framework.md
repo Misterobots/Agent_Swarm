@@ -169,7 +169,7 @@ The **Grafana Agent Activity dashboard** (`http://<gateway-node-ip>:3001`) shows
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -189,7 +189,7 @@ The **Grafana Agent Activity dashboard** (`http://<gateway-node-ip>:3001`) shows
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

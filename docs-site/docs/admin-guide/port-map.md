@@ -65,7 +65,7 @@ Complete port registry across all Agent Swarm nodes.
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth â€” Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |

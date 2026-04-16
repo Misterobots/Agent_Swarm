@@ -145,7 +145,7 @@ The initial extraction failed because nemotron-mini occasionally returns malform
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -160,7 +160,7 @@ The initial extraction failed because nemotron-mini occasionally returns malform
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

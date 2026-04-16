@@ -96,7 +96,7 @@ A comprehensive re-audit following the **Langfuse Observability Platform** deplo
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -107,7 +107,7 @@ A comprehensive re-audit following the **Langfuse Observability Platform** deplo
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

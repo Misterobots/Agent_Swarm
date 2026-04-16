@@ -311,7 +311,7 @@ Evidence files: see [`docs/evidence/`](../evidence/) for all point-in-time audit
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -330,7 +330,7 @@ Evidence files: see [`docs/evidence/`](../evidence/) for all point-in-time audit
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

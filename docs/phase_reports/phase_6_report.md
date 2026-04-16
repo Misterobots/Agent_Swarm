@@ -160,7 +160,7 @@ Full regression: **508 passed**, 16 failed (all pre-existing in test_mars_loop, 
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -177,7 +177,7 @@ Full regression: **508 passed**, 16 failed (all pre-existing in test_mars_loop, 
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

@@ -44,7 +44,7 @@ Baseline Commit: 982796a4547566ba9316a90671891cc7c91d9227
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -55,7 +55,7 @@ Baseline Commit: 982796a4547566ba9316a90671891cc7c91d9227
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

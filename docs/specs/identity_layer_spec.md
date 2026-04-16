@@ -116,7 +116,7 @@ JWT-ACE extends the identity layer from static API keys to per-request ephemeral
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -133,7 +133,7 @@ JWT-ACE extends the identity layer from static API keys to per-request ephemeral
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

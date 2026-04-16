@@ -26,7 +26,7 @@ The Buddy is a virtual companion that lives in the chat sidebar. It's a pixel-ar
 
 ## Changelog: Source → Hive Implementation
 
-<details>
+<details markdown>
 <summary><strong>View full changelog table</strong> (click to expand)</summary>
 
 | Feature | claude-buddy (Source) | Hive Implementation | Delta |
@@ -57,7 +57,7 @@ Click the **"Hatch a Companion"** button at the bottom of the chat sidebar. The 
 - **Name**: A randomly generated name (e.g., "Nibbles", "Pixelloop", "Glitch")
 - **Personality**: A behavioral trait (e.g., "Curious and quietly encouraging")
 
-<details>
+<details markdown>
 <summary><strong>Species Catalog</strong> (click to expand)</summary>
 
 | Species | Visual Style | Body Color | Accent Color |
@@ -105,7 +105,7 @@ The buddy automatically reacts to chat events:
 
 ## Leveling System
 
-<details>
+<details markdown>
 <summary><strong>XP Awards Table</strong> (click to expand)</summary>
 
 | Action | XP |
@@ -120,7 +120,7 @@ The buddy automatically reacts to chat events:
 
 ### Level Thresholds
 
-<details>
+<details markdown>
 <summary><strong>Full level progression table (21 levels)</strong> (click to expand)</summary>
 
 Levels follow a Fibonacci-inspired progression:
@@ -147,7 +147,7 @@ Levels follow a Fibonacci-inspired progression:
 
 Your buddy visually evolves at milestone levels:
 
-<details>
+<details markdown>
 <summary><strong>Evolution Stages Table</strong> (click to expand)</summary>
 
 | Stage | Level | Name | Visual Change |
@@ -173,7 +173,7 @@ Each species has distinct colors per stage — bodies darken and accents intensi
 
 ## Achievements
 
-<details>
+<details markdown>
 <summary><strong>Achievement List</strong> (click to expand)</summary>
 
 | Achievement | Condition |
@@ -200,7 +200,7 @@ Achievements appear as badges in the expanded buddy panel.
 
 The buddy periodically shows helpful tips in a speech bubble. Tips are contextual:
 
-<details>
+<details markdown>
 <summary><strong>Contextual Tips Examples</strong> (click to expand)</summary>
 
 | Context | Example Tips |
@@ -230,7 +230,7 @@ The system tracks daily usage streaks:
 
 ## UI Layout
 
-<details>
+<details markdown>
 <summary><strong>Collapsed View</strong> (click to expand)</summary>
 
 The buddy shows as a compact bar at the bottom of the sidebar:
@@ -244,7 +244,7 @@ The buddy shows as a compact bar at the bottom of the sidebar:
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Expanded View</strong> (click to expand)</summary>
 
 ```
@@ -392,7 +392,7 @@ curl http://localhost:8008/v1/buddy/achievements
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth</strong> (click to expand)</summary>
 
 | Component | File |

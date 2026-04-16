@@ -415,7 +415,7 @@ If Authentik is healthy but blocking, the provider configuration may need updati
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -432,7 +432,7 @@ If Authentik is healthy but blocking, the provider configuration may need updati
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

@@ -130,7 +130,7 @@ The combination of MarsRL and MAESTRO-SPIFFE lays the foundation for "Phase 3" s
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -142,7 +142,7 @@ The combination of MarsRL and MAESTRO-SPIFFE lays the foundation for "Phase 3" s
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

@@ -36,7 +36,7 @@ Both modes are independent and can be combined with any skill or style setting.
 
 This table documents what was adopted from each source and what was changed or added in our implementation.
 
-<details>
+<details markdown>
 <summary><strong>View full changelog table</strong> (click to expand)</summary>
 
 | Feature | Source Concept | Hive Implementation | Delta |
@@ -334,7 +334,7 @@ curl -X POST http://localhost:8008/v1/chat \
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth</strong> (click to expand)</summary>
 
 | Component | File |

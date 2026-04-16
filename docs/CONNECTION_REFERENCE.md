@@ -113,7 +113,7 @@ For off-site access, use your Tailscale IP addresses or MagicDNS names instead o
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -124,7 +124,7 @@ For off-site access, use your Tailscale IP addresses or MagicDNS names instead o
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

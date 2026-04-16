@@ -357,7 +357,7 @@ docker-compose -f docker-compose-monitoring-fixed.yml restart
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -370,7 +370,7 @@ docker-compose -f docker-compose-monitoring-fixed.yml restart
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

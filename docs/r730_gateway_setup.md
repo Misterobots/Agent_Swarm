@@ -74,7 +74,7 @@ Select the `Home-AI-Swarm` or `default` model from the dropdown at the top of th
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -85,7 +85,7 @@ Select the `Home-AI-Swarm` or `default` model from the dropdown at the top of th
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

@@ -85,7 +85,7 @@ Wires two components together (e.g., `esp:D2` to `led1:DIN`).
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -99,7 +99,7 @@ Wires two components together (e.g., `esp:D2` to `led1:DIN`).
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

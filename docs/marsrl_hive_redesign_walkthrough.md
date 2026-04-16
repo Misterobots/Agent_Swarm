@@ -190,7 +190,7 @@ _Version 3.1 | 2026-03-12 | Qwen 3.5 9B Loop + Dell R730 Topology_
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -202,7 +202,7 @@ _Version 3.1 | 2026-03-12 | Qwen 3.5 9B Loop + Dell R730 Topology_
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

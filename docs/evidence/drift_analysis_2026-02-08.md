@@ -37,7 +37,7 @@ The `source-of-truth.json` has been updated with the latest file counts and time
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -47,7 +47,7 @@ The `source-of-truth.json` has been updated with the latest file counts and time
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

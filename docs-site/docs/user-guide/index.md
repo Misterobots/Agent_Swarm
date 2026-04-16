@@ -25,7 +25,7 @@ Feature-by-feature guides for everything Agent Swarm can do. Each page covers wh
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth â€” Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |

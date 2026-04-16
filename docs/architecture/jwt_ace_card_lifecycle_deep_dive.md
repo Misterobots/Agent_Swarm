@@ -37,7 +37,7 @@ Documents the JWT-ACE (Agent Card Embedded JWT) lifecycle model. Version 2.0 rep
 
 ## Changelog: Source → Hive Implementation
 
-<details>
+<details markdown>
 <summary><strong>View full changelog table</strong> (click to expand)</summary>
 
 | Feature | Standard / Source | Hive Implementation | Delta |
@@ -66,7 +66,7 @@ Documents the JWT-ACE (Agent Card Embedded JWT) lifecycle model. Version 2.0 rep
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Card Lifecycle Diagram</strong> (click to expand)</summary>
 
 ```
@@ -119,7 +119,7 @@ Session Start
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>EphemeralAgentCard Dataclass</strong> (click to expand)</summary>
 
 ```python
@@ -220,7 +220,7 @@ child_card = derive_child_card(
 child_token = issuer.issue_token(child_card)
 ```
 
-<details>
+<details markdown>
 <summary><strong>Derivation Rules</strong> (click to expand)</summary>
 
 | Property | Rule |
@@ -236,7 +236,7 @@ child_token = issuer.issue_token(child_card)
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Worker Role → Capabilities</strong> (click to expand)</summary>
 
 | Role | Capabilities |
@@ -282,7 +282,7 @@ Both are stored in `threading.local()` and are safe for concurrent worker thread
 
 ## Capability Gate (Enforcement)
 
-<details>
+<details markdown>
 <summary><strong>Capability Gate Flow Diagram</strong> (click to expand)</summary>
 
 ```
@@ -321,7 +321,7 @@ Card has "terminal_exec"?
 
 ## Migration from v1 (Per-Intent)
 
-<details>
+<details markdown>
 <summary><strong>Migration Comparison: v1 vs v2</strong> (click to expand)</summary>
 
 | Aspect | v1 | v2 (Current) |
@@ -449,7 +449,7 @@ print('ALL SECURITY CHECKS PASSED')
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth</strong> (click to expand)</summary>
 
 | Component | File |

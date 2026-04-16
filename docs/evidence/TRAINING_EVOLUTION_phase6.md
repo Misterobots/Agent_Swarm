@@ -61,7 +61,7 @@ Phase 6 is completely validated. The Hive UI can observe training metrics precis
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -72,7 +72,7 @@ Phase 6 is completely validated. The Hive UI can observe training metrics precis
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

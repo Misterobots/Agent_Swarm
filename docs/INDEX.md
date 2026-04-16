@@ -164,7 +164,7 @@ These are **read-only reference** — do not update them. All current content li
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -174,7 +174,7 @@ These are **read-only reference** — do not update them. All current content li
 
 </details>
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

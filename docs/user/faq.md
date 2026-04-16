@@ -97,7 +97,7 @@ If you just deployed or restarted services, metrics take up to 15 seconds to app
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -113,7 +113,7 @@ If you just deployed or restarted services, metrics take up to 15 seconds to app
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |

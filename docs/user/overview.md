@@ -93,7 +93,7 @@ The current system is running **Version 3.4** (Phase 6 complete):
 
 ## Source References
 
-<details>
+<details markdown>
 <summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
 
 | Source | Type | Relevance |
@@ -109,7 +109,7 @@ The current system is running **Version 3.4** (Phase 6 complete):
 
 ---
 
-<details>
+<details markdown>
 <summary><strong>Changelog</strong> (click to expand)</summary>
 
 | Date | Author | Changes |
