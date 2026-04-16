@@ -25,19 +25,17 @@ Feature-by-feature guides for everything Agent Swarm can do. Each page covers wh
 
 ## Source References
 
-<details markdown>
-<summary><strong>Source of Truth â€” Canonical Files</strong> (click to expand)</summary>
+??? info "Source of Truth â€” Canonical Files"
 
-| Source | Type | Relevance |
-|--------|------|-----------|
-| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
-| `execution_plane/docker-compose.yml` | Infrastructure | Execution Node (GPU + agent runtime) |
-| `control_plane/docker-compose.yml` | Infrastructure | Control Node (Langfuse, SPIRE, PostgreSQL) |
-| `ui/src/app/` | Implementation | Hive Mind UI workspace routing |
-| `agents/main.py` | Implementation | Agent runtime API entry point |
-| `docs/INDEX.md` | Documentation | Master documentation index |
+    | Source | Type | Relevance |
+    |--------|------|-----------|
+    | `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
+    | `execution_plane/docker-compose.yml` | Infrastructure | Execution Node (GPU + agent runtime) |
+    | `control_plane/docker-compose.yml` | Infrastructure | Control Node (Langfuse, SPIRE, PostgreSQL) |
+    | `ui/src/app/` | Implementation | Hive Mind UI workspace routing |
+    | `agents/main.py` | Implementation | Agent runtime API entry point |
+    | `docs/INDEX.md` | Documentation | Master documentation index |
 
-</details>
 
 ---
 

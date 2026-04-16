@@ -39,21 +39,19 @@ Both modes are independent and can be combined with any skill or style setting.
 
 This table documents what was adopted from each source and what was changed or added in our implementation.
 
-<details markdown>
-<summary><strong>View full changelog table</strong> (click to expand)</summary>
+??? info "View full changelog table"
 
-| Feature | Source Concept | Hive Implementation | Delta |
-|---------|---------------|---------------------|-------|
-| Plan output delivery | Batch text response (AutoGPT, BabyAGI) | Real-time SSE stream with dedicated `plan` event type | Streaming delivery instead of blocking |
-| Auto-feed toggle | Not present in any source | Chain-link (🔗) toggle, off by default | Novel addition — controlled plan→execute flow |
-| Plan interception | Separate planning agent (BabyAGI) | Router-level intercept before intent classification | Integrated into existing routing pipeline |
-| Think tag format | Model-native `<thinking>` (Claude) | Custom `<think>` tags parsed by `_parse_think_tags()` | Server-side extraction, not model-native |
-| Think UI rendering | Hidden reasoning (Claude), none (o1) | Collapsible "Thought" block, streamed in real time | Always visible, user-controlled collapse |
-| Mode persistence | Session-only (o1) | Browser localStorage via Zustand persist middleware | Survives page refresh |
-| Mode independence | Mutually exclusive in most implementations | Fully independent — both can be active simultaneously | Plan + Think can combine |
-| System prompt injection | Built into model API (Claude, o1) | Injected by router as system message prefix | Works with any LLM backend (Ollama, etc.) |
+    | Feature | Source Concept | Hive Implementation | Delta |
+    |---------|---------------|---------------------|-------|
+    | Plan output delivery | Batch text response (AutoGPT, BabyAGI) | Real-time SSE stream with dedicated `plan` event type | Streaming delivery instead of blocking |
+    | Auto-feed toggle | Not present in any source | Chain-link (🔗) toggle, off by default | Novel addition — controlled plan→execute flow |
+    | Plan interception | Separate planning agent (BabyAGI) | Router-level intercept before intent classification | Integrated into existing routing pipeline |
+    | Think tag format | Model-native `<thinking>` (Claude) | Custom `<think>` tags parsed by `_parse_think_tags()` | Server-side extraction, not model-native |
+    | Think UI rendering | Hidden reasoning (Claude), none (o1) | Collapsible "Thought" block, streamed in real time | Always visible, user-controlled collapse |
+    | Mode persistence | Session-only (o1) | Browser localStorage via Zustand persist middleware | Survives page refresh |
+    | Mode independence | Mutually exclusive in most implementations | Fully independent — both can be active simultaneously | Plan + Think can combine |
+    | System prompt injection | Built into model API (Claude, o1) | Injected by router as system message prefix | Works with any LLM backend (Ollama, etc.) |
 
-</details>
 
 ---
 
@@ -337,18 +335,16 @@ curl -X POST http://localhost:8008/v1/chat \
 
 ---
 
-<details markdown>
-<summary><strong>Source of Truth</strong> (click to expand)</summary>
+??? info "Source of Truth"
 
-| Component | File |
-|-----------|------|
-| UI toggles & state | `ui/src/lib/stores/settings-store.ts` |
-| Plan toggle component | `ui/src/components/chat/ultraplan-toggle.tsx` |
-| Plan event handling | `ui/src/lib/hooks/use-chat-stream.ts` |
-| SSE event parsing | `ui/src/lib/utils/sse-parser.ts` |
-| Backend plan interception | `agents/router.py` — `chat_swarm()` UltraPlan block |
-| Backend think injection | `agents/router.py` — `chat_swarm()` UltraThink block |
-| Think tag parser | `agents/router.py` — `_parse_think_tags()` |
-| ChatRequest model | `agents/main.py` — `ChatRequest` class |
+    | Component | File |
+    |-----------|------|
+    | UI toggles & state | `ui/src/lib/stores/settings-store.ts` |
+    | Plan toggle component | `ui/src/components/chat/ultraplan-toggle.tsx` |
+    | Plan event handling | `ui/src/lib/hooks/use-chat-stream.ts` |
+    | SSE event parsing | `ui/src/lib/utils/sse-parser.ts` |
+    | Backend plan interception | `agents/router.py` — `chat_swarm()` UltraPlan block |
+    | Backend think injection | `agents/router.py` — `chat_swarm()` UltraThink block |
+    | Think tag parser | `agents/router.py` — `_parse_think_tags()` |
+    | ChatRequest model | `agents/main.py` — `ChatRequest` class |
 
-</details>

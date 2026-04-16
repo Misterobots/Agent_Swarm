@@ -84,22 +84,20 @@ Generated images are:
 
 ## Source References
 
-<details markdown>
-<summary><strong>Source of Truth — Canonical Files</strong> (click to expand)</summary>
+??? info "Source of Truth — Canonical Files"
 
-| Source | Type | Relevance |
-|--------|------|-----------|
-| `ui/src/app/art-studio/page.tsx` | Implementation | Art Studio page component and layout |
-| `ui/src/components/art-studio/GeneratePanel.tsx` | Implementation | Generation controls (Image, 3D, Action Figure) |
-| `ui/src/components/art-studio/GalleryPanel.tsx` | Implementation | Gallery grid with image/3D tabs |
-| `ui/src/stores/artStudioStore.ts` | Implementation | Client-side state (mode, settings, history) |
-| `agents/router.py` | Implementation | Intent detection routing creative requests |
-| `r730_gateway/comfyui/` | Infrastructure | ComfyUI workflows for image & 3D generation |
-| [TripoSG](https://github.com/VAST-AI-Research/TripoSG) | External | Text/image-to-3D mesh pipeline |
-| [Hunyuan3D](https://github.com/Tencent/Hunyuan3D-2) | External | High-quality textured 3D generation |
-| [ComfyUI](https://github.com/comfyanonymous/ComfyUI) | External | Diffusion model workflow engine |
+    | Source | Type | Relevance |
+    |--------|------|-----------|
+    | `ui/src/app/art-studio/page.tsx` | Implementation | Art Studio page component and layout |
+    | `ui/src/components/art-studio/GeneratePanel.tsx` | Implementation | Generation controls (Image, 3D, Action Figure) |
+    | `ui/src/components/art-studio/GalleryPanel.tsx` | Implementation | Gallery grid with image/3D tabs |
+    | `ui/src/stores/artStudioStore.ts` | Implementation | Client-side state (mode, settings, history) |
+    | `agents/router.py` | Implementation | Intent detection routing creative requests |
+    | `r730_gateway/comfyui/` | Infrastructure | ComfyUI workflows for image & 3D generation |
+    | [TripoSG](https://github.com/VAST-AI-Research/TripoSG) | External | Text/image-to-3D mesh pipeline |
+    | [Hunyuan3D](https://github.com/Tencent/Hunyuan3D-2) | External | High-quality textured 3D generation |
+    | [ComfyUI](https://github.com/comfyanonymous/ComfyUI) | External | Diffusion model workflow engine |
 
-</details>
 
 ---
 

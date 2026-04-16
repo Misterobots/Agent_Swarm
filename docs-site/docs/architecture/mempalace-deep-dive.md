@@ -38,56 +38,52 @@ Documents the integration of the official [MemPalace](https://github.com/mempala
 
 This table documents what was adopted from the official MemPalace library and what was customized for the Hive.
 
-<details markdown>
-<summary><strong>View full changelog table</strong> (click to expand)</summary>
+??? info "View full changelog table"
 
-| Feature | MemPalace Library (v3.3.0) | Hive Implementation | Delta |
-|---------|---------------------------|---------------------|-------|
-| Palace hierarchy | Wing → Hall → Room → Drawer | Wing → Hall → Drawer (skip Room) | Simplified — Room layer auto-created but not exposed |
-| Wing derivation | Manual wing names | Auto-derived from agent name (`"Code Developer"` → `"Code_Developer"`) | Automatic mapping, no manual config |
-| Hall mapping | Free-form hall names | Fixed set of 6 halls mapped from `memory_type` | Constrained to known categories |
-| ChromaBackend | Default persistent client | Configured with `MEMPALACE_DATA_DIR` env var | Environment-driven path |
-| KnowledgeGraph | SQLite-backed, full API | Wrapped as `team_store/team_get/team_search/team_clear` | Simplified team-scoped API |
-| Diary / snapshots | CLI commands | Wrapped `save_snapshot()` / `get_snapshot()` with fallback | Graceful degradation if CLI unavailable |
-| Error handling | Raises exceptions | All methods catch exceptions, return safe defaults | Never propagates errors to callers |
-| Initialization | Explicit `Palace()` constructor | Singleton `MemPalaceClient` with lazy init | One instance per process |
-| Search | `search_memories(query, n)` | `search(query, agent_name, memory_type, limit)` with wing/hall scoping | Scoped search per agent + type |
-| `extract()` | Not in base library | Custom fact extraction using LLM (optional) | Added intelligence layer |
+    | Feature | MemPalace Library (v3.3.0) | Hive Implementation | Delta |
+    |---------|---------------------------|---------------------|-------|
+    | Palace hierarchy | Wing → Hall → Room → Drawer | Wing → Hall → Drawer (skip Room) | Simplified — Room layer auto-created but not exposed |
+    | Wing derivation | Manual wing names | Auto-derived from agent name (`"Code Developer"` → `"Code_Developer"`) | Automatic mapping, no manual config |
+    | Hall mapping | Free-form hall names | Fixed set of 6 halls mapped from `memory_type` | Constrained to known categories |
+    | ChromaBackend | Default persistent client | Configured with `MEMPALACE_DATA_DIR` env var | Environment-driven path |
+    | KnowledgeGraph | SQLite-backed, full API | Wrapped as `team_store/team_get/team_search/team_clear` | Simplified team-scoped API |
+    | Diary / snapshots | CLI commands | Wrapped `save_snapshot()` / `get_snapshot()` with fallback | Graceful degradation if CLI unavailable |
+    | Error handling | Raises exceptions | All methods catch exceptions, return safe defaults | Never propagates errors to callers |
+    | Initialization | Explicit `Palace()` constructor | Singleton `MemPalaceClient` with lazy init | One instance per process |
+    | Search | `search_memories(query, n)` | `search(query, agent_name, memory_type, limit)` with wing/hall scoping | Scoped search per agent + type |
+    | `extract()` | Not in base library | Custom fact extraction using LLM (optional) | Added intelligence layer |
 
-</details>
 
 ---
 
 ## Architecture Overview
 
-<details markdown>
-<summary><strong>Architecture Diagram</strong> (click to expand)</summary>
+??? info "Architecture Diagram"
 
-```
-┌─────────────────────────────────────────────────────┐
-│                 Agent Layer                           │
-│   router.py  ·  coordinator.py  ·  main.py           │
-│       ↓              ↓                ↓              │
-│       └──────── mempalace_client.py ─────────┘       │
-│                     │                                 │
-│           ┌─────────┴──────────┐                     │
-│           │  MemPalace Library  │                     │
-│           │  (pip install)      │                     │
-│           ├─────────────────────┤                     │
-│           │ ChromaBackend       │ ← Drawer storage   │
-│           │ search_memories()   │ ← Semantic search   │
-│           │ KnowledgeGraph      │ ← Team memory       │
-│           │ Diary / CLI         │ ← Snapshots         │
-│           └─────────────────────┘                     │
-│                     │                                 │
-│           ┌─────────┴──────────┐                     │
-│           │ ChromaDB (embedded) │                     │
-│           │ SQLite (KG)         │                     │
-│           └────────────────────┘                     │
-└─────────────────────────────────────────────────────┘
-```
+    ```
+    ┌─────────────────────────────────────────────────────┐
+    │                 Agent Layer                           │
+    │   router.py  ·  coordinator.py  ·  main.py           │
+    │       ↓              ↓                ↓              │
+    │       └──────── mempalace_client.py ─────────┘       │
+    │                     │                                 │
+    │           ┌─────────┴──────────┐                     │
+    │           │  MemPalace Library  │                     │
+    │           │  (pip install)      │                     │
+    │           ├─────────────────────┤                     │
+    │           │ ChromaBackend       │ ← Drawer storage   │
+    │           │ search_memories()   │ ← Semantic search   │
+    │           │ KnowledgeGraph      │ ← Team memory       │
+    │           │ Diary / CLI         │ ← Snapshots         │
+    │           └─────────────────────┘                     │
+    │                     │                                 │
+    │           ┌─────────┴──────────┐                     │
+    │           │ ChromaDB (embedded) │                     │
+    │           │ SQLite (KG)         │                     │
+    │           └────────────────────┘                     │
+    └─────────────────────────────────────────────────────┘
+    ```
 
-</details>
 
 No separate memory server is required. MemPalace runs embedded in the agent process.
 
@@ -132,40 +128,34 @@ Wings are derived from agent names:
 
 The `MemPalaceClient` singleton (`agents/mempalace_client.py`) exposes this interface:
 
-<details markdown>
-<summary><strong>Full Client API — Individual Memory</strong> (click to expand)</summary>
+??? info "Full Client API — Individual Memory"
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `store()` | `(content, agent_name, memory_type, metadata)` | Store a memory in the appropriate wing/hall/drawer |
-| `search()` | `(query, agent_name, memory_type, limit) → list[dict]` | Semantic search across an agent's memories |
-| `delete()` | `(memory_id) → bool` | Delete a specific memory by ID |
-| `stats()` | `() → dict` | Collection statistics (count, palace name) |
-| `extract()` | `(text, agent_name) → list[dict]` | Extract structured facts from raw text |
+    | Method | Signature | Description |
+    |--------|-----------|-------------|
+    | `store()` | `(content, agent_name, memory_type, metadata)` | Store a memory in the appropriate wing/hall/drawer |
+    | `search()` | `(query, agent_name, memory_type, limit) → list[dict]` | Semantic search across an agent's memories |
+    | `delete()` | `(memory_id) → bool` | Delete a specific memory by ID |
+    | `stats()` | `() → dict` | Collection statistics (count, palace name) |
+    | `extract()` | `(text, agent_name) → list[dict]` | Extract structured facts from raw text |
 
-</details>
 
-<details markdown>
-<summary><strong>Full Client API — Snapshots</strong> (click to expand)</summary>
+??? info "Full Client API — Snapshots"
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `save_snapshot()` | `(tag) → dict` | Save current palace state (CLI-based) |
-| `get_snapshot()` | `(tag) → dict` | Retrieve a saved snapshot |
+    | Method | Signature | Description |
+    |--------|-----------|-------------|
+    | `save_snapshot()` | `(tag) → dict` | Save current palace state (CLI-based) |
+    | `get_snapshot()` | `(tag) → dict` | Retrieve a saved snapshot |
 
-</details>
 
-<details markdown>
-<summary><strong>Full Client API — Team Memory (KnowledgeGraph)</strong> (click to expand)</summary>
+??? info "Full Client API — Team Memory (KnowledgeGraph)"
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `team_store()` | `(team_id, key, value, author_agent)` | Store a team-scoped fact |
-| `team_get()` | `(team_id, key) → str or None` | Retrieve a team fact by key |
-| `team_search()` | `(team_id, query) → list[dict]` | Search team facts |
-| `team_clear()` | `(team_id)` | Clear all facts for a team |
+    | Method | Signature | Description |
+    |--------|-----------|-------------|
+    | `team_store()` | `(team_id, key, value, author_agent)` | Store a team-scoped fact |
+    | `team_get()` | `(team_id, key) → str or None` | Retrieve a team fact by key |
+    | `team_search()` | `(team_id, query) → list[dict]` | Search team facts |
+    | `team_clear()` | `(team_id)` | Clear all facts for a team |
 
-</details>
 
 ### Health
 
@@ -247,19 +237,17 @@ No operation raises an exception to callers.
 
 ## Migration from v1 (HTTP Client)
 
-<details markdown>
-<summary><strong>Migration Comparison Table</strong> (click to expand)</summary>
+??? info "Migration Comparison Table"
 
-| Aspect | v1 (Old) | v2 (Current) |
-|--------|----------||--------------|
-| Backend | pgvector HTTP service on port 9200 | Embedded ChromaDB |
-| Protocol | HTTP REST via httpx | Python library calls |
-| Persistence | PostgreSQL with pgvector | ChromaDB files + SQLite |
-| Team memory | Not supported | KnowledgeGraph (SQLite) |
-| External dependency | Separate Docker container | `pip install mempalace` |
-| Failure mode | Connection errors | Graceful ImportError fallback |
+    | Aspect | v1 (Old) | v2 (Current) |
+    |--------|----------||--------------|
+    | Backend | pgvector HTTP service on port 9200 | Embedded ChromaDB |
+    | Protocol | HTTP REST via httpx | Python library calls |
+    | Persistence | PostgreSQL with pgvector | ChromaDB files + SQLite |
+    | Team memory | Not supported | KnowledgeGraph (SQLite) |
+    | External dependency | Separate Docker container | `pip install mempalace` |
+    | Failure mode | Connection errors | Graceful ImportError fallback |
 
-</details>
 
 ### Deployment
 
@@ -367,16 +355,14 @@ print(f'Found {len(results)} result(s) - PASS')
 
 ---
 
-<details markdown>
-<summary><strong>Source of Truth</strong> (click to expand)</summary>
+??? info "Source of Truth"
 
-| Component | File |
-|-----------|------|
-| MemPalace client singleton | `agents/mempalace_client.py` |
-| Unit tests | `tests/test_mempalace_client.py` |
-| Dockerfile dependency | `execution_plane/Dockerfile` |
-| Router usage | `agents/router.py` (L672, L1635) |
-| Coordinator usage | `agents/coordinator.py` (L38, L46) |
-| API endpoints | `agents/main.py` (L999, L1060) |
+    | Component | File |
+    |-----------|------|
+    | MemPalace client singleton | `agents/mempalace_client.py` |
+    | Unit tests | `tests/test_mempalace_client.py` |
+    | Dockerfile dependency | `execution_plane/Dockerfile` |
+    | Router usage | `agents/router.py` (L672, L1635) |
+    | Coordinator usage | `agents/coordinator.py` (L38, L46) |
+    | API endpoints | `agents/main.py` (L999, L1060) |
 
-</details>

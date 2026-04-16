@@ -65,21 +65,19 @@ Complete port registry across all Agent Swarm nodes.
 
 ## Source References
 
-<details markdown>
-<summary><strong>Source of Truth â€” Canonical Files</strong> (click to expand)</summary>
+??? info "Source of Truth â€” Canonical Files"
 
-| Source | Type | Relevance |
-|--------|------|----------|
-| `network.env` | Configuration | All IP addresses and node roles |
-| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
-| `execution_plane/docker-compose.yml` | Infrastructure | Execution Node services |
-| `control_plane/docker-compose.yml` | Infrastructure | Control Node services |
-| `config/prometheus/prometheus.yml` | Configuration | Scrape targets and intervals |
-| `config/grafana/provisioning/dashboards/` | Configuration | Dashboard JSON definitions |
-| `agents/main.py` | Implementation | API endpoint definitions |
-| `agents/metrics.py` | Implementation | Custom Prometheus metrics |
+    | Source | Type | Relevance |
+    |--------|------|----------|
+    | `network.env` | Configuration | All IP addresses and node roles |
+    | `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
+    | `execution_plane/docker-compose.yml` | Infrastructure | Execution Node services |
+    | `control_plane/docker-compose.yml` | Infrastructure | Control Node services |
+    | `config/prometheus/prometheus.yml` | Configuration | Scrape targets and intervals |
+    | `config/grafana/provisioning/dashboards/` | Configuration | Dashboard JSON definitions |
+    | `agents/main.py` | Implementation | API endpoint definitions |
+    | `agents/metrics.py` | Implementation | Custom Prometheus metrics |
 
-</details>
 
 ---
 
