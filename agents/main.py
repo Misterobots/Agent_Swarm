@@ -1617,9 +1617,9 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
 
     async def _run_training():
         import asyncio
-        _active_training["status"] = "running"
-        _active_training["started_at"] = datetime.utcnow().isoformat()
         try:
+            _active_training["status"] = "running"
+            _active_training["started_at"] = datetime.utcnow().isoformat()
             if req.run_type == "export":
                 # Export traces only
                 from training.export_traces import TraceExporter
@@ -1775,6 +1775,19 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
 
     background_tasks.add_task(_run_training)
     return {"status": "started", "run_type": req.run_type, "time_budget_minutes": req.time_budget_minutes}
+
+
+@app.post("/v1/training/cancel")
+async def training_cancel():
+    """Force-cancel a stuck training run by resetting the in-memory lock."""
+    prev_status = _active_training["status"]
+    prev_run_id = _active_training["run_id"]
+    _active_training["status"] = "idle"
+    _active_training["run_id"] = None
+    _active_training["started_at"] = None
+    _active_training["task"] = None
+    logger.warning(f"[Training] Force-cancelled: was status={prev_status}, run_id={prev_run_id}")
+    return {"status": "cancelled", "previous_status": prev_status, "previous_run_id": prev_run_id}
 
 
 @app.get("/v1/training/runs/{run_id}/report")
@@ -1962,12 +1975,11 @@ async def start_conversion(req: ConvertRequest, background_tasks: BackgroundTask
     from training.convert_gguf import run_convert
     from config import TRAINING_BASE_SOLVER
 
-    _active_training["status"] = "running"
-    _active_training["run_id"] = f"convert-{req.training_run_id}"
-    _active_training["started_at"] = __import__("datetime").datetime.utcnow().isoformat()
-
     async def _run_conversion():
         try:
+            _active_training["status"] = "running"
+            _active_training["run_id"] = f"convert-{req.training_run_id}"
+            _active_training["started_at"] = __import__("datetime").datetime.utcnow().isoformat()
             report = run_convert(
                 training_run_id=req.training_run_id,
                 base_model=req.base_model or TRAINING_BASE_SOLVER,
