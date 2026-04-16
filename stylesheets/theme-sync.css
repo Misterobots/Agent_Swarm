@@ -1,0 +1,249 @@
+/*
+ * Theme Sync CSS — Maps each Hive UI theme to MkDocs Material custom properties.
+ *
+ * Applied via [data-hive-theme="<name>"] set by theme-sync.js.
+ * Overrides Material's --md-* variables for a seamless visual match.
+ */
+
+/* Smooth transition when switching themes */
+body[data-hive-theme] {
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ── Ember — Warm forge aesthetic ──────────────────────────────── */
+[data-hive-theme="ember"] {
+  --md-primary-fg-color:             #f97316;
+  --md-primary-fg-color--light:      #fb923c;
+  --md-primary-fg-color--dark:       #ea580c;
+  --md-primary-bg-color:             #fff;
+  --md-accent-fg-color:              #ef4444;
+  --md-accent-fg-color--transparent: rgba(239, 68, 68, 0.1);
+
+  --md-default-bg-color:             #110e0c;
+  --md-default-fg-color:             #f5e6db;
+  --md-default-fg-color--light:      #a8846c;
+  --md-default-fg-color--lighter:    rgba(168, 132, 108, 0.5);
+  --md-default-fg-color--lightest:   rgba(168, 132, 108, 0.2);
+
+  --md-code-bg-color:                #1f1714;
+  --md-code-fg-color:                #f5e6db;
+  --md-code-hl-color:                rgba(249, 115, 22, 0.15);
+  --md-typeset-color:                #f5e6db;
+  --md-typeset-a-color:              #f97316;
+  --md-admonition-bg-color:          #1f1714;
+  --md-footer-bg-color:              #141110;
+  --md-footer-bg-color--dark:        #110e0c;
+}
+
+/* ── Slate — Cool architectural blue ───────────────────────────── */
+[data-hive-theme="slate"] {
+  --md-primary-fg-color:             #4ba6c7;
+  --md-primary-fg-color--light:      #7ec8e3;
+  --md-primary-fg-color--dark:       #3a8aa8;
+  --md-primary-bg-color:             #fff;
+  --md-accent-fg-color:              #7a8ce0;
+  --md-accent-fg-color--transparent: rgba(122, 140, 224, 0.1);
+
+  --md-default-bg-color:             #11161d;
+  --md-default-fg-color:             #d4dce8;
+  --md-default-fg-color--light:      #6b839e;
+  --md-default-fg-color--lighter:    rgba(107, 131, 158, 0.5);
+  --md-default-fg-color--lightest:   rgba(107, 131, 158, 0.2);
+
+  --md-code-bg-color:                #1a2230;
+  --md-code-fg-color:                #d4dce8;
+  --md-code-hl-color:                rgba(75, 166, 199, 0.15);
+  --md-typeset-color:                #d4dce8;
+  --md-typeset-a-color:              #4ba6c7;
+  --md-admonition-bg-color:          #1a2230;
+  --md-footer-bg-color:              #141a22;
+  --md-footer-bg-color--dark:        #11161d;
+}
+
+/* ── Signal — Radio operator gold ──────────────────────────────── */
+[data-hive-theme="signal"] {
+  --md-primary-fg-color:             #d89a4d;
+  --md-primary-fg-color--light:      #e8b56e;
+  --md-primary-fg-color--dark:       #c0843a;
+  --md-primary-bg-color:             #fff;
+  --md-accent-fg-color:              #8ba7b3;
+  --md-accent-fg-color--transparent: rgba(139, 167, 179, 0.1);
+
+  --md-default-bg-color:             #171a1b;
+  --md-default-fg-color:             #e8dcc8;
+  --md-default-fg-color--light:      #8ba7b3;
+  --md-default-fg-color--lighter:    rgba(139, 167, 179, 0.5);
+  --md-default-fg-color--lightest:   rgba(139, 167, 179, 0.2);
+
+  --md-code-bg-color:                #222628;
+  --md-code-fg-color:                #e8dcc8;
+  --md-code-hl-color:                rgba(216, 154, 77, 0.15);
+  --md-typeset-color:                #e8dcc8;
+  --md-typeset-a-color:              #d89a4d;
+  --md-admonition-bg-color:          #222628;
+  --md-footer-bg-color:              #1a1d1f;
+  --md-footer-bg-color--dark:        #171a1b;
+}
+
+/* ── Office — Professional & clean (light) ─────────────────────── */
+[data-hive-theme="office"] {
+  --md-primary-fg-color:             #2e5090;
+  --md-primary-fg-color--light:      #1a73e8;
+  --md-primary-fg-color--dark:       #1e3a6e;
+  --md-primary-bg-color:             #fff;
+  --md-accent-fg-color:              #0d6efd;
+  --md-accent-fg-color--transparent: rgba(13, 110, 253, 0.1);
+
+  --md-default-bg-color:             #f8f9fa;
+  --md-default-fg-color:             #212529;
+  --md-default-fg-color--light:      #6c757d;
+  --md-default-fg-color--lighter:    rgba(108, 117, 125, 0.5);
+  --md-default-fg-color--lightest:   rgba(108, 117, 125, 0.2);
+
+  --md-code-bg-color:                #e9ecef;
+  --md-code-fg-color:                #212529;
+  --md-code-hl-color:                rgba(13, 110, 253, 0.1);
+  --md-typeset-color:                #212529;
+  --md-typeset-a-color:              #2e5090;
+  --md-admonition-bg-color:          #e9ecef;
+  --md-footer-bg-color:              #e9ecef;
+  --md-footer-bg-color--dark:        #ced4da;
+}
+
+/* ── Hacker — Green-on-black terminal ──────────────────────────── */
+[data-hive-theme="hacker"] {
+  --md-primary-fg-color:             #39ff14;
+  --md-primary-fg-color--light:      #00ff00;
+  --md-primary-fg-color--dark:       #1a8c1a;
+  --md-primary-bg-color:             #000;
+  --md-accent-fg-color:              #00cc44;
+  --md-accent-fg-color--transparent: rgba(0, 204, 68, 0.1);
+
+  --md-default-bg-color:             #0a0e14;
+  --md-default-fg-color:             #33ff33;
+  --md-default-fg-color--light:      #1a8c1a;
+  --md-default-fg-color--lighter:    rgba(26, 140, 26, 0.5);
+  --md-default-fg-color--lightest:   rgba(26, 140, 26, 0.2);
+
+  --md-code-bg-color:                #111820;
+  --md-code-fg-color:                #33ff33;
+  --md-code-hl-color:                rgba(57, 255, 20, 0.15);
+  --md-typeset-color:                #33ff33;
+  --md-typeset-a-color:              #39ff14;
+  --md-admonition-bg-color:          #111820;
+  --md-footer-bg-color:              #0c1018;
+  --md-footer-bg-color--dark:        #0a0e14;
+}
+[data-hive-theme="hacker"] .md-typeset,
+[data-hive-theme="hacker"] .md-nav {
+  font-family: "Courier New", "Fira Code", monospace;
+}
+
+/* ── Star Trek — LCARS starship bridge ─────────────────────────── */
+[data-hive-theme="star-trek"] {
+  --md-primary-fg-color:             #ff9900;
+  --md-primary-fg-color--light:      #ffcc66;
+  --md-primary-fg-color--dark:       #cc7a00;
+  --md-primary-bg-color:             #000;
+  --md-accent-fg-color:              #9999ff;
+  --md-accent-fg-color--transparent: rgba(153, 153, 255, 0.1);
+
+  --md-default-bg-color:             #000000;
+  --md-default-fg-color:             #ff9966;
+  --md-default-fg-color--light:      #cc6699;
+  --md-default-fg-color--lighter:    rgba(204, 102, 153, 0.5);
+  --md-default-fg-color--lightest:   rgba(204, 102, 153, 0.2);
+
+  --md-code-bg-color:                #101010;
+  --md-code-fg-color:                #ff9966;
+  --md-code-hl-color:                rgba(255, 153, 0, 0.15);
+  --md-typeset-color:                #ff9966;
+  --md-typeset-a-color:              #ff9900;
+  --md-admonition-bg-color:          #101010;
+  --md-footer-bg-color:              #000000;
+  --md-footer-bg-color--dark:        #000000;
+}
+[data-hive-theme="star-trek"] .md-typeset,
+[data-hive-theme="star-trek"] .md-nav {
+  font-family: "Arial Narrow", "Antonio", "Trebuchet MS", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Cyberpunk — Neon-soaked future ────────────────────────────── */
+[data-hive-theme="cyberpunk"] {
+  --md-primary-fg-color:             #ff10f0;
+  --md-primary-fg-color--light:      #ff44ff;
+  --md-primary-fg-color--dark:       #cc00cc;
+  --md-primary-bg-color:             #0d0221;
+  --md-accent-fg-color:              #00ffff;
+  --md-accent-fg-color--transparent: rgba(0, 255, 255, 0.1);
+
+  --md-default-bg-color:             #0d0221;
+  --md-default-fg-color:             #e0d0ff;
+  --md-default-fg-color--light:      #8b6cc7;
+  --md-default-fg-color--lighter:    rgba(139, 108, 199, 0.5);
+  --md-default-fg-color--lightest:   rgba(139, 108, 199, 0.2);
+
+  --md-code-bg-color:                #1a0540;
+  --md-code-fg-color:                #e0d0ff;
+  --md-code-hl-color:                rgba(255, 16, 240, 0.15);
+  --md-typeset-color:                #e0d0ff;
+  --md-typeset-a-color:              #ff10f0;
+  --md-admonition-bg-color:          #1a0540;
+  --md-footer-bg-color:              #120328;
+  --md-footer-bg-color--dark:        #0d0221;
+}
+[data-hive-theme="cyberpunk"] .md-typeset,
+[data-hive-theme="cyberpunk"] .md-nav {
+  font-family: "Rajdhani", "Share Tech Mono", monospace;
+}
+
+/* ── Minimal — Clean & distraction-free (light) ────────────────── */
+[data-hive-theme="minimal"] {
+  --md-primary-fg-color:             #2c2c2c;
+  --md-primary-fg-color--light:      #000000;
+  --md-primary-fg-color--dark:       #444444;
+  --md-primary-bg-color:             #fafafa;
+  --md-accent-fg-color:              #666666;
+  --md-accent-fg-color--transparent: rgba(102, 102, 102, 0.1);
+
+  --md-default-bg-color:             #fafafa;
+  --md-default-fg-color:             #1a1a1a;
+  --md-default-fg-color--light:      #888888;
+  --md-default-fg-color--lighter:    rgba(136, 136, 136, 0.5);
+  --md-default-fg-color--lightest:   rgba(136, 136, 136, 0.2);
+
+  --md-code-bg-color:                #f0f0f0;
+  --md-code-fg-color:                #1a1a1a;
+  --md-code-hl-color:                rgba(44, 44, 44, 0.1);
+  --md-typeset-color:                #1a1a1a;
+  --md-typeset-a-color:              #2c2c2c;
+  --md-admonition-bg-color:          #f0f0f0;
+  --md-footer-bg-color:              #f0f0f0;
+  --md-footer-bg-color--dark:        #e0e0e0;
+}
+[data-hive-theme="minimal"] .md-typeset,
+[data-hive-theme="minimal"] .md-nav {
+  font-family: "Georgia", serif;
+  line-height: 1.7;
+}
+
+/* ── Header bar + nav override ─────────────────────────────────── */
+body[data-hive-theme] .md-header {
+  background-color: var(--md-primary-fg-color);
+}
+body[data-hive-theme] .md-tabs {
+  background-color: var(--md-primary-fg-color);
+}
+
+/* Sidebar background matches page */
+body[data-hive-theme] .md-sidebar {
+  background-color: var(--md-default-bg-color);
+}
+
+/* Search bar */
+body[data-hive-theme] .md-search__input {
+  background-color: var(--md-code-bg-color);
+  color: var(--md-default-fg-color);
+}
