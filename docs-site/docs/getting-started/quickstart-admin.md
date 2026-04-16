@@ -19,17 +19,35 @@ Deploy the full Agent Swarm stack across three nodes from scratch.
 
 ## Network Layout
 
-```
-┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│  Control Node    │    │  Execution Node  │    │  Gateway Node    │
-│  192.168.2.102   │    │  192.168.2.101   │    │  192.168.2.103   │
-│                  │    │                  │    │                  │
-│  SPIRE Server    │    │  Ollama (GPU)    │    │  Traefik         │
-│  PostgreSQL      │    │  Agent Runtime   │    │  Prometheus      │
-│  Langfuse        │    │  ComfyUI         │    │  Grafana         │
-│  ClickHouse      │    │  Voice Engine    │    │  Loki            │
-│  MemPalace       │    │  OpenHands       │    │  Ollama (2nd)    │
-└──────────────────┘    └──────────────────┘    └──────────────────┘
+```mermaid
+graph LR
+    subgraph CTRL["Control Node<br/>192.168.2.102"]
+        C1["SPIRE Server"]
+        C2["PostgreSQL"]
+        C3["Langfuse"]
+        C4["ClickHouse"]
+        C5["MemPalace"]
+    end
+
+    subgraph EXEC["Execution Node<br/>192.168.2.101"]
+        E1["Ollama (GPU)"]
+        E2["Agent Runtime"]
+        E3["ComfyUI"]
+        E4["Voice Engine"]
+        E5["OpenHands"]
+    end
+
+    subgraph GW["Gateway Node<br/>192.168.2.103"]
+        G1["Traefik"]
+        G2["Prometheus"]
+        G3["Grafana"]
+        G4["Loki"]
+        G5["Ollama (2nd)"]
+    end
+
+    CTRL <--> EXEC
+    EXEC <--> GW
+    CTRL <--> GW
 ```
 
 ## Step 1: Clone the Repository

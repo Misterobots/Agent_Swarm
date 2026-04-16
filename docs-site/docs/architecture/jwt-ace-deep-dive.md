@@ -69,50 +69,28 @@ Documents the JWT-ACE (Agent Card Embedded JWT) lifecycle model. Version 2.0 rep
 
 ??? info "Card Lifecycle Diagram"
 
-    ```
-    Session Start
-        │
-        ▼
-    ┌─────────────────────────────────┐
-    │  _issue_session_card()          │  ← Union of ALL intent capabilities
-    │  security_level = max(all)      │
-    │  expiry = max(all)              │
-    │  set_current_token(token)       │
-    └──────────────┬──────────────────┘
-                   │
-        Intent Routing (per message)
-                   │
-                   ▼
-    ┌─────────────────────────────────┐
-    │  set_active_scope(intent_caps)  │  ← Narrow to this intent's capabilities
-    │  (same token, different scope)   │
-    └──────────────┬──────────────────┘
-                   │
-        ┌──────────┴──────────┐
-        │ Normal Route         │ Coordinator Route
-        │ (single agent)       │ (multi-worker)
-        │                      │
-        │                      ▼
-        │         ┌─────────────────────────┐
-        │         │ derive_child_card()      │
-        │         │ caps ⊆ parent caps       │
-        │         │ level ≤ parent level     │
-        │         │ parent_id = parent UUID  │
-        │         │ task_description set     │
-        │         └────────┬────────────────┘
-        │                  │
-        │              Workers (threads)
-        │              set_current_token(child_token)
-        │                  │
-        └──────────┬───────┘
-                   │
-        Session End (finally block)
-                   │
-                   ▼
-    ┌─────────────────────────────────┐
-    │  clear_active_scope()           │
-    │  clear_current_token()          │
-    └─────────────────────────────────┘
+    ```mermaid
+    graph TD
+        START(["Session Start"]) --> ISSUE
+
+        ISSUE["_issue_session_card()<br/>Union of ALL intent capabilities<br/>security_level = max(all)<br/>expiry = max(all)<br/>set_current_token(token)"]
+        ISSUE --> ROUTING(["Intent Routing<br/><i>per message</i>"])
+        ROUTING --> SCOPE
+
+        SCOPE["set_active_scope(intent_caps)<br/><i>Narrow to this intent's capabilities</i><br/>Same token, different scope"]
+        SCOPE --> NORMAL & COORD
+
+        NORMAL(["Normal Route<br/><i>single agent</i>"])
+        COORD(["Coordinator Route<br/><i>multi-worker</i>"])
+
+        COORD --> CHILD["derive_child_card()<br/>caps ⊆ parent caps<br/>level ≤ parent level<br/>parent_id = parent UUID<br/>task_description set"]
+        CHILD --> WORKERS(["Workers (threads)<br/>set_current_token(child_token)"])
+
+        NORMAL --> END_SESSION
+        WORKERS --> END_SESSION
+
+        END_SESSION(["Session End<br/><i>finally block</i>"])
+        END_SESSION --> CLEAR["clear_active_scope()<br/>clear_current_token()"]
     ```
 
 
@@ -277,21 +255,24 @@ Both are stored in `threading.local()` and are safe for concurrent worker thread
 
 ??? info "Capability Gate Flow Diagram"
 
-    ```
-    Request for "terminal_exec"
-        │
-        ▼
-    Card has "terminal_exec"?
-        ├─ No → DENY
-        ├─ Yes ─┐
-        │       ▼
-        │   Active scope set?
-        │       ├─ No (None) → ALLOW
-        │       ├─ Yes: "terminal_exec" in scope?
-        │       │       ├─ No → DENY (not in intent scope)
-        │       │       └─ Yes → ALLOW
-        │       └─ Fallback capability check (same logic)
-        └─ Fallback capability check (same logic)
+    ```mermaid
+    graph TD
+        REQ(["Request for 'terminal_exec'"])
+        REQ --> HAS{"Card has<br/>'terminal_exec'?"}
+
+        HAS -->|No| DENY1["DENY"]
+        HAS -->|Yes| SCOPED{"Active scope set?"}
+
+        SCOPED -->|"No (None)"| ALLOW1["ALLOW"]
+        SCOPED -->|Yes| INSCOPE{"'terminal_exec'<br/>in scope?"}
+
+        INSCOPE -->|No| DENY2["DENY<br/><i>not in intent scope</i>"]
+        INSCOPE -->|Yes| ALLOW2["ALLOW"]
+
+        style DENY1 fill:#8b0000,stroke:#ff0000,color:#fff
+        style DENY2 fill:#8b0000,stroke:#ff0000,color:#fff
+        style ALLOW1 fill:#006400,stroke:#00ff00,color:#fff
+        style ALLOW2 fill:#006400,stroke:#00ff00,color:#fff
     ```
 
 

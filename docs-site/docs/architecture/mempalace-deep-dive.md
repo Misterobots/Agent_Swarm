@@ -60,28 +60,34 @@ This table documents what was adopted from the official MemPalace library and wh
 
 ??? info "Architecture Diagram"
 
-    ```
-    ┌─────────────────────────────────────────────────────┐
-    │                 Agent Layer                           │
-    │   router.py  ·  coordinator.py  ·  main.py           │
-    │       ↓              ↓                ↓              │
-    │       └──────── mempalace_client.py ─────────┘       │
-    │                     │                                 │
-    │           ┌─────────┴──────────┐                     │
-    │           │  MemPalace Library  │                     │
-    │           │  (pip install)      │                     │
-    │           ├─────────────────────┤                     │
-    │           │ ChromaBackend       │ ← Drawer storage   │
-    │           │ search_memories()   │ ← Semantic search   │
-    │           │ KnowledgeGraph      │ ← Team memory       │
-    │           │ Diary / CLI         │ ← Snapshots         │
-    │           └─────────────────────┘                     │
-    │                     │                                 │
-    │           ┌─────────┴──────────┐                     │
-    │           │ ChromaDB (embedded) │                     │
-    │           │ SQLite (KG)         │                     │
-    │           └────────────────────┘                     │
-    └─────────────────────────────────────────────────────┘
+    ```mermaid
+    graph TD
+        subgraph Agent["Agent Layer"]
+            R["router.py"] --> MC["mempalace_client.py"]
+            C["coordinator.py"] --> MC
+            M["main.py"] --> MC
+        end
+
+        MC --> LIB
+
+        subgraph LIB["MemPalace Library<br/><i>pip install</i>"]
+            CB["ChromaBackend"] -.->|Drawer storage| LIB_NOTE[ ]
+            SM["search_memories()"] -.->|Semantic search| LIB_NOTE
+            KG["KnowledgeGraph"] -.->|Team memory| LIB_NOTE
+            DI["Diary / CLI"] -.->|Snapshots| LIB_NOTE
+        end
+
+        LIB --> STORE
+
+        subgraph STORE["Storage Layer"]
+            CHROMA["ChromaDB<br/><i>embedded</i>"]
+            SQLITE["SQLite<br/><i>KnowledgeGraph</i>"]
+        end
+
+        style Agent fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
+        style LIB fill:#0f3460,stroke:#16213e,color:#e0e0e0
+        style STORE fill:#162447,stroke:#16213e,color:#e0e0e0
+        style LIB_NOTE fill:none,stroke:none
     ```
 
 
