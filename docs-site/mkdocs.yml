@@ -111,6 +111,10 @@ extra:
 
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/theme-sync.css
+
+extra_javascript:
+  - javascripts/theme-sync.js
 
 nav:
   - Home: index.md
