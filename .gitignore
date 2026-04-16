@@ -63,6 +63,9 @@ migration_backup_*/
 *.mp4
 *.wav
 *.png
+!docs/screenshots/*.png
+!docs/assets/screenshots/*.png
+!docs/assets/*.png
 *.index
 delivered_artifacts/
 
