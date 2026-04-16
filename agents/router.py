@@ -855,6 +855,11 @@ def chat_swarm(
             intent = "ACTION_FIGURE"
             confidence = 0.95
             reasoning = f"Keyword override: action figure keywords detected in '{user_input[:60]}'"
+        # --- /standardize-doc command (admin-only) ---
+        if _lower.strip().startswith("/standardize-doc"):
+            intent = "DOC_STANDARDS"
+            confidence = 1.0
+            reasoning = "Slash command: /standardize-doc"
         
         yield {"type": "log", "content": f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}"}
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
@@ -1380,6 +1385,106 @@ def chat_swarm(
                  yield {"type": "log", "content": "[Art Director] Offline. Skipping review."}
                  
              AGENT_STATE.labels(agent_name="ArtDirector").set(1)
+
+        # --- ROUTE: DOC STANDARDS AGENT (admin-only /standardize-doc) ---
+        if intent == "DOC_STANDARDS":
+            yield _emit_turn_metadata(turn_id, "Doc Standards Agent", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
+
+            # Admin gate
+            if not _is_admin_session(session_id, owner_id):
+                yield {"type": "error", "content": "🔒 `/standardize-doc` requires admin privileges (L3_ADMIN)."}
+                _audit_security_event("doc_standards_access_denied", {
+                    "session_id": session_id, "owner_id": owner_id,
+                    "reason": "insufficient_security_level",
+                })
+                logger.warning(f"[Router] Non-admin tried /standardize-doc: {owner_id}")
+                return
+
+            yield {"type": "status", "content": "📄 Doc Standards Agent: Parsing command..."}
+            AGENT_STATE.labels(agent_name="DocStandards").set(2)
+
+            # Parse command: /standardize-doc <filepath> [--flag ...]
+            import shlex
+            try:
+                parts = shlex.split(user_input)
+            except ValueError:
+                parts = user_input.split()
+
+            # Strip the command prefix
+            parts = [p for p in parts if not p.lower().startswith("/standardize")]
+            filepath = parts[0] if parts else ""
+            flags = parts[1:] if len(parts) > 1 else []
+
+            if not filepath:
+                # No filepath → full DocSite alignment scan
+                yield {"type": "status", "content": "📄 Doc Standards Agent: No file specified — running full DocSite alignment..."}
+                try:
+                    from specialized.doc_standards_agent import batch_scan
+                    for event in batch_scan(
+                        model=model,
+                        auto_fix=not dry_run,
+                        full_rewrite=full_rewrite,
+                    ):
+                        etype = event.get("type", "")
+                        econtent = event.get("content", "")
+                        if etype in ("response", "message"):
+                            yield _emit_stream_mode("responding")
+                            yield {"type": "message", "content": econtent}
+                        else:
+                            yield event
+                except Exception as e:
+                    logger.error(f"[DocStandards] Batch scan failed: {e}", exc_info=True)
+                    yield {"type": "error", "content": f"Doc Standards batch scan error: {e}"}
+
+                AGENT_STATE.labels(agent_name="DocStandards").set(1)
+                WORKFLOW_STEPS.labels(status="success", agent_type="DocStandards").inc()
+                return
+
+            full_rewrite = "--full-rewrite" in flags
+            dry_run = "--dry-run" in flags
+            source_ref = ""
+            external_urls = []
+
+            # Parse --source-ref value
+            if "--source-ref" in flags:
+                idx = flags.index("--source-ref")
+                if idx + 1 < len(flags):
+                    source_ref = flags[idx + 1]
+
+            # Parse --urls values
+            if "--urls" in flags:
+                idx = flags.index("--urls")
+                for u in flags[idx + 1:]:
+                    if u.startswith("--"):
+                        break
+                    if u.startswith("http"):
+                        external_urls.append(u)
+
+            try:
+                from specialized.doc_standards_agent import standardize_document
+                for event in standardize_document(
+                    filepath,
+                    model=model,
+                    source_ref=source_ref,
+                    external_urls=external_urls or None,
+                    full_rewrite=full_rewrite,
+                    dry_run=dry_run,
+                ):
+                    etype = event.get("type", "")
+                    econtent = event.get("content", "")
+                    if etype == "response":
+                        yield _emit_stream_mode("responding")
+                        yield {"type": "message", "content": econtent}
+                    else:
+                        yield event
+            except Exception as e:
+                logger.error(f"[DocStandards] Agent failed: {e}", exc_info=True)
+                yield {"type": "error", "content": f"Doc Standards Agent error: {e}"}
+
+            AGENT_STATE.labels(agent_name="DocStandards").set(1)
+            WORKFLOW_STEPS.labels(status="success", agent_type="DocStandards").inc()
+            return
 
         # --- ROUTE: DOCUMENTATION / TECHNICAL WRITING ---
         if intent == "DOCUMENTATION":
