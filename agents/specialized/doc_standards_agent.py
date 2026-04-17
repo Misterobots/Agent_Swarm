@@ -69,6 +69,34 @@ CATEGORY_MAP = {
     "security": "SEC",
 }
 
+# Category code → human-readable domain name
+DOMAIN_MAP = {
+    "ARCH": "Architecture",
+    "MOD": "Module",
+    "PROC": "Procedures",
+    "TUT": "Tutorial",
+    "ADM": "Admin Guide",
+    "DEV": "Developer Guide",
+    "USR": "User Guide",
+    "TSH": "Troubleshooting",
+    "REF": "Reference",
+    "SVC": "Service",
+    "TOOL": "Tool",
+    "FAQ": "FAQ",
+    "SEC": "Security",
+}
+
+# Category code → default owner team
+OWNER_MAP = {
+    "ARCH": "Core Platform",
+    "SEC": "Security Team",
+    "ADM": "Platform Ops",
+    "DEV": "Developer Experience",
+    "USR": "User Experience",
+    "SVC": "Service Team",
+}
+DEFAULT_OWNER = "Core Platform"
+
 # Image patterns that need lightbox treatment
 IMAGE_PATTERN = re.compile(
     r'!\[([^\]]*)\]\(([^)]+)\)(?!\{.*loading)', re.MULTILINE
@@ -272,23 +300,41 @@ def enforce_frontmatter(
 # ---------------------------------------------------------------------------
 # Document ID Badge Injection
 # ---------------------------------------------------------------------------
-def inject_doc_id_badge(content: str, doc_id: str, source_ref: str) -> str:
-    """Add the Document ID badge line after the first H1 heading."""
+def inject_doc_id_badge(content: str, doc_id: str, source_ref: str, category: str = "MOD") -> str:
+    """Add a Document ID metadata block after the first H1, matching Mempalace deep dive format."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    badge = f'\n> **Document ID:** `{doc_id}` · **Source:** {source_ref} · **Last Updated:** {now}\n'
+    domain = DOMAIN_MAP.get(category, "Module")
+    owner = OWNER_MAP.get(category, DEFAULT_OWNER)
+    badge = (
+        f"\n```\n"
+        f"Document ID: {doc_id}\n"
+        f"Domain: {domain}\n"
+        f"Owner: {owner}\n"
+        f"Status: Active\n"
+        f"Version: 1.0\n"
+        f"Last Updated: {now}\n"
+        f"```\n"
+    )
 
     # Find first H1
     h1_match = re.search(r'^(#\s+.+)$', content, re.MULTILINE)
     if h1_match:
         insert_pos = h1_match.end()
-        # Check if badge already exists
-        next_lines = content[insert_pos:insert_pos + 200]
+        # Check if badge already exists (code-block or legacy blockquote format)
+        next_lines = content[insert_pos:insert_pos + 300]
         if "Document ID:" in next_lines:
-            # Replace existing badge
-            badge_pattern = re.compile(r'\n>.*?Document ID:.*?\n', re.DOTALL)
+            # Replace existing badge — handle both code-block and blockquote styles
+            # Code-block style: ```\n...Document ID...\n```
+            cb_pattern = re.compile(r'\n```\n(?:.*?Document ID:.*?)```\n', re.DOTALL)
             after = content[insert_pos:]
-            after = badge_pattern.sub(badge, after, count=1)
-            return content[:insert_pos] + after
+            if cb_pattern.search(after):
+                after = cb_pattern.sub(badge, after, count=1)
+                return content[:insert_pos] + after
+            # Legacy blockquote style: > **Document ID:**...
+            bq_pattern = re.compile(r'\n>.*?Document ID:.*?\n')
+            if bq_pattern.search(after):
+                after = bq_pattern.sub(badge, after, count=1)
+                return content[:insert_pos] + after
         return content[:insert_pos] + badge + content[insert_pos:]
 
     return content
@@ -493,7 +539,7 @@ def standardize_document(
         # Apply deterministic fixes on top of LLM output
         result = enforce_frontmatter(result, doc_id, source_ref=source_ref or "Internal")
         result = enforce_lightbox(result)
-        result = inject_doc_id_badge(result, doc_id, source_ref or "Internal")
+        result = inject_doc_id_badge(result, doc_id, source_ref or "Internal", category=category)
     else:
         # Incremental: keep existing content, generate and inject missing sections
         yield {"type": "status", "content": "🔧 Enhancing document incrementally..."}
@@ -504,7 +550,7 @@ def standardize_document(
         yield {"type": "log", "content": "[DocStandards] Frontmatter enforced."}
 
         # 5b. Inject Doc ID badge
-        result = inject_doc_id_badge(result, doc_id, source_ref or "Internal")
+        result = inject_doc_id_badge(result, doc_id, source_ref or "Internal", category=category)
 
         # 5c. Fix lightbox on all images
         result = enforce_lightbox(result)

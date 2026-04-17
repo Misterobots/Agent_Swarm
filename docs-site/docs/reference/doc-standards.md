@@ -4,7 +4,14 @@ title: Documentation Standards
 
 # Documentation Standards
 
-> **Document ID:** `DOC-REF-0001` · **Source:** Internal · **Last Updated:** 2026-04-16
+```
+Document ID: DOC-REF-0001
+Domain: Reference
+Owner: Core Platform
+Status: Approved
+Version: 1.0
+Last Updated: 2026-04-16
+```
 
 Every page in the Agent Swarm DocSite must follow this standard template to ensure consistency, traceability, and completeness.
 
@@ -34,11 +41,27 @@ source_ref: "URL or project name"
 
 ### 2. Document ID Badge
 
-Immediately after the H1 heading, include:
+Immediately after the H1 heading, include a metadata code block:
 
-```markdown
-> **Document ID:** `DOC-MOD-0042` · **Source:** https://example.com · **Last Updated:** 2026-04-16
+````markdown
 ```
+Document ID: DOC-MOD-0042
+Domain: Module
+Owner: Core Platform
+Status: Active
+Version: 1.0
+Last Updated: 2026-04-16
+```
+````
+
+| Field | Description |
+|-------|-------------|
+| `Document ID` | Unique `DOC-{CAT}-{NNNN}` identifier |
+| `Domain` | Category name (Architecture, Module, Security, etc.) |
+| `Owner` | Responsible team |
+| `Status` | Active, Approved, Draft, or Deprecated |
+| `Version` | Semantic version of the document |
+| `Last Updated` | ISO date of last modification |
 
 ### 3. Source Citations & References
 
