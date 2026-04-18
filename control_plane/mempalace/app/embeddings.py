@@ -79,44 +79,45 @@ JSON array:"""
 async def extract_memories(conversation_text: str) -> list[dict]:
     """Use an LLM to extract memorable facts from a conversation turn."""
     client = _get_client()
-    prompt = EXTRACTION_PROMPT.format(conversation=conversation_text[:4000])
 
-    try:
-        resp = await client.post(
-            f"{OLLAMA_HOST}/api/generate",
-            json={
-                "model": EXTRACT_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.1, "num_predict": 1024},
-            },
-            timeout=90.0,
-        )
-        resp.raise_for_status()
-        raw = resp.json().get("response", "").strip()
+    for attempt, max_chars in enumerate([4000, 2000], 1):
+        prompt = EXTRACTION_PROMPT.format(conversation=conversation_text[:max_chars])
 
-        memories = _parse_llm_json(raw)
-        if memories is None:
-            return []
+        try:
+            resp = await client.post(
+                f"{OLLAMA_HOST}/api/generate",
+                json={
+                    "model": EXTRACT_MODEL,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.1, "num_predict": 1024},
+                },
+                timeout=90.0,
+            )
+            resp.raise_for_status()
+            raw = resp.json().get("response", "").strip()
 
-        if not isinstance(memories, list):
-            logger.warning("Extraction returned non-list: %s", type(memories))
-            return []
+            memories = _parse_llm_json(raw)
+            if memories is not None and isinstance(memories, list) and len(memories) > 0:
+                # Validate structure
+                valid = []
+                for m in memories:
+                    if isinstance(m, dict) and "content" in m and "type" in m:
+                        valid.append({
+                            "content": str(m["content"])[:500],
+                            "type": m.get("type", "semantic"),
+                            "domain": m.get("domain", "general"),
+                        })
+                if valid:
+                    return valid
+                logger.warning("Attempt %d: extracted %d items but none valid", attempt, len(memories))
+            else:
+                logger.warning("Attempt %d: extraction returned empty/null", attempt)
 
-        # Validate structure
-        valid = []
-        for m in memories:
-            if isinstance(m, dict) and "content" in m and "type" in m:
-                valid.append({
-                    "content": str(m["content"])[:500],
-                    "type": m.get("type", "semantic"),
-                    "domain": m.get("domain", "general"),
-                })
-        return valid
+        except (json.JSONDecodeError, httpx.HTTPError) as exc:
+            logger.warning("Attempt %d extraction failed: %s", attempt, exc)
 
-    except (json.JSONDecodeError, httpx.HTTPError) as exc:
-        logger.warning("Memory extraction failed: %s", exc)
-        return []
+    return []
 
 
 def _parse_llm_json(raw: str):
@@ -158,10 +159,16 @@ def _parse_llm_json(raw: str):
                 end = i + 1
                 break
     if depth != 0:
-        logger.warning("Unbalanced brackets in LLM JSON output")
-        return None
+        logger.warning("Unbalanced brackets in LLM JSON output — attempting repair")
+        # Try to close the array at the last complete object '}'
+        last_brace = raw.rfind("}")
+        if last_brace > start:
+            fragment = raw[start:last_brace + 1] + "]"
+        else:
+            return None
+    else:
+        fragment = raw[start:end]
 
-    fragment = raw[start:end]
     try:
         return json.loads(fragment)
     except json.JSONDecodeError:
@@ -172,9 +179,24 @@ def _parse_llm_json(raw: str):
     cleaned = re.sub(r"(\})\s*(\{)", r"\1, \2", cleaned)  # missing commas between objects
     try:
         return json.loads(cleaned)
-    except json.JSONDecodeError as exc:
-        logger.warning("JSON repair failed: %s", exc)
-        return None
+    except json.JSONDecodeError:
+        pass
+
+    # Last resort: regex-extract individual {...} objects
+    objects = re.findall(r'\{[^{}]*\}', fragment)
+    if objects:
+        results = []
+        for obj_str in objects:
+            try:
+                results.append(json.loads(obj_str))
+            except json.JSONDecodeError:
+                continue
+        if results:
+            logger.info("Recovered %d memories via regex fallback", len(results))
+            return results
+
+    logger.warning("JSON repair failed for fragment (len=%d)", len(fragment))
+    return None
 
 
 async def close_client():

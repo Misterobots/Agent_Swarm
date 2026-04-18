@@ -737,10 +737,15 @@ def chat_swarm(
         # 1c. MemPalace Semantic Recall — inject relevant memories from vector store
         if memory_enabled:
             try:
-                from mempalace_client import mempalace as _mp
-                relevant = _mp.search(user_input, owner_id=owner_id, limit=5)
-                if relevant:
-                    # Filter by similarity score (>0.5 = meaningfully relevant)
+                import httpx as _httpx_recall
+                _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.103:8200")
+                with _httpx_recall.Client(timeout=10.0) as _mp_client:
+                    _mp_resp = _mp_client.post(
+                        f"{_mp_url}/v1/memories/search",
+                        json={"query": user_input, "owner_id": owner_id, "limit": 5},
+                    )
+                if _mp_resp.status_code == 200:
+                    relevant = _mp_resp.json()
                     strong = [m for m in relevant if (m.get("score") or 0) > 0.5]
                     if strong:
                         semantic_text = "\n".join(f"- {m['content']}" for m in strong)

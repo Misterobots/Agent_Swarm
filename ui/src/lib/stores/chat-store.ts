@@ -57,6 +57,7 @@ export const useChatStore = create<ChatState>()(
           title: "New Chat",
           messages: [],
           model,
+          memoryEnabled: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };

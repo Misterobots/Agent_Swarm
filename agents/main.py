@@ -376,6 +376,43 @@ class ChatRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# MemPalace HTTP extraction — calls the FastAPI service for durable storage
+# ---------------------------------------------------------------------------
+import httpx as _httpx
+
+_MEMPALACE_API_URL = os.getenv("MEMPALACE_API_URL", "http://192.168.2.103:8200")
+
+
+async def _mempalace_extract_http(conversation: str, owner_id: str | None = None) -> int:
+    """POST conversation text to the MemPalace /v1/extract endpoint.
+
+    Returns the number of memories extracted, or 0 on failure.
+    """
+    payload: dict = {"conversation": conversation}
+    if owner_id:
+        payload["owner_id"] = owner_id
+    try:
+        async with _httpx.AsyncClient(timeout=90.0) as client:
+            resp = await client.post(
+                f"{_MEMPALACE_API_URL}/v1/extract",
+                json=payload,
+            )
+        if resp.status_code == 200:
+            memories = resp.json()
+            return len(memories) if isinstance(memories, list) else 0
+        else:
+            logger.warning(
+                "[MemPalace] Extraction returned %s: %s",
+                resp.status_code,
+                resp.text[:200],
+            )
+            return 0
+    except Exception as exc:
+        logger.warning("[MemPalace] HTTP extraction failed: %s", exc)
+        return 0
+
+
+# ---------------------------------------------------------------------------
 # Phase 2 — Tool approval store (in-process, single asyncio event loop)
 # ---------------------------------------------------------------------------
 
@@ -995,14 +1032,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     logger.info(f"[MemPalace] Scheduling extraction ({len(response_text)} chars, owner={owner_id})")
 
                     async def _bg_extract(conv, oid):
-                        try:
-                            from mempalace_client import mempalace
-                            result = await asyncio.to_thread(
-                                mempalace.extract, conv, owner_id=oid
-                            )
-                            logger.info(f"[MemPalace] Extraction complete: {len(result)} memories stored")
-                        except Exception as exc:
-                            logger.warning(f"[MemPalace] Background extraction failed: {exc}")
+                        count = await _mempalace_extract_http(conv, owner_id=oid)
+                        logger.info(f"[MemPalace] Extraction complete: {count} memories stored")
 
                     asyncio.get_event_loop().create_task(_bg_extract(conversation[:8000], owner_id))
                 except Exception as e:
@@ -1056,12 +1087,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 logger.info(f"[MemPalace] Scheduling extraction (non-stream, {len(full_resp)} chars, owner={owner_id})")
 
                 async def _bg_extract_ns(conv, oid):
-                    try:
-                        from mempalace_client import mempalace
-                        result = await asyncio.to_thread(mempalace.extract, conv, owner_id=oid)
-                        logger.info(f"[MemPalace] Extraction complete: {len(result)} memories stored")
-                    except Exception as exc:
-                        logger.warning(f"[MemPalace] Background extraction failed: {exc}")
+                    count = await _mempalace_extract_http(conv, owner_id=oid)
+                    logger.info(f"[MemPalace] Extraction complete: {count} memories stored")
 
                 asyncio.get_event_loop().create_task(_bg_extract_ns(conversation[:8000], owner_id))
             except Exception as e:

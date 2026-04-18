@@ -172,6 +172,8 @@ services:
       # SPIFFE Workload API socket path
       - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
       - PYTHONPATH=/app
+      # MemPalace API (R730 gateway)
+      - MEMPALACE_API_URL=${MEMPALACE_API_URL:-http://192.168.2.103:8200}
       # Agent session storage + Template registry
       - AGNO_DB_URL=${AGNO_DB_URL}
       - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}
