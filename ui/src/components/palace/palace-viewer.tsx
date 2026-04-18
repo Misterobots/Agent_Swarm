@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { usePalaceStore } from "@/lib/stores/palace-store";
 import { usePalaceColors } from "@/lib/palace/theme-materials";
-import { AtmosphereCanvas } from "./atmosphere-canvas";
+import { PalaceArchitecture } from "./palace-architecture";
 import { LobbyView } from "./views/lobby-view";
 import { WingView } from "./views/wing-view";
 import { RoomView } from "./views/room-view";
@@ -130,8 +130,8 @@ export function PalaceViewer() {
         }}
       />
 
-      {/* ── Layer 1: Atmospheric particles (R3F, transparent) ── */}
-      <AtmosphereCanvas />
+      {/* ── Layer 1: Architectural structure (SVG, theme-aware) ── */}
+      <PalaceArchitecture />
 
       {/* ── Layer 2: CSS 3D spatial content ───────────────────── */}
       <div
@@ -190,6 +190,10 @@ export function PalaceViewer() {
         @keyframes palaceGlowPulse {
           0%, 100% { opacity: 0.6; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.05); }
+        }
+        @keyframes palaceArchFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
       `}</style>
     </div>
