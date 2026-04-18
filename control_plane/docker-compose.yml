@@ -131,6 +131,7 @@ services:
       - "8200:8200"
     networks:
       - swarm_net
+      - ai_lab_net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
       interval: 10s
@@ -267,6 +268,9 @@ services:
 networks:
   swarm_net:
     driver: bridge
+  ai_lab_net:
+    external: true
+    name: ai_lab_net
 
 volumes:
   pg_data:
