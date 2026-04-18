@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, delete, func, update, text
 
-from .database import async_session, init_db, Memory, AgentSnapshot, TeamMemory
+from .database import async_session, init_db, Memory, AgentSnapshot, TeamMemory, MemoryAuditLog
 from .embeddings import embed_text, embed_texts, extract_memories, close_client
 
 logging.basicConfig(
@@ -73,6 +73,9 @@ class MemoryOut(BaseModel):
     created_at: str
     access_count: int
     score: Optional[float] = None
+    wing: Optional[str] = None
+    hall: Optional[str] = None
+    room: Optional[str] = None
 
 
 class SearchQuery(BaseModel):
@@ -122,11 +125,53 @@ class TeamMemoryOut(BaseModel):
     created_at: str
 
 
+# ── Palace Viewer schemas ──────────────────────────────────────────────────
+
+class RoomOut(BaseModel):
+    name: str
+    drawer_count: int
+
+
+class HallOut(BaseModel):
+    name: str
+    rooms: list[RoomOut]
+
+
+class WingOut(BaseModel):
+    name: str
+    halls: list[HallOut]
+
+
+class PalaceLayoutOut(BaseModel):
+    wings: list[WingOut]
+    total_memories: int
+
+
+class MemoryUpdate(BaseModel):
+    content: Optional[str] = None
+    memory_type: Optional[str] = None
+    domain: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class AuditLogOut(BaseModel):
+    id: str
+    memory_id: str
+    action: str
+    actor_id: str
+    actor_role: str
+    previous_content: Optional[str]
+    new_content: Optional[str]
+    changed_fields: dict
+    created_at: str
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _memory_to_out(m: Memory, score: float | None = None) -> MemoryOut:
+    meta = m.metadata_ or {}
     return MemoryOut(
         id=str(m.id),
         content=m.content,
@@ -135,10 +180,13 @@ def _memory_to_out(m: Memory, score: float | None = None) -> MemoryOut:
         agent_id=m.agent_id,
         team_id=m.team_id,
         owner_id=m.owner_id,
-        metadata=m.metadata_ or {},
+        metadata=meta,
         created_at=m.created_at.isoformat() if m.created_at else "",
         access_count=m.access_count or 0,
         score=score,
+        wing=meta.get("wing"),
+        hall=meta.get("hall"),
+        room=meta.get("room"),
     )
 
 
@@ -469,3 +517,202 @@ async def clear_team_memory(team_id: str):
         )
         await session.commit()
     return {"status": "cleared", "team_id": team_id, "deleted": result.rowcount}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Palace Viewer — Layout & Navigation
+# ═══════════════════════════════════════════════════════════════════════════
+
+_HALL_MAP = {
+    "semantic": "hall_facts",
+    "episodic": "hall_events",
+    "procedural": "hall_advice",
+    "preference": "hall_preferences",
+    "discovery": "hall_discoveries",
+}
+
+
+def _derive_wing(agent_id: str | None, team_id: str | None) -> str:
+    if team_id:
+        return f"wing_team_{team_id}"
+    if agent_id:
+        return f"wing_{agent_id}"
+    return "wing_agent_swarm"
+
+
+@app.get("/v1/palace/layout", response_model=PalaceLayoutOut)
+async def palace_layout(
+    owner_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+):
+    """Return hierarchical palace layout: wings → halls → rooms → drawer counts."""
+    async with async_session() as session:
+        stmt = select(
+            Memory.agent_id,
+            Memory.team_id,
+            Memory.memory_type,
+            Memory.domain,
+            func.count(Memory.id).label("cnt"),
+        ).group_by(Memory.agent_id, Memory.team_id, Memory.memory_type, Memory.domain)
+
+        if owner_id:
+            stmt = stmt.where(Memory.owner_id == owner_id)
+        if agent_id:
+            stmt = stmt.where(Memory.agent_id == agent_id)
+
+        rows = (await session.execute(stmt)).all()
+
+    # Build the hierarchy in-memory
+    wings_map: dict[str, dict[str, dict[str, int]]] = {}
+    total = 0
+    for (aid, tid, mtype, domain, cnt) in rows:
+        wing_name = _derive_wing(aid, tid)
+        hall_name = _HALL_MAP.get(mtype, f"hall_{mtype}")
+        room_name = domain or "general"
+        total += cnt
+
+        wings_map.setdefault(wing_name, {})
+        wings_map[wing_name].setdefault(hall_name, {})
+        wings_map[wing_name][hall_name][room_name] = (
+            wings_map[wing_name][hall_name].get(room_name, 0) + cnt
+        )
+
+    wings = []
+    for wname, halls in sorted(wings_map.items()):
+        hall_list = []
+        for hname, rooms in sorted(halls.items()):
+            room_list = [
+                RoomOut(name=rname, drawer_count=rcnt)
+                for rname, rcnt in sorted(rooms.items())
+            ]
+            hall_list.append(HallOut(name=hname, rooms=room_list))
+        wings.append(WingOut(name=wname, halls=hall_list))
+
+    return PalaceLayoutOut(wings=wings, total_memories=total)
+
+
+@app.get("/v1/palace/room", response_model=list[MemoryOut])
+async def palace_room_memories(
+    wing: str,
+    hall: str,
+    room: str,
+    owner_id: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """Fetch memories for a specific palace room (used by the 3D drawer view)."""
+    # Reverse-derive filters from palace coordinates
+    # hall → memory_type
+    reverse_hall = {v: k for k, v in _HALL_MAP.items()}
+    memory_type = reverse_hall.get(hall)
+
+    stmt = select(Memory).where(Memory.domain == room)
+    if memory_type:
+        stmt = stmt.where(Memory.memory_type == memory_type)
+    if owner_id:
+        stmt = stmt.where(Memory.owner_id == owner_id)
+
+    # Filter by wing (agent or team)
+    if wing.startswith("wing_team_"):
+        team_id = wing[len("wing_team_"):]
+        stmt = stmt.where(Memory.team_id == team_id)
+    elif wing.startswith("wing_") and wing != "wing_agent_swarm":
+        agent_id = wing[len("wing_"):]
+        stmt = stmt.where(Memory.agent_id == agent_id)
+
+    stmt = stmt.order_by(Memory.created_at.desc()).limit(limit).offset(offset)
+
+    async with async_session() as session:
+        rows = (await session.execute(stmt)).scalars().all()
+
+    return [_memory_to_out(m) for m in rows]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Memory Edit (PATCH) + Audit Trail
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.patch("/v1/memories/{memory_id}", response_model=MemoryOut)
+async def update_memory(
+    memory_id: UUID,
+    req: MemoryUpdate,
+    actor_id: str = "anonymous",
+    actor_role: str = "user",
+):
+    """Update a memory's content/fields and log the change."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Memory).where(Memory.id == memory_id)
+        )
+        mem = result.scalar_one_or_none()
+        if not mem:
+            raise HTTPException(404, "Memory not found")
+
+        # Track changes for audit
+        changed: dict = {}
+        prev_content = mem.content
+
+        if req.content is not None and req.content != mem.content:
+            changed["content"] = {"old": mem.content, "new": req.content}
+            mem.content = req.content
+            mem.embedding = await embed_text(req.content)
+
+        if req.memory_type is not None and req.memory_type != mem.memory_type:
+            changed["memory_type"] = {"old": mem.memory_type, "new": req.memory_type}
+            mem.memory_type = req.memory_type
+
+        if req.domain is not None and req.domain != mem.domain:
+            changed["domain"] = {"old": mem.domain, "new": req.domain}
+            mem.domain = req.domain
+
+        if req.metadata is not None:
+            changed["metadata"] = {"old": mem.metadata_, "new": req.metadata}
+            mem.metadata_ = req.metadata
+
+        if not changed:
+            return _memory_to_out(mem)
+
+        # Write audit log
+        audit = MemoryAuditLog(
+            memory_id=memory_id,
+            action="edited",
+            actor_id=actor_id,
+            actor_role=actor_role,
+            previous_content=prev_content,
+            new_content=mem.content,
+            changed_fields=changed,
+        )
+        session.add(audit)
+        await session.commit()
+        await session.refresh(mem)
+
+    logger.info("Memory %s edited by %s (%s): %s",
+                memory_id, actor_id, actor_role, list(changed.keys()))
+    return _memory_to_out(mem)
+
+
+@app.get("/v1/memories/{memory_id}/audit", response_model=list[AuditLogOut])
+async def get_audit_log(memory_id: UUID):
+    """Get the audit trail for a specific memory."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(MemoryAuditLog)
+            .where(MemoryAuditLog.memory_id == memory_id)
+            .order_by(MemoryAuditLog.created_at.desc())
+        )
+        logs = result.scalars().all()
+
+    return [
+        AuditLogOut(
+            id=str(log.id),
+            memory_id=str(log.memory_id),
+            action=log.action,
+            actor_id=log.actor_id,
+            actor_role=log.actor_role,
+            previous_content=log.previous_content,
+            new_content=log.new_content,
+            changed_fields=log.changed_fields or {},
+            created_at=log.created_at.isoformat() if log.created_at else "",
+        )
+        for log in logs
+    ]

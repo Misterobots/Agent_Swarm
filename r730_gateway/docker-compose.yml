@@ -356,6 +356,7 @@ services:
       - ../network.env
     environment:
       - API_BASE_URL=http://${EXECUTION_NODE_HOST:-execution-node}:8008
+      - MEMPALACE_BASE_URL=http://${CONTROL_NODE_IP:-192.168.2.102}:8200
       - LANGFUSE_URL=http://${CONTROL_NODE_IP:-192.168.2.102}:3000
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}

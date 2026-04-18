@@ -14,8 +14,10 @@
 [data-theme="ember"] {
   --chat-bg: #110e0c;
   --chat-surface: #141110;
+  --chat-surface-rgb: 20, 17, 16;
   --chat-panel: #1f1714;
   --chat-border: #2a2220;
+  --chat-border-rgb: 42, 34, 32;
   --chat-soft: #1a1512;
   --chat-text: #f5e6db;
   --chat-muted: #a8846c;
@@ -32,8 +34,10 @@
 [data-theme="slate"] {
   --chat-bg: #11161d;
   --chat-surface: #141a22;
+  --chat-surface-rgb: 20, 26, 34;
   --chat-panel: #1a2230;
   --chat-border: #243044;
+  --chat-border-rgb: 36, 48, 68;
   --chat-soft: #182030;
   --chat-text: #d4dce8;
   --chat-muted: #6b839e;
@@ -50,8 +54,10 @@
 [data-theme="signal"] {
   --chat-bg: #171a1b;
   --chat-surface: #1a1d1f;
+  --chat-surface-rgb: 26, 29, 31;
   --chat-panel: #222628;
   --chat-border: #333839;
+  --chat-border-rgb: 51, 56, 57;
   --chat-soft: #1e2224;
   --chat-text: #e8dcc8;
   --chat-muted: #8ba7b3;
@@ -68,8 +74,10 @@
 [data-theme="office"] {
   --chat-bg: #f8f9fa;
   --chat-surface: #ffffff;
+  --chat-surface-rgb: 255, 255, 255;
   --chat-panel: #e9ecef;
   --chat-border: #ced4da;
+  --chat-border-rgb: 206, 212, 218;
   --chat-soft: #f1f3f5;
   --chat-text: #212529;
   --chat-muted: #6c757d;
@@ -84,17 +92,19 @@
 
 /* ── Hacker — Green-on-black terminal ────────────────────────── */
 [data-theme="hacker"] {
-  --chat-bg: #0a0e14;
-  --chat-surface: #0c1018;
-  --chat-panel: #111820;
-  --chat-border: #1a2a1a;
-  --chat-soft: #0e1418;
-  --chat-text: #33ff33;
-  --chat-muted: #1a8c1a;
-  --chat-accent: #39ff14;
+  --chat-bg: #000000;
+  --chat-surface: #020a02;
+  --chat-surface-rgb: 2, 10, 2;
+  --chat-panel: #041204;
+  --chat-border: #0a3a0a;
+  --chat-border-rgb: 10, 58, 10;
+  --chat-soft: #010801;
+  --chat-text: #00FF41;
+  --chat-muted: #0d7a0d;
+  --chat-accent: #00FF41;
   --chat-accent-strong: #00ff00;
   --chat-accent-2: #00cc44;
-  --chat-thinking: #39ff14;
+  --chat-thinking: #00FF41;
   --chat-font: "Courier New", "Fira Code", monospace;
   --chat-radius: 0;
   --chat-input-radius: 0;
@@ -104,8 +114,10 @@
 [data-theme="star-trek"] {
   --chat-bg: #000000;
   --chat-surface: #000000;
+  --chat-surface-rgb: 0, 0, 0;
   --chat-panel: #101010;
   --chat-border: #cc6699;
+  --chat-border-rgb: 204, 102, 153;
   --chat-soft: #0a0a0a;
   --chat-text: #ff9966;
   --chat-muted: #cc6699;
@@ -122,8 +134,10 @@
 [data-theme="cyberpunk"] {
   --chat-bg: #0d0221;
   --chat-surface: #120328;
+  --chat-surface-rgb: 18, 3, 40;
   --chat-panel: #1a0540;
   --chat-border: #3d1466;
+  --chat-border-rgb: 61, 20, 102;
   --chat-soft: #150430;
   --chat-text: #e0d0ff;
   --chat-muted: #8b6cc7;
@@ -140,8 +154,10 @@
 [data-theme="minimal"] {
   --chat-bg: #fafafa;
   --chat-surface: #ffffff;
+  --chat-surface-rgb: 255, 255, 255;
   --chat-panel: #f0f0f0;
   --chat-border: #e0e0e0;
+  --chat-border-rgb: 224, 224, 224;
   --chat-soft: #f5f5f5;
   --chat-text: #1a1a1a;
   --chat-muted: #888888;
@@ -169,7 +185,7 @@
 
 /* ── Hacker: scanline overlay + CRT glow ─────────────────────── */
 [data-theme="hacker"] .chat-shell {
-  text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+  text-shadow: 0 0 6px rgba(0, 255, 65, 0.35), 0 0 2px rgba(0, 255, 0, 0.15);
   position: relative;
 }
 [data-theme="hacker"] .chat-shell::after {
@@ -181,14 +197,14 @@
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 255, 0, 0.015) 2px,
-    rgba(0, 255, 0, 0.015) 4px
+    rgba(0, 255, 65, 0.025) 2px,
+    rgba(0, 255, 65, 0.025) 4px
   );
   z-index: 50;
 }
 [data-theme="hacker"] .chat-shell input,
 [data-theme="hacker"] .chat-shell textarea {
-  caret-color: #39ff14;
+  caret-color: #00FF41;
 }
 
 /* ── Star Trek LCARS: distinctive panels ─────────────────────── */
@@ -304,7 +320,7 @@ body {
   filter: drop-shadow(0 0 4px rgba(46, 80, 144, 0.2));
 }
 [data-theme="hacker"] .sidebar-logo {
-  filter: drop-shadow(0 0 10px rgba(57, 255, 20, 0.6));
+  filter: drop-shadow(0 0 12px rgba(0, 255, 65, 0.7)) drop-shadow(0 0 4px rgba(0, 255, 0, 0.4));
   animation: hacker-logo-pulse 3s ease-in-out infinite;
 }
 [data-theme="star-trek"] .sidebar-logo {
@@ -319,13 +335,13 @@ body {
 }
 
 @keyframes hacker-logo-pulse {
-  0%, 100% { filter: drop-shadow(0 0 10px rgba(57, 255, 20, 0.6)); }
-  50% { filter: drop-shadow(0 0 16px rgba(57, 255, 20, 0.9)); }
+  0%, 100% { filter: drop-shadow(0 0 12px rgba(0, 255, 65, 0.7)) drop-shadow(0 0 4px rgba(0, 255, 0, 0.4)); }
+  50% { filter: drop-shadow(0 0 20px rgba(0, 255, 65, 1)) drop-shadow(0 0 8px rgba(0, 255, 0, 0.6)); }
 }
 
 /* Active nav accent glow — per theme */
 [data-theme="hacker"] .sidebar-active {
-  text-shadow: 0 0 4px rgba(57, 255, 20, 0.3);
+  text-shadow: 0 0 6px rgba(0, 255, 65, 0.45);
 }
 [data-theme="cyberpunk"] .sidebar-active {
   box-shadow: inset 0 0 12px rgba(255, 16, 240, 0.1), 0 0 6px rgba(255, 16, 240, 0.1);
@@ -355,8 +371,8 @@ body {
     0deg,
     transparent,
     transparent 3px,
-    rgba(0, 255, 0, 0.012) 3px,
-    rgba(0, 255, 0, 0.012) 6px
+    rgba(0, 255, 65, 0.018) 3px,
+    rgba(0, 255, 65, 0.018) 6px
   );
   z-index: 1;
 }

@@ -50,6 +50,17 @@ All UIs are accessible via the Gateway Node Traefik gateway (`http://<gateway-no
 | VS Code (Coding) | `http://<gateway-node-ip>:8444` | Gateway Node | Coding sandbox IDE |
 | MinIO Console | `http://<control-node-ip>:9001` | Control Node | Object storage browser |
 
+### Hive UI Split Backend Routing
+
+The Next.js Hive UI uses a shared proxy route at `/api/backend/*`, but it does **not** send every request to the same upstream.
+
+| Env Var | Upstream | Used For |
+|---------|----------|----------|
+| `API_BASE_URL` | `http://<execution-node-ip>:8008` | Agent Runtime APIs such as identity, chat, training, ops, and GitHub OAuth |
+| `MEMPALACE_BASE_URL` | `http://<control-node-ip>:8200` | Palace Viewer and memory APIs such as `/v1/palace/*` and `/v1/memories/*` |
+
+For R730 gateway deployment, `r730_gateway/docker-compose.yml` must set **both** environment variables on the `hive-ui` service. Without `MEMPALACE_BASE_URL`, the Palace Viewer loads the shell but cannot reach Palace layout or memory CRUD endpoints through the normal UI proxy.
+
 ---
 
 ## 3. API Endpoints
@@ -127,6 +138,7 @@ Raw Ollama (Execution Node):
 | OpenHands | 3002 | Code execution sandbox | `r730_gateway/docker-compose.yml` |
 | VS Code (DevOps) | 8445 | Infrastructure IDE | `r730_gateway/docker-compose.yml` |
 | VS Code (Coding) | 8444 | Coding sandbox IDE | `r730_gateway/docker-compose.yml` |
+| Hive UI (Next.js) | 3200 -> 3000 | Unified web UI with split proxy to Agent Runtime + MemPalace | `r730_gateway/docker-compose.yml` |
 | SPIRE Agent (Gateway) | — (Unix socket) | Workload identity agent (pending enrollment) | `r730_gateway/docker-compose.yml` |
 
 ### Compute Node — Execution Node (<execution-node-ip>)

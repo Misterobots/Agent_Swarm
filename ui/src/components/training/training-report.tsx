@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchTrainingReport, type TrainingReport } from "@/lib/api/training";
+import { useEffect, useState, useRef } from "react";
+import { fetchTrainingReport, fetchLiveTrainingMetrics, type TrainingReport } from "@/lib/api/training";
+import type { LiveTrainingMetrics } from "@/types/training";
 import {
   Clock,
   Database,
@@ -14,20 +15,57 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Section, Stat, formatDuration, formatNumber } from "./report-helpers";
+import { PipelineProgress } from "./pipeline-progress";
+
+function formatEta(seconds: number | null | undefined): string {
+  if (seconds == null || seconds <= 0) return "—";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  if (m < 60) return `${m}m ${s}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
 
 export function TrainingReportView({ runId }: { runId: number }) {
   const [report, setReport] = useState<TrainingReport | null>(null);
+  const [live, setLive] = useState<LiveTrainingMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Initial report fetch
   useEffect(() => {
     fetchTrainingReport(runId).then((r) => {
       setReport(r);
       setLoading(false);
     });
   }, [runId]);
+
+  // Live polling for running runs
+  useEffect(() => {
+    if (!report || (report.status !== "running" && report.status !== "pending")) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      return;
+    }
+
+    const poll = () => {
+      fetchLiveTrainingMetrics(runId).then(setLive);
+      // Also refresh the report to get updated DB state
+      fetchTrainingReport(runId).then((r) => {
+        if (r) setReport(r);
+      });
+    };
+
+    poll(); // Immediate first poll
+    intervalRef.current = setInterval(poll, 5000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [runId, report?.status]);
 
   if (loading) {
     return (
@@ -56,6 +94,9 @@ export function TrainingReportView({ runId }: { runId: number }) {
   const isCompleted = report.status === "completed";
   const isFailed = report.status === "failed";
 
+  const isRunning = !isCompleted && !isFailed;
+  const liveData = report.live ?? live;
+
   return (
     <div className="space-y-5">
       {/* Status Banner */}
@@ -64,7 +105,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
           "flex items-center gap-2 px-3 py-2 rounded-lg text-sm",
           isCompleted && "bg-emerald-500/5 border border-emerald-500/20",
           isFailed && "bg-red-500/5 border border-red-500/20",
-          !isCompleted && !isFailed && "bg-amber-500/5 border border-amber-500/20"
+          isRunning && "bg-amber-500/5 border border-amber-500/20"
         )}
       >
         {isCompleted ? (
@@ -79,13 +120,15 @@ export function TrainingReportView({ runId }: { runId: number }) {
             "font-medium",
             isCompleted && "text-emerald-300",
             isFailed && "text-red-300",
-            !isCompleted && !isFailed && "text-amber-300"
+            isRunning && "text-amber-300"
           )}
         >
           {isCompleted
             ? "Training Completed Successfully"
             : isFailed
             ? "Training Failed"
+            : (liveData?.phase ?? report.phase)
+            ? `In Progress: ${(liveData?.phase ?? report.phase ?? "").replace(/_/g, " ")}`
             : "Training In Progress"}
         </span>
         <span className="text-[var(--chat-muted)] ml-auto text-xs">
@@ -106,6 +149,80 @@ export function TrainingReportView({ runId }: { runId: number }) {
         </div>
       )}
 
+      {/* Pipeline Progress */}
+      <PipelineProgress
+        runType={report.run_type}
+        currentPhase={liveData?.phase ?? report.phase}
+        status={report.status}
+        phaseTimings={report.timing.phase_timings}
+      />
+
+      {/* Live Training Metrics (shown only for running runs) */}
+      {isRunning && liveData && (
+        <Section
+          icon={<Activity size={14} className="text-amber-400 animate-pulse" />}
+          title="Live Training"
+        >
+          {/* Step progress bar */}
+          {liveData.total_steps != null && liveData.total_steps > 0 && (
+            <div className="mb-3">
+              <div className="flex justify-between text-xs text-[var(--chat-muted)] mb-1">
+                <span>Step {liveData.current_step ?? 0} / {liveData.total_steps}</span>
+                <span>
+                  {liveData.current_epoch != null && liveData.total_epochs
+                    ? `Epoch ${liveData.current_epoch.toFixed(2)} / ${liveData.total_epochs}`
+                    : liveData.current_epoch != null
+                    ? `Epoch ${liveData.current_epoch.toFixed(2)}`
+                    : ""}
+                </span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden bg-[var(--chat-surface)]">
+                <div
+                  className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, ((liveData.current_step ?? 0) / liveData.total_steps) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Stat
+              label="Loss"
+              value={liveData.loss != null ? liveData.loss.toFixed(4) : "—"}
+            />
+            <Stat
+              label="Reward (mean)"
+              value={liveData.reward_mean != null ? liveData.reward_mean.toFixed(4) : "—"}
+              detail={liveData.reward_std != null ? `σ ${liveData.reward_std.toFixed(4)}` : undefined}
+            />
+            <Stat
+              label="Step Time"
+              value={liveData.step_time_sec != null ? `${liveData.step_time_sec.toFixed(1)}s` : "—"}
+            />
+            <Stat
+              label="ETA"
+              value={formatEta(liveData.eta_sec)}
+              detail={
+                liveData.budget_remaining_sec != null
+                  ? `Budget: ${formatEta(liveData.budget_remaining_sec)} remaining`
+                  : liveData.elapsed_sec != null
+                  ? `Elapsed: ${formatEta(liveData.elapsed_sec)}`
+                  : undefined
+              }
+            />
+          </div>
+          {liveData.entropy != null && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+              <Stat label="Entropy" value={liveData.entropy.toFixed(4)} />
+              {liveData.learning_rate != null && (
+                <Stat label="Learning Rate" value={liveData.learning_rate.toExponential(2)} />
+              )}
+            </div>
+          )}
+        </Section>
+      )}
+
       {/* Timing */}
       <Section
         icon={<Clock size={14} className="text-[var(--chat-accent)]" />}
@@ -114,20 +231,20 @@ export function TrainingReportView({ runId }: { runId: number }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Stat
             label="Total Wall Clock"
-            value={t.total_wall_clock_sec ? formatDuration(t.total_wall_clock_sec) : "â€”"}
+            value={t.total_wall_clock_sec ? formatDuration(t.total_wall_clock_sec) : "—"}
           />
           <Stat
             label="Active Training"
-            value={t.active_training_sec ? formatDuration(t.active_training_sec) : "â€”"}
+            value={t.active_training_sec ? formatDuration(t.active_training_sec) : "—"}
           />
           <Stat
             label="Overhead"
-            value={t.overhead_sec ? formatDuration(t.overhead_sec) : "â€”"}
+            value={t.overhead_sec ? formatDuration(t.overhead_sec) : "—"}
             detail={t.overhead_note}
           />
           <Stat
             label="Started"
-            value={t.started_at ? new Date(t.started_at).toLocaleString() : "â€”"}
+            value={t.started_at ? new Date(t.started_at).toLocaleString() : "—"}
           />
         </div>
         {t.overhead_sec != null && t.total_wall_clock_sec != null && t.total_wall_clock_sec > 0 && (
@@ -154,6 +271,43 @@ export function TrainingReportView({ runId }: { runId: number }) {
             </div>
           </div>
         )}
+        {t.phase_timings && (() => {
+          const phases = Object.entries(t.phase_timings!).filter(([, v]) => v > 0);
+          const total = phases.reduce((s, [, v]) => s + v, 0);
+          if (!phases.length || total <= 0) return null;
+          const colors: Record<string, string> = {
+            synthetic_gen_sec: "bg-violet-500",
+            security_scan_sec: "bg-red-400",
+            dataset_download_sec: "bg-blue-400",
+            model_loading_sec: "bg-amber-400",
+            training_sec: "bg-cyan-500",
+            saving_adapter_sec: "bg-emerald-400",
+            exporting_traces_sec: "bg-pink-400",
+          };
+          return (
+            <div className="mt-3">
+              <div className="text-[10px] text-[var(--chat-muted)] mb-1">Phase Breakdown</div>
+              <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-[var(--chat-surface)]">
+                {phases.map(([k, v], i) => (
+                  <div
+                    key={k}
+                    className={`${colors[k] ?? "bg-gray-400"} ${i === 0 ? "rounded-l-full" : ""} ${i === phases.length - 1 ? "rounded-r-full" : ""}`}
+                    style={{ width: `${(v / total) * 100}%` }}
+                    title={`${k.replace(/_sec$/, "").replace(/_/g, " ")}: ${formatDuration(v)}`}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3 mt-1 text-[10px] text-[var(--chat-muted)]">
+                {phases.map(([k, v]) => (
+                  <span key={k} className="flex items-center gap-1">
+                    <span className={`inline-block w-2 h-2 rounded-full ${colors[k] ?? "bg-gray-400"}`} />
+                    {k.replace(/_sec$/, "").replace(/_/g, " ")} ({formatDuration(v)})
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </Section>
 
       {/* Dataset */}
@@ -162,11 +316,11 @@ export function TrainingReportView({ runId }: { runId: number }) {
         title="Dataset"
       >
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Stat label="Total Samples" value={d.total_samples?.toLocaleString() ?? "â€”"} />
-          <Stat label="Training Examples" value={d.training_examples?.toLocaleString() ?? "â€”"} />
+          <Stat label="Total Samples" value={d.total_samples?.toLocaleString() ?? "—"} />
+          <Stat label="Training Examples" value={d.training_examples?.toLocaleString() ?? "—"} />
           <Stat
             label="Source"
-            value={d.path ? d.path.split("/").pop() ?? "â€”" : "â€”"}
+            value={d.path ? d.path.split("/").pop() ?? "—" : "—"}
           />
         </div>
       </Section>
@@ -177,15 +331,15 @@ export function TrainingReportView({ runId }: { runId: number }) {
         title="Model"
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Stat label="Base Model" value={m.base_model ?? "â€”"} className="col-span-2" />
+          <Stat label="Base Model" value={m.base_model ?? "—"} className="col-span-2" />
           <Stat
             label="Trainable Parameters"
-            value={m.trainable_params ? formatNumber(m.trainable_params) : "â€”"}
+            value={m.trainable_params ? formatNumber(m.trainable_params) : "—"}
             detail={m.trainable_pct ? `${m.trainable_pct}% of ${formatNumber(m.total_params ?? 0)} total` : undefined}
           />
           <Stat
             label="Total Parameters"
-            value={m.total_params ? formatNumber(m.total_params) : "â€”"}
+            value={m.total_params ? formatNumber(m.total_params) : "—"}
           />
         </div>
       </Section>
@@ -209,27 +363,30 @@ export function TrainingReportView({ runId }: { runId: number }) {
       </Section>
 
       {/* Results */}
-      {isCompleted && (
+      {(isCompleted || (isRunning && liveData)) && (
         <Section
           icon={<TrendingDown size={14} className="text-[var(--chat-accent)]" />}
-          title="Results"
+          title={isRunning ? "Current Results" : "Results"}
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Stat
               label="Final Loss"
-              value={r.final_loss != null ? r.final_loss.toFixed(4) : "â€”"}
+              value={
+                (isRunning && liveData?.loss != null) ? liveData.loss.toFixed(4)
+                : r.final_loss != null ? r.final_loss.toFixed(4) : "—"
+              }
             />
             <Stat
               label="Samples/sec"
-              value={r.train_samples_per_second ? r.train_samples_per_second.toFixed(2) : "â€”"}
+              value={r.train_samples_per_second ? r.train_samples_per_second.toFixed(2) : "—"}
             />
             <Stat
               label="Steps/sec"
-              value={r.train_steps_per_second ? r.train_steps_per_second.toFixed(2) : "â€”"}
+              value={r.train_steps_per_second ? r.train_steps_per_second.toFixed(2) : "—"}
             />
             <Stat
               label="Adapter"
-              value={r.adapter_path ? r.adapter_path.split("/").pop() ?? "â€”" : "â€”"}
+              value={r.adapter_path ? r.adapter_path.split("/").pop() ?? "—" : isRunning ? "In progress" : "—"}
               detail={r.adapter_path ?? undefined}
             />
           </div>
@@ -246,7 +403,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
             <Stat label="Version" value={dep.model_version.version_tag} />
             <Stat
               label="Ollama Model"
-              value={dep.model_version.ollama_model_name ?? "â€”"}
+              value={dep.model_version.ollama_model_name ?? "—"}
             />
             <Stat
               label="Status"
@@ -299,7 +456,7 @@ export function TrainingReportView({ runId }: { runId: number }) {
               value={`${dep.ab_test.result_count} samples`}
               detail={
                 dep.ab_test.candidate_avg_score != null
-                  ? `Candidate: ${dep.ab_test.candidate_avg_score.toFixed(3)} vs Base: ${dep.ab_test.base_avg_score?.toFixed(3) ?? "â€”"}`
+                  ? `Candidate: ${dep.ab_test.candidate_avg_score.toFixed(3)} vs Base: ${dep.ab_test.base_avg_score?.toFixed(3) ?? "—"}`
                   : undefined
               }
             />

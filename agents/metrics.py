@@ -117,6 +117,42 @@ TRAINING_STEP_TIME = Gauge(
     'training_step_time_seconds',
     'Time per training step in seconds',
 )
+TRAINING_TOTAL_STEPS = Gauge(
+    'training_total_steps',
+    'Total training steps expected (set once at train begin)',
+)
+TRAINING_PHASE = Gauge(
+    'training_phase_ordinal',
+    'Current pipeline phase as ordinal: 0=idle, 1=synthetic_generation, '
+    '2=security_scan, 3=dataset_download, 4=model_loading, 5=training, '
+    '6=saving_adapter, 7=completed, 8=failed',
+)
+TRAINING_TIME_BUDGET_SEC = Gauge(
+    'training_time_budget_seconds',
+    'Wall-clock training time budget in seconds (0 = unlimited)',
+)
+TRAINING_BUDGET_START = Gauge(
+    'training_budget_start_epoch',
+    'Unix epoch when the training time budget clock started',
+)
+TRAINING_RUN_ID = Gauge(
+    'training_run_id',
+    'Database ID of the currently active training run',
+)
+
+# Phase name <-> ordinal mapping (keep in sync with the gauge description)
+PHASE_ORDINALS: dict[str, int] = {
+    "idle": 0,
+    "synthetic_generation": 1,
+    "security_scan": 2,
+    "dataset_download": 3,
+    "model_loading": 4,
+    "training": 5,
+    "saving_adapter": 6,
+    "completed": 7,
+    "failed": 8,
+}
+PHASE_NAMES: dict[int, str] = {v: k for k, v in PHASE_ORDINALS.items()}
 
 # ---------------------------------------------------------------------------
 # IoT Sensitive Action Metrics

@@ -5,12 +5,13 @@ import {
   fetchTrainingRuns,
   fetchConvertReport,
   fetchTemplates,
+  fetchLiveTrainingMetrics,
   startConvert,
   startDeploy,
   type ConvertReport,
   type Template,
 } from "@/lib/api/training";
-import type { TrainingRun } from "@/types/training";
+import type { TrainingRun, LiveTrainingMetrics } from "@/types/training";
 import {
   History,
   RefreshCw,
@@ -26,6 +27,7 @@ export function TrainingRunHistory() {
   const [runs, setRuns] = useState<TrainingRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [liveMetrics, setLiveMetrics] = useState<Record<number, LiveTrainingMetrics>>({});
 
   const refresh = useCallback(async () => {
     const data = await fetchTrainingRuns(50);
@@ -38,6 +40,27 @@ export function TrainingRunHistory() {
     const interval = setInterval(refresh, 30000);
     return () => clearInterval(interval);
   }, [refresh]);
+
+  // Poll live metrics for running runs every 10s
+  useEffect(() => {
+    const runningIds = runs.filter((r) => r.status === "running").map((r) => r.id);
+    if (runningIds.length === 0) return;
+
+    const pollLive = async () => {
+      const results: Record<number, LiveTrainingMetrics> = {};
+      await Promise.all(
+        runningIds.map(async (id) => {
+          const m = await fetchLiveTrainingMetrics(id);
+          if (m) results[id] = m;
+        })
+      );
+      setLiveMetrics((prev) => ({ ...prev, ...results }));
+    };
+
+    pollLive();
+    const interval = setInterval(pollLive, 10000);
+    return () => clearInterval(interval);
+  }, [runs]);
 
   if (loading) {
     return (
@@ -125,7 +148,7 @@ export function TrainingRunHistory() {
                       </td>
                       <td className="p-3 text-[var(--chat-text)]">{run.run_type}</td>
                       <td className="p-3 text-[var(--chat-muted)] truncate max-w-[180px]">
-                        {run.target_model ?? "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                        {run.target_model ?? "—"}
                       </td>
                       <td className="p-3">
                         <span
@@ -141,11 +164,13 @@ export function TrainingRunHistory() {
                               "bg-[var(--chat-muted)]/10 text-[var(--chat-muted)]"
                           )}
                         >
-                          {run.status}
+                          {run.status === "running" && liveMetrics[run.id]?.phase
+                            ? liveMetrics[run.id]?.phase?.replace(/_/g, " ")
+                            : run.status}
                         </span>
                       </td>
                       <td className="p-3 text-right text-[var(--chat-muted)]">
-                        {run.dataset_size ?? "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                        {run.dataset_size ?? "—"}
                       </td>
                       <td className="p-3 text-right text-[var(--chat-muted)] text-xs">
                         {new Date(run.started_at).toLocaleString()}
@@ -153,9 +178,30 @@ export function TrainingRunHistory() {
                       <td className="p-3 text-right text-[var(--chat-muted)] text-xs">
                         {duration != null
                           ? `${formatDuration(duration)}${run.status === "running" ? " (live)" : ""}`
-                          : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                          : "—"}
                       </td>
                     </tr>
+                    {run.status === "running" && !expanded && liveMetrics[run.id] && (() => {
+                      const live = liveMetrics[run.id];
+                      const pct = live.total_steps ? Math.round((live.current_step / live.total_steps) * 100) : 0;
+                      return (
+                        <tr className="bg-amber-500/5 border-b border-[var(--chat-border)]">
+                          <td colSpan={8} className="px-6 py-1.5">
+                            <div className="flex items-center gap-4 text-xs text-[var(--chat-muted)]">
+                              <span>Step {live.current_step}/{live.total_steps}</span>
+                              <div className="flex-1 max-w-[200px] h-1.5 bg-[var(--chat-border)] rounded-full overflow-hidden">
+                                <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span>{pct}%</span>
+                              {live.loss != null && <span>Loss: {live.loss.toFixed(3)}</span>}
+                              {live.reward_mean != null && <span>Reward: {live.reward_mean.toFixed(3)}</span>}
+                              {live.step_time_sec != null && <span>{live.step_time_sec.toFixed(1)}s/step</span>}
+                              {live.eta_sec != null && <span>ETA: {Math.round(live.eta_sec / 60)}m</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })()}
                     {expanded && (
                       <tr className="bg-[var(--chat-panel)]">
                         <td colSpan={8} className="p-4">

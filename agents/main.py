@@ -1625,9 +1625,10 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
             # Create a DB row immediately so the run is visible in history
             try:
                 from training.grpo_trainer import _record_training_run
+                from config import TRAINING_BASE_SOLVER as _default_base
                 _early_run_id = _record_training_run(
                     run_type=req.run_type or "training",
-                    target_model=req.base_model or "pending",
+                    target_model=req.base_model or _default_base,
                     dataset_path=req.dataset_path or "pending",
                     dataset_size=0,
                     status="running",
@@ -1659,11 +1660,20 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
             elif req.run_type == "curated":
                 # Download curated datasets → security scan → train
                 from training.dataset_curator import DatasetCurator
-                from training.grpo_trainer import train_grpo, GRPOTrainingConfig
+                from training.grpo_trainer import train_grpo, GRPOTrainingConfig, _update_training_run as _update_run
                 from config import TRAINING_BASE_SOLVER, \
                     TRAINING_LORA_RANK, TRAINING_LEARNING_RATE, TRAINING_NUM_EPOCHS
 
                 ds_keys = req.curated_datasets or ["glaive-function-calling", "hermes-function-calling"]
+
+                # Progressive update: dataset download phase
+                if _early_run_id:
+                    _update_run(_early_run_id, "running", metrics={
+                        "phase": "dataset_download",
+                        "curated_datasets": ds_keys,
+                        "target_model": req.base_model or TRAINING_BASE_SOLVER,
+                    })
+
                 curator = DatasetCurator()
                 curation_result = await asyncio.to_thread(
                     curator.download_and_convert,
@@ -1681,6 +1691,16 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                     f"({curation_result['total_rejected']} rejected by security scan)"
                 )
 
+                # Progressive update: security scan done, moving to training
+                if _early_run_id:
+                    _update_run(_early_run_id, "running", metrics={
+                        "phase": "model_loading",
+                        "dataset_path": output_path,
+                        "dataset_size": curation_result["total_written"],
+                        "rejected_samples": curation_result["total_rejected"],
+                        "target_model": req.base_model or TRAINING_BASE_SOLVER,
+                    })
+
                 cfg = GRPOTrainingConfig(
                     time_budget_minutes=req.time_budget_minutes,
                     base_model=req.base_model or TRAINING_BASE_SOLVER,
@@ -1696,15 +1716,28 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                 # Generate synthetic trajectories → security scan → train
                 from training.synthetic_gen import SyntheticTrajectoryGenerator
                 from training.dataset_curator import scan_existing_dataset
-                from training.grpo_trainer import train_grpo, GRPOTrainingConfig
+                from training.grpo_trainer import train_grpo, GRPOTrainingConfig, _update_training_run as _update_run
                 from config import TRAINING_DATASET_DIR, TRAINING_BASE_SOLVER, \
                     TRAINING_LORA_RANK, TRAINING_LEARNING_RATE, TRAINING_NUM_EPOCHS
 
                 target = req.synthetic_target or 552
+                import time as _time_mod
+                _phase_timings = {}
+
+                # Progressive update: mark synthetic generation phase
+                _t_synth_start = _time_mod.time()
+                if _early_run_id:
+                    _update_run(_early_run_id, "running", metrics={
+                        "phase": "synthetic_generation",
+                        "target_trajectories": target,
+                        "target_model": req.base_model or TRAINING_BASE_SOLVER,
+                    })
+
                 gen = SyntheticTrajectoryGenerator(output_dir=TRAINING_DATASET_DIR)
                 count = await asyncio.to_thread(
                     gen.generate_dataset, target_count=target
                 )
+                _phase_timings["synthetic_gen_sec"] = round(_time_mod.time() - _t_synth_start, 1)
                 logger.info(f"Synthetic generation complete: {count} trajectories")
 
                 if count == 0:
@@ -1718,11 +1751,34 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                 )
                 dataset_path = synth_files[0]
 
+                # Progressive update: mark security scan phase
+                _t_scan_start = _time_mod.time()
+                if _early_run_id:
+                    _update_run(_early_run_id, "running", metrics={
+                        "phase": "security_scan",
+                        "dataset_path": dataset_path,
+                        "dataset_size": count,
+                        "target_model": req.base_model or TRAINING_BASE_SOLVER,
+                    })
+
                 # Security scan the generated data
                 scan_report = await asyncio.to_thread(scan_existing_dataset, dataset_path)
+                _phase_timings["security_scan_sec"] = round(_time_mod.time() - _t_scan_start, 1)
                 blocked = scan_report["scan_summary"].get("blocked", 0)
                 if blocked > 0:
                     logger.warning(f"Security scan found {blocked} blocked samples in synthetic data")
+
+                # Progressive update: mark training phase
+                _t_train_start = _time_mod.time()
+                if _early_run_id:
+                    _update_run(_early_run_id, "running", metrics={
+                        "phase": "model_loading",
+                        "dataset_path": dataset_path,
+                        "dataset_size": count,
+                        "blocked_samples": blocked,
+                        "target_model": req.base_model or TRAINING_BASE_SOLVER,
+                        "phase_timings": _phase_timings,
+                    })
 
                 cfg = GRPOTrainingConfig(
                     time_budget_minutes=req.time_budget_minutes,
@@ -1732,16 +1788,30 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                     num_epochs=req.epochs or TRAINING_NUM_EPOCHS,
                 )
                 result = await asyncio.to_thread(train_grpo, dataset_path, cfg, _early_run_id)
+                _phase_timings["training_sec"] = round(_time_mod.time() - _t_train_start, 1)
+                # Store final phase timings
+                if _early_run_id:
+                    _update_run(_early_run_id, "completed", metrics={
+                        "phase": "completed",
+                        "phase_timings": _phase_timings,
+                    })
                 _active_training["run_id"] = result.get("run_id")
                 _active_training["status"] = "idle"
 
             elif req.run_type == "full_pipeline":
                 # Export → Train
                 from training.export_traces import TraceExporter
-                from training.grpo_trainer import train_grpo, GRPOTrainingConfig
+                from training.grpo_trainer import train_grpo, GRPOTrainingConfig, _update_training_run as _update_run
                 from config import TRAINING_DATASET_DIR, TRAINING_BASE_SOLVER, \
                     TRAINING_LORA_RANK, TRAINING_LEARNING_RATE, TRAINING_NUM_EPOCHS
                 import glob
+
+                # Progressive update: export phase
+                if _early_run_id:
+                    _update_run(_early_run_id, "running", metrics={
+                        "phase": "exporting_traces",
+                        "target_model": req.base_model or TRAINING_BASE_SOLVER,
+                    })
 
                 exporter = TraceExporter()
                 await asyncio.to_thread(
@@ -1756,6 +1826,14 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                 if not datasets_found:
                     raise ValueError("No dataset found after export")
 
+                # Progressive update: model loading phase
+                if _early_run_id:
+                    _update_run(_early_run_id, "running", metrics={
+                        "phase": "model_loading",
+                        "dataset_path": datasets_found[0],
+                        "target_model": req.base_model or TRAINING_BASE_SOLVER,
+                    })
+
                 cfg = GRPOTrainingConfig(
                     time_budget_minutes=req.time_budget_minutes,
                     base_model=req.base_model or TRAINING_BASE_SOLVER,
@@ -1769,7 +1847,7 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
 
             else:
                 # Training only — use specified or latest dataset
-                from training.grpo_trainer import train_grpo, GRPOTrainingConfig
+                from training.grpo_trainer import train_grpo, GRPOTrainingConfig, _update_training_run as _update_run
                 from config import TRAINING_DATASET_DIR, TRAINING_BASE_SOLVER, \
                     TRAINING_LORA_RANK, TRAINING_LEARNING_RATE, TRAINING_NUM_EPOCHS
                 import glob
@@ -1783,6 +1861,14 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                     if not datasets_found:
                         raise ValueError("No training dataset found")
                     dataset = datasets_found[0]
+
+                # Progressive update: model loading phase
+                if _early_run_id:
+                    _update_run(_early_run_id, "running", metrics={
+                        "phase": "model_loading",
+                        "dataset_path": dataset,
+                        "target_model": req.base_model or TRAINING_BASE_SOLVER,
+                    })
 
                 cfg = GRPOTrainingConfig(
                     time_budget_minutes=req.time_budget_minutes,
@@ -1829,6 +1915,141 @@ async def training_cancel():
     _active_training["task"] = None
     logger.warning(f"[Training] Force-cancelled: was status={prev_status}, run_id={prev_run_id}")
     return {"status": "cancelled", "previous_status": prev_status, "previous_run_id": prev_run_id}
+
+
+@app.get("/v1/training/runs/{run_id}/live")
+async def training_run_live(run_id: int):
+    """Return real-time training metrics by reading Prometheus gauges + DB row.
+
+    This endpoint is polled by the UI every 5 seconds for running runs.
+    It combines in-memory Prometheus gauge values (updated every step) with
+    the latest DB heartbeat so the UI can show live step count, loss, ETA, etc.
+    """
+    import json as _json
+    from config import TEMPLATE_DB_URL
+
+    # 1. Read Prometheus gauges (in-process, fast)
+    prom = {}
+    try:
+        from metrics import (
+            TRAINING_IS_ACTIVE, TRAINING_STEP_CURRENT, TRAINING_EPOCH_CURRENT,
+            TRAINING_TOTAL_STEPS, TRAINING_LOSS, TRAINING_GRAD_NORM,
+            TRAINING_LEARNING_RATE, TRAINING_REWARD_MEAN, TRAINING_REWARD_STD,
+            TRAINING_STEP_TIME, TRAINING_ENTROPY, TRAINING_PHASE,
+            TRAINING_TIME_BUDGET_SEC, TRAINING_BUDGET_START, TRAINING_RUN_ID,
+            PHASE_NAMES,
+        )
+        prom = {
+            "is_active": TRAINING_IS_ACTIVE._value.get(),
+            "current_step": int(TRAINING_STEP_CURRENT._value.get()),
+            "total_steps": int(TRAINING_TOTAL_STEPS._value.get()),
+            "current_epoch": round(TRAINING_EPOCH_CURRENT._value.get(), 4),
+            "loss": round(TRAINING_LOSS._value.get(), 6) if TRAINING_LOSS._value.get() else None,
+            "grad_norm": round(TRAINING_GRAD_NORM._value.get(), 4) if TRAINING_GRAD_NORM._value.get() else None,
+            "learning_rate": TRAINING_LEARNING_RATE._value.get() or None,
+            "reward_mean": round(TRAINING_REWARD_MEAN._value.get(), 4) if TRAINING_REWARD_MEAN._value.get() else None,
+            "reward_std": round(TRAINING_REWARD_STD._value.get(), 4) if TRAINING_REWARD_STD._value.get() else None,
+            "step_time_sec": round(TRAINING_STEP_TIME._value.get(), 2) if TRAINING_STEP_TIME._value.get() else None,
+            "entropy": round(TRAINING_ENTROPY._value.get(), 4) if TRAINING_ENTROPY._value.get() else None,
+            "phase_ordinal": int(TRAINING_PHASE._value.get()),
+            "phase": PHASE_NAMES.get(int(TRAINING_PHASE._value.get()), "unknown"),
+            "time_budget_sec": TRAINING_TIME_BUDGET_SEC._value.get() or None,
+            "budget_start_epoch": TRAINING_BUDGET_START._value.get() or None,
+            "prom_run_id": int(TRAINING_RUN_ID._value.get()) if TRAINING_RUN_ID._value.get() else None,
+        }
+    except Exception as e:
+        logger.debug(f"[Live] Prometheus gauge read failed: {e}")
+
+    # 2. Read latest DB metrics for this run
+    db_metrics = {}
+    db_status = None
+    db_started_at = None
+    db_config = {}
+    try:
+        import psycopg2
+        conn = psycopg2.connect(TEMPLATE_DB_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT status, metrics::text, config::text, started_at
+            FROM swarm.training_runs WHERE id = %s
+        """, (run_id,))
+        row = cur.fetchone()
+        if row:
+            db_status = row[0]
+            db_metrics = _json.loads(row[1]) if row[1] else {}
+            db_config = _json.loads(row[2]) if row[2] else {}
+            db_started_at = row[3].isoformat() if row[3] else None
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.debug(f"[Live] DB read failed for run {run_id}: {e}")
+
+    if db_status is None:
+        raise HTTPException(status_code=404, detail=f"Training run {run_id} not found")
+
+    # 3. Merge — prefer Prometheus (real-time) over DB (heartbeat lag)
+    current_step = prom.get("current_step") or db_metrics.get("current_step", 0)
+    total_steps = prom.get("total_steps") or db_metrics.get("total_steps", 0)
+    step_time = prom.get("step_time_sec") or db_metrics.get("step_time_sec")
+    loss = prom.get("loss") or db_metrics.get("loss")
+    reward_mean = prom.get("reward_mean") or db_metrics.get("reward_mean")
+    reward_std = prom.get("reward_std") or db_metrics.get("reward_std")
+    entropy = prom.get("entropy") or db_metrics.get("entropy")
+    phase = prom.get("phase") if prom.get("phase") != "unknown" else db_metrics.get("phase", "unknown")
+    current_epoch = prom.get("current_epoch") or db_metrics.get("current_epoch", 0)
+    total_epochs = db_config.get("num_epochs") or db_metrics.get("num_epochs")
+
+    # 4. ETA calculation
+    import time as _time
+    elapsed_sec = None
+    if db_started_at:
+        from datetime import datetime
+        started_dt = datetime.fromisoformat(db_started_at)
+        elapsed_sec = (_time.time() - started_dt.timestamp())
+
+    eta_sec = None
+    budget_remaining_sec = None
+    if step_time and total_steps and current_step < total_steps:
+        eta_sec = round((total_steps - current_step) * step_time, 1)
+    budget_sec = prom.get("time_budget_sec") or db_config.get("time_budget_minutes")
+    if budget_sec:
+        # If from config it's minutes, convert
+        if budget_sec == db_config.get("time_budget_minutes"):
+            budget_sec = budget_sec * 60
+        budget_start = prom.get("budget_start_epoch")
+        if budget_start:
+            budget_remaining_sec = round(budget_sec - (_time.time() - budget_start), 1)
+            if budget_remaining_sec < 0:
+                budget_remaining_sec = 0
+            # ETA is min of step-based and budget-based
+            if eta_sec is not None and budget_remaining_sec is not None:
+                eta_sec = min(eta_sec, budget_remaining_sec)
+            elif budget_remaining_sec is not None:
+                eta_sec = budget_remaining_sec
+
+    return {
+        "run_id": run_id,
+        "status": db_status,
+        "phase": phase,
+        "current_step": current_step,
+        "total_steps": total_steps,
+        "current_epoch": current_epoch,
+        "total_epochs": total_epochs,
+        "loss": loss,
+        "grad_norm": prom.get("grad_norm"),
+        "learning_rate": prom.get("learning_rate"),
+        "reward_mean": reward_mean,
+        "reward_std": reward_std,
+        "entropy": entropy,
+        "step_time_sec": step_time,
+        "elapsed_sec": round(elapsed_sec, 1) if elapsed_sec else None,
+        "eta_sec": eta_sec,
+        "time_budget_sec": prom.get("time_budget_sec") or (db_config.get("time_budget_minutes", 0) * 60 if db_config.get("time_budget_minutes") else None),
+        "budget_remaining_sec": budget_remaining_sec,
+        "target_model": db_metrics.get("target_model"),
+        "dataset_size": db_metrics.get("dataset_size"),
+        "dataset_path": db_metrics.get("dataset_path"),
+    }
 
 
 @app.get("/v1/training/runs/{run_id}/report")
@@ -1923,6 +2144,7 @@ async def training_run_report(run_id: int):
             "run_id": run["id"],
             "status": run["status"],
             "run_type": run["run_type"],
+            "phase": metrics.get("phase"),  # Progressive pipeline phase
 
             "timing": {
                 "started_at": run["started_at"],
@@ -1931,16 +2153,17 @@ async def training_run_report(run_id: int):
                 "active_training_sec": round(train_runtime, 1) if train_runtime else None,
                 "overhead_sec": round(overhead_sec, 1) if overhead_sec else None,
                 "overhead_note": "Model loading, quantization, dataset preparation",
+                "phase_timings": metrics.get("phase_timings"),
             },
 
             "dataset": {
-                "path": run["dataset_path"],
-                "total_samples": run["dataset_size"],
+                "path": metrics.get("dataset_path") or run["dataset_path"],
+                "total_samples": metrics.get("dataset_size") or run["dataset_size"],
                 "training_examples": metrics.get("train_samples"),
             },
 
             "model": {
-                "base_model": metrics.get("base_model") or run["target_model"],
+                "base_model": metrics.get("target_model") or metrics.get("base_model") or run["target_model"],
                 "trainable_params": metrics.get("trainable_params"),
                 "total_params": metrics.get("total_params"),
                 "trainable_pct": metrics.get("trainable_pct"),
@@ -1972,6 +2195,72 @@ async def training_run_report(run_id: int):
 
             "error": run["error_message"],
         }
+
+        # For running runs, populate live metrics from Prometheus gauges
+        if run["status"] == "running":
+            live = None
+            try:
+                from metrics import (
+                    TRAINING_STEP_CURRENT, TRAINING_EPOCH_CURRENT,
+                    TRAINING_TOTAL_STEPS, TRAINING_LOSS, TRAINING_REWARD_MEAN,
+                    TRAINING_REWARD_STD, TRAINING_STEP_TIME, TRAINING_ENTROPY,
+                    TRAINING_PHASE, TRAINING_TIME_BUDGET_SEC, TRAINING_BUDGET_START,
+                    PHASE_NAMES,
+                )
+                import time as _time
+                current_step = int(TRAINING_STEP_CURRENT._value.get())
+                total_steps_val = int(TRAINING_TOTAL_STEPS._value.get())
+                step_time_val = TRAINING_STEP_TIME._value.get()
+                budget_sec = TRAINING_TIME_BUDGET_SEC._value.get()
+                budget_start = TRAINING_BUDGET_START._value.get()
+
+                # Compute elapsed and ETA
+                elapsed_sec = None
+                if row[8]:
+                    elapsed_sec = round((_time.time() - row[8].timestamp()), 1)
+                eta_sec = None
+                if step_time_val and total_steps_val and current_step < total_steps_val:
+                    eta_sec = round((total_steps_val - current_step) * step_time_val, 1)
+                budget_remaining = None
+                if budget_sec and budget_start:
+                    budget_remaining = round(budget_sec - (_time.time() - budget_start), 1)
+                    if budget_remaining < 0:
+                        budget_remaining = 0
+                    if eta_sec is not None:
+                        eta_sec = min(eta_sec, budget_remaining)
+                    else:
+                        eta_sec = budget_remaining
+
+                live = {
+                    "phase": PHASE_NAMES.get(int(TRAINING_PHASE._value.get()), metrics.get("phase")),
+                    "current_step": current_step,
+                    "total_steps": total_steps_val or metrics.get("total_steps"),
+                    "current_epoch": round(TRAINING_EPOCH_CURRENT._value.get(), 4),
+                    "total_epochs": metrics.get("num_epochs"),
+                    "loss": round(TRAINING_LOSS._value.get(), 6) if TRAINING_LOSS._value.get() else None,
+                    "reward_mean": round(TRAINING_REWARD_MEAN._value.get(), 4) if TRAINING_REWARD_MEAN._value.get() else None,
+                    "reward_std": round(TRAINING_REWARD_STD._value.get(), 4) if TRAINING_REWARD_STD._value.get() else None,
+                    "entropy": round(TRAINING_ENTROPY._value.get(), 4) if TRAINING_ENTROPY._value.get() else None,
+                    "step_time_sec": round(step_time_val, 2) if step_time_val else None,
+                    "elapsed_sec": elapsed_sec,
+                    "eta_sec": eta_sec,
+                    "budget_remaining_sec": budget_remaining,
+                }
+            except Exception as live_err:
+                logger.debug(f"[Report] Live metrics unavailable: {live_err}")
+                # Fall back to DB heartbeat metrics
+                live = {
+                    "phase": metrics.get("phase"),
+                    "current_step": metrics.get("current_step"),
+                    "total_steps": metrics.get("total_steps"),
+                    "current_epoch": metrics.get("current_epoch"),
+                    "total_epochs": metrics.get("num_epochs"),
+                    "loss": metrics.get("loss"),
+                    "reward_mean": metrics.get("reward_mean"),
+                    "reward_std": metrics.get("reward_std"),
+                    "step_time_sec": metrics.get("step_time_sec"),
+                }
+            report["live"] = live
 
         return report
 

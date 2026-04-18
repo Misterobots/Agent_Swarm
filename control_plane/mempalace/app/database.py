@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from sqlalchemy import (
     Column, String, Text, Integer, Float, DateTime, Index,
-    text, func,
+    ForeignKey, text, func,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -107,6 +107,26 @@ class TeamMemory(Base):
     value = Column(Text, nullable=False)
     embedding = Column(Vector(VECTOR_DIM))
     author_agent = Column(String(100))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class MemoryAuditLog(Base):
+    """Audit trail for memory modifications (edit, delete, create by admin)."""
+
+    __tablename__ = "memory_audit_log"
+    __table_args__ = (
+        Index("ix_audit_memory_id", "memory_id"),
+        {"schema": "mempalace"},
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    memory_id = Column(UUID(as_uuid=True), nullable=False)
+    action = Column(String(20), nullable=False)          # created | edited | deleted
+    actor_id = Column(String(100), nullable=False)
+    actor_role = Column(String(20), nullable=False)       # user | admin
+    previous_content = Column(Text)
+    new_content = Column(Text)
+    changed_fields = Column(JSONB, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -8,10 +8,19 @@ function getBackendUrl() {
   return process.env.API_BASE_URL || "http://localhost:8000";
 }
 
+function getMemPalaceUrl() {
+  return process.env.MEMPALACE_BASE_URL || process.env.MEMPALACE_URL || "http://localhost:8200";
+}
+
+function isMemPalacePath(path: string) {
+  return /^\/v1\/(palace(?:\/|$)|memories(?:\/|$))/.test(path);
+}
+
 async function proxyRequest(req: NextRequest) {
   const url = new URL(req.url);
   const backendPath = url.pathname.replace(/^\/api\/backend/, "");
-  const target = `${getBackendUrl()}${backendPath}${url.search}`;
+  const baseUrl = isMemPalacePath(backendPath) ? getMemPalaceUrl() : getBackendUrl();
+  const target = `${baseUrl}${backendPath}${url.search}`;
 
   const headers = new Headers();
   headers.set("Content-Type", req.headers.get("Content-Type") || "application/json");
@@ -143,5 +152,21 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  return proxyRequest(req);
+}
+
+export async function PATCH(req: NextRequest) {
+  return proxyRequest(req);
+}
+
+export async function PUT(req: NextRequest) {
+  return proxyRequest(req);
+}
+
+export async function DELETE(req: NextRequest) {
+  return proxyRequest(req);
+}
+
+export async function OPTIONS(req: NextRequest) {
   return proxyRequest(req);
 }

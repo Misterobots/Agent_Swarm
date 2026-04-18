@@ -1,0 +1,15 @@
+configuration:
+  ha_url:
+    name: Home Assistant URL
+    description: Base URL for your Home Assistant instance.
+  ha_token:
+    name: Home Assistant Token
+    description: Dedicated long-lived access token used by Mission Control.
+  gemini_api_key:
+    name: Gemini API Key
+    description: API key used for TTS, challenge generation, and image generation.
+  server_url:
+    name: Server URL
+    description: LAN-reachable Mission Control URL used by speakers, browsers, and Apple TV.
+network:
+  8765/TCP: Mission Control LAN web UI

@@ -154,17 +154,34 @@ def _update_training_run(
 
         conn = psycopg2.connect(TEMPLATE_DB_URL)
         cur = conn.cursor()
+
+        # Also update top-level columns if provided in metrics
+        extra_sets = ""
+        extra_params = []
+        if metrics:
+            if "dataset_size" in metrics and metrics["dataset_size"]:
+                extra_sets += ", dataset_size = %s"
+                extra_params.append(metrics["dataset_size"])
+            if "dataset_path" in metrics and metrics["dataset_path"]:
+                extra_sets += ", dataset_path = %s"
+                extra_params.append(metrics["dataset_path"])
+            if "target_model" in metrics and metrics["target_model"]:
+                extra_sets += ", target_model = %s"
+                extra_params.append(metrics["target_model"])
+
         cur.execute(
-            """
+            f"""
             UPDATE swarm.training_runs
             SET status = %s,
                 metrics = COALESCE(%s::jsonb, metrics),
                 error_message = COALESCE(%s, error_message),
                 completed_at = CASE WHEN %s IN ('completed','failed')
                                THEN CURRENT_TIMESTAMP ELSE completed_at END
+                {extra_sets}
             WHERE id = %s
             """,
-            (status, json.dumps(metrics) if metrics else None, error, status, run_id),
+            [status, json.dumps(metrics) if metrics else None, error, status]
+            + extra_params + [run_id],
         )
         conn.commit()
         cur.close()
@@ -199,10 +216,13 @@ def train_grpo(
         from trl import GRPOConfig, GRPOTrainer
 
         class PrometheusTrainingCallback(TrainerCallback):
-            """Push per-step training metrics to Prometheus gauges."""
+            """Push per-step training metrics to Prometheus gauges and heartbeat to DB."""
 
-            def __init__(self):
+            def __init__(self, db_run_id: Optional[int] = None, heartbeat_every: int = 5):
                 self._metrics = None
+                self._db_run_id = db_run_id
+                self._heartbeat_every = heartbeat_every
+                self._last_logs: dict = {}
 
             def _load_metrics(self):
                 if self._metrics is None:
@@ -214,7 +234,8 @@ def train_grpo(
                             TRAINING_REWARD_MEAN, TRAINING_REWARD_STD,
                             TRAINING_COMPLETION_LEN_MEAN, TRAINING_COMPLETION_LEN_MIN,
                             TRAINING_COMPLETION_LEN_MAX, TRAINING_ENTROPY,
-                            TRAINING_STEP_TIME,
+                            TRAINING_STEP_TIME, TRAINING_TOTAL_STEPS,
+                            TRAINING_PHASE, PHASE_ORDINALS,
                         )
                         self._metrics = {
                             "active": TRAINING_IS_ACTIVE,
@@ -230,17 +251,37 @@ def train_grpo(
                             "comp_max": TRAINING_COMPLETION_LEN_MAX,
                             "entropy": TRAINING_ENTROPY,
                             "step_time": TRAINING_STEP_TIME,
+                            "total_steps": TRAINING_TOTAL_STEPS,
+                            "phase": TRAINING_PHASE,
                         }
+                        self._phase_ordinals = PHASE_ORDINALS
                     except ImportError:
                         logger.warning("Prometheus metrics not available for training callback")
                         self._metrics = {}
+                        self._phase_ordinals = {}
                 return self._metrics
 
             def on_train_begin(self, args, state, control, **kwargs):
                 m = self._load_metrics()
                 if m.get("active"):
                     m["active"].set(1)
-                logger.info("[PrometheusCallback] Training metrics active")
+                if m.get("total_steps") and state.max_steps:
+                    m["total_steps"].set(state.max_steps)
+                if m.get("phase"):
+                    m["phase"].set(self._phase_ordinals.get("training", 5))
+                logger.info(
+                    f"[PrometheusCallback] Training metrics active — "
+                    f"max_steps={state.max_steps}"
+                )
+                # DB heartbeat: record total_steps at start
+                if self._db_run_id and state.max_steps:
+                    try:
+                        _update_training_run(self._db_run_id, "running", metrics={
+                            "phase": "training",
+                            "total_steps": state.max_steps,
+                        })
+                    except Exception as hb_err:
+                        logger.warning(f"[Heartbeat] on_train_begin DB update failed: {hb_err}")
 
             def on_log(self, args, state, control, logs=None, **kwargs):
                 m = self._load_metrics()
@@ -267,16 +308,45 @@ def train_grpo(
                             m[metric_key].set(float(val))
                         except (TypeError, ValueError):
                             pass
+                # Keep a copy of the latest logs for the heartbeat
+                self._last_logs.update({k: v for k, v in logs.items() if v is not None})
 
             def on_step_end(self, args, state, control, **kwargs):
                 m = self._load_metrics()
                 if m.get("step"):
                     m["step"].set(state.global_step)
 
+                # DB heartbeat every N steps
+                if (
+                    self._db_run_id
+                    and self._heartbeat_every > 0
+                    and state.global_step % self._heartbeat_every == 0
+                ):
+                    try:
+                        heartbeat = {
+                            "phase": "training",
+                            "current_step": state.global_step,
+                            "total_steps": state.max_steps,
+                            "current_epoch": round(state.epoch, 4) if state.epoch else None,
+                            "loss": self._last_logs.get("loss"),
+                            "reward_mean": self._last_logs.get("reward"),
+                            "reward_std": self._last_logs.get("reward_std"),
+                            "step_time_sec": self._last_logs.get("step_time"),
+                            "learning_rate": self._last_logs.get("learning_rate"),
+                        }
+                        _update_training_run(
+                            self._db_run_id, "running",
+                            metrics={k: v for k, v in heartbeat.items() if v is not None},
+                        )
+                    except Exception as hb_err:
+                        logger.warning(f"[Heartbeat] step {state.global_step} DB update failed: {hb_err}")
+
             def on_train_end(self, args, state, control, **kwargs):
                 m = self._load_metrics()
                 if m.get("active"):
                     m["active"].set(0)
+                if m.get("phase"):
+                    m["phase"].set(self._phase_ordinals.get("completed", 7))
                 logger.info("[PrometheusCallback] Training ended, metrics reset")
 
         class TimeBudgetCallback(TrainerCallback):
@@ -290,6 +360,11 @@ def train_grpo(
             def on_train_begin(self, args, state, control, **kwargs):
                 self.start_time = time.time()
                 logger.info(f"[TimeBudget] Training window: {self.budget_seconds / 60:.1f} min")
+                try:
+                    from metrics import TRAINING_BUDGET_START
+                    TRAINING_BUDGET_START.set(self.start_time)
+                except Exception:
+                    pass
 
             def on_step_end(self, args, state, control, **kwargs):
                 if self.start_time is None:
@@ -375,6 +450,23 @@ def train_grpo(
         )
 
         logger.info(f"Loading base model: {config.base_model}")
+
+        # Phase: model_loading — update DB and Prometheus
+        if run_id:
+            _update_training_run(run_id, "running", metrics={
+                "phase": "model_loading",
+                "target_model": config.base_model,
+                "dataset_path": dataset_path,
+                "dataset_size": len(trajectories),
+            })
+        try:
+            from metrics import TRAINING_PHASE, TRAINING_RUN_ID, PHASE_ORDINALS
+            TRAINING_PHASE.set(PHASE_ORDINALS.get("model_loading", 4))
+            if run_id:
+                TRAINING_RUN_ID.set(run_id)
+        except Exception:
+            pass
+
         tokenizer = AutoTokenizer.from_pretrained(
             config.base_model, trust_remote_code=True
         )
@@ -492,7 +584,7 @@ def train_grpo(
         callbacks = []
         # Always add Prometheus callback for live metrics
         try:
-            callbacks.append(PrometheusTrainingCallback())
+            callbacks.append(PrometheusTrainingCallback(db_run_id=run_id, heartbeat_every=5))
         except Exception as e:
             logger.warning(f"Prometheus training callback unavailable: {e}")
 
@@ -503,6 +595,12 @@ def train_grpo(
                 f"[TimeBudget] Budget set: {config.time_budget_minutes:.1f} min "
                 f"(timer starts after model load)"
             )
+            # Set Prometheus budget gauges
+            try:
+                from metrics import TRAINING_TIME_BUDGET_SEC
+                TRAINING_TIME_BUDGET_SEC.set(budget_seconds)
+            except Exception:
+                pass
 
         trainer = GRPOTrainer(
             model=model,
@@ -517,6 +615,15 @@ def train_grpo(
         train_result = trainer.train()
 
         # Save LoRA adapter
+        # Phase: saving_adapter
+        if run_id:
+            _update_training_run(run_id, "running", metrics={"phase": "saving_adapter"})
+        try:
+            from metrics import TRAINING_PHASE, PHASE_ORDINALS
+            TRAINING_PHASE.set(PHASE_ORDINALS.get("saving_adapter", 6))
+        except Exception:
+            pass
+
         adapter_path = str(run_dir / "adapter")
         model.save_pretrained(adapter_path)
         tokenizer.save_pretrained(adapter_path)
@@ -529,7 +636,7 @@ def train_grpo(
             "train_runtime": train_metrics.get("train_runtime", 0),
             "train_samples_per_second": train_metrics.get("train_samples_per_second", 0),
             "train_steps_per_second": train_metrics.get("train_steps_per_second", 0),
-            "total_steps": train_metrics.get("total_flos", 0) and state.global_step if hasattr(train_result, 'global_step') else train_metrics.get("train_steps", 0),
+            "total_steps": trainer.state.global_step if hasattr(trainer, 'state') else train_metrics.get("train_steps", 0),
             "train_samples": len(prompts),
             "trainable_params": trainable_params,
             "total_params": total_params,
@@ -571,8 +678,10 @@ def train_grpo(
         if run_id:
             _update_training_run(run_id, "failed", error=str(e))
         try:
-            from metrics import TRAINING_RUNS_TOTAL
+            from metrics import TRAINING_RUNS_TOTAL, TRAINING_IS_ACTIVE, TRAINING_PHASE, PHASE_ORDINALS
             TRAINING_RUNS_TOTAL.labels(run_type="training", status="failed").inc()
+            TRAINING_IS_ACTIVE.set(0)
+            TRAINING_PHASE.set(PHASE_ORDINALS.get("failed", 8))
         except Exception:
             pass
         raise

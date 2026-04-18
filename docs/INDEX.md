@@ -42,6 +42,7 @@
 | [Security](admin/security.md) | SPIRE/SPIFFE, JWT-ACE, MAESTRO framework, defensive layers |
 | [Troubleshooting](admin/troubleshooting.md) | Common failure modes, SPIRE, monitoring, voice, GPU issues |
 | [Agent Training Reference](admin/agent_training_reference.md) | Agent architecture, adding new agents, semantic router training, templates |
+| [Mission Control on Home Assistant](admin/mission_control_home_assistant_deployment.md) | Host-local deployment runbook for Mission Control on `192.168.2.100` |
 
 ---
 
@@ -101,6 +102,7 @@ All point-in-time audit snapshots are in [`evidence/`](evidence/). Key milestone
 
 | File | Date | Scope |
 |------|------|-------|
+| [Palace Viewer Browser Validation](evidence/palace_viewer_browser_validation_2026_04_17.md) | 2026-04-17 | Palace Viewer deployment and browser interaction validation |
 | [Phase 6 Training Pipeline Audit](evidence/phase6_training_pipeline_audit_2026_03_21.md) | 2026-03-21 | GRPO training, A/B testing, model lifecycle |
 | [Phase 5 JWT-ACE Audit](evidence/phase5_jwt_ace_audit_2026_03_17.md) | 2026-03-17 | Capability gating, ExpertiseTemplate versioning |
 | [MAESTRO Full Audit (Feb 22)](evidence/maestro_full_audit_2026_02_22.md) | 2026-02-22 | Post-MarsRL full system review |
@@ -179,6 +181,7 @@ These are **read-only reference** — do not update them. All current content li
 
 | Date | Author | Changes |
 |------|--------|--------|
+| 2026-04-17 | GitHub Copilot | Added Palace Viewer browser validation evidence |
 | 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide |
 | 2026-04-15 | AI-Copilot | v3.4 — Added Plan/Think, MemPalace, Buddy, JWT-ACE deep dives |
 | 2026-03-21 | AI-Copilot | v3.3 — Phase 6 training pipeline docs |

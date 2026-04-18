@@ -343,8 +343,10 @@ def run_convert(
         return report
 
     # Use the base_model from the training run if not overridden
-    if base_model == TRAINING_BASE_SOLVER and row[1]:
-        base_model = row[1]
+    # Only accept HuggingFace-style IDs (contain '/'), not Ollama tags or placeholders
+    db_model = row[1]
+    if base_model == TRAINING_BASE_SOLVER and db_model and "/" in db_model and db_model not in ("pending", "unknown"):
+        base_model = db_model
 
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M")
     version_tag = f"v{timestamp}"

@@ -199,6 +199,8 @@ class SyntheticTrajectoryGenerator:
         Generate a single trajectory by sending the task to the solver
         via Ollama API and formatting the response.
         """
+        # Use longer timeout for first request (cold model loading can take minutes)
+        timeout = 300 if not hasattr(self, "_model_warm") else 120
         try:
             resp = requests.post(
                 f"{self.solver_host}/api/generate",
@@ -208,11 +210,12 @@ class SyntheticTrajectoryGenerator:
                     "stream": False,
                     "options": {"temperature": 0.3, "num_predict": 2048},
                 },
-                timeout=120,
+                timeout=timeout,
             )
             resp.raise_for_status()
             result = resp.json()
             response_text = result.get("response", "")
+            self._model_warm = True  # Model is loaded after first success
         except Exception as e:
             logger.warning(f"Solver generation failed: {e}")
             return None
@@ -298,6 +301,8 @@ class SyntheticTrajectoryGenerator:
 
         generated = 0
         attempts = 0
+        consecutive_failures = 0
+        max_consecutive_failures = 10  # Circuit breaker
 
         with open(output_path, "w", encoding="utf-8") as f:
             while generated < target_count and attempts < max_attempts:
@@ -309,8 +314,17 @@ class SyntheticTrajectoryGenerator:
                 if trajectory:
                     f.write(json.dumps(trajectory) + "\n")
                     generated += 1
+                    consecutive_failures = 0
                     if generated % 10 == 0:
                         logger.info(f"Generated {generated}/{target_count} trajectories ({attempts} attempts)")
+                else:
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_consecutive_failures:
+                        logger.error(
+                            f"Circuit breaker: {max_consecutive_failures} consecutive failures. "
+                            f"Stopping after {generated}/{target_count} trajectories."
+                        )
+                        break
 
         logger.info(
             f"Generated {generated} trajectories in {attempts} attempts → {output_path}"

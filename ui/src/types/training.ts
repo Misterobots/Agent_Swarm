@@ -38,3 +38,27 @@ export interface TrainingStatus {
   model_versions: ModelVersion[];
   active_run?: ActiveRun | null;
 }
+
+export interface LiveTrainingMetrics {
+  run_id: number;
+  status: string;
+  phase: string | null;
+  current_step: number;
+  total_steps: number;
+  current_epoch: number;
+  total_epochs: number | null;
+  loss: number | null;
+  grad_norm: number | null;
+  learning_rate: number | null;
+  reward_mean: number | null;
+  reward_std: number | null;
+  entropy: number | null;
+  step_time_sec: number | null;
+  elapsed_sec: number | null;
+  eta_sec: number | null;
+  time_budget_sec: number | null;
+  budget_remaining_sec: number | null;
+  target_model: string | null;
+  dataset_size: number | null;
+  dataset_path: string | null;
+}

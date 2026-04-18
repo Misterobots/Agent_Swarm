@@ -1,4 +1,4 @@
-import type { TrainingStatus, TrainingRun } from "@/types/training";
+import type { TrainingStatus, TrainingRun, LiveTrainingMetrics } from "@/types/training";
 import type { ModelCatalog, TrainingRun as OpsTrainingRun } from "@/types/ops";
 
 const API_BASE = "/api/backend";
@@ -68,6 +68,7 @@ export interface TrainingReport {
   run_id: number;
   status: string;
   run_type: string;
+  phase?: string | null;
   timing: {
     started_at: string | null;
     completed_at: string | null;
@@ -75,6 +76,7 @@ export interface TrainingReport {
     active_training_sec: number | null;
     overhead_sec: number | null;
     overhead_note: string;
+    phase_timings?: Record<string, number> | null;
   };
   dataset: {
     path: string | null;
@@ -115,11 +117,24 @@ export interface TrainingReport {
     } | null;
   };
   error: string | null;
+  live?: Partial<LiveTrainingMetrics> | null;
 }
 
 export async function fetchTrainingReport(runId: number): Promise<TrainingReport | null> {
   try {
     const res = await fetch(`${API_BASE}/v1/training/runs/${runId}/report`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchLiveTrainingMetrics(
+  runId: number
+): Promise<LiveTrainingMetrics | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v1/training/runs/${runId}/live`);
     if (!res.ok) return null;
     return await res.json();
   } catch {
