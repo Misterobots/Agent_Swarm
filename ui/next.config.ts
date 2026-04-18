@@ -16,6 +16,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/mempalace",
+        destination: "/palace",
+        permanent: true,
+      },
+    ];
+  },
   // Backend proxying is handled by the API route at
   // src/app/api/backend/[...path]/route.ts which reads API_BASE_URL at runtime.
   // A next.config rewrite would bake the URL at build time, causing misrouting
