@@ -42,10 +42,12 @@ Theme-adaptive InstancedMesh particles fill the scene. Each theme motif defines 
 | Motif | Particles | Behavior |
 |-------|-----------|----------|
 | Forge (ember) | 120 | Rising sparks, warm orange |
-| Terminal | 100 | Falling green rain |
-| Neon | 140 | Chaotic multicolor drift |
-| Gallery | 25 | Slow, sparse dust motes |
-| LCARS | 80 | Horizontal data streams |
+| Terminal (hacker) | 420 | Matrix digital rain — vertically elongated 3.5× streaks, brightness variation per particle for cascade effect, near-zero wobble |
+| Neon (cyberpunk) | 140 | Chaotic multicolor drift |
+| Gallery (minimal) | 25 | Slow, sparse dust motes |
+| LCARS (star-trek) | 80 | Horizontal data streams |
+| Snow (slate) | 180 | Gentle snowfall with lateral drift |
+| Signal | 100 | Clean accent-colored particles |
 
 ### Volumetric Light Cones
 Animated light cone meshes simulate visible light volume. In the lobby, wide shafts sweep slowly; in rooms, focused downlights illuminate drawer areas. Opacity pulses with a sine wave.
@@ -85,7 +87,7 @@ The Palace reads CSS variables from the active theme motif via a `MutationObserv
 - **slab** (slate) — cool grays, stone aesthetic
 - **signal** — accent-driven, clean
 - **grid** (office) — structured, neutral
-- **terminal** (hacker) — green-on-black, matrix rain
+- **terminal** (hacker) — Matrix theme: pure black `#000000` backgrounds, Matrix green `#00FF41` text/accents, enhanced scanlines with `rgba(0,255,65,0.025)`, dual drop-shadow CRT glow, intensified logo pulse, 420 digital rain particles
 - **lcars** (star-trek) — panels, data streams
 - **neon** (cyberpunk) — vivid magentas and cyans
 - **gallery** (minimal) — sparse, white-space focused
