@@ -285,22 +285,17 @@ export function useChatStream(options?: {
           } else if (event.type === "turn_metadata") {
             const incoming = event.turnMetadata;
             if (incoming) {
-              const prevTurnId = turnMetadataRef.current?.turnId;
-              const prevAgent = turnMetadataRef.current?.agentName;
-              const prevTools = turnMetadataRef.current?.toolsInvoked;
-              const prevContinuable = turnMetadataRef.current?.continuable;
-              const prevTokens = turnMetadataRef.current?.inContextTokens;
-              const prevResume = turnMetadataRef.current?.resumeToken;
-              const prevTrace = turnMetadataRef.current?.traceId;
+              // Snapshot previous metadata before overwriting (breaks TS circular ref)
+              const snap = JSON.parse(JSON.stringify(turnMetadataRef.current ?? {})) as Partial<TurnMetadata>;
               turnMetadataRef.current = {
-                turnId: incoming.turnId || event.turnId || prevTurnId || turnId,
-                agentName: incoming.agentName || prevAgent,
+                turnId: incoming.turnId || event.turnId || snap.turnId || turnId,
+                agentName: incoming.agentName || snap.agentName,
                 streamModes: streamModesRef.current,
-                toolsInvoked: incoming.toolsInvoked || prevTools || [],
-                continuable: incoming.continuable !== undefined ? incoming.continuable !== false : (prevContinuable ?? true),
-                inContextTokens: incoming.inContextTokens ?? prevTokens,
-                resumeToken: incoming.resumeToken || prevResume,
-                traceId: incoming.traceId || prevTrace,
+                toolsInvoked: incoming.toolsInvoked || snap.toolsInvoked || [],
+                continuable: incoming.continuable !== undefined ? incoming.continuable !== false : (snap.continuable ?? true),
+                inContextTokens: incoming.inContextTokens ?? snap.inContextTokens,
+                resumeToken: incoming.resumeToken || snap.resumeToken,
+                traceId: incoming.traceId || snap.traceId,
               };
             }
           } else if (event.type === "continuation") {
