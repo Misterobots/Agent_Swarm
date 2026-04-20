@@ -285,7 +285,7 @@ export function useChatStream(options?: {
           } else if (event.type === "turn_metadata") {
             const incoming = event.turnMetadata;
             if (incoming) {
-              const prev = turnMetadataRef.current;
+              const prev: TurnMetadata | null = turnMetadataRef.current;
               turnMetadataRef.current = {
                 turnId: incoming.turnId || event.turnId || prev?.turnId || turnId,
                 agentName: incoming.agentName || prev?.agentName,
