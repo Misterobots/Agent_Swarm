@@ -27,6 +27,7 @@
 | [How the Agent Swarm Works](user/framework.md) | Plain-language explanation of MarsRL, agents, and routing |
 | [Training Guide](user/training_guide.md) | How to use the Training interface — run types, options, security scanning, CLI, API |
 | [Art Studio Guide](user/art_studio_guide.md) | Image, 3D model, and action figure generation workspace |
+| [Image Generation Hive Guide](user/image_generation_hive_guide.md) | Functional and visual guide for curated image profiles, training loop, and architecture |
 | [FAQ](user/faq.md) | Common questions from day-to-day users |
 | [Plan & Think Modes Guide](user/plan_and_think_modes.md) | UltraPlan structured planning, UltraThink visible reasoning, auto-feed setting |
 | [Buddy Companion Guide](user/buddy_companion_guide.md) | Pixel-art buddy hatching, species, XP leveling, evolution, achievements, tips |

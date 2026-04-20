@@ -35,6 +35,11 @@ export function ImageControls({ models }: { models: string[] }) {
             <option key={m} value={m}>{m}</option>
           ))}
         </select>
+        {models.length === 0 && (
+          <p className="mt-2 text-xs text-amber-400">
+            No ComfyUI checkpoints detected. Image generation will stay unavailable until a model is mounted in ComfyUI.
+          </p>
+        )}
       </label>
 
       <div className="grid grid-cols-2 gap-3">

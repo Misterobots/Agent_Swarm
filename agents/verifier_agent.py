@@ -52,13 +52,14 @@ class LogicVerifier:
                 self._guard_agent = None
         return self._guard_agent
 
-    def verify(self, task: str, response: str) -> VerifierResult:
+    def verify(self, task: str, response: str, intent: str = "CODE") -> VerifierResult:
         """
         Run all verification layers on the agent's response.
 
         Args:
             task:     The original user task (for context)
             response: The Solver's output to verify
+            intent:   The classified intent (used for alignment checking)
 
         Returns:
             VerifierResult with passed, reason, and score
@@ -67,6 +68,13 @@ class LogicVerifier:
 
         score = 1.0
         failures = []
+
+        # --- Layer 0: Intent-Response Alignment (cheapest — pure heuristics) ---
+        alignment_ok, alignment_reason = self._check_intent_alignment(task, response, intent)
+        if not alignment_ok:
+            score -= 0.40
+            failures.append(f"Alignment: {alignment_reason}")
+            logger.warning(f"[Verifier] Alignment fail: {alignment_reason}")
 
         # --- Layer 2: Coherence (run first, cheapest) ---
         coherence_ok, coherence_reason = self._check_coherence(response)
@@ -170,6 +178,60 @@ class LogicVerifier:
             return False, "Response appears truncated (unclosed code block)"
 
         return True, "Coherence OK"
+
+    # ------------------------------------------------------------------
+    # Layer 0: Intent-Response Alignment
+    # ------------------------------------------------------------------
+
+    _TASK_CODE_KEYWORDS = {
+        "write", "fix", "implement", "create", "build", "debug", "refactor",
+        "function", "script", "api", "endpoint", "class", "module", "compile",
+        "deploy", "test case", "code review",
+    }
+
+    def _check_intent_alignment(self, task: str, response: str, intent: str) -> tuple[bool, str]:
+        """
+        Heuristic check: does the response style match what the task actually asked for?
+        Catches cases where a conversational question gets tool-call / code-only answers.
+        Returns (ok, reason).
+        """
+        task_lower = task.strip().lower()
+        resp_stripped = response.strip()
+
+        # Only flag misalignment for CODE-routed tasks
+        if intent != "CODE":
+            return True, "Non-CODE intent — alignment check skipped"
+
+        # Check if the task looks like a genuine code request
+        has_code_signal = any(kw in task_lower for kw in self._TASK_CODE_KEYWORDS)
+
+        # If the task is a short question with no code keywords, the response
+        # should contain some natural-language explanation, not just tool calls.
+        is_question = task_lower.rstrip().endswith("?")
+        is_short = len(task_lower) < 120
+
+        if is_question and is_short and not has_code_signal:
+            # Response is entirely tool calls / JSON with no prose
+            has_prose = False
+            for line in resp_stripped.split("\n"):
+                line_clean = line.strip()
+                if not line_clean:
+                    continue
+                # Skip lines that are JSON tool calls or code artifacts
+                if line_clean.startswith(("{", "[", "}", "]", "```", "def ", "import ")):
+                    continue
+                # If we find a line of natural language, it's aligned
+                if len(line_clean) > 20 and not line_clean.startswith(("#", "//")):
+                    has_prose = True
+                    break
+
+            if not has_prose:
+                return False, (
+                    "Task is a conversational question but response contains only "
+                    "tool calls / code with no natural-language answer"
+                )
+
+        return True, "Alignment OK"
 
     # ------------------------------------------------------------------
     # Layer 3: Safety via llama-guard

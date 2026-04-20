@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Mic2,
   Paintbrush,
+  Palette,
   Radar,
   Scale,
   Settings,
@@ -36,6 +37,26 @@ export const primaryNavigation: NavigationItem[] = [
     href: "/chat",
     icon: MessageSquare,
     matchPrefixes: ["/chat"],
+  },
+  {
+    label: "Art Studio",
+    href: "/art-studio",
+    icon: Palette,
+    matchPrefixes: ["/art-studio"],
+    children: [
+      {
+        label: "Generator",
+        href: "/art-studio",
+        icon: Palette,
+        matchPrefixes: ["/art-studio"],
+      },
+      {
+        label: "Gallery",
+        href: "/art-studio/gallery",
+        icon: ImagePlus,
+        matchPrefixes: ["/art-studio/gallery"],
+      },
+    ],
   },
   {
     label: "Developer",

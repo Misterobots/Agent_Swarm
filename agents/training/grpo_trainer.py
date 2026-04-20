@@ -1,15 +1,18 @@
 """
-QLoRA GRPO training wrapper for MarsRL fine-tuning.
+Unsloth-accelerated GRPO training wrapper for MarsRL fine-tuning.
 
-Uses HuggingFace TRL's GRPOTrainer with 4-bit quantization to fit
-8B+ models on the RTX 5060 Ti (16GB VRAM).
+Uses Unsloth's FastLanguageModel with TRL's GRPOTrainer for
+2x faster 4-bit QLoRA training with ~60% less VRAM.
+
+Supports both Solver (Qwen2.5-Coder) and Router (Nemotron) models.
 
 Training order:
   1. Solver (qwen2.5-coder) — code quality from MarsRL traces
-  2. Router (nemotron-orchestrator) — routing accuracy via DPO (future)
+  2. Router (nemotron-orchestrator) — routing accuracy via GRPO
 
 Usage:
     python -m training.grpo_trainer --dataset training_data/grpo_traces.jsonl
+    python -m training.grpo_trainer --dataset training_data/router_traces.jsonl --base-model nvidia/Nemotron-Mini-4B-Instruct
 """
 
 import json
@@ -26,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import (
     TRAINING_OUTPUT_DIR,
     TRAINING_BASE_SOLVER,
+    TRAINING_BASE_ROUTER,
     TRAINING_LORA_RANK,
     TRAINING_LORA_ALPHA,
     TRAINING_BATCH_SIZE,
@@ -211,8 +215,8 @@ def train_grpo(
     # Lazy imports — these are heavy and only needed on the Execution Node
     try:
         import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainerCallback
-        from peft import LoraConfig, get_peft_model, TaskType
+        from unsloth import FastLanguageModel
+        from transformers import TrainerCallback
         from trl import GRPOConfig, GRPOTrainer
 
         class PrometheusTrainingCallback(TrainerCallback):
@@ -383,13 +387,37 @@ def train_grpo(
     except ImportError as e:
         raise RuntimeError(
             f"Training dependencies not installed: {e}. "
-            "Run: pip install torch transformers peft trl bitsandbytes"
+            "Run: pip install unsloth trl"
         )
 
     # Load dataset
     trajectories = _load_dataset(dataset_path)
     if not trajectories:
         raise ValueError(f"No trajectories found in {dataset_path}")
+
+    # ── Attention backend diagnostic ──────────────────────────────────────────
+    import torch as _torch
+    _fa_version = "not installed"
+    try:
+        import flash_attn as _fa
+        _fa_version = getattr(_fa, "__version__", "installed")
+    except ImportError:
+        pass
+    _cc = _torch.cuda.get_device_capability() if _torch.cuda.is_available() else ("?", "?")
+    _device = _torch.cuda.get_device_name(0) if _torch.cuda.is_available() else "cpu"
+    logger.info(
+        "[ATTN] flash-attn=%s | device=%s (sm_%s%s) | "
+        "torch_flash_sdp=%s | torch_mem_eff_sdp=%s",
+        _fa_version, _device, _cc[0], _cc[1],
+        _torch.backends.cuda.flash_sdp_enabled(),
+        _torch.backends.cuda.mem_efficient_sdp_enabled(),
+    )
+    if _fa_version == "not installed":
+        logger.warning(
+            "[ATTN] flash-attn not found — Unsloth will use SDPA (slower prefill). "
+            "Rebuild the container to pick up the new flash-attn FA4 layer."
+        )
+    # ─────────────────────────────────────────────────────────────────────────
 
     reward_fn = MarsRewardFunction()
 
@@ -441,15 +469,8 @@ def train_grpo(
                 exc_info=True,
             )
 
-        # 4-bit quantization config for QLoRA
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_use_double_quant=True,
-        )
-
-        logger.info(f"Loading base model: {config.base_model}")
+        # Unsloth handles quantization, model loading, and LoRA in one call
+        logger.info(f"Loading base model via Unsloth: {config.base_model}")
 
         # Phase: model_loading — update DB and Prometheus
         if run_id:
@@ -467,32 +488,30 @@ def train_grpo(
         except Exception:
             pass
 
-        tokenizer = AutoTokenizer.from_pretrained(
-            config.base_model, trust_remote_code=True
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=config.base_model,
+            max_seq_length=config.max_seq_len,
+            load_in_4bit=True,
+            dtype=None,  # auto-detect (bf16 on Ampere+)
         )
+
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
-        model = AutoModelForCausalLM.from_pretrained(
-            config.base_model,
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            torch_dtype=torch.bfloat16,
-        )
-
-        # LoRA configuration
-        lora_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM,
+        # Unsloth LoRA — applied via FastLanguageModel.get_peft_model
+        model = FastLanguageModel.get_peft_model(
+            model,
             r=config.lora_rank,
             lora_alpha=config.lora_alpha,
             lora_dropout=0.05,
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                            "gate_proj", "up_proj", "down_proj"],
+            target_modules=[
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                "gate_proj", "up_proj", "down_proj",
+            ],
             bias="none",
+            use_gradient_checkpointing="unsloth",  # 30% less VRAM
+            random_state=42,
         )
-
-        model = get_peft_model(model, lora_config)
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in model.parameters())
         logger.info(
@@ -555,7 +574,7 @@ def train_grpo(
             save_strategy=save_strategy,
             save_steps=save_steps,
             bf16=True,
-            gradient_checkpointing=True,
+            gradient_checkpointing=False,  # Unsloth handles this internally
             report_to="tensorboard" if _has_tensorboard() else "none",
             logging_dir=str(run_dir / "tensorboard_logs"),
         )
@@ -629,6 +648,27 @@ def train_grpo(
         tokenizer.save_pretrained(adapter_path)
         logger.info(f"LoRA adapter saved to {adapter_path}")
 
+        # Also export merged GGUF directly via Unsloth (Q4_K_M)
+        gguf_path = None
+        try:
+            gguf_dir = str(run_dir / "gguf")
+            model.save_pretrained_gguf(
+                gguf_dir,
+                tokenizer,
+                quantization_method="q4_k_m",
+            )
+            # Find the generated .gguf file
+            from pathlib import Path as _P
+            gguf_files = list(_P(gguf_dir).glob("*.gguf"))
+            if gguf_files:
+                gguf_path = str(gguf_files[0])
+                logger.info(f"GGUF exported to {gguf_path}")
+            else:
+                logger.warning("Unsloth GGUF export produced no .gguf files")
+        except Exception as gguf_err:
+            logger.warning(f"GGUF export failed (adapter still saved): {gguf_err}")
+            gguf_path = None
+
         # Collect metrics
         train_metrics = train_result.metrics or {}
         metrics = {
@@ -652,6 +692,7 @@ def train_grpo(
             "time_budget_minutes": config.time_budget_minutes,
             "budget_limited": time_bounded,
             "adapter_path": adapter_path,
+            "gguf_path": gguf_path,
             "run_dir": str(run_dir),
         }
 
@@ -668,6 +709,7 @@ def train_grpo(
 
         return {
             "adapter_path": adapter_path,
+            "gguf_path": gguf_path,
             "metrics": metrics,
             "run_id": run_id,
             "run_dir": str(run_dir),
@@ -688,9 +730,15 @@ def train_grpo(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run QLoRA GRPO training")
+    parser = argparse.ArgumentParser(description="Run Unsloth GRPO training")
     parser.add_argument("--dataset", "-d", required=True, help="Path to GRPO JSONL dataset")
     parser.add_argument("--base-model", default=TRAINING_BASE_SOLVER, help="HuggingFace model ID")
+    parser.add_argument(
+        "--target",
+        choices=["solver", "router"],
+        default="solver",
+        help="Training target: solver (Qwen) or router (Nemotron)",
+    )
     parser.add_argument("--output-dir", default=TRAINING_OUTPUT_DIR, help="Training output directory")
     parser.add_argument("--epochs", type=int, default=TRAINING_NUM_EPOCHS)
     parser.add_argument("--lora-rank", type=int, default=TRAINING_LORA_RANK)
@@ -706,8 +754,14 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(name)s | %(levelname)s | %(message)s")
 
+    # Select base model from target
+    base_model = args.base_model
+    if args.target == "router" and base_model == TRAINING_BASE_SOLVER:
+        base_model = TRAINING_BASE_ROUTER
+        logger.info(f"Router training — using base model: {base_model}")
+
     config = GRPOTrainingConfig(
-        base_model=args.base_model,
+        base_model=base_model,
         output_dir=args.output_dir,
         num_epochs=args.epochs,
         lora_rank=args.lora_rank,
@@ -717,7 +771,11 @@ def main():
 
     result = train_grpo(args.dataset, config)
     print(f"\nTraining complete!")
+    print(f"  Target:  {args.target}")
+    print(f"  Model:   {base_model}")
     print(f"  Adapter: {result['adapter_path']}")
+    if result.get('gguf_path'):
+        print(f"  GGUF:    {result['gguf_path']}")
     print(f"  Loss:    {result['metrics'].get('train_loss', 'N/A')}")
     print(f"  Runtime: {result['metrics'].get('train_runtime', 0):.1f}s")
     if args.time_budget:

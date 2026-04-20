@@ -32,8 +32,8 @@ export default function SettingsPage() {
         <Settings size={18} className="text-[var(--chat-muted)]" />
         <h1 className="text-sm font-medium text-[var(--chat-text)]">Settings</h1>
       </div>
-      <div className="flex-1 overflow-y-auto p-6 max-w-2xl">
-        <div className="space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 max-w-2xl">
+        <div className="space-y-6 md:space-y-8">
           {/* Chat */}
           <section>
             <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Chat</h2>

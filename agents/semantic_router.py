@@ -26,8 +26,8 @@ class SemanticRouter:
             If the input contains "Original Request", "System Question", and "User Answer", merge the "User Answer" into the "Original Request" context to deduce the final intent.
             
             CATEGORIES:
-            1. **CONVERSATION**: Greetings, casual chat, small talk, simple factual questions, or anything social in nature. Default for any message that is unclear but does not require specialized tools. (Keywords: "hello", "hi", "how are you", "what is", "tell me about", "who are you", "what can you do")
-            2. **CODE**: Software engineering, writing scripts (Python/JS/etc.), debugging, fixing errors, or building apps. (Keywords: "write script", "fix bug", "function", "develop", "code", "implement", "refactor")
+            1. **CONVERSATION**: Greetings, casual chat, small talk, simple factual questions, meta-questions about the AI system itself, or anything social in nature. Default for any message that is unclear but does not require specialized tools. (Keywords: "hello", "hi", "how are you", "what is", "tell me about", "who are you", "what can you do", "what do you have access to", "what files do you have", "what tools", "what are your capabilities", "tell me about yourself", "how do you work", "help me understand you")
+            2. **CODE**: Software engineering, writing scripts (Python/JS/etc.), debugging, fixing errors, or building apps. The user must be asking you to BUILD, WRITE, FIX, or MODIFY software — not merely asking about files or capabilities. (Keywords: "write script", "fix bug", "function", "develop", "code", "implement", "refactor")
             3. **DEVOPS**: Infrastructure, Docker, Kubernetes, CI/CD pipelines, Linux administration, networking, shell scripts, server configuration, or cloud deployment. (Keywords: "docker", "kubernetes", "deploy", "nginx", "server", "firewall", "pipeline", "bash script", "systemd", "compose")
             4. **DATA**: Data analysis, SQL queries, CSV/JSON processing, statistics, charts, dashboards, or data transformation. (Keywords: "query", "sql", "analyze data", "csv", "dataframe", "statistics", "chart", "pandas", "aggregate")
             5. **IMAGE**: Generating 2D visual art, photos, concept art, or textures. (Keywords: "draw", "generate image", "picture of", "photo", "paint", "illustration")
@@ -51,6 +51,8 @@ class SemanticRouter:
 
             CRITICAL DIRECTIVES:
             - CONVERSATION is the default for social, general, or ambiguous inputs. Prefer CONVERSATION over AMBIGUOUS unless the user is asking for a specific capability you cannot determine.
+            - META-QUESTIONS: If the user asks about YOUR files, YOUR access, YOUR tools, YOUR capabilities, or YOUR identity — ALWAYS classify as CONVERSATION. These are questions ABOUT the system, not requests to BUILD software. Example: "What files do you have access to?" → CONVERSATION (not CODE).
+            - Only classify as CODE when the user explicitly wants you to BUILD, WRITE, FIX, DEBUG, or MODIFY software artifacts.
             - Only output AMBIGUOUS if the user is asking for something that could be CODE, IMAGE, DEVOPS, or another capability-specific intent but you cannot tell which.
             - If confidence is < 0.50, output AMBIGUOUS with a disambiguation_question.
             - Output VALID JSON only. Do not wrap in markdown or add conversational text.

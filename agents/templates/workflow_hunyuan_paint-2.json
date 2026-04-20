@@ -20,11 +20,14 @@
     },
     "20": {
         "inputs": {
-            "model": "hunyuan3d-dit-v2-0-fp16.safetensors"
+            "image": [
+                "26",
+                0
+            ]
         },
-        "class_type": "Hy3DModelLoader",
+        "class_type": "TripoSGPrepareImage",
         "_meta": {
-            "title": "Hy3D Model Loader"
+            "title": "TripoSG Prepare Image"
         }
     },
     "25": {
@@ -69,54 +72,56 @@
             "title": "Delight (FLAT for Geometry)"
         }
     },
+    "30": {
+        "inputs": {
+            "model": "VAST-AI/TripoSG"
+        },
+        "class_type": "TripoSGModelLoader",
+        "_meta": {
+            "title": "TripoSG Model Loader"
+        }
+    },
     "40": {
         "inputs": {
-            "pipeline": [
-                "20",
+            "model": [
+                "30",
                 0
             ],
             "image": [
-                "26",
+                "20",
                 0
             ],
             "seed": "{{SEED}}",
-            "steps": "{{STEPS}}",
-            "guidance_scale": "{{CFG}}",
-            "scheduler": "FlowMatchEulerDiscreteScheduler",
-            "force_offload": true
+            "steps": 75,
+            "cfg": 4.0
         },
-        "class_type": "Hy3DGenerateMesh",
+        "class_type": "TripoSGInference",
         "_meta": {
-            "title": "Hy3D Generate Mesh"
-        }
-    },
-    "42": {
-        "inputs": {
-            "vae": [
-                "20",
-                1
-            ],
-            "latents": [
-                "40",
-                0
-            ],
-            "box_v": 1.01,
-            "octree_resolution": 384,
-            "num_chunks": 8000,
-            "mc_level": 0,
-            "mc_algo": "mc",
-            "enable_flash_vdm": true,
-            "force_offload": true
-        },
-        "class_type": "Hy3DVAEDecode",
-        "_meta": {
-            "title": "Hy3D VAE Decode"
+            "title": "TripoSG Inference (High Quality)"
         }
     },
     "45": {
         "inputs": {
             "trimesh": [
-                "42",
+                "40",
+                0
+            ],
+            "merge_vertices": true,
+            "vertex_count": 35000,
+            "smooth_iter": 5,
+            "align_to_boundaries": true,
+            "triangulate_result": true,
+            "max_facenum": 80000
+        },
+        "class_type": "Hy3DIMRemesh",
+        "_meta": {
+            "title": "Hy3D Instant Remesh (High Poly)"
+        }
+    },
+    "48": {
+        "inputs": {
+            "trimesh": [
+                "45",
                 0
             ],
             "remove_floaters": true,
@@ -127,13 +132,13 @@
         },
         "class_type": "Hy3DPostprocessMesh",
         "_meta": {
-            "title": "Hy3D Postprocess Mesh"
+            "title": "Remove Floating Particles"
         }
     },
     "50": {
         "inputs": {
             "trimesh": [
-                "45",
+                "48",
                 0
             ]
         },
@@ -254,9 +259,9 @@
             "file_format": "glb",
             "save_file": true
         },
-        "class_type": "Hy3DExportMesh",
+        "class_type": "SaveTrimesh",
         "_meta": {
-            "title": "Hy3D Export Mesh"
+            "title": "Save Trimesh (GLB)"
         }
     }
 }

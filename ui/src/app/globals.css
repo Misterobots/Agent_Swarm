@@ -433,3 +433,64 @@ body {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE & TOUCH UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Safe area padding for bottom navigation */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Disable hover effects on touch devices */
+@media (hover: none) {
+  .hover\:bg-\[var\(--chat-panel\)\]:hover {
+    background: inherit;
+  }
+}
+
+/* Hide scrollbar on mobile */
+@media (max-width: 767px) {
+  .scrollbar-thin::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-thin {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* iOS rubber-band scroll containment */
+@supports (-webkit-touch-callout: none) {
+  .chat-shell {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Minimum touch target sizes */
+@media (max-width: 767px) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Exempt small inline buttons */
+  .inline-flex, [class*="gap-1"] button {
+    min-height: unset;
+    min-width: unset;
+  }
+}
+
+/* Prevent text selection on navigation elements */
+nav, .bottom-tab-bar {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Bottom tab bar safe area */
+@media (max-width: 767px) {
+  .pb-14 {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+

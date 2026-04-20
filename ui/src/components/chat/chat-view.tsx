@@ -12,13 +12,14 @@ import { InputToolbar } from "./input-toolbar";
 import { UltraplanToggle } from "./ultraplan-toggle";
 import { UltrathinkToggle } from "./ultrathink-toggle";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
-import { Bot, Brain, Code2, X } from "lucide-react";
+import { Bot, Brain, Code2, X, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { ThemeSelector } from "./theme-selector";
 import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import { useBuddyStore } from "@/lib/stores/buddy-store";
+import { useIsMobile } from "@/lib/hooks/use-mobile";
 import type { FileAttachment } from "@/types/chat";
 
 function usageBarClass(pct: number): string {
@@ -66,6 +67,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isMobile } = useIsMobile();
   const buddyReact = useBuddyStore((s) => s.react);
   const { awayEvents, pushEvent, dismiss: dismissAway } = useAwaySummary();
 
@@ -134,13 +137,13 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   return (
     <div className="chat-shell flex flex-col h-full" data-route="chat">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-4 py-2">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-3 md:px-4 py-2">
+        <div className="flex items-center gap-2 md:gap-3">
           <ModelSelector />
-          <ThemeSelector />
-          <UltraplanToggle />
-          <UltrathinkToggle />
-          {activeConversationId && (
+          {!isMobile && <ThemeSelector />}
+          {!isMobile && <UltraplanToggle />}
+          {!isMobile && <UltrathinkToggle />}
+          {!isMobile && activeConversationId && (
             <button
               type="button"
               onClick={() =>
@@ -160,6 +163,45 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
               Memory
             </button>
           )}
+          {/* Mobile overflow menu trigger */}
+          {isMobile && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-1.5 rounded-md text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
+              >
+                <MoreHorizontal size={18} />
+              </button>
+              {mobileMenuOpen && (
+                <div className="absolute top-full left-0 mt-1 z-30 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-lg p-2 space-y-1 min-w-[160px]">
+                  <div className="px-2 py-1.5"><ThemeSelector /></div>
+                  <div className="px-2 py-1.5"><UltraplanToggle /></div>
+                  <div className="px-2 py-1.5"><UltrathinkToggle /></div>
+                  {activeConversationId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateConversation(activeConversationId, {
+                          memoryEnabled: !(activeConv?.memoryEnabled ?? false),
+                        });
+                        setMobileMenuOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-colors",
+                        activeConv?.memoryEnabled
+                          ? "text-[var(--chat-accent-strong)]"
+                          : "text-[var(--chat-muted)]"
+                      )}
+                    >
+                      <Brain size={14} />
+                      Memory {activeConv?.memoryEnabled ? "On" : "Off"}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -167,7 +209,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
             onClick={() => {
               void compactConversation();
             }}
-            className="w-44 h-2 rounded-full bg-[var(--chat-panel)] overflow-hidden border border-[var(--chat-border)]"
+            className="w-24 md:w-44 h-2 rounded-full bg-[var(--chat-panel)] overflow-hidden border border-[var(--chat-border)]"
             title={`Context usage: ${(tokenUsage.pct * 100).toFixed(1)}% (${tokenUsage.used}/${tokenUsage.total}) - Click to compact`}
           >
             <div
@@ -184,7 +226,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         {tokenUsage.pct >= 0.95 && (
-          <div className="mx-auto max-w-3xl mt-3 px-4">
+          <div className="mx-auto max-w-3xl mt-3 px-3 md:px-4">
             <div className="rounded-md border border-[color:color-mix(in_srgb,var(--chat-accent-2)_50%,var(--chat-border))] bg-[color:color-mix(in_srgb,var(--chat-accent-2)_10%,transparent)] px-3 py-2 text-xs text-[var(--chat-text)]">
               Context is near capacity. Compact now to preserve response quality.
             </div>
@@ -192,7 +234,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         )}
         <AwaySummaryBanner events={awayEvents} onDismiss={dismissAway} />
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)] gap-4">
+          <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)] gap-4 px-4">
             <div className="w-16 h-16 rounded-2xl bg-[color:color-mix(in_srgb,var(--chat-accent)_14%,transparent)] flex items-center justify-center border border-[var(--chat-border)]">
               <Bot size={32} className="text-[var(--chat-accent-strong)]" />
             </div>
@@ -202,7 +244,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
             </div>
           </div>
         ) : (
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-3xl mx-auto px-3 md:px-0">
             {messages.map((msg, idx) => {
               // Find the preceding user message for creative-redirect links
               let precedingUserPrompt: string | undefined;

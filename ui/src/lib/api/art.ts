@@ -72,7 +72,7 @@ async function safeSubmit(url: string, body: object): Promise<SubmitResponse> {
 
 export async function fetchArtModels(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/v1/art/models`);
-  if (!res.ok) return ["v1-5-pruned-emaonly.ckpt"];
+  if (!res.ok) return [];
   const data = await res.json();
   return data.models || [];
 }
@@ -151,7 +151,9 @@ export interface Gallery3DFile {
   category: string;
   ext: string;
   size_bytes: number;
-  path: string;
+  url: string;
+  download_url: string;
+  path?: string;
 }
 
 export async function fetch3DGallery(): Promise<Gallery3DFile[]> {

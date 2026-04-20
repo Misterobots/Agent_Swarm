@@ -12,7 +12,7 @@ logger = logging.getLogger("mempalace.embeddings")
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://192.168.2.101:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
-EXTRACT_MODEL = os.getenv("EXTRACT_MODEL", "nemotron-mini")
+EXTRACT_MODEL = os.getenv("EXTRACT_MODEL", "qwen2.5-coder:14b-instruct-q4_k_m")
 HTTPX_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "60"))
 
 _client: Optional[httpx.AsyncClient] = None

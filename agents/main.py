@@ -4,12 +4,13 @@ import sys
 import os
 import json
 import uuid
+import time
 # Ensure agents dir is in path
 if "/app/agents" not in sys.path:
     sys.path.append("/app/agents")
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Request
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 import uvicorn
 from contextlib import asynccontextmanager
@@ -2600,46 +2601,44 @@ class ActionFigureRequest(BaseModel):
 # ── Art Studio async job queue ──────────────────────────────────────────────
 # All generation runs in background; clients poll GET /v1/art/jobs/{id}
 import asyncio as _art_asyncio
-from datetime import datetime as _dt
 
-_art_jobs: dict[str, dict] = {}  # job_id → {status, result, mode, prompt, created_at, finished_at}
+from media_job_store import (
+    create_art_job as _store_create_art_job,
+    finish_art_job as _store_finish_art_job,
+    get_art_job as _store_get_art_job,
+    update_art_job as _store_update_art_job,
+    create_image_training_run as _store_create_image_training_run,
+    get_image_training_run as _store_get_image_training_run,
+)
+from workspace_paths import resolve_workspace_path
 
 def _art_job_create(mode: str, prompt: str) -> str:
-    job_id = str(uuid.uuid4())
-    _art_jobs[job_id] = {
-        "status": "running",
-        "result": None,
-        "mode": mode,
-        "prompt": prompt,
-        "created_at": _dt.utcnow().isoformat(),
-        "finished_at": None,
-    }
-    return job_id
+    return _store_create_art_job(mode, prompt)
+
+
+def _art_job_update(job_id: str, **fields):
+    return _store_update_art_job(job_id, **fields)
 
 def _art_job_finish(job_id: str, status: str, result: str):
-    if job_id in _art_jobs:
-        _art_jobs[job_id]["status"] = status
-        _art_jobs[job_id]["result"] = result
-        _art_jobs[job_id]["finished_at"] = _dt.utcnow().isoformat()
+    _store_finish_art_job(job_id, status, result)
 
 @app.get("/v1/art/jobs/{job_id}")
 async def art_job_status(job_id: str):
     """Poll for generation job status."""
-    job = _art_jobs.get(job_id)
+    job = _store_get_art_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
 
 @app.get("/v1/art/models")
 async def list_art_models():
-    """List available ComfyUI model checkpoints."""
+    """List curated image profiles plus raw ComfyUI checkpoints."""
     try:
-        from specialized.image_gen import list_available_models
-        models = list_available_models()
-        return {"models": models or ["v1-5-pruned-emaonly.ckpt"]}
+        from specialized.image_gen import get_image_model_catalog
+        return get_image_model_catalog()
     except Exception as e:
         logger.warning(f"Failed to list art models: {e}")
-        return {"models": ["v1-5-pruned-emaonly.ckpt"]}
+        return {"models": [], "profiles": [], "checkpoints": []}
 
 @app.post("/v1/art/generate/image")
 async def art_generate_image(req: ImageGenRequest):
@@ -2683,22 +2682,27 @@ async def art_generate_3d(req: ThreeDGenRequest):
                 import re
                 concept_prompt = (
                     f"one single {req.prompt}, solo, alone, full body, centered subject, "
-                    f"standing straight, neutral pose, front facing camera, "
-                    f"clean edges, isolated on plain white background, "
-                    f"studio lighting, high detail, sharp focus, "
-                    f"no cropping, entire figure visible head to toe"
+                    f"standing straight, A-pose, legs slightly apart, arms slightly away from body, "
+                    f"front facing camera, perfectly symmetrical, "
+                    f"clean hard edges, every limb fully separated and distinct, "
+                    f"isolated on pure white background, "
+                    f"bright even studio lighting, high detail, sharp focus, "
+                    f"no ground, no floor, no shadow, no base, no pedestal, "
+                    f"no cropping, entire figure visible head to toe, feet floating above white"
                 )
                 _CONCEPT_NEG = (
                     "multiple objects, multiple characters, text, watermark, frame, border, "
-                    "vignette, gradient background, shadow on ground, complex background, "
-                    "environment, landscape, cropped, cut off, portrait only, partial body, "
-                    "bad anatomy, deformed, extra limbs, blurry, low quality, low resolution"
+                    "vignette, gradient background, shadow on ground, ground shadow, cast shadow, "
+                    "ground contact, floor, puddle, rock base, stone base, earth, dirt, "
+                    "complex background, environment, landscape, cropped, cut off, portrait only, "
+                    "partial body, bad anatomy, deformed, extra limbs, blurry, low quality, "
+                    "low resolution, dark background, colored background, feet touching ground"
                 )
-                _art_jobs[job_id]["result"] = "Generating concept art..."
+                _art_job_update(job_id, result="Generating concept art...")
                 img_result = await _art_asyncio.to_thread(
                     generate_image, concept_prompt,
                     width=1024, height=1024,
-                    cfg=2.0, steps=6,
+                    cfg=4.5, steps=20,
                     negative_prompt=_CONCEPT_NEG,
                     skip_refinement=True,
                 )
@@ -2722,7 +2726,7 @@ async def art_generate_3d(req: ThreeDGenRequest):
             if prepared_path:
                 image_path = prepared_path
 
-            _art_jobs[job_id]["result"] = "Generating 3D model (this may take several minutes)..."
+            _art_job_update(job_id, result="Generating 3D model (this may take several minutes)...")
             # Build quality overrides from request
             quality_overrides = {}
             if req.steps > 0:
@@ -2731,9 +2735,10 @@ async def art_generate_3d(req: ThreeDGenRequest):
                 quality_overrides["cfg"] = req.cfg
             if not quality_overrides and req.quality:
                 _QUALITY_PRESETS = {
-                    "fast":     {"steps": 50, "cfg": 5.0},
-                    "balanced": {"steps": 75, "cfg": 5.0},
-                    "high":     {"steps": 100, "cfg": 5.0},
+                    "fast":     {"steps": 75,  "cfg": 5.0},
+                    "balanced": {"steps": 100, "cfg": 5.5},
+                    "high":     {"steps": 150, "cfg": 6.0},
+                    "ultra":    {"steps": 200, "cfg": 6.5},
                 }
                 quality_overrides = _QUALITY_PRESETS.get(req.quality, {})
 
@@ -2759,25 +2764,28 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             from specialized.image_gen import generate_image
             import re
             concept_prompt = (
-                f"{req.prompt}, T-pose reference sheet, front view, "
-                f"arms extended straight to sides at shoulder height, legs slightly apart, "
-                f"symmetrical, single character, centered subject, "
-                f"isolated on solid white background, studio product photo lighting, "
-                f"entire body visible head to toe, high detail, sharp focus, "
-                f"no props, no text, no cropping"
+                f"{req.prompt}, neutral A-pose turnaround, front view, "
+                f"standing perfectly upright, arms hanging relaxed at 45 degrees from body, "
+                f"feet together, body facing directly forward, "
+                f"symmetrical, single character, small figure centered with large white space around it, "
+                f"isolated on pure solid white background, studio product photo lighting, "
+                f"entire body visible head to toe including feet, high detail, sharp focus, "
+                f"no weapons, no props, no accessories, no text, no cropping, no vignette"
             )
             _TPOSE_NEG = (
                 "multiple objects, multiple characters, text, watermark, frame, border, "
-                "vignette, gradient background, shadow on ground, complex background, "
-                "environment, landscape, cropped, portrait only, partial body, cut off feet, "
-                "perspective distortion, foreshortening, dynamic pose, action pose, "
+                "vignette, dark edges, gradient background, shadow on ground, cast shadow, "
+                "ground plane, rock base, pedestal, complex background, environment, landscape, "
+                "cropped, portrait only, partial body, cut off feet, "
+                "perspective distortion, foreshortening, dynamic pose, action pose, fighting stance, "
+                "weapon, sword, gun, shield, "
                 "bad anatomy, deformed, extra limbs, blurry, low quality, low resolution"
             )
-            _art_jobs[job_id]["result"] = "Generating T-pose concept art..."
+            _art_job_update(job_id, result="Generating concept art...")
             img_result = await _art_asyncio.to_thread(
                 generate_image, concept_prompt,
                 width=1024, height=1024,
-                cfg=2.0, steps=6,
+                cfg=4.5, steps=20,
                 negative_prompt=_TPOSE_NEG,
                 skip_refinement=True,
             )
@@ -2798,7 +2806,7 @@ async def art_generate_action_figure(req: ActionFigureRequest):
             if prepared_path:
                 image_path = prepared_path
 
-            _art_jobs[job_id]["result"] = "Generating 3D mesh and segmenting into posable parts..."
+            _art_job_update(job_id, result="Generating 3D mesh and segmenting into posable parts...")
             from specialized.action_figure_agent import generate_action_figure
             result = await _art_asyncio.to_thread(
                 generate_action_figure, image_path, req.workflow,
@@ -2833,6 +2841,7 @@ async def art_gallery_images():
                 images.append({
                     "filename": f,
                     "url": f"/delivered_artifacts/{f}",
+                    "download_url": f"/v1/art/gallery/images/{f}?dl=1",
                     "size_bytes": os.path.getsize(fpath),
                     "meta": meta,
                 })
@@ -2840,9 +2849,27 @@ async def art_gallery_images():
     except Exception as e:
         return {"images": [], "error": str(e)}
 
+@app.get("/v1/art/gallery/images/{filename}")
+async def art_serve_gallery_image(filename: str, dl: int = 0):
+    """Serve a delivered image, optionally as a download attachment."""
+    import re
+    if not re.match(r'^[\w.\- ]+$', filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    fpath = os.path.normpath(os.path.join("/workspace/delivered_artifacts", filename))
+    if not fpath.startswith("/workspace/delivered_artifacts"):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.isfile(fpath):
+        raise HTTPException(status_code=404, detail="Image not found")
+    ext = filename.rsplit(".", 1)[-1].lower()
+    media_types = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}
+    media_type = media_types.get(ext, "application/octet-stream")
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'} if dl else {}
+    return FileResponse(fpath, media_type=media_type, headers=headers)
+
+
 @app.get("/v1/art/gallery/3d")
 async def art_gallery_3d():
-    """List 3D model files."""
+    """List 3D model files with direct download URLs."""
     output_dirs = [
         ("3d_models", "/app/comfy_io/output/3D"),
         ("action_figures", "/app/comfy_io/output/action_figures"),
@@ -2851,29 +2878,30 @@ async def art_gallery_3d():
     for category, dir_path in output_dirs:
         if not os.path.exists(dir_path):
             continue
+        subdir = "3D" if category == "3d_models" else "action_figures"
         for f in sorted(os.listdir(dir_path), key=lambda x: os.path.getmtime(os.path.join(dir_path, x)), reverse=True):
             if f.lower().endswith(('.glb', '.obj', '.stl', '.3mf')):
                 fpath = os.path.join(dir_path, f)
+                rel = f"{subdir}/{f}"
                 files.append({
                     "filename": f,
                     "category": category,
                     "ext": f.rsplit(".", 1)[-1].upper(),
                     "size_bytes": os.path.getsize(fpath),
-                    "path": fpath,
+                    "url": f"/v1/art/files/{rel}",
+                    "download_url": f"/v1/art/files/{rel}?dl=1",
                 })
     return {"files": files}
 
 # ── Serve 3D model files (GLB/OBJ/STL) for the viewer ─────────────────────
 
 @app.get("/v1/art/files/{filepath:path}")
-async def art_serve_file(filepath: str):
-    """Serve a generated 3D file for the browser viewer."""
-    # Only allow serving from known output directories
-    allowed_roots = ["/app/comfy_io/output", "/app/comfy_io/output/action_figures"]
+async def art_serve_file(filepath: str, dl: int = 0):
+    """Serve a generated 3D file for the browser viewer. Pass ?dl=1 to force download."""
     full_path = os.path.join("/app/comfy_io/output", filepath)
     full_path = os.path.normpath(full_path)
 
-    if not any(full_path.startswith(root) for root in ["/app/comfy_io/output"]):
+    if not full_path.startswith("/app/comfy_io/output"):
         raise HTTPException(status_code=403, detail="Access denied")
     if not os.path.isfile(full_path):
         raise HTTPException(status_code=404, detail=f"File not found: {filepath}")
@@ -2882,7 +2910,61 @@ async def art_serve_file(filepath: str):
     media_types = {"glb": "model/gltf-binary", "gltf": "model/gltf+json",
                    "obj": "text/plain", "stl": "model/stl", "3mf": "model/3mf"}
     media_type = media_types.get(ext, "application/octet-stream")
-    return FileResponse(full_path, media_type=media_type)
+    filename = os.path.basename(full_path)
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'} if dl else {}
+    return FileResponse(full_path, media_type=media_type, headers=headers)
+
+
+@app.get("/v1/art/jobs/{job_id}/download")
+async def art_job_download(job_id: str, dl: int = 1):
+    """
+    Single-hop download from a job ID.
+    Resolves the output file from the job result and streams it directly.
+    Pass ?dl=0 to serve inline (e.g. for browser preview) instead of attachment.
+    """
+    import re
+    from fastapi.responses import RedirectResponse
+
+    job = _store_get_art_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.get("status") not in ("ok", "completed"):
+        raise HTTPException(status_code=409, detail=f"Job not complete — status: {job.get('status')}")
+
+    result = job.get("result", "")
+
+    # Image jobs: result contains "Generated Image: filename.png"
+    img_match = re.search(r"Generated Image: ([\w.\-]+)", result)
+    if img_match:
+        filename = img_match.group(1)
+        fpath = os.path.normpath(f"/workspace/delivered_artifacts/{filename}")
+        if not fpath.startswith("/workspace/delivered_artifacts"):
+            raise HTTPException(status_code=403, detail="Access denied")
+        if not os.path.isfile(fpath):
+            raise HTTPException(status_code=404, detail=f"Output file not found: {filename}")
+        ext = filename.rsplit(".", 1)[-1].lower()
+        media_types = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}
+        media_type = media_types.get(ext, "application/octet-stream")
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'} if dl else {}
+        return FileResponse(fpath, media_type=media_type, headers=headers)
+
+    # 3D jobs: result contains a path ending in .glb/.obj/.stl
+    path_match = re.search(r"(/[^\s]+\.(?:glb|obj|stl|3mf))", result, re.IGNORECASE)
+    if path_match:
+        full_path = os.path.normpath(path_match.group(1))
+        allowed = ["/app/comfy_io/output", "/workspace"]
+        if not any(full_path.startswith(r) for r in allowed):
+            raise HTTPException(status_code=403, detail="Access denied")
+        if not os.path.isfile(full_path):
+            raise HTTPException(status_code=404, detail=f"Output file not found: {full_path}")
+        ext = full_path.rsplit(".", 1)[-1].lower()
+        media_types = {"glb": "model/gltf-binary", "obj": "text/plain", "stl": "model/stl", "3mf": "model/3mf"}
+        media_type = media_types.get(ext, "application/octet-stream")
+        filename = os.path.basename(full_path)
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'} if dl else {}
+        return FileResponse(full_path, media_type=media_type, headers=headers)
+
+    raise HTTPException(status_code=422, detail="Could not resolve output file from job result")
 
 # ── Smooth / optimize a generated mesh for 3D printing ─────────────────────
 
@@ -2964,7 +3046,7 @@ async def art_segment_with_joints(req: SegmentRequest):
                 _center_mesh, _scale_mesh_to_height, _ensure_output_dir,
             )
 
-            _art_jobs[job_id]["result"] = "Loading and repairing mesh..."
+            _art_job_update(job_id, result="Loading and repairing mesh...")
             mesh = _load_mesh(req.mesh_path)
             mesh = repair_mesh(mesh)
             mesh = _center_mesh(mesh)
@@ -2982,7 +3064,7 @@ async def art_segment_with_joints(req: SegmentRequest):
 
             skeleton = {"joints": user_joints, "confidence": 1.0, "detected_features": {}}
 
-            _art_jobs[job_id]["result"] = f"Cutting mesh at {len(user_joints)} joints..."
+            _art_job_update(job_id, result=f"Cutting mesh at {len(user_joints)} joints...")
 
             # Determine which body parts we can extract (all required joints must be placed)
             _ensure_output_dir()
@@ -3619,6 +3701,25 @@ class MediaForgeGenerateRequest(BaseModel):
     workflow_name: str = "workflow_hunyuan_paint-2.json"
 
 
+class MediaImageLoRATrainRequest(BaseModel):
+    name: str
+    base_profile: str = "sdxl-general"
+    dataset_dir: str = "/workspace/delivered_artifacts"
+    trigger_word: str | None = None
+    max_images: int = 250
+    learning_rate: float = 1e-4
+    steps: int = 1000
+    trainer_mode: str = "plan-only"
+
+
+class MediaImageRatingRequest(BaseModel):
+    score: int = Field(..., ge=1, le=5, description="Quality score 1-5")
+    approved: bool = Field(False, description="Approve image for LoRA training dataset")
+    notes: str | None = None
+    trigger_word: str | None = None
+    base_profile: str = "sdxl-general"
+
+
 @app.get("/api/v1/media/comfyui/status")
 async def media_comfyui_status():
     """Check ComfyUI availability for media workflows."""
@@ -3633,11 +3734,10 @@ async def media_comfyui_status():
 
 @app.get("/api/v1/media/comfyui/checkpoints")
 async def media_comfyui_checkpoints():
-    """List available ComfyUI checkpoints."""
+    """List curated image profiles plus raw ComfyUI checkpoints."""
     try:
-        from specialized.image_gen import list_available_models
-        models = list_available_models()
-        return {"models": models}
+        from specialized.image_gen import get_image_model_catalog
+        return get_image_model_catalog()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch checkpoints: {e}")
 
@@ -3666,6 +3766,117 @@ async def media_generate_3d(req: MediaForgeGenerateRequest):
         return {"result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"3D generation failed: {e}")
+
+
+@app.post("/api/v1/media/training/image-lora")
+async def media_train_image_lora(req: MediaImageLoRATrainRequest):
+    """Queue a dedicated image LoRA training preparation run."""
+    resolved_dataset_dir = resolve_workspace_path(req.dataset_dir)
+    if not os.path.isdir(resolved_dataset_dir):
+        raise HTTPException(status_code=404, detail=f"Dataset directory not found: {req.dataset_dir}")
+
+    payload = req.model_dump()
+    payload["dataset_dir"] = resolved_dataset_dir
+    run = _store_create_image_training_run(payload)
+    return {"run_id": run["run_id"], "status": run["status"], "payload": run["payload"]}
+
+
+@app.get("/api/v1/media/training/image-lora/{run_id}")
+async def media_train_image_lora_status(run_id: str):
+    """Get status for a queued image LoRA training run."""
+    run = _store_get_image_training_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Image LoRA training run not found")
+    return run
+
+
+@app.post("/v1/art/jobs/{job_id}/rate")
+async def rate_art_job(job_id: str, req: MediaImageRatingRequest):
+    """
+    Rate a completed art job (score 1-5).  When approved=True the output image
+    is copied to the approved-shots dataset and a mini LoRA training run is queued.
+    """
+    import re
+    import shutil as _shutil
+    from pathlib import Path as _Path
+
+    job = _store_get_art_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Persist the rating back to the job record
+    _art_job_update(
+        job_id,
+        score=req.score,
+        approved=req.approved,
+        rating_notes=req.notes,
+        rated_at=time.time(),
+    )
+
+    response: dict = {"job_id": job_id, "score": req.score, "approved": req.approved}
+
+    if req.approved:
+        result_str = job.get("result", "")
+        match = re.search(r"Generated Image: ([\w.\-]+)", result_str)
+        if not match:
+            response["warning"] = "Job result did not contain an image filename — skipping training enqueue."
+            return response
+
+        filename = match.group(1)
+
+        # Locate the image in delivered_artifacts
+        _workspace = "/workspace" if os.path.isdir("/workspace/delivered_artifacts") else str(
+            _Path(__file__).resolve().parent.parent
+        )
+        src_img = _Path(_workspace) / "delivered_artifacts" / filename
+        if not src_img.exists():
+            response["warning"] = f"Image file not found at {src_img} — skipping training enqueue."
+            return response
+
+        # Copy to approved-shots dataset
+        approved_dir = _Path(_workspace) / "training_data" / "image_lora" / "approved_shots"
+        approved_dir.mkdir(parents=True, exist_ok=True)
+        dst_img = approved_dir / filename
+        _shutil.copy(src_img, dst_img)
+
+        # Copy sidecar if present
+        src_sidecar = _Path(str(src_img) + ".json")
+        if src_sidecar.exists():
+            _shutil.copy(src_sidecar, _Path(str(dst_img) + ".json"))
+        else:
+            # Create minimal sidecar from job metadata
+            import json as _json
+            sidecar = {
+                "prompt": job.get("prompt", ""),
+                "job_id": job_id,
+                "score": req.score,
+                "trigger_word": req.trigger_word,
+                "approved": True,
+            }
+            _Path(str(dst_img) + ".json").write_text(_json.dumps(sidecar, indent=2))
+
+        # Enqueue a mini LoRA training run on the approved dataset
+        trigger = req.trigger_word or (job.get("prompt", "concept") or "concept").split()[0]
+        training_payload = {
+            "name": f"feedback_{job_id[:8]}",
+            "dataset_dir": str(approved_dir),
+            "base_profile": req.base_profile,
+            "trigger_word": trigger,
+            "steps": 150,
+            "learning_rate": 1e-4,
+            "max_images": 50,
+            "trainer_mode": "execute",
+        }
+        run = _store_create_image_training_run(training_payload)
+        response["training_run_id"] = run["run_id"]
+        response["training_status"] = run["status"]
+        response["dataset_dir"] = str(approved_dir)
+        logger.info(
+            "Approved art job %s queued as training run %s (trigger=%s)",
+            job_id, run["run_id"], trigger,
+        )
+
+    return response
 
 
 # --- Voice Synthesis Endpoint ---

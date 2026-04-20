@@ -58,17 +58,28 @@ RUN pip install --no-cache-dir \
     datasets \
     huggingface_hub
 
-# Training runtime dependencies (QLoRA GRPO fine-tuning, RTX 5060 Ti / sm_120)
-RUN pip install --no-cache-dir --pre torch --index-url https://download.pytorch.org/whl/nightly/cu128
+# Training runtime dependencies (Unsloth GRPO fine-tuning, RTX 5060 Ti / sm_120)
+# NOTE: unsloth pins torch<2.11.0, so we let it install the correct torch version.
+# Installing torch nightly here would just get downgraded by unsloth's dependency resolver.
 RUN pip install --no-cache-dir \
-    transformers \
-    peft \
+    unsloth \
     trl \
-    bitsandbytes \
+    transformers \
     accelerate \
     sentencepiece \
     protobuf \
     tensorboard
+
+# NOTE: flash-attn requires nvcc (CUDA compiler) to build from source, which is not
+# present in python:3.11-slim. Without flash-attn, Unsloth uses PyTorch SDPA, which
+# still leverages fused attention kernels on sm_120 via torch.backends.cuda.
+# To enable flash-attn, switch to a CUDA devel base image (e.g. nvidia/cuda:12.8-devel).
+
+# Image LoRA training dependencies
+RUN pip install --no-cache-dir \
+    diffusers \
+    peft \
+    safetensors
 
 # 3D pipeline dependencies (action figure segmentation, mesh processing)
 RUN pip install --no-cache-dir \

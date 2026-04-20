@@ -98,7 +98,7 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   };
 
   return (
-    <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-4">
+    <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 md:p-4">
       <div className="relative flex items-end gap-2 max-w-3xl mx-auto">
         {isSlash && matches.length > 0 && (
           <div className="absolute bottom-full mb-2 left-0 right-12 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] overflow-hidden z-20">
@@ -122,7 +122,7 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
           placeholder={placeholder || "Send a message..."}
           rows={1}
           className={cn(
-            "flex-1 resize-none bg-[var(--chat-panel)] text-[var(--chat-text)] rounded-md px-4 py-3 font-mono",
+            "flex-1 resize-none bg-[var(--chat-panel)] text-[var(--chat-text)] rounded-md px-3 py-2.5 md:px-4 md:py-3 font-mono",
             "border border-[var(--chat-border)] focus:border-[var(--chat-accent)] focus:outline-none",
             "placeholder:text-[var(--chat-muted)] text-sm leading-relaxed",
             "scrollbar-thin",
@@ -132,7 +132,7 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
         {isStreaming ? (
           <button
             onClick={onStop}
-            className="flex-shrink-0 w-10 h-10 rounded-md bg-red-700 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+            className="flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md bg-red-700 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
           >
             <Square size={16} />
           </button>
@@ -141,7 +141,7 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
             onClick={handleSend}
             disabled={!input.trim()}
             className={cn(
-              "flex-shrink-0 w-10 h-10 rounded-md flex items-center justify-center transition-colors",
+              "flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md flex items-center justify-center transition-colors",
               input.trim()
                 ? "bg-[var(--chat-accent)] hover:bg-[var(--chat-accent-strong)] text-white"
                 : "bg-[var(--chat-soft)] text-[var(--chat-muted)] cursor-not-allowed"

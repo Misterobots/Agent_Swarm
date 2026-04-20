@@ -13,6 +13,141 @@ logger = setup_logger("CreativeStudio")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://host.docker.internal:8188")
 MODEL_NAME = "qwen2.5-coder:14b" # Logic model
+DEPLOYED_FALLBACK_CHECKPOINT = "sd_xl_turbo_1.0_fp16.safetensors"
+
+IMAGE_MODEL_REGISTRY = {
+    "auto": {
+        "label": "Auto Best Available",
+        "category": "adaptive",
+        "description": "Select the strongest available curated profile in priority order.",
+        "priority": ["flux-dev-quality", "flux-schnell-preview", "sdxl-general", "sdxl-turbo-preview", "sd15-fast-legacy"],
+    },
+    "flux-dev-quality": {
+        "label": "FLUX Dev Quality",
+        "category": "quality",
+        "description": "Highest prompt fidelity and image quality when FLUX dev checkpoints are available.",
+        "match_any": ["flux"],
+        "match_all": ["dev"],
+        "defaults": {"width": 1024, "height": 1024},
+        "trainable": True,
+    },
+    "flux-schnell-preview": {
+        "label": "FLUX Schnell Preview",
+        "category": "preview",
+        "description": "Fast FLUX ideation path for previews and iteration.",
+        "match_all": ["flux", "schnell"],
+        "defaults": {"width": 1024, "height": 1024},
+        "trainable": True,
+    },
+    "sdxl-general": {
+        "label": "SDXL General",
+        "category": "quality",
+        "description": "General-purpose SDXL path for higher resolution images and stronger composition.",
+        "match_any": ["sdxl", "xl"],
+        "exclude_any": ["turbo"],
+        "defaults": {"width": 1024, "height": 1024},
+        "trainable": True,
+    },
+    "sdxl-turbo-preview": {
+        "label": "SDXL Turbo Preview",
+        "category": "preview",
+        "description": "Fast SDXL preview path optimized for iteration speed.",
+        "match_all": ["xl", "turbo"],
+        "defaults": {"width": 1024, "height": 1024},
+        "trainable": True,
+    },
+    "sd15-fast-legacy": {
+        "label": "SD1.5 Fast Legacy",
+        "category": "legacy",
+        "description": "Compatibility path for SD1.5 checkpoints and 3D bootstrap images.",
+        "match_any": ["sd15", "1.5", "dreamshaper", "pruned", "v15"],
+        "defaults": {"width": 768, "height": 768},
+        "trainable": True,
+    },
+}
+
+
+def _resolve_workspace_root() -> str:
+    script_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    mounted_workspace = os.getenv("WORKSPACE_ROOT", "/workspace")
+    if mounted_workspace and os.path.exists(mounted_workspace):
+        return mounted_workspace
+    return script_root
+
+
+def _extract_checkpoint_names(payload: dict) -> list[str]:
+    return (
+        payload.get("CheckpointLoaderSimple", {})
+        .get("input", {})
+        .get("required", {})
+        .get("ckpt_name", [[]])[0]
+    )
+
+
+def _checkpoint_matches_profile(ckpt_name: str, profile: dict) -> bool:
+    ckpt_lower = ckpt_name.lower()
+    match_all = profile.get("match_all", [])
+    match_any = profile.get("match_any", [])
+    exclude_any = profile.get("exclude_any", [])
+
+    if match_all and not all(token in ckpt_lower for token in match_all):
+        return False
+    if match_any and not any(token in ckpt_lower for token in match_any):
+        return False
+    if exclude_any and any(token in ckpt_lower for token in exclude_any):
+        return False
+    return True
+
+
+def _match_profile_checkpoint(profile_id: str, available_ckpts: list[str]) -> str | None:
+    profile = IMAGE_MODEL_REGISTRY[profile_id]
+    for ckpt in available_ckpts:
+        if _checkpoint_matches_profile(ckpt, profile):
+            return ckpt
+    return None
+
+
+def get_image_model_catalog(available_ckpts: list[str] | None = None) -> dict:
+    if available_ckpts is None:
+        available_ckpts = list_available_models()
+
+    profiles = []
+    for profile_id, profile in IMAGE_MODEL_REGISTRY.items():
+        if profile_id == "auto":
+            resolved_checkpoint = None
+            for candidate_id in profile.get("priority", []):
+                resolved_checkpoint = _match_profile_checkpoint(candidate_id, available_ckpts)
+                if resolved_checkpoint:
+                    break
+            available = resolved_checkpoint is not None
+        else:
+            resolved_checkpoint = _match_profile_checkpoint(profile_id, available_ckpts)
+            available = resolved_checkpoint is not None
+
+        profiles.append({
+            "id": profile_id,
+            "label": profile["label"],
+            "category": profile["category"],
+            "description": profile["description"],
+            "trainable": profile.get("trainable", False),
+            "available": available,
+            "resolved_checkpoint": resolved_checkpoint,
+            "defaults": profile.get("defaults", {}),
+        })
+
+    recommended_profile = next(
+        (item["id"] for item in profiles if item["id"] != "auto" and item["available"]),
+        None,
+    )
+
+    return {
+        "default_profile": "auto",
+        "recommended_profile": recommended_profile,
+        "profiles": profiles,
+        "checkpoints": available_ckpts,
+        # Preserve backward compatibility for older clients that expect `models`.
+        "models": available_ckpts,
+    }
 
 def list_available_models() -> list:
     """Queries ComfyUI for all available checkpoints."""
@@ -20,17 +155,80 @@ def list_available_models() -> list:
         url = f"{COMFYUI_HOST}/object_info/CheckpointLoaderSimple"
         req = requests.get(url, timeout=5)
         if req.status_code == 200:
-            return req.json().get('CheckpointLoaderSimple', {}).get('input', {}).get('required', {}).get('ckpt_name', [])[0]
+            models = _extract_checkpoint_names(req.json())
+            if not models:
+                logger.warning(
+                    "ComfyUI checkpoint discovery returned an empty list",
+                    extra={"comfyui_host": COMFYUI_HOST, "endpoint": url},
+                )
+            return models
+        logger.warning(
+            f"ComfyUI checkpoint discovery failed with status {req.status_code}: {req.text[:200]}"
+        )
     except Exception as e:
         logger.warning(f"Failed to list models: {e}")
-    # Fallback to the checkpoint we actually deploy in this stack.
-    return ["sd_xl_turbo_1.0_fp16.safetensors"]
+    return []
 
 def get_available_checkpoint():
     """Queries ComfyUI for the first available checkpoint."""
-    # This is legacy, but we keep it for now or redirect
     models = list_available_models()
-    return models[0] if models else "v1-5-pruned-emaonly.ckpt"
+    return models[0] if models else None
+
+
+def resolve_generation_target(requested_model: str | None, available_ckpts: list[str]) -> dict:
+    requested_model = requested_model or "auto"
+
+    if requested_model in IMAGE_MODEL_REGISTRY:
+        if requested_model == "auto":
+            for candidate_id in IMAGE_MODEL_REGISTRY["auto"].get("priority", []):
+                checkpoint = _match_profile_checkpoint(candidate_id, available_ckpts)
+                if checkpoint:
+                    return {
+                        "requested_model": requested_model,
+                        "profile_id": candidate_id,
+                        "checkpoint": checkpoint,
+                    }
+            raise RuntimeError(
+                "No curated image profiles are currently available. "
+                f"ComfyUI reported checkpoints: {available_ckpts or 'none'}"
+            )
+
+        checkpoint = _match_profile_checkpoint(requested_model, available_ckpts)
+        if not checkpoint:
+            raise ValueError(
+                f"Requested image profile '{requested_model}' is unavailable. "
+                f"ComfyUI reported checkpoints: {available_ckpts or 'none'}"
+            )
+        return {
+            "requested_model": requested_model,
+            "profile_id": requested_model,
+            "checkpoint": checkpoint,
+        }
+
+    if requested_model in available_ckpts:
+        return {
+            "requested_model": requested_model,
+            "profile_id": "direct-checkpoint",
+            "checkpoint": requested_model,
+        }
+
+    raise ValueError(
+        f"Requested checkpoint or profile '{requested_model}' is unavailable. "
+        f"Available profiles: {list(IMAGE_MODEL_REGISTRY.keys())}. "
+        f"ComfyUI reported checkpoints: {available_ckpts or 'none'}"
+    )
+
+
+def select_checkpoint(requested_ckpt: str | None, available_ckpts: list[str]) -> str:
+    if not available_ckpts:
+        raise RuntimeError(
+            "No ComfyUI checkpoints are available. Add a model under models/checkpoints "
+            f"or verify the ComfyUI host ({COMFYUI_HOST}) is mounted correctly. "
+            f"Expected deployed fallback: {DEPLOYED_FALLBACK_CHECKPOINT}."
+        )
+
+    target = resolve_generation_target(requested_ckpt, available_ckpts)
+    return target["checkpoint"]
 
 # --- LAYER 3: MODEL DETECTION ---
 def detect_model_type(ckpt_name: str) -> str:
@@ -91,20 +289,24 @@ def queue_prompt(prompt_text: str, **kwargs):
     negative_prompt_override = kwargs.get("negative_prompt")
     all_ckpts = list_available_models()
     
-    ckpt_name = "v1-5-pruned-emaonly.ckpt"
-    
-    # 1. Select Checkpoint
-    if requested_ckpt and requested_ckpt in all_ckpts:
-        ckpt_name = requested_ckpt
-    elif all_ckpts:
-         ckpt_name = all_ckpts[0]
-         for c in all_ckpts:
-            if "flux" in c.lower() and "schnell" in c.lower(): ckpt_name = c; break
-            if "xl" in c.lower() and "turbo" not in c.lower(): ckpt_name = c
+    try:
+        target = resolve_generation_target(requested_ckpt, all_ckpts)
+        ckpt_name = target["checkpoint"]
+    except (RuntimeError, ValueError) as exc:
+        logger.error(
+            "Checkpoint selection failed for image generation",
+            extra={
+                "requested_ckpt": requested_ckpt,
+                "available_ckpts": all_ckpts,
+                "prompt_preview": prompt_text[:120],
+            },
+        )
+        return f"Error: {exc}"
             
     # 2. Determine Configuration
     model_type = detect_model_type(ckpt_name)
     raw_params = get_model_params(model_type)
+    profile_defaults = IMAGE_MODEL_REGISTRY.get(target["profile_id"], {}).get("defaults", {})
     
     # APPLY OVERRIDES
     params = {
@@ -112,15 +314,18 @@ def queue_prompt(prompt_text: str, **kwargs):
         "steps": int(kwargs.get("steps", raw_params["steps"])),
         "sampler": kwargs.get("sampler", raw_params["sampler"]),
         "scheduler": kwargs.get("scheduler", raw_params["scheduler"]),
-        "width": int(kwargs.get("width", raw_params["width"])),
-        "height": int(kwargs.get("height", raw_params["height"]))
+        "width": int(kwargs.get("width", profile_defaults.get("width", raw_params["width"]))),
+        "height": int(kwargs.get("height", profile_defaults.get("height", raw_params["height"])))
     }
     
     if kwargs.get("skip_refinement"):
         final_prompt = prompt_text
     else:
         final_prompt = refine_prompt(prompt_text, model_type)
-    print(f"--- [ComfyUI] Config: {model_type} | Ckpt: {ckpt_name} | Params: {params} ---")
+    print(
+        f"--- [ComfyUI] Config: {model_type} | Profile: {target['profile_id']} | "
+        f"Ckpt: {ckpt_name} | Params: {params} ---"
+    )
 
     # 3. Payload
     p = {
@@ -210,9 +415,13 @@ def queue_prompt(prompt_text: str, **kwargs):
         return f"Error connecting to ComfyUI: {e}"
 
     print("--- [ComfyUI] Waiting for generation... ---")
-    time.sleep(2) 
-    
-    for i in range(180):  # Up to 3 minutes for model loading + generation
+    time.sleep(2)
+
+    timeout_seconds = 900  # 15 minutes — covers model load + queue wait + steps=20+ generation
+    start_time = time.time()
+    lost_count = 0
+
+    while (time.time() - start_time) < timeout_seconds:
         try:
             history_url = f"{COMFYUI_HOST}/history/{prompt_id}"
             res = requests.get(history_url, timeout=5)
@@ -236,14 +445,35 @@ def queue_prompt(prompt_text: str, **kwargs):
                      if images:
                          filename = images[0]['filename']
                          subfolder = images[0].get('subfolder', '')
-                         return f"Generated Image: {filename} (in {subfolder} output)"
+                         return (
+                             f"Generated Image: {filename} (in {subfolder} output) "
+                             f"| profile={target['profile_id']} | checkpoint={ckpt_name}"
+                         )
                      return "Error: ComfyUI completed but produced no image output."
                 return "Error: ComfyUI completed but SaveImage node produced no output."
+
+            # Not in history yet — check queue to avoid premature timeout while waiting in line
+            try:
+                q_res = requests.get(f"{COMFYUI_HOST}/queue", timeout=5)
+                q_data = q_res.json()
+                is_pending = any(item[1] == prompt_id for item in q_data.get('queue_pending', []))
+                is_running = any(item[1] == prompt_id for item in q_data.get('queue_running', []))
+                if is_pending:
+                    # Reset timer while queued so we don't count wait time against generation budget
+                    start_time = time.time()
+                elif not is_running:
+                    lost_count += 1
+                    if lost_count > 5:
+                        return "Error: ComfyUI job disappeared from queue without producing output."
+            except Exception:
+                pass
+
         except Exception as e:
             logger.warning(f"Polling error: {e}")
-        time.sleep(1)
+        time.sleep(2)
 
-    return "Error: Generation timed out."
+    elapsed = int(time.time() - start_time)
+    return f"Error: Image generation timed out after {elapsed}s (limit {timeout_seconds}s)."
 
 # --- LAYER 6: VERIFICATION ---
 import cv2
@@ -370,7 +600,7 @@ def generate_image(
     print(f"DEBUG: generate_image called with prompt='{prompt}' device='{target_device}'")
     logger.info(f"DEBUG: generate_image called with prompt='{prompt}' device='{target_device}'")
 
-    workspace_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    workspace_root = _resolve_workspace_root()
     # PATH DISCOVEY LOGIC
     # We need to find where ComfyUI is dumping images.
     candidate_paths = [
@@ -389,8 +619,18 @@ def generate_image(
             
     if not output_dir:
         return "Error: Could not locate ComfyUI output directory. Check COMFYUI_OUTPUT_DIR env var."
-    
-    for attempt in range(MAX_RETRIES + 1):
+
+    last_candidate: dict | None = None
+
+    try:
+        from utils.gpu_queue import request_lock as _request_lock
+        _gpu_ctx = _request_lock("image", timeout=600)
+    except Exception:
+        from contextlib import nullcontext
+        _gpu_ctx = nullcontext()
+
+    with _gpu_ctx:
+      for attempt in range(MAX_RETRIES + 1):
         if attempt > 0:
             logger.info(f"--- [Creative Studio] Verification Failed. Retrying ({attempt}/{MAX_RETRIES})... ---")
             
@@ -401,6 +641,7 @@ def generate_image(
              
         try:
             filename = result_msg.split("Generated Image: ")[1].split(" ")[0]
+            resolved_target = resolve_generation_target(model_name, list_available_models())
             img_path = os.path.join(output_dir, filename)
             
             if not os.path.exists(img_path):
@@ -415,6 +656,9 @@ def generate_image(
                     "prompt": prompt,
                     "params": kwargs,
                     "model": model_name,
+                    "resolved_profile": resolved_target["profile_id"],
+                    "resolved_checkpoint": resolved_target["checkpoint"],
+                    "resolved_model_type": detect_model_type(resolved_target["checkpoint"]),
                     "timestamp": time.time()
                 }
                 meta_path = img_path + ".json"
@@ -427,12 +671,22 @@ def generate_image(
             struct_ok, struct_reason = verify_structure(img_path)
             if not struct_ok:
                 logger.warning(f"Structure Check Failed: {struct_reason}")
+                last_candidate = {
+                    "filename": filename,
+                    "img_path": img_path,
+                    "warning": f"Structure warning: {struct_reason}",
+                }
                 continue 
             
             # 2. Semantic Verification
             sem_ok, sem_reason = verify_semantics(img_path, prompt)
             if not sem_ok:
                 logger.warning(f"Semantic Check Failed: {sem_reason}")
+                last_candidate = {
+                    "filename": filename,
+                    "img_path": img_path,
+                    "warning": f"Semantic warning: {sem_reason}",
+                }
                 continue 
                 
             # 3. Delivery (New in v2)
@@ -458,6 +712,35 @@ def generate_image(
             pass
             
         return result_msg 
+
+    if last_candidate:
+        try:
+            import shutil
+
+            filename = last_candidate["filename"]
+            img_path = last_candidate["img_path"]
+            warning = last_candidate["warning"]
+            delivery_dir = os.path.join(workspace_root, "delivered_artifacts")
+            os.makedirs(delivery_dir, exist_ok=True)
+
+            target_path = os.path.join(delivery_dir, filename)
+            shutil.copy(img_path, target_path)
+
+            if os.path.exists(img_path + ".json"):
+                shutil.copy(img_path + ".json", target_path + ".json")
+
+            logger.warning(
+                "Delivered image after verification warnings",
+                extra={
+                    "delivered_filename": filename,
+                    "warning": warning,
+                    "prompt_preview": prompt[:120],
+                },
+            )
+            return f"Generated Image: {filename} (Saved to Gallery) | Verification warning: {warning}"
+        except Exception as e:
+            logger.error(f"Fallback delivery failed: {e}")
+            return f"Error: image generated but fallback delivery failed: {e}"
 
     return "Failed to generate valid image after retries."
 

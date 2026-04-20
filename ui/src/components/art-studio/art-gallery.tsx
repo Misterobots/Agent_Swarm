@@ -123,6 +123,13 @@ export function ArtGallery() {
                     {f.ext} &bull; {(f.size_bytes / (1024 * 1024)).toFixed(1)} MB
                   </p>
                   <p className="text-[10px] text-[var(--chat-muted)] mt-0.5">{f.category}</p>
+                  <a
+                    href={`/api/backend${f.download_url}`}
+                    download={f.filename}
+                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white transition-colors"
+                  >
+                    <Download size={12} /> Download {f.ext}
+                  </a>
                 </div>
               ))}
             </div>

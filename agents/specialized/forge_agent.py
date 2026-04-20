@@ -22,7 +22,7 @@ COMFY_OUTPUT_DIR = "/app/comfy_io/output"
 TEMPLATE_DIR = "/app/agents/templates"
 
 # Default TripoSG quality settings
-_DEFAULT_STEPS = 100
+_DEFAULT_STEPS = 150
 _DEFAULT_CFG = 5.0
 
 
@@ -60,29 +60,70 @@ def prepare_image_for_3d(image_path: str) -> str:
             import cv2
             alpha = np.array(img_nobg)[:, :, 3]
             _, thresh = cv2.threshold(alpha, 30, 255, cv2.THRESH_BINARY)
+
+            # Morphological close to fill small holes before contour detection
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+            thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+
             contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if len(contours) > 1:
+            if len(contours) >= 1:
                 largest = max(contours, key=cv2.contourArea)
                 mask = np.zeros_like(alpha)
                 cv2.drawContours(mask, [largest], -1, 255, cv2.FILLED)
+
+                # --- Ground shadow removal ---
+                # Shadow pixels are semi-transparent, low-saturation, and appear near the
+                # BOTTOM of the bounding box. We erase the bottom N% of marginal alpha rows.
                 nobg_data = np.array(img_nobg)
-                nobg_data[mask == 0, 3] = 0
-                # Crop to bounding box of largest subject with padding
                 x, y, w, h = cv2.boundingRect(largest)
-                pad = max(w, h) // 20  # 5% padding
-                x0 = max(0, x - pad)
-                y0 = max(0, y - pad)
-                x1 = min(nobg_data.shape[1], x + w + pad)
-                y1 = min(nobg_data.shape[0], y + h + pad)
-                cropped = nobg_data[y0:y1, x0:x1]
+                shadow_row_threshold = y + int(h * 0.92)  # bottom 8% of bbox
+                # Any row below 92% bbox height that is <80% opaque gets zeroed
+                for row_idx in range(shadow_row_threshold, nobg_data.shape[0]):
+                    row_alpha = nobg_data[row_idx, :, 3].astype(float)
+                    if row_alpha.mean() < 200:  # mostly translucent → shadow row
+                        nobg_data[row_idx, :, 3] = 0
+                    else:
+                        break  # stop once we hit a solid row (real feet geometry)
+
+                nobg_data[mask == 0, 3] = 0
+
+                # Recalculate bounding box after shadow strip
+                alpha_clean = nobg_data[:, :, 3]
+                rows_with_content = np.any(alpha_clean > 30, axis=1)
+                cols_with_content = np.any(alpha_clean > 30, axis=0)
+                if rows_with_content.any() and cols_with_content.any():
+                    row_min, row_max = np.where(rows_with_content)[0][[0, -1]]
+                    col_min, col_max = np.where(cols_with_content)[0][[0, -1]]
+                    pad = max(row_max - row_min, col_max - col_min) // 20  # 5% padding
+                    row_min = max(0, row_min - pad)
+                    row_max = min(nobg_data.shape[0], row_max + pad)
+                    col_min = max(0, col_min - pad)
+                    col_max = min(nobg_data.shape[1], col_max + pad)
+                    cropped = nobg_data[row_min:row_max, col_min:col_max]
+                else:
+                    cropped = nobg_data
+
                 # Resize to square (TripoSG expects square input)
                 side = max(cropped.shape[0], cropped.shape[1])
                 square = np.zeros((side, side, 4), dtype=np.uint8)
                 oy = (side - cropped.shape[0]) // 2
                 ox = (side - cropped.shape[1]) // 2
-                square[oy:oy+cropped.shape[0], ox:ox+cropped.shape[1]] = cropped
-                img_nobg = Image.fromarray(square).resize((1024, 1024), Image.LANCZOS)
-                logger.info(f"--- [Forge] Isolated largest subject from {len(contours)} contours ---")
+                square[oy:oy + cropped.shape[0], ox:ox + cropped.shape[1]] = cropped
+
+                # Add a safe-zone border (~13% on every side) so the subject never
+                # crowds the image edge.  Without this, Hunyuan3D hallucinates the
+                # image frame itself as solid occluding geometry (visible as flat
+                # rectangular slabs flanking the model in the output mesh).
+                safe_fraction = 0.13  # ≈13 % border each side → subject fills central 74 %
+                padded_side = int(round(side / (1.0 - 2.0 * safe_fraction)))
+                padded = np.zeros((padded_side, padded_side, 4), dtype=np.uint8)
+                border_px = (padded_side - side) // 2
+                padded[border_px:border_px + side, border_px:border_px + side] = square
+                img_nobg = Image.fromarray(padded).resize((1024, 1024), Image.LANCZOS)
+                logger.info(
+                    "[Forge] Isolated subject from %d contours, stripped ground shadow rows",
+                    len(contours),
+                )
         except Exception as e:
             logger.warning(f"[Forge] Subject isolation skipped: {e}")
 
@@ -212,6 +253,24 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
     
     timeout_seconds = 1800 # 30 Minutes
     start_time = time.time()
+
+    def find_recent_output_file() -> str | None:
+        latest_match = None
+        latest_mtime = start_time
+        for root, _, files in os.walk(COMFY_OUTPUT_DIR):
+            for fname in files:
+                if not fname.lower().endswith((".glb", ".obj", ".3mf")):
+                    continue
+                full_path = os.path.join(root, fname)
+                try:
+                    mtime = os.path.getmtime(full_path)
+                except OSError:
+                    continue
+                if mtime >= latest_mtime:
+                    latest_match = full_path
+                    latest_mtime = mtime
+        return latest_match
+
     lost_count = 0
     
     while (time.time() - start_time) < timeout_seconds:
@@ -227,11 +286,14 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
                 if status_str == 'error':
                     msgs = entry.get('status', {}).get('messages', [])
                     err_detail = "Unknown ComfyUI error"
+                    err_node = ""
                     for msg in msgs:
                         if isinstance(msg, list) and msg[0] == 'execution_error':
                             err_detail = msg[1].get('exception_message', err_detail)
+                            err_node = msg[1].get('node_type', '')
                             break
-                    return f"Error: ComfyUI 3D generation failed: {err_detail.strip()}"
+                    node_hint = f" (node: {err_node})" if err_node else ""
+                    return f"Error: ComfyUI 3D generation failed{node_hint}: {err_detail.strip()}"
 
                 logger.info("--- [Forge] Generation Complete. Parsing outputs... ---")
                 outputs = entry.get('outputs', {})
@@ -266,7 +328,12 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
                             logger.info(f"--- [Forge] Found 3D Model: {full_path} ---")
                             return f"3D Model Generated Successfully: {full_path}"
                                 
-                return "Error: Generation finished but no 3D model file (.glb/.obj) was found in outputs."
+                fallback_output = find_recent_output_file()
+                if fallback_output:
+                    logger.info(f"--- [Forge] Found 3D Model via output scan: {fallback_output} ---")
+                    return f"3D Model Generated Successfully: {fallback_output}"
+
+                return "Error: Generation finished but no 3D model file (.glb/.obj) was found in outputs or recent output scan."
 
             # Check Queue (Is it still running?)
             # This prevents premature timeouts if the queue is deep or processing is slow

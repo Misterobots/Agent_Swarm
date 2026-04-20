@@ -145,8 +145,16 @@ class MarsRLLoop:
 
         t0 = time.time()
         last_tok_time = time.time()
+
+        # Detect if the solver has tools registered. When tools are present,
+        # streaming captures raw tool-call JSON as text BEFORE Phi executes
+        # them. Use non-streaming mode so Phi can run tools and return the
+        # synthesized response.
+        _solver_has_tools = bool(getattr(self.solver, "tools", None))
+
         try:
-            if event_callback:
+            if event_callback and not _solver_has_tools:
+                # --- Streaming mode (no tools) ---
                 current_response = ""
                 solver_stream = self.solver.run(task, stream=True)
                 for chunk in solver_stream:
@@ -161,12 +169,17 @@ class MarsRLLoop:
                     if time.time() - last_tok_time > stream_timeout:
                         logger.warning(f"[MarsLoop] Solver stream idle for {stream_timeout}s. Current Response Len: {len(current_response)}")
                         event_callback({"type": "log", "content": f"⚠️ Solver stream idle for {stream_timeout}s. Checking for results..."})
-                        # Don't necessarily break if we have some content; the loop might just be thinking
-                        # But for safety, we break to avoid UI hang if TTFT is too long
                         break
             else:
+                # --- Non-streaming mode (tools present, or no UI callback) ---
+                # Phi executes tool calls internally and returns the final
+                # synthesized response with tool results incorporated.
+                if _solver_has_tools and event_callback:
+                    event_callback({"type": "log", "content": "[MarsRL] Solver has tools — using non-streaming mode for tool execution"})
                 solver_resp = self.solver.run(task)
                 current_response = solver_resp.content if hasattr(solver_resp, "content") else str(solver_resp)
+                if event_callback:
+                    event_callback({"type": "message", "content": current_response})
                 
             iterations += 1
             solver_elapsed = time.time() - t0
@@ -206,7 +219,7 @@ class MarsRLLoop:
                 event_callback({"type": "status", "content": f"🔍 MarsRL: Verifying attempt {attempt + 1}/{self.max_iter}..."})
 
             try:
-                vr: VerifierResult = self.verifier.verify(task, current_response)
+                vr: VerifierResult = self.verifier.verify(task, current_response, intent=self.intent)
             except Exception as e:
                 logger.error(f"[MarsLoop] Verifier error: {e}")
                 vr = VerifierResult(passed=True, reason="Verifier unavailable", score=0.7)

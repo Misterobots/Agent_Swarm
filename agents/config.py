@@ -76,10 +76,10 @@ TRAINING_OUTPUT_DIR          = os.getenv("TRAINING_OUTPUT_DIR",          "/works
 TRAINING_DATASET_DIR         = os.getenv("TRAINING_DATASET_DIR",         "/workspace/training_data")
 TRAINING_BASE_SOLVER         = os.getenv("TRAINING_BASE_SOLVER",         "Qwen/Qwen2.5-Coder-7B-Instruct")
 TRAINING_BASE_ROUTER         = os.getenv("TRAINING_BASE_ROUTER",         "nvidia/Nemotron-Mini-4B-Instruct")
-TRAINING_LORA_RANK           = int(os.getenv("TRAINING_LORA_RANK",       "16"))
-TRAINING_LORA_ALPHA          = int(os.getenv("TRAINING_LORA_ALPHA",      "32"))
-TRAINING_BATCH_SIZE          = int(os.getenv("TRAINING_BATCH_SIZE",      "1"))
-TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION", "8"))
+TRAINING_LORA_RANK           = int(os.getenv("TRAINING_LORA_RANK",       "64"))
+TRAINING_LORA_ALPHA          = int(os.getenv("TRAINING_LORA_ALPHA",      "128"))
+TRAINING_BATCH_SIZE          = int(os.getenv("TRAINING_BATCH_SIZE",      "2"))
+TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION", "4"))
 
 # ---------------------------------------------------------------------------
 # Context Window Management
@@ -155,8 +155,8 @@ ADMIN_ONLY_MODELS: set[str] = {
     "claude-haiku-3-5-20241022",
 }
 
-TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "5e-6"))
+TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "2e-5"))
 TRAINING_NUM_EPOCHS          = int(os.getenv("TRAINING_NUM_EPOCHS",      "3"))
-TRAINING_MAX_SEQ_LEN         = int(os.getenv("TRAINING_MAX_SEQ_LEN",    "4096"))
+TRAINING_MAX_SEQ_LEN         = int(os.getenv("TRAINING_MAX_SEQ_LEN",    "8192"))
 TRAINING_WINDOW_START        = int(os.getenv("TRAINING_WINDOW_START",    "2"))   # hour
 TRAINING_WINDOW_END          = int(os.getenv("TRAINING_WINDOW_END",      "6"))   # hour

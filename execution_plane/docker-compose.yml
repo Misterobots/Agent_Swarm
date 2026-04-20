@@ -43,6 +43,7 @@ services:
     environment:
       # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
+      - OLLAMA_KV_CACHE_TYPE=q8_0      # Q8 KV cache: ~50% less KV VRAM vs f16, faster prefill on long prompts
       - OLLAMA_NUM_PARALLEL=2          # Concurrent requests across 2 GPUs
       - OLLAMA_KEEP_ALIVE=30m          # Keep expert models hot (32GB total VRAM)
     volumes:
@@ -218,6 +219,44 @@ services:
       # Labels for SPIRE workload attestation
       - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/runtime"
 
+  # IMAGE LORA WORKER - Dedicated queue consumer for image training prep / execution
+  image-training-worker:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile
+    image: home-ai-lab/agent-runtime:latest
+    container_name: image_training_worker
+    restart: always
+    depends_on:
+      - comfyui
+      - spire-agent
+    env_file:
+      - ../network.env
+    environment:
+      - COMFYUI_HOST=http://comfyui_gpu:8188
+      - PYTHONPATH=/app
+      - REDIS_HOST=192.168.2.102
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}
+      - TRAINING_OUTPUT_DIR=/workspace/training_output
+      - TRAINING_DATASET_DIR=/workspace/training_data
+      - IMAGE_LORA_TRAINER_COMMAND=${IMAGE_LORA_TRAINER_COMMAND:-python /app/agents/training/diffusers_lora_train.py --manifest {dataset_manifest} --output_dir {output_dir} --base_checkpoint {base_checkpoint} --trigger_word {trigger_word} --steps {steps} --lr {learning_rate}}
+      - COMFYUI_CHECKPOINT_DIR=/home/runner/ComfyUI/models/checkpoints
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/output:/app/comfy_io/output
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/models/checkpoints:/home/runner/ComfyUI/models/checkpoints:ro
+      - spire_socket:/var/run/spire:ro
+    command: ["python", "/app/agents/training/image_lora_worker.py"]
+    networks:
+      - execution_net
+    labels:
+      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/image-training-worker"
+
   # --- COMFYUI (Creature Forge) ---
   comfyui:
     image: yanwk/comfyui-boot:cu121
@@ -256,26 +295,42 @@ services:
         export LD_LIBRARY_PATH="$$NVIDIA_BASE/cudnn/lib:$$NVIDIA_BASE/cublas/lib:$$NVIDIA_BASE/cuda_runtime/lib:$$NVIDIA_BASE/cuda_cupti/lib:$$NVIDIA_BASE/cufft/lib:$$NVIDIA_BASE/curand/lib:$$NVIDIA_BASE/cusolver/lib:$$NVIDIA_BASE/cusparse/lib:$$NVIDIA_BASE/nccl/lib:$$NVIDIA_BASE/nvtx/lib:$$LD_LIBRARY_PATH"
         echo "[ENV] Updated LD_LIBRARY_PATH: $$LD_LIBRARY_PATH"
         
-        if [ ! -f .5060_patch_v10_applied ]; then
-            echo "[SETUP] Applying 5060 Ti Patches (v10)..."
-            
-            echo "[SETUP] Installing PyTorch Nightly (CUDA 12.8 compatible)..."
-            pip install "numpy<2.0" "pillow>=12.1.0" rembg --pre torch torchvision torchaudio --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu128 --extra-index-url https://pypi.org/simple
-            
-            echo "[SETUP] Installing Critical Dependencies..."
-            pip install xatlas accelerate utils3d pymeshlab watchdog kiui onnxruntime-gpu transformers diffusers sentencepiece protobuf scipy einops opencv-python jaxtyping typeguard lxml pyfqmr plyfile pyhocon omegaconf matplotlib tripo3d easydict simpleeval huggingface_hub[hf_xet] pyvista
-            
-            echo "[SETUP] Cleaning up old xformers artifacts..."
-            rm -rf /home/runner/.local/lib/python3.11/site-packages/xformers
-            rm -rf /home/runner/.local/lib/python3.11/site-packages/xformers-*.dist-info
-            
-            # Note: xformers masking is now handled by custom_nodes/AAA_Antigravity_Patch/
-            
-            rm .5060_patch_* 2>/dev/null || true
-            touch .5060_patch_v10_applied
-            echo "[SETUP] Patching Complete. Marker v10 created."
+        NEED_5060_PATCH=0
+        if [ ! -f .5060_patch_v11_applied ]; then
+          NEED_5060_PATCH=1
         else
-            echo "[SETUP] Patches already applied. Skipping install."
+          if ! python3 -c "import sys; import torch; arch_list = set(torch.cuda.get_arch_list()); sys.exit(0 if 'sm_120' in arch_list else 1)"
+          then
+            echo "[SETUP] Existing torch build does not advertise sm_120 support; forcing patch refresh."
+            NEED_5060_PATCH=1
+          fi
+        fi
+
+        if [ "$$NEED_5060_PATCH" = "1" ]; then
+          echo "[SETUP] Applying 5060 Ti Patches (v11)..."
+
+          echo "[SETUP] Installing PyTorch Nightly (CUDA 12.8 compatible)..."
+          pip install "numpy<2.0" "pillow>=12.1.0" rembg --pre torch torchvision torchaudio --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu128 --extra-index-url https://pypi.org/simple
+
+          echo "[SETUP] Installing Critical Dependencies..."
+          pip install xatlas accelerate utils3d pymeshlab watchdog kiui onnxruntime-gpu transformers diffusers sentencepiece protobuf scipy einops opencv-python jaxtyping typeguard lxml pyfqmr plyfile pyhocon omegaconf matplotlib tripo3d easydict simpleeval huggingface_hub[hf_xet] pyvista
+
+          echo "[SETUP] Cleaning up stale xformers artifacts..."
+          pip uninstall -y xformers || true
+          rm -rf /home/runner/.local/lib/python3.11/site-packages/xformers
+          rm -rf /home/runner/.local/lib/python3.11/site-packages/xformers-*.dist-info
+          rm -rf /usr/local/lib64/python3.11/site-packages/xformers
+          rm -rf /usr/local/lib64/python3.11/site-packages/xformers-*.dist-info
+          rm -rf /usr/local/lib/python3.11/site-packages/xformers
+          rm -rf /usr/local/lib/python3.11/site-packages/xformers-*.dist-info
+
+          # Note: xformers masking is now handled by custom_nodes/AAA_Antigravity_Patch/
+
+          rm .5060_patch_* 2>/dev/null || true
+          touch .5060_patch_v11_applied
+          echo "[SETUP] Patching Complete. Marker v11 created."
+        else
+          echo "[SETUP] Patches already applied. Skipping install."
         fi
         
         echo "Launching ComfyUI..."

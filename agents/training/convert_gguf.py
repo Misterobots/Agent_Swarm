@@ -369,39 +369,56 @@ def run_convert(
     total_start = time.time()
 
     try:
-        # Step 1: Merge LoRA
-        logger.info(f"[Convert] Step 1: Merging LoRA from {adapter_path}")
-        merge_start = time.time()
-        merged_dir = merge_lora(adapter_path, base_model)
-        merge_sec = time.time() - merge_start
-        report["timing"]["merge_sec"] = round(merge_sec, 1)
-        report["model"]["merged_dir"] = merged_dir
-        report["model"]["merged_size_mb"] = round(_dir_size_mb(merged_dir), 1)
-        logger.info(f"[Convert] Merge complete in {merge_sec:.0f}s")
+        # Check if Unsloth already exported a GGUF during training
+        unsloth_gguf = metrics.get("gguf_path")
+        if unsloth_gguf and os.path.isdir(unsloth_gguf):
+            # Find the actual .gguf file in the directory
+            gguf_files = [f for f in os.listdir(unsloth_gguf) if f.endswith(".gguf")]
+            if gguf_files:
+                gguf_path = os.path.join(unsloth_gguf, gguf_files[0])
+                logger.info(f"[Convert] Using pre-built Unsloth GGUF: {gguf_path}")
+                report["method"] = "unsloth_gguf"
+                report["model"]["gguf_path"] = gguf_path
+                report["model"]["gguf_size_mb"] = round(os.path.getsize(gguf_path) / (1024 * 1024), 1)
+                report["timing"]["merge_sec"] = 0
+                report["timing"]["convert_sec"] = 0
+                import_path = gguf_path
+            else:
+                unsloth_gguf = None  # directory exists but no .gguf files
 
-        # Step 2: Try GGUF conversion, fall back to safetensors
-        gguf_path = None
-        import_path = None
-        convert_start = time.time()
+        if not unsloth_gguf or not import_path:
+            # Fallback: traditional LoRA merge → GGUF pipeline
+            # Step 1: Merge LoRA
+            logger.info(f"[Convert] Step 1: Merging LoRA from {adapter_path}")
+            merge_start = time.time()
+            merged_dir = merge_lora(adapter_path, base_model)
+            merge_sec = time.time() - merge_start
+            report["timing"]["merge_sec"] = round(merge_sec, 1)
+            report["model"]["merged_dir"] = merged_dir
+            report["model"]["merged_size_mb"] = round(_dir_size_mb(merged_dir), 1)
+            logger.info(f"[Convert] Merge complete in {merge_sec:.0f}s")
 
-        try:
-            logger.info("[Convert] Step 2: Attempting GGUF conversion...")
-            gguf_path = convert_to_gguf(merged_dir)
-            report["method"] = "gguf"
-            report["model"]["gguf_path"] = gguf_path
-            report["model"]["gguf_size_mb"] = round(_dir_size_mb(gguf_path), 1)
-            import_path = gguf_path
-        except FileNotFoundError as e:
-            logger.warning(f"[Convert] GGUF unavailable: {e}")
-            report["method"] = "safetensors_direct"
-            report["warnings"].append(
-                f"llama.cpp not installed — using Ollama safetensors import. "
-                f"This works but produces larger models. Install llama.cpp for Q4_K_M quantization."
-            )
-            import_path = merged_dir
+            # Step 2: Try GGUF conversion, fall back to safetensors
+            convert_start = time.time()
 
-        convert_sec = time.time() - convert_start
-        report["timing"]["convert_sec"] = round(convert_sec, 1)
+            try:
+                logger.info("[Convert] Step 2: Attempting GGUF conversion...")
+                gguf_path = convert_to_gguf(merged_dir)
+                report["method"] = "gguf"
+                report["model"]["gguf_path"] = gguf_path
+                report["model"]["gguf_size_mb"] = round(_dir_size_mb(gguf_path), 1)
+                import_path = gguf_path
+            except FileNotFoundError as e:
+                logger.warning(f"[Convert] GGUF unavailable: {e}")
+                report["method"] = "safetensors_direct"
+                report["warnings"].append(
+                    f"llama.cpp not installed — using Ollama safetensors import. "
+                    f"This works but produces larger models. Install llama.cpp for Q4_K_M quantization."
+                )
+                import_path = merged_dir
+
+            convert_sec = time.time() - convert_start
+            report["timing"]["convert_sec"] = round(convert_sec, 1)
 
         # Step 3: Create Ollama model
         logger.info(f"[Convert] Step 3: Creating Ollama model {ollama_name}")
@@ -495,11 +512,13 @@ def run_convert(
             })
 
         # Clean up merged dir (adapter + GGUF/Ollama are the keepers)
-        try:
-            shutil.rmtree(merged_dir)
-            logger.info(f"Cleaned up merged model dir: {merged_dir}")
-        except OSError:
-            report["warnings"].append(f"Could not clean up merged dir: {merged_dir}")
+        merged_dir = report.get("model", {}).get("merged_dir")
+        if merged_dir:
+            try:
+                shutil.rmtree(merged_dir)
+                logger.info(f"Cleaned up merged model dir: {merged_dir}")
+            except OSError:
+                report["warnings"].append(f"Could not clean up merged dir: {merged_dir}")
 
         # Prometheus
         try:
