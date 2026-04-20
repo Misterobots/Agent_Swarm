@@ -11,6 +11,8 @@ import { ModelSelector } from "./model-selector";
 import { InputToolbar } from "./input-toolbar";
 import { UltraplanToggle } from "./ultraplan-toggle";
 import { UltrathinkToggle } from "./ultrathink-toggle";
+import { WebGroundingToggle } from "./web-grounding-toggle";
+import { DocGroundingToggle } from "./doc-grounding-toggle";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
 import { Bot, Brain, Code2, X, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -160,6 +162,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           {!isMobile && <ThemeSelector />}
           {!isMobile && <UltraplanToggle />}
           {!isMobile && <UltrathinkToggle />}
+          {!isMobile && <WebGroundingToggle />}
+          {!isMobile && <DocGroundingToggle />}
           {!isMobile && activeConversationId && (
             <button
               type="button"
@@ -195,6 +199,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                   <div className="px-2 py-1.5"><ThemeSelector /></div>
                   <div className="px-2 py-1.5"><UltraplanToggle /></div>
                   <div className="px-2 py-1.5"><UltrathinkToggle /></div>
+                  <div className="px-2 py-1.5"><WebGroundingToggle /></div>
+                  <div className="px-2 py-1.5"><DocGroundingToggle /></div>
                   {activeConversationId && (
                     <button
                       type="button"

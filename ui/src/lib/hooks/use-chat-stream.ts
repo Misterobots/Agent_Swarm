@@ -77,6 +77,8 @@ export function useChatStream(options?: {
   const researchMode = useSettingsStore((s) => s.researchMode);
   const ultraplanMode = useSettingsStore((s) => s.ultraplanMode);
   const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
+  const groundingWeb = useSettingsStore((s) => s.groundingWeb);
+  const groundingDocs = useSettingsStore((s) => s.groundingDocs);
 
   useEffect(() => {
     const conv = activeConversation();
@@ -198,7 +200,7 @@ export function useChatStream(options?: {
       abortRef.current = controller;
 
       try {
-        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode)) {
+        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {

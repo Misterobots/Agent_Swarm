@@ -630,6 +630,60 @@ def _parse_think_tags(text: str):
             yield ("thought" if in_think else "message", part)
 
 
+# ---------------------------------------------------------------------------
+# Grounding helpers
+# ---------------------------------------------------------------------------
+
+# Keywords that suggest the query needs live / external information
+_WEB_GROUNDING_KEYWORDS = frozenset([
+    "latest", "current", "today", "now", "news", "recent", "recently",
+    "yesterday", "this week", "this month", "this year", "2024", "2025",
+    "who won", "what is the price", "stock price", "weather", "trending",
+    "breaking", "just announced", "released", "update", "version",
+])
+
+
+def _needs_web_grounding(query: str) -> bool:
+    """Return True when the query likely benefits from live web results."""
+    q = query.lower()
+    return any(kw in q for kw in _WEB_GROUNDING_KEYWORDS)
+
+
+def _retrieve_doc_context(query: str, owner_id: str | None, limit: int = 5) -> list[dict]:
+    """Query PgVector for the top-*limit* relevant knowledge-base chunks.
+
+    Returns a list of dicts with keys ``source`` and ``content``.
+    Returns an empty list on any error so the caller can stay non-fatal.
+    """
+    try:
+        import os as _os
+        from agno.vectordb.pgvector import PgVector, SearchType
+        from agno.embedder.ollama import OllamaEmbedder
+
+        db_url = _os.getenv("AGNO_DB_URL", "postgresql+psycopg://ai:ai@localhost:5532/ai")
+        collection = "architect_knowledge"
+
+        embedder = OllamaEmbedder(id="nomic-embed-text", dimensions=768)
+        vdb = PgVector(
+            table_name=collection,
+            db_url=db_url,
+            search_type=SearchType.hybrid,
+            embedder=embedder,
+        )
+        rows = vdb.search(query=query, limit=limit)
+        results: list[dict] = []
+        for row in rows or []:
+            content = getattr(row, "content", None) or str(row)
+            meta = getattr(row, "meta_data", {}) or {}
+            source = meta.get("source", meta.get("name", "unknown"))
+            results.append({"source": source, "content": content})
+        return results
+    except Exception as exc:
+        import logging as _logging
+        _logging.getLogger("Router").debug("[Router] Doc grounding retrieval failed: %s", exc)
+        return []
+
+
 def chat_swarm(
     user_input: str,
     session_id: str = "default_session",
@@ -643,6 +697,8 @@ def chat_swarm(
     ultraplan_mode: bool = False,
     ultrathink_mode: bool = False,
     attachments: list | None = None,
+    grounding_web: bool = False,
+    grounding_docs: bool = False,
 ):
     """
     Generator that yields status updates and final response for UI.
@@ -654,6 +710,10 @@ def chat_swarm(
     - ultraplan_mode: If True, decompose task into plan only — no execution.
     - ultrathink_mode: If True, use deeper reasoning with visible chain-of-thought.
     - attachments: File attachments from the UI.
+    - grounding_web: If True and owner has permission, run intent-aware web search
+      and inject top results as [Web Grounding Context] before the prompt.
+    - grounding_docs: If True and owner has permission, query the knowledge base and
+      inject relevant chunks as [Document Context] before the prompt.
     """
     AGENT_STATE.labels(agent_name="Router").set(2)
     WORKFLOW_STEPS.labels(status="started", agent_type="Router").inc()
@@ -803,6 +863,65 @@ def chat_swarm(
                         yield _t(f"→ MemPalace: {len(strong)} relevant memories recalled")
             except Exception as _mp_err:
                 logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
+
+        # 1d. Web Grounding — inject live search results when permitted and intent warrants it
+        if grounding_web:
+            try:
+                from grounding_permissions import grounding_permissions as _gp
+                if _gp.is_permitted(owner_id or "", "web_grounding"):
+                    if _needs_web_grounding(user_input):
+                        from tools.web_browser import web_search as _web_search
+                        yield {"type": "status", "content": "🌐 Web Grounding: Searching..."}
+                        results = _web_search(user_input, num_results=5)
+                        if results:
+                            snippets = "\n".join(
+                                f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('snippet','')}"
+                                for i, r in enumerate(results)
+                            )
+                            web_msg = {"role": "system", "content": f"[Web Grounding Context]\n{snippets}"}
+                            if history is None:
+                                history = [web_msg]
+                            else:
+                                history.append(web_msg)
+                            yield _t(f"→ Web grounding: {len(results)} results injected")
+                        else:
+                            yield _t("→ Web grounding: no results returned")
+                    else:
+                        yield _t("→ Web grounding: skipped (query does not need live data)")
+                else:
+                    logger.warning(
+                        "[Router] Web grounding requested by %s but permission not granted", owner_id
+                    )
+                    yield {"type": "status", "content": "⚠️ Web grounding not permitted — submit a governance request."}
+            except Exception as _wg_err:
+                logger.error("[Router] Web grounding failed (non-fatal): %s", _wg_err)
+
+        # 1e. Document Grounding — inject relevant knowledge-base chunks when permitted
+        if grounding_docs:
+            try:
+                from grounding_permissions import grounding_permissions as _gp
+                if _gp.is_permitted(owner_id or "", "docs_grounding"):
+                    chunks = _retrieve_doc_context(user_input, owner_id, limit=5)
+                    if chunks:
+                        doc_text = "\n\n".join(
+                            f"[Source: {c.get('source','unknown')}]\n{c.get('content','')}"
+                            for c in chunks
+                        )
+                        doc_msg = {"role": "system", "content": f"[Document Context]\n{doc_text}"}
+                        if history is None:
+                            history = [doc_msg]
+                        else:
+                            history.append(doc_msg)
+                        yield _t(f"→ Doc grounding: {len(chunks)} chunks injected")
+                    else:
+                        yield _t("→ Doc grounding: no relevant chunks found")
+                else:
+                    logger.warning(
+                        "[Router] Doc grounding requested by %s but permission not granted", owner_id
+                    )
+                    yield {"type": "status", "content": "⚠️ Document grounding not permitted — submit a governance request."}
+            except Exception as _dg_err:
+                logger.error("[Router] Doc grounding failed (non-fatal): %s", _dg_err)
 
         # 2. Security Check (on the Merged Input)
         yield {"type": "status", "content": "🔒 Security Agent: Scanning input..."}

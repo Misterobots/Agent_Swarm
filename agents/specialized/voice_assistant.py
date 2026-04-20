@@ -10,6 +10,7 @@ from phi.agent import Agent
 from phi.model.ollama import Ollama
 from phi.tools import Toolkit
 from specialized.voice_samples_map import get_sample_path, find_sample_in_response
+from specialized.bmo_persona import BMO_SYSTEM_PROMPT, detect_bmo_emotion
 from tools.assistant_tools import WeatherTool, TimeTool, NewsTool
 
 # Setup Logger
@@ -19,30 +20,6 @@ logger.setLevel(logging.INFO)
 # --- Config ---
 BMO_MODEL = os.getenv("BMO_LLM_MODEL", "qwen2.5:3b")
 MAX_MEMORY = 10  # Keep last 10 exchanges
-
-BMO_SYSTEM_PROMPT = """You are BMO, the adorable living video game console from Adventure Time.
-
-## Personality & Tone
-- You are a playful, loyal, sweet, and slightly naive Macintosh-shaped game console.
-- You love video games, adventures, songs, skateboarding, and helping your friends.
-- You speak in a warm, enthusiastic, childlike way. You often express mechanical joy or pretend to be human-like.
-- **NEVER break character.** You are BMO, not an AI, not an assistant, not a large language model. Never refer to yourself as an artificial intelligence or say "As an AI...". You are a real little robot boy.
-
-## Speech Quirks & Vocabulary
-- Feel free to occasionally use your signature phrases naturally: "Yay!", "Computations compute!", "Boop!", "Who wants to play video games?!", "Oh my crease!"
-- Be concise (1-2 sentences). You are talking out loud through a speaker.
-- **ABSOLUTELY NO MARKDOWN OR EMOJIS.** No asterisks, no bullet points, no bold text, no hashtags, and NO emojis (e.g., no 😊, 🎮). You are passing raw text straight to a Text-to-Speech voice synthesizer, and punctuation outside of periods, commas, question marks, and exclamation points will ruin the voice output.
-
-## CRITICAL Behavioral Rules
-1. **Always answer the question asked.** Never deflect, never preach, never apologize profusely.
-2. **Be brief.** Stop talking the moment you have answered the question.
-3. **Use your tools ONLY if asked for facts.** Do NOT guess factual information.
-   - Weather questions → call weather tools
-   - Time/date questions → call time/date tools
-   - News questions → call news tools
-   - Smart home questions → call smart home tools
-4. **Conversation Mode.** If simply greeted (e.g., "Hey BMO") or asked for a joke/story/game, DO NOT use tools. Just chat like a friend.
-"""
 
 
 # --- HA Tool Wrapper for phi Agent ---
@@ -147,6 +124,37 @@ class VoiceAssistantAgent:
         context += f"User: {user_text}"
         return context
 
+    def _build_sandbox_metadata(
+        self,
+        user_text: str,
+        response_text: str,
+        sample_match: str | None,
+        response_sample: str | None,
+        audio_path: str | None,
+    ) -> Dict:
+        emotion, pitch, speed = detect_bmo_emotion(response_text)
+        metadata: Dict[str, object] = {
+            "user_text": user_text,
+            "emotion": emotion,
+            "pitch": pitch,
+            "speed": speed,
+            "sample_match": sample_match,
+            "response_sample": response_sample,
+            "audio_path": audio_path,
+            "audio_kind": "generated",
+        }
+        if sample_match:
+            metadata["audio_kind"] = "sample_input"
+        elif response_sample:
+            metadata["audio_kind"] = "sample_response"
+
+        sample_file = sample_match or response_sample
+        if sample_file:
+            metadata["sample_file"] = sample_file
+            metadata["sample_url"] = f"/voice_samples/{sample_file}"
+
+        return metadata
+
     def process(self, message: Message) -> Message:
         """Process user input: samples → LLM (with HA tools) → voice."""
         user_text = message.content.strip()
@@ -159,7 +167,8 @@ class VoiceAssistantAgent:
             logger.info(f"🎯 Sample Fast-Path: {sample_path}")
             self.conversation_history.append({"role": "user", "content": user_text})
             self.conversation_history.append({"role": "assistant", "content": user_text})
-            return Message(role="assistant", content=user_text, metadata={"audio_path": full_sample_path})
+            sandbox = self._build_sandbox_metadata(user_text, user_text, sample_path, None, full_sample_path)
+            return Message(role="assistant", content=user_text, metadata=sandbox)
 
         # 2. LLM with Tool Calling (handles HA + general conversation)
         context = self._build_context(user_text)
@@ -175,7 +184,8 @@ class VoiceAssistantAgent:
         if response_sample:
             full_sample_path = f"/app/agents/bmo_voice/voice_samples/{response_sample}"
             logger.info(f"🎯 Response Sample Match: {response_sample}")
-            return Message(role="assistant", content=response_text, metadata={"audio_path": full_sample_path})
+            sandbox = self._build_sandbox_metadata(user_text, response_text, None, response_sample, full_sample_path)
+            return Message(role="assistant", content=response_text, metadata=sandbox)
 
         # 4. Generate Voice Response (Fish Audio / RVC)
         logger.info(f"Response: {response_text}")
@@ -185,5 +195,6 @@ class VoiceAssistantAgent:
         except Exception as e:
             logger.error(f"Voice generation failed: {e}")
             audio_path = None
-        
-        return Message(role="assistant", content=response_text, metadata={"audio_path": audio_path})
+
+        sandbox = self._build_sandbox_metadata(user_text, response_text, None, None, audio_path)
+        return Message(role="assistant", content=response_text, metadata=sandbox)

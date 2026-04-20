@@ -55,9 +55,11 @@ def measure_ttft(host: str, port: int, model: str, prompt: str, timeout: float =
                 if not line.strip():
                     continue
                 chunk = json.loads(line)
-                if chunk.get("response") and ttft is None:
+                # Detect first meaningful output: response token, thinking token, or tool call
+                has_content = chunk.get("response") or chunk.get("thinking")
+                if has_content and ttft is None:
                     ttft = (time.perf_counter() - t_start) * 1000  # ms
-                if chunk.get("response"):
+                if has_content:
                     tokens += 1
                 if chunk.get("done"):
                     break
@@ -98,6 +100,9 @@ def run_benchmark(host: str, port: int, model: str, rounds: int, warmup: bool):
             print(f"  Round {r+1}: ERROR - {result['error']}")
             continue
         ttft = result["ttft_ms"]
+        if ttft is None:
+            print(f"  Round {r+1:2d}: TTFT=   N/A  total={result['total_ms']:7.1f}ms  \"{result['prompt']}...\"")
+            continue
         all_ttft.append(ttft)
         print(f"  Round {r+1:2d}: TTFT={ttft:7.1f}ms  total={result['total_ms']:7.1f}ms  \"{result['prompt']}...\"")
 

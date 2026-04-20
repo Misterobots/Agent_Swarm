@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePalaceStore } from "@/lib/stores/palace-store";
 import { usePalaceColors } from "@/lib/palace/theme-materials";
+import { useAccess } from "@/lib/hooks/use-access";
 
 /* ── Visual encoding helpers ──────────────────────────────────────────── */
 
@@ -46,6 +47,7 @@ export function RoomView() {
   const highlightedIds = usePalaceStore((s) => s.highlightedMemoryIds);
   const searchResults = usePalaceStore((s) => s.searchResults);
   const adminViewingOwner = usePalaceStore((s) => s.adminViewingOwner);
+  const { username } = useAccess();
   const colors = usePalaceColors();
 
   useEffect(() => {
@@ -60,6 +62,12 @@ export function RoomView() {
   }, [location.wing, location.hall, location.room, loadRoomMemories, adminViewingOwner]);
 
   const displayRoom = location.room?.replace(/_/g, " ") ?? "Room";
+  const showOwnerBadge = adminViewingOwner === null;
+  const scopeSummary = adminViewingOwner
+    ? adminViewingOwner === username
+      ? "Showing your memories"
+      : `Showing memories for ${adminViewingOwner}`
+    : "Showing memories from everyone";
 
   // Light-theme glass overrides
   const glassAlphaBase = colors.isLight ? 0.55 : 0.25;
@@ -124,6 +132,9 @@ export function RoomView() {
         </h2>
         <p className="text-xs" style={{ color: colors.muted }}>
           {roomMemories.length} memor{roomMemories.length !== 1 ? "ies" : "y"}
+        </p>
+        <p className="text-[11px] mt-1" style={{ color: colors.muted }}>
+          {scopeSummary}
         </p>
       </div>
 
@@ -204,14 +215,32 @@ export function RoomView() {
                 />
 
                 {/* Header row: icon + type + domain badge */}
-                <div className="flex items-center gap-2 mb-2.5 w-full">
-                  <span className="text-sm leading-none">{icon}</span>
-                  <span
-                    className="text-[11px] font-medium capitalize"
-                    style={{ color: colors.text, opacity: 0.75 }}
-                  >
-                    {memory.memory_type}
-                  </span>
+                <div className="flex items-start gap-2 mb-2.5 w-full">
+                  <span className="text-sm leading-none mt-0.5">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="text-[11px] font-medium capitalize"
+                        style={{ color: colors.text, opacity: 0.75 }}
+                      >
+                        {memory.memory_type}
+                      </span>
+                      {showOwnerBadge && memory.owner_id && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-md font-medium"
+                          style={{
+                            background: colors.isLight
+                              ? "rgba(0, 0, 0, 0.045)"
+                              : "rgba(255, 255, 255, 0.06)",
+                            color: colors.muted,
+                            border: `1px solid ${colors.border}`,
+                          }}
+                        >
+                          {memory.owner_id}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   {memory.domain && (
                     <span
                       className="ml-auto text-[10px] px-1.5 py-0.5 rounded-md font-medium"

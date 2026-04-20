@@ -347,10 +347,21 @@ async def voice_chat(request: VoiceRequest):
     agent = get_voice_agent()
     # Process message
     response_msg = agent.process(Message(role="user", content=request.text))
-    
+    metadata = response_msg.metadata or {}
+
     return {
         "text": response_msg.content,
-        "audio_path": response_msg.metadata.get("audio_path") if response_msg.metadata else None
+        "audio_path": metadata.get("audio_path"),
+        "sandbox": {
+            "emotion": metadata.get("emotion"),
+            "pitch": metadata.get("pitch"),
+            "speed": metadata.get("speed"),
+            "sample_match": metadata.get("sample_match"),
+            "response_sample": metadata.get("response_sample"),
+            "sample_file": metadata.get("sample_file"),
+            "sample_url": metadata.get("sample_url"),
+            "audio_kind": metadata.get("audio_kind"),
+        },
     }
 
 # --- OpenAI-Compatible Chat Endpoint (For VS Code Extensions) ---
@@ -374,6 +385,8 @@ class ChatRequest(BaseModel):
     ultrathink_mode: bool = False      # deep reasoning with visible chain-of-thought
     attachments: Optional[List[dict]] = None  # file attachments [{name, mimeType, data, size}]
     dev_mode: bool = False            # Phase 2: enable AI agentic coding tools in dev workspace
+    grounding_web: bool = False       # inject live web search results (requires governance permission)
+    grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
 
 
 # ---------------------------------------------------------------------------
@@ -858,6 +871,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     ultraplan_mode=request.ultraplan_mode,
                     ultrathink_mode=request.ultrathink_mode,
                     attachments=request.attachments,
+                    grounding_web=request.grounding_web,
+                    grounding_docs=request.grounding_docs,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -1067,6 +1082,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             ultraplan_mode=request.ultraplan_mode,
             ultrathink_mode=request.ultrathink_mode,
             attachments=request.attachments,
+            grounding_web=request.grounding_web,
+            grounding_docs=request.grounding_docs,
         )
         full_resp = ""
         for update in gen:
@@ -1237,11 +1254,28 @@ async def get_request(req_id: str):
 async def update_request_status(req_id: str, update: UpdateRequestModel):
     """
     Admin/Agent Update Status (Approve/Reject).
+    When a GROUNDING_WEB or GROUNDING_DOCS request is approved, the permission
+    is automatically written to the grounding permissions store.
     """
     item = governance_manager.update_status(req_id, update.status, update.note)
     if not item:
         raise HTTPException(status_code=404, detail="Request not found")
     logger.info(f"Request {req_id} updated to {update.status}")
+
+    # Auto-grant grounding permissions on approval
+    if update.status == RequestStatus.APPROVED:
+        try:
+            from grounding_permissions import grounding_permissions as _gp
+            _type = item.type if hasattr(item, "type") else item.dict().get("type", "")
+            if _type in ("GROUNDING_WEB", "grounding_web"):
+                _gp.grant(item.user, "web_grounding")
+                logger.info(f"[Grounding] web_grounding granted to {item.user}")
+            elif _type in ("GROUNDING_DOCS", "grounding_docs"):
+                _gp.grant(item.user, "docs_grounding")
+                logger.info(f"[Grounding] docs_grounding granted to {item.user}")
+        except Exception as _perm_err:
+            logger.error(f"[Grounding] Failed to write permission on approval: {_perm_err}")
+
     return item
 
 # --- Node Health Endpoint (Phase 6) ---
@@ -1251,6 +1285,56 @@ async def health_nodes():
     from inference.node_health import get_node_monitor
     monitor = get_node_monitor()
     return {"nodes": monitor.get_all_statuses()}
+
+
+# ---------------------------------------------------------------------------
+#  Grounding Permissions Endpoints
+# ---------------------------------------------------------------------------
+
+from grounding_permissions import grounding_permissions as _grounding_perm_store
+
+class GroundingRequestModel(BaseModel):
+    permission: str  # "web_grounding" or "docs_grounding"
+    reason: str = ""
+
+@app.get("/api/v1/grounding/status")
+async def grounding_status(http_request: Request):
+    """Return the current grounding permissions for the authenticated user."""
+    owner_id = _resolve_owner_id(None, http_request)
+    _grounding_perm_store.reload()
+    return _grounding_perm_store.get_status(owner_id)
+
+@app.post("/api/v1/grounding/request")
+async def request_grounding_permission(
+    req: GroundingRequestModel,
+    http_request: Request,
+    x_swarm_source: str = Header(None, alias="X-Swarm-Source"),
+):
+    """Submit a governance request to unlock a grounding capability.
+
+    The request is stored as a GROUNDING_WEB or GROUNDING_DOCS governance item.
+    An admin can approve it via POST /api/v1/request/{id}/status which will
+    automatically write the permission to the grounding store.
+    """
+    if req.permission not in ("web_grounding", "docs_grounding"):
+        raise HTTPException(status_code=400, detail="permission must be 'web_grounding' or 'docs_grounding'")
+
+    owner_id = _resolve_owner_id(None, http_request)
+    req_type_map = {
+        "web_grounding": "GROUNDING_WEB",
+        "docs_grounding": "GROUNDING_DOCS",
+    }
+    gov_type = req_type_map[req.permission]
+    description = (
+        f"User {owner_id!r} is requesting {req.permission} capability. "
+        f"Reason: {req.reason or 'not provided'}"
+    )
+    try:
+        item = governance_manager.submit_request(gov_type, description, owner_id)
+        return {"status": "submitted", "request_id": item.id, "permission": req.permission}
+    except Exception as exc:
+        logger.error("[Grounding] Failed to submit governance request: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Failed to submit request: {exc}")
 
 
 # ---------------------------------------------------------------------------

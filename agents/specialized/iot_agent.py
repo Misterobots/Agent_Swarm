@@ -13,8 +13,9 @@ from tools.wokwi_ops import create_simulation, add_part, connect_wires
 def get_iot_agent() -> Agent:
     """
     Returns the configured IoT Controller Agent.
+    Thinking mode disabled — IoT commands are direct tool calls, not reasoning tasks.
     """
-    MODEL_NAME = "qwen2.5-coder:14b"
+    MODEL_NAME = os.getenv("PRIMARY_MODEL", "qwen3:14b")
     OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
     # System Instructions for the Expanded IoT Agent
@@ -45,7 +46,11 @@ def get_iot_agent() -> Agent:
 
     return Agent(
         name="IoT Controller",
-        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST),
+        model=Ollama(
+            id=MODEL_NAME,
+            host=OLLAMA_HOST,
+            request_params={"think": False},  # No thinking — direct tool dispatch
+        ),
         description="You are the Home Automation Specialist. You control lights, switches, and scenes via Home Assistant, and develop firmware via Wokwi/ESPHome.",
         instructions=INSTRUCTIONS,
         tools=[get_states, call_service, mqtt_publish, mqtt_subscribe, esphome_compile, esphome_upload, create_simulation, add_part, connect_wires],

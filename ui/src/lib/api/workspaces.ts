@@ -1,4 +1,5 @@
 import type {
+  BmoSandboxResponse,
   ComfyCheckpoints,
   ComfyStatus,
   EvidenceContent,
@@ -131,4 +132,14 @@ export async function synthesizeVoice(text: string, pitch: number, method: strin
   });
   if (!res.ok) return null;
   return res.blob();
+}
+
+export async function runBmoSandboxPrompt(text: string): Promise<BmoSandboxResponse | null> {
+  const res = await fetch(`${API_BASE}/v1/voice/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) return null;
+  return res.json();
 }

@@ -35,9 +35,13 @@ stateDiagram-v2
 
 | Type | Triggers |
 |------|----------|
-| `execute_command` | Blocklisted shell commands |
-| `file_delete` | Deleting important files |
-| `system_modify` | Network/system changes |
+| `PACKAGE` | Agent or user requests a `pip install` or `apt install` |
+| `MODEL` | Agent requests access to a restricted or new model |
+| `PERMISSION` | Escalating file/tool access levels |
+| `FEATURE` | Enabling a new system feature |
+| `GROUNDING_WEB` | User requests internet/web search grounding access |
+| `GROUNDING_DOCS` | User requests knowledge-base document grounding access |
+| `OTHER` | Any miscellaneous privileged request |
 | `privilege_escalation` | Requesting higher security level |
 
 ## Assessment

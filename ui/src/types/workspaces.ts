@@ -49,3 +49,20 @@ export interface ComfyCheckpoints {
 export interface MediaGenerationResult {
   result: string;
 }
+
+export interface BmoSandboxDiagnostics {
+  emotion?: string | null;
+  pitch?: number | null;
+  speed?: number | null;
+  sample_match?: string | null;
+  response_sample?: string | null;
+  sample_file?: string | null;
+  sample_url?: string | null;
+  audio_kind?: string | null;
+}
+
+export interface BmoSandboxResponse {
+  text: string;
+  audio_path?: string | null;
+  sandbox?: BmoSandboxDiagnostics | null;
+}

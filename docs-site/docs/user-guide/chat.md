@@ -65,8 +65,12 @@ The primary interface for interacting with Agent Swarm. Every message goes throu
 | `skill` | `string` | `null` | Force a specific skill |
 | `style` | `string` | `null` | Response style hints |
 | `research_mode` | `bool` | `false` | Enable multi-source research mode |
+| `ultraplan_mode` | `bool` | `false` | Decompose task into a plan only — no execution |
+| `ultrathink_mode` | `bool` | `false` | Deep reasoning with visible chain-of-thought |
 | `dev_mode` | `bool` | `false` | Enable Phase 2 dev tools (file ops, terminal) |
 | `attachments` | `List[dict]` | `null` | File attachments for context |
+| `grounding_web` | `bool` | `false` | Inject live web search results (requires `web_grounding` permission) |
+| `grounding_docs` | `bool` | `false` | Inject knowledge-base document chunks (requires `docs_grounding` permission) |
 
 ### Streaming
 

@@ -149,6 +149,7 @@ nav:
     - Settings: user-guide/settings.md
     - Buddy Companion: user-guide/buddy.md
     - Plan & Think Modes: user-guide/plan-think.md
+    - Grounding: user-guide/grounding.md
   - Architecture:
     - architecture/index.md
     - Topology: architecture/topology.md
@@ -204,6 +205,7 @@ nav:
       - Models: developer-guide/api/models.md
       - Tasks: developer-guide/api/tasks.md
       - Governance: developer-guide/api/governance.md
+      - Grounding: developer-guide/api/grounding.md
       - Training: developer-guide/api/training.md
       - Internal: developer-guide/api/internal.md
   - Modules:

@@ -12,10 +12,12 @@ GOVERNANCE_DB_PATH = "/workspace/governance.json"
 
 # --- Models ---
 class RequestType(str, Enum):
-    PACKAGE = "PACKAGE"  # pip install, apt install
-    MODEL = "MODEL"      # Pull new model
-    PERMISSION = "PERMISSION" # Change file access
-    FEATURE = "FEATURE"  # Request new feature
+    PACKAGE = "PACKAGE"          # pip install, apt install
+    MODEL = "MODEL"              # Pull new model
+    PERMISSION = "PERMISSION"    # Change file access
+    FEATURE = "FEATURE"          # Request new feature
+    GROUNDING_WEB = "GROUNDING_WEB"    # Grant internet/web grounding access
+    GROUNDING_DOCS = "GROUNDING_DOCS"  # Grant document/library grounding access
     OTHER = "OTHER"
 
 class RequestStatus(str, Enum):

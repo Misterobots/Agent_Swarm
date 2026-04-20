@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { usePalaceStore } from "@/lib/stores/palace-store";
 import { usePalaceColors } from "@/lib/palace/theme-materials";
+import { useAccess } from "@/lib/hooks/use-access";
 import { PalaceArchitecture } from "./palace-architecture";
 import { LobbyView } from "./views/lobby-view";
 import { WingView } from "./views/wing-view";
@@ -16,16 +17,29 @@ export function PalaceViewer() {
   const layoutLoading = usePalaceStore((s) => s.layoutLoading);
   const layoutError = usePalaceStore((s) => s.layoutError);
   const loadLayout = usePalaceStore((s) => s.loadLayout);
+  const adminViewingOwner = usePalaceStore((s) => s.adminViewingOwner);
+  const setAdminOwner = usePalaceStore((s) => s.setAdminOwner);
   const selectedMemory = usePalaceStore((s) => s.selectedMemory);
   const goBack = usePalaceStore((s) => s.goBack);
   const selectMemory = usePalaceStore((s) => s.selectMemory);
   const roomMemories = usePalaceStore((s) => s.roomMemories);
+  const { isAdmin, username, loading: accessLoading } = useAccess();
+  const scopeInitialized = useRef(false);
 
   const colors = usePalaceColors();
 
   useEffect(() => {
-    loadLayout();
-  }, [loadLayout]);
+    if (accessLoading) return;
+
+    if (isAdmin && username && !scopeInitialized.current && adminViewingOwner === null) {
+      scopeInitialized.current = true;
+      setAdminOwner(username);
+      return;
+    }
+
+    scopeInitialized.current = true;
+    loadLayout(adminViewingOwner ?? undefined);
+  }, [accessLoading, isAdmin, username, adminViewingOwner, setAdminOwner, loadLayout]);
 
   // Keyboard shortcuts (unchanged)
   const handleKeyDown = useCallback(
@@ -65,7 +79,9 @@ export function PalaceViewer() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  if (layoutLoading) {
+  const activeOwnerScope = adminViewingOwner ?? undefined;
+
+  if (layoutLoading || accessLoading) {
     return (
       <div className="flex items-center justify-center h-full w-full">
         <div className="flex flex-col items-center gap-3">
@@ -98,7 +114,7 @@ export function PalaceViewer() {
             {layoutError}
           </span>
           <button
-            onClick={() => loadLayout()}
+            onClick={() => loadLayout(activeOwnerScope)}
             className="mt-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
             style={{
               background: "var(--chat-accent)",

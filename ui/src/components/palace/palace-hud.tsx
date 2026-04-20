@@ -1,14 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { ChevronRight, Search, ArrowLeft, Users } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { ChevronRight, Search, ArrowLeft, Users, User, Globe, Crosshair } from "lucide-react";
 import { usePalaceStore, type PalaceLocation } from "@/lib/stores/palace-store";
 import { usePalaceColors } from "@/lib/palace/theme-materials";
 import { useAccess } from "@/lib/hooks/use-access";
 
 export function PalaceHud() {
   const location = usePalaceStore((s) => s.location);
-  const locationHistory = usePalaceStore((s) => s.locationHistory);
   const navigateTo = usePalaceStore((s) => s.navigateTo);
   const goBack = usePalaceStore((s) => s.goBack);
   const layout = usePalaceStore((s) => s.layout);
@@ -18,7 +17,7 @@ export function PalaceHud() {
   const adminViewingOwner = usePalaceStore((s) => s.adminViewingOwner);
   const setAdminOwner = usePalaceStore((s) => s.setAdminOwner);
   const loadLayout = usePalaceStore((s) => s.loadLayout);
-  const { isAdmin } = useAccess();
+  const { isAdmin, username, displayName } = useAccess();
   const colors = usePalaceColors();
 
   // Light-theme glass overrides
@@ -32,6 +31,16 @@ export function PalaceHud() {
   const [searchValue, setSearchValue] = useState("");
   const [showOwnerInput, setShowOwnerInput] = useState(false);
   const [ownerInput, setOwnerInput] = useState("");
+
+  const isSelfScope = Boolean(username) && adminViewingOwner === username;
+  const isEveryoneScope = adminViewingOwner === null;
+  const isCustomScope = Boolean(adminViewingOwner && adminViewingOwner !== username);
+
+  const scopeLabel = useMemo(() => {
+    if (isSelfScope) return `Self${displayName ? ` · ${displayName}` : ""}`;
+    if (isCustomScope) return `Owner · ${adminViewingOwner}`;
+    return "Everyone";
+  }, [isSelfScope, isCustomScope, displayName, adminViewingOwner]);
 
   // ── Breadcrumb segments ───────────────────────────────────────────────
 
@@ -82,6 +91,30 @@ export function PalaceHud() {
     loadLayout(oid ?? undefined);
     setShowOwnerInput(false);
   }, [ownerInput, setAdminOwner, loadLayout]);
+
+  const handleScopeChange = useCallback(
+    (scope: "self" | "everyone" | "custom") => {
+      if (scope === "self" && username) {
+        setAdminOwner(username);
+        setOwnerInput(username);
+        loadLayout(username);
+        setShowOwnerInput(false);
+        return;
+      }
+
+      if (scope === "everyone") {
+        setAdminOwner(null);
+        setOwnerInput("");
+        loadLayout();
+        setShowOwnerInput(false);
+        return;
+      }
+
+      setOwnerInput(adminViewingOwner ?? username ?? "");
+      setShowOwnerInput(true);
+    },
+    [username, adminViewingOwner, setAdminOwner, loadLayout],
+  );
 
   return (
     <div className="absolute inset-x-0 top-0 pointer-events-none z-10">
@@ -176,24 +209,72 @@ export function PalaceHud() {
 
           {/* Admin wing switch */}
           {isAdmin && (
-            <div className="relative">
-              <button
-                onClick={() => setShowOwnerInput(!showOwnerInput)}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs transition-colors"
+            <div className="relative flex items-center gap-2">
+              <div
+                className="hidden md:flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs"
                 style={{
-                  background: adminViewingOwner
-                    ? "var(--chat-accent)"
-                    : "var(--chat-surface)",
-                  color: adminViewingOwner
-                    ? "var(--chat-bg)"
-                    : "var(--chat-muted)",
-                  border: "1px solid var(--chat-border)",
+                  background: `rgba(var(--chat-surface-rgb, 30, 30, 30), ${glassAlpha})`,
+                  backdropFilter: "blur(16px) saturate(1.4)",
+                  WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+                  border: `1px solid rgba(var(--chat-border-rgb, 60, 60, 60), ${glassBorderAlpha})`,
+                  color: "var(--chat-muted)",
+                  boxShadow: glassShadow,
                 }}
-                title="Switch user scope (admin)"
+                title="Current Palace scope"
               >
-                <Users size={14} />
-                {adminViewingOwner ? adminViewingOwner : "All users"}
-              </button>
+                <Users size={13} />
+                <span>{scopeLabel}</span>
+              </div>
+
+              <div
+                className="flex items-center gap-1 p-1 rounded-xl"
+                style={{
+                  background: `rgba(var(--chat-surface-rgb, 30, 30, 30), ${glassAlpha})`,
+                  backdropFilter: "blur(16px) saturate(1.4)",
+                  WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+                  border: `1px solid rgba(var(--chat-border-rgb, 60, 60, 60), ${glassBorderAlpha})`,
+                  boxShadow: glassShadow,
+                }}
+              >
+                <button
+                  onClick={() => handleScopeChange("self")}
+                  disabled={!username}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-colors"
+                  style={{
+                    background: isSelfScope ? "var(--chat-accent)" : "transparent",
+                    color: isSelfScope ? "var(--chat-bg)" : "var(--chat-muted)",
+                    opacity: username ? 1 : 0.5,
+                  }}
+                  title="View only your memories"
+                >
+                  <User size={13} />
+                  Self
+                </button>
+                <button
+                  onClick={() => handleScopeChange("everyone")}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-colors"
+                  style={{
+                    background: isEveryoneScope ? "var(--chat-accent)" : "transparent",
+                    color: isEveryoneScope ? "var(--chat-bg)" : "var(--chat-muted)",
+                  }}
+                  title="View all visible memories"
+                >
+                  <Globe size={13} />
+                  Everyone
+                </button>
+                <button
+                  onClick={() => handleScopeChange("custom")}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-colors"
+                  style={{
+                    background: isCustomScope || showOwnerInput ? "var(--chat-accent)" : "transparent",
+                    color: isCustomScope || showOwnerInput ? "var(--chat-bg)" : "var(--chat-muted)",
+                  }}
+                  title="View a specific owner"
+                >
+                  <Crosshair size={13} />
+                  Owner
+                </button>
+              </div>
 
               {showOwnerInput && (
                 <div
@@ -201,18 +282,28 @@ export function PalaceHud() {
                   style={{
                     background: "var(--chat-surface)",
                     border: "1px solid var(--chat-border)",
-                    minWidth: 200,
+                    minWidth: 260,
                   }}
                 >
                   <input
                     value={ownerInput}
                     onChange={(e) => setOwnerInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleOwnerSwitch()}
-                    placeholder="owner_id (blank=all)"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleOwnerSwitch();
+                      if (e.key === "Escape") setShowOwnerInput(false);
+                    }}
+                    placeholder="owner_id"
                     className="bg-transparent border-none outline-none text-sm flex-1 px-1"
                     style={{ color: "var(--chat-text)" }}
                     autoFocus
                   />
+                  <button
+                    onClick={() => setShowOwnerInput(false)}
+                    className="px-2 py-0.5 rounded text-xs"
+                    style={{ color: "var(--chat-muted)" }}
+                  >
+                    Cancel
+                  </button>
                   <button
                     onClick={handleOwnerSwitch}
                     className="px-2 py-0.5 rounded text-xs font-medium"
@@ -221,7 +312,7 @@ export function PalaceHud() {
                       color: "var(--chat-bg)",
                     }}
                   >
-                    Go
+                    Apply
                   </button>
                 </div>
               )}

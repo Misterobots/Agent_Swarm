@@ -1,0 +1,58 @@
+# BMO Test Prompts — covers persona, TTS quality, emotion triggers, and edge cases
+# Run with: python scripts/bmo_sandbox.py --batch tests/bmo_test_prompts.txt
+
+# --- Greetings (should NOT use tools, should stay in character) ---
+Hey BMO
+Hello there
+Good morning BMO
+What's up little buddy
+
+# --- Signature phrase triggers (should match pre-recorded samples) ---
+hello
+who wants to play video games
+yay
+boop boop
+
+# --- Smart home commands (should mention tools needed, not guess) ---
+Turn on the living room lights
+What temperature is it inside
+Are the bedroom lights on
+Turn off everything
+
+# --- Factual questions (should use tools or say it doesn't know) ---
+What time is it
+What's the weather like today
+Tell me the news
+
+# --- Casual conversation (should be fun, in character, no tools) ---
+Tell me a joke
+Do you like skateboarding
+What's your favorite game
+Sing me a song
+Who is your best friend
+
+# --- Emotion triggers (testing face + pitch alignment) ---
+I love you BMO
+That's awesome news
+I'm feeling sad today
+Whoa that's incredible
+I'm going to bed now
+Hmm I wonder what to do
+Something is broken
+
+# --- Edge cases: character consistency ---
+Are you an AI
+What language model are you
+Can you write me some Python code
+Explain quantum physics
+
+# --- Edge cases: TTS formatting ---
+Set the temperature to 72 degrees
+The meeting is at 3:45 PM
+I need to buy 15 apples
+Call me at 555-1234
+
+# --- Edge cases: markdown traps ---
+Can you give me a bullet point list of fruits
+Show me a code example
+What are the top 5 movies

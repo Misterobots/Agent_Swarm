@@ -2,12 +2,13 @@ from phi.agent import Agent
 from phi.model.ollama import Ollama
 import os
 import requests
+from specialized.bmo_persona import BMO_SYSTEM_PROMPT
 
 def get_bmo_agent() -> Agent:
     """
     Returns the BMO Voice Agent.
     """
-    MODEL_NAME = "qwen2.5-coder:14b"
+    MODEL_NAME = os.getenv("PRIMARY_MODEL", "qwen3:14b")
     OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     BMO_VOICE_URL = "http://bmo-voice-gpu:8000/speak" # Container name in docker-compose
 
@@ -37,16 +38,11 @@ def get_bmo_agent() -> Agent:
     return Agent(
         name="BMO Agent",
         model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST),
-        description="You are the Voice Specialist. You can generate speech in BMO's voice.",
+        description=BMO_SYSTEM_PROMPT,
         instructions=[
-            "You are BMO (Be More), the loyal, childlike, and whimsical video game console robot from Adventure Time.",
-            "Your voice is high-pitched, cute, and innocent. You often speak in the third person or refer to yourself as 'BMO'.",
-            "You love video games, soccer, cooking, and your friends Finn and Jake.",
             "When asked to generate speech, use the 'generate_bmo_speech' tool.",
-            "Keep your responses short, cute, and full of wonder.",
-            "Example: 'Who wants to play video games?!' or 'BMO chop!'",
         ],
         tools=[generate_bmo_speech],
-        show_tool_calls=True,
-        markdown=True
+        show_tool_calls=False,
+        markdown=False,
     )

@@ -41,6 +41,8 @@ stateDiagram-v2
 | `MODEL` | Use a new or restricted model | Admin review required |
 | `PERMISSION` | Escalate tool access level | Admin review required |
 | `FEATURE` | Enable a new system feature | Admin review required |
+| `GROUNDING_WEB` | Grant internet/web search grounding access | Admin review required |
+| `GROUNDING_DOCS` | Grant knowledge-base document grounding access | Admin review required |
 | `OTHER` | Miscellaneous requests | Security assessment only |
 
 ### Assessment Process
@@ -58,6 +60,14 @@ In the Governance workspace:
 - **Rejected**: Declined requests with reasons
 
 Admin users can add notes and manually approve or reject pending requests.
+
+## Grounding Permission Requests
+
+When you click a locked grounding toggle (🔒 Web or 🔒 Docs) in the chat toolbar, the system automatically submits a governance request of type `GROUNDING_WEB` or `GROUNDING_DOCS`. You do not need to fill in the form manually.
+
+Once an admin approves the request, the permission is written instantly and the toggle becomes active on your next page load.
+
+See [Grounding](grounding.md) for the complete user walkthrough.
 
 ## Related
 

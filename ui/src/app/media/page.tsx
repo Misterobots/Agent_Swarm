@@ -58,6 +58,11 @@ export default function MediaPage() {
             description="Audio-oriented media workflows and generated voice artifacts."
             href="/media/voice"
           />
+          <WorkspaceLinkCard
+            title="BMO Sandbox"
+            description="Test BMO conversations in the browser with audio playback and emotion diagnostics."
+            href="/media/bmo-sandbox"
+          />
         </WorkspaceCardGrid>
       </WorkspaceSection>
 

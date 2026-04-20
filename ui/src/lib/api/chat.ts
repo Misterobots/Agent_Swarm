@@ -15,6 +15,8 @@ export interface ChatStreamOptions {
   ultraplanMode?: boolean;
   ultrathinkMode?: boolean;
   attachments?: FileAttachment[];
+  groundingWeb?: boolean;
+  groundingDocs?: boolean;
 }
 
 export async function* sendChatStream(
@@ -30,6 +32,8 @@ export async function* sendChatStream(
   ultraplanMode?: boolean,
   ultrathinkMode?: boolean,
   devMode?: boolean,
+  groundingWeb?: boolean,
+  groundingDocs?: boolean,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -45,6 +49,8 @@ export async function* sendChatStream(
   if (ultrathinkMode) body.ultrathink_mode = true;
   if (attachments && attachments.length > 0) body.attachments = attachments;
   if (devMode) body.dev_mode = true;
+  if (groundingWeb) body.grounding_web = true;
+  if (groundingDocs) body.grounding_docs = true;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",

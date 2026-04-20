@@ -14,6 +14,8 @@ interface SettingsState {
   ultraplanMode: boolean;
   ultrathinkMode: boolean;
   autoFeedPlan: boolean;
+  groundingWeb: boolean;
+  groundingDocs: boolean;
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
@@ -23,6 +25,8 @@ interface SettingsState {
   setUltraplanMode: (on: boolean) => void;
   setUltrathinkMode: (on: boolean) => void;
   setAutoFeedPlan: (on: boolean) => void;
+  setGroundingWeb: (on: boolean) => void;
+  setGroundingDocs: (on: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -37,6 +41,8 @@ export const useSettingsStore = create<SettingsState>()(
       ultraplanMode: false,
       ultrathinkMode: false,
       autoFeedPlan: false,
+      groundingWeb: false,
+      groundingDocs: false,
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),
@@ -46,6 +52,8 @@ export const useSettingsStore = create<SettingsState>()(
       setUltraplanMode: (ultraplanMode) => set({ ultraplanMode }),
       setUltrathinkMode: (ultrathinkMode) => set({ ultrathinkMode }),
       setAutoFeedPlan: (autoFeedPlan) => set({ autoFeedPlan }),
+      setGroundingWeb: (groundingWeb) => set({ groundingWeb }),
+      setGroundingDocs: (groundingDocs) => set({ groundingDocs }),
     }),
     { name: "hive-settings" }
   )
