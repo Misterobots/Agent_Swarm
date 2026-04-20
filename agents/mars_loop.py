@@ -10,6 +10,7 @@ that expose a .run(prompt) interface.
 """
 
 import time
+import re
 import logging
 import threading
 import queue
@@ -152,6 +153,8 @@ class MarsRLLoop:
         # synthesized response.
         _solver_has_tools = bool(getattr(self.solver, "tools", None))
 
+        _in_think = False  # Track <think> state across solver chunks
+
         try:
             if event_callback and not _solver_has_tools:
                 # --- Streaming mode (no tools) ---
@@ -162,8 +165,24 @@ class MarsRLLoop:
                     last_tok_time = time.time()
                     
                     if hasattr(chunk, "content") and chunk.content:
-                        current_response += chunk.content
-                        event_callback({"type": "message", "content": chunk.content})
+                        raw = chunk.content
+                        # Parse <think>...</think> tags so reasoning shows
+                        # in the chat UI's ThinkingIndicator.
+                        parts = re.split(r'(<think>|</think>)', raw)
+                        for part in parts:
+                            if part == '<think>':
+                                _in_think = True
+                                continue
+                            elif part == '</think>':
+                                _in_think = False
+                                continue
+                            if not part:
+                                continue
+                            if _in_think:
+                                event_callback({"type": "thought", "content": part})
+                            else:
+                                current_response += part
+                                event_callback({"type": "message", "content": part})
                     
                     # Check for idle timeout during stream
                     if time.time() - last_tok_time > stream_timeout:
@@ -178,8 +197,13 @@ class MarsRLLoop:
                     event_callback({"type": "log", "content": "[MarsRL] Solver has tools — using non-streaming mode for tool execution"})
                 solver_resp = self.solver.run(task)
                 current_response = solver_resp.content if hasattr(solver_resp, "content") else str(solver_resp)
+                # Strip <think> blocks from stored response (verifier sees clean text);
+                # main.py SSE layer will parse them into thought events for the UI.
+                current_response = re.sub(r'<think>.*?</think>', '', current_response, flags=re.DOTALL).strip()
                 if event_callback:
-                    event_callback({"type": "message", "content": current_response})
+                    # Forward the raw response — main.py handles <think> parsing
+                    raw_resp = solver_resp.content if hasattr(solver_resp, "content") else str(solver_resp)
+                    event_callback({"type": "message", "content": raw_resp})
                 
             iterations += 1
             solver_elapsed = time.time() - t0

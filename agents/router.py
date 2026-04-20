@@ -117,12 +117,10 @@ try:
         host=os.getenv("LANGFUSE_HOST", "http://localhost:3001")
     )
     USE_LANGFUSE = True
-    langfuse_context = None # Stubbed for v3 compatibility until open-telemetry logic is integrated
     logger.info("[Router] Langfuse tracing enabled")
 except ImportError:
     USE_LANGFUSE = False
     observe = lambda *args, **kwargs: lambda f: f  # No-op decorator
-    langfuse_context = None
     logger.warning("[Router] Langfuse not available, tracing disabled")
 
 @observe(name="handle_task_event")  # Langfuse traces this function
@@ -393,6 +391,40 @@ def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None):
         logger.debug(f"[Router] Trace scoring failed: {e}")
 
 
+from contextlib import contextmanager
+
+@contextmanager
+def _langfuse_span(name: str, agent_name: str, model_id: str, input_text: str):
+    """Create a Langfuse observation span around an agent execution.
+    Yields a dict that the caller should populate with 'output' when done."""
+    result = {"output": ""}
+    if USE_LANGFUSE and langfuse:
+        try:
+            ctx = langfuse.start_as_current_observation(
+                name=name,
+                as_type="generation",
+                input={"prompt": input_text[:4000]},
+                metadata={"agent": agent_name, "model": model_id},
+            )
+            ctx.__enter__()
+            try:
+                yield result
+            finally:
+                try:
+                    langfuse.update_current_observation(
+                        output={"response": result["output"][:4000]},
+                        metadata={"response_len": len(result["output"])},
+                    )
+                except Exception:
+                    pass
+                ctx.__exit__(None, None, None)
+        except Exception as e:
+            logger.debug(f"[Router] Span creation failed for {name}: {e}")
+            yield result
+    else:
+        yield result
+
+
 def _is_explicit_train_request(text: str) -> bool:
     """Return True only for clear, intentional memory-training instructions."""
     if not text:
@@ -635,6 +667,19 @@ def chat_swarm(
     lf_trace = None  # Langfuse trace handle (populated below if Langfuse is active)
     turn_id = f"{session_id}-{int(time.time()*1000)}"
 
+    # Collect thought/log events for Langfuse trace narrative
+    _trace_thoughts = []  # {"type": "thought"|"log", "content": "..."}
+
+    def _t(content: str) -> dict:
+        """Create a thought event and collect it for tracing."""
+        _trace_thoughts.append({"type": "thought", "content": content, "ts": time.time()})
+        return {"type": "thought", "content": content}
+
+    def _l(content: str) -> dict:
+        """Create a log event and collect it for tracing."""
+        _trace_thoughts.append({"type": "log", "content": content, "ts": time.time()})
+        return {"type": "log", "content": content}
+
     # --- Langfuse top-level trace for all intents (v4 context manager) ---
     _lf_ctx = None
     if USE_LANGFUSE and langfuse:
@@ -643,9 +688,10 @@ def chat_swarm(
                 name="chat_swarm",
                 as_type="agent",
                 input={"message": user_input[:4000]},
-                metadata={"session_id": session_id, "owner_id": owner_id},
+                metadata={"session_id": session_id, "owner_id": owner_id, "model": model},
             )
             _lf_ctx.__enter__()
+            lf_trace = langfuse.get_current_trace_id()
         except Exception as e:
             _lf_ctx = None
             logger.debug(f"[Router] Trace creation failed: {e}")
@@ -676,7 +722,7 @@ def chat_swarm(
         extracted_context = context_match.group(0)
         # Strip Open-WebUI's boilerplate injection
         user_input = re.sub(r'### Task:.*?<context>.*?</context>\s*', '', user_input, flags=re.DOTALL).strip()
-        yield {"type": "log", "content": f"[Router] Intercepted RAG Context ({len(extracted_context)} chars)."}
+        yield _l(f"[Router] Intercepted RAG Context ({len(extracted_context)} chars).")
     
     # 1. Load Context (Memory Bridge)
     from context_manager import get_pending_context, clear_context, save_pending_image_clarification
@@ -730,7 +776,7 @@ def chat_swarm(
                         history = [recall_msg]
                     else:
                         history = [recall_msg] + list(history)
-                    yield {"type": "thought", "content": f"→ Memory: Recalled {len(recent)} prior session summaries"}
+                    yield _t(f"→ Memory: Recalled {len(recent)} prior session summaries")
             except Exception as _mem_err:
                 logger.debug(f"[Router] Memory recall failed (non-fatal): {_mem_err}")
 
@@ -754,77 +800,47 @@ def chat_swarm(
                             history = [mp_msg]
                         else:
                             history.append(mp_msg)
-                        yield {"type": "thought", "content": f"→ MemPalace: {len(strong)} relevant memories recalled"}
+                        yield _t(f"→ MemPalace: {len(strong)} relevant memories recalled")
             except Exception as _mp_err:
                 logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
 
-        # 2. Async Safety Check — runs in background thread to avoid blocking TTFT.
-        #    The check result is polled after intent routing begins streaming.
-        #    If UNSAFE is detected, the stream will be aborted.
-        import threading
-        _safety_result = {"status": "pending", "content": ""}
+        # 2. Security Check (on the Merged Input)
+        yield {"type": "status", "content": "🔒 Security Agent: Scanning input..."}
+        security = get_security_agent()
+        AGENT_STATE.labels(agent_name="Security").set(2)
+        
+        security_check: RunResponse = security.run(f"Validate this user command for safety: {user_input}")
+        yield {"type": "log", "content": f"[Security Analysis] Algo: Llama-Guard | Output: {security_check.content}"}
+        
+        AGENT_STATE.labels(agent_name="Security").set(1)
+        
+        if "UNSAFE" in security_check.content.upper():
+            yield {"type": "error", "content": f"🚫 BLOCKED: {security_check.content}"}
+            WORKFLOW_STEPS.labels(status="blocked", agent_type="Security").inc()
+            return # HITL Block
 
-        def _run_safety_check():
-            try:
-                security = get_security_agent()
-                AGENT_STATE.labels(agent_name="Security").set(2)
-                check: RunResponse = security.run(f"Validate this user command for safety: {user_input}")
-                _safety_result["content"] = check.content
-                if "UNSAFE" in check.content.upper():
-                    _safety_result["status"] = "blocked"
-                    logger.warning(f"[Security] UNSAFE detected (async): {check.content}")
-                else:
-                    _safety_result["status"] = "pass"
-                AGENT_STATE.labels(agent_name="Security").set(1)
-            except Exception as e:
-                logger.error(f"[Security] Async check failed: {e}")
-                _safety_result["status"] = "pass"  # Fail-open: don't block on security failure
-                AGENT_STATE.labels(agent_name="Security").set(1)
+        yield {"type": "status", "content": "✅ Security Agent: Input Cleared."}
+        yield _t("→ Security: PASS")
+        WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
 
-        _safety_thread = threading.Thread(target=_run_safety_check, daemon=True)
-        _safety_thread.start()
-        yield {"type": "log", "content": "[Security] Async safety scan started (non-blocking)."}
-
-        # --- ANTHROPIC FAST-PATH (per-user key OR admin fallback) ---
+        # --- ANTHROPIC FAST-PATH (admin-only Claude models) ---
         if model and _is_anthropic_model(model):
-            # Check if this user has their own Anthropic API key connected
-            _user_anthropic_key = None
-            try:
-                from provider_keys import get_user_anthropic_key
-                _user_anthropic_key = get_user_anthropic_key(owner_id) if owner_id else None
-            except Exception as e:
-                logger.debug(f"[Router] provider_keys lookup failed: {e}")
-
-            if _user_anthropic_key:
-                # User has their own key — use it directly (no admin check needed)
+            if not _is_admin_session(session_id, owner_id):
+                yield {"type": "error", "content": "🔒 Claude models require admin privileges. Falling back to local model."}
+                logger.warning(f"[Router] Non-admin tried Anthropic model: {model}")
+                _audit_security_event(
+                    "claude_access_denied",
+                    {
+                        "requested_model": model,
+                        "session_id": session_id,
+                        "owner_id": owner_id,
+                        "reason": "insufficient_security_level",
+                    },
+                )
+                model = None  # Fall through to normal Ollama routing
+            elif ANTHROPIC_ENABLED:
                 yield {"type": "status", "content": f"☁️ Claude ({model}): Generating..."}
-                yield {"type": "thought", "content": f"→ Provider: Anthropic via connected account ({model})"}
-                try:
-                    provider = AnthropicProvider(api_key=_user_anthropic_key, model=model)
-                    api_messages = [{"role": "user", "content": user_input}]
-                    if history:
-                        api_messages = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in history]
-                        api_messages.append({"role": "user", "content": user_input})
-
-                    for chunk in provider.generate_stream(
-                        prompt=user_input,
-                        messages=api_messages,
-                        system="You are Hive Mind, a helpful AI assistant in a self-hosted home lab.",
-                    ):
-                        yield chunk.as_dict()
-
-                    _score_trace(lf_trace, langfuse, 0.9, output="[anthropic stream - user key]")
-                    WORKFLOW_STEPS.labels(status="success", agent_type="Anthropic").inc()
-                except Exception as e:
-                    logger.error(f"[Router] Anthropic provider error (user key): {e}")
-                    yield {"type": "error", "content": f"Claude API error: {e}"}
-                    _score_trace(lf_trace, langfuse, 0.0)
-                finally:
-                    AGENT_STATE.labels(agent_name="Router").set(1)
-                return
-            elif _is_admin_session(session_id, owner_id) and ANTHROPIC_ENABLED:
-                yield {"type": "status", "content": f"☁️ Claude ({model}): Generating..."}
-                yield {"type": "thought", "content": f"→ Provider: Anthropic ({model})"}
+                yield _t(f"→ Provider: Anthropic ({model})")
                 try:
                     provider = AnthropicProvider(model=model)
                     api_messages = [{"role": "user", "content": user_input}]
@@ -849,22 +865,21 @@ def chat_swarm(
                     AGENT_STATE.labels(agent_name="Router").set(1)
                 return
             else:
-                # No user key, and either not admin or system key not configured
                 logger.warning(
-                    f"[Router] Claude model requested but no access: {model} (user={owner_id})"
+                    f"[Router] Claude model requested but provider unavailable: {model}"
                 )
                 _audit_security_event(
-                    "claude_access_denied",
+                    "claude_provider_unavailable",
                     {
                         "requested_model": model,
                         "session_id": session_id,
                         "owner_id": owner_id,
-                        "reason": "no_connected_key",
+                        "reason": "provider_not_configured",
                     },
                 )
                 yield {
                     "type": "error",
-                    "content": "Connect your Anthropic API key in Settings → Connected Accounts to use Claude models.",
+                    "content": "Claude provider is not configured. Falling back to local model.",
                 }
                 model = None
 
@@ -897,7 +912,7 @@ def chat_swarm(
             confidence = 1.0
             reasoning = "Slash command: /standardize-doc"
         
-        yield {"type": "log", "content": f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}"}
+        yield _l(f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}")
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
 
         if intent == "TRAIN" and not _is_explicit_train_request(user_input):
@@ -912,12 +927,12 @@ def chat_swarm(
             intent = "CONVERSATION"
             confidence = max(confidence, 0.75)
 
-        yield {"type": "thought", "content": f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)"}
+        yield _t(f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)")
 
         # --- FAST MODE: hive-fast skips MarsRL verification loop ---
         _fast_mode = (model == "hive-fast")
         if _fast_mode:
-            yield {"type": "log", "content": "[Router] Hive Fast mode — single-pass, no MarsRL verification."}
+            yield _l("[Router] Hive Fast mode — single-pass, no MarsRL verification.")
 
         # --- SKILL HINT OVERRIDE ---
         # If the UI sent an explicit skill hint, override intent when confidence is low
@@ -931,19 +946,19 @@ def chat_swarm(
         if skill and skill in _skill_to_intent and confidence < 0.80:
             old_intent = intent
             intent = _skill_to_intent[skill]
-            yield {"type": "thought", "content": f"→ Skill override: {old_intent} → {intent} (skill={skill})"}
+            yield _t(f"→ Skill override: {old_intent} → {intent} (skill={skill})")
 
         # --- RESEARCH MODE OVERRIDE ---
         if research_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "TRAIN"):
             intent = "RESEARCH"
-            yield {"type": "thought", "content": "→ Research mode activated: forcing RESEARCH intent"}
+            yield _t("→ Research mode activated: forcing RESEARCH intent")
 
         # --- ULTRAPLAN MODE: Plan-Only (no execution) ---
         if ultraplan_mode:
             yield _emit_turn_metadata(turn_id, "Planner", ["thinking", "responding"])
             yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "📋 Planner: Decomposing task..."}
-            yield {"type": "thought", "content": "→ UltraPlan mode: generating plan only (no execution)"}
+            yield _t("→ UltraPlan mode: generating plan only (no execution)")
 
             PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(PLAN_MODEL)
@@ -1010,7 +1025,7 @@ def chat_swarm(
                 history = [think_msg]
             else:
                 history = list(history) + [think_msg]
-            yield {"type": "thought", "content": "→ UltraThink: deep reasoning mode activated"}
+            yield _t("→ UltraThink: deep reasoning mode activated")
 
         # --- STYLE SYSTEM PROMPT ---
         _style_prompts = {
@@ -1027,7 +1042,7 @@ def chat_swarm(
                 history = [style_msg]
             else:
                 history = list(history) + [style_msg]
-            yield {"type": "thought", "content": f"→ Style: {style}"}
+            yield _t(f"→ Style: {style}")
 
         if USE_LANGFUSE and langfuse:
             try:
@@ -1039,16 +1054,20 @@ def chat_swarm(
                         "owner_id": owner_id,
                     }
                 )
+                # Create a dedicated span for intent classification
+                with langfuse.start_as_current_observation(
+                    name="intent_classification",
+                    as_type="span",
+                    input={"user_input": user_input[:2000]},
+                    output={"intent": intent, "confidence": confidence, "reasoning": reasoning[:200]},
+                    metadata={
+                        "model": router_inst.model_name if hasattr(router_inst, "model_name") else "semantic_router",
+                        "fast_mode": _fast_mode,
+                    },
+                ):
+                    pass
             except Exception:
                 pass
-
-        if USE_LANGFUSE and langfuse_context:
-            langfuse_context.update_current_observation(
-                name="intent_routing",
-                metadata={"model": router_inst.model_name, "host": router_inst.host},
-                output=routing_decision,
-                scores=[{"name": "routing_confidence", "value": confidence}]
-            )
 
         # --- JWT-ACE: Set active scope for this intent ---
         if JWT_ACE_AVAILABLE:
@@ -1063,21 +1082,6 @@ def chat_swarm(
             })
 
         route_start_time = time.time()
-
-        # --- ASYNC SAFETY GATE: Check if the background safety thread has finished ---
-        # By now the safety check has had time to run during intent classification.
-        # Give it a brief wait (up to 200ms) then proceed. If still pending, we'll
-        # check again after the first token buffer in each route handler.
-        _safety_thread.join(timeout=0.2)
-        if _safety_result["status"] == "blocked":
-            yield {"type": "error", "content": f"🚫 BLOCKED: {_safety_result['content']}"}
-            WORKFLOW_STEPS.labels(status="blocked", agent_type="Security").inc()
-            return
-        if _safety_result["status"] == "pass":
-            yield {"type": "thought", "content": "→ Security: PASS"}
-            WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
-        else:
-            yield {"type": "log", "content": "[Security] Safety check still in progress — streaming will proceed."}
 
         # --- ROUTE: VISION (Image Analysis via VLM) ---
         # Must be checked BEFORE CREATIVE_INTENTS to prevent "what do you see
@@ -1229,7 +1233,11 @@ def chat_swarm(
 
             conversationalist = Agent(
                 name="Hive Mind",
-                model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+                model=Ollama(
+                    id=CONV_MODEL,
+                    host=OLLAMA_HOST,
+                    client_kwargs={"timeout": 120.0},
+                ),
                 storage=_conv_storage,
                 session_id=session_id,
                 add_history_to_messages=True,
@@ -1243,13 +1251,15 @@ def chat_swarm(
 
             full_content = ""
             try:
-                with request_lock(context="text"):
-                    response_stream = conversationalist.run(user_input, stream=True)
-                    for chunk in response_stream:
-                        if chunk.content:
-                            yield _emit_stream_mode("responding")
-                            full_content += chunk.content
-                            yield {"type": "message", "content": chunk.content}
+                with _langfuse_span("conversation_generation", "Conversationalist", CONV_MODEL, user_input) as span_result:
+                    with request_lock(context="text"):
+                        response_stream = conversationalist.run(user_input, stream=True)
+                        for chunk in response_stream:
+                            if chunk.content:
+                                yield _emit_stream_mode("responding")
+                                full_content += chunk.content
+                                yield {"type": "message", "content": chunk.content}
+                    span_result["output"] = full_content
                 _score_trace(lf_trace, langfuse, 0.85, output=full_content)
             except Exception as e:
                 _score_trace(lf_trace, langfuse, 0.0)
@@ -1281,7 +1291,7 @@ def chat_swarm(
 
             if _fast_mode:
                 # --- HIVE FAST: single-pass Ollama (no MarsRL) ---
-                yield {"type": "thought", "content": f"→ Hive Fast: single-pass Architect ({DEVOPS_MODEL})"}
+                yield _t(f"→ Hive Fast: single-pass DevOps ({DEVOPS_MODEL})")
                 devops_agent = Agent(
                     name="DevOps Engineer",
                     model=Ollama(id=DEVOPS_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
@@ -1294,13 +1304,15 @@ def chat_swarm(
                 )
                 full_content = ""
                 try:
-                    with request_lock(context="text"):
-                        yield _emit_stream_mode("responding")
-                        response_stream = devops_agent.run(devops_input, stream=True)
-                        for chunk in response_stream:
-                            if chunk.content:
-                                full_content += chunk.content
-                                yield {"type": "message", "content": chunk.content}
+                    with _langfuse_span("devops_fast_generation", "DevOps", DEVOPS_MODEL, devops_input) as span_result:
+                        with request_lock(context="text"):
+                            yield _emit_stream_mode("responding")
+                            response_stream = devops_agent.run(devops_input, stream=True)
+                            for chunk in response_stream:
+                                if chunk.content:
+                                    full_content += chunk.content
+                                    yield {"type": "message", "content": chunk.content}
+                        span_result["output"] = full_content
                     _score_trace(lf_trace, langfuse, 0.85, output=full_content)
                 except Exception as e:
                     _score_trace(lf_trace, langfuse, 0.0)
@@ -1323,7 +1335,7 @@ def chat_swarm(
                 )
 
                 yield {"type": "log", "content": f"[DevOps] Routing to MarsRL with infra context."}
-                yield {"type": "thought", "content": f"→ Routing to Architect ({DEVOPS_MODEL}) via MarsRL loop"}
+                yield _t(f"→ Routing to Architect ({DEVOPS_MODEL}) via MarsRL loop")
                 try:
                     tool_call_id = f"tool-devops-{int(time.time()*1000)}"
                     yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": "DEVOPS", "model": DEVOPS_MODEL})
@@ -1376,14 +1388,16 @@ def chat_swarm(
                     yield {"type": "log", "content": f"[DataAnalyst] Reading attached context ({len(extracted_context)} chars)..."}
                     final_input = f"{final_input}\n\n[Data Context]:\n{extracted_context}"
 
-                with request_lock(context="text"):
-                    response_stream = data_agent.run(final_input, stream=True)
-                    yield {"type": "status", "content": "📊 Data Analyst: Generating analysis..."}
-                    for chunk in response_stream:
-                        if chunk.content:
-                            yield _emit_stream_mode("responding")
-                            full_content += chunk.content
-                            yield {"type": "message", "content": chunk.content}
+                with _langfuse_span("data_analysis_generation", "DataAnalyst", DATA_MODEL, final_input) as span_result:
+                    with request_lock(context="text"):
+                        response_stream = data_agent.run(final_input, stream=True)
+                        yield {"type": "status", "content": "📊 Data Analyst: Generating analysis..."}
+                        for chunk in response_stream:
+                            if chunk.content:
+                                yield _emit_stream_mode("responding")
+                                full_content += chunk.content
+                                yield {"type": "message", "content": chunk.content}
+                    span_result["output"] = full_content
                 _score_trace(lf_trace, langfuse, 0.85, output=full_content)
             except Exception as e:
                 _score_trace(lf_trace, langfuse, 0.0)
@@ -1613,17 +1627,19 @@ def chat_swarm(
                     yield {"type": "log", "content": f"[TechnicalWriter] Reading Attached RAG Context ({len(extracted_context)} chars)..."}
                     final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
                     
-                with request_lock(context="text"):
-                    response_stream = tech_writer.run(final_input, stream=True)
-                    yield {"type": "status", "content": "📝 Technical Writer: Generating document..."}
-                    full_content = ""
-                    for chunk in response_stream:
-                        if chunk.content:
-                            yield _emit_stream_mode("responding")
-                            full_content += chunk.content
-                            yield {"type": "message", "content": chunk.content}
-                
-                    yield {"type": "log", "content": "[TechnicalWriter] Document Transformation Complete."}
+                with _langfuse_span("documentation_generation", "TechnicalWriter", TECH_MODEL, final_input) as span_result:
+                    with request_lock(context="text"):
+                        response_stream = tech_writer.run(final_input, stream=True)
+                        yield {"type": "status", "content": "📝 Technical Writer: Generating document..."}
+                        full_content = ""
+                        for chunk in response_stream:
+                            if chunk.content:
+                                yield _emit_stream_mode("responding")
+                                full_content += chunk.content
+                                yield {"type": "message", "content": chunk.content}
+                    
+                        yield {"type": "log", "content": "[TechnicalWriter] Document Transformation Complete."}
+                    span_result["output"] = full_content
                 _score_trace(lf_trace, langfuse, 0.85, output=full_content)
 
             except Exception as e:
@@ -1670,15 +1686,17 @@ def chat_swarm(
                     yield {"type": "log", "content": "[Librarian] Reading Attached RAG Context..."}
                     final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
                     
-                with request_lock(context="text"):
-                    response_stream = researcher.run(final_input, stream=True)
-                    yield {"type": "status", "content": "📚 Librarian Agent: Drafting response..."}
-                    full_content = ""
-                    for chunk in response_stream:
-                        if chunk.content:
-                            yield _emit_stream_mode("responding")
-                            full_content += chunk.content
-                            yield {"type": "message", "content": chunk.content}
+                with _langfuse_span("research_generation", "Librarian", resolved_model, final_input) as span_result:
+                    with request_lock(context="text"):
+                        response_stream = researcher.run(final_input, stream=True)
+                        yield {"type": "status", "content": "📚 Librarian Agent: Drafting response..."}
+                        full_content = ""
+                        for chunk in response_stream:
+                            if chunk.content:
+                                yield _emit_stream_mode("responding")
+                                full_content += chunk.content
+                                yield {"type": "message", "content": chunk.content}
+                    span_result["output"] = full_content
                 
                 yield {"type": "log", "content": f"[Research] Completed query: {user_input}"}
                 _score_trace(lf_trace, langfuse, 0.85, output=full_content)
@@ -1963,7 +1981,7 @@ def chat_swarm(
                     yield _emit_stream_mode("thinking")
                     yield {"type": "status", "content": "⚡ Architect (Fast): Generating..."}
                     AGENT_STATE.labels(agent_name="Architect").set(2)
-                    yield {"type": "thought", "content": f"→ Hive Fast: single-pass Architect ({ARCH_MODEL})"}
+                    yield _t(f"→ Hive Fast: single-pass Architect ({ARCH_MODEL})")
 
                     fast_agent = Agent(
                         name="Architect",
@@ -1973,18 +1991,20 @@ def chat_swarm(
                         add_history_to_messages=True,
                         num_history_responses=10,
                         instructions="""You are the Hive Mind Architect, an expert software engineer and system designer.
-                        Write clean, correct, production-quality code. Explain your reasoning concisely.
-                        You run on local hardware in a self-hosted home lab.""",
+Write clean, correct, production-quality code. Explain your reasoning concisely.
+You run on local hardware in a self-hosted home lab.""",
                         show_tool_calls=False,
                     )
                     full_content = ""
-                    with request_lock(context="text"):
-                        yield _emit_stream_mode("responding")
-                        response_stream = fast_agent.run(final_input, stream=True)
-                        for chunk in response_stream:
-                            if chunk.content:
-                                full_content += chunk.content
-                                yield {"type": "message", "content": chunk.content}
+                    with _langfuse_span("architect_fast_generation", "Architect", ARCH_MODEL, final_input) as span_result:
+                        with request_lock(context="text"):
+                            yield _emit_stream_mode("responding")
+                            response_stream = fast_agent.run(final_input, stream=True)
+                            for chunk in response_stream:
+                                if chunk.content:
+                                    full_content += chunk.content
+                                    yield {"type": "message", "content": chunk.content}
+                        span_result["output"] = full_content
                     _score_trace(lf_trace, langfuse, 0.85, output=full_content)
                 else:
                     # --- HIVE MIND: full MarsRL loop ---
@@ -2010,16 +2030,14 @@ def chat_swarm(
 
                     yield {"type": "log", "content": f"[MarsRL] Intent: {intent} | Loop initialized."}
 
-                    yield {"type": "thought", "content": f"→ Routing to Architect ({ARCH_MODEL}) via MarsRL loop"}
+                    yield _t(f"→ Routing to Architect ({ARCH_MODEL}) via MarsRL loop")
                     tool_call_id = f"tool-architect-{int(time.time()*1000)}"
                     yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": intent})
                     with request_lock(context="text"):
                         yield _emit_stream_mode("tool-use")
                         yield _emit_tool_progress(tool_call_id, "marsrl_loop", 20, "Solver started")
                         for update in mars_loop_stream(final_input, mars):
-                            # Capture MarsLoopResult for performance recording
                             if update.get("type") == "log" and "[MarsRL] Iterations:" in update.get("content", ""):
-                                # Extract scores from the summary line for perf recording
                                 pass
                             yield update
                         yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "Loop complete")
@@ -2061,6 +2079,10 @@ def chat_swarm(
         WORKFLOW_STEPS.labels(status="error", agent_type="Router").inc()
     finally:
         try:
+            # Emit the Langfuse trace ID as turn metadata so the UI can
+            # show it in the expandable Agent Trace, not in the response body.
+            if USE_LANGFUSE and lf_trace:
+                yield {"type": "turn_metadata", "turnMetadata": {"traceId": lf_trace}}
             yield _emit_stream_mode("requesting")
             yield _emit_continuation_hint("await_user", "Turn complete")
             yield _emit_turn_boundary(turn_id, "completed")
@@ -2069,6 +2091,28 @@ def chat_swarm(
         AGENT_STATE.labels(agent_name="Router").set(1)
         # Close Langfuse trace context and flush
         if USE_LANGFUSE and langfuse:
+            try:
+                # Flush collected thoughts/logs as a dedicated reasoning span
+                if _trace_thoughts:
+                    reasoning_text = "\n".join(
+                        f"[{t.get('type','?')}] {t.get('content','')}" for t in _trace_thoughts
+                    )
+                    with langfuse.start_as_current_observation(
+                        name="reasoning_narrative",
+                        as_type="span",
+                        input={"user_input": user_input[:2000]},
+                        output={"reasoning": reasoning_text[:8000]},
+                        metadata={
+                            "step_count": len(_trace_thoughts),
+                            "intent": intent if 'intent' in dir() else "UNKNOWN",
+                            "model": model,
+                            "fast_mode": _fast_mode if '_fast_mode' in dir() else False,
+                            "elapsed_s": round(time.time() - route_start_time, 2),
+                        },
+                    ):
+                        pass
+            except Exception as e:
+                logger.debug(f"[Router] Reasoning span failed: {e}")
             try:
                 if _lf_ctx is not None:
                     _lf_ctx.__exit__(None, None, None)

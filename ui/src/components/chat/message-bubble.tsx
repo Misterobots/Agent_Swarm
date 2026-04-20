@@ -139,9 +139,21 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
                 {traceOpen && (
                   <div className="px-3 py-2 bg-[var(--chat-soft)]">
                     {message.turnMetadata && (
-                      <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--chat-muted)]">
-                        <span>Turn {message.turnMetadata.turnId.slice(0, 8)}</span>
-                        {message.turnMetadata.agentName ? <span>{message.turnMetadata.agentName}</span> : null}
+                      <div className="mb-2 flex items-center gap-2 flex-wrap">
+                        <div className="inline-flex items-center gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--chat-muted)]">
+                          <span>Turn {message.turnMetadata.turnId.slice(0, 8)}</span>
+                          {message.turnMetadata.agentName ? <span>{message.turnMetadata.agentName}</span> : null}
+                        </div>
+                        {message.turnMetadata.traceId && (
+                          <a
+                            href={`${window.location.protocol}//${window.location.hostname}:3000/project/default/traces/${message.turnMetadata.traceId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/10 px-2 py-1 text-[10px] font-medium text-[var(--chat-accent)] hover:bg-[var(--chat-accent)]/20 transition-colors"
+                          >
+                            🔗 View Trace
+                          </a>
+                        )}
                       </div>
                     )}
                     {message.thoughtTrace?.map((t, idx) => (

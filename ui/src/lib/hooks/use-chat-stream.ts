@@ -285,14 +285,16 @@ export function useChatStream(options?: {
           } else if (event.type === "turn_metadata") {
             const incoming = event.turnMetadata;
             if (incoming) {
+              const prev = turnMetadataRef.current;
               turnMetadataRef.current = {
-                turnId: incoming.turnId || event.turnId || turnId,
-                agentName: incoming.agentName,
+                turnId: incoming.turnId || event.turnId || prev?.turnId || turnId,
+                agentName: incoming.agentName || prev?.agentName,
                 streamModes: streamModesRef.current,
-                toolsInvoked: incoming.toolsInvoked || [],
-                continuable: incoming.continuable !== false,
-                inContextTokens: incoming.inContextTokens,
-                resumeToken: incoming.resumeToken,
+                toolsInvoked: incoming.toolsInvoked || prev?.toolsInvoked || [],
+                continuable: incoming.continuable !== undefined ? incoming.continuable !== false : (prev?.continuable ?? true),
+                inContextTokens: incoming.inContextTokens ?? prev?.inContextTokens,
+                resumeToken: incoming.resumeToken || prev?.resumeToken,
+                traceId: incoming.traceId || prev?.traceId,
               };
             }
           } else if (event.type === "continuation") {

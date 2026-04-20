@@ -31,6 +31,7 @@ export interface TurnMetadata {
   inContextTokens?: number;
   continuable: boolean;
   resumeToken?: string;
+  traceId?: string;
 }
 
 /**
