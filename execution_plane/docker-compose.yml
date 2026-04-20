@@ -43,9 +43,8 @@ services:
     environment:
       # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
-      - OLLAMA_KV_CACHE_TYPE=q8_0      # Q8 KV cache: ~50% less KV VRAM vs f16, faster prefill on long prompts
       - OLLAMA_NUM_PARALLEL=2          # Concurrent requests across 2 GPUs
-      - OLLAMA_KEEP_ALIVE=30m          # Keep expert models hot (32GB total VRAM)
+      - OLLAMA_KEEP_ALIVE=-1           # Primary model pinned permanently in VRAM
     volumes:
       - ollama_models:/root/.ollama
     ports:
@@ -192,7 +191,16 @@ services:
       - HOME_LON=${HOME_LON:--87.6298}
       - HOME_CITY=${HOME_CITY:-your area}
       # MarsRL / Secondary inference
-      - ROUTER_MODEL=${ROUTER_MODEL:-nemotron-mini}
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
+      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:14b}
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
+      - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
+      # Connected Accounts — external LLM providers (BYOK)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
     volumes:
       - ../agents:/app/agents
       - ../:/workspace

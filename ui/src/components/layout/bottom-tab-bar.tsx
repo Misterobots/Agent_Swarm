@@ -16,7 +16,7 @@ interface TabItem {
 
 const TAB_ITEMS: TabItem[] = [
   { label: "Chat", href: "/chat", icon: MessageSquare, matchPrefixes: ["/chat"] },
-  { label: "Art", href: "/art-studio", icon: Palette, matchPrefixes: ["/art-studio"] },
+  { label: "Art", href: "/art-studio", icon: Palette, matchPrefixes: ["/art-studio", "/media"] },
   { label: "Tools", href: "/dev", icon: Wrench, matchPrefixes: ["/dev"] },
   { label: "Settings", href: "/settings", icon: Settings, matchPrefixes: ["/settings"] },
 ];
@@ -27,6 +27,11 @@ interface BottomTabBarProps {
 
 export function BottomTabBar({ onMenuPress }: BottomTabBarProps) {
   const pathname = usePathname();
+
+  // "More" highlights when current route isn't covered by any tab
+  const anyTabActive = TAB_ITEMS.some((item) =>
+    isNavigationItemActive({ ...item, matchPrefixes: item.matchPrefixes }, pathname)
+  );
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--chat-border)] bg-[var(--chat-surface)] pb-[env(safe-area-inset-bottom)]">
@@ -41,7 +46,7 @@ export function BottomTabBar({ onMenuPress }: BottomTabBarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors",
+                "flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors touch-target",
                 active
                   ? "text-[var(--chat-accent)]"
                   : "text-[var(--chat-muted)]"
@@ -54,7 +59,12 @@ export function BottomTabBar({ onMenuPress }: BottomTabBarProps) {
         })}
         <button
           onClick={onMenuPress}
-          className="flex flex-col items-center justify-center gap-0.5 w-full h-full text-[var(--chat-muted)] transition-colors active:text-[var(--chat-accent)]"
+          className={cn(
+            "flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors touch-target",
+            !anyTabActive
+              ? "text-[var(--chat-accent)]"
+              : "text-[var(--chat-muted)] active:text-[var(--chat-accent)]"
+          )}
         >
           <Menu size={20} />
           <span className="text-[10px] font-medium">More</span>

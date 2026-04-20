@@ -32,16 +32,18 @@ TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (2
 def _get_preferred_host(model_name: str) -> str:
     """
     Static hardware-aware routing (no health checks).
-    - Justin-PC (Local): 16GB VRAM (5060 Ti). Essential for large models.
-    - R730 (Secondary): 8GB VRAM (3070 Ti). Ideal for light models (<8GB).
+    - Justin-PC (Local): 2x 16GB VRAM (5060 Ti). Primary inference for all task models.
+    - R730 (Secondary): 8GB VRAM (3070 Ti). Dedicated to safety + embeddings only.
+    
+    After model consolidation, qwen3:14b is the primary workhorse and always
+    runs on Justin-PC. Only safety and embedding models route to R730.
     """
-    heavy_models = ["qwen2.5-coder", "llama3.1:70b", "qwen3.5"]
-    light_models = ["nemotron-mini", "nemotron-orchestrator", "llama-guard3:8b", "qwen2.5:3b"]
+    # R730 models — async safety + embeddings (not latency-critical)
+    r730_models = ["llama-guard", "nomic-embed"]
 
-    if any(m in model_name for m in heavy_models):
-        return OLLAMA_HOST
-    if any(m in model_name for m in light_models):
+    if any(m in model_name for m in r730_models):
         return SECONDARY_OLLAMA_HOST
+    # Everything else goes to Justin-PC (fast CPU, dual 5060 Ti)
     return OLLAMA_HOST
 
 

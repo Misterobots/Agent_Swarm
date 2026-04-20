@@ -19,7 +19,6 @@ import requests
 from dispatcher import Event, EventType
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock, get_best_host_for_model
-from tools.capability_tools import check_capability, request_tooling_access
 from phi.storage.agent.postgres import PgAgentStorage
 from config import AGNO_DB_URL
 
@@ -420,260 +419,6 @@ def _is_explicit_train_request(text: str) -> bool:
     return bool(teach_pattern)
 
 
-# ---------------------------------------------------------------------------
-# 3-Tier Intent Classifier
-# ---------------------------------------------------------------------------
-# Tier 1: Deterministic rules (slash commands, explicit directives) — 0ms
-# Tier 2: Weighted keyword scorer (covers ~90% of prompts) — 0ms
-# Tier 3: Neural router (nemotron-orchestrator:8b) — 55-80s, rare fallback
-#
-# The scorer assigns weighted points per intent based on keyword hits, URL
-# detection, structural signals (question marks, prompt length), and
-# negative signals. The highest-scoring intent wins if it clears the
-# confidence threshold.
-# ---------------------------------------------------------------------------
-
-# Each entry: (keyword_or_pattern, weight)
-# Higher weight = stronger signal. Weights are summed per intent.
-_INTENT_SIGNALS: dict[str, list[tuple[str, float]]] = {
-    "CONVERSATION": [
-        # Greetings
-        ("hello", 0.8), ("hi ", 0.7), ("hi!", 0.7), ("hey", 0.6),
-        ("good morning", 0.8), ("good evening", 0.8), ("good afternoon", 0.8),
-        # Identity / meta / capability questions
-        ("who are you", 1.0), ("what are you", 1.0), ("what can you do", 1.0),
-        ("what do you do", 0.9), ("tell me about yourself", 1.0),
-        ("how do you work", 0.9), ("what files do you have", 0.9),
-        ("what do you have access to", 1.0), ("what tools do you have", 1.0),
-        ("what are your capabilities", 1.0), ("do you have access to", 0.9),
-        ("currently have access", 0.9), ("can you browse", 0.8),
-        ("can you search the web", 0.8), ("do you support", 0.8),
-        ("is there a tool for", 0.8), ("what models do you", 0.8),
-        ("what agents do you", 0.8), ("what services do you", 0.8),
-        ("are you online", 0.7), ("are you there", 0.7),
-        ("how are you", 0.8), ("what's up", 0.7),
-        # Social
-        ("thank you", 0.9), ("thanks", 0.8), ("goodbye", 0.9), ("bye", 0.8),
-        # General knowledge questions
-        ("what is a ", 0.5), ("what is the ", 0.5), ("who was ", 0.5),
-        ("explain ", 0.4), ("tell me about ", 0.4), ("how does ", 0.4),
-    ],
-    "CODE": [
-        ("write a script", 1.0), ("write a function", 1.0), ("write code", 1.0),
-        ("fix the bug", 1.0), ("fix this error", 1.0), ("fix this code", 1.0),
-        ("implement ", 0.8), ("refactor ", 0.8), ("debug ", 0.8),
-        ("build a ", 0.5), ("create a script", 0.9), ("create a function", 0.9),
-        ("code review", 0.9), ("pull request", 0.7), ("merge conflict", 0.8),
-        ("test case", 0.7), ("unit test", 0.8), ("compile ", 0.6),
-        ("syntax error", 0.8), ("traceback", 0.8), ("exception", 0.5),
-        ("def ", 0.4), ("class ", 0.4), ("import ", 0.3),
-    ],
-    "DEVOPS": [
-        ("docker ", 0.9), ("dockerfile", 1.0), ("docker compose", 1.0),
-        ("kubernetes", 1.0), ("k8s", 1.0), ("helm ", 0.9),
-        ("deploy ", 0.6), ("nginx", 0.9), ("apache", 0.8),
-        ("firewall", 0.9), ("iptables", 1.0), ("ufw", 0.9),
-        ("systemd", 1.0), ("systemctl", 1.0), ("journalctl", 0.9),
-        ("ci/cd", 1.0), ("pipeline", 0.6), ("github actions", 0.9),
-        ("terraform", 1.0), ("ansible", 1.0),
-        ("bash script", 0.8), ("shell script", 0.8),
-        ("server config", 0.8), ("ssl cert", 0.9), ("dns ", 0.7),
-        ("ssh ", 0.6), ("scp ", 0.7), ("rsync", 0.7),
-        ("cron ", 0.8), ("crontab", 0.9),
-    ],
-    "DATA": [
-        ("sql ", 0.9), ("query ", 0.6), ("select ", 0.5),
-        ("csv ", 0.8), ("dataframe", 1.0), ("pandas", 1.0),
-        ("analyze data", 1.0), ("data analysis", 1.0),
-        ("statistics", 0.7), ("chart", 0.6), ("graph ", 0.5),
-        ("dashboard", 0.7), ("aggregate", 0.7), ("join ", 0.4),
-        ("excel ", 0.7), ("spreadsheet", 0.7), ("pivot", 0.7),
-    ],
-    "IMAGE": [
-        ("generate an image", 1.0), ("generate image", 1.0),
-        ("draw ", 0.8), ("paint ", 0.7), ("illustration", 0.8),
-        ("picture of", 0.8), ("photo of", 0.7),
-        ("concept art", 0.9), ("texture ", 0.5),
-        ("art style", 0.7), ("portrait", 0.6), ("landscape", 0.5),
-        ("render ", 0.4), ("design a logo", 0.8),
-    ],
-    "3D": [
-        ("3d model", 1.0), ("3d print", 0.8), ("mesh ", 0.8),
-        (".glb", 1.0), (".obj", 0.9), (".stl", 0.9),
-        ("blender", 0.8), ("forge ", 0.5),
-        ("3d object", 0.9), ("3d asset", 0.9),
-    ],
-    "ACTION_FIGURE": [
-        ("action figure", 1.0), ("posable", 1.0), ("poseable", 1.0),
-        ("ball joint", 1.0), ("figurine", 0.9), ("articulated figure", 1.0),
-        ("3d print figure", 1.0),
-    ],
-    "RESEARCH": [
-        ("research ", 0.8), ("deep dive", 0.9), ("analyze ", 0.5),
-        ("compare ", 0.5), ("history of", 0.7), ("literature review", 1.0),
-        ("what caused", 0.6), ("pros and cons", 0.7),
-        ("explain in depth", 0.8), ("comprehensive", 0.6),
-        # URL detection signals — checking/analyzing a website is research
-        ("http://", 0.7), ("https://", 0.7), (".com", 0.4), (".org", 0.4),
-        ("check the site", 0.8), ("check the website", 0.9),
-        ("performance", 0.4), ("suggest improvements", 0.5),
-        ("suggest adjustments", 0.5), ("audit ", 0.5),
-        ("review the", 0.4), ("look at ", 0.3),
-    ],
-    "DOCUMENTATION": [
-        ("write a readme", 1.0), ("write a guide", 0.9),
-        ("rewrite ", 0.7), ("summarize ", 0.6),
-        ("format markdown", 0.9), ("document this", 0.8),
-        ("technical writing", 0.9), ("write documentation", 1.0),
-    ],
-    "TRAIN": [
-        ("learn:", 1.0), ("correction:", 1.0),
-        ("remember that", 1.0), ("remember this rule", 1.0),
-        ("store this rule", 1.0), ("add rule", 0.9),
-        ("from now on", 0.7),
-    ],
-    "IOT_CONTROL": [
-        ("turn on ", 0.9), ("turn off ", 0.9), ("switch on", 0.9), ("switch off", 0.9),
-        ("lights", 0.7), ("thermostat", 0.8), ("temperature", 0.5),
-        ("unlock ", 0.7), ("lock ", 0.6), ("scene ", 0.5),
-        ("home assistant", 0.9), ("smart home", 0.8),
-        ("set brightness", 0.9), ("dim the", 0.8),
-    ],
-    "IOT_DEV": [
-        ("esp32", 1.0), ("arduino", 1.0), ("flash firmware", 1.0),
-        ("compile firmware", 1.0), ("wokwi", 1.0),
-        ("mqtt ", 0.7), ("gpio", 0.9), ("esphome", 1.0),
-        ("simulate circuit", 1.0), ("breadboard", 0.8),
-    ],
-    "VISION": [
-        ("what do you see", 1.0), ("describe this image", 1.0),
-        ("analyze this image", 1.0), ("what is in this picture", 1.0),
-        ("read this screenshot", 1.0), ("ocr ", 0.9),
-        ("identify ", 0.5), ("look at this", 0.7),
-        ("what's in the photo", 0.9),
-    ],
-    "COORDINATE": [
-        ("plan and build", 1.0), ("coordinate ", 0.7),
-        ("multi-step", 0.8), ("build a full", 0.7),
-        ("design and implement", 0.9), ("create a complete", 0.8),
-        ("end-to-end", 0.7), ("full stack", 0.7),
-        ("set up a system", 0.8), ("set up an entire", 0.9),
-    ],
-}
-
-# Structural bonus/penalty rules applied after keyword scoring
-_STRUCTURAL_RULES = {
-    # Short prompts ending with "?" are likely conversational or research, not CODE
-    "short_question_penalty_CODE": -0.3,
-    # URLs boost RESEARCH
-    "url_detected_boost_RESEARCH": 0.4,
-    # Very short input (<20 chars) boosts CONVERSATION
-    "very_short_boost_CONVERSATION": 0.3,
-}
-
-# Minimum score to accept a Tier 2 classification (below this → Tier 3 neural)
-_TIER2_CONFIDENCE_THRESHOLD = 0.60
-# Minimum gap between top two intents for confident classification
-_TIER2_MIN_GAP = 0.15
-
-
-def _weighted_classify(user_input: str) -> dict | None:
-    """
-    Tier 2: Weighted keyword scorer.
-
-    Scans the input for keywords/phrases across all intents, sums weighted
-    scores, applies structural bonuses/penalties, and returns the best match.
-    Returns None if confidence is below threshold (falls through to Tier 3).
-    """
-    if not user_input or len(user_input.strip()) < 2:
-        return None
-
-    _lower = user_input.strip().lower()
-
-    # --- Score every intent ---
-    scores: dict[str, float] = {}
-    for intent, signals in _INTENT_SIGNALS.items():
-        total = 0.0
-        for keyword, weight in signals:
-            if keyword in _lower:
-                total += weight
-        scores[intent] = total
-
-    # --- Structural adjustments ---
-    is_question = _lower.rstrip().endswith("?")
-    is_short = len(_lower) < 120
-    has_url = bool(re.search(r"https?://|www\.", _lower))
-
-    # Short questions are unlikely to be CODE
-    if is_question and is_short:
-        scores["CODE"] = scores.get("CODE", 0) + _STRUCTURAL_RULES["short_question_penalty_CODE"]
-
-    # URL presence boosts RESEARCH
-    if has_url:
-        scores["RESEARCH"] = scores.get("RESEARCH", 0) + _STRUCTURAL_RULES["url_detected_boost_RESEARCH"]
-
-    # Very short input boosts CONVERSATION
-    if len(_lower) < 20:
-        scores["CONVERSATION"] = scores.get("CONVERSATION", 0) + _STRUCTURAL_RULES["very_short_boost_CONVERSATION"]
-
-    # Clamp negatives
-    scores = {k: max(v, 0.0) for k, v in scores.items()}
-
-    # --- Pick winner ---
-    if not any(v > 0 for v in scores.values()):
-        return None  # No signals detected → Tier 3
-
-    sorted_intents = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    best_intent, best_score = sorted_intents[0]
-    runner_up_score = sorted_intents[1][1] if len(sorted_intents) > 1 else 0.0
-
-    # Normalize score to 0.0-1.0 range (cap at 3.0 raw → 1.0 normalized)
-    normalized = min(best_score / 3.0, 1.0)
-
-    # Reject if below threshold or if top two are too close (ambiguous)
-    gap = best_score - runner_up_score
-    if normalized < _TIER2_CONFIDENCE_THRESHOLD or (gap < _TIER2_MIN_GAP and runner_up_score > 0):
-        # Log for debugging
-        top3 = sorted_intents[:3]
-        logger.debug(f"[Classifier] Tier 2 inconclusive: {[(i, round(s, 2)) for i, s in top3]}")
-        return None  # Fall through to Tier 3
-
-    return {
-        "intent": best_intent,
-        "confidence": round(normalized, 2),
-        "reasoning": f"Tier 2 keyword scorer: {best_intent} (raw={best_score:.2f}, gap={gap:.2f})",
-    }
-
-
-def _fast_classify(user_input: str) -> dict | None:
-    """
-    3-Tier intent classifier (Tier 1 + Tier 2).
-
-    Tier 1: Deterministic rules — slash commands, explicit directives.
-    Tier 2: Weighted keyword scorer — covers ~90% of prompts at 0ms.
-
-    Returns a routing decision dict if confident, or None to fall through
-    to Tier 3 (neural router).
-    """
-    if not user_input:
-        return None
-
-    _lower = user_input.strip().lower()
-
-    # --- TIER 1: Deterministic rules (highest priority) ---
-
-    # Slash commands
-    if _lower.startswith("/standardize-doc"):
-        return {"intent": "DOC_STANDARDS", "confidence": 1.0, "reasoning": "Tier 1: /standardize-doc command"}
-
-    # Explicit training directives
-    if _is_explicit_train_request(user_input):
-        return {"intent": "TRAIN", "confidence": 0.98, "reasoning": "Tier 1: explicit training directive"}
-
-    # --- TIER 2: Weighted keyword scorer ---
-    return _weighted_classify(user_input)
-
-
 def _extract_constraint_context(history: list | None, user_input: str) -> str:
     """Extract important user constraints from prior turns for requirement continuity."""
     if not history:
@@ -1013,41 +758,71 @@ def chat_swarm(
             except Exception as _mp_err:
                 logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
 
-        # 2. Security Check (on the Merged Input)
-        yield {"type": "status", "content": "🔒 Security Agent: Scanning input..."}
-        security = get_security_agent()
-        AGENT_STATE.labels(agent_name="Security").set(2)
-        
-        security_check: RunResponse = security.run(f"Validate this user command for safety: {user_input}")
-        yield {"type": "log", "content": f"[Security Analysis] Algo: Llama-Guard | Output: {security_check.content}"}
-        
-        AGENT_STATE.labels(agent_name="Security").set(1)
-        
-        if "UNSAFE" in security_check.content.upper():
-            yield {"type": "error", "content": f"🚫 BLOCKED: {security_check.content}"}
-            WORKFLOW_STEPS.labels(status="blocked", agent_type="Security").inc()
-            return # HITL Block
+        # 2. Async Safety Check — runs in background thread to avoid blocking TTFT.
+        #    The check result is polled after intent routing begins streaming.
+        #    If UNSAFE is detected, the stream will be aborted.
+        import threading
+        _safety_result = {"status": "pending", "content": ""}
 
-        yield {"type": "status", "content": "✅ Security Agent: Input Cleared."}
-        yield {"type": "thought", "content": "→ Security: PASS"}
-        WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
+        def _run_safety_check():
+            try:
+                security = get_security_agent()
+                AGENT_STATE.labels(agent_name="Security").set(2)
+                check: RunResponse = security.run(f"Validate this user command for safety: {user_input}")
+                _safety_result["content"] = check.content
+                if "UNSAFE" in check.content.upper():
+                    _safety_result["status"] = "blocked"
+                    logger.warning(f"[Security] UNSAFE detected (async): {check.content}")
+                else:
+                    _safety_result["status"] = "pass"
+                AGENT_STATE.labels(agent_name="Security").set(1)
+            except Exception as e:
+                logger.error(f"[Security] Async check failed: {e}")
+                _safety_result["status"] = "pass"  # Fail-open: don't block on security failure
+                AGENT_STATE.labels(agent_name="Security").set(1)
 
-        # --- ANTHROPIC FAST-PATH (admin-only Claude models) ---
+        _safety_thread = threading.Thread(target=_run_safety_check, daemon=True)
+        _safety_thread.start()
+        yield {"type": "log", "content": "[Security] Async safety scan started (non-blocking)."}
+
+        # --- ANTHROPIC FAST-PATH (per-user key OR admin fallback) ---
         if model and _is_anthropic_model(model):
-            if not _is_admin_session(session_id, owner_id):
-                yield {"type": "error", "content": "🔒 Claude models require admin privileges. Falling back to local model."}
-                logger.warning(f"[Router] Non-admin tried Anthropic model: {model}")
-                _audit_security_event(
-                    "claude_access_denied",
-                    {
-                        "requested_model": model,
-                        "session_id": session_id,
-                        "owner_id": owner_id,
-                        "reason": "insufficient_security_level",
-                    },
-                )
-                model = None  # Fall through to normal Ollama routing
-            elif ANTHROPIC_ENABLED:
+            # Check if this user has their own Anthropic API key connected
+            _user_anthropic_key = None
+            try:
+                from provider_keys import get_user_anthropic_key
+                _user_anthropic_key = get_user_anthropic_key(owner_id) if owner_id else None
+            except Exception as e:
+                logger.debug(f"[Router] provider_keys lookup failed: {e}")
+
+            if _user_anthropic_key:
+                # User has their own key — use it directly (no admin check needed)
+                yield {"type": "status", "content": f"☁️ Claude ({model}): Generating..."}
+                yield {"type": "thought", "content": f"→ Provider: Anthropic via connected account ({model})"}
+                try:
+                    provider = AnthropicProvider(api_key=_user_anthropic_key, model=model)
+                    api_messages = [{"role": "user", "content": user_input}]
+                    if history:
+                        api_messages = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in history]
+                        api_messages.append({"role": "user", "content": user_input})
+
+                    for chunk in provider.generate_stream(
+                        prompt=user_input,
+                        messages=api_messages,
+                        system="You are Hive Mind, a helpful AI assistant in a self-hosted home lab.",
+                    ):
+                        yield chunk.as_dict()
+
+                    _score_trace(lf_trace, langfuse, 0.9, output="[anthropic stream - user key]")
+                    WORKFLOW_STEPS.labels(status="success", agent_type="Anthropic").inc()
+                except Exception as e:
+                    logger.error(f"[Router] Anthropic provider error (user key): {e}")
+                    yield {"type": "error", "content": f"Claude API error: {e}"}
+                    _score_trace(lf_trace, langfuse, 0.0)
+                finally:
+                    AGENT_STATE.labels(agent_name="Router").set(1)
+                return
+            elif _is_admin_session(session_id, owner_id) and ANTHROPIC_ENABLED:
                 yield {"type": "status", "content": f"☁️ Claude ({model}): Generating..."}
                 yield {"type": "thought", "content": f"→ Provider: Anthropic ({model})"}
                 try:
@@ -1074,45 +849,35 @@ def chat_swarm(
                     AGENT_STATE.labels(agent_name="Router").set(1)
                 return
             else:
+                # No user key, and either not admin or system key not configured
                 logger.warning(
-                    f"[Router] Claude model requested but provider unavailable: {model}"
+                    f"[Router] Claude model requested but no access: {model} (user={owner_id})"
                 )
                 _audit_security_event(
-                    "claude_provider_unavailable",
+                    "claude_access_denied",
                     {
                         "requested_model": model,
                         "session_id": session_id,
                         "owner_id": owner_id,
-                        "reason": "provider_not_configured",
+                        "reason": "no_connected_key",
                     },
                 )
                 yield {
                     "type": "error",
-                    "content": "Claude provider is not configured. Falling back to local model.",
+                    "content": "Connect your Anthropic API key in Settings → Connected Accounts to use Claude models.",
                 }
                 model = None
 
-        # 3. Intent Routing — Fast-Path + Neural Fallback
-        # Try zero-latency keyword classifier first; only invoke the neural
-        # router (nemotron-orchestrator:8b, ~60-80s) if fast-path returns None.
-        fast_decision = _fast_classify(user_input)
-        if fast_decision is not None:
-            intent = fast_decision["intent"]
-            confidence = fast_decision["confidence"]
-            reasoning = fast_decision["reasoning"]
-            yield {"type": "log", "content": f"[Router] {reasoning} — neural router skipped"}
-            logger.info(f"--- [Router] Tier 1/2 decision: {intent} (Conf: {confidence}) ---")
-        else:
-            from semantic_router import get_semantic_router
-            
-            yield {"type": "status", "content": "🧠 Neural Cortex: Analyzing intent (Tier 3 fallback)..."}
-            logger.info("[Router] Tier 2 inconclusive — falling back to neural router (Tier 3)")
-            
-            router_inst = get_semantic_router()
-            routing_decision = router_inst.route(user_input)
-            intent = routing_decision.get("intent", "RESEARCH") # Fail safe default
-            confidence = routing_decision.get("confidence", 0.0)
-            reasoning = routing_decision.get("reasoning", "No reasoning provided.")
+        # 3. Intent Routing (Neural Upgrade)
+        from semantic_router import get_semantic_router
+        
+        yield {"type": "status", "content": "🧠 Neural Cortex: Analyzing intent..."}
+        
+        router_inst = get_semantic_router()
+        routing_decision = router_inst.route(user_input)
+        intent = routing_decision.get("intent", "RESEARCH") # Fail safe default
+        confidence = routing_decision.get("confidence", 0.0)
+        reasoning = routing_decision.get("reasoning", "No reasoning provided.")
 
         constraint_context = _extract_constraint_context(history, user_input)
 
@@ -1149,6 +914,11 @@ def chat_swarm(
 
         yield {"type": "thought", "content": f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)"}
 
+        # --- FAST MODE: hive-fast skips MarsRL verification loop ---
+        _fast_mode = (model == "hive-fast")
+        if _fast_mode:
+            yield {"type": "log", "content": "[Router] Hive Fast mode — single-pass, no MarsRL verification."}
+
         # --- SKILL HINT OVERRIDE ---
         # If the UI sent an explicit skill hint, override intent when confidence is low
         _skill_to_intent = {
@@ -1175,7 +945,7 @@ def chat_swarm(
             yield {"type": "status", "content": "📋 Planner: Decomposing task..."}
             yield {"type": "thought", "content": "→ UltraPlan mode: generating plan only (no execution)"}
 
-            PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", "qwen3.5:9b"))
+            PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(PLAN_MODEL)
 
             plan_system_prompt = (
@@ -1293,6 +1063,21 @@ def chat_swarm(
             })
 
         route_start_time = time.time()
+
+        # --- ASYNC SAFETY GATE: Check if the background safety thread has finished ---
+        # By now the safety check has had time to run during intent classification.
+        # Give it a brief wait (up to 200ms) then proceed. If still pending, we'll
+        # check again after the first token buffer in each route handler.
+        _safety_thread.join(timeout=0.2)
+        if _safety_result["status"] == "blocked":
+            yield {"type": "error", "content": f"🚫 BLOCKED: {_safety_result['content']}"}
+            WORKFLOW_STEPS.labels(status="blocked", agent_type="Security").inc()
+            return
+        if _safety_result["status"] == "pass":
+            yield {"type": "thought", "content": "→ Security: PASS"}
+            WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
+        else:
+            yield {"type": "log", "content": "[Security] Safety check still in progress — streaming will proceed."}
 
         # --- ROUTE: VISION (Image Analysis via VLM) ---
         # Must be checked BEFORE CREATIVE_INTENTS to prevent "what do you see
@@ -1439,7 +1224,7 @@ def chat_swarm(
             yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
             AGENT_STATE.labels(agent_name="Conversationalist").set(2)
 
-            CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", "qwen2.5:3b"))
+            CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
 
             conversationalist = Agent(
@@ -1449,21 +1234,11 @@ def chat_swarm(
                 session_id=session_id,
                 add_history_to_messages=True,
                 num_history_responses=10,
-                tools=[check_capability, request_tooling_access],
                 instructions="""You are Hive Mind, a friendly and knowledgeable AI assistant in a self-hosted home lab.
                 You have a warm, direct personality. You can answer general questions, chat casually, explain concepts clearly,
                 and help the user understand their AI system. Keep responses concise unless depth is clearly needed.
-                You are running entirely on local hardware — no cloud dependencies.
-
-                IMPORTANT — Capability & Tool Questions:
-                When the user asks about access to a tool, capability, or functionality (e.g. "Do you have access to Browser?",
-                "Can you search the web?", "What tools do you have?"), you MUST call the check_capability tool with the
-                relevant capability name. NEVER guess or assume — always introspect the live registry.
-
-                If check_capability shows a capability is NOT available, inform the user and offer to submit a governance
-                request using request_tooling_access. Explain that the request will go through security assessment and
-                admin approval before the capability is activated.""",
-                show_tool_calls=True,
+                You are running entirely on local hardware — no cloud dependencies.""",
+                show_tool_calls=False,
             )
 
             full_content = ""
@@ -1491,23 +1266,8 @@ def chat_swarm(
             yield {"type": "status", "content": "🖥️ DevOps Engineer: Analyzing infrastructure task..."}
             AGENT_STATE.labels(agent_name="DevOps").set(2)
 
-            DEVOPS_MODEL = _resolve_model_for_intent("DEVOPS", os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b"))
+            DEVOPS_MODEL = _resolve_model_for_intent("DEVOPS", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(DEVOPS_MODEL)
-
-            solver = get_architect_agent(session_id=session_id)
-            verifier = get_verifier()
-            corrector = get_corrector()
-
-            mars = MarsRLLoop(
-                solver=solver,
-                verifier=verifier,
-                corrector=corrector,
-                max_iter=2,
-                intent=intent,
-                session_id=session_id,
-                token=ace_token,
-                template_metadata=template_metadata,
-            )
 
             devops_input = f"[DEVOPS TASK] {user_input}"
             if history_context:
@@ -1519,23 +1279,66 @@ def chat_swarm(
             if extracted_context:
                 devops_input = f"{devops_input}\n\n[Attached Context]:\n{extracted_context}"
 
-            yield {"type": "log", "content": f"[DevOps] Routing to MarsRL with infra context."}
-            yield {"type": "thought", "content": f"→ Routing to Architect ({DEVOPS_MODEL}) via MarsRL loop"}
-            try:
-                tool_call_id = f"tool-devops-{int(time.time()*1000)}"
-                yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": "DEVOPS", "model": DEVOPS_MODEL})
-                with request_lock(context="text"):
-                    yield _emit_stream_mode("tool-use")
-                    yield _emit_tool_progress(tool_call_id, "marsrl_loop", 25, "Initializing MarsRL loop")
-                    for update in mars_loop_stream(devops_input, mars):
-                        yield update
-                    yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "MarsRL loop complete")
-                yield _emit_tool_result(tool_call_id, "marsrl_loop", "DevOps plan generated", True)
-                _score_trace(lf_trace, langfuse, 0.9)
-            except Exception as e:
-                yield _emit_tool_result(tool_call_id, "marsrl_loop", f"DevOps execution failed: {e}", False)
-                _score_trace(lf_trace, langfuse, 0.0)
-                raise e
+            if _fast_mode:
+                # --- HIVE FAST: single-pass Ollama (no MarsRL) ---
+                yield {"type": "thought", "content": f"→ Hive Fast: single-pass Architect ({DEVOPS_MODEL})"}
+                devops_agent = Agent(
+                    name="DevOps Engineer",
+                    model=Ollama(id=DEVOPS_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+                    storage=_conv_storage,
+                    session_id=session_id,
+                    add_history_to_messages=True,
+                    num_history_responses=10,
+                    instructions="You are a DevOps engineer in a self-hosted home lab. Help with infrastructure, Docker, networking, and system administration tasks.",
+                    show_tool_calls=False,
+                )
+                full_content = ""
+                try:
+                    with request_lock(context="text"):
+                        yield _emit_stream_mode("responding")
+                        response_stream = devops_agent.run(devops_input, stream=True)
+                        for chunk in response_stream:
+                            if chunk.content:
+                                full_content += chunk.content
+                                yield {"type": "message", "content": chunk.content}
+                    _score_trace(lf_trace, langfuse, 0.85, output=full_content)
+                except Exception as e:
+                    _score_trace(lf_trace, langfuse, 0.0)
+                    yield {"type": "error", "content": f"DevOps task failed: {e}"}
+            else:
+                # --- HIVE MIND: full MarsRL loop ---
+                solver = get_architect_agent(session_id=session_id)
+                verifier = get_verifier()
+                corrector = get_corrector()
+
+                mars = MarsRLLoop(
+                    solver=solver,
+                    verifier=verifier,
+                    corrector=corrector,
+                    max_iter=2,
+                    intent=intent,
+                    session_id=session_id,
+                    token=ace_token,
+                    template_metadata=template_metadata,
+                )
+
+                yield {"type": "log", "content": f"[DevOps] Routing to MarsRL with infra context."}
+                yield {"type": "thought", "content": f"→ Routing to Architect ({DEVOPS_MODEL}) via MarsRL loop"}
+                try:
+                    tool_call_id = f"tool-devops-{int(time.time()*1000)}"
+                    yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": "DEVOPS", "model": DEVOPS_MODEL})
+                    with request_lock(context="text"):
+                        yield _emit_stream_mode("tool-use")
+                        yield _emit_tool_progress(tool_call_id, "marsrl_loop", 25, "Initializing MarsRL loop")
+                        for update in mars_loop_stream(devops_input, mars):
+                            yield update
+                        yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "MarsRL loop complete")
+                    yield _emit_tool_result(tool_call_id, "marsrl_loop", "DevOps plan generated", True)
+                    _score_trace(lf_trace, langfuse, 0.9)
+                except Exception as e:
+                    yield _emit_tool_result(tool_call_id, "marsrl_loop", f"DevOps execution failed: {e}", False)
+                    _score_trace(lf_trace, langfuse, 0.0)
+                    raise e
 
             AGENT_STATE.labels(agent_name="DevOps").set(1)
             WORKFLOW_STEPS.labels(status="success", agent_type="DevOps").inc()
@@ -1548,7 +1351,7 @@ def chat_swarm(
             yield {"type": "status", "content": "📊 Data Analyst: Processing your data request..."}
             AGENT_STATE.labels(agent_name="DataAnalyst").set(2)
 
-            DATA_MODEL = _resolve_model_for_intent("DATA", os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b"))
+            DATA_MODEL = _resolve_model_for_intent("DATA", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(DATA_MODEL)
 
             data_agent = Agent(
@@ -1614,7 +1417,7 @@ def chat_swarm(
              AGENT_STATE.labels(agent_name="ArtDirector").set(2)
              
              # Config — template-driven model selection with health-aware routing
-             MODEL_NAME = _resolve_model_for_intent("IMAGE", os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b"))
+             MODEL_NAME = _resolve_model_for_intent("IMAGE", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
              OLLAMA_HOST = get_best_host_for_model(MODEL_NAME)
              
              art_director = Agent(
@@ -1775,10 +1578,7 @@ def chat_swarm(
             AGENT_STATE.labels(agent_name="TechnicalWriter").set(2)
             
             # Template-driven model selection with health-aware routing
-            TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", "qwen3.5:9b"))
-            # Legacy template default can reference models not present in current Ollama catalog.
-            if TECH_MODEL == "qwen3.5:9b":
-                TECH_MODEL = os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b")
+            TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(TECH_MODEL)
             
             tech_writer = Agent(
@@ -2129,75 +1929,14 @@ def chat_swarm(
             WORKFLOW_STEPS.labels(status="success", agent_type="IoTController").inc()
             return
 
-        # --- ROUTE: STANDARD ARCHITECT / CODE (MarsRL Loop) ---
-        # Only fall through to MarsRL if no specialized route handled this intent
+        # --- ROUTE: STANDARD ARCHITECT / CODE (MarsRL Loop or Fast Pass) ---
+        # Only fall through if no specialized route handled this intent
         if intent not in ("CONVERSATION", "DEVOPS", "DATA", "AMBIGUOUS", "IMAGE",
                           "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE",
                           "TRAIN", "IOT_CONTROL", "VISION", "COORDINATE"):
 
-            # --- CODE Escape Hatch ---
-            # If the input is a short prompt with no code-related keywords,
-            # it was likely misclassified — downgrade to CONVERSATION.
-            _code_kw = {"write", "fix", "implement", "create", "build", "debug",
-                        "refactor", "function", "script", "api", "endpoint", "class",
-                        "module", "compile", "deploy", "code", "test case", "merge",
-                        "pull request", "import", "install", "run", "execute"}
-            _lower_input = user_input.strip().lower()
-            _has_code_signal = any(kw in _lower_input for kw in _code_kw)
-            _is_short = len(_lower_input) < 150
-
-            # Escape if: short prompt + no code keywords (catches both questions and imperatives)
-            if _is_short and not _has_code_signal:
-                intent = "CONVERSATION"
-                confidence = max(confidence, 0.85)
-                yield {"type": "log", "content": "[Router] CODE intent downgraded to CONVERSATION (short question, no code indicators)."}
-                logger.info(f"[Router] CODE escape hatch triggered. Input: {user_input[:80]}")
-                # Fall through — the CONVERSATION route already returned above,
-                # so we need to handle it inline here.
-                yield _emit_turn_metadata(turn_id, "Hive Mind", ["thinking", "responding"])
-                yield _emit_stream_mode("thinking")
-                yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
-                AGENT_STATE.labels(agent_name="Conversationalist").set(2)
-
-                CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", "qwen2.5:3b"))
-                OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
-
-                conversationalist = Agent(
-                    name="Hive Mind",
-                    model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
-                    storage=_conv_storage,
-                    session_id=session_id,
-                    add_history_to_messages=True,
-                    num_history_responses=10,
-                    instructions="""You are Hive Mind, a friendly and knowledgeable AI assistant in a self-hosted home lab.
-                    You have a warm, direct personality. You can answer general questions, chat casually, explain concepts clearly,
-                    and help the user understand their AI system. Keep responses concise unless depth is clearly needed.
-                    You are running entirely on local hardware — no cloud dependencies.""",
-                    show_tool_calls=False,
-                )
-
-                full_content = ""
-                try:
-                    with request_lock(context="text"):
-                        response_stream = conversationalist.run(user_input, stream=True)
-                        for chunk in response_stream:
-                            if chunk.content:
-                                yield _emit_stream_mode("responding")
-                                full_content += chunk.content
-                                yield {"type": "message", "content": chunk.content}
-                    _score_trace(lf_trace, langfuse, 0.85, output=full_content)
-                except Exception as e:
-                    _score_trace(lf_trace, langfuse, 0.0)
-                    yield {"type": "error", "content": f"Conversation failed: {e}"}
-
-                AGENT_STATE.labels(agent_name="Conversationalist").set(1)
-                WORKFLOW_STEPS.labels(status="success", agent_type="Conversationalist").inc()
-                return
-
-            yield _emit_turn_metadata(turn_id, "Architect", ["thinking", "tool-use", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}
-            AGENT_STATE.labels(agent_name="Architect").set(2)
+            ARCH_MODEL = os.getenv('ARCHITECT_MODEL', os.getenv('PRIMARY_MODEL', 'qwen3:14b'))
+            OLLAMA_HOST = get_best_host_for_model(ARCH_MODEL)
 
             try:
                 from memory_system import memory
@@ -2206,10 +1945,10 @@ def chat_swarm(
                 final_input = user_input
                 if history_context:
                     final_input = f"{history_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[MarsRL] Reviewed prior turns for continuity."}
+                    yield {"type": "log", "content": "[Architect] Reviewed prior turns for continuity."}
                 if constraint_context:
                     final_input = f"{constraint_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[MarsRL] Injected active user constraints."}
+                    yield {"type": "log", "content": "[Architect] Injected active user constraints."}
                 if code_rules:
                     rule_block = "\n".join([f"- {r}" for r in code_rules])
                     final_input = f"{final_input}\n\n[🧠 MEMORY] Apply these user-taught coding rules:\n{rule_block}"
@@ -2218,37 +1957,73 @@ def chat_swarm(
                 if extracted_context:
                     final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
 
-                solver = get_architect_agent(session_id=session_id)
-                verifier = get_verifier()
-                corrector = get_corrector()
+                if _fast_mode:
+                    # --- HIVE FAST: single-pass Ollama (no MarsRL) ---
+                    yield _emit_turn_metadata(turn_id, "Architect (Fast)", ["thinking", "responding"])
+                    yield _emit_stream_mode("thinking")
+                    yield {"type": "status", "content": "⚡ Architect (Fast): Generating..."}
+                    AGENT_STATE.labels(agent_name="Architect").set(2)
+                    yield {"type": "thought", "content": f"→ Hive Fast: single-pass Architect ({ARCH_MODEL})"}
 
-                mars = MarsRLLoop(
-                    solver=solver,
-                    verifier=verifier,
-                    corrector=corrector,
-                    max_iter=2,
-                    intent=intent,
-                    session_id=session_id,
-                    token=ace_token,
-                    template_metadata=template_metadata,
-                )
+                    fast_agent = Agent(
+                        name="Architect",
+                        model=Ollama(id=ARCH_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+                        storage=_conv_storage,
+                        session_id=session_id,
+                        add_history_to_messages=True,
+                        num_history_responses=10,
+                        instructions="""You are the Hive Mind Architect, an expert software engineer and system designer.
+                        Write clean, correct, production-quality code. Explain your reasoning concisely.
+                        You run on local hardware in a self-hosted home lab.""",
+                        show_tool_calls=False,
+                    )
+                    full_content = ""
+                    with request_lock(context="text"):
+                        yield _emit_stream_mode("responding")
+                        response_stream = fast_agent.run(final_input, stream=True)
+                        for chunk in response_stream:
+                            if chunk.content:
+                                full_content += chunk.content
+                                yield {"type": "message", "content": chunk.content}
+                    _score_trace(lf_trace, langfuse, 0.85, output=full_content)
+                else:
+                    # --- HIVE MIND: full MarsRL loop ---
+                    yield _emit_turn_metadata(turn_id, "Architect", ["thinking", "tool-use", "responding"])
+                    yield _emit_stream_mode("thinking")
+                    yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}
+                    AGENT_STATE.labels(agent_name="Architect").set(2)
 
-                yield {"type": "log", "content": f"[MarsRL] Intent: {intent} | Loop initialized."}
+                    solver = get_architect_agent(session_id=session_id)
+                    verifier = get_verifier()
+                    corrector = get_corrector()
 
-                yield {"type": "thought", "content": f"→ Routing to Architect ({os.getenv('ARCHITECT_MODEL', 'qwen2.5-coder:14b')}) via MarsRL loop"}
-                tool_call_id = f"tool-architect-{int(time.time()*1000)}"
-                yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": intent})
-                with request_lock(context="text"):
-                    yield _emit_stream_mode("tool-use")
-                    yield _emit_tool_progress(tool_call_id, "marsrl_loop", 20, "Solver started")
-                    for update in mars_loop_stream(final_input, mars):
-                        # Capture MarsLoopResult for performance recording
-                        if update.get("type") == "log" and "[MarsRL] Iterations:" in update.get("content", ""):
-                            # Extract scores from the summary line for perf recording
-                            pass
-                        yield update
-                    yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "Loop complete")
-                yield _emit_tool_result(tool_call_id, "marsrl_loop", "Architect response generated", True)
+                    mars = MarsRLLoop(
+                        solver=solver,
+                        verifier=verifier,
+                        corrector=corrector,
+                        max_iter=2,
+                        intent=intent,
+                        session_id=session_id,
+                        token=ace_token,
+                        template_metadata=template_metadata,
+                    )
+
+                    yield {"type": "log", "content": f"[MarsRL] Intent: {intent} | Loop initialized."}
+
+                    yield {"type": "thought", "content": f"→ Routing to Architect ({ARCH_MODEL}) via MarsRL loop"}
+                    tool_call_id = f"tool-architect-{int(time.time()*1000)}"
+                    yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": intent})
+                    with request_lock(context="text"):
+                        yield _emit_stream_mode("tool-use")
+                        yield _emit_tool_progress(tool_call_id, "marsrl_loop", 20, "Solver started")
+                        for update in mars_loop_stream(final_input, mars):
+                            # Capture MarsLoopResult for performance recording
+                            if update.get("type") == "log" and "[MarsRL] Iterations:" in update.get("content", ""):
+                                # Extract scores from the summary line for perf recording
+                                pass
+                            yield update
+                        yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "Loop complete")
+                    yield _emit_tool_result(tool_call_id, "marsrl_loop", "Architect response generated", True)
 
             except Exception as e:
                 error_str = str(e)

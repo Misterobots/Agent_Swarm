@@ -151,6 +151,41 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Training run cleanup failed (non-fatal): {e}")
 
+        # 8. Pre-warm primary inference models (TTFT optimization)
+        #    Sends a minimal inference request to load the model into VRAM
+        #    with keep_alive=-1 (permanent until eviction). Runs in background
+        #    thread to avoid blocking startup.
+        import threading
+
+        def _prewarm_models():
+            import requests as _req
+            _primary_model = os.getenv("PRIMARY_MODEL", os.getenv("COORDINATOR_MODEL", "qwen3:14b"))
+            _ollama_host = os.getenv("OLLAMA_HOST", "http://ollama:11434")
+            _models_to_warm = [
+                (_primary_model, _ollama_host),
+            ]
+            for model_name, host in _models_to_warm:
+                try:
+                    logger.info(f"[Pre-warm] Loading '{model_name}' into VRAM on {host}...")
+                    resp = _req.post(
+                        f"{host}/api/generate",
+                        json={
+                            "model": model_name,
+                            "prompt": "Hi",
+                            "keep_alive": -1,
+                            "options": {"num_predict": 1},
+                        },
+                        timeout=120,
+                    )
+                    if resp.status_code == 200:
+                        logger.info(f"[Pre-warm] '{model_name}' loaded and pinned in VRAM (keep_alive=-1)")
+                    else:
+                        logger.warning(f"[Pre-warm] '{model_name}' returned status {resp.status_code}")
+                except Exception as e:
+                    logger.warning(f"[Pre-warm] Failed to warm '{model_name}': {e}")
+
+        threading.Thread(target=_prewarm_models, daemon=True).start()
+
         print("DEBUG: Startup Complete. Yielding...")
         logger.info("Swarm Engine Online. Waiting for events...")
         yield
@@ -666,8 +701,22 @@ async def list_models(request: Request):
     import time
     try:
         base_models = [
-            {"id": "swarm-standard",  "object": "model", "created": int(time.time()), "owned_by": "MarsRL"},
-            {"id": "Home-AI-Swarm",   "object": "model", "created": int(time.time()), "owned_by": "MarsRL"},
+            {
+                "id": "hive-fast",
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "local",
+                "label": "Hive Fast",
+                "description": "Single-pass response using local models. Fastest option — no verification or correction loop. Best for casual chat, quick questions, and simple tasks.",
+            },
+            {
+                "id": "hive-mind",
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "local",
+                "label": "Hive Mind",
+                "description": "Full MarsRL pipeline: Solver → Verifier → Corrector. Produces higher-quality responses through multi-pass verification. Best for code, research, and complex tasks.",
+            },
         ]
 
         # Append GitHub Models if this user has a connected token
@@ -687,6 +736,24 @@ async def list_models(request: Request):
                         })
             except Exception as e:
                 logger.warning(f"list_models: could not fetch GitHub models: {e}")
+
+            # Append models for each connected API-key provider (Anthropic, Google, etc.)
+            try:
+                from provider_keys import list_connected, PROVIDERS
+                connected = list_connected(uid)
+                for acct in connected:
+                    provider_id = acct["provider"]
+                    provider_info = PROVIDERS.get(provider_id, {})
+                    for m in provider_info.get("models", []):
+                        base_models.append({
+                            "id": m["id"],
+                            "object": "model",
+                            "created": int(time.time()),
+                            "owned_by": provider_id,
+                            "context_window": m.get("context"),
+                        })
+            except Exception as e:
+                logger.warning(f"list_models: could not fetch provider models: {e}")
 
         return {"object": "list", "data": base_models}
     except Exception as e:
@@ -4035,6 +4102,89 @@ if __name__ == "__main__":
     # If run directly via python, use uvicorn
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# ---------------------------------------------------------------------------
+# CONNECTED ACCOUNTS — Per-user provider API key management
+# ---------------------------------------------------------------------------
+
+class _ProviderKeyRequest(BaseModel):
+    provider: str       # 'anthropic' | 'google'
+    api_key: str
+    label: str = ""
+
+@app.get("/api/v1/providers")
+async def list_providers():
+    """Return the catalogue of connectable external providers."""
+    from provider_keys import PROVIDERS
+    return {
+        "providers": [
+            {"id": pid, "label": p["label"], "models": p["models"]}
+            for pid, p in PROVIDERS.items()
+        ]
+    }
+
+@app.get("/api/v1/connected-accounts")
+async def list_connected_accounts(http_request: Request):
+    """Return which providers the current user has connected."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    accounts = []
+
+    # Check GitHub OAuth token
+    try:
+        from github_oauth import get_token
+        gh = get_token(uid)
+        if gh:
+            accounts.append({
+                "provider": "github",
+                "label": "GitHub Models",
+                "username": gh.github_username,
+                "connected_at": gh.created_at.isoformat() if gh.created_at else None,
+            })
+    except Exception as e:
+        logger.debug(f"connected-accounts: github check failed: {e}")
+
+    # Check API-key providers (Anthropic, Google, etc.)
+    try:
+        from provider_keys import list_connected
+        accounts.extend(list_connected(uid))
+    except Exception as e:
+        logger.debug(f"connected-accounts: provider_keys check failed: {e}")
+
+    return {"accounts": accounts}
+
+@app.post("/api/v1/connected-accounts/key")
+async def upsert_provider_key(body: _ProviderKeyRequest, http_request: Request):
+    """Store or update the user's API key for a provider."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    from provider_keys import upsert_key, PROVIDERS
+    if body.provider not in PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {body.provider}. Supported: {list(PROVIDERS.keys())}")
+
+    try:
+        upsert_key(user_id=uid, provider=body.provider, api_key=body.api_key, label=body.label)
+    except Exception as e:
+        logger.error(f"upsert_provider_key: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to store key: {e}")
+
+    return {"status": "connected", "provider": body.provider}
+
+@app.delete("/api/v1/connected-accounts/{provider}")
+async def delete_provider_key(provider: str, http_request: Request):
+    """Remove the user's stored API key for a provider."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    from provider_keys import delete_key
+    deleted = delete_key(user_id=uid, provider=provider)
+    return {"disconnected": deleted, "provider": provider}
 
 
 # ---------------------------------------------------------------------------

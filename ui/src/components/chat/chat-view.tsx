@@ -68,9 +68,26 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const activeConv = activeConversation();
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { isMobile } = useIsMobile();
   const buddyReact = useBuddyStore((s) => s.react);
   const { awayEvents, pushEvent, dismiss: dismissAway } = useAwaySummary();
+
+  // Close mobile overflow menu on outside tap
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleTouch = (e: MouseEvent | TouchEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleTouch);
+    document.addEventListener("touchstart", handleTouch);
+    return () => {
+      document.removeEventListener("mousedown", handleTouch);
+      document.removeEventListener("touchstart", handleTouch);
+    };
+  }, [mobileMenuOpen]);
 
   // Show the thinking indicator when streaming and either we have a status
   // message or the assistant message is still empty (waiting for first content)
@@ -137,8 +154,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   return (
     <div className="chat-shell flex flex-col h-full" data-route="chat">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-3 md:px-4 py-2">
-        <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-3 md:px-4 py-2 min-w-0">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <ModelSelector />
           {!isMobile && <ThemeSelector />}
           {!isMobile && <UltraplanToggle />}
@@ -165,7 +182,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           )}
           {/* Mobile overflow menu trigger */}
           {isMobile && (
-            <div className="relative">
+            <div className="relative" ref={mobileMenuRef}>
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -203,13 +220,13 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           <button
             type="button"
             onClick={() => {
               void compactConversation();
             }}
-            className="w-24 md:w-44 h-2 rounded-full bg-[var(--chat-panel)] overflow-hidden border border-[var(--chat-border)]"
+            className="w-16 md:w-44 h-2 rounded-full bg-[var(--chat-panel)] overflow-hidden border border-[var(--chat-border)]"
             title={`Context usage: ${(tokenUsage.pct * 100).toFixed(1)}% (${tokenUsage.used}/${tokenUsage.total}) - Click to compact`}
           >
             <div
@@ -217,7 +234,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
               style={{ width: `${Math.min(100, tokenUsage.pct * 100)}%` }}
             />
           </button>
-          <span className="text-xs text-[var(--chat-muted)] min-w-[3rem]">
+          <span className="text-xs text-[var(--chat-muted)] hidden md:inline min-w-[3rem]">
             {(tokenUsage.pct * 100).toFixed(0)}%
           </span>
         </div>

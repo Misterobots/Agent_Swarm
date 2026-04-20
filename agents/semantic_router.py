@@ -2,12 +2,123 @@ from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 import json
 import os
+import re
+import logging
+
+_router_logger = logging.getLogger("SemanticRouter")
+
+# ---------------------------------------------------------------------------
+# Keyword Fast-Path: Regex patterns that bypass the LLM router entirely.
+# Ordered by expected frequency. Each tuple: (compiled regex, intent, base confidence).
+# The LLM is only called when no pattern matches (ambiguous/complex inputs).
+# ---------------------------------------------------------------------------
+_FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
+    # VISION — user is asking to look at an image they provide
+    (re.compile(
+        r"what do you see|describe this image|analyze this image|what is in this picture"
+        r"|read this screenshot|ocr|identify.*image|what'?s happening in this photo"
+        r"|look at this|what'?s in this (image|photo|screenshot)",
+        re.I,
+    ), "VISION", 0.92),
+
+    # ACTION_FIGURE — very specific keywords (checked before 3D/IMAGE)
+    (re.compile(
+        r"action figure|posable|ball joint|figurine|poseable|articulated figure|3d print figure",
+        re.I,
+    ), "ACTION_FIGURE", 0.95),
+
+    # IMAGE — generate visual art
+    (re.compile(
+        r"\b(draw|paint|generate\s+(an?\s+)?image|picture of|illustration of|concept art of"
+        r"|create\s+(an?\s+)?image|make\s+(an?\s+)?image|render\s+(an?\s+)?image)\b",
+        re.I,
+    ), "IMAGE", 0.90),
+
+    # 3D — generate 3D geometry/meshes
+    (re.compile(
+        r"\b(3d model|mesh|\.glb|\.obj|forge|blender model|3d generate)\b",
+        re.I,
+    ), "3D", 0.90),
+
+    # IOT_CONTROL — smart home commands
+    (re.compile(
+        r"\b(turn (on|off)|lights?\s+(on|off)|set (temperature|thermostat)|unlock\b"
+        r"|home assistant|scene\s+\w+)",
+        re.I,
+    ), "IOT_CONTROL", 0.92),
+
+    # IOT_DEV — firmware / embedded development
+    (re.compile(
+        r"\b(wokwi|flash esp32|compile firmware|mqtt|arduino|simulate circuit)\b",
+        re.I,
+    ), "IOT_DEV", 0.90),
+
+    # TRAIN — teaching system new rules
+    (re.compile(
+        r"\b(remember that|learn this|correction:|from now on|teach you)\b",
+        re.I,
+    ), "TRAIN", 0.92),
+
+    # DEVOPS — infrastructure, Docker, servers
+    (re.compile(
+        r"\b(docker(?:file|-compose)?|kubernetes|k8s|deploy|nginx|systemd|firewall"
+        r"|pipeline|bash script|ci/?cd|terraform|ansible|server config"
+        r"|compose (up|down|build|restart)|helm)\b",
+        re.I,
+    ), "DEVOPS", 0.88),
+
+    # CODE — software engineering (must explicitly request building/writing code)
+    (re.compile(
+        r"\b(write\s+(a\s+)?script|fix\s+(the\s+)?bug|implement\s+|refactor\b"
+        r"|write\s+(a\s+)?(function|class|module|program|api)|debug\s+this"
+        r"|code\s+(this|that|it)|create\s+(a\s+)?(script|app|program))\b",
+        re.I,
+    ), "CODE", 0.88),
+
+    # DATA — SQL, analytics, data processing
+    (re.compile(
+        r"\b(sql\s+query|analyze\s+data|csv|dataframe|pandas|statistics|aggregate"
+        r"|chart|polars|write\s+a\s+query)\b",
+        re.I,
+    ), "DATA", 0.88),
+
+    # RESEARCH — deep knowledge / analysis
+    (re.compile(
+        r"\b(research\b|deep\s+dive|history\s+of|literature\s+review|what\s+caused"
+        r"|compare\s+and\s+(contrast|analyze)|academic|multi-source)\b",
+        re.I,
+    ), "RESEARCH", 0.85),
+
+    # DOCUMENTATION — rewriting, formatting, summarizing
+    (re.compile(
+        r"\b(rewrite|summarize\s+(this|the)|format\s+(this|the)\s+(document|markdown)"
+        r"|write\s+a\s+(guide|readme|doc)|technical\s+writing)\b",
+        re.I,
+    ), "DOCUMENTATION", 0.85),
+
+    # COORDINATE — complex multi-step orchestration
+    (re.compile(
+        r"\b(plan\s+and\s+build|coordinate|multi-?step|build\s+a\s+full"
+        r"|end-?to-?end|full\s+stack|set\s+up\s+a\s+system|design\s+and\s+implement)\b",
+        re.I,
+    ), "COORDINATE", 0.85),
+
+    # CONVERSATION — greetings, meta-questions, casual chat (broad catch)
+    (re.compile(
+        r"^(hi|hello|hey|howdy|yo|sup|good\s+(morning|evening|afternoon))\b"
+        r"|what (can you|are your|do you)\s+(do|capabilities|access|have)"
+        r"|who are you|tell me about yourself|how do you work|help me understand you",
+        re.I,
+    ), "CONVERSATION", 0.90),
+]
+
 
 class SemanticRouter:
     def __init__(self):
-        # Nemotron-Orchestrator-8B: Nvidia's purpose-built multi-agent routing model
-        # Runs on Dell R730 (RTX 3070 Ti 8GB) via SECONDARY_OLLAMA_HOST
-        self.model_name = os.getenv("ROUTER_MODEL", "nemotron-orchestrator:8b")
+        # After TTFT optimization: router uses the primary model (qwen3:14b) on
+        # Justin-PC instead of nemotron-orchestrator on R730. This eliminates
+        # the cross-network hop and keeps the model already hot in VRAM.
+        self.model_name = os.getenv("ROUTER_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b"))
         from utils.gpu_queue import get_best_host_for_model
         self.host = get_best_host_for_model(self.model_name)
         
@@ -87,10 +198,41 @@ class SemanticRouter:
         except Exception as e:
             print(f"--- [Router] Self-Healing Failed: {e} ---")
 
+    def fast_classify(self, user_input: str) -> dict | None:
+        """
+        Keyword fast-path: returns a routing decision in <1ms if a regex
+        pattern matches, or None to fall through to the LLM router.
+        """
+        text = user_input
+        # If this is a composite ambiguity-resolution prompt, extract the original request
+        if "Original Request:" in text and "User Answer:" in text:
+            # Use the combined text for matching
+            pass
+
+        for pattern, intent, confidence in _FAST_PATH_RULES:
+            if pattern.search(text):
+                _router_logger.info(
+                    f"[Router] Fast-path match: {intent} ({confidence*100:.0f}%) "
+                    f"for '{text[:80]}'"
+                )
+                return {
+                    "intent": intent,
+                    "confidence": confidence,
+                    "reasoning": f"Keyword fast-path: matched {intent} pattern",
+                }
+        return None
+
     def route(self, user_input: str) -> dict:
         """
         Analyzes input and returns routing decision, with a multi-step confidence cascade.
+        Fast-path keywords are checked first (<1ms); LLM is only called for ambiguous inputs.
         """
+        # --- Fast-path: regex keyword matching (saves 300-1200ms) ---
+        fast_result = self.fast_classify(user_input)
+        if fast_result:
+            return fast_result
+
+        _router_logger.info(f"[Router] No fast-path match — falling back to LLM router")
         max_retries = 2
         
         for attempt in range(max_retries):

@@ -267,7 +267,9 @@ services:
     # No Traefik labels — Redis accessed directly on port 6379, not via reverse proxy
 
   # ═══════════════════════════════════════════════════════════════════════════════
-  # INFERENCE SERVICES (Secondary, lower priority than Justin-PC)
+  # INFERENCE SERVICES (Dedicated safety + embeddings only after TTFT optimization)
+  # All primary task models now consolidated on Justin-PC (qwen3:14b).
+  # R730 handles only: llama-guard-3:8b (async safety), nomic-embed (embeddings).
   # ═══════════════════════════════════════════════════════════════════════════════
 
   ollama:
@@ -286,12 +288,12 @@ services:
               count: all
               capabilities: [gpu]
     environment:
-      # RTX 3070 Ti settings (8GB VRAM)
+      # RTX 3070 Ti settings (8GB VRAM) — safety + embeddings only
       - OLLAMA_HOST=0.0.0.0:11434
       - OLLAMA_GPU_OVERHEAD=512MiB
       - OLLAMA_FLASH_ATTENTION=1
       - OLLAMA_NUM_PARALLEL=1
-      - OLLAMA_KEEP_ALIVE=10m
+      - OLLAMA_KEEP_ALIVE=-1            # Pin safety model permanently (fits in 8GB)
       - OLLAMA_METRICS=1               # Expose /metrics for Prometheus scraping
     volumes:
       - ollama_models:/root/.ollama

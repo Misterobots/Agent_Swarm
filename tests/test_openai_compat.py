@@ -7,7 +7,7 @@ BASE_URL = "http://localhost:8008"
 def test_chat_completions_streaming():
     print("--- Testing /v1/chat/completions (Streaming, Standard Mode) ---")
     payload = {
-        "model": "swarm-standard",
+        "model": "hive-fast",
         "messages": [
             {"role": "user", "content": "My name is Justin."},
             {"role": "assistant", "content": "Hello Justin! How can I help you?"},
@@ -54,7 +54,7 @@ def test_chat_completions_streaming():
 def test_chat_completions_non_streaming():
     print("\n--- Testing /v1/chat/completions (Non-Streaming, Standard Mode) ---")
     payload = {
-        "model": "swarm-standard",
+        "model": "hive-fast",
         "messages": [
             {"role": "user", "content": "Tell me a very short joke."}
         ],

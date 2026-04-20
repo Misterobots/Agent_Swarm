@@ -19,7 +19,7 @@ export interface ChatStreamOptions {
 
 export async function* sendChatStream(
   messages: Pick<ChatMessage, "role" | "content">[],
-  model: string = "swarm-standard",
+  model: string = "hive-fast",
   signal?: AbortSignal,
   sessionId?: string,
   memoryEnabled: boolean = false,

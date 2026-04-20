@@ -50,7 +50,7 @@ export const useChatStore = create<ChatState>()(
         return state.conversations.find((c) => c.id === state.activeConversationId);
       },
 
-      createConversation: (model = "swarm-standard") => {
+      createConversation: (model = "hive-mind") => {
         const id = generateId();
         const conv: Conversation = {
           id,

@@ -166,6 +166,9 @@ export interface Model {
   object: string;
   created: number;
   owned_by: string;
+  label?: string;
+  description?: string;
+  context_window?: number;
 }
 
 export interface ToolCallEvent {

@@ -4,8 +4,16 @@ import { Panel, Group, Separator } from "react-resizable-panels";
 import { ChatView } from "@/components/chat/chat-view";
 import { EditorPane } from "./editor-pane";
 import { TerminalPane } from "./terminal-pane";
+import { useIsMobile } from "@/lib/hooks/use-mobile";
 
 export function DevWorkspace() {
+  const { isMobile } = useIsMobile();
+
+  // On mobile, show only the chat pane (editor+terminal are impractical)
+  if (isMobile) {
+    return <ChatView showDevContext />;
+  }
+
   return (
     <Group orientation="horizontal" className="h-full">
       {/* Chat pane */}

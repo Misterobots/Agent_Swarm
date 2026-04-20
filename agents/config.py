@@ -59,10 +59,19 @@ MEMPALACE_URL        = os.getenv("MEMPALACE_URL",        f"http://{CONTROL_NODE_
 HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTANT_IP}:8123")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{GATEWAY_NODE_IP}:11434")
 OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
-ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "nemotron-orchestrator:8b")
-ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      "qwen2.5-coder:14b-instruct-q4_k_m")
-COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    "qwen3:14b")
-LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      "llama3.2:3b")
+# ---------------------------------------------------------------------------
+# Model Consolidation (TTFT Optimization)
+# Primary model: qwen3:14b — handles code, conversation, coordination,
+# research, documentation. Pinned in VRAM (keep_alive=-1) on GPU 0.
+# BMO voice: qwen2.5:3b — lightweight, on-demand.
+# Safety: llama-guard-3:8b — async on R730.
+# Vision: moondream — on-demand.
+# ---------------------------------------------------------------------------
+PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "qwen3:14b")
+ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         PRIMARY_MODEL)
+ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      PRIMARY_MODEL)
+COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    PRIMARY_MODEL)
+LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
 
 # ---------------------------------------------------------------------------
 # ExpertiseTemplate Database (swarm schema in langfuse DB)
@@ -85,21 +94,24 @@ TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION",
 # Context Window Management
 # ---------------------------------------------------------------------------
 CONTEXT_WINDOWS: dict[str, int] = {
+    "qwen3:14b": 40960,
     "qwen2.5-coder:14b": 32768,
     "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
     "qwen3.5:9b": 32768,
-    "qwen3:14b": 40960,
     "nemotron-orchestrator:8b": 32768,
     "nemotron-mini": 4096,
+    "qwen2.5:3b": 8192,
     "llama3.2:3b": 8192,
     "default": 8192,
 }
 COMPACT_AUTO_THRESHOLD = 0.95
 
 # ---------------------------------------------------------------------------
-# LLM Provider Configuration (multi-provider support)
+# LLM Provider Configuration (multi-provider BYOK support)
+# Local Ollama models are free for all users. External providers
+# (Anthropic, GitHub Models, Gemini) require per-user connected keys.
 # ---------------------------------------------------------------------------
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")          # "ollama" | "anthropic"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")          # default local provider
 ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6-20250514")
 MCP_BRIDGE_ENABLED = os.getenv("MCP_BRIDGE_ENABLED", "false")
@@ -148,11 +160,22 @@ GRPC_MAX_WORKERS       = int(os.getenv("GRPC_MAX_WORKERS", "4"))
 GRPC_AUTH_ENABLED      = os.getenv("GRPC_AUTH_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
 GRPC_AUTH_CACHE_TTL    = int(os.getenv("GRPC_AUTH_CACHE_TTL", "300"))
 
-# Admin-only models — only users with security_level >= L3_ADMIN may select these
+# Subscription-required models — users must connect their own API key to use these.
+# Admin fallback: if ANTHROPIC_API_KEY env var is set, admins can still use it.
 ADMIN_ONLY_MODELS: set[str] = {
     "claude-opus-4-20250514",
     "claude-sonnet-4-6-20250514",
     "claude-haiku-3-5-20241022",
+}
+
+# Models that any user can access if they have a connected provider key
+SUBSCRIPTION_MODELS: dict[str, str] = {
+    # model_id -> provider name (matches provider_keys.PROVIDERS)
+    "claude-opus-4-20250514":      "anthropic",
+    "claude-sonnet-4-6-20250514":   "anthropic",
+    "claude-haiku-3-5-20241022":    "anthropic",
+    "gemini-2.0-flash":             "google",
+    "gemini-2.0-pro":               "google",
 }
 
 TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "2e-5"))

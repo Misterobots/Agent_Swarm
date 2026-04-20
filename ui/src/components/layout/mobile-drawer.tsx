@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChatStore } from "@/lib/stores/chat-store";
@@ -14,7 +14,7 @@ import {
 } from "@/lib/config/navigation";
 import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
-import { Plus, Trash2, MessageSquare, X, LogOut, LogIn, User } from "lucide-react";
+import { Plus, Trash2, MessageSquare, X, LogOut, LogIn, User, ChevronDown } from "lucide-react";
 import { useAccess } from "@/lib/hooks/use-access";
 import type { NavigationItem } from "@/lib/config/navigation";
 import { useMemo } from "react";
@@ -259,6 +259,60 @@ function DrawerNavItem({
 }) {
   const active = isNavigationItemActive(item, pathname);
   const Icon = item.icon;
+  const hasChildren = item.children && item.children.length > 0;
+  const [expanded, setExpanded] = useState(() => active);
+
+  // Auto-expand when navigating to a child route
+  useEffect(() => {
+    if (active && hasChildren) setExpanded(true);
+  }, [active, hasChildren]);
+
+  if (hasChildren) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className={cn(
+            "relative flex items-center gap-2.5 mx-2 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 w-[calc(100%-1rem)]",
+            active
+              ? "bg-[var(--chat-panel)] text-[var(--chat-text)]"
+              : "text-[var(--chat-muted)] active:bg-[color:color-mix(in_srgb,var(--chat-panel)_50%,transparent)]"
+          )}
+        >
+          {active && (
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--chat-accent)]" />
+          )}
+          <Icon size={16} className={cn("shrink-0 transition-colors", active && "text-[var(--chat-accent)]")} />
+          <span className="truncate flex-1 text-left">{item.label}</span>
+          <ChevronDown
+            size={14}
+            className={cn(
+              "shrink-0 transition-transform duration-200 text-[var(--chat-muted)]",
+              expanded && "rotate-180"
+            )}
+          />
+        </button>
+        <div
+          className={cn(
+            "overflow-hidden transition-all duration-200",
+            expanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+          )}
+        >
+          <div className="ml-4 mt-0.5 space-y-0.5 border-l border-[var(--chat-border)] pl-2">
+            {item.children!.map((child) => (
+              <DrawerNavItem
+                key={child.href}
+                item={child}
+                pathname={pathname}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Link
@@ -268,7 +322,7 @@ function DrawerNavItem({
         "relative flex items-center gap-2.5 mx-2 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
         active
           ? "bg-[var(--chat-panel)] text-[var(--chat-text)]"
-          : "text-[var(--chat-muted)] hover:bg-[color:color-mix(in_srgb,var(--chat-panel)_50%,transparent)] hover:text-[var(--chat-text)]"
+          : "text-[var(--chat-muted)] active:bg-[color:color-mix(in_srgb,var(--chat-panel)_50%,transparent)]"
       )}
     >
       {active && (

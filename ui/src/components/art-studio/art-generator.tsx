@@ -8,8 +8,9 @@ import { ImageControls } from "./controls/image-controls";
 import { ThreeDControls } from "./controls/three-d-controls";
 import { ActionFigureControls } from "./controls/action-figure-controls";
 import { GenerationHistory } from "./generation-history";
-import { Sparkles, Image, Box, Bone, Loader2 } from "lucide-react";
+import { Sparkles, Image, Box, Bone, Loader2, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useIsMobile } from "@/lib/hooks/use-mobile";
 
 // Lazy-load the heavy Three.js components
 const ModelViewer = lazy(() =>
@@ -40,6 +41,8 @@ export function ArtGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [models, setModels] = useState<string[]>([]);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const { isMobile } = useIsMobile();
 
   // Load models on mount
   useEffect(() => {
@@ -167,9 +170,25 @@ export function ArtGenerator() {
   }, [addEntry, setEditorMeshPath, clearJoints]);
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full overflow-hidden">
+      {/* Mobile controls toggle */}
+      {isMobile && !showJointEditor && (
+        <button
+          onClick={() => setControlsOpen(!controlsOpen)}
+          className="flex items-center gap-2 px-4 py-2 border-b border-[var(--chat-border)] bg-[var(--chat-surface)] text-sm text-[var(--chat-muted)]"
+        >
+          {controlsOpen ? <X size={16} /> : <SlidersHorizontal size={16} />}
+          {controlsOpen ? "Hide Controls" : "Show Controls"}
+        </button>
+      )}
+
       {/* Left: Controls / Joint Editor Panel */}
-      <div className="w-72 border-r border-[var(--chat-border)] bg-[var(--chat-bg)] flex flex-col overflow-y-auto">
+      <div className={cn(
+        "border-r border-[var(--chat-border)] bg-[var(--chat-bg)] flex flex-col overflow-y-auto",
+        isMobile
+          ? cn("w-full border-r-0 border-b", controlsOpen ? "max-h-[50vh]" : "max-h-0 overflow-hidden")
+          : "w-72"
+      )}>
         {showJointEditor ? (
           <Suspense fallback={<div className="p-4 text-[var(--chat-muted)] text-sm">Loading editor...</div>}>
             <JointEditor
@@ -216,8 +235,8 @@ export function ArtGenerator() {
       <div className="flex-1 flex flex-col">
         {/* Prompt Bar (hidden when joint editor is open) */}
         {!showJointEditor && (
-          <div className="border-b border-[var(--chat-border)] bg-[var(--chat-bg)] p-4">
-            <div className="flex gap-3 max-w-4xl mx-auto">
+          <div className="border-b border-[var(--chat-border)] bg-[var(--chat-bg)] p-3 md:p-4">
+            <div className="flex gap-2 md:gap-3 max-w-4xl mx-auto">
               <input
                 type="text"
                 value={prompt}
@@ -237,7 +256,7 @@ export function ArtGenerator() {
                 onClick={handleGenerate}
                 disabled={!prompt.trim() || isGenerating}
                 className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all",
+                  "flex items-center gap-2 px-3 md:px-5 py-2.5 rounded-lg text-sm font-medium transition-all flex-shrink-0",
                   isGenerating
                     ? "bg-[var(--chat-surface)] text-[var(--chat-muted)] cursor-not-allowed"
                     : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30"
@@ -266,7 +285,7 @@ export function ArtGenerator() {
               <ModelViewer url={meshFileUrl(editorMeshPath)} />
             </Suspense>
           ) : (
-            <div className="h-full overflow-y-auto p-6">
+            <div className="h-full overflow-y-auto p-3 md:p-6">
               {history.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)] gap-4">
                   <div className="w-20 h-20 rounded-2xl bg-violet-900/20 flex items-center justify-center">

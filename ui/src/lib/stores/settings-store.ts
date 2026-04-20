@@ -29,7 +29,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       mode: "standard",
-      model: "Home-AI-Swarm",
+      model: "hive-mind",
       theme: "ember",
       skill: "general",
       style: "default",

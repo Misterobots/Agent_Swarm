@@ -36,7 +36,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [theme]);
 
   return (
-    <div data-theme={theme} className="flex h-screen bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
+    <div data-theme={theme} className="flex h-dvh overflow-x-hidden bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
       {/* Desktop/Tablet Sidebar */}
       {!isMobile && (
         <div
