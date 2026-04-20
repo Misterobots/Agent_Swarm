@@ -285,16 +285,22 @@ export function useChatStream(options?: {
           } else if (event.type === "turn_metadata") {
             const incoming = event.turnMetadata;
             if (incoming) {
-              const prev: TurnMetadata | null = turnMetadataRef.current;
+              const prevTurnId = turnMetadataRef.current?.turnId;
+              const prevAgent = turnMetadataRef.current?.agentName;
+              const prevTools = turnMetadataRef.current?.toolsInvoked;
+              const prevContinuable = turnMetadataRef.current?.continuable;
+              const prevTokens = turnMetadataRef.current?.inContextTokens;
+              const prevResume = turnMetadataRef.current?.resumeToken;
+              const prevTrace = turnMetadataRef.current?.traceId;
               turnMetadataRef.current = {
-                turnId: incoming.turnId || event.turnId || prev?.turnId || turnId,
-                agentName: incoming.agentName || prev?.agentName,
+                turnId: incoming.turnId || event.turnId || prevTurnId || turnId,
+                agentName: incoming.agentName || prevAgent,
                 streamModes: streamModesRef.current,
-                toolsInvoked: incoming.toolsInvoked || prev?.toolsInvoked || [],
-                continuable: incoming.continuable !== undefined ? incoming.continuable !== false : (prev?.continuable ?? true),
-                inContextTokens: incoming.inContextTokens ?? prev?.inContextTokens,
-                resumeToken: incoming.resumeToken || prev?.resumeToken,
-                traceId: incoming.traceId || prev?.traceId,
+                toolsInvoked: incoming.toolsInvoked || prevTools || [],
+                continuable: incoming.continuable !== undefined ? incoming.continuable !== false : (prevContinuable ?? true),
+                inContextTokens: incoming.inContextTokens ?? prevTokens,
+                resumeToken: incoming.resumeToken || prevResume,
+                traceId: incoming.traceId || prevTrace,
               };
             }
           } else if (event.type === "continuation") {
