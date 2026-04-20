@@ -989,7 +989,13 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         # typed chunks so the React UI can route them to the
                         # ThinkingIndicator / thought-trace instead of
                         # rendering them as message text.
-                        if msg_type in ("status", "thought", "log", "plan"):
+                        # turn_boundary / turn_metadata / continuation /
+                        # stream_mode are UI-routing signals — forward as
+                        # typed chunks so the hook handles them, not the
+                        # content appender.
+                        if msg_type in ("status", "thought", "log", "plan",
+                                        "turn_boundary", "turn_metadata",
+                                        "continuation", "stream_mode"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
