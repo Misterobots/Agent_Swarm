@@ -366,10 +366,10 @@ code {
 </head>
 
 <body>
-    <h1 id="hive-ecosystem--naming-scheme-options">Hive Ecosystem — Naming Scheme Options</h1>
+    <h1 id="memex-ecosystem--naming-scheme-options">Memex Ecosystem — Naming Scheme Options</h1>
 <p><strong>Date:</strong> April 20, 2026<br>
 <strong>Context:</strong> Replacing informal node/service/agent names (R730, Justin-PC, Wyse 5070, BMO, etc.) with a consistent naming scheme across the full stack — env vars, docker-compose, Prometheus labels, Python source, and documentation.<br>
-<strong>Hive</strong> stays as the top-level brand in all options.</p>
+<strong>Memex</strong> is the top-level brand. Node/service/agent names follow the Pioneer scheme.</p>
 <hr>
 <h2 id="current-state-baseline">Current State (Baseline)</h2>
 <table>
@@ -644,7 +644,7 @@ code {
 </table>
 <h3 id="topology-diagram-option-a">Topology Diagram (Option A)</h3>
 <pre class="hljs"><code><div>graph TB
-    subgraph Hive[&quot;🌌 HIVE&quot;]
+    subgraph Hive[&quot;🌌 MEMEX&quot;]
         subgraph Helios[&quot;☀️ Helios — Gateway Node&quot;]
             transit[&quot;Transit\n(Traefik)&quot;]
             luminary[&quot;Luminary\n(Prometheus)&quot;]
@@ -852,7 +852,7 @@ code {
 </table>
 <h3 id="topology-diagram-option-b">Topology Diagram (Option B)</h3>
 <pre class="hljs"><code><div>graph TB
-    subgraph Hive[&quot;🔷 HIVE&quot;]
+    subgraph Hive[&quot;🔷 MEMEX&quot;]
         subgraph APEX[&quot;🏢 APEX — Gateway&quot;]
             GATEWAY[&quot;GATEWAY\n(Traefik)&quot;]
             WATCH[&quot;WATCH\n(Prometheus)&quot;]
@@ -1344,7 +1344,7 @@ code {
 <p>✅ <code>turing_gateway/</code> — directory renamed from <code>r730_gateway/</code> (April 20, 2026).</p>
 </blockquote>
 <hr>
-<p><em>Generated: April 20, 2026 — Hive v3.4</em></p>
+<p><em>Generated: April 20, 2026 — Memex v3.4</em></p>
 
 </body>
 

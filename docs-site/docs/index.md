@@ -12,7 +12,7 @@ Version {{ version }} · {{ phase }} · All inference runs on-premises — no ex
 
 ## What is Agent Swarm?
 
-Agent Swarm (also called **Agentic Hive** or **Home AI Lab**) is a production multi-agent system running across three physical nodes on a local network. It provides:
+Agent Swarm (also called **Memex** or **Home AI Lab**) is a production multi-agent system running across three physical nodes on a local network. It provides:
 
 - **Intelligent chat and coding** with inference-time quality verification (MarsRL)
 - **Image, 3D, and action figure generation** via ComfyUI pipelines
@@ -63,7 +63,7 @@ graph TB
 
     ---
 
-    Learn how to use the Hive — chat, generate images, control devices, and more.
+    Learn how to use Memex — chat, generate images, control devices, and more.
 
     [:octicons-arrow-right-24: User Quickstart](getting-started/quickstart-user.md)
 

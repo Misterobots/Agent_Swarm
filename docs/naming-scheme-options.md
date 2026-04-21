@@ -1,4 +1,4 @@
-# Hive Ecosystem — Naming Scheme Options
+# Memex Ecosystem — Naming Scheme Options
 
 **Date:** April 20, 2026  
 **Status:** ✅ **DECIDED — Option G (Computing Pioneers) implemented on April 20, 2026**  

@@ -1,4 +1,4 @@
-# Hive — Pioneer Naming Glossary
+# Memex — Pioneer Naming Glossary
 
 > **Naming scheme adopted:** April 20, 2026  
 > All infrastructure components use names from Computing Pioneers. Named projects (MemPalace, ComfyUI, etc.) retain their original names with the Pioneer container name as a parenthetical reference.

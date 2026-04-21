@@ -1,4 +1,4 @@
-﻿# Home AI Lab: Agentic Hive
+﻿# Home AI Lab: Memex
 
 **Version**: 3.4 (Phase 6 complete) · **Status**: Production · **Updated**: 2026-03-31
 
@@ -98,6 +98,6 @@ python scripts/smoke_mcp_bridge.py --base-url http://127.0.0.1:8008 --bearer <JW
 
 ---
 
-_Agentic Hive v3.4 · Self-hosted · Private inference · No cloud dependencies_
+_Memex v3.4 · Self-hosted · Private inference · No cloud dependencies_
 
 
