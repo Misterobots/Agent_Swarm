@@ -1,6 +1,6 @@
 # BMO Voice: Raspberry Pi Deployment Guide
 
-This guide will help you install the BMO Client on your Raspberry Pi so it can talk to your Home AI Lab.
+This guide will help you install the BMO Client on the BMO device so it can talk to your Home AI Lab.
 
 ## 1. Prerequisites
 
@@ -8,17 +8,17 @@ This guide will help you install the BMO Client on your Raspberry Pi so it can t
 - **USB Microphone** and **Speaker** (or HDMI audio).
 - **Network Access**: The Pi must be on the same network as your PC (or connected via Tailscale).
 
-## 2. Installation on Raspberry Pi
+## 2. Installation on the BMO Device
 
-Open a terminal on your Raspberry Pi and run:
+Open a terminal on the BMO device (`misterobots@192.168.2.106`) and run:
 
 ```bash
 # 1. Update System
 sudo apt update && sudo apt install -y python3-pip python3-venv portaudio19-dev libsndfile1
 
 # 2. Create Project Directory
-mkdir -p ~/bmo_client
-cd ~/bmo_client
+mkdir -p /home/misterobots/bmo_client
+cd /home/misterobots/bmo_client
 
 # 3. Create Virtual Environment
 python3 -m venv venv
@@ -30,37 +30,31 @@ pip install requests sounddevice soundfile numpy
 
 ## 3. Copy the Client Script
 
-You can copy the `pi_client.py` from your PC to the Pi using `scp` (replace `pi@raspberrypi.local` with your Pi's address):
+You can copy the current client payload from this repo to the BMO device using `scripts/sync_bmo.ps1`.
 
 **From your PC (PowerShell):**
 
 ```powershell
-scp agents/bmo_voice/pi_client.py pi@raspberrypi.local:~/bmo_client/
+.\scripts\sync_bmo.ps1
 ```
 
-**Or create manually on Pi:**
-
-```bash
-nano pi_client.py
-# Paste the content of agents/bmo_voice/pi_client.py based on the file on your PC
-# Press Ctrl+X, Y, Enter to save.
-```
+This sync copies the canonical BMO payload into `/home/misterobots/bmo_client`, including `agents/bmo_voice/*`, `scripts/voice_satellite.py`, `scripts/requirements_satellite.txt`, and `network.env`.
 
 ## 4. Usage (Classic Client)
 
 Activate the environment (if not already):
 
 ```bash
-cd ~/bmo_client
+cd /home/misterobots/bmo_client
 source venv/bin/activate
 ```
 
 ### 🤖 Text-to-Speech (Test)
 
-Replace `192.168.1.X` with your PC's IP address.
+Use the execution node IP from `network.env`.
 
 ```bash
-python pi_client.py --host 192.168.1.X --text "Hello! I am BMO. Who wants to play video games?" --device 4
+python pi_client.py --host "$LOVELACE_IP" --text "Hello! I am BMO. Who wants to play video games?" --device 4
 ```
 
 ### 🎤 Voice-to-Voice (Talk to BMO)
@@ -68,7 +62,7 @@ python pi_client.py --host 192.168.1.X --text "Hello! I am BMO. Who wants to pla
 This will record your microphone for 5 seconds, send it to the server, and play back the response in BMO's voice.
 
 ```bash
-python pi_client.py --host 192.168.1.X --record --duration 5
+python pi_client.py --host "$LOVELACE_IP" --record --duration 5
 ```
 
 ### 🎛️ Parameters
@@ -92,16 +86,12 @@ pip install aiohttp
 
 ### Step 2: Update Files
 
-Copy the new `bmo_driver.py` and the `face/` directory to your Pi.
+The sync script already copies the current `bmo_driver.py`, `voice_satellite.py`, and `face/` assets to the BMO device.
 
-**From PC (PowerShell):**
+If you need to resync manually, run:
 
 ```powershell
-# Copy Driver
-scp agents/bmo_voice/bmo_driver.py pi@raspberrypi.local:~/bmo_client/
-
-# Copy Face Assets (Recursive)
-scp -r agents/bmo_voice/face pi@raspberrypi.local:~/bmo_client/
+.\scripts\sync_bmo.ps1 -RestartService
 ```
 
 ### Step 3: Run the Driver
@@ -109,7 +99,7 @@ scp -r agents/bmo_voice/face pi@raspberrypi.local:~/bmo_client/
 Run the driver. It will start a web server on port 8080 and listen for console input.
 
 ```bash
-python bmo_driver.py --host 192.168.1.X --device 4
+python bmo_driver.py --host "$LOVELACE_IP" --device 4
 ```
 
 _You can type `talk` to record voice (5s) or just type a sentence to make BMO speak._
@@ -171,8 +161,9 @@ If the script runs but doesn't play audio (only saves it):
 | Source | Type | Relevance |
 |--------|------|----------|
 | `bmo_client/` | Implementation | BMO Voice client source |
-| `network.env` | Configuration | Backend API URLs |
+| `network.env` | Configuration | Node IPs and backend API URLs |
 | `voice_satellite.py` | Implementation | Wake word listener, audio pipeline |
+| `scripts/sync_bmo.ps1` | Deployment | Canonical sync to the BMO device |
 
 </details>
 

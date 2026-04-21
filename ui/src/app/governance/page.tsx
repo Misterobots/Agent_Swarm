@@ -63,6 +63,8 @@ export default function GovernancePage() {
 
   useEffect(() => {
     load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const filtered = useMemo(() => {

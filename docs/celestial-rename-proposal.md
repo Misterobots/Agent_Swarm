@@ -24,7 +24,7 @@ with a consistent celestial naming scheme. The top-level brand **Hive** is uncha
 | Turing | **Turing** | Gateway, monitoring, edge ingress | 192.168.2.103 |
 | Lovelace | **Lovelace** | GPU compute, AI inference, ComfyUI | 192.168.2.101 |
 | Hopper / Hopper | **Hopper** | Control plane, identity (SPIRE), observability | 192.168.2.102 |
-| Pi / BMO | **Shannon** | Voice interface, ambient periphery | 192.168.2.157 |
+| Pi / BMO | **Shannon** | Voice interface, ambient periphery | 192.168.2.106 |
 
 ```mermaid
 graph LR

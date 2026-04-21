@@ -21,7 +21,7 @@ export interface GalleryItem {
 
 export interface GovernanceRequest {
   id: string;
-  type: "PACKAGE" | "MODEL" | "PERMISSION" | "FEATURE" | "GROUNDING_WEB" | "GROUNDING_DOCS" | "GROUNDING_FILE" | "OTHER";
+  type: "PACKAGE" | "MODEL" | "PERMISSION" | "FEATURE" | "OTHER";
   description: string;
   user: string;
   timestamp: string;

@@ -5,6 +5,12 @@
 # Ensure running from correct directory
 cd "$(dirname "$0")"
 
+if [ -f ../../network.env ]; then
+	set -a
+	. ../../network.env
+	set +a
+fi
+
 # Activate virtual environment
 source venv/bin/activate
 
@@ -19,6 +25,6 @@ echo "🚀 Launching BMO Face (Pygame X11)..."
 # Run with specific hardware device IDs for this setup
 # Output: 1 (vc4-hdmi)
 # Input: 3 (G933 Headset Mic)
-python bmo_driver.py --host 192.168.2.157 --output_device 1 --input_device 3
+python bmo_driver.py --host "${LOVELACE_IP:-192.168.2.101}" --output_device 1 --input_device 3
 
 

@@ -36,7 +36,7 @@ for _candidate in [os.path.join(_script_dir, "..", "network.env"), os.path.join(
         break
 
 # Try centralized config first, then env var, then fallback
-HOST_IP = os.getenv("LOVELACE_IP", os.getenv("LOVELACE_IP", os.getenv("BMO_HOST_IP", "")))
+HOST_IP = os.getenv("LOVELACE_IP") or os.getenv("BMO_HOST_IP", "")
 
 if not HOST_IP:
     print("\n❌ ERROR: HOST_IP could not be determined.")

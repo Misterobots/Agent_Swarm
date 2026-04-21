@@ -12,6 +12,7 @@ export function WebGroundingToggle() {
   const { status, loading, request } = useGroundingPermissions();
   const [requesting, setRequesting] = useState(false);
   const [requested, setRequested] = useState(false);
+  const [error, setError] = useState(false);
 
   const permitted = !loading && status.web_grounding;
 
@@ -21,12 +22,13 @@ export function WebGroundingToggle() {
       return;
     }
     if (requesting || requested) return;
+    setError(false);
     setRequesting(true);
     try {
       await request("web_grounding", "Requesting web grounding access for live search results.");
       setRequested(true);
     } catch {
-      // request submission failed — silently swallow; admin can be contacted manually
+      setError(true);
     } finally {
       setRequesting(false);
     }
@@ -34,14 +36,18 @@ export function WebGroundingToggle() {
 
   const label = requesting
     ? "Requesting…"
+    : error
+    ? "Request Failed"
     : requested
     ? "Pending Approval"
     : permitted
     ? "Web"
     : "Web (Locked)";
 
-  const title = permitted
-    ? "Toggle internet grounding — inject live web search results before responding"
+  const title = error
+    ? "Request failed \u2014 click to retry"
+    : permitted
+    ? "Toggle internet grounding \u2014 inject live web search results before responding"
     : requested
     ? "Web grounding approval is pending admin review"
     : "Internet grounding requires a governance approval. Click to submit a request.";
@@ -49,11 +55,15 @@ export function WebGroundingToggle() {
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={error ? () => { setError(false); setRequested(false); } : handleClick}
       disabled={requesting}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs border transition-colors",
-        !permitted
+        error
+          ? "bg-red-500/10 text-red-400 border-red-500/40 cursor-pointer"
+          : requested && !permitted
+          ? "bg-amber-500/10 text-amber-400 border-amber-500/40 cursor-default"
+          : !permitted
           ? "bg-[var(--chat-panel)] text-[var(--chat-muted)] border-[var(--chat-border)] opacity-60 cursor-pointer"
           : groundingWeb
           ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
