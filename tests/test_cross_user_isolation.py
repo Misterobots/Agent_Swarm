@@ -14,7 +14,7 @@ if AGENTS_DIR not in sys.path:
 
 
 def test_context_isolated_by_distinct_session_ids(monkeypatch, tmp_path):
-    from agents import context_manager
+    from agents import brooks as context_manager
 
     monkeypatch.setattr(context_manager, "CONTEXT_DIR", str(tmp_path))
 
@@ -25,7 +25,7 @@ def test_context_isolated_by_distinct_session_ids(monkeypatch, tmp_path):
 
 
 def test_context_collision_should_not_leak_across_principals(monkeypatch, tmp_path):
-    from agents import context_manager
+    from agents import brooks as context_manager
 
     monkeypatch.setattr(context_manager, "CONTEXT_DIR", str(tmp_path))
 
