@@ -21,3 +21,4 @@ echo "🚀 Launching BMO Face (Pygame X11)..."
 # Input: 3 (G933 Headset Mic)
 python bmo_driver.py --host 192.168.2.157 --output_device 1 --input_device 3
 
+

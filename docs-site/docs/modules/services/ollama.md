@@ -1,4 +1,4 @@
----
+﻿---
 title: "Service: Ollama"
 ---
 
@@ -10,8 +10,8 @@ Local LLM inference engine.
 
 | Instance | Node | Port | GPU |
 |----------|------|------|-----|
-| Primary | Execution ({{ execution_node_ip }}) | {{ ollama_port }} | RTX 5060 Ti 16 GB |
-| Secondary | Gateway ({{ gateway_node_ip }}) | 11435 | RTX 3070 Ti 8 GB |
+| Primary | Execution ({{ lovelace_ip }}) | {{ ollama_port }} | RTX 5060 Ti 16 GB |
+| Secondary | Gateway ({{ turing_ip }}) | 11435 | RTX 3070 Ti 8 GB |
 
 ## Purpose
 
@@ -23,14 +23,14 @@ OpenAI-compatible API:
 
 ```bash
 # Chat completion
-curl http://{{ execution_node_ip }}:{{ ollama_port }}/v1/chat/completions \
+curl http://{{ lovelace_ip }}:{{ ollama_port }}/v1/chat/completions \
     -d '{"model": "{{ solver_model }}", "messages": [{"role": "user", "content": "Hello"}]}'
 
 # List models
-curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags
+curl http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags
 
 # Pull model
-curl -X POST http://{{ execution_node_ip }}:{{ ollama_port }}/api/pull \
+curl -X POST http://{{ lovelace_ip }}:{{ ollama_port }}/api/pull \
     -d '{"name": "{{ solver_model }}"}'
 ```
 
@@ -47,3 +47,5 @@ curl -X POST http://{{ execution_node_ip }}:{{ ollama_port }}/api/pull \
 
 - [Admin: Models](../../admin-guide/configuration/models.md)
 - [Admin: Scaling](../../admin-guide/operations/scaling.md)
+
+

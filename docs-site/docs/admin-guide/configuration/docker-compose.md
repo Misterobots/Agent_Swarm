@@ -1,4 +1,4 @@
----
+﻿---
 title: Docker Compose
 ---
 
@@ -12,7 +12,7 @@ Each node has its own `docker-compose.yml` defining the services that run on tha
 |------|------|----------|
 | Control | `control_plane/docker-compose.yml` | SPIRE Server, PostgreSQL, Langfuse, ClickHouse, MemPalace, MinIO, Redis |
 | Execution | `execution_plane/docker-compose.yml` | SPIRE Agent, Ollama, Agent Runtime, ComfyUI, Voice Engine, BMO, OpenHands |
-| Gateway | `r730_gateway/docker-compose.yml` | SPIRE Agent, Traefik, Prometheus, Grafana, Loki, Promtail, AlertManager, Ollama, Redis, Docs Site |
+| Gateway | `turing_gateway/docker-compose.yml` | SPIRE Agent, Traefik, jacquard, hollerith, knuth, Promtail, AlertManager, Ollama, Redis, Docs Site |
 
 ## Common Patterns
 
@@ -84,11 +84,11 @@ graph TD
     MP --> PG
     SPIRE-A --> SPIRE-S[SPIRE Server]
     Traefik --> RT
-    Prometheus --> RT
-    Prometheus --> Ollama
-    Promtail --> Loki
-    Grafana --> Prometheus
-    Grafana --> Loki
+    jacquard --> RT
+    jacquard --> Ollama
+    Promtail --> knuth
+    hollerith --> jacquard
+    hollerith --> knuth
 ```
 
 ## Useful Commands
@@ -118,3 +118,5 @@ docker compose down -v
 
 - [Configuration: Environment](environment.md) — variable reference
 - [Architecture: Topology](../../architecture/topology.md) — node layout
+
+

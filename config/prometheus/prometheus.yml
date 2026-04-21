@@ -1,4 +1,4 @@
-global:
+﻿global:
   scrape_interval: 15s
   evaluation_interval: 15s
   scrape_timeout: 10s
@@ -8,39 +8,39 @@ rule_files:
 
 scrape_configs:
   # ═══════════════════════════════════════════════════════════════
-  # R730 GATEWAY (192.168.2.103) — Self-monitoring
+  # TURING GATEWAY (192.168.2.103) — Self-monitoring
   # ═══════════════════════════════════════════════════════════════
 
-  - job_name: 'prometheus'
+  - job_name: 'jacquard'
     static_configs:
       - targets: ['localhost:9090']
         labels:
-          node: 'r730'
+          node: 'turing'
 
-  - job_name: 'r730_cadvisor'
+  - job_name: 'turing_cadvisor'
     static_configs:
-      - targets: ['cadvisor-r730:8080']
+      - targets: ['cadvisor-turing:8080']
         labels:
-          node: 'r730'
+          node: 'turing'
     scrape_timeout: 30s
     scrape_interval: 30s
 
-  - job_name: 'r730_traefik'
+  - job_name: 'turing_traefik'
     static_configs:
       - targets: ['traefik-gateway:8080']
         labels:
-          node: 'r730'
+          node: 'Turing'
     metrics_path: /metrics
 
   # ═══════════════════════════════════════════════════════════════
-  # JUSTIN-PC COMPUTE (192.168.2.101) — GPU & Agent Services
+  # Lovelace COMPUTE (192.168.2.101) — GPU & Agent Services
   # ═══════════════════════════════════════════════════════════════
 
   - job_name: 'justin_agent_runtime'
     static_configs:
       - targets: ['192.168.2.101:8008']
         labels:
-          node: 'justin-pc'
+          node: 'Lovelace'
           service: 'agent-runtime'
     metrics_path: /metrics
     scrape_interval: 30s
@@ -53,7 +53,8 @@ scrape_configs:
     static_configs:
       - targets: ['192.168.2.102:8001']
         labels:
-          node: 'wyse-5070'
+          node: 'hopper'
           service: 'security'
     metrics_path: /metrics
     scrape_interval: 30s
+

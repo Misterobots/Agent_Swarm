@@ -1,12 +1,12 @@
-#!/bin/bash
-# Setup script for R730 Monitoring Stack
-# Run this on R730: bash setup_monitoring.sh
+﻿#!/bin/bash
+# Setup script for Turing Monitoring Stack
+# Run this on Turing: bash setup_monitoring.sh
 
 set -e
 
-echo "🚀 Setting up R730 Monitoring Stack..."
+echo "🚀 Setting up Turing Monitoring Stack..."
 
-WORK_DIR="$HOME/r730_gateway"
+WORK_DIR="$HOME/turing_gateway"
 cd "$WORK_DIR"
 
 # Create config directories
@@ -32,7 +32,7 @@ scrape_configs:
 
   - job_name: 'cadvisor'
     static_configs:
-      - targets: ['cadvisor-r730:8080']
+      - targets: ['cadvisor-Turing:8080']
 
   - job_name: 'docker'
     static_configs:
@@ -114,7 +114,7 @@ positions:
   filename: /tmp/positions.yaml
 
 clients:
-  - url: http://loki-r730:3100/loki/api/v1/push
+  - url: http://loki-Turing:3100/loki/api/v1/push
 
 scrape_configs:
   - job_name: docker
@@ -147,7 +147,7 @@ datasources:
     type: prometheus
     access: proxy
     orgId: 1
-    url: http://prometheus-r730:9090
+    url: http://prometheus-Turing:9090
     isDefault: true
     editable: true
     jsonData:
@@ -165,7 +165,7 @@ datasources:
     type: loki
     access: proxy
     orgId: 1
-    url: http://loki-r730:3100
+    url: http://loki-Turing:3100
     jsonData:
       maxLines: 1000
 EOF
@@ -190,3 +190,4 @@ echo ""
 echo "3. Check services:"
 echo "   docker compose -f docker-compose-monitoring-fixed.yml ps"
 echo ""
+

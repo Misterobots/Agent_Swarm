@@ -1,4 +1,4 @@
----
+﻿---
 title: Architecture
 ---
 
@@ -8,15 +8,15 @@ Technical design documentation for the Agent Swarm system.
 
 ```mermaid
 graph TB
-    subgraph Gateway["Gateway Node · R730 · {{ gateway_node_ip }}"]
+    subgraph Gateway["Gateway Node · Turing · {{ turing_ip }}"]
         Traefik[Traefik]
-        Prometheus[Prometheus]
-        Grafana[Grafana]
-        Loki[Loki]
+        jacquard[jacquard]
+        hollerith[hollerith]
+        knuth[knuth]
         OllamaGW[Ollama Secondary]
     end
 
-    subgraph Execution["Execution Node · Justin-PC · {{ execution_node_ip }}"]
+    subgraph Execution["Execution Node · Lovelace · {{ lovelace_ip }}"]
         Runtime[Agent Runtime]
         Ollama[Ollama Primary]
         ComfyUI[ComfyUI]
@@ -24,7 +24,7 @@ graph TB
         OpenHands[OpenHands]
     end
 
-    subgraph Control["Control Node · Wyse 5070 · {{ control_node_ip }}"]
+    subgraph Control["Control Node · Hopper · {{ hopper_ip }}"]
         SPIRE[SPIRE Server]
         PG[(PostgreSQL)]
         Langfuse[Langfuse]
@@ -39,8 +39,8 @@ graph TB
     Runtime -.->|identity| SPIRE
     Runtime -.->|traces| Langfuse
     Runtime -.->|memory| MemPalace
-    Prometheus -->|scrape| Runtime
-    Prometheus -->|scrape| OllamaGW
+    jacquard -->|scrape| Runtime
+    jacquard -->|scrape| OllamaGW
 ```
 
 ## Sections
@@ -53,5 +53,7 @@ graph TB
 | [Security Model](security-model.md) | SPIFFE/SPIRE, JWT-ACE, MAESTRO |
 | [Agent System](agent-system.md) | Agent roles, routing, intent classification |
 | [Memory System](memory-system.md) | Persistent knowledge, preferences, MemPalace |
-| [Observability](observability.md) | Prometheus, Grafana, Langfuse, Loki |
+| [Observability](observability.md) | jacquard, hollerith, Langfuse, knuth |
 | [Architecture Decisions](decisions/index.md) | ADR index and records |
+
+

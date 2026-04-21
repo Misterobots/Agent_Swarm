@@ -64,3 +64,5 @@ The Hive Mind UI includes a built-in Three.js 3D viewer. Generated models are re
 - [Art Studio](art-studio.md) — image generation pipeline
 - [Tutorial: Create an Action Figure](../tutorials/build-3d-model.md)
 - [Module: Dispatcher](../modules/dispatcher.md) — queue configuration for 3D jobs
+
+

@@ -14,3 +14,4 @@ echo "GENERIC_NOSLASH: $code_3"
 url_4="http://authentik_server:9000/application/o/grafana/token"
 code_4=$(curl -o /dev/null -s -w "%{http_code}" -X POST $url_4)
 echo "SPECIFIC_NOSLASH: $code_4"
+

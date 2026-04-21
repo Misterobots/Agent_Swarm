@@ -1,4 +1,4 @@
----
+﻿---
 title: Scaling
 ---
 
@@ -30,7 +30,7 @@ OLLAMA_NUM_PARALLEL=4
 
 ### Add RAM
 
-The Gateway node benefits from more RAM for Prometheus TSDB and Loki retention.
+The Gateway node benefits from more RAM for jacquard TSDB and knuth retention.
 
 ## Horizontal Scaling
 
@@ -51,7 +51,7 @@ The Gateway node benefits from more RAM for Prometheus TSDB and Loki retention.
      agent-runtime:
        loadBalancer:
          servers:
-           - url: "http://{{ execution_node_ip }}:{{ agent_runtime_port }}"
+           - url: "http://{{ lovelace_ip }}:{{ agent_runtime_port }}"
            - url: "http://192.168.2.105:{{ agent_runtime_port }}"
    ```
 
@@ -62,8 +62,8 @@ For inference-heavy workloads, add a secondary Ollama on the Gateway node (alrea
 ```python
 # In config, the router can fallback to secondary Ollama
 OLLAMA_HOSTS = [
-    "http://{{ execution_node_ip }}:{{ ollama_port }}",  # primary (RTX 5060 Ti)
-    "http://{{ gateway_node_ip }}:11435",                 # secondary (RTX 3070 Ti)
+    "http://{{ lovelace_ip }}:{{ ollama_port }}",  # primary (RTX 5060 Ti)
+    "http://{{ turing_ip }}:11435",                 # secondary (RTX 3070 Ti)
 ]
 ```
 
@@ -87,12 +87,12 @@ Increase workers in `agents/dispatcher.py` configuration.
 If local disk fills up, offload artifacts to MinIO (Control Node):
 
 ```
-http://{{ control_node_ip }}:9000
+http://{{ hopper_ip }}:9000
 ```
 
-### Prometheus Retention
+### jacquard Retention
 
-Adjust retention in `r730_gateway/docker-compose.yml`:
+Adjust retention in `turing_gateway/docker-compose.yml`:
 
 ```yaml
 command:
@@ -104,3 +104,5 @@ command:
 
 - [Architecture: Topology](../../architecture/topology.md) — current node layout
 - [Admin: Prerequisites](../deployment/prerequisites.md) — hardware recommendations
+
+

@@ -1,4 +1,4 @@
-# R730 Monitoring Stack (to be added to existing docker-compose)
+﻿# Turing Monitoring Stack (to be added to existing docker-compose)
 # This adds ONLY the monitoring services without Traefik (reuses existing Traefik on port 80)
 
 services:
@@ -8,8 +8,8 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus-r730
-    hostname: prometheus-r730
+    container_name: prometheus-Turing
+    hostname: prometheus-Turing
     restart: unless-stopped
     volumes:
       - ./config/prometheus:/etc/prometheus
@@ -30,8 +30,8 @@ services:
 
   loki:
     image: grafana/loki:latest
-    container_name: loki-r730
-    hostname: loki-r730
+    container_name: loki-Turing
+    hostname: loki-Turing
     restart: unless-stopped
     ports:
       - "3100:3100"
@@ -49,8 +49,8 @@ services:
 
   promtail:
     image: grafana/promtail:latest
-    container_name: promtail-r730
-    hostname: promtail-r730
+    container_name: promtail-Turing
+    hostname: promtail-Turing
     restart: unless-stopped
     volumes:
       - ./config/promtail:/etc/promtail
@@ -62,8 +62,8 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor-r730
-    hostname: cadvisor-r730
+    container_name: cadvisor-Turing
+    hostname: cadvisor-Turing
     restart: unless-stopped
     ports:
       - "8888:8080"
@@ -85,8 +85,8 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana-r730
-    hostname: grafana-r730
+    container_name: grafana-Turing
+    hostname: grafana-Turing
     restart: unless-stopped
     ports:
       - "3001:3000"
@@ -114,8 +114,8 @@ services:
   # Task Queue (persistent)
   redis-monitoring:
     image: redis:7.2-alpine
-    container_name: redis-monitoring-r730
-    hostname: redis-monitoring-r730
+    container_name: redis-monitoring-Turing
+    hostname: redis-monitoring-Turing
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -134,3 +134,5 @@ volumes:
     driver: local
   redis_data:
     driver: local
+
+

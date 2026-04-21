@@ -250,3 +250,5 @@ Skip the approval workflow for trusted users:
 - [Plan & Think Modes](plan-think.md) — other reasoning toggles
 - [Module: Router](../modules/router.md) — grounding injection in the pipeline
 - [API: Grounding](../developer-guide/api/grounding.md) — full API reference
+
+

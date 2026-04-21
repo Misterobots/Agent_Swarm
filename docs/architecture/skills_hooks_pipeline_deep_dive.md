@@ -1,4 +1,4 @@
-# Skills Registry and Hook Invocation Pipeline Deep Dive
+﻿# Skills Registry and Hook Invocation Pipeline Deep Dive
 
 Document ID: ARCH-DD-004
 Domain: Architecture
@@ -31,7 +31,7 @@ Describe how skill execution and hook processing are orchestrated with policy co
 ## Evidence
 - `agents/tools/iot_ops.py`
 - `agents/metrics.py`
-- `r730_gateway/config/prometheus/auth_alert_rules.yml`
+- `turing_gateway/config/prometheus/auth_alert_rules.yml`
 - `tests/test_iot_controls.py`
 
 ## Open Follow-Ups

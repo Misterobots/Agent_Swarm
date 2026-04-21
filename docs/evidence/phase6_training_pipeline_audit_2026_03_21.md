@@ -1,4 +1,4 @@
-# Phase 6 Audit: GRPO Training Pipeline & Model Lifecycle
+﻿# Phase 6 Audit: GRPO Training Pipeline & Model Lifecycle
 
 > **Note**: This is a historical audit snapshot from 2026-03-21. Node names have been updated to current logical designations.
 
@@ -62,9 +62,9 @@
 
 | Item                          | Status  | Evidence                                                              |
 | ----------------------------- | ------- | --------------------------------------------------------------------- |
-| Training Pipeline dashboard   | ✅ PASS | `r730_gateway/dashboards/training_pipeline.json` — 7 panels           |
-| Template Scores dashboard     | ✅ PASS | `r730_gateway/dashboards/template_performance.json` — 8 panels        |
-| PostgreSQL-Swarm datasource   | ✅ PASS | `r730_gateway/provisioning/datasources/datasource.yml` — langfuse DB  |
+| Training Pipeline dashboard   | ✅ PASS | `turing_gateway/dashboards/training_pipeline.json` — 7 panels           |
+| Template Scores dashboard     | ✅ PASS | `turing_gateway/dashboards/template_performance.json` — 8 panels        |
+| PostgreSQL-Swarm datasource   | ✅ PASS | `turing_gateway/provisioning/datasources/datasource.yml` — langfuse DB  |
 | Grafana anonymous auth        | ✅ PASS | `GF_AUTH_ANONYMOUS_ENABLED=true` for iframe embedding                 |
 | Dashboard provisioning        | ✅ PASS | File-based from /etc/grafana/dashboards/, 30s update interval         |
 | Sample data seeded            | ✅ PASS | Training runs, model versions, A/B tests seeded via SQL               |
@@ -105,8 +105,8 @@
 | `agents/training/grpo_trainer.py` | New | QLoRA GRPO training wrapper |
 | `agents/training/convert_gguf.py` | New | LoRA merge → GGUF → Ollama pipeline |
 | `agents/training/ab_test.py` | New | A/B testing harness with auto-promotion |
-| `r730_gateway/dashboards/training_pipeline.json` | New | Grafana Training Pipeline dashboard |
-| `r730_gateway/dashboards/template_performance.json` | New | Grafana Template Scores dashboard |
+| `turing_gateway/dashboards/training_pipeline.json` | New | Grafana Training Pipeline dashboard |
+| `turing_gateway/dashboards/template_performance.json` | New | Grafana Template Scores dashboard |
 | `execution_plane/Dockerfile.training` | New | Training runtime Docker image |
 
 ## Modified File Manifest
@@ -120,8 +120,8 @@
 | `agents/expertise/async_template_updater.py` | _evaluate_ab_tests() method |
 | `agents/expertise/template_registry.py` | DB password fix |
 | `execution_plane/docker-compose.yml` | training-runtime service + volumes |
-| `r730_gateway/provisioning/datasources/datasource.yml` | PostgreSQL-Swarm datasource |
-| `r730_gateway/docker-compose.yml` | Grafana anonymous auth env vars |
+| `turing_gateway/provisioning/datasources/datasource.yml` | PostgreSQL-Swarm datasource |
+| `turing_gateway/docker-compose.yml` | Grafana anonymous auth env vars |
 
 ---
 
@@ -220,7 +220,7 @@ Phase 6 is **DEPLOYED AND OPERATIONAL**. All code committed, dashboards provisio
 | `agents/grpc/server.py` | Implementation | OpenClaude gRPC inference server |
 | `agents/training/grpo_trainer.py` | Implementation | GRPO training pipeline |
 | `config/grafana/dashboards/` | Infrastructure | Provisioned training dashboards |
-| `r730_gateway/docker-compose.yml` | Infrastructure | Training service deployment |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Training service deployment |
 
 </details>
 

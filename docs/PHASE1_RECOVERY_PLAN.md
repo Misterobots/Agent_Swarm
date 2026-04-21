@@ -1,4 +1,4 @@
-# Phase 1 - RECOVERY: Fix Monitoring Stack Deployment
+﻿# Phase 1 - RECOVERY: Fix Monitoring Stack Deployment
 
 ## Problems Encountered
 
@@ -7,7 +7,7 @@
    - Fix: Run container as root (user: "0:0") and use proper volume mount
 
 2. ✗ **Promtail config missing**: `/etc/promtail/promtail.yml does not exist`
-   - Root cause: Config files not provisioned on R730
+   - Root cause: Config files not provisioned on Turing
    - Fix: Run setup script to create all config files
 
 3. ⚠️ **Version attribute warning**: Docker Compose version is obsolete
@@ -19,36 +19,36 @@
 
 ## Recovery Steps
 
-### Step 1: Copy Setup Files to R730
+### Step 1: Copy Setup Files to Turing
 
-Run from Justin-PC (where you are now):
+Run from Lovelace (where you are now):
 
 ```powershell
 # Copy the fixed compose file
-scp C:\Users\panca\Documents\GitHub\Home_AI_Lab\r730_gateway\docker-compose-monitoring-fixed.yml `
-    ubuntu@192.168.2.103:~/r730_gateway/docker-compose-monitoring-fixed.yml
+scp C:\Users\panca\Documents\GitHub\Home_AI_Lab\turing_gateway\docker-compose-monitoring-fixed.yml `
+    ubuntu@192.168.2.103:~/turing_gateway/docker-compose-monitoring-fixed.yml
 
 # Copy the setup script
-scp C:\Users\panca\Documents\GitHub\Home_AI_Lab\r730_gateway\setup_monitoring.sh `
-    ubuntu@192.168.2.103:~/r730_gateway/setup_monitoring.sh
+scp C:\Users\panca\Documents\GitHub\Home_AI_Lab\turing_gateway\setup_monitoring.sh `
+    ubuntu@192.168.2.103:~/turing_gateway/setup_monitoring.sh
 ```
 
-### Step 2: Stop Old Stack on R730
+### Step 2: Stop Old Stack on Turing
 
 ```bash
 ssh ubuntu@192.168.2.103 << 'EOF'
-cd ~/r730_gateway
+cd ~/turing_gateway
 
 # Stop old problematic containers
 docker compose -f docker-compose-monitoring.yml down || true
 docker compose -f docker-compose-monitoring-stack.yml down || true
 
 # Remove old containers to clean slate
-docker rm -f prometheus-r730 grafana-r730 loki-r730 promtail-r730 || true
-docker rm -f redis-monitoring-r730 || true
+docker rm -f prometheus-turing grafana-turing loki-turing promtail-turing || true
+docker rm -f redis-monitoring-turing || true
 
 # Optional: Clean volume data if you want fresh start
-# docker volume rm r730_gateway_prometheus_data r730_gateway_loki_data r730_gateway_grafana_data r730_gateway_redis_data
+# docker volume rm turing_gateway_prometheus_data turing_gateway_loki_data turing_gateway_grafana_data turing_gateway_redis_data
 
 echo "✅ Old stack stopped"
 EOF
@@ -58,7 +58,7 @@ EOF
 
 ```bash
 ssh ubuntu@192.168.2.103 << 'EOF'
-cd ~/r730_gateway
+cd ~/turing_gateway
 chmod +x setup_monitoring.sh
 bash setup_monitoring.sh
 EOF
@@ -75,7 +75,7 @@ This will create:
 
 ```bash
 ssh ubuntu@192.168.2.103 << 'EOF'
-cd ~/r730_gateway
+cd ~/turing_gateway
 
 # Pull latest images
 docker compose -f docker-compose-monitoring-fixed.yml pull
@@ -98,19 +98,19 @@ EOF
 
 ```bash
 ssh ubuntu@192.168.2.103 << 'EOF'
-cd ~/r730_gateway
+cd ~/turing_gateway
 
 # All containers should show "Up" status
 docker compose -f docker-compose-monitoring-fixed.yml ps
 
 # Expected output:
 # NAME                      IMAGE                       STATUS
-# prometheus-r730           prom/prometheus:latest      Up
-# loki-r730                 grafana/loki:latest         Up (healthy)
-# promtail-r730             grafana/promtail:latest     Up
-# cadvisor-r730             gcr.io/cadvisor...          Up (healthy)
-# grafana-r730              grafana/grafana:latest      Up
-# redis-monitoring-r730     redis:7.2-alpine            Up
+# prometheus-turing           prom/prometheus:latest      Up
+# loki-turing                 grafana/loki:latest         Up (healthy)
+# promtail-turing             grafana/promtail:latest     Up
+# cadvisor-turing             gcr.io/cadvisor...          Up (healthy)
+# grafana-turing              grafana/grafana:latest      Up
+# redis-monitoring-turing     redis:7.2-alpine            Up
 
 # Check for errors in logs
 docker compose -f docker-compose-monitoring-fixed.yml logs --tail=20 | grep -i error
@@ -120,7 +120,7 @@ EOF
 ### Step 6: Validate Services Are Responding
 
 ```bash
-# From Justin-PC, verify endpoints
+# From Lovelace, verify endpoints
 curl -s http://192.168.2.103:9090/-/healthy  # Prometheus
 curl -s http://192.168.2.103:3100/ready      # Loki  
 curl -s http://192.168.2.103:9080            # Promtail
@@ -143,26 +143,26 @@ curl -s http://192.168.2.103:3001/api/health # Grafana
 ### Check specific container logs:
 ```bash
 ssh ubuntu@192.168.2.103 << 'EOF'
-docker logs prometheus-r730 --tail=20
-docker logs loki-r730 --tail=20
-docker logs promtail-r730 --tail=20
-docker logs grafana-r730 --tail=20
+docker logs prometheus-turing --tail=20
+docker logs loki-turing --tail=20
+docker logs promtail-turing --tail=20
+docker logs grafana-turing --tail=20
 EOF
 ```
 
 ### Restart single service:
 ```bash
 ssh ubuntu@192.168.2.103 << 'EOF'
-cd ~/r730_gateway
-docker compose -f docker-compose-monitoring-fixed.yml restart loki-r730
-docker logs loki-r730 --tail=20
+cd ~/turing_gateway
+docker compose -f docker-compose-monitoring-fixed.yml restart loki-turing
+docker logs loki-turing --tail=20
 EOF
 ```
 
 ### Reset volumes (DESTRUCTIVE - loses data):
 ```bash
 ssh ubuntu@192.168.2.103 << 'EOF'
-cd ~/r730_gateway
+cd ~/turing_gateway
 docker compose -f docker-compose-monitoring-fixed.yml down -v
 docker compose -f docker-compose-monitoring-fixed.yml up -d
 EOF
@@ -174,7 +174,7 @@ Once all services are running:
 1. ✅ Access Grafana at http://192.168.2.103:3001 (admin/admin)
 2. ✅ Add Prometheus datasource  
 3. ✅ Add Loki datasource
-4. ✅ Create dashboards for Justin-PC and R730
+4. ✅ Create dashboards for Lovelace and Turing
 5. ✅ Configure log scraping from both nodes
 
 ---
@@ -186,7 +186,7 @@ Once all services are running:
 
 | Source | Type | Relevance |
 |--------|------|----------|
-| `r730_gateway/docker-compose.yml` | Infrastructure | Grafana, Prometheus, Loki on R730 |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Grafana, Prometheus, Loki on Turing |
 | `config/grafana/` | Configuration | Datasource and dashboard definitions |
 
 </details>

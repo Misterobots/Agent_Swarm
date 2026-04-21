@@ -1,4 +1,4 @@
-version: '3.8'
+﻿version: '3.8'
 
 services:
   # --- Docker Sidecar Probe (read-only container metadata) ---
@@ -58,14 +58,14 @@ services:
     container_name: control-security
     restart: unless-stopped
     depends_on:
-      db:
+      codd:
         condition: service_healthy
     env_file:
       - .env
       - ./security/.env
       - ../network.env
     environment:
-      - DATABASE_URL=postgresql://${LANGFUSE_DB_USER}:${LANGFUSE_DB_PASSWORD}@postgres:5432/${LANGFUSE_DB_NAME}
+      - DATABASE_URL=postgresql://${LANGFUSE_DB_USER}:${LANGFUSE_DB_PASSWORD}@codd:5432/${LANGFUSE_DB_NAME}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - JWT_EXPIRATION_HOURS=24
       - LOG_LEVEL=INFO
@@ -80,9 +80,9 @@ services:
       retries: 3
 
   # --- Langfuse Database (PostgreSQL) ---
-  db:
+  codd:
     image: pgvector/pgvector:pg15
-    container_name: postgres
+    container_name: codd
     env_file:
       - .env
     environment:
@@ -105,14 +105,14 @@ services:
 
 
   # --- MemPalace Memory Service ---
-  mempalace:
+  bush:
     build:
       context: ./mempalace
       dockerfile: Dockerfile
-    container_name: mempalace
+    container_name: bush
     restart: unless-stopped
     depends_on:
-      db:
+      codd:
         condition: service_healthy
     env_file:
       - .env
@@ -120,7 +120,7 @@ services:
     environment:
       - MEMPALACE_DB_USER=${LANGFUSE_DB_USER}
       - MEMPALACE_DB_PASSWORD=${LANGFUSE_DB_PASSWORD}
-      - MEMPALACE_DB_HOST=postgres
+      - MEMPALACE_DB_HOST=codd
       - MEMPALACE_DB_PORT=5432
       - MEMPALACE_DB_NAME=${LANGFUSE_DB_NAME}
       - OLLAMA_HOST=http://192.168.2.101:11434
@@ -159,18 +159,18 @@ services:
       timeout: 10s
       retries: 3
 
-  langfuse-web:
+  floyd-web:
     image: langfuse/langfuse:3
-    container_name: langfuse-web
+    container_name: floyd-web
     restart: unless-stopped
     depends_on:
       clickhouse:
         condition: service_healthy
-      db:
+      codd:
         condition: service_healthy
-      redis:
+      ritchie:
         condition: service_started
-      minio:
+      backus:
         condition: service_healthy
     env_file:
       - ../network.env
@@ -186,11 +186,11 @@ services:
       - CLICKHOUSE_CLUSTER_ENABLED=false
       # Auth
       - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=http://${CONTROL_NODE_IP}:3000
+      - NEXTAUTH_URL=http://${HOPPER_IP}:3000
       - SALT=${LANGFUSE_SALT}
       - ENCRYPTION_KEY=${LANGFUSE_ENCRYPTION_KEY}
       # Redis
-      - REDIS_HOST=redis
+      - REDIS_HOST=ritchie
       - REDIS_PORT=6379
       - REDIS_AUTH=${REDIS_PASSWORD}
       # S3/MinIO (Required for event storage)
@@ -198,7 +198,7 @@ services:
       - LANGFUSE_S3_EVENT_UPLOAD_REGION=auto
       - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
       - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://backus:9000
       - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
       - LANGFUSE_S3_EVENT_UPLOAD_PREFIX=events/
       # Disable batch export and media upload for simpler setup
@@ -211,21 +211,21 @@ services:
       - swarm_net
 
   # Langfuse v3 Worker: Processes ingestion queue -> ClickHouse
-  langfuse-worker:
+  floyd-worker:
     image: langfuse/langfuse-worker:3
-    container_name: langfuse-worker
+    container_name: floyd-worker
     restart: unless-stopped
     depends_on:
-      langfuse-web:
+      floyd-web:
         condition: service_started
     environment: *langfuse-env
     networks:
       - swarm_net
 
 
-  redis:
+  ritchie:
     image: redis:7.2-alpine
-    container_name: redis_control
+    container_name: ritchie_hopper
     restart: unless-stopped
     command: >
       --requirepass ${REDIS_PASSWORD}
@@ -242,9 +242,9 @@ services:
       timeout: 10s
       retries: 10
 
-  minio:
+  backus:
     image: minio/minio:latest
-    container_name: minio
+    container_name: backus
     restart: unless-stopped
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
@@ -278,3 +278,4 @@ volumes:
   spire_data:
   clickhouse_data:
   minio_data:
+

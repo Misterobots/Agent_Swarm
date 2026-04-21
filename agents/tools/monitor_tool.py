@@ -1,4 +1,4 @@
-"""
+﻿"""
 MONITOR_TOOL — Agent-callable system monitoring tool.
 
 Wraps the cluster health infrastructure so any agent can check system
@@ -13,10 +13,14 @@ import logging
 logger = logging.getLogger("MonitorTool")
 
 # Node IPs from config
-CONTROL_NODE_IP = os.getenv("CONTROL_NODE_IP", "192.168.2.102")
-JUSTIN_PC_IP = os.getenv("JUSTIN_PC_IP", "192.168.2.101")
-R730_IP = os.getenv("R730_IP", "192.168.2.103")
-LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", f"http://{CONTROL_NODE_IP}:3000")
+HOPPER_IP = os.getenv("HOPPER_IP", os.getenv("HOPPER_IP", "192.168.2.102"))
+LOVELACE_IP    = os.getenv("LOVELACE_IP",   os.getenv("LOVELACE_IP",    "192.168.2.101"))
+TURING_IP   = os.getenv("TURING_IP",  os.getenv("TURING_IP",         "192.168.2.103"))
+# backward-compat
+HOPPER_IP = HOPPER_IP
+LOVELACE_IP    = LOVELACE_IP
+TURING_IP         = TURING_IP
+LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", f"http://{HOPPER_IP}:3000")
 
 
 def _tcp_check(host: str, port: int, timeout: float = 2.0) -> bool:
@@ -50,9 +54,9 @@ def check_control_plane() -> str:
     """
     services = [
         {"name": "Langfuse", "check": lambda: _http_check(f"{LANGFUSE_HOST}/api/public/health")},
-        {"name": "PostgreSQL", "check": lambda: _tcp_check(CONTROL_NODE_IP, 5432)},
-        {"name": "SPIRE Server", "check": lambda: _tcp_check(CONTROL_NODE_IP, 8081)},
-        {"name": "MinIO API", "check": lambda: _http_check(f"http://{CONTROL_NODE_IP}:9190/minio/health/live")},
+        {"name": "PostgreSQL", "check": lambda: _tcp_check(HOPPER_IP, 5432)},
+        {"name": "SPIRE Server", "check": lambda: _tcp_check(HOPPER_IP, 8081)},
+        {"name": "MinIO API", "check": lambda: _http_check(f"http://{HOPPER_IP}:9190/minio/health/live")},
     ]
     results = []
     for svc in services:
@@ -76,9 +80,9 @@ def check_node_connectivity() -> str:
         JSON string with node connectivity status.
     """
     nodes = [
-        {"name": "Justin-PC (Execution)", "ip": JUSTIN_PC_IP, "probe_port": 11434},
-        {"name": "Control Node", "ip": CONTROL_NODE_IP, "probe_port": 5432},
-        {"name": "R730 (Gateway)", "ip": R730_IP, "probe_port": 80},
+        {"name": "Lovelace (Execution)", "ip": LOVELACE_IP, "probe_port": 11434},
+        {"name": "Hopper (Control)", "ip": HOPPER_IP, "probe_port": 5432},
+        {"name": "Turing (Gateway)", "ip": TURING_IP, "probe_port": 80},
     ]
     results = []
     for node in nodes:
@@ -104,9 +108,9 @@ def get_system_health_report() -> str:
     # Control-plane services
     cp_services = [
         {"name": "Langfuse", "check": lambda: _http_check(f"{LANGFUSE_HOST}/api/public/health")},
-        {"name": "PostgreSQL", "check": lambda: _tcp_check(CONTROL_NODE_IP, 5432)},
-        {"name": "SPIRE Server", "check": lambda: _tcp_check(CONTROL_NODE_IP, 8081)},
-        {"name": "MinIO API", "check": lambda: _http_check(f"http://{CONTROL_NODE_IP}:9190/minio/health/live")},
+        {"name": "PostgreSQL", "check": lambda: _tcp_check(HOPPER_IP, 5432)},
+        {"name": "SPIRE Server", "check": lambda: _tcp_check(HOPPER_IP, 8081)},
+        {"name": "MinIO API", "check": lambda: _http_check(f"http://{HOPPER_IP}:9190/minio/health/live")},
     ]
     cp_results = []
     for svc in cp_services:
@@ -118,9 +122,9 @@ def get_system_health_report() -> str:
 
     # Node connectivity + container counts via Docker API
     node_defs = [
-        {"name": "Justin-PC", "role": "execution", "ip": JUSTIN_PC_IP},
-        {"name": "Control Node", "role": "control", "ip": CONTROL_NODE_IP},
-        {"name": "R730", "role": "gateway", "ip": R730_IP},
+        {"name": "Lovelace", "role": "execution", "ip": LOVELACE_IP},
+        {"name": "Hopper", "role": "control", "ip": HOPPER_IP},
+        {"name": "Turing", "role": "gateway", "ip": TURING_IP},
     ]
     node_results = []
     total_containers = 0
@@ -172,3 +176,5 @@ MONITOR_TOOLS = [
     check_node_connectivity,
     get_system_health_report,
 ]
+
+

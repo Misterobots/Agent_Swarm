@@ -1,4 +1,4 @@
-# Phase 5 Completion Report — Remote & Multi-Node
+﻿# Phase 5 Completion Report — Remote & Multi-Node
 
 **Date:** 2026-04-13  
 **Commit:** `8be0a24`  
@@ -38,7 +38,7 @@
 
 ### 1. SSH Remote Executor (`utils/remote_executor.py`)
 - **Secure SSH command execution** via `subprocess.run(["ssh", ...])` (uses system SSH agent)
-- **Host allowlist**: Only `justin-pc`, `control-plane`, `r730` can be targeted
+- **Host allowlist**: Only `lovelace`, `control-plane`, `turing` can be targeted
 - **Safety integration**: Commands validated through `bash_classifier` before remote execution
 - **Health caching**: 30-second TTL SSH connectivity checks
 - **Audit logging**: Every remote execution logged via `security.audit_logger`
@@ -46,8 +46,8 @@
 - **Config**: `SSH_DEFAULT_TIMEOUT`, `SSH_CONNECT_TIMEOUT`, `SSH_KEY_PATH`, `SSH_USER`
 
 ### 2. Bridge Mode (`utils/bridge.py`)
-- **Cross-node task submission**: `bridge.submit_task("r730", "Run nvidia-smi")`
-- **API request proxying**: `bridge.proxy_request("r730", "GET", "/v1/models")`
+- **Cross-node task submission**: `bridge.submit_task("turing", "Run nvidia-smi")`
+- **API request proxying**: `bridge.proxy_request("turing", "GET", "/v1/models")`
 - **Job tracking**: UUID-based job registry with status (submitted/running/completed/failed)
 - **Health-aware routing**: HTTP health checks on all Hive node API endpoints
 - **File transfer**: SCP-based file transfer between nodes via `transfer_file()`
@@ -162,9 +162,9 @@ All routes prerendered (static)
 │  └─ TriggerScheduler (cron + interval + once + remote)  │
 ├─────────────────────────────────────────────────────────┤
 │  Network Topology                                       │
-│  ├─ Justin-PC (192.168.2.101) — Primary, 2× 5060 Ti    │
+│  ├─ Lovelace (192.168.2.101) — Primary, 2× 5060 Ti    │
 │  ├─ Control Plane (192.168.2.102) — Services            │
-│  └─ R730 (192.168.2.103) — Gateway, RTX 3070 Ti        │
+│  └─ Turing (192.168.2.103) — Gateway, RTX 3070 Ti        │
 └─────────────────────────────────────────────────────────┘
 ```
 

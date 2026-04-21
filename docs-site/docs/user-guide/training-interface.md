@@ -71,3 +71,5 @@ After a training run, the ExpertiseTemplate registry can route a percentage of t
 - [Module: Training Pipeline](../modules/mars-loop.md) — GRPO trainer details
 - [Module: Template Registry](../modules/config.md) — A/B testing and model variants
 - [Tutorial: Train a Model](../tutorials/train-preferences.md) — step-by-step guide
+
+

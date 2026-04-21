@@ -1,4 +1,4 @@
----
+﻿---
 title: "Troubleshooting: SPIRE"
 ---
 
@@ -54,7 +54,7 @@ Check the expiry timestamp.
 **Fix**:
 
 1. Verify the server is running: `docker compose ps spire-server`
-2. Check network connectivity: `ping {{ control_node_ip }}`
+2. Check network connectivity: `ping {{ hopper_ip }}`
 3. Verify the port (8081) is accessible
 4. Check firewall rules
 
@@ -71,3 +71,5 @@ docker compose exec spire-server /opt/spire/bin/spire-server entry show
 ```
 
 Verify entries exist for each service with the correct selectors.
+
+

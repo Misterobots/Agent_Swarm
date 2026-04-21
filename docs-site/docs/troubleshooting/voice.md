@@ -1,4 +1,4 @@
----
+﻿---
 title: "Troubleshooting: Voice"
 ---
 
@@ -12,7 +12,7 @@ title: "Troubleshooting: Voice"
 
 ```bash
 # Check Whisper service
-curl http://{{ execution_node_ip }}:9000/health
+curl http://{{ lovelace_ip }}:9000/health
 docker logs whisper --tail 30
 ```
 
@@ -32,7 +32,7 @@ docker logs whisper --tail 30
 
 ```bash
 # Check Piper service
-curl http://{{ execution_node_ip }}:5500/health
+curl http://{{ lovelace_ip }}:5500/health
 docker logs piper --tail 30
 ```
 
@@ -79,3 +79,5 @@ docker logs piper --tail 30
 2. Ensure the page is served over HTTPS (or localhost)
 3. Try a different browser
 4. Check OS audio input settings
+
+

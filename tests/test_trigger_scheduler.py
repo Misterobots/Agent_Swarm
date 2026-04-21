@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for the Trigger Scheduler (Phase 5).
 """
 
@@ -64,10 +64,10 @@ class TestTrigger(unittest.TestCase):
         t = Trigger(
             trigger_id="t4", name="remote", trigger_type=TriggerType.INTERVAL,
             handler=lambda: None, interval_seconds=60,
-            remote_node="r730", remote_task="nvidia-smi",
+            remote_node="Turing", remote_task="nvidia-smi",
         )
         d = t.to_dict()
-        self.assertEqual(d["remote_node"], "r730")
+        self.assertEqual(d["remote_node"], "Turing")
         self.assertEqual(d["remote_task"], "nvidia-smi")
 
 
@@ -240,10 +240,10 @@ class TestTriggerScheduler(unittest.TestCase):
         sched = self._get_scheduler()
         tid = sched.add_interval(
             "remote-poll", lambda: None, seconds=60,
-            remote_node="r730", remote_task="nvidia-smi"
+            remote_node="Turing", remote_task="nvidia-smi"
         )
         t = sched.get(tid)
-        self.assertEqual(t["remote_node"], "r730")
+        self.assertEqual(t["remote_node"], "Turing")
 
     def test_handler_error_tracked(self):
         sched = self._get_scheduler()
@@ -267,3 +267,5 @@ class TestTriggerSingleton(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+

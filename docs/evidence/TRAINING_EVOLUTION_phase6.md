@@ -1,9 +1,9 @@
-# Training Pipeline Evolution & Validation
+﻿# Training Pipeline Evolution & Validation
 
 > **Note**: This is a historical document from Phase 6 development. Node names have been updated to current logical designations.
 
 ## Overview
-This document chronicles the successful testing, fixing, and end-to-end validation of the Home AI Lab **Phase 6 Agent Training Runtime**. The goal of Phase 6 was to establish a fully reproducible, automated loop for generating synthetic data, fine-tuning reasoning models via GRPO (Generative Reward Policy Optimization), and converting those models to run directly in the local GPU cluster.
+This document knuths the successful testing, fixing, and end-to-end validation of the Home AI Lab **Phase 6 Agent Training Runtime**. The goal of Phase 6 was to establish a fully reproducible, automated loop for generating synthetic data, fine-tuning reasoning models via GRPO (Generative Reward Policy Optimization), and converting those models to run directly in the local GPU cluster.
 
 ## Pipeline Validation Run (March 22, 2026)
 
@@ -68,7 +68,7 @@ Phase 6 is completely validated. The Hive UI can observe training metrics precis
 |--------|------|----------|
 | `agents/training/grpo_trainer.py` | Implementation | GRPO training pipeline |
 | `config/grafana/dashboards/` | Infrastructure | Training metric dashboards (PostgreSQL, cAdvisor) |
-| `r730_gateway/docker-compose.yml` | Infrastructure | cAdvisor GPU telemetry service |
+| `turing_gateway/docker-compose.yml` | Infrastructure | cAdvisor GPU telemetry service |
 
 </details>
 

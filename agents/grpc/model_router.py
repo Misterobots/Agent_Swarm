@@ -1,4 +1,4 @@
-"""
+﻿"""
 model_router.py — Intent → Model → Node routing for OpenClaude gRPC server.
 
 Pure Python module with no gRPC dependency.  Maps user prompts through
@@ -59,7 +59,7 @@ MODEL_ROLES: Dict[str, str] = {
     VISION_MODEL: "vision",
 }
 
-# Context windows (duplicated here for standalone operation on R730)
+# Context windows (duplicated here for standalone operation on Turing)
 CONTEXT_WINDOWS: Dict[str, int] = {
     "qwen2.5-coder:14b": 32768,
     "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
@@ -522,3 +522,5 @@ def get_model_router() -> ModelRouter:
     if _router_instance is None:
         _router_instance = ModelRouter()
     return _router_instance
+
+

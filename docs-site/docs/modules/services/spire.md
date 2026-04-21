@@ -1,4 +1,4 @@
----
+﻿---
 title: "Service: SPIRE"
 ---
 
@@ -10,9 +10,9 @@ Workload identity service (SPIFFE Runtime Environment).
 
 | Component | Node | Port |
 |-----------|------|------|
-| SPIRE Server | Control ({{ control_node_ip }}) | 8081 |
-| SPIRE Agent | Execution ({{ execution_node_ip }}) | Unix socket |
-| SPIRE Agent | Gateway ({{ gateway_node_ip }}) | Unix socket |
+| SPIRE Server | Control ({{ hopper_ip }}) | 8081 |
+| SPIRE Agent | Execution ({{ lovelace_ip }}) | Unix socket |
+| SPIRE Agent | Gateway ({{ turing_ip }}) | Unix socket |
 
 ## Trust Domain
 
@@ -49,3 +49,5 @@ spire-agent healthcheck
 - [Architecture: Security Model](../../architecture/security-model.md)
 - [Admin: SPIRE Configuration](../../admin-guide/configuration/spire.md)
 - [Troubleshooting: SPIRE](../../troubleshooting/spire.md)
+
+

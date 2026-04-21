@@ -1,4 +1,4 @@
-
+﻿
 import streamlit as st
 import time
 import streamlit as st
@@ -7,7 +7,7 @@ import importlib
 import uuid
 import router
 importlib.reload(router)
-from router import chat_swarm
+from church import chat_swarm
 from logger_setup import setup_logger
 
 # Setup UI Logger
@@ -591,7 +591,7 @@ def render_art_workspace():
     else:
         # Check context manager for saved art_studio_redirect
         try:
-            from context_manager import get_pending_context, clear_context
+            from brooks import get_pending_context, clear_context
             ctx = get_pending_context(session_id=st.session_state.get("session_id", "default"))
             if ctx and ctx.get("type") == "art_studio_redirect":
                 prefill_prompt = ctx.get("prompt", "")
@@ -1327,7 +1327,7 @@ def render_ide(root_dir_param, mode="coding"):
     
     # Imports
     try:
-        from router import chat_swarm
+        from church import chat_swarm
     except ImportError:
         st.error("Router unavailable")
         return
@@ -1995,3 +1995,7 @@ elif st.session_state.workspace == "Governance":
     render_governance_workspace()
 elif st.session_state.workspace == "Documents":
     render_documents_workspace()
+
+
+
+

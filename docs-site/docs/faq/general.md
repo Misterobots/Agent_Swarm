@@ -53,3 +53,5 @@ Yes, once models are downloaded. All inference, storage, and processing happen o
 - **Self-hosted** — runs on your hardware
 - **Extensible** — add custom agents, tools, and workflows
 - **IoT-connected** — controls smart home devices
+
+

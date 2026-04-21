@@ -1,4 +1,4 @@
-"""
+﻿"""
 Capability Introspection & Governance Tools
 =============================================
 
@@ -167,7 +167,7 @@ def request_tooling_access(capability: str, reason: str) -> str:
         return "Please provide a reason for the request so it can be properly assessed."
 
     try:
-        from governance import governance_manager, RequestType
+        from liskov import governance_manager, RequestType
 
         description = f"Tooling access request: {capability} — Reason: {reason}"
         request = governance_manager.submit_request(

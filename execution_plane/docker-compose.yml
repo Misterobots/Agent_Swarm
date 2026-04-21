@@ -1,8 +1,8 @@
-# JUSTIN-PC EXECUTION PLANE - PHASE 3
+﻿# LOVELACE EXECUTION PLANE - PHASE 3
 # Removed: Traefik, Prometheus, Grafana, Loki, Promtail, cAdvisor, Redis monitoring
 # Kept: Compute services (Ollama, ComfyUI, BMO Voice, OpenHands, Agent Runtime, Agent UI, Ops Portal)
-# NOTE: Services are now accessed through R730 Traefik Gateway on port 80/443
-# Routing: Justin-PC (192.168.2.101) <- R730 Traefik (192.168.2.103:80) <- Existing media stack
+# NOTE: Services are now accessed through Turing Traefik Gateway on port 80/443
+# Routing: Lovelace (192.168.2.101) <- Turing Traefik (192.168.2.103:80) <- Existing media stack
 
 services:
   # SPIRE AGENT - Workload Identity Provider
@@ -172,7 +172,7 @@ services:
       # SPIFFE Workload API socket path
       - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
       - PYTHONPATH=/app
-      # MemPalace API (R730 gateway)
+      # MemPalace API (Turing gateway)
       - MEMPALACE_API_URL=${MEMPALACE_API_URL:-http://192.168.2.103:8200}
       # Agent session storage + Template registry
       - AGNO_DB_URL=${AGNO_DB_URL}
@@ -265,7 +265,7 @@ services:
     labels:
       - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/image-training-worker"
 
-  # --- COMFYUI (Creature Forge) ---
+  # --- COMFYUI (Creature Minsky) ---
   comfyui:
     image: yanwk/comfyui-boot:cu121
     container_name: comfyui_gpu

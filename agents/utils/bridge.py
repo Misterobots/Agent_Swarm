@@ -1,4 +1,4 @@
-"""
+﻿"""
 bridge.py — Cross-Machine Agent Bridge
 
 Provides a relay layer for transparent cross-node agent operations.
@@ -16,7 +16,7 @@ Usage:
     from utils.bridge import get_bridge
 
     bridge = get_bridge()
-    result = bridge.submit_task("r730", "Run nvidia-smi and report GPU usage")
+    result = bridge.submit_task("Turing", "Run nvidia-smi and report GPU usage")
     status = bridge.get_job_status(result["job_id"])
 """
 
@@ -87,23 +87,23 @@ class Bridge:
 
     def _initialize_nodes(self):
         """Build node map from config topology."""
-        from config import EXECUTION_NODE_IP, CONTROL_NODE_IP, GATEWAY_NODE_IP
+        from config import LOVELACE_IP, HOPPER_IP, TURING_IP
 
         # Each Hive node runs the swarm API on port 8000
         api_port = os.getenv("HIVE_API_PORT", "8000")
 
         self._nodes = {
-            "justin-pc": BridgeNode(
-                name="justin-pc",
-                api_url=f"http://{EXECUTION_NODE_IP}:{api_port}",
+            "Lovelace": BridgeNode(
+                name="Lovelace",
+                api_url=f"http://{LOVELACE_IP}:{api_port}",
             ),
             "control-plane": BridgeNode(
                 name="control-plane",
-                api_url=f"http://{CONTROL_NODE_IP}:{api_port}",
+                api_url=f"http://{HOPPER_IP}:{api_port}",
             ),
-            "r730": BridgeNode(
-                name="r730",
-                api_url=f"http://{GATEWAY_NODE_IP}:{api_port}",
+            "Turing": BridgeNode(
+                name="Turing",
+                api_url=f"http://{TURING_IP}:{api_port}",
             ),
         }
 
@@ -157,7 +157,7 @@ class Bridge:
         Submit a task to a remote node's async task endpoint.
 
         Args:
-            target_node: Name of the remote node (e.g. "r730")
+            target_node: Name of the remote node (e.g. "Turing")
             task: Task description or command
             intent: Optional intent override
             timeout: HTTP request timeout
@@ -337,3 +337,5 @@ def get_bridge() -> Bridge:
     if _bridge is None:
         _bridge = Bridge()
     return _bridge
+
+

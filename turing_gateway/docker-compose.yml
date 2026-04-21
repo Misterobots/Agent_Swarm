@@ -1,13 +1,13 @@
-# R730 Gateway & Ops Hub Docker Compose
+﻿# Turing Gateway & Ops Hub Docker Compose
 # Routing handled by Saltbox's Traefik (connected to ai_lab_net externally)
-# Hosts: Monitoring (Prometheus, Loki, Grafana), Logging, Ollama, Open-WebUI
-# Compute services (Ollama, BMO Voice, ComfyUI, etc.) remain on the Execution Node
+# Hosts: Monitoring (Jacquard/Prometheus, Knuth/Loki, Hollerith/Grafana), Mccarthy/Ollama
+# Compute services (Minsky/Ollama, Wozniak/ComfyUI, etc.) remain on the Lovelace Execution Node
 
 services:
   # Docker Sidecar Probe - exposes read-only container metadata for central monitoring
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
-    container_name: docker-socket-proxy-r730
+    container_name: docker-socket-proxy-turing
     restart: unless-stopped
     environment:
       - CONTAINERS=1
@@ -33,10 +33,10 @@ services:
   # WORKLOAD IDENTITY (SPIRE Agent)
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  spire-agent-r730:
+  diffie-agent:
     image: ghcr.io/spiffe/spire-agent:1.10.1
-    container_name: spire-agent-r730
-    hostname: spire-agent-r730
+    container_name: diffie-agent-turing
+    hostname: diffie-agent-turing
     restart: unless-stopped
     volumes:
       - ./config/spire:/etc/spire/agent
@@ -58,10 +58,10 @@ services:
   # METRICS & OBSERVABILITY
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  prometheus:
+  jacquard:
     image: prom/prometheus:latest
-    container_name: prometheus-r730
-    hostname: prometheus-r730
+    container_name: jacquard-turing
+    hostname: jacquard-turing
     restart: unless-stopped
     volumes:
       - ./config/prometheus:/etc/prometheus
@@ -74,8 +74,8 @@ services:
       - '--storage.tsdb.retention.time=90d'  # Keep 3 months of metrics
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
-      - "${CONTROL_NODE_HOST:-control-node}:${CONTROL_NODE_IP:-192.168.2.102}"
+      - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
+      - "${HOPPER_HOST:-control-node}:${HOPPER_IP:-192.168.2.102}"
     networks:
       - ai_lab_net
     labels:
@@ -86,8 +86,8 @@ services:
 
   alertmanager:
     image: prom/alertmanager:latest
-    container_name: alertmanager-r730
-    hostname: alertmanager-r730
+    container_name: alertmanager-turing
+    hostname: alertmanager-turing
     restart: unless-stopped
     volumes:
       - ./config/alertmanager:/etc/alertmanager
@@ -116,8 +116,8 @@ services:
 
   blackbox-exporter:
     image: prom/blackbox-exporter:latest
-    container_name: blackbox-exporter-r730
-    hostname: blackbox-exporter-r730
+    container_name: blackbox-exporter-turing
+    hostname: blackbox-exporter-turing
     restart: unless-stopped
     volumes:
       - ./config/blackbox:/etc/blackbox_exporter:ro
@@ -127,15 +127,15 @@ services:
       - '--config.file=/etc/blackbox_exporter/blackbox.yml'
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
-      - "${CONTROL_NODE_HOST:-control-node}:${CONTROL_NODE_IP:-192.168.2.102}"
+      - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
+      - "${HOPPER_HOST:-control-node}:${HOPPER_IP:-192.168.2.102}"
     networks:
       - ai_lab_net
 
-  loki:
+  knuth:
     image: grafana/loki:latest
-    container_name: loki-r730
-    hostname: loki-r730
+    container_name: knuth-turing
+    hostname: knuth-turing
     restart: unless-stopped
     ports:
       - "3100:3100"
@@ -153,8 +153,8 @@ services:
 
   promtail:
     image: grafana/promtail:latest
-    container_name: promtail-r730
-    hostname: promtail-r730
+    container_name: promtail-turing
+    hostname: promtail-turing
     restart: unless-stopped
     volumes:
       - ./config/promtail:/etc/promtail
@@ -166,8 +166,8 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor-r730
-    hostname: cadvisor-r730
+    container_name: cadvisor-turing
+    hostname: cadvisor-turing
     restart: unless-stopped
     command:
       - --housekeeping_interval=30s      # Reduce collection frequency (default 1s)
@@ -191,10 +191,10 @@ services:
       - "traefik.http.routers.cadvisor.entrypoints=web"
       - "traefik.http.services.cadvisor.loadbalancer.server.port=8080"
 
-  grafana:
+  hollerith:
     image: grafana/grafana:latest
-    container_name: grafana-r730
-    hostname: grafana-r730
+    container_name: hollerith-turing
+    hostname: hollerith-turing
     restart: unless-stopped
     ports:
       - "3001:3000"  # Port 3001 to avoid conflict with Langfuse @ 3000 and Open-WebUI
@@ -216,8 +216,8 @@ services:
       - ./provisioning:/etc/grafana/provisioning:ro
       - ./dashboards:/etc/grafana/dashboards:ro
     depends_on:
-      - prometheus
-      - loki
+      - jacquard
+      - knuth
       - alertmanager
     networks:
       - ai_lab_net
@@ -247,10 +247,10 @@ services:
   # TASK QUEUE & PERSISTENCE
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  redis:
+  ritchie:
     image: redis:7.2-alpine
-    container_name: redis-r730
-    hostname: redis-r730
+    container_name: ritchie-turing
+    hostname: ritchie-turing
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -268,17 +268,17 @@ services:
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # INFERENCE SERVICES (Dedicated safety + embeddings only after TTFT optimization)
-  # All primary task models now consolidated on Justin-PC (qwen3:14b).
-  # R730 handles only: llama-guard-3:8b (async safety), nomic-embed (embeddings).
+  # All primary task models now consolidated on Lovelace (qwen3:14b).
+  # Turing handles only: llama-guard-3:8b (async safety), nomic-embed (embeddings).
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  ollama:
+  mccarthy:
     image: ollama/ollama:latest
-    container_name: ollama-r730
-    hostname: ollama-r730
+    container_name: mccarthy-turing
+    hostname: mccarthy-turing
     restart: always
     depends_on:
-      spire-agent-r730:
+      diffie-agent:
         condition: service_started
     deploy:
       resources:
@@ -306,18 +306,18 @@ services:
       - "traefik.http.routers.ollama.rule=PathPrefix(`/ollama`)"
       - "traefik.http.routers.ollama.entrypoints=web"
       - "traefik.http.services.ollama.loadbalancer.server.port=11434"
-      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/ollama-r730"
+      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/mccarthy-turing"
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui-r730
+    container_name: open-webui-turing
     hostname: open-webui
     restart: unless-stopped
     depends_on:
       - ollama
     environment:
       # Point to local Ollama
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=http://mccarthy:11434
       # Disable default OpenAI integration
       - OPENAI_API_BASE_URL=
       - OPENAI_API_KEY=
@@ -357,17 +357,17 @@ services:
     env_file:
       - ../network.env
     environment:
-      - API_BASE_URL=http://${EXECUTION_NODE_HOST:-execution-node}:8008
+      - API_BASE_URL=http://${LOVELACE_HOST:-lovelace}:8008
       - MEMPALACE_BASE_URL=http://mempalace:8200
-      - LANGFUSE_URL=http://${CONTROL_NODE_IP:-192.168.2.102}:3000
+      - LANGFUSE_URL=http://${HOPPER_IP:-192.168.2.102}:3000
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
-      - CONTROL_NODE_IP=${CONTROL_NODE_IP:-192.168.2.102}
-      - NEXT_PUBLIC_GATEWAY_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}
-      - NEXT_PUBLIC_GRAFANA_URL=http://${GATEWAY_NODE_IP:-192.168.2.103}/grafana
-      - GRAFANA_INTERNAL_URL=http://grafana-r730:3000/grafana
+      - HOPPER_IP=${HOPPER_IP:-192.168.2.102}
+      - NEXT_PUBLIC_GATEWAY_URL=http://${TURING_IP:-192.168.2.103}
+      - NEXT_PUBLIC_GRAFANA_URL=http://${TURING_IP:-192.168.2.103}/grafana
+      - GRAFANA_INTERNAL_URL=http://hollerith-turing:3000/grafana
     extra_hosts:
-      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
+      - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
     volumes:
       - ../docs:/app/docs:ro
     ports:
@@ -416,7 +416,7 @@ services:
       - "traefik.http.routers.terminal-ws.priority=30"
       - "traefik.http.routers.terminal-ws.service=terminal-ws"
       - "traefik.http.routers.terminal-ws.middlewares=authentik@docker"
-      - "traefik.http.services.terminal-ws.loadbalancer.server.url=http://${EXECUTION_NODE_HOST:-execution-node}:8008"
+      - "traefik.http.services.terminal-ws.loadbalancer.server.url=http://${LOVELACE_HOST:-lovelace}:8008"
       - "traefik.http.routers.terminal-ws-ext.rule=Host(`hive.shivelymedia.com`) && PathPrefix(`/ws/terminal`)"
       - "traefik.http.routers.terminal-ws-ext.entrypoints=websecure"
       - "traefik.http.routers.terminal-ws-ext.priority=30"
@@ -440,7 +440,7 @@ services:
       - ../network.env
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - SECONDARY_OLLAMA_HOST=http://${EXECUTION_NODE_IP:-192.168.2.101}:11434
+      - SECONDARY_OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
       - ROUTER_MODEL=${ROUTER_MODEL:-nemotron-mini}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen2.5-coder:14b-instruct-q4_k_m}
       - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
@@ -456,7 +456,7 @@ services:
         condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "${EXECUTION_NODE_HOST:-execution-node}:${EXECUTION_NODE_IP:-192.168.2.101}"
+      - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
     healthcheck:
       test: ["CMD", "python", "-c", "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=3)"]
       interval: 30s
@@ -491,7 +491,7 @@ services:
   # ═══════════════════════════════════════════════════════════════════════════════
 
   # ═══════════════════════════════════════════════════════════════════════════════
-  # DEVELOPMENT TOOLS (migrated from Justin-PC, Phase 8)
+  # DEVELOPMENT TOOLS (migrated from Lovelace, Phase 8)
   # ═══════════════════════════════════════════════════════════════════════════════
 
   # OPENHANDS - AI Development Agent (v1.5)
@@ -539,7 +539,7 @@ services:
       - vscode_config_devops:/config
       - ../execution_plane/init_ide:/custom-cont-init.d:ro
     ports:
-      - "8445:8443"  # 8443 used by Saltbox/Traefik on R730
+      - "8445:8443"  # 8443 used by Saltbox/Traefik on Turing
     networks:
       - ai_lab_net
     labels:
@@ -581,7 +581,7 @@ services:
       - "traefik.http.services.ide-coding.loadbalancer.server.port=8443"
 
   # ═══════════════════════════════════════════════════════════════════════════════
-  # OPS PORTAL — Admin Dashboard (migrated from Justin-PC, Phase 8)
+  # OPS PORTAL — Admin Dashboard (migrated from Lovelace, Phase 8)
   # ═══════════════════════════════════════════════════════════════════════════════
 
   ops-portal:
@@ -623,7 +623,7 @@ services:
 
   ntfy:
     image: binwiederhier/ntfy:latest
-    container_name: ntfy-r730
+    container_name: ntfy-Turing
     hostname: ntfy
     restart: unless-stopped
     init: true
@@ -732,8 +732,11 @@ volumes:
   # Authentik volumes removed — now managed by Saltbox (Phase 8B)
   openhands_data:
     driver: local
-  # Code Servers (migrated from Justin-PC)
+  # Code Servers (migrated from Lovelace)
   vscode_config_devops:
     driver: local
   vscode_config_coding:
     driver: local
+
+
+

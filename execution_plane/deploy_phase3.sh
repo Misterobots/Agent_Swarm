@@ -1,13 +1,13 @@
-#!/bin/bash
-# Phase 3 Cleanup - Remove monitoring services from Justin-PC compose
-# Run this on Justin-PC (misterobots@192.168.2.101) locally
+﻿#!/bin/bash
+# Phase 3 Cleanup - Remove monitoring services from Lovelace compose
+# Run this on Lovelace (misterobots@192.168.2.101) locally
 
 set -e
 
 COMPOSE_FILE="docker-compose.yml"
 cd ~/execution_plane
 
-echo "🔄 Phase 3: Removing Monitoring Services from Justin-PC"
+echo "🔄 Phase 3: Removing Monitoring Services from Lovelace"
 echo "========================================================"
 
 # Step 1: Backup
@@ -116,4 +116,5 @@ echo ""
 echo "✅ Phase 3 Deployment Complete!"
 echo ""
 echo "Freed storage: ~60-75GB (monitoring data)"
-echo "Justin-PC now COMPUTE ONLY - Monitoring on R730 Gateway (192.168.2.103)"
+echo "Lovelace now COMPUTE ONLY - Monitoring on Turing Gateway (192.168.2.103)"
+

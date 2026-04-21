@@ -1,4 +1,4 @@
----
+﻿---
 title: "FAQ: Troubleshooting"
 ---
 
@@ -9,20 +9,20 @@ Quick answers to common issues. For detailed guides, see the [Troubleshooting](.
 ## The chat doesn't respond
 
 1. Check if the Agent Runtime is running: `docker ps | grep agent-runtime`
-2. Check if Ollama is healthy: `curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags`
+2. Check if Ollama is healthy: `curl http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags`
 3. Check logs: `docker logs agent-runtime --tail 50`
 
 ## Image generation fails
 
-1. Verify ComfyUI is running: `curl http://{{ execution_node_ip }}:8188/system_stats`
+1. Verify ComfyUI is running: `curl http://{{ lovelace_ip }}:8188/system_stats`
 2. Check GPU memory: `docker exec ollama nvidia-smi`
 3. Ollama may need to unload models to free VRAM
 
 ## Voice doesn't work
 
 1. Check microphone permissions in the browser
-2. Verify Whisper: `curl http://{{ execution_node_ip }}:9000/health`
-3. Verify Piper: `curl http://{{ execution_node_ip }}:5500/health`
+2. Verify Whisper: `curl http://{{ lovelace_ip }}:9000/health`
+3. Verify Piper: `curl http://{{ lovelace_ip }}:5500/health`
 
 ## IoT commands don't work
 
@@ -43,18 +43,20 @@ See [Performance Tuning](../procedures/performance-tuning.md). Quick checks:
 
 - GPU VRAM usage: `nvidia-smi`
 - Too many models loaded: reduce `OLLAMA_MAX_LOADED_MODELS`
-- Network latency: `ping {{ execution_node_ip }}`
+- Network latency: `ping {{ lovelace_ip }}`
 
 ## How do I check if all services are running?
 
 ```bash
 docker compose ps                # On each node
-curl http://{{ gateway_node_ip }}/health   # Gateway health check
+curl http://{{ turing_ip }}/health   # Gateway health check
 ```
 
 ## Where are the logs?
 
 - **Docker logs**: `docker logs <container-name> --tail 100`
-- **Grafana/Loki**: `http://{{ gateway_node_ip }}:3001`
-- **Langfuse traces**: `http://{{ control_node_ip }}:3000`
+- **hollerith/knuth**: `http://{{ turing_ip }}:3001`
+- **Langfuse traces**: `http://{{ hopper_ip }}:3000`
 - **Local log files**: `logs/` directory
+
+

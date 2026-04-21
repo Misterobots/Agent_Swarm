@@ -109,3 +109,5 @@ Type in the search bar to filter memories across the entire Palace. Matching dra
 Post-processing pipeline: Bloom → N8AO ambient occlusion → Vignette → ACES filmic tone mapping.
 
 Adaptive device pixel ratio: `[1, 1.5]` for performance on lower-end GPUs.
+
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 tests/test_coordinator_memory.py
 
 Unit tests for the coordinator's MemPalace team memory integration.
@@ -34,7 +34,7 @@ mock_gpu_queue.get_best_host_for_model.return_value = "http://localhost:11434"
 mock_config = MagicMock()
 mock_config.AGNO_DB_URL = "sqlite:///test.db"
 mock_config.ARCHITECT_MODEL = "test-model"
-mock_config.CONTROL_NODE_IP = "127.0.0.1"
+mock_config.HOPPER_IP = "127.0.0.1"
 
 # Install mocks before importing coordinator
 for mod_name, mock_obj in {
@@ -186,3 +186,4 @@ class TestCoordinatorMemoryPattern:
         long_result = "x" * 5000
         truncated = long_result[:2000]
         assert len(truncated) == 2000
+

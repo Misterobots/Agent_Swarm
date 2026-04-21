@@ -67,3 +67,5 @@ Preferences are stored in three domains:
 - [Module: Memory](../modules/memory.md) — memory system internals
 - [Module: Preferences](../modules/memory.md) — user preference storage
 - [Grounding](grounding.md) — web and document grounding toggles
+
+

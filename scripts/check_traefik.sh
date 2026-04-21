@@ -20,3 +20,4 @@ echo ""
 echo "---"
 # Check insecure API on the internal entrypoint with the right path
 docker exec traefik wget -qO- http://127.0.0.1:8080/dashboard/ 2>&1 | head -c 200
+

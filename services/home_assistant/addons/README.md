@@ -1,6 +1,6 @@
-# Home Assistant Add-ons
+﻿# Home Assistant Add-ons
 
-Native Home Assistant add-on scaffolds that should be installed on the Home Assistant box rather than on Hive or the R730.
+Native Home Assistant add-on scaffolds that should be installed on the Home Assistant box rather than on Hive or the Turing.
 
 ## Add-ons
 

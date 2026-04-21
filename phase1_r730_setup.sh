@@ -1,33 +1,33 @@
-#!/bin/bash
-# R730 PHASE 1 SETUP - Run these commands on R730 (ubuntu@192.168.2.103)
+﻿#!/bin/bash
+# Turing PHASE 1 SETUP - Run these commands on Turing (ubuntu@192.168.2.103)
 
 set -e
 
-echo "=== PHASE 1: Deploy R730 Gateway Stack ==="
+echo "=== PHASE 1: Deploy Turing Gateway Stack ==="
 echo ""
 
 # Step 3: Create config directories
-echo "[Step 3] Creating config directories on R730..."
-mkdir -p ~/r730_gateway/config/{prometheus,loki,promtail,grafana}
+echo "[Step 3] Creating config directories on Turing..."
+mkdir -p ~/turing_gateway/config/{prometheus,loki,promtail,grafana}
 echo "✓ Directories created"
 echo ""
 
-# Step 4: Copy Prometheus config from Justin-PC
-echo "[Step 4] Copying Prometheus config from Justin-PC..."
-scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/prometheus ~/r730_gateway/config/
+# Step 4: Copy Prometheus config from Lovelace
+echo "[Step 4] Copying Prometheus config from Lovelace..."
+scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/prometheus ~/turing_gateway/config/
 echo "✓ Prometheus config copied"
 echo ""
 
-# Step 4a: Update Prometheus targets to point to Justin-PC
-echo "[Step 4a] Updating Prometheus targets to scrape Justin-PC..."
-sed -i 's/localhost/192.168.2.101/g' ~/r730_gateway/config/prometheus/prometheus.yml
+# Step 4a: Update Prometheus targets to point to Lovelace
+echo "[Step 4a] Updating Prometheus targets to scrape Lovelace..."
+sed -i 's/localhost/192.168.2.101/g' ~/turing_gateway/config/prometheus/prometheus.yml
 echo "✓ Prometheus targets updated to 192.168.2.101"
-grep -A2 "targets:" ~/r730_gateway/config/prometheus/prometheus.yml | head -6
+grep -A2 "targets:" ~/turing_gateway/config/prometheus/prometheus.yml | head -6
 echo ""
 
-# Step 4b: Add cAdvisor target for Justin-PC
-echo "[Step 4b] Adding cAdvisor target for Justin-PC..."
-cat >> ~/r730_gateway/config/prometheus/prometheus.yml << 'EOF'
+# Step 4b: Add cAdvisor target for Lovelace
+echo "[Step 4b] Adding cAdvisor target for Lovelace..."
+cat >> ~/turing_gateway/config/prometheus/prometheus.yml << 'EOF'
 
   - job_name: 'cadvisor-justin'
     static_configs:
@@ -38,22 +38,22 @@ echo ""
 
 # Step 5: Copy Loki & Promtail configs
 echo "[Step 5] Copying Loki and Promtail configs..."
-scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/loki ~/r730_gateway/config/
-scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/promtail ~/r730_gateway/config/
+scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/loki ~/turing_gateway/config/
+scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/promtail ~/turing_gateway/config/
 echo "✓ Loki and Promtail configs copied"
-ls -la ~/r730_gateway/config/
+ls -la ~/turing_gateway/config/
 echo ""
 
 # Step 6: Copy new compose file
-echo "[Step 6] Copying docker-compose file to R730..."
+echo "[Step 6] Copying docker-compose file to Turing..."
 # Note: This assumes the file already exists. If not, you'll need to copy it manually.
-# scp ~/docker-compose-new.yml ubuntu@192.168.2.103:~/r730_gateway/docker-compose.yml
+# scp ~/docker-compose-new.yml ubuntu@192.168.2.103:~/turing_gateway/docker-compose.yml
 echo "✓ (Assuming docker-compose.yml already exists or will be provided)"
 echo ""
 
-# Step 7: Deploy to R730
-echo "[Step 7] Starting Docker Compose services on R730..."
-cd ~/r730_gateway
+# Step 7: Deploy to Turing
+echo "[Step 7] Starting Docker Compose services on Turing..."
+cd ~/turing_gateway
 
 # Pull latest images
 echo "  - Pulling Docker images..."
@@ -87,3 +87,4 @@ echo "Next steps:"
 echo "1. Wait 2-3 minutes for all services to be healthy"
 echo "2. Run Phase 2 validation commands"
 echo "3. Monitor logs: docker compose logs -f --tail=50"
+

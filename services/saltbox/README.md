@@ -1,6 +1,6 @@
-# Saltbox Custom Containers
+﻿# Saltbox Custom Containers
 
-Custom services deployed on the R730 following the [Saltbox Traefik Template](https://docs.saltbox.dev/reference/modules/traefik_template/) pattern.
+Custom services deployed on the Turing following the [Saltbox Traefik Template](https://docs.saltbox.dev/reference/modules/traefik_template/) pattern.
 
 ## Services
 
@@ -11,7 +11,7 @@ Custom services deployed on the R730 following the [Saltbox Traefik Template](ht
 
 ## Deployment
 
-Each service is deployed independently under `/opt/<appname>/` on the R730:
+Each service is deployed independently under `/opt/<appname>/` on the Turing:
 
 ```bash
 # Seafile

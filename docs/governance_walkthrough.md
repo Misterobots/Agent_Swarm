@@ -1,4 +1,4 @@
-# Governance Walkthrough: Agentic Hive
+﻿# Governance Walkthrough: Agentic Hive
 
 **Version**: 3.0 (MarsRL + SPIFFE + 3-Node Topology)
 **Date**: 2026-02-22
@@ -55,13 +55,13 @@ The most significant governance improvement in v3.0 is the **MarsRL LogicVerifie
 
 ## 3. SPIFFE / SPIRE Zero-Trust
 
-All workloads on Justin-PC hold a **short-lived X.509 SVID** issued by the SPIRE server on the Dell Wyse. These certificates:
+All workloads on Lovelace hold a **short-lived X.509 SVID** issued by the SPIRE server on the Dell Wyse. These certificates:
 
 - Rotate automatically (no long-lived secrets)
 - Are tied to the specific Docker workload (image SHA + labels)
 - Enable mutual TLS (mTLS) between authenticated services
 
-**Current status**: Justin-PC fully enrolled. Dell R730 pending enrollment.
+**Current status**: Lovelace fully enrolled. Dell Turing pending enrollment.
 
 ---
 

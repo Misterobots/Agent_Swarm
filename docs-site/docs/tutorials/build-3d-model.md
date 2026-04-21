@@ -70,3 +70,5 @@ This uses a specialized workflow optimized for character models with proper prop
 
 - [User Guide: 3D Generation](../user-guide/3d-generation.md) — full reference
 - [Modules: 3D Pipeline](../modules/3d-pipeline.md) — technical details
+
+

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 TTFT (Time-to-First-Token) Benchmark Script
 =============================================
@@ -7,7 +7,7 @@ Run before/after optimization to quantify improvements.
 
 Usage:
     python scripts/benchmark_ttft.py                      # defaults to local Ollama
-    python scripts/benchmark_ttft.py --host 192.168.2.103 # test R730
+    python scripts/benchmark_ttft.py --host 192.168.2.103 # test Turing
     python scripts/benchmark_ttft.py --rounds 20          # more samples
 """
 
@@ -28,7 +28,7 @@ PROMPTS = [
     "What's the weather like today?",
     "Explain how SPIRE attestation works",
     # Medium-length queries
-    "I need to deploy a new Docker container on the R730 server with GPU passthrough enabled. Can you walk me through the steps?",
+    "I need to deploy a new Docker container on the Turing server with GPU passthrough enabled. Can you walk me through the steps?",
     "Create a REST API endpoint that accepts JSON payloads and stores them in PostgreSQL with proper validation",
 ]
 
@@ -136,3 +136,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

@@ -1,4 +1,4 @@
----
+﻿---
 title: "Procedure: Onboard User"
 ---
 
@@ -12,7 +12,7 @@ Set up a new user with access to Agent Swarm.
 
 Give the user the Hive UI URL:
 
-- **LAN**: `http://{{ gateway_node_ip }}/`
+- **LAN**: `http://{{ turing_ip }}/`
 - **Remote**: Share Tailscale URL
 
 ### 2. Create Owner ID
@@ -44,3 +44,5 @@ These are stored in Skills Memory under their `owner_id`.
 ### 5. Verify Access
 
 Have the user send a test message through the Hive UI to confirm end-to-end functionality.
+
+

@@ -1,4 +1,4 @@
----
+﻿---
 title: Backup & Restore
 ---
 
@@ -17,11 +17,11 @@ Strategies for backing up and recovering Agent Swarm data.
 | Training Data | Execution Node volume | tar/rsync | Weekly |
 | Docker Compose files | Git repository | `git push` | On change |
 | Config files | Git repository | `git push` | On change |
-| Grafana dashboards | Gateway Node | API export | On change |
+| hollerith dashboards | Gateway Node | API export | On change |
 
 !!! warning "Not Backed Up"
     - Ollama model cache (re-pullable)
-    - Prometheus TSDB (retention-based, ephemeral)
+    - jacquard TSDB (retention-based, ephemeral)
     - Container images (re-pullable from registry)
 
 ## PostgreSQL Backup
@@ -73,12 +73,12 @@ BACKUP_DIR="/backups/$(date +%Y%m%d)"
 mkdir -p "$BACKUP_DIR"
 
 echo "Backing up PostgreSQL..."
-ssh user@{{ control_node_ip }} \
+ssh user@{{ hopper_ip }} \
     "docker compose -f /opt/Agent_Swarm/control_plane/docker-compose.yml exec -T postgres pg_dump -U postgres -Fc" \
     > "$BACKUP_DIR/postgres.dump"
 
 echo "Backing up workspace volumes..."
-ssh user@{{ execution_node_ip }} \
+ssh user@{{ lovelace_ip }} \
     "docker compose -f /opt/Agent_Swarm/execution_plane/docker-compose.yml exec -T agent-runtime tar czf - /workspace" \
     > "$BACKUP_DIR/workspace.tar.gz"
 
@@ -115,3 +115,5 @@ docker compose exec agent-runtime tar xzf /tmp/memory-backup.tar.gz -C /
 
 - [Procedures: Disaster Recovery](../../procedures/disaster-recovery.md) — full recovery runbook
 - [Architecture: Memory System](../../architecture/memory-system.md) — what's stored where
+
+

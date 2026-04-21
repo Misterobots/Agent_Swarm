@@ -31,3 +31,5 @@ Dangerous patterns are intercepted:
 ## Allowed Intents
 
 `CODE`, `DEVOPS`, `COORDINATE`
+
+

@@ -126,3 +126,5 @@ Queue concurrency limits prevent GPU memory exhaustion.
 - [Architecture: Agent System](agent-system.md) — agent roles and routing
 - [Module: Router](../modules/router.md) — semantic routing internals
 - [Module: Dispatcher](../modules/dispatcher.md) — event bus details
+
+

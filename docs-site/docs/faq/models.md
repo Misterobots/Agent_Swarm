@@ -1,4 +1,4 @@
----
+﻿---
 title: "FAQ: Models"
 ---
 
@@ -51,7 +51,7 @@ Not out of the box. The system is designed for local Ollama models. However, bec
 ## How do I check which models are loaded?
 
 ```bash
-curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags | python -m json.tool
+curl http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags | python -m json.tool
 ```
 
 ## Why is inference slow?
@@ -62,3 +62,5 @@ See [Performance Tuning](../procedures/performance-tuning.md). Common causes:
 - Large context windows
 - Flash Attention disabled
 - Thermal throttling
+
+

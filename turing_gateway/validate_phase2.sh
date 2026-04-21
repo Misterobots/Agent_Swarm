@@ -1,13 +1,13 @@
-#!/bin/bash
-# Phase 2 Validation Script - Run on R730
+﻿#!/bin/bash
+# Phase 2 Validation Script - Run on Turing
 
-echo "🔍 Phase 2: Validating R730 Monitoring Stack"
+echo "🔍 Phase 2: Validating Turing Monitoring Stack"
 echo "=================================================="
 echo ""
 
 # 1. Check all containers are running
 echo "1️⃣  Container Status:"
-docker compose -f ~/r730_gateway/docker-compose-monitoring-fixed.yml ps
+docker compose -f ~/turing_gateway/docker-compose-monitoring-fixed.yml ps
 echo ""
 
 # 2. Check Prometheus targets
@@ -22,7 +22,7 @@ echo ""
 
 # 4. Check Promtail logs
 echo "4️⃣  Promtail Status:"
-docker logs promtail-r730 --tail=5 | grep -E "Starting|Connected|Error" || echo "   (Checking logs...)"
+docker logs promtail-Turing --tail=5 | grep -E "Starting|Connected|Error" || echo "   (Checking logs...)"
 echo ""
 
 # 5. Check cAdvisor metrics
@@ -41,3 +41,4 @@ docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsa
 echo ""
 
 echo "✅ Phase 2 Validation Complete!"
+

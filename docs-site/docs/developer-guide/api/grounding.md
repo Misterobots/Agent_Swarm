@@ -181,3 +181,5 @@ Permissions are stored at `/workspace/grounding_permissions.json` on the control
 - [Chat Completions API](chat-completions.md) — full chat request schema
 - [Governance API](governance.md) — approve/reject pending grounding requests
 - [User Guide: Grounding](../../user-guide/grounding.md) — end-user walkthrough
+
+

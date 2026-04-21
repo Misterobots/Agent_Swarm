@@ -1,4 +1,4 @@
-# Phase 1: Coordinator Mode — Completion Report
+﻿# Phase 1: Coordinator Mode — Completion Report
 
 **Date:** 2026-04-13
 **Tag:** `phase-1-complete`
@@ -61,9 +61,9 @@ Simple CONVERSATION intent tested — routes correctly, no regression.
 
 | Model | Role | Host |
 |-------|------|------|
-| nemotron-mini | Intent classification | R730 (192.168.2.103) |
-| qwen3:14b | Decomposition + Synthesis | Justin-PC (ollama_gpu) |
-| qwen2.5-coder:14b-instruct-q4_k_m | Research + Implementation + Verification workers | Justin-PC (ollama_gpu) |
+| nemotron-mini | Intent classification | Turing (192.168.2.103) |
+| qwen3:14b | Decomposition + Synthesis | Lovelace (ollama_gpu) |
+| qwen2.5-coder:14b-instruct-q4_k_m | Research + Implementation + Verification workers | Lovelace (ollama_gpu) |
 
 ## Bugs Fixed
 

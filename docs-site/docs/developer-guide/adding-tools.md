@@ -120,3 +120,5 @@ def test_my_tool_default_param():
 
 - [Developer: Adding Agents](adding-agents.md) — create agents that use tools
 - [Architecture: Security Model](../architecture/security-model.md) — capability gating
+
+

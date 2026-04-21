@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for the SSH Remote Executor (Phase 5).
 """
 
@@ -18,7 +18,7 @@ class TestExecutionResult(unittest.TestCase):
     def _make_result(self, **kwargs):
         from utils.remote_executor import ExecutionResult
         defaults = {
-            "host": "r730",
+            "host": "Turing",
             "command": "echo hello",
             "stdout": "hello\n",
             "stderr": "",
@@ -43,7 +43,7 @@ class TestExecutionResult(unittest.TestCase):
     def test_to_dict(self):
         r = self._make_result()
         d = r.to_dict()
-        self.assertEqual(d["host"], "r730")
+        self.assertEqual(d["host"], "Turing")
         self.assertEqual(d["command"], "echo hello")
         self.assertEqual(d["exit_code"], 0)
         self.assertIn("duration_ms", d)
@@ -52,7 +52,7 @@ class TestExecutionResult(unittest.TestCase):
         r = self._make_result(exit_code=0)
         s = str(r)
         self.assertIn("OK", s)
-        self.assertIn("r730", s)
+        self.assertIn("Turing", s)
 
     def test_str_fail(self):
         r = self._make_result(exit_code=127)
@@ -83,15 +83,15 @@ class TestRemoteExecutor(unittest.TestCase):
         hosts = executor.list_hosts()
         self.assertTrue(len(hosts) >= 3)
         names = [h["name"] for h in hosts]
-        self.assertIn("justin-pc", names)
+        self.assertIn("Lovelace", names)
         self.assertIn("control-plane", names)
-        self.assertIn("r730", names)
+        self.assertIn("Turing", names)
 
     def test_get_host_known(self):
         executor = self._get_executor()
-        host = executor.get_host("r730")
+        host = executor.get_host("Turing")
         self.assertIsNotNone(host)
-        self.assertEqual(host.name, "r730")
+        self.assertEqual(host.name, "Turing")
 
     def test_get_host_unknown(self):
         executor = self._get_executor()
@@ -108,7 +108,7 @@ class TestRemoteExecutor(unittest.TestCase):
         executor = self._get_executor()
         # rm -rf / is in the security_policy.json blocklist
         with patch("utils.remote_executor.RemoteExecutor._check_command_safety", return_value=(True, "Blocked by policy")):
-            result = executor.execute("r730", "rm -rf /")
+            result = executor.execute("Turing", "rm -rf /")
             self.assertFalse(result.success)
             self.assertIn("blocked", result.stderr.lower())
 
@@ -121,7 +121,7 @@ class TestRemoteExecutor(unittest.TestCase):
             returncode=0,
         )
         executor = self._get_executor()
-        result = executor.execute("r730", "nvidia-smi", check_safety=False)
+        result = executor.execute("Turing", "nvidia-smi", check_safety=False)
         self.assertTrue(result.success)
         self.assertIn("GPU", result.stdout)
         mock_run.assert_called_once()
@@ -132,7 +132,7 @@ class TestRemoteExecutor(unittest.TestCase):
         import subprocess
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="ssh", timeout=5)
         executor = self._get_executor()
-        result = executor.execute("r730", "sleep 999", timeout=5, check_safety=False)
+        result = executor.execute("Turing", "sleep 999", timeout=5, check_safety=False)
         self.assertTrue(result.timed_out)
         self.assertFalse(result.success)
 
@@ -144,7 +144,7 @@ class TestRemoteExecutor(unittest.TestCase):
             returncode=127,
         )
         executor = self._get_executor()
-        result = executor.execute("r730", "nonexistent_cmd", check_safety=False)
+        result = executor.execute("Turing", "nonexistent_cmd", check_safety=False)
         self.assertFalse(result.success)
         self.assertEqual(result.exit_code, 127)
 
@@ -180,3 +180,5 @@ class TestRemoteExecutorSingleton(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+

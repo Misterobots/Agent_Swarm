@@ -1,4 +1,4 @@
----
+﻿---
 title: "Module: Image Agent"
 ---
 
@@ -27,7 +27,7 @@ ComfyUI pipeline orchestration for 2D image generation.
 1. User message classified as `IMAGE` intent
 2. Image Agent extracts generation parameters from user prompt
 3. Selects appropriate workflow/pipeline
-4. Submits workflow to ComfyUI API (`http://{{ execution_node_ip }}:8188`)
+4. Submits workflow to ComfyUI API (`http://{{ lovelace_ip }}:8188`)
 5. Polls for completion
 6. Saves output to `delivered_artifacts/images/`
 7. Returns image path and metadata
@@ -58,3 +58,5 @@ rules = memory.get_relevant_rules(prompt, "visual_rules")
 - [User Guide: Art Studio](../user-guide/art-studio.md)
 - [Developer: ComfyUI Workflows](../developer-guide/comfyui-workflows.md)
 - [Module: ComfyUI Service](services/comfyui.md)
+
+

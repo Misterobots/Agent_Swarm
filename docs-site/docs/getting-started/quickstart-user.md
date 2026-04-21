@@ -1,4 +1,4 @@
----
+﻿---
 title: "Quickstart: Users"
 ---
 
@@ -16,7 +16,7 @@ This guide gets you from zero to chatting with the Hive in under five minutes.
 Navigate to the Hive Mind interface:
 
 ```
-http://{{ gateway_node_ip }}
+http://{{ turing_ip }}
 ```
 
 You'll see the main dashboard with a sidebar listing available workspaces.
@@ -89,13 +89,15 @@ Click **Monitor** in the sidebar to see:
 
 | Interface | URL | Purpose |
 |-----------|-----|---------|
-| Hive Mind UI | `http://{{ gateway_node_ip }}` | Primary interface |
-| Grafana | `http://{{ gateway_node_ip }}:3001` | Monitoring dashboards |
-| Langfuse | `http://{{ control_node_ip }}:3000` | LLM trace viewer |
-| ComfyUI | `http://{{ gateway_node_ip }}/comfy` | Image workflow editor |
+| Hive Mind UI | `http://{{ turing_ip }}` | Primary interface |
+| hollerith | `http://{{ turing_ip }}:3001` | Monitoring dashboards |
+| Langfuse | `http://{{ hopper_ip }}:3000` | LLM trace viewer |
+| ComfyUI | `http://{{ turing_ip }}/comfy` | Image workflow editor |
 
 ## Next Steps
 
 - [Chat Guide](../user-guide/chat.md) — deeper dive into chat features
 - [Art Studio Guide](../user-guide/art-studio.md) — image generation workflows
 - [FAQ](../faq/general.md) — answers to common questions
+
+

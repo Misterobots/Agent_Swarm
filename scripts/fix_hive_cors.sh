@@ -1,7 +1,7 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -e
 
-COMPOSE="/home/misterobots/Home_AI_Lab/r730_gateway/docker-compose.yml"
+COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
 
 # Check if bypass routers already exist
 if grep -q 'hive-api-bypass' "$COMPOSE"; then
@@ -40,3 +40,4 @@ echo "Bypass routers added."
 echo ""
 echo "Verifying:"
 grep -n 'hive-api-bypass\|hive-rsc-bypass' "$COMPOSE"
+

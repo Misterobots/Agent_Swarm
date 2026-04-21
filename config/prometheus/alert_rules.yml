@@ -1,4 +1,4 @@
-groups:
+﻿groups:
   # ═══════════════════════════════════════════════════════════════
   # SERVICE AVAILABILITY
   # ═══════════════════════════════════════════════════════════════
@@ -19,7 +19,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Ollama GPU inference is DOWN on Justin-PC"
+          summary: "Ollama GPU inference is DOWN on Lovelace"
           description: "Primary inference engine at 192.168.2.101:11434 is unreachable. All LLM requests will fail."
 
   # ═══════════════════════════════════════════════════════════════
@@ -99,3 +99,5 @@ groups:
         annotations:
           summary: "Prometheus TSDB compactions failing"
           description: "TSDB compactions are failing. Storage may be corrupted or full."
+
+

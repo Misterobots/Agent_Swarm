@@ -1,4 +1,4 @@
----
+﻿---
 title: Admin Guide
 ---
 
@@ -17,7 +17,7 @@ Step-by-step guides for deploying each node from scratch.
 | [Prerequisites](deployment/prerequisites.md) | Hardware, OS, Docker, GPU drivers |
 | [Control Plane](deployment/control-plane.md) | SPIRE, PostgreSQL, Langfuse, MemPalace |
 | [Execution Plane](deployment/execution-plane.md) | Ollama, Agent Runtime, ComfyUI, Voice |
-| [Gateway](deployment/gateway.md) | Traefik, Prometheus, Grafana, Loki |
+| [Gateway](deployment/gateway.md) | Traefik, jacquard, hollerith, knuth |
 | [Networking](deployment/networking.md) | LAN layout, DNS, Tailscale, firewall |
 | [Post-Deployment](deployment/post-deploy.md) | Verification, smoke tests, first request |
 
@@ -50,3 +50,5 @@ Reference for all configuration files and environment variables.
 | Guide | Description |
 |-------|-------------|
 | [Port Map](port-map.md) | All ports across all nodes |
+
+

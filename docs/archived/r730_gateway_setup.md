@@ -1,38 +1,38 @@
-# MarsRL Hive Gateway Setup
+﻿# MarsRL Hive Gateway Setup
 
-This guide explains how to deploy the **AI Lab Gateway** on the Dell R730 Server. The gateway provides the OpenWebUI interface and runs its own Ollama instance for routing and safety models.
+This guide explains how to deploy the **AI Lab Gateway** on the Dell Turing Server. The gateway provides the OpenWebUI interface and runs its own Ollama instance for routing and safety models.
 
 > **Note:** The AI Lab gateway runs on its own isolated Docker network (`ai_lab_net`), completely separate from any other services (e.g. Saltbox media stack) on the same host.
 
 ## 1. Prerequisites
 
-- Docker + Docker Compose installed on the R730
+- Docker + Docker Compose installed on the Turing
 - NVIDIA Container Toolkit installed (for GPU passthrough)
 - The `network.env` file from the repo root (for reference IPs)
 
 ## 2. Deploy the AI Lab Gateway
 
-On the Dell R730 server, clone the repo (or copy the `r730_gateway/` folder) and start the stack:
+On the Dell Turing server, clone the repo (or copy the `turing_gateway/` folder) and start the stack:
 
 ```bash
-cd r730_gateway
+cd turing_gateway
 docker compose up -d
 ```
 
 This starts two containers:
 | Container | Port | Description |
 |-----------|------|-------------|
-| `ollama-r730` | `:11434` | Ollama inference (nemotron-orchestrator, llama-guard) |
+| `ollama-turing` | `:11434` | Ollama inference (nemotron-orchestrator, llama-guard) |
 | `open-webui` | `:3000` | OpenWebUI chat interface |
 
 ## 3. Pull the AI Lab Models
 
-After the first start, pull the required models into the R730's Ollama:
+After the first start, pull the required models into the Turing's Ollama:
 
 ```bash
-docker exec ollama-r730 ollama pull qwen3.5:9b
-docker exec ollama-r730 ollama pull nemotron-orchestrator:8b
-docker exec ollama-r730 ollama pull llama-guard-3:8b
+docker exec ollama-turing ollama pull qwen3.5:9b
+docker exec ollama-turing ollama pull nemotron-orchestrator:8b
+docker exec ollama-turing ollama pull llama-guard-3:8b
 ```
 
 The gateway will be available at: **http://192.168.2.103:3000**
@@ -41,7 +41,7 @@ Create your initial admin account by clicking "Sign Up" on the login screen.
 
 ## 4. Connect the Windows PC Swarm API
 
-To enable the full MarsRL coding loop, connect OpenWebUI to the Justin-PC Swarm Engine:
+To enable the full MarsRL coding loop, connect OpenWebUI to the Lovelace Swarm Engine:
 
 1. In OpenWebUI, go to **Profile → Settings → Admin Settings → Connections**
 2. Under **OpenAI API**, click `+` to add a connection:
@@ -66,6 +66,6 @@ There are no shared containers, networks, or volumes. To avoid port conflicts:
 
 Select the `Home-AI-Swarm` or `default` model from the dropdown at the top of the chat to route prompts through the intent classifier. 
 
-- **Code/Technical Requests**: Automatically routed to `qwen3.5:9b` (Primary Solver/Corrector) running right here on the R730. This ensures maximum speed by avoiding VRAM bottlenecks on the desktop.
+- **Code/Technical Requests**: Automatically routed to `qwen3.5:9b` (Primary Solver/Corrector) running right here on the Turing. This ensures maximum speed by avoiding VRAM bottlenecks on the desktop.
 - **Expert Tasks**: Large codebase analysis uses the Primary Solver `qwen3.5:9b` model.
-- **Image/3D**: Routed to ComfyUI on Justin-PC's 16GB GPU.
+- **Image/3D**: Routed to ComfyUI on Lovelace's 16GB GPU.

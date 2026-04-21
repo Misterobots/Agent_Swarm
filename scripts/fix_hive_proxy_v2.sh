@@ -1,7 +1,7 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -e
 
-COMPOSE="/home/misterobots/Home_AI_Lab/r730_gateway/docker-compose.yml"
+COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
 UI_DIR="/home/misterobots/Home_AI_Lab/ui"
 
 # 1. Extract server.js from the image
@@ -41,3 +41,4 @@ grep -B2 -A8 'container_name: hive_ui' "$COMPOSE"
 echo ""
 echo "Verifying volumes section:"
 grep -A5 'volumes:' "$COMPOSE" | head -10
+

@@ -1,7 +1,7 @@
-"""
+﻿"""
 server.py — OpenClaude gRPC Server
 
-Headless gRPC inference gateway deployed on R730.  Routes inference
+Headless gRPC inference gateway deployed on Turing.  Routes inference
 requests through ModelRouter to Ollama nodes across the cluster.
 
 Requires generated protobuf stubs (run generate.sh first).
@@ -277,3 +277,5 @@ if __name__ == "__main__":
     else:
         logger.error("Failed to start server")
         exit(1)
+
+

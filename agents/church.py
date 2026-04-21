@@ -1,12 +1,12 @@
-from phi.agent import Agent, RunResponse
+﻿from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
-from architect_agent import get_architect_agent
+from leibniz_agent import get_architect_agent
 from security_agent import get_security_agent
 
 # MarsRL Loop — Solver → Verifier → Corrector
 from mars_loop import MarsRLLoop, mars_loop_stream
 from verifier_agent import get_verifier
-from corrector_agent import get_corrector
+from dijkstra_agent import get_corrector
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
 import time
@@ -205,9 +205,9 @@ def handle_task_event(event: Event):
              # trigger forge here if implemented
 
         elif intent == "COORDINATE":
-            # Multi-worker orchestration via Coordinator Mode
-            from coordinator import coordinate_task
-            logger.info(f"[Router] Routing to Coordinator Mode (async path)")
+            # Multi-worker orchestration via Lamport Mode
+            from lamport import coordinate_task
+            logger.info(f"[Router] Routing to Lamport Mode (async path)")
             for update in coordinate_task(
                 user_input=user_input,
                 session_id=session_id,
@@ -785,7 +785,7 @@ def chat_swarm(
         yield _l(f"[Router] Intercepted RAG Context ({len(extracted_context)} chars).")
     
     # 1. Load Context (Memory Bridge)
-    from context_manager import get_pending_context, clear_context, save_pending_image_clarification
+    from brooks import get_pending_context, clear_context, save_pending_image_clarification
     pending_ctx = get_pending_context(session_id=session_id, owner_id=owner_id)
     
     # Check if this is a reply to a clarification
@@ -1274,7 +1274,7 @@ def chat_swarm(
             AGENT_STATE.labels(agent_name="Coordinator").set(2)
 
             try:
-                from coordinator import coordinate_task
+                from lamport import coordinate_task
 
                 tool_call_id = f"tool-coordinator-{int(time.time()*1000)}"
                 yield _emit_tool_start(tool_call_id, "coordinate_task", {"intent": "COORDINATE"})
@@ -1331,7 +1331,7 @@ def chat_swarm(
                 )
             }
             # Save prompt so Art Studio can pick it up
-            from context_manager import save_pending_context
+            from brooks import save_pending_context
             save_pending_context({
                 "type": "art_studio_redirect",
                 "intent": intent,
@@ -1531,7 +1531,7 @@ def chat_swarm(
              question = routing_decision.get("disambiguation_question", "Could you clarify your request?")
              
              # SAVE CONTEXT so we remember what was ambiguous
-             from context_manager import save_pending_context
+             from brooks import save_pending_context
              save_pending_context({
                  "type": "ambiguity_resolution",
                  "prompt": user_input,

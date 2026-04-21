@@ -1,4 +1,4 @@
-# Agentic Hive: Technical Architecture & Design Specification
+﻿# Agentic Hive: Technical Architecture & Design Specification
 
 ## 1. Executive Summary
 
@@ -20,9 +20,9 @@ The **Agentic Hive** is a decentralized, multi-agent orchestration system design
 
 | Node                                    | Role                          | Hardware                   | Key Services                                          |
 | --------------------------------------- | ----------------------------- | -------------------------- | ----------------------------------------------------- |
-| **Dell Wyse 5070** (192.168.2.102)      | Control Plane                 | x86 low-power              | SPIRE, PostgreSQL, Langfuse, ClickHouse, Redis, MinIO |
-| **Justin-PC** (192.168.2.101)           | Heavy Inference + App Runtime | RTX 5060 Ti 16GB, 32GB RAM | Docker Execution Plane, ComfyUI, qwen3.5:9b           |
-| **Dell PowerEdge R730** (192.168.2.103) | Routing + Offload Inference   | RTX 3070 Ti 8GB            | qwen3.5:9b, nemotron-orchestrator, llama-guard-3:8b   |
+| **Dell Hopper** (192.168.2.102)      | Control Plane                 | x86 low-power              | SPIRE, PostgreSQL, Langfuse, ClickHouse, Redis, MinIO |
+| **Lovelace** (192.168.2.101)           | Heavy Inference + App Runtime | RTX 5060 Ti 16GB, 32GB RAM | Docker Execution Plane, ComfyUI, qwen3.5:9b           |
+| **Dell PowerEdge Turing** (192.168.2.103) | Routing + Offload Inference   | RTX 3070 Ti 8GB            | qwen3.5:9b, nemotron-orchestrator, llama-guard-3:8b   |
 
 ---
 
@@ -104,7 +104,7 @@ Pass threshold: score ≥ 0.60
 | `agents/governance.py` | Implementation | MAESTRO compliance layer |
 | `control_plane/docker-compose.yml` | Infrastructure | Control Plane services |
 | `execution_plane/docker-compose.yml` | Infrastructure | Execution Plane services |
-| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway services |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Gateway services |
 
 </details>
 
@@ -114,7 +114,7 @@ Pass threshold: score ≥ 0.60
 | Date | Author | Changes |
 |------|--------|--------|
 | 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
-| 2026-03-12 | AI-Copilot | v3.1 — Qwen 3.5 9B standardization, Dell R730 topology |
+| 2026-03-12 | AI-Copilot | v3.1 — Qwen 3.5 9B standardization, Dell Turing topology |
 
 </details>
 

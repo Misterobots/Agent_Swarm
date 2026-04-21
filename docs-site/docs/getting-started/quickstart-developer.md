@@ -1,4 +1,4 @@
----
+﻿---
 title: "Quickstart: Developers"
 ---
 
@@ -98,7 +98,7 @@ Agent_Swarm/
 │   └── mcp/                 # Model Context Protocol server
 ├── control_plane/           # Control Node Docker Compose
 ├── execution_plane/         # Execution Node Docker Compose
-├── r730_gateway/            # Gateway Node Docker Compose
+├── turing_gateway/            # Gateway Node Docker Compose
 ├── ui/                      # Next.js frontend (Hive Mind UI)
 ├── services/                # Standalone services (voice_engine, saltbox)
 ├── scripts/                 # Deployment and utility scripts
@@ -123,3 +123,5 @@ Agent_Swarm/
 - [Adding Tools](../developer-guide/adding-tools.md) — register an MCP tool
 - [API Reference](../developer-guide/api/chat-completions.md) — full endpoint documentation
 - [Architecture](../architecture/index.md) — understand the system design
+
+

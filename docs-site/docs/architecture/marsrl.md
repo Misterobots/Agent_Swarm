@@ -1,4 +1,4 @@
----
+﻿---
 title: MarsRL Loop
 ---
 
@@ -100,7 +100,7 @@ Every MarsRL invocation is traced in Langfuse:
 - **Scores**: Process-reward scores at each step
 - **Metadata**: Intent, model, template version, token scope
 
-Access traces at `http://{{ control_node_ip }}:3000`.
+Access traces at `http://{{ hopper_ip }}:3000`.
 
 ## When MarsRL Applies
 
@@ -122,3 +122,5 @@ MarsRL does **not** run for:
 - [Getting Started: Concepts](../getting-started/concepts.md) — simplified explanation
 - [Module: MarsRL Loop](../modules/mars-loop.md) — implementation reference
 - [Decision: ADR-004 MarsRL](decisions/adr-004-marsrl.md) — design rationale
+
+

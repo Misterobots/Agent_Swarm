@@ -1,0 +1,1315 @@
+﻿=== C:\Users\panca\Documents\Github\Agent_Swarm\agents\verify_output.txt ===
+  3: SUCCESS: Matched 'Hello there' to '/app/agents/bmo_voice/voice_samples/Intro01_HELLO_there.wav'
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\config\prometheus\alert_rules.yml ===
+  22: summary: "Ollama GPU inference is DOWN on Lovelace"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\config\prometheus\prometheus.yml ===
+  11: # Turing GATEWAY (192.168.2.103) — Self-monitoring
+  18: node: 'turing'
+  20: - job_name: 'turing_cadvisor'
+  22: - targets: ['cadvisor-turing:8080']
+  24: node: 'turing'
+  28: - job_name: 'turing_traefik'
+  32: node: 'turing'
+  36: # JUSTIN-PC COMPUTE (192.168.2.101) — GPU & Agent Services
+  43: node: 'lovelace'
+  49: # CONTROL PLANE — WYSE 5070 (192.168.2.102)
+  56: node: 'hopper'
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\control_plane\.env ===
+  27: HOPPER_IP=192.168.2.102
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\control_plane\docker-compose.yml ===
+  189: - NEXTAUTH_URL=http://${HOPPER_IP}:3000
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\admin\mission_control_home_assistant_deployment.md ===
+  5: Mission Control is **not** part of Hive or the Turing Saltbox stack yet. Keep it isolated on the Home Assistant box for now.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\admin\security.md ===
+  82: └── SPIRE Agent (spire-agent-turing container) — ⚠️ pending enrollment
+  241: | `GRAFANA_ADMIN_PASSWORD` | `turing_gateway/.env` | Grafana admin account |
+  245: - PostgreSQL: `langfuse/langfuse` — change in both control_plane and turing_gateway `.env`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\admin\technical_reference.md ===
+  62: For Turing gateway deployment, `turing_gateway/docker-compose.yml` must set **both** environment variables on the `hive-ui` service. Without `MEMPALACE_BASE_URL`, the Palace Viewer loads the shell but cannot reach Palace layout or memory CRUD endpoints through the normal UI proxy.
+  76: | `http://<gateway-node-ip>/swarm/voice/stream` | POST | BMO Voice PCM → TTS stream |
+  88: | RVC Voice | `http://<execution-node-ip>:8100/infer` | Execution Node | BMO voice model |
+  129: | Traefik v3.6 | 80, 443, 8082 | Reverse proxy + routing | `turing_gateway/docker-compose.yml` |
+  130: | Prometheus | 9091 (→9090) | Metrics collection (15s scrape, 90d retention) | `turing_gateway/docker-compose.yml` |
+  131: | Grafana | 3001 | Dashboards (Prometheus + Loki + PostgreSQL-Swarm) | `turing_gateway/docker-compose.yml` |
+  132: | Loki | 3100 | Log aggregation | `turing_gateway/docker-compose.yml` |
+  133: | Promtail | — | Log collector (Docker socket → Loki) | `turing_gateway/docker-compose.yml` |
+  134: | cAdvisor | 8888 (→8080) | Container resource metrics for Gateway Node | `turing_gateway/docker-compose.yml` |
+  135: | Authentik | 9000, 9443 | SSO identity provider | `turing_gateway/docker-compose.yml` |
+  136: | Ollama (Gateway) | 11434 | Secondary inference (nemotron, llama-guard) | `turing_gateway/docker-compose.yml` |
+  137: | Open-WebUI | 3000 | Chat UI connected to Swarm API | `turing_gateway/docker-compose.yml` |
+  138: | OpenHands | 3002 | Code execution sandbox | `turing_gateway/docker-compose.yml` |
+  139: | VS Code (DevOps) | 8445 | Infrastructure IDE | `turing_gateway/docker-compose.yml` |
+  140: | VS Code (Coding) | 8444 | Coding sandbox IDE | `turing_gateway/docker-compose.yml` |
+  141: | Hive UI (Next.js) | 3200 -> 3000 | Unified web UI with split proxy to Agent Runtime + MemPalace | `turing_gateway/docker-compose.yml` |
+  142: | SPIRE Agent (Gateway) | — (Unix socket) | Workload identity agent (pending enrollment) | `turing_gateway/docker-compose.yml` |
+  151: | BMO Voice | `bmo_voice_gpu` | 8100 | RVC voice reconstruction | `execution_plane/docker-compose.yml` |
+  162: Configured in `turing_gateway/config/prometheus/prometheus.yml`:
+  166: | `cadvisor-turing` | `cadvisor-turing:8080` | Gateway Node container CPU/memory/net/disk |
+  291: - `turing_gateway/.env` — Gateway secrets (Authentik, Traefik)
+  307: | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\admin\troubleshooting.md ===
+  82: | Gateway Node Ollama used but `nemotron` not loaded | `docker exec ollama-turing ollama pull nemotron-orchestrator:8b` |
+  146: docker exec grafana-turing psql postgresql://langfuse:langfuse@<control-node-ip>:5432/langfuse \
+  278: ### BMO Voice Not Responding
+  282: docker compose ps bmo-voice voice-engine
+  285: docker compose logs bmo-voice --tail=30
+  293: | `bmo-voice` exits immediately | GPU driver error | Restart container; check `nvidia-smi` on Execution Node |
+  294: | Voice quality degraded | RVC model not loaded | Check `bmo-voice` logs for model load status |
+  425: | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node services, Traefik, Grafana, Prometheus |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\architecture\skills_hooks_pipeline_deep_dive.md ===
+  34: - `turing_gateway/config/prometheus/auth_alert_rules.yml`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\compliance\spiffe_spire_maestro_assessment_2026_02_22.md ===
+  14: The key change since the last assessment (v1.3, 2026-02-09) is the addition of a **third inference node** — the Gateway Node (Dell PowerEdge Turing) — which introduces new identity and trust boundary considerations requiring SPIRE enrollment.
+  98: spire-server agent ban -spiffeID spiffe://home-lab/dell-turing  # clean start
+  100: -spiffeID spiffe://home-lab/dell-turing/ollama \
+  113: spire-server agent list | grep dell-turing
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\evidence\phase5_jwt_ace_audit_2026_03_17.md ===
+  122: 2. Turing SPIRE enrollment (still pending from Phase 4)
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\evidence\phase6_training_pipeline_audit_2026_03_21.md ===
+  65: | Training Pipeline dashboard   | ✅ PASS | `turing_gateway/dashboards/training_pipeline.json` — 7 panels           |
+  66: | Template Scores dashboard     | ✅ PASS | `turing_gateway/dashboards/template_performance.json` — 8 panels        |
+  67: | PostgreSQL-Swarm datasource   | ✅ PASS | `turing_gateway/provisioning/datasources/datasource.yml` — langfuse DB  |
+  108: | `turing_gateway/dashboards/training_pipeline.json` | New | Grafana Training Pipeline dashboard |
+  109: | `turing_gateway/dashboards/template_performance.json` | New | Grafana Template Scores dashboard |
+  123: | `turing_gateway/provisioning/datasources/datasource.yml` | PostgreSQL-Swarm datasource |
+  124: | `turing_gateway/docker-compose.yml` | Grafana anonymous auth env vars |
+  223: | `turing_gateway/docker-compose.yml` | Infrastructure | Training service deployment |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\evidence\project_status_snapshot.md ===
+  24: - `promtool check rules turing_gateway/config/prometheus/auth_alert_rules.yml`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\evidence\TRAINING_EVOLUTION_phase6.md ===
+  71: | `turing_gateway/docker-compose.yml` | Infrastructure | cAdvisor GPU telemetry service |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\governance\documentation_gap_register.md ===
+  91: 2. Added Prometheus alert rule file for auth/key-compromise signals: `turing_gateway/config/prometheus/auth_alert_rules.yml`.
+  92: 3. Wired Prometheus rule loading through `turing_gateway/config/prometheus/prometheus.yml` via `rule_files`.
+  99: - `docker run --rm --entrypoint promtool -v "${PWD}/turing_gateway/config/prometheus:/etc/prometheus" prom/prometheus check config /etc/prometheus/prometheus.yml`
+  101: - `docker run --rm --entrypoint promtool -v "${PWD}/turing_gateway/config/prometheus:/etc/prometheus" prom/prometheus check rules /etc/prometheus/auth_alert_rules.yml`
+  113: | Prometheus alert rules | `turing_gateway/config/prometheus/auth_alert_rules.yml` | 6 rules: 401 spike (critical), 403 spike, metrics unavailable, request drop, IoT blocked spike, IoT unlock detection |
+  114: | Prometheus config | `turing_gateway/config/prometheus/prometheus.yml` | Rule file loaded; scrape targets configured |
+  223: - Added Prometheus alert rules in `turing_gateway/config/prometheus/auth_alert_rules.yml` for blocked sensitive-action spikes and executed lock-unlock events.
+  226: 13. Prometheus rule validation executed: `docker run --rm --entrypoint promtool -v "${PWD}/turing_gateway/config/prometheus:/etc/prometheus" prom/prometheus check rules /etc/prometheus/auth_alert_rules.yml`.
+  244: | Prometheus alert rules | `turing_gateway/config/prometheus/auth_alert_rules.yml` | 2 IoT-specific alerts added; total 6 rules |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\governance\gap_closure_task_specifications.md ===
+  576: - [x] IoT features documented in existing code (turing_gateway modules or similar)
+  627: - [x] Review turing_gateway modules and IoT code
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\governance\sprint_tracking_board.md ===
+  175: - GAP-002 operationalization: added `docs/security/key_compromise_incident_checklist.md`, wired Prometheus auth/key-compromise alert rules via `turing_gateway/config/prometheus/auth_alert_rules.yml`, and linked runbook/checklist into docs index and docs API allowlist.
+  177: - GAP-002 config validation: containerized `promtool` confirmed `turing_gateway/config/prometheus/prometheus.yml` is valid and `auth_alert_rules.yml` contains 4 syntactically valid rules.
+  192: - GAP-004 alert validation: containerized `promtool` check on `turing_gateway/config/prometheus/auth_alert_rules.yml` succeeded with `6 rules found` after adding IoT-sensitive action alert rules.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\phase_reports\phase_0_report.md ===
+  44: - Pulled `moondream:latest` (~1.7GB) on Lovelace Ollama (GPU 0)
+  54: ### UI Regression (Hive UI — Turing port 3200)
+  79: - `turing_gateway_docker-compose.yml`
+  89: - Turing Ollama `OLLAMA_GPU_OVERHEAD=512MiB` parsing bug (pre-existing)
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\phase_reports\phase_1_report.md ===
+  64: | nemotron-mini | Intent classification | Turing (192.168.2.103) |
+  65: | qwen3:14b | Decomposition + Synthesis | Lovelace (ollama_gpu) |
+  66: | qwen2.5-coder:14b-instruct-q4_k_m | Research + Implementation + Verification workers | Lovelace (ollama_gpu) |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\phase_reports\phase_2_report.md ===
+  32: | `control_plane/.env` | Added `LOVELACE_IP=192.168.2.101` for compose interpolation |
+  40: (memory_enabled=true)  │  (Lovelace)   │
+  65: │ Ollama (Lovelace     │
+  114: | Prometheus targets (3/3) | ✅ agent-runtime, cadvisor-justin, cadvisor-turing |
+  132: 3. **Turing GPU offload**: llama3.2:3b runs with `size_vram: 0` (CPU-only on Turing), causing ~200s generation times
+  139: | nomic-embed-text | Lovelace Ollama :11434 | 768-dim embedding generation |
+  140: | nemotron-mini | Lovelace Ollama :11434 | Memory extraction from conversations |
+  141: | qwen3:14b | Lovelace Ollama :11434 | Coordinator decomposition/synthesis |
+  142: | llama3.2:3b | Turing Ollama :11434 | Librarian (research/devops tasks) |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\phase_reports\phase_3_report.md ===
+  63: - Tamagotchi-style sidebar widget, completely separate from BMO voice assistant
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\phase_reports\phase_5_report.md ===
+  41: - **Host allowlist**: Only `lovelace`, `control-plane`, `turing` can be targeted
+  49: - **Cross-node task submission**: `bridge.submit_task("turing", "Run nvidia-smi")`
+  50: - **API request proxying**: `bridge.proxy_request("turing", "GET", "/v1/models")`
+  165: │  ├─ Lovelace (192.168.2.101) — Primary, 2× 5060 Ti    │
+  167: │  └─ Turing (192.168.2.103) — Gateway, RTX 3070 Ti        │
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\phase_reports\phase_6_report.md ===
+  20: | `agents/grpc/Dockerfile` | Container image for Turing deployment with pb2 generation at build |
+  37: | `turing_gateway/docker-compose.yml` | Added `openclaude-grpc` service with Traefik routing, Authentik auth, SPIFFE ID |
+  51: - **Multi-node inference** across Lovelace (2× RTX 5060 Ti, 32GB VRAM) and Turing (RTX 3070 Ti, 8GB VRAM)
+  128: │Lovelace │        │  Turing    │
+  174: | `turing_gateway/docker-compose.yml` | Infrastructure | Traefik + gRPC deployment |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\security\key_compromise_incident_checklist.md ===
+  71: 1. Prometheus rule file: `turing_gateway/config/prometheus/auth_alert_rules.yml`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\security\key_compromise_incident_runbook.md ===
+  39: 1. Prometheus rule file: `turing_gateway/config/prometheus/auth_alert_rules.yml`.
+  46: 5. Alertmanager path: `turing_gateway/config/alertmanager/alertmanager.yml`.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\user\art_studio_guide.md ===
+  153: | `turing_gateway/comfyui/` | Infrastructure | ComfyUI workflows for image & 3D generation |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\user\faq.md ===
+  108: | `turing_gateway/docker-compose.yml` | Infrastructure | Service definitions, port mappings |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\user\framework.md ===
+  104: | **BMO Voice** | Qwen 2.5 3B + RVC + Qwen-TTS | Voice interaction pipeline |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\user\overview.md ===
+  101: | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
+  129: When service ports or URLs change, update the "How Do I Access It?" table. Cross-reference `turing_gateway/docker-compose.yml` for current port mappings.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\AGENTIC_HIVE_ARCHITECTURE.md ===
+  23: | **Dell Hopper** (192.168.2.102)      | Control Plane                 | x86 low-power              | SPIRE, PostgreSQL, Langfuse, ClickHouse, Redis, MinIO |
+  24: | **Lovelace** (192.168.2.101)           | Heavy Inference + App Runtime | RTX 5060 Ti 16GB, 32GB RAM | Docker Execution Plane, ComfyUI, qwen3.5:9b           |
+  25: | **Dell PowerEdge Turing** (192.168.2.103) | Routing + Offload Inference   | RTX 3070 Ti 8GB            | qwen3.5:9b, nemotron-orchestrator, llama-guard-3:8b   |
+  107: | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway services |
+  117: | 2026-03-12 | AI-Copilot | v3.1 — Qwen 3.5 9B standardization, Dell Turing topology |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\bmo_deployment_guide.md ===
+  1: # BMO Voice: Raspberry Pi Deployment Guide
+  38: scp agents/bmo_voice/pi_client.py pi@raspberrypi.local:~/bmo_client/
+  45: # Paste the content of agents/bmo_voice/pi_client.py based on the file on your PC
+  101: scp agents/bmo_voice/bmo_driver.py pi@raspberrypi.local:~/bmo_client/
+  104: scp -r agents/bmo_voice/face pi@raspberrypi.local:~/bmo_client/
+  173: | `bmo_client/` | Implementation | BMO Voice client source |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\bmo_troubleshooting.md ===
+  1: # BMO Voice Satellite Troubleshooting Guide
+  3: This document outlines known issues, symptoms, and fixes for the BMO Voice Satellite (`voice_satellite.py`), specifically running on low-resource ARM hardware like a Raspberry Pi.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\CONNECTION_REFERENCE.md ===
+  11: **Architecture Overview**: Turing serves as the **Gateway/Ops layer** with centralized routing, while Lovelace focuses on **GPU-intensive inference and generation**.
+  16: | Lovelace      | `192.168.2.101` | Compute Node (Inference + ComfyUI)      |
+  18: | **Turing**       | `192.168.2.103` | **Gateway/Ops Hub** (Traefik, Monitoring) |
+  19: | iDRAC          | `192.168.2.104` | Turing Remote Management                  |
+  25: **Primary Entry Point**: All UIs accessible via **Turing Traefik Gateway** @ `http://192.168.2.103`
+  29: | **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell Turing    | Central reverse proxy (primary entry point for all services)       |
+  30: | **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell Turing    | Primary chat interface to interact with the Swarm.                |
+  31: | **Grafana / Ops Portal** | `http://192.168.2.103:3001` | Dell Turing    | Real-time Docker logs, GPU metrics, agent performance.            |
+  32: | **Prometheus Metrics**   | `http://192.168.2.103:9090` | Dell Turing    | Time-series metrics database + query interface.                   |
+  33: | **Loki Logs API**        | `http://192.168.2.103:3100` | Dell Turing    | Log aggregation backend (data source for Grafana).                |
+  34: | **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell Turing    | Live routing and load balancer metrics.                           |
+  36: | **OpenHands Sandbox**    | `http://192.168.2.103/hands` | Turing→Lovelace | Secure Docker-in-Docker (routed via Traefik).                    |
+  37: | **ComfyUI**              | `http://192.168.2.103/comfy` | Turing→Lovelace | Node-based GUI for 3D/Image Generation (routed via Traefik).     |
+  43: ### 1. The Swarm Engine (via Turing Traefik Gateway)
+  45: **Primary Entrypoint**: All requests route through Turing Traefik to Lovelace backend
+  47: | Endpoint (Routed via Turing)                                 | Method | Description                                              |
+  53: | `http://192.168.2.103/swarm/voice/stream`                  | `POST` | BMO Voice Satellite endpoint (PCM → TTS).                |
+  55: **Direct Access** (if Traefik unavailable): `http://192.168.2.101:8008/...` (Lovelace bypass)
+  61: | **Ollama (Primary)**         | `http://192.168.2.101:11434/api/generate` | Lovelace | `qwen3.5:9b` (Heavy-Local) — Large-scale coding expertise. |
+  62: | **Ollama (Secondary/Gateway)** | `http://192.168.2.103:11434/api/generate` | Dell Turing | `qwen3.5:9b`, `nemotron-orchestrator`, `llama-guard3:8b`. |
+  63: | **RVC Voice Generation**     | `http://192.168.2.101:8100/infer`         | Lovelace | Physical BMO robot voice reconstruction.          |
+  64: | **Qwen3-TTS Module**         | `http://192.168.2.101:8020/tts`           | Lovelace | Base Text-to-Speech generation.                   |
+  72: ### Primary Connection ⭐ (via Turing Traefik Gateway)
+  80: - **Lovelace Inference:** `http://192.168.2.101:8008/v1`
+  81: - **Turing Inference:** `http://192.168.2.103:11434/api` (Ollama only)
+  99: **Primary Gateway Entry Point**: All services routed through Turing Traefik
+  103: | **Dell Turing**  | `dell-turing.tail-xxxx.ts.net` | 80, 3000, 3001, 9090, 8080 | Gateway/Ops Hub (Traefik + all monitoring) |
+  104: | **Lovelace**  | `lovelace.tail-xxxx.ts.net` | 8008, 8188, 11434 (direct access only) | Compute Node (direct access if needed) |
+  110: > **Recommended**: Connect via Turing gateway (`dell-turing.tail-xxxx.ts.net:80`) for all services unless you need direct access to compute node.
+  122: | `turing_gateway/docker-compose.yml` | Infrastructure | Traefik reverse proxy rules |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\engineering_framework_marsrl_spiffe.md ===
+  32: - **Offloading**: Automatically routed to the Dell Turing (8GB VRAM) to prevent local thrashing.
+  49: - **Offloading**: Same as solver, executes on Turing side to maintain cache consistency.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\github-oauth-setup.md ===
+  52: On **Lovelace** (192.168.2.101), open `/workspace/network.env` (the repo root `network.env` mounted into containers):
+  91: After saving `network.env`, restart the `agent_runtime` container on Lovelace to pick up the new env vars:
+  130: - [ ] Update `network.env` on Lovelace
+  232: Then rebuild and redeploy `hive_ui` on Turing:
+  237: docker compose -f turing_gateway/docker-compose.yml up -d --build hive-ui
+  317: | `network.env` location | `/workspace/network.env` (Lovelace) |
+  321: | Backend container | `agent_runtime` on Lovelace (192.168.2.101) |
+  322: | UI container | `hive-ui` on Turing (192.168.2.103) |
+  355: - Update callback URLs if the Turing IP or domain changes.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\governance_walkthrough.md ===
+  58: All workloads on Lovelace hold a **short-lived X.509 SVID** issued by the SPIRE server on the Dell Wyse. These certificates:
+  64: **Current status**: Lovelace fully enrolled. Dell Turing pending enrollment.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\INFRASTRUCTURE_REFERENCE.md ===
+  14: | **Control** | Hopper (192.168.2.102) | Orchestration & Observability Backend | 16GB RAM, 512GB SSD | SPIRE, Langfuse, PostgreSQL, ClickHouse, MinIO |
+  15: | **Ops/Gateway** | Dell Turing (192.168.2.103) | Reverse Proxy & Monitoring | 384GB RAM, 24 CPU, 450GB SSD | Traefik, Prometheus, Grafana, Loki, cAdvisor, Redis |
+  16: | **Compute** | Lovelace (192.168.2.101) | GPU Inference & Agent Runtime | 32GB RAM, RTX 5060 Ti (16GB), 500GB SSD | Ollama, ComfyUI, Agent Runtime, Voice Services |
+  27: - **Function**: Issues X.509 SVIDs to processes on Lovelace and Turing
+  57: ### TIER 2: OPS & GATEWAY (192.168.2.103 - Turing)
+  102: ### TIER 3: COMPUTE (192.168.2.101 - JUSTIN-PC)
+  111: | BMO Voice | 8100 | ✓ | Voice conversion (RVC) |
+  137: ├── 192.168.2.101 - Lovelace (Compute)
+  138: ├── 192.168.2.102 - Hopper (Control)
+  139: └── 192.168.2.103 - Turing (Gateway/Monitoring)
+  148: Turing Traefik:80/443
+  149: ├─ /ai → Lovelace:8501 (Agent UI)
+  150: ├─ /comfy → Lovelace:8188 (ComfyUI)
+  151: ├─ /ops → Lovelace:8502 (Ops Portal)
+  152: ├─ /prometheus → Turing:9090 (Prometheus)
+  153: ├─ /grafana → Turing:3000 (Grafana)
+  162: 1. Client → Turing Traefik `/ai`
+  163: 2. Traefik → Lovelace:8501 (Agent UI)
+  180: Turing Monitoring Stack
+  201: ### Lovelace (500GB SSD)
+  208: ### Turing (450GB SSD)
+  247: | BMO Voice | 5-10s/60s | Real-time |
+  253: | Lovelace CPU | 15-20% | **80%** |
+  254: | Lovelace Disk | 350GB | **80%** |
+  255: | Turing CPU | Low | **80%** |
+  256: | Turing Disk | 70GB | **80%** |
+  262: ### Lovelace
+  272: ### Turing
+  274: ~/turing_gateway/
+  308: # Full stack restart (Lovelace)
+  311: # Monitoring stack (Turing)
+  366: | `execution_plane/docker-compose.yml` | Infrastructure | Lovelace services |
+  368: | `turing_gateway/docker-compose.yml` | Infrastructure | Turing gateway services |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\JUSTIN_PC_COMPOSE_REFERENCE.md ===
+  3: # This is the REFERENCE structure for Lovelace after moving Traefik + monitoring to Turing.
+  4: # Only compute/inference services remain on Lovelace.
+  9: # SERVICES REMOVED FROM JUSTIN-PC:
+  10: #   - traefik (→ moved to Turing)
+  11: #   - prometheus (→ moved to Turing)
+  12: #   - grafana (→ moved to Turing)
+  13: #   - loki (→ moved to Turing)
+  14: #   - promtail (→ moved to Turing)
+  15: #   - cadvisor (→ moved to Turing)
+  16: #   - redis_queue (→ moved to Turing)
+  18: # SERVICES REMAINING ON JUSTIN-PC:
+  21: #   ✓ bmo-voice (RVC voice)
+  42: # NOTE: This is the primary (heavy) inference engine for Lovelace
+  43: # All inference requests should prefer this over Turing
+  46: bmo-voice:
+  48: context: ../agents/bmo_voice
+  50: container_name: bmo_voice_gpu
+  86: # NOTE: Now routes metrics/logs to Turing instead of local stack
+  87: - METRICS_ENDPOINT=http://192.168.2.103:9090  # Prometheus on Turing
+  88: - LOGS_ENDPOINT=http://192.168.2.103:3100     # Loki on Turing
+  90: # CRITICAL: These labels enable Traefik on Turing to route requests to this service
+  104: # CRITICAL: These labels enable Traefik on Turing to route requests to this service
+  115: #   ✗ prometheus_data (→ moved to Turing)
+  116: #   ✗ grafana_data (→ moved to Turing)
+  117: #   ✗ loki_data (→ moved to Turing)
+  118: #   ✗ redis_data (→ moved to Turing)
+  138: | `execution_plane/docker-compose.yml` | Infrastructure | Actual compose file for Lovelace |
+  149: | 2026-03-14 | AI-Copilot | Post-migration compose reference (monitoring offloaded to Turing) |
+  157: - Update when services are added or removed from Lovelace.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\marsrl_hive_redesign_walkthrough.md ===
+  17: | **Solver** (code generation) | `qwen3.5:9b`               | Dell Turing | RTX 3070 Ti 8GB  | Primary solver; low VRAM      |
+  18: | **Corrector** (fix failures) | `qwen3.5:9b`               | Dell Turing | RTX 3070 Ti 8GB  | Primary corrector             |
+  19: | **Router / Orchestrator**    | `nemotron-orchestrator:8b` | Dell Turing | RTX 3070 Ti 8GB  | Intent classification         |
+  20: | **Safety Verifier**          | `llama-guard-3:8b`         | Dell Turing | RTX 3070 Ti 8GB  | Existing security layer       |
+  38: │  Control Plane — Dell Hopper │
+  49: │  Primary Inference — Lovelace  │
+  65: │  Secondary Inference — Dell Turing     │
+  86: Nemotron-Orchestrator (Dell Turing) ── classifies intent ──▶ IMAGE/3D/IoT routes (unchanged)
+  90: Qwen 3.5 9B [SOLVER] (Dell Turing / Lovelace)
+  96: └── Layer 3: llama-guard-3 safety check (Dell Turing)
+  100: └── FAIL ──▶ Qwen 3.5 9B [CORRECTOR] (Dell Turing / Lovelace)
+  140: | [`agents/teams.py`](../agents/teams.py)                           | Orchestrator → Nemotron on Turing; removed Devstral accessors                            |
+  148: ### 5060ti PC / Turing (Inference Nodes)
+  158: echo 'SECONDARY_OLLAMA_HOST=http://<turing-ip>:11434' >> execution_plane/.env
+  187: _Version 3.1 | 2026-03-12 | Qwen 3.5 9B Loop + Dell Turing Topology_
+  201: | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway and Traefik routing |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\MIGRATION_EXECUTION_CHECKLIST.md ===
+  1: # Turing Migration Execution Checklist
+  6: - [ ] Backup Lovelace docker-compose.yml
+  24: git commit -m "Pre-migration backup: Traefik + monitoring on Lovelace"
+  28: - [ ] Test Turing is reachable from Lovelace
+  39: - [ ] Check Turing disk space
+  47: ## Phase 1: Deploy on Turing (1 hour - Day 0 Evening)
+  49: ### Step 3: Prepare Turing Directory Structure
+  50: - [ ] SSH into Turing
+  58: mkdir -p ~/turing_gateway/config/{prometheus,loki,promtail,grafana}
+  62: - [ ] Copy Prometheus config from Lovelace
+  65: ~/turing_gateway/config/
+  68: - [ ] Update Prometheus targets to scrape Lovelace remotely
+  70: # Edit ~/turing_gateway/config/prometheus/prometheus.yml
+  74: sed -i 's/localhost/192.168.2.101/g' ~/turing_gateway/config/prometheus/prometheus.yml
+  77: cat ~/turing_gateway/config/prometheus/prometheus.yml | grep -A2 "targets:"
+  80: - [ ] Add cAdvisor target for Lovelace
+  82: cat >> ~/turing_gateway/config/prometheus/prometheus.yml << 'EOF'
+  94: ~/turing_gateway/config/
+  100: ~/turing_gateway/config/
+  105: ls -la ~/turing_gateway/config/*/
+  109: - [ ] Copy the updated Turing compose file
+  111: scp ~/Home_AI_Lab/turing_gateway/docker-compose-new.yml \
+  112: ubuntu@192.168.2.103:~/turing_gateway/docker-compose.yml
+  117: ssh ubuntu@192.168.2.103 "ls -lh ~/turing_gateway/docker-compose.yml"
+  120: ### Step 7: Deploy Traefik + Monitoring to Turing
+  121: - [ ] Log into Turing and deploy
+  124: cd ~/turing_gateway
+  155: ## Phase 2: Validate Turing Services (1 hour - Day 1 Morning)
+  157: ### Step 8: Test Turing Traefik Gateway
+  167: - [ ] Verify Traefik can reach Lovelace
+  169: docker exec traefik-gateway ping -c 1 lovelace
+  172: docker exec traefik-gateway curl -I http://lovelace:8008/docs
+  173: # Should reach Agent Runtime on Lovelace
+  183: #   {job: "cadvisor-turing", instance: "localhost:8888"}
+  222: ├─ URL: http://prometheus-turing:9090
+  232: ├─ URL: http://loki-turing:3100
+  239: ### Step 12: Test Routing to Lovelace
+  258: - [ ] ✅ If all routes work: Turing gateway is operational!
+  262: ## Phase 3: Update Lovelace (1 hour - Day 1 Afternoon)
+  264: ### Step 13: Update Lovelace Docker Compose
+  267: - [ ] Edit `execution_plane/docker-compose.yml` on Lovelace
+  302: ✓ bmo-voice
+  318: ### Step 14: Restart Lovelace Services
+  341: # ✓ bmo-voice
+  366: ### Step 15: Test Lovelace Direct Access
+  390: - [ ] Test primary entry point (Turing Traefik)
+  399: # Compute UIs (should route to Lovelace)
+  414: - [ ] Check Prometheus is collecting from Lovelace
+  416: # Query for Lovelace data
+  422: - [ ] Check Loki is collecting Lovelace logs
+  424: # Query for logs from Lovelace containers
+  425: curl "http://192.168.2.103:3100/loki/api/v1/query?query={hostname=\"lovelace\"}" \
+  431: - [ ] Check Lovelace free space
+  440: - [ ] Check Turing usage
+  448: # Total used on Turing: ~120-150GB (previously ~80-100GB)
+  456: git commit -m "POST-MIGRATION: Move Traefik + monitoring to Turing gateway
+  458: - Traefik now routes all services through Turing @ 192.168.2.103:80
+  459: - Prometheus, Grafana, Loki, cAdvisor on Turing
+  460: - Lovelace now pure compute node (Ollama, ComfyUI, BMO Voice)
+  461: - Storage freed: ~50-75GB on Lovelace
+  462: - CPU load reduced: -20% on Lovelace during monitoring queries"
+  477: - [ ] CPU load on Turing should be <10%
+  478: - [ ] Network latency from Turing to Lovelace should be <5ms
+  479: - [ ] Memory on Lovelace GPU should remain stable
+  508: # If you need to revert: See docs/Turing_MIGRATION_PLAN.md "Rollback Plan" section
+  517: - [x] Turing Traefik successfully routes all requests (via :80)
+  518: - [x] Prometheus collects metrics from both Turing and Lovelace
+  521: - [x] Lovelace has 50-75GB more free space
+  522: - [x] Lovelace CPU load reduced by 15-20%
+  523: - [x] GPU memory headroom on Lovelace for heavy inference
+  525: - [x] All UIs accessible via Turing gateway (primary entry point)
+  526: - [x] Direct access to Lovelace still possible if needed
+  532: ### Issue: Traefik not routing to Lovelace
+  535: docker exec traefik-gateway ping lovelace
+  536: docker exec traefik-gateway nslookup lovelace
+  539: docker exec traefik-gateway bash -c "echo '192.168.2.101 lovelace' >> /etc/hosts"
+  542: ### Issue: Prometheus not scraping Lovelace
+  548: docker exec prometheus-turing cat /etc/prometheus/prometheus.yml | grep -A5 "targets:"
+  554: docker logs promtail-turing | tail -20
+  563: docker exec grafana-turing curl http://prometheus-turing:9090/api/v1/targets
+  574: **Expected Benefit**: 50-75GB freed on Lovelace, -20% CPU load
+  585: | `execution_plane/docker-compose.yml` | Infrastructure | Lovelace compose (post-migration) |
+  586: | `turing_gateway/docker-compose.yml` | Infrastructure | Turing compose (received monitoring services) |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\PHASE1_RECOVERY_PLAN.md ===
+  10: - Root cause: Config files not provisioned on Turing
+  22: ### Step 1: Copy Setup Files to Turing
+  24: Run from Lovelace (where you are now):
+  28: scp C:\Users\panca\Documents\GitHub\Home_AI_Lab\turing_gateway\docker-compose-monitoring-fixed.yml `
+  29: ubuntu@192.168.2.103:~/turing_gateway/docker-compose-monitoring-fixed.yml
+  32: scp C:\Users\panca\Documents\GitHub\Home_AI_Lab\turing_gateway\setup_monitoring.sh `
+  33: ubuntu@192.168.2.103:~/turing_gateway/setup_monitoring.sh
+  36: ### Step 2: Stop Old Stack on Turing
+  40: cd ~/turing_gateway
+  47: docker rm -f prometheus-turing grafana-turing loki-turing promtail-turing || true
+  48: docker rm -f redis-monitoring-turing || true
+  51: # docker volume rm turing_gateway_prometheus_data turing_gateway_loki_data turing_gateway_grafana_data turing_gateway_redis_data
+  61: cd ~/turing_gateway
+  78: cd ~/turing_gateway
+  101: cd ~/turing_gateway
+  108: # prometheus-turing           prom/prometheus:latest      Up
+  109: # loki-turing                 grafana/loki:latest         Up (healthy)
+  110: # promtail-turing             grafana/promtail:latest     Up
+  111: # cadvisor-turing             gcr.io/cadvisor...          Up (healthy)
+  112: # grafana-turing              grafana/grafana:latest      Up
+  113: # redis-monitoring-turing     redis:7.2-alpine            Up
+  123: # From Lovelace, verify endpoints
+  146: docker logs prometheus-turing --tail=20
+  147: docker logs loki-turing --tail=20
+  148: docker logs promtail-turing --tail=20
+  149: docker logs grafana-turing --tail=20
+  156: cd ~/turing_gateway
+  157: docker compose -f docker-compose-monitoring-fixed.yml restart loki-turing
+  158: docker logs loki-turing --tail=20
+  165: cd ~/turing_gateway
+  177: 4. ✅ Create dashboards for Lovelace and Turing
+  189: | `turing_gateway/docker-compose.yml` | Infrastructure | Grafana, Prometheus, Loki on Turing |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\PHASE3_DEPLOYMENT_GUIDE.md ===
+  1: # Phase 3: Update & Restart Lovelace
+  6: - traefik (Reverse proxy - now using Turing Traefik)
+  7: - cadvisor (Container metrics - now on Turing)
+  8: - prometheus (Metrics DB - now on Turing)
+  9: - grafana (Dashboard - now on Turing)
+  10: - loki (Log aggregation - now on Turing)
+  11: - promtail (Log shipper - now on Turing)
+  23: - bmo-voice (Voice cloning)
+  46: # From Lovelace, copy the Phase 3 compose
+  59: ### Step 4: Restart Lovelace Services
+  78: - ✅ bmo_voice_gpu (Up)
+  95: # Test from Lovelace that services are accessible locally
+  96: # These should work internally at :port but route through Turing for external access
+  108: ### Step 7: Verify Metrics Collection on Turing
+  110: # Check that Turing Prometheus is scraping Lovelace services
+  114: # This is OK - Turing's Traefik will need to be configured to scrape Lovelace services
+  121: git commit -m 'PHASE 3: Remove local Traefik + monitoring, migrate to Turing gateway'"
+  126: - [ ] All compute services running on Lovelace
+  130: - [ ] Turing Prometheus points to Lovelace services
+  131: - [ ] Access via Turing Traefik: http://192.168.2.103/comfy, http://192.168.2.103/ai, etc.
+  136: - Lovelace: ~500GB total, ~425GB used (85%)
+  140: - Lovelace: ~425GB freed → ~500GB used (~60%)
+  141: - Turing: Absorbs monitoring (now ~50-75GB used for monitoring)
+  143: **Result: Lovelace freed ~75GB of storage, now focused on COMPUTE only**
+  170: | `execution_plane/docker-compose.yml` | Infrastructure | Post-Phase 3 Lovelace compose |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\PHASE5_PLUS_ROADMAP.md ===
+  379: | Training Pipeline dashboard | `turing_gateway/dashboards/training_pipeline.json` | ✅ Provisioned |
+  380: | Template Scores dashboard | `turing_gateway/dashboards/template_performance.json` | ✅ Provisioned |
+  381: | PostgreSQL-Swarm datasource | `turing_gateway/provisioning/datasources/datasource.yml` | ✅ Configured |
+  418: - Register nodes: [ollama:11434, turing_ollama:11434]
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\turing_gateway_setup.md ===
+  3: This guide explains how to deploy the **AI Lab Gateway** on the Dell Turing Server. The gateway provides the OpenWebUI interface and runs its own Ollama instance for routing and safety models.
+  9: - Docker + Docker Compose installed on the Turing
+  15: On the Dell Turing server, clone the repo (or copy the `turing_gateway/` folder) and start the stack:
+  18: cd turing_gateway
+  25: | `ollama-turing` | `:11434` | Ollama inference (nemotron-orchestrator, llama-guard) |
+  30: After the first start, pull the required models into the Turing's Ollama:
+  33: docker exec ollama-turing ollama pull qwen3.5:9b
+  34: docker exec ollama-turing ollama pull nemotron-orchestrator:8b
+  35: docker exec ollama-turing ollama pull llama-guard-3:8b
+  44: To enable the full MarsRL coding loop, connect OpenWebUI to the Lovelace Swarm Engine:
+  69: - **Code/Technical Requests**: Automatically routed to `qwen3.5:9b` (Primary Solver/Corrector) running right here on the Turing. This ensures maximum speed by avoiding VRAM bottlenecks on the desktop.
+  71: - **Image/3D**: Routed to ComfyUI on Lovelace's 16GB GPU.
+  82: | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway compose with OpenWebUI + Ollama |
+  94: | 2026-03-01 | AI-Copilot | Initial Turing gateway setup guide |
+  112: | Send text prompt via gateway | Routed to Ollama on Turing |
+  113: | Send image generation prompt | Routed to ComfyUI on Lovelace |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs\Turing_MIGRATION_PLAN.md ===
+  1: # Turing Storage & Monitoring Offload Plan
+  4: **Target**: Migrate diagnostic/monitoring stack from Lovelace (execution_plane) to Turing
+  6: **CPU Impact**: -15-20% load on Lovelace, +5-8% on Turing
+  12: **Cleanest architecture**: Create a **Gateway/Ops layer on Turing** with centralized routing and monitoring, leaving **Lovelace as a pure compute/inference node**.
+  16: | **Traefik (Reverse Proxy)** | Lovelace | Turing | Central routing layer; unified API gateway for all services |
+  17: | **Prometheus** | Lovelace | Turing | Metrics storage is I/O heavy; Turing has spare disk |
+  18: | **Grafana** | Lovelace | Turing | Read-only dashboard UI; low resource cost |
+  19: | **Loki** | Lovelace | Turing | Log aggregation storage; 30-40GB/quarter |
+  20: | **Promtail** | Lovelace | Turing | Log shipper agent; minimal CPU |
+  21: | **cAdvisor** | Lovelace | Turing | Container monitoring; lightweight |
+  22: | **Redis (Queue)** | Lovelace | Turing | Queue persistence; can move with monitoring |
+  24: **Turing becomes Gateway/Ops Hub**:
+  33: **Lovelace becomes Compute/Inference Node** (GPU-dedicated):
+  36: - BMO Voice (Home Assistant voice agent with RVC)
+  52: ### Current Storage Utilization (Lovelace)
+  65: ### Turing Available Resources
+  68: Dell Turing @ 192.168.2.103:
+  77: ### Lovelace Impact Post-Migration
+  90: ### Phase 1: Prepare Turing (1-2 hours)
+  92: **1.1 Verify Turing Connectivity & Networking**
+  94: # From Lovelace, verify Turing is reachable
+  98: # Check Turing disk space
+  102: **1.2 Extend Turing Docker Compose**
+  103: - Update `turing_gateway/docker-compose.yml` to include monitoring stack
+  104: - Add shared volumes for metrics storage → `/data/monitoring` on Turing
+  107: - Prometheus on Turing scrapes metrics from Lovelace by hostname
+  108: - Promtail ships logs to Loki (same Turing network)
+  111: ### Phase 2: Deploy Gateway Stack to Turing (45 mins)
+  113: **2.1 Add Traefik + Monitoring to Turing Compose**
+  115: File: `turing_gateway/docker-compose.yml`
+  142: - "lovelace:192.168.2.101"      # Route to Lovelace for compute services
+  153: container_name: prometheus-turing
+  175: container_name: loki-turing
+  191: # LOG SHIPPING AGENT (scrapes container logs from Lovelace via Docker API)
+  194: container_name: promtail-turing
+  208: container_name: cadvisor-turing
+  231: container_name: grafana-turing
+  256: container_name: redis-turing
+  282: **2.2 Copy & Adapt Configs from Lovelace to Turing**
+  284: # SSH into Turing
+  287: # Copy monitoring configs from Lovelace
+  289: ~/turing_gateway/config/
+  292: ~/turing_gateway/config/
+  295: ~/turing_gateway/config/
+  297: # Update Prometheus targets to scrape Lovelace containers remotely
+  298: cat ~/turing_gateway/config/prometheus/prometheus.yml | sed 's|localhost:9100|192.168.2.101:9100|g' \
+  299: > ~/turing_gateway/config/prometheus/prometheus.yml.new && \
+  300: mv ~/turing_gateway/config/prometheus/prometheus.yml.new ~/turing_gateway/config/prometheus/prometheus.yml
+  302: # Add cAdvisor target for Lovelace
+  307: """ >> ~/turing_gateway/config/prometheus/prometheus.yml
+  310: **2.3 Deploy to Turing**
+  312: cd ~/turing_gateway
+  322: #   URL: http://prometheus-turing:9090
+  327: #   URL: http://loki-turing:3100
+  333: **3.1 Test Traefik Routing to Lovelace**
+  338: # Should resolve through Traefik on Turing to Lovelace services
+  343: docker exec traefik-gateway ping lovelace  # Should resolve to 192.168.2.101
+  354: #   - Lovelace cAdvisor (192.168.2.101:8080)
+  355: #   - Lovelace Ollama (192.168.2.101:11434)
+  366: # Should show logs from containers on both Turing and Lovelace
+  371: # Verify Traefik can route to Lovelace
+  372: curl -H "Host: lovelace" http://192.168.2.103/
+  374: # Should reach Lovelace services (ComfyUI, Ollama, Agent Runtime, etc.)
+  377: ### Phase 4: Decommission Lovelace Monitoring (20 mins, staggered)
+  381: The Agent Runtime container on Lovelace likely has Traefik labels for routing. We need to:
+  382: 1. Start Turing Traefik with Lovelace remote targets configured
+  383: 2. Test all routes work through Turing Traefik
+  384: 3. **Then** remove Lovelace Traefik
+  386: **4.1 Update Agent Runtime Labels for Turing Traefik**
+  388: Before removing Lovelace Traefik, update routing labels to be discovered by Turing Traefik:
+  395: # These labels will now be discovered by Turing Traefik via Docker API
+  402: **4.2 Remove Traefik from Lovelace**
+  413: **4.3 Remove Monitoring Services from Lovelace**
+  437: **4.5 Reload Lovelace Stack**
+  453: # Should show: spire-agent, ollama, bmo-voice, voice-engine, openhands, agent-runtime, comfyui
+  456: **4.6 Validate Lovelace Is Still Reachable**
+  458: # From Lovelace, test Turing can route to it
+  461: # From Turing, verify Docker API can still reach Lovelace containers
+  469: Primary entry point changes from Lovelace to Turing:
+  476: | **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell Turing    | Central reverse proxy for ALL services (new primary entry) |
+  477: | **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell Turing    | Primary chat interface to interact with the Swarm.         |
+  479: | **Grafana Portal** ⭐    | `http://192.168.2.103:3001` | Dell Turing    | Ops dashboards, metrics, logs (moved from Lovelace)       |
+  480: | **Prometheus Metrics**   | `http://192.168.2.103:9090` | Dell Turing    | Time-series metrics database (moved from Lovelace)        |
+  481: | **Loki Logs API**        | `http://192.168.2.103:3100` | Dell Turing    | Log aggregation backend (moved from Lovelace)             |
+  482: | **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell Turing    | Live routing and load balancer metrics                     |
+  483: | **cAdvisor Metrics**     | `http://192.168.2.103:8888` | Dell Turing    | Container resource monitoring                              |
+  484: | **OpenHands Sandbox**    | `http://192.168.2.103/hands` via Traefik | Dell Turing    | Docker-in-Docker sandbox (routed from Lovelace)           |
+  485: | **ComfyUI**              | `http://192.168.2.103/comfy` via Traefik | Dell Turing    | Image/3D generation (routed from Lovelace)                |
+  493: ### Gateway Layer (Turing)
+  495: Turing Traefik (port 80)
+  497: └─ Routed: Agent Runtime, ComfyUI, OpenHands, Ollama, BMO Voice (all on Lovelace)
+  505: ### Compute Layer (Lovelace)
+  507: Lovelace (no reverse proxy)
+  510: ├─ BMO Voice (Home Assistant agent)
+  517: - ✅ Single entry point (Turing:80) for all UIs
+  518: - ✅ Compute node (Lovelace) has no external routing overhead
+  528: # Test each route through Turing Traefik
+  529: echo "Testing routes through Turing Traefik..."
+  531: # Test metrics services (local to Turing)
+  536: # Test compute services (routed to Lovelace)
+  547: # Verify Prometheus is scraping from Lovelace
+  577: #  3. Dashboards show metrics from both Turing and Lovelace
+  581: **6.5 Lovelace Isolation Verification**
+  584: # Verify Lovelace containers are NOT running Traefik/Monitoring
+  591: # bmo_voice_gpu             Up                  192.168.2.101:8100->8000/tcp
+  601: # Check Lovelace free space (should be ~50-75GB more)
+  625: Week 1:  Lovelace gains ~50GB free space
+  626: Turing used: 120GB → 180GB
+  631: Month 1: Total monitoring storage: ~35-40GB on Turing
+  632: Lovelace stress: 60% reduction in I/O
+  643: | **Traefik routing breaks during migration** | Run both Traefik instances in parallel (Lovelace on :81, Turing on :80) for 1 hour; verify all routes work before shutting down old |
+  644: | **Network latency to Lovelace services** | Traefik adds ~2-5ms per hop (negligible for home lab); routing happens at L4 (low overhead) |
+  645: | **Turing disk fills with logs** | Set retention: Prometheus 90 days, Loki 60 days; configure log rotation in Promtail |
+  647: | **Turing Traefik fails → all UIs down** | Keep rollback plan; verify Turing stability for 48 hours before full commitment |
+  648: | **Lovelace containers fail to register with Turing Traefik** | Verify Docker network connectivity; test `docker exec traefik-gateway ping lovelace` |
+  657: All services now accessible through **Turing Traefik Gateway** @ `http://192.168.2.103:80`
+  665: | **Agent Runtime** | - | `http://192.168.2.103/swarm` | FastAPI engine (Lovelace) |
+  666: | **ComfyUI** | - | `http://192.168.2.103/comfy` | Generative (Lovelace) |
+  667: | **OpenHands** | - | `http://192.168.2.103/hands` | Sandbox dev (Lovelace) |
+  677: 1. **Open-WebUI UI server** (currently hosted on Turing) - move to Control Node for centralization
+  678: 2. **Ollama on Turing** - can reduce to CPU-only inference mode if needed for storage
+  679: 3. **Docker registry/artifact caching** - move to Turing to reduce Lovelace disk churn
+  694: # ROLLBACK SCENARIO: Turing Traefik is unstable
+  696: # 1. Restore Lovelace Traefik (5 mins)
+  702: # 2. Point clients back to Lovelace
+  708: # 3. Stop Turing monitoring (to avoid confusion)
+  710: cd ~/turing_gateway
+  713: # 4. Verify Lovelace monitoring is healthy
+  724: **Early wins**: Immediate Lovelace storage relief, reduced CPU contention with ComfyUI
+  736: | `execution_plane/docker-compose.yml` | Infrastructure | Lovelace compose (source) |
+  737: | `turing_gateway/docker-compose.yml` | Infrastructure | Turing compose (destination) |
+  747: | 2026-03-10 | AI-Copilot | Turing migration planning document |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\configuration\docker-compose.md ===
+  15: | Gateway | `turing_gateway/docker-compose.yml` | SPIRE Agent, Traefik, Prometheus, Grafana, Loki, Promtail, AlertManager, Ollama, Redis, Docs Site |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\configuration\environment.md ===
+  13: | `HOPPER_IP` | `{{ control_node_ip }}` | Control Plane IP |
+  14: | `LOVELACE_IP` | `{{ execution_node_ip }}` | Execution Plane IP |
+  15: | `TURING_IP` | `{{ gateway_node_ip }}` | Gateway Node IP |
+  53: | `LANGFUSE_HOST` | `http://{{ control_node_ip }}:3000` | Langfuse URL |
+  59: | `SPIRE_SERVER_ADDRESS` | `{{ control_node_ip }}:8081` | SPIRE server endpoint |
+  75: | `MINIO_ENDPOINT` | `{{ control_node_ip }}:9000` | MinIO API endpoint |
+  91: - OLLAMA_HOST=http://${LOVELACE_IP}:${OLLAMA_PORT}
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\configuration\spire.md ===
+  58: Location: `execution_plane/config/spire/agent.conf` and `turing_gateway/config/spire/agent.conf`
+  64: server_address = "{{ control_node_ip }}"
+  104: | `spiffe://home-ai-lab/traefik` | turing-gateway | `unix:uid:0` |
+  118: -spiffeID spiffe://home-ai-lab/turing-gateway \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\configuration\traefik.md ===
+  7: Traefik serves as the reverse proxy and API gateway on the Gateway node (Turing).
+  11: Location: `turing_gateway/config/traefik/traefik.yml`
+  25: The Traefik dashboard is available at `http://{{ gateway_node_ip }}:8080` for route inspection and debugging.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\deployment\control-plane.md ===
+  7: The Control Plane (Dell Hopper, {{ control_node_ip }}) runs identity, databases, tracing, and memory services.
+  26: ssh user@{{ control_node_ip }}
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\deployment\execution-plane.md ===
+  7: The Execution Plane (Lovelace, {{ execution_node_ip }}) runs all GPU compute: Ollama, Agent Runtime, ComfyUI, Voice Engine, and sandboxed code execution.
+  17: | BMO Voice | 5060 | ✅ | Character voice assistant |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\deployment\gateway.md ===
+  7: The Gateway (Dell Turing, {{ gateway_node_ip }}) runs Traefik reverse proxy, the monitoring stack, and secondary Ollama.
+  29: ssh user@{{ gateway_node_ip }}
+  36: Review and update `turing_gateway/config/traefik/traefik.yml`:
+  57: nano turing_gateway/config/spire/agent.conf
+  70: cd turing_gateway
+  95: On first deployment, add data sources in Grafana at `http://{{ gateway_node_ip }}:3001`:
+  100: Import dashboards from `turing_gateway/config/grafana/dashboards/`.
+  106: | `/swarm/*` | Agent Runtime ({{ execution_node_ip }}:{{ agent_runtime_port }}) | Main API |
+  107: | `/comfyui/*` | ComfyUI ({{ execution_node_ip }}:8188) | Image generation UI |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\deployment\networking.md ===
+  14: Router --- Exec["Lovelace<br/>{{ execution_node_ip }}"]
+  15: Router --- Ctrl["Hopper<br/>{{ control_node_ip }}"]
+  16: Router --- GW["Turing<br/>{{ gateway_node_ip }}"]
+  27: | Lovelace (Exec) | {{ execution_node_ip }} | (DHCP reservation) |
+  28: | Hopper (Ctrl) | {{ control_node_ip }} | (DHCP reservation) |
+  29: | Turing (Gateway) | {{ gateway_node_ip }} | (DHCP reservation) |
+  53: | **Enabled Nodes** | Turing, Lovelace |
+  59: http://turing.tail12345.ts.net/swarm/v1/chat/completions
+  60: http://turing.tail12345.ts.net/grafana
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\deployment\post-deploy.md ===
+  23: curl -s http://{{ execution_node_ip }}:{{ agent_runtime_port }}/ | jq .
+  26: curl -s http://{{ control_node_ip }}:3000/api/public/health | jq .
+  27: curl -s http://{{ control_node_ip }}:8200/health
+  43: curl -s http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags | \
+  57: curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+  70: curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+  84: | Grafana | `http://{{ gateway_node_ip }}:3001` | Login page |
+  85: | Prometheus | `http://{{ gateway_node_ip }}:9091/targets` | All targets UP |
+  86: | Langfuse | `http://{{ control_node_ip }}:3000` | Traces from step 4 |
+  91: curl -s http://{{ gateway_node_ip }}:8080/api/http/routers | \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\operations\backup-restore.md ===
+  76: ssh user@{{ control_node_ip }} \
+  81: ssh user@{{ execution_node_ip }} \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\operations\monitoring.md ===
+  11: Access Grafana at `http://{{ gateway_node_ip }}:3001`.
+  27: cp turing_gateway/config/grafana/dashboards/*.json \
+  40: curl -sf http://{{ control_node_ip }}:3000/api/public/health && echo "Langfuse: OK" || echo "Langfuse: DOWN"
+  41: curl -sf http://{{ control_node_ip }}:8200/health && echo "MemPalace: OK" || echo "MemPalace: DOWN"
+  44: curl -sf http://{{ execution_node_ip }}:{{ agent_runtime_port }}/ && echo "Runtime: OK" || echo "Runtime: DOWN"
+  45: curl -sf http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags > /dev/null && echo "Ollama: OK" || echo "Ollama: DOWN"
+  48: curl -sf http://{{ gateway_node_ip }}:3001/api/health && echo "Grafana: OK" || echo "Grafana: DOWN"
+  49: curl -sf http://{{ gateway_node_ip }}:9091/-/healthy && echo "Prometheus: OK" || echo "Prometheus: DOWN"
+  50: curl -sf http://{{ gateway_node_ip }}:3100/ready && echo "Loki: OK" || echo "Loki: DOWN"
+  55: Check all scrape targets: `http://{{ gateway_node_ip }}:9091/targets`
+  61: AlertManager at `http://{{ gateway_node_ip }}:9093` routes alerts to email and ntfy.
+  77: Edit alert rules in `turing_gateway/config/prometheus/alert_rules.yml`.
+  79: AlertManager routing in `turing_gateway/config/alertmanager/alertmanager.yml`:
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\operations\scaling.md ===
+  54: - url: "http://{{ execution_node_ip }}:{{ agent_runtime_port }}"
+  65: "http://{{ execution_node_ip }}:{{ ollama_port }}",  # primary (RTX 5060 Ti)
+  66: "http://{{ gateway_node_ip }}:11435",                 # secondary (RTX 3070 Ti)
+  90: http://{{ control_node_ip }}:9000
+  95: Adjust retention in `turing_gateway/docker-compose.yml`:
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\admin-guide\port-map.md ===
+  9: ## Execution Node â€” {{ execution_node_ip }}
+  17: | 5060 | BMO Voice Assistant | HTTP | LAN |
+  21: ## Control Node â€” {{ control_node_ip }}
+  35: ## Gateway Node â€” {{ gateway_node_ip }}
+  73: | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\architecture\decisions\adr-002-hook-execution.md ===
+  23: - **Execution Node** (Lovelace): All GPU compute — Ollama, ComfyUI, Voice Engine, Agent Runtime
+  24: - **Control Node** (Hopper): All coordination — SPIRE, databases, Langfuse, MemPalace
+  25: - **Gateway Node** (Turing): All ingress — Traefik, monitoring stack, secondary Ollama
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\architecture\index.md ===
+  11: subgraph Gateway["Gateway Node · Turing · {{ gateway_node_ip }}"]
+  19: subgraph Execution["Execution Node · Lovelace · {{ execution_node_ip }}"]
+  27: subgraph Control["Control Node · Hopper · {{ control_node_ip }}"]
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\architecture\marsrl.md ===
+  103: Access traces at `http://{{ control_node_ip }}:3000`.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\architecture\memory-system.md ===
+  81: | **URL** | `http://{{ control_node_ip }}:8200` |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\architecture\observability.md ===
+  56: | **URL** | `http://{{ control_node_ip }}:3000` |
+  71: 1. Open Langfuse at `http://{{ control_node_ip }}:3000`
+  81: | **URL** | `http://{{ gateway_node_ip }}:9091` |
+  90: | Agent Runtime | `{{ execution_node_ip }}:{{ agent_runtime_port }}/metrics` | Request counts, latency, agent state |
+  91: | cAdvisor (Justin) | `{{ execution_node_ip }}:8081/metrics` | Container CPU, memory, network |
+  92: | cAdvisor (Turing) | Internal :8080/metrics | Container resources |
+  109: | **URL** | `http://{{ gateway_node_ip }}:3001` |
+  126: | **URL** | `http://{{ gateway_node_ip }}:3100` |
+  143: | **URL** | `http://{{ gateway_node_ip }}:9093` |
+  154: | `turing_gateway/config/prometheus/prometheus.yml` | Scrape configuration |
+  155: | `turing_gateway/config/alertmanager/alertmanager.yml` | Alert routing |
+  156: | `turing_gateway/config/loki/loki-config.yml` | Loki storage configuration |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\architecture\security-model.md ===
+  16: SA2[SPIRE Agent · Turing]
+  62: | Gateway Node | `spiffe://home-ai-lab/turing-gateway` |
+  69: - SPIRE Agent (Gateway): `turing_gateway/config/spire/agent.conf`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\architecture\skills-hooks-deep-dive.md ===
+  38: - `turing_gateway/config/prometheus/auth_alert_rules.yml`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\architecture\topology.md ===
+  15: Exec["Lovelace<br/>192.168.2.101<br/>RTX 5060 Ti 16GB"]
+  16: Ctrl["Hopper<br/>192.168.2.102<br/>Low-power x86"]
+  17: GW["Turing<br/>192.168.2.103<br/>RTX 3070 Ti 8GB"]
+  24: ### Execution Node — Lovelace ({{ execution_node_ip }})
+  32: | **Services** | Ollama, Agent Runtime, ComfyUI, Voice Engine, BMO Voice, OpenHands |
+  34: ### Control Node — Dell Hopper ({{ control_node_ip }})
+  44: ### Gateway Node — Dell PowerEdge Turing ({{ gateway_node_ip }})
+  65: E6[BMO Voice · GPU]
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\developer-guide\api\chat-completions.md ===
+  15: Via Gateway: `POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions`
+  121: curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+  135: "http://{{ gateway_node_ip }}/swarm/v1/chat/completions",
+  150: "http://{{ gateway_node_ip }}/swarm/v1/chat/completions",
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\developer-guide\api\models.md ===
+  46: curl http://{{ gateway_node_ip }}/swarm/v1/models | python -m json.tool
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\developer-guide\comfyui-workflows.md ===
+  60: 1. Access ComfyUI at `http://{{ execution_node_ip }}:8188`
+  94: curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\developer-guide\local-dev.md ===
+  53: LOVELACE_IP=127.0.0.1
+  54: HOPPER_IP=127.0.0.1
+  55: TURING_IP=127.0.0.1
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\faq\models.md ===
+  54: curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags | python -m json.tool
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\faq\troubleshooting-faq.md ===
+  12: 2. Check if Ollama is healthy: `curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags`
+  17: 1. Verify ComfyUI is running: `curl http://{{ execution_node_ip }}:8188/system_stats`
+  24: 2. Verify Whisper: `curl http://{{ execution_node_ip }}:9000/health`
+  25: 3. Verify Piper: `curl http://{{ execution_node_ip }}:5500/health`
+  46: - Network latency: `ping {{ execution_node_ip }}`
+  52: curl http://{{ gateway_node_ip }}/health   # Gateway health check
+  58: - **Grafana/Loki**: `http://{{ gateway_node_ip }}:3001`
+  59: - **Langfuse traces**: `http://{{ control_node_ip }}:3000`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\getting-started\concepts.md ===
+  129: | **Control Plane** | Dell Hopper ({{ control_node_ip }}) | Identity, databases, observability, memory |
+  130: | **Execution Plane** | Lovelace ({{ execution_node_ip }}) | GPU inference, agent runtime, creative tools |
+  131: | **Gateway** | Dell Turing ({{ gateway_node_ip }}) | Reverse proxy, monitoring, secondary inference |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\getting-started\overview.md ===
+  39: | **Control Plane** | Dell Hopper | {{ control_node_ip }} | Identity (SPIRE), databases (PostgreSQL, ClickHouse), observability (Langfuse), memory (MemPalace) |
+  40: | **Execution Plane** | Lovelace (RTX 5060 Ti 16GB) | {{ execution_node_ip }} | GPU inference (Ollama), Agent Runtime (FastAPI), ComfyUI, Voice Engine, OpenHands |
+  41: | **Gateway** | Dell PowerEdge Turing (RTX 3070 Ti 8GB) | {{ gateway_node_ip }} | Reverse proxy (Traefik), monitoring (Prometheus, Grafana, Loki), secondary inference |
+  46: Gateway[Gateway · Turing] -->|/swarm/*| Execution[Execution · Lovelace]
+  47: Execution -->|identity| Control[Control · Hopper]
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\getting-started\quickstart-admin.md ===
+  67: LOVELACE_IP=192.168.2.101
+  68: HOPPER_IP=192.168.2.102
+  69: TURING_IP=192.168.2.103
+  115: ssh Turing
+  116: cd ~/Home_AI_Lab/turing_gateway
+  141: If all four return valid JSON, the cluster is operational. Open `http://{{ gateway_node_ip }}` to access the Hive UI.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\getting-started\quickstart-developer.md ===
+  101: ├── turing_gateway/            # Gateway Node Docker Compose
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\getting-started\quickstart-user.md ===
+  19: http://{{ gateway_node_ip }}
+  92: | Hive Mind UI | `http://{{ gateway_node_ip }}` | Primary interface |
+  93: | Grafana | `http://{{ gateway_node_ip }}:3001` | Monitoring dashboards |
+  94: | Langfuse | `http://{{ control_node_ip }}:3000` | LLM trace viewer |
+  95: | ComfyUI | `http://{{ gateway_node_ip }}/comfy` | Image workflow editor |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\services\comfyui.md ===
+  13: | **Node** | Execution ({{ execution_node_ip }}) |
+  15: | **URL** | `http://{{ execution_node_ip }}:8188` |
+  30: f"http://{{ execution_node_ip }}:8188/prompt",
+  36: status = requests.get(f"http://{{ execution_node_ip }}:8188/history/{prompt_id}")
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\services\hive-ui.md ===
+  13: | **URL** | `http://{{ gateway_node_ip }}/` |
+  32: http://{{ gateway_node_ip }}/
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\services\langfuse.md ===
+  13: | **Node** | Control Plane ({{ control_node_ip }}) |
+  15: | **URL** | `http://{{ control_node_ip }}:3000` |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\services\mempalace.md ===
+  13: | **Node** | Control Plane ({{ control_node_ip }}) |
+  15: | **URL** | `http://{{ control_node_ip }}:8200` |
+  37: client = MemPalaceClient(url="http://{{ control_node_ip }}:8200")
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\services\ollama.md ===
+  13: | Primary | Execution ({{ execution_node_ip }}) | {{ ollama_port }} | RTX 5060 Ti 16 GB |
+  14: | Secondary | Gateway ({{ gateway_node_ip }}) | 11435 | RTX 3070 Ti 8 GB |
+  26: curl http://{{ execution_node_ip }}:{{ ollama_port }}/v1/chat/completions \
+  30: curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags
+  33: curl -X POST http://{{ execution_node_ip }}:{{ ollama_port }}/api/pull \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\services\openhands.md ===
+  13: | **Node** | Execution ({{ execution_node_ip }}) |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\services\spire.md ===
+  13: | SPIRE Server | Control ({{ control_node_ip }}) | 8081 |
+  14: | SPIRE Agent | Execution ({{ execution_node_ip }}) | Unix socket |
+  15: | SPIRE Agent | Gateway ({{ gateway_node_ip }}) | Unix socket |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\config.md ===
+  31: config.langfuse_host    # http://{{ control_node_ip }}:3000
+  45: | `LANGFUSE_HOST` | `langfuse_host` | `http://{{ control_node_ip }}:3000` |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\image-agent.md ===
+  30: 4. Submits workflow to ComfyUI API (`http://{{ execution_node_ip }}:8188`)
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\modules\metrics.md ===
+  60: - targets: ['{{ execution_node_ip }}:{{ agent_runtime_port }}']
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\procedures\add-model.md ===
+  34: curl -X POST http://{{ execution_node_ip }}:{{ ollama_port }}/v1/chat/completions \
+  60: curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags | python -m json.tool
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\procedures\configure-alerting.md ===
+  13: Edit `turing_gateway/config/prometheus/alert_rules.yml`:
+  38: Edit `turing_gateway/config/alertmanager/alertmanager.yml`:
+  71: curl -X POST http://{{ gateway_node_ip }}:9093/api/v1/alerts \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\procedures\log-analysis.md ===
+  11: Open Grafana at `http://{{ gateway_node_ip }}:3001`, select the **Loki** data source, and use the **Explore** tab.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\procedures\onboard-user.md ===
+  15: - **LAN**: `http://{{ gateway_node_ip }}/`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\procedures\performance-tuning.md ===
+  72: - Verify LAN latency: `ping {{ execution_node_ip }}` should be < 1ms
+  79: time curl -s -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\procedures\rotate-spire-keys.md ===
+  31: -spiffeID spiffe://home-ai-lab/turing-gateway \
+  54: # Same process on Turing
+  56: nano turing_gateway/config/spire/agent.conf
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\procedures\switch-models.md ===
+  38: curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\reference\environment-variables.md ===
+  21: | `OLLAMA_HOST` | Ollama server address | `{{ execution_node_ip }}` |
+  32: | `HOPPER_IP` | Control Plane address | `{{ control_node_ip }}` |
+  33: | `LOVELACE_IP` | Execution Plane address | `{{ execution_node_ip }}` |
+  34: | `TURING_IP` | Gateway / Turing address | `{{ gateway_node_ip }}` |
+  72: | `COMFYUI_HOST` | ComfyUI server address | `{{ execution_node_ip }}` |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\reference\glossary.md ===
+  13: | **Control Node** | The server ({{ control_node_ip }}) running SPIRE, PostgreSQL, and Langfuse |
+  16: | **Execution Node** | The server ({{ execution_node_ip }}) running Ollama, Agent Runtime, ComfyUI, and voice services |
+  17: | **Gateway Node** | The Turing server ({{ gateway_node_ip }}) running Traefik, Prometheus, Grafana, and Loki |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\troubleshooting\agent-runtime.md ===
+  55: curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\troubleshooting\comfyui.md ===
+  15: curl http://{{ execution_node_ip }}:8188/system_stats
+  76: **Symptom**: `http://{{ execution_node_ip }}:8188` doesn't respond.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\troubleshooting\langfuse.md ===
+  9: **Symptom**: `http://{{ control_node_ip }}:3000` doesn't respond.
+  37: 2. Test connectivity from agent runtime: `curl http://{{ control_node_ip }}:3000/api/public/health`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\troubleshooting\network.md ===
+  9: **Symptom**: Requests to `{{ gateway_node_ip }}` return 404 or timeout.
+  15: curl http://{{ gateway_node_ip }}:8080/api/overview
+  18: curl http://{{ gateway_node_ip }}:8080/api/http/routers | python -m json.tool
+  37: ping {{ execution_node_ip }}
+  40: curl -v http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\troubleshooting\spire.md ===
+  57: 2. Check network connectivity: `ping {{ control_node_ip }}`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\troubleshooting\voice.md ===
+  15: curl http://{{ execution_node_ip }}:9000/health
+  35: curl http://{{ execution_node_ip }}:5500/health
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\tutorials\first-chat.md ===
+  20: http://{{ gateway_node_ip }}/
+  59: Open Langfuse at `http://{{ control_node_ip }}:3000` to see the full trace of your conversation, including:
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\tutorials\generate-image.md ===
+  17: Navigate to `http://{{ gateway_node_ip }}/` and open a new conversation.
+  33: 3. **Queues the job** on ComfyUI at `{{ execution_node_ip }}:8188`
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\tutorials\train-preferences.md ===
+  55: curl -X POST http://{{ gateway_node_ip }}/swarm/v1/training/trigger \
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\tutorials\voice-assistant.md ===
+  24: curl http://{{ execution_node_ip }}:9000/health
+  27: curl http://{{ execution_node_ip }}:5500/health
+  32: In the Hive UI (`http://{{ gateway_node_ip }}/`):
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\user-guide\art-studio.md ===
+  13: - **ComfyUI Direct**: `http://{{ execution_node_ip }}:8188` for node-based workflow editing
+  50: Power users can access ComfyUI directly at `http://{{ execution_node_ip }}:8188` to:
+  96: | `turing_gateway/comfyui/` | Infrastructure | ComfyUI workflows for image & 3D generation |
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\user-guide\chat.md ===
+  13: - **URL**: `http://{{ gateway_node_ip }}/swarm/v1/chat/completions`
+  26: curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+  43: "http://{{ gateway_node_ip }}/swarm/v1/chat/completions",
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\user-guide\code-assistant.md ===
+  55: Access OpenHands directly at `http://{{ gateway_node_ip }}:3002`.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\user-guide\index.md ===
+  16: | **Voice** | BMO voice synthesis and TTS | [Voice](voice.md) |
+  32: | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
+  46: When service ports or URLs change, update the "How Do I Access It?" table. Cross-reference `turing_gateway/docker-compose.yml` for current port mappings.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\user-guide\voice.md ===
+  23: 3. Synthesizes audio using the BMO voice profile via RVC
+  39: curl -X POST http://{{ gateway_node_ip }}/swarm/v1/voice/chat \
+  55: Pre-recorded BMO voice samples are available at:
+  58: http://{{ execution_node_ip }}:{{ agent_runtime_port }}/voice_samples/{filename}
+  75: - [Module: BMO Voice](../modules/voice-agent.md) — RVC synthesis service
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\docs\index.md ===
+  25: subgraph Gateway["Gateway Node · Turing<br/>{{ gateway_node_ip }}"]
+  32: subgraph Execution["Execution Node · Lovelace<br/>{{ execution_node_ip }}"]
+  39: subgraph Control["Control Node<br/>{{ control_node_ip }}"]
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\docs-site\mkdocs.yml ===
+  107: control_node_ip: "192.168.2.102"
+  108: execution_node_ip: "192.168.2.101"
+  109: gateway_node_ip: "192.168.2.103"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\execution_plane\.env ===
+  10: SPIRE_Turing_JOIN_TOKEN=a4ad893e-f01c-48ec-93c3-5dcf76ab4a4e
+  12: LOVELACE_IP=192.168.2.101
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\execution_plane\deploy_phase3.sh ===
+  2: # Phase 3 Cleanup - Remove monitoring services from Lovelace compose
+  3: # Run this on Lovelace (misterobots@192.168.2.101) locally
+  10: echo "🔄 Phase 3: Removing Monitoring Services from Lovelace"
+  31: 'bmo-voice',
+  119: echo "Lovelace now COMPUTE ONLY - Monitoring on Turing Gateway (192.168.2.103)"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\execution_plane\docker-compose.yml ===
+  1: # LOVELACE EXECUTION PLANE - PHASE 3
+  3: # Kept: Compute services (Ollama, ComfyUI, BMO Voice, OpenHands, Agent Runtime, Agent UI, Ops Portal)
+  4: # NOTE: Services are now accessed through Turing Traefik Gateway on port 80/443
+  5: # Routing: Lovelace (192.168.2.101) <- Turing Traefik (192.168.2.103:80) <- Existing media stack
+  56: # BMO VOICE - RVC Inference Engine
+  57: bmo-voice:
+  59: context: ../agents/bmo_voice
+  61: container_name: bmo_voice_gpu
+  75: - ../agents/bmo_voice:/app
+  80: - "traefik.http.routers.bmo-voice.rule=PathPrefix(`/bmo`)"
+  81: - "traefik.http.routers.bmo-voice.entrypoints=web"
+  82: - "traefik.http.services.bmo-voice.loadbalancer.server.port=8000"
+  175: # MemPalace API (Turing gateway)
+  186: # BMO Voice LLM — small 3B model that fits alongside comfyui
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\execution_plane\ts.txt ===
+  1: 100.66.218.35   lovelace           pause.not@  windows  -
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\migration_backup_20260314_163149\phase-0\control_plane_docker-compose.yml ===
+  153: - NEXTAUTH_URL=http://${HOPPER_IP}:3000
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\migration_backup_20260314_163149\phase-0\execution_plane_docker-compose.yml ===
+  1: # LOVELACE EXECUTION PLANE - PHASE 3
+  3: # Kept: Compute services (Ollama, ComfyUI, BMO Voice, OpenHands, Agent Runtime, Agent UI, Ops Portal)
+  4: # NOTE: Services are now accessed through Turing Traefik Gateway on port 80/443
+  5: # Routing: Lovelace (192.168.2.101) <- Turing Traefik (192.168.2.103:80) <- Existing media stack
+  56: # BMO VOICE - RVC Inference Engine
+  57: bmo-voice:
+  59: context: ../agents/bmo_voice
+  61: container_name: bmo_voice_gpu
+  75: - ../agents/bmo_voice:/app
+  80: - "traefik.http.routers.bmo-voice.rule=PathPrefix(`/bmo`)"
+  81: - "traefik.http.routers.bmo-voice.entrypoints=web"
+  82: - "traefik.http.services.bmo-voice.loadbalancer.server.port=8000"
+  171: # BMO Voice LLM — small 3B model that fits alongside comfyui
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\migration_backup_20260314_163149\phase-0\turing_gateway_docker-compose.yml ===
+  1: # Turing Gateway & Ops Hub Docker Compose
+  4: # Compute services (Ollama, BMO Voice, ComfyUI, etc.) remain on the Execution Node
+  10: container_name: docker-socket-proxy-turing
+  36: spire-agent-turing:
+  38: container_name: spire-agent-turing
+  39: hostname: spire-agent-turing
+  63: container_name: prometheus-turing
+  64: hostname: prometheus-turing
+  77: - "${EXECUTION_NODE_HOST:-execution-node}:${LOVELACE_IP:-192.168.2.101}"
+  78: - "${CONTROL_NODE_HOST:-control-node}:${HOPPER_IP:-192.168.2.102}"
+  89: container_name: alertmanager-turing
+  90: hostname: alertmanager-turing
+  119: container_name: blackbox-exporter-turing
+  120: hostname: blackbox-exporter-turing
+  130: - "${EXECUTION_NODE_HOST:-execution-node}:${LOVELACE_IP:-192.168.2.101}"
+  131: - "${CONTROL_NODE_HOST:-control-node}:${HOPPER_IP:-192.168.2.102}"
+  137: container_name: loki-turing
+  138: hostname: loki-turing
+  156: container_name: promtail-turing
+  157: hostname: promtail-turing
+  169: container_name: cadvisor-turing
+  170: hostname: cadvisor-turing
+  196: container_name: grafana-turing
+  197: hostname: grafana-turing
+  245: container_name: redis-turing
+  246: hostname: redis-turing
+  263: # INFERENCE SERVICES (Secondary, lower priority than Lovelace)
+  268: container_name: ollama-turing
+  269: hostname: ollama-turing
+  272: spire-agent-turing:
+  300: - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/ollama-turing"
+  304: container_name: open-webui-turing
+  352: - LANGFUSE_URL=http://${HOPPER_IP:-192.168.2.102}:3000
+  355: - HOPPER_IP=${HOPPER_IP:-192.168.2.102}
+  356: - NEXT_PUBLIC_GATEWAY_URL=http://${TURING_IP:-192.168.2.103}
+  357: - NEXT_PUBLIC_GRAFANA_URL=http://${TURING_IP:-192.168.2.103}/grafana
+  358: - GRAFANA_INTERNAL_URL=http://grafana-turing:3000
+  360: - "${EXECUTION_NODE_HOST:-execution-node}:${LOVELACE_IP:-192.168.2.101}"
+  409: # DEVELOPMENT TOOLS (migrated from Lovelace, Phase 8)
+  457: - "8445:8443"  # 8443 used by Saltbox/Traefik on Turing
+  499: # OPS PORTAL — Admin Dashboard (migrated from Lovelace, Phase 8)
+  541: container_name: ntfy-turing
+  621: # Code Servers (migrated from Lovelace)
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\config\prometheus\prometheus.yml ===
+  9: # Turing node — container-level metrics (CPU, memory, network, disk I/O)
+  10: - job_name: 'cadvisor-turing'
+  14: - targets: ['cadvisor-turing:8080']
+  16: node: 'turing'
+  18: # Lovelace node — GPU execution plane container metrics
+  24: node: 'lovelace'
+  26: # Lovelace — Agent Runtime (custom Prometheus metrics: agent_state, workflow_steps, training_*, ab_test_*)
+  33: node: 'lovelace'
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\config\promtail\promtail.yml ===
+  9: - url: http://loki-turing:3100/loki/api/v1/push
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\provisioning\datasources\datasource.yml ===
+  4: # all dashboard JSON files (turing_gateway/dashboards/*.json).
+  21: url: http://prometheus-turing:9090
+  29: url: http://loki-turing:3100
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\scripts\sync-spire-bundle.sh ===
+  8: BUNDLE_PATH="/home/misterobots/Home_AI_Lab/turing_gateway/config/spire/certs/spire-server-bundle.crt"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\.env ===
+  2: # turing_gateway/.env — Turing Gateway compose-time variables
+  28: LOVELACE_IP=192.168.2.101
+  30: HOPPER_IP=192.168.2.102
+  31: TURING_IP=192.168.2.103
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\docker-compose-monitoring-fixed.yml ===
+  1: # Turing Monitoring Stack - FIXED VERSION
+  16: container_name: prometheus-turing
+  17: hostname: prometheus-turing
+  38: container_name: loki-turing
+  39: hostname: loki-turing
+  58: container_name: promtail-turing
+  59: hostname: promtail-turing
+  73: - HOSTNAME=turing
+  74: - LOKI_URL=http://loki-turing:3100
+  82: container_name: cadvisor-turing
+  83: hostname: cadvisor-turing
+  105: container_name: grafana-turing
+  106: hostname: grafana-turing
+  133: redis-monitoring-turing:
+  135: container_name: redis-monitoring-turing
+  136: hostname: redis-monitoring-turing
+  163: name: monitoring-turing
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\docker-compose-monitoring-stack.yml ===
+  1: # Turing Monitoring Stack (to be added to existing docker-compose)
+  11: container_name: prometheus-turing
+  12: hostname: prometheus-turing
+  33: container_name: loki-turing
+  34: hostname: loki-turing
+  52: container_name: promtail-turing
+  53: hostname: promtail-turing
+  65: container_name: cadvisor-turing
+  66: hostname: cadvisor-turing
+  88: container_name: grafana-turing
+  89: hostname: grafana-turing
+  117: container_name: redis-monitoring-turing
+  118: hostname: redis-monitoring-turing
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\docker-compose.yml ===
+  1: # Turing Gateway & Ops Hub Docker Compose
+  4: # Compute services (Ollama, BMO Voice, ComfyUI, etc.) remain on the Execution Node
+  10: container_name: docker-socket-proxy-turing
+  36: spire-agent-turing:
+  38: container_name: spire-agent-turing
+  39: hostname: spire-agent-turing
+  63: container_name: prometheus-turing
+  64: hostname: prometheus-turing
+  77: - "${EXECUTION_NODE_HOST:-execution-node}:${LOVELACE_IP:-192.168.2.101}"
+  78: - "${CONTROL_NODE_HOST:-control-node}:${HOPPER_IP:-192.168.2.102}"
+  89: container_name: alertmanager-turing
+  90: hostname: alertmanager-turing
+  119: container_name: blackbox-exporter-turing
+  120: hostname: blackbox-exporter-turing
+  130: - "${EXECUTION_NODE_HOST:-execution-node}:${LOVELACE_IP:-192.168.2.101}"
+  131: - "${CONTROL_NODE_HOST:-control-node}:${HOPPER_IP:-192.168.2.102}"
+  137: container_name: loki-turing
+  138: hostname: loki-turing
+  156: container_name: promtail-turing
+  157: hostname: promtail-turing
+  169: container_name: cadvisor-turing
+  170: hostname: cadvisor-turing
+  196: container_name: grafana-turing
+  197: hostname: grafana-turing
+  252: container_name: redis-turing
+  253: hostname: redis-turing
+  271: # All primary task models now consolidated on Lovelace (qwen3:14b).
+  272: # Turing handles only: llama-guard-3:8b (async safety), nomic-embed (embeddings).
+  277: container_name: ollama-turing
+  278: hostname: ollama-turing
+  281: spire-agent-turing:
+  309: - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/ollama-turing"
+  313: container_name: open-webui-turing
+  362: - LANGFUSE_URL=http://${HOPPER_IP:-192.168.2.102}:3000
+  365: - HOPPER_IP=${HOPPER_IP:-192.168.2.102}
+  366: - NEXT_PUBLIC_GATEWAY_URL=http://${TURING_IP:-192.168.2.103}
+  367: - NEXT_PUBLIC_GRAFANA_URL=http://${TURING_IP:-192.168.2.103}/grafana
+  368: - GRAFANA_INTERNAL_URL=http://grafana-turing:3000/grafana
+  370: - "${EXECUTION_NODE_HOST:-execution-node}:${LOVELACE_IP:-192.168.2.101}"
+  443: - SECONDARY_OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
+  459: - "${EXECUTION_NODE_HOST:-execution-node}:${LOVELACE_IP:-192.168.2.101}"
+  494: # DEVELOPMENT TOOLS (migrated from Lovelace, Phase 8)
+  542: - "8445:8443"  # 8443 used by Saltbox/Traefik on Turing
+  584: # OPS PORTAL — Admin Dashboard (migrated from Lovelace, Phase 8)
+  626: container_name: ntfy-turing
+  735: # Code Servers (migrated from Lovelace)
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\phase4_config.sh ===
+  30: echo "  Location: ~/turing_gateway/config/loki/loki.yml"
+  63: echo "  • Storage is allocated on Turing (/tmp/loki)"
+  76: echo "GPU Configuration for Lovelace (RTX 5060 Ti - 16GB VRAM):"
+  146: echo "  WebUI:   http://192.168.2.103/comfy (via Turing Traefik)"
+  149: echo "BMO Voice (RVC Inference):"
+  151: echo "  Gateway: http://192.168.2.103/bmo (via Turing Traefik)"
+  155: echo "  Gateway: http://192.168.2.103/voice (via Turing Traefik)"
+  166: echo "  Gateway: http://192.168.2.103/ai (via Turing Traefik)"
+  170: echo "  Gateway: http://192.168.2.103/ops (via Turing Traefik)"
+  174: echo "  Gateway: http://192.168.2.103/hands (via Turing Traefik)"
+  180: echo "  Gateway: http://192.168.2.103/devops (via Turing Traefik)"
+  185: echo "  Gateway: http://192.168.2.103/code (via Turing Traefik)"
+  192: echo "  Outpost: Integrated with Traefik on Turing"
+  196: echo "=== MONITORING STACK (Turing) ==="
+  211: echo "  Running on: Turing"
+  213: echo "  Exports:    → Loki on Turing"
+  222: echo "External Access (via Turing Traefik):"
+  229: echo "      │ Turing    │              │Justin│"
+  244: echo "  • Monitoring and logging consolidated on Turing"
+  255: echo "  3. Create Grafana dashboards for Lovelace metrics"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\setup_monitoring.sh ===
+  2: # Setup script for Turing Monitoring Stack
+  3: # Run this on Turing: bash setup_monitoring.sh
+  7: echo "🚀 Setting up Turing Monitoring Stack..."
+  9: WORK_DIR="$HOME/turing_gateway"
+  35: - targets: ['cadvisor-turing:8080']
+  117: - url: http://loki-turing:3100/loki/api/v1/push
+  150: url: http://prometheus-turing:9090
+  168: url: http://loki-turing:3100
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\turing_gateway\validate_phase2.sh ===
+  2: # Phase 2 Validation Script - Run on Turing
+  4: echo "🔍 Phase 2: Validating Turing Monitoring Stack"
+  10: docker compose -f ~/turing_gateway/docker-compose-monitoring-fixed.yml ps
+  25: docker logs promtail-turing --tail=5 | grep -E "Starting|Connected|Error" || echo "   (Checking logs...)"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\scripts\fix_hive_cors.sh ===
+  4: COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\scripts\fix_hive_proxy.sh ===
+  4: COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
+  8: echo "LOVELACE_IP=100.112.7.31" > "$NETENV"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\scripts\fix_hive_proxy_v2.sh ===
+  4: COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\scripts\fix_hive_proxy_v3.sh ===
+  4: COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\scripts\fix_tls_warnings.sh ===
+  3: COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\scripts\register_turing_workloads.sh ===
+  2: # SPIRE Turing Workload Registration Script
+  3: # Run this on the control plane (Hopper) after Turing SPIRE agent is running
+  10: echo "=== SPIRE Turing Workload Registration ==="
+  22: # Step 1: Generate a join token for the Turing SPIRE Agent
+  23: echo "Generating join token for Turing SPIRE Agent..."
+  25: -spiffeID spiffe://$TRUST_DOMAIN/spire-agent-turing \
+  29: echo "ACTION REQUIRED: Add the token above to turing_gateway/.env as SPIRE_Turing_JOIN_TOKEN=<token>"
+  32: # Step 2: Register Turing Ollama workload
+  33: echo "Registering Turing ollama workload..."
+  35: -spiffeID spiffe://$TRUST_DOMAIN/inference/ollama-turing \
+  36: -parentID spiffe://$TRUST_DOMAIN/spire-agent-turing \
+  41: echo "=== Turing Registration Complete ==="
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\services\home_assistant\addons\README.md ===
+  3: Native Home Assistant add-on scaffolds that should be installed on the Home Assistant box rather than on Hive or the Turing.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\services\home_assistant\README.md ===
+  3: Native Home Assistant deployment assets that belong on the Home Assistant box at `192.168.2.100`, not on Hive or the Turing gateway.
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\services\saltbox\README.md ===
+  3: Custom services deployed on the Turing following the [Saltbox Traefik Template](https://docs.saltbox.dev/reference/modules/traefik_template/) pattern.
+  14: Each service is deployed independently under `/opt/<appname>/` on the Turing:
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\engineering_overview.md ===
+  28: - **Hardware**: Dell Hopper Thin Client
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\network.env ===
+  8: LOVELACE_IP=192.168.2.101
+  10: HOPPER_IP=192.168.2.102
+  11: TURING_IP=192.168.2.103
+  39: SPIRE_Turing_JOIN_TOKEN=a4ad893e-f01c-48ec-93c3-5dcf76ab4a4e
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\phase1_turing_setup.sh ===
+  2: # Turing PHASE 1 SETUP - Run these commands on Turing (ubuntu@192.168.2.103)
+  6: echo "=== PHASE 1: Deploy Turing Gateway Stack ==="
+  10: echo "[Step 3] Creating config directories on Turing..."
+  11: mkdir -p ~/turing_gateway/config/{prometheus,loki,promtail,grafana}
+  15: # Step 4: Copy Prometheus config from Lovelace
+  16: echo "[Step 4] Copying Prometheus config from Lovelace..."
+  17: scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/prometheus ~/turing_gateway/config/
+  21: # Step 4a: Update Prometheus targets to point to Lovelace
+  22: echo "[Step 4a] Updating Prometheus targets to scrape Lovelace..."
+  23: sed -i 's/localhost/192.168.2.101/g' ~/turing_gateway/config/prometheus/prometheus.yml
+  25: grep -A2 "targets:" ~/turing_gateway/config/prometheus/prometheus.yml | head -6
+  28: # Step 4b: Add cAdvisor target for Lovelace
+  29: echo "[Step 4b] Adding cAdvisor target for Lovelace..."
+  30: cat >> ~/turing_gateway/config/prometheus/prometheus.yml << 'EOF'
+  41: scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/loki ~/turing_gateway/config/
+  42: scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/promtail ~/turing_gateway/config/
+  44: ls -la ~/turing_gateway/config/
+  48: echo "[Step 6] Copying docker-compose file to Turing..."
+  50: # scp ~/docker-compose-new.yml ubuntu@192.168.2.103:~/turing_gateway/docker-compose.yml
+  54: # Step 7: Deploy to Turing
+  55: echo "[Step 7] Starting Docker Compose services on Turing..."
+  56: cd ~/turing_gateway
+
+=== C:\Users\panca\Documents\Github\Agent_Swarm\SPIRE Architecture Documentation.md ===
+  5206: lovelace (short form)
+  5210: I see your setup. Your current machine is `lovelace-2` (IP: `100.66.218.35`) and your collaborator Travis (`travis-laptop`) needs access.
+

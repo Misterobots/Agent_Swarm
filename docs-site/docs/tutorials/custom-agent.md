@@ -1,4 +1,4 @@
----
+﻿---
 title: "Tutorial: Create a Custom Agent"
 ---
 
@@ -22,7 +22,7 @@ Build, register, and deploy your own specialized agent.
 Create `agents/my_agent.py`:
 
 ```python
-from agents.coordinator import Coordinator
+from agents.lamport import Coordinator
 from agents.logger_setup import get_logger
 
 logger = get_logger("my_agent")
@@ -121,3 +121,5 @@ docker compose up -d agent-runtime
 
 - [Developer Guide: Adding Agents](../developer-guide/adding-agents.md) — detailed guide
 - [Developer Guide: Adding Tools](../developer-guide/adding-tools.md) — tool development
+
+

@@ -1,4 +1,4 @@
----
+﻿---
 title: "Service: Langfuse"
 ---
 
@@ -10,9 +10,9 @@ LLM observability and tracing service.
 
 | Property | Value |
 |----------|-------|
-| **Node** | Control Plane ({{ control_node_ip }}) |
+| **Node** | Control Plane ({{ hopper_ip }}) |
 | **Port** | 3000 |
-| **URL** | `http://{{ control_node_ip }}:3000` |
+| **URL** | `http://{{ hopper_ip }}:3000` |
 | **Backend** | ClickHouse + PostgreSQL |
 | **Compose** | `control_plane/docker-compose.yml` |
 
@@ -58,3 +58,5 @@ trace.score(name="verification", value=0.85)
 
 - [Architecture: Observability](../../architecture/observability.md)
 - [Admin: Monitoring](../../admin-guide/operations/monitoring.md)
+
+

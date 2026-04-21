@@ -57,3 +57,5 @@ Intent=IOT_CONTROL → tools=[ha_call_service, ha_turn_on], level=L5
 - [Architecture: Security Model](../security-model.md) — full security architecture
 - `agents/security/token_issuer.py` — Token Issuer implementation
 - `agents/security/capability_gate.py` — Token validation and enforcement
+
+

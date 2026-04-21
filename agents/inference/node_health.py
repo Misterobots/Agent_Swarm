@@ -1,4 +1,4 @@
-"""
+﻿"""
 node_health.py — Ollama Node Health Monitor
 
 Maintains a cached view of which Ollama nodes are alive and which models
@@ -54,12 +54,12 @@ class NodeHealthMonitor:
 
         nodes = {
             ollama_host: NodeStatus(
-                host=ollama_host, name="justin-pc", vram_mb=16384
+                host=ollama_host, name="Lovelace", vram_mb=16384
             ),
         }
         if secondary_host and secondary_host != ollama_host:
             nodes[secondary_host] = NodeStatus(
-                host=secondary_host, name="r730", vram_mb=8192
+                host=secondary_host, name="Turing", vram_mb=8192
             )
         return nodes
 
@@ -180,3 +180,5 @@ def get_node_monitor() -> NodeHealthMonitor:
     if _monitor is None:
         _monitor = NodeHealthMonitor()
     return _monitor
+
+

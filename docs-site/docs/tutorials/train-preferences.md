@@ -1,4 +1,4 @@
----
+﻿---
 title: "Tutorial: Train Preferences"
 ---
 
@@ -52,7 +52,7 @@ Training pairs are stored in `training_data/`:
 
 ```bash
 # Trigger training
-curl -X POST http://{{ gateway_node_ip }}/swarm/v1/training/trigger \
+curl -X POST http://{{ turing_ip }}/swarm/v1/training/trigger \
     -H "Content-Type: application/json" \
     -d '{"owner_id": "user-123"}'
 ```
@@ -74,3 +74,5 @@ graph LR
 
 - [User Guide: Training](../user-guide/training-interface.md) — full training reference
 - [Architecture: MarsRL](../architecture/marsrl.md) — how MarsRL works
+
+

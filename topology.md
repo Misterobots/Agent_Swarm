@@ -1,4 +1,4 @@
-# System Architecture: Home AI Lab v2
+﻿# System Architecture: Home AI Lab v2
 
 ## 🗺️ High-Level Topology
 
@@ -52,7 +52,7 @@ graph TD
 | **Agent UI** | `8501` | 💬 Chat Interface |
 | **ComfyUI** | `8188` | 🎨 Image Engine |
 | **Ollama** | `11434`| 🧠 AI Models |
-| **Grafana** | `80` | 📊 Metrics |
+| **hollerith** | `80` | 📊 Metrics |
 | **Validation**| `5000` | 👁️ Visual Checks |
 
 ---
@@ -63,3 +63,5 @@ Use `launch_swarm.bat` to manage the entire system.
 
 *   **startup**: Launches Docker + ComfyUI together.
 *   **shutdown**: Press **`Q`** in the launcher window to clean kill all processes.
+
+

@@ -1,4 +1,4 @@
----
+﻿---
 title: "Procedure: Performance Tuning"
 ---
 
@@ -69,16 +69,18 @@ services:
 
 ### Network Latency
 
-- Verify LAN latency: `ping {{ execution_node_ip }}` should be < 1ms
+- Verify LAN latency: `ping {{ lovelace_ip }}` should be < 1ms
 - Use wired connections for GPU nodes (not WiFi)
 
 ## Benchmarking
 
 ```bash
 # Simple latency test
-time curl -s -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+time curl -s -X POST http://{{ turing_ip }}/swarm/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"messages": [{"role": "user", "content": "Hello"}], "stream": false}'
 ```
 
 Target: < 5 seconds for simple chat responses.
+
+

@@ -1,10 +1,10 @@
----
+﻿---
 title: Deploy Execution Plane
 ---
 
 # Deploy Execution Plane
 
-The Execution Plane (Justin-PC, {{ execution_node_ip }}) runs all GPU compute: Ollama, Agent Runtime, ComfyUI, Voice Engine, and sandboxed code execution.
+The Execution Plane (Lovelace, {{ lovelace_ip }}) runs all GPU compute: Ollama, Agent Runtime, ComfyUI, Voice Engine, and sandboxed code execution.
 
 ## Services
 
@@ -113,3 +113,5 @@ Key Ollama environment variables in `docker-compose.yml`:
 ## Next
 
 → [Deploy Gateway](gateway.md)
+
+

@@ -1,4 +1,4 @@
-from architect_agent import get_architect_agent
+﻿from leibniz_agent import get_architect_agent
 from tools.file_ops import write_file
 
 if __name__ == "__main__":

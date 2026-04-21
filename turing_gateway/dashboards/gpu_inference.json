@@ -1,4 +1,4 @@
-{
+﻿{
   "annotations": {
     "list": []
   },
@@ -92,7 +92,7 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "up{job=~\"agent-runtime|cadvisor-justin|cadvisor-r730\"}",
+          "expr": "up{job=~\"agent-runtime|cadvisor-justin|cadvisor-turing\"}",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
@@ -111,7 +111,7 @@
       },
       "id": 201,
       "panels": [],
-      "title": "OLLAMA \u2014 Justin-PC (RTX 5060 Ti 16GB)",
+      "title": "OLLAMA \u2014 Lovelace (RTX 5060 Ti 16GB)",
       "type": "row"
     },
     {

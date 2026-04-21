@@ -55,3 +55,5 @@ Describe the end-to-end routing pipeline from request ingress through intent cla
 
 ## Open Follow-Ups
 - Operational rollout from parse mode to soft/hard enforcement is tracked in governance closure packet residuals.
+
+

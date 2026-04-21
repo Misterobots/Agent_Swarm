@@ -1,4 +1,4 @@
-# Key Compromise Incident Checklist
+﻿# Key Compromise Incident Checklist
 
 Document ID: SEC-KEY-003
 Domain: Security
@@ -68,6 +68,6 @@ Record:
 5. Follow-up action items.
 
 ## Alert Mapping
-1. Prometheus rule file: `r730_gateway/config/prometheus/auth_alert_rules.yml`
+1. Prometheus rule file: `turing_gateway/config/prometheus/auth_alert_rules.yml`
 2. Primary alert for runbook entry: `AgentRuntimeAuth401RateSpike`
 3. Supporting alerts: `AgentRuntimeAuth403RateSpike`, `AgentRuntimeMetricsUnavailable`

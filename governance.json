@@ -68,5 +68,31 @@
       "Updated in Next UI to COMPLETED"
     ],
     "admin_notes": null
+  },
+  "969bb771": {
+    "id": "969bb771",
+    "type": "OTHER",
+    "description": "test",
+    "user": "coding_user",
+    "timestamp": "2026-04-20T22:44:36.515632",
+    "status": "PENDING",
+    "assessment_notes": [
+      "Security Assessment: MANUAL_REVIEW: Non-standard request type.",
+      "Technical Check: COMPATIBLE"
+    ],
+    "admin_notes": null
+  },
+  "1b08e85a": {
+    "id": "1b08e85a",
+    "type": "OTHER",
+    "description": "ui retest after fix",
+    "user": "coding_user",
+    "timestamp": "2026-04-20T22:49:38.861028",
+    "status": "PENDING",
+    "assessment_notes": [
+      "Security Assessment: MANUAL_REVIEW: Non-standard request type.",
+      "Technical Check: COMPATIBLE"
+    ],
+    "admin_notes": null
   }
 }

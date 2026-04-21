@@ -48,3 +48,4 @@ mkdir -p ~/home_ai_lab/control_plane
 echo "--- Bootstrap Complete ---"
 echo "WARNING: You must LOG OUT and LOG BACK IN for Docker permissions to work."
 echo "Command: exit"
+

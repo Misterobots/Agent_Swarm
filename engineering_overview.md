@@ -1,4 +1,4 @@
-# Home AI Lab: Engineering Datasheet
+﻿# Home AI Lab: Engineering Datasheet
 
 **Version**: 1.0 (Phase 3 Alpha)
 **Date**: January 2026
@@ -14,7 +14,7 @@ The **Home AI Lab** is a private, air-gapped capable AI orchestration platform d
 
 - **Zero-Shared State**: Agents communicate via stateless APIs (Ollama/REST), with persistent memory isolated in the Control Plane.
 - **Sandboxed Execution**: All code generation occurs within isolated Docker-in-Docker (DinD) environments (OpenHands).
-- **Observability First**: Full-stack monitoring via Prometheus (Metrics) and Loki (Logs), visualized in Grafana.
+- **Observability First**: Full-stack monitoring via jacquard (Metrics) and knuth (Logs), visualized in hollerith.
 - **Enterprise Identity**: SPIRE (SPIFFE) integration for workload identity and zero-trust authentication.
 
 ---
@@ -25,7 +25,7 @@ The system is physically distributed but logically unified under a single mesh n
 
 ### Control Plane (The Brain)
 
-- **Hardware**: Dell Wyse 5070 Thin Client
+- **Hardware**: Hopper Thin Client
 - **OS**: Ubuntu Server 24.04 LTS
 - **Role**: State Management & Identity Authority
 - **Services**:
@@ -45,7 +45,7 @@ The system is physically distributed but logically unified under a single mesh n
   - **Ollama**: Accelerated LLM Inference API.
   - **Agent Runtime**: Python-based Agno agents (Architect, Security, Router).
   - **ComfyUI**: Node-based Stable Diffusion backend for Image Generation.
-  - **Monitoring Stack**: Prometheus, Loki, Grafana, cAdvisor.
+  - **Monitoring Stack**: jacquard, knuth, hollerith, cAdvisor.
 
 ---
 
@@ -67,7 +67,7 @@ graph TD
         ImageGen -->|API| ComfyUI[ComfyUI Host]
     end
 
-    Architect -->|Logs/Metrics| Observability[Grafana Stack]
+    Architect -->|Logs/Metrics| Observability[hollerith Stack]
 ```
 
 ### Agent Roles
@@ -121,4 +121,6 @@ graph TD
   - `container_cpu_usage_seconds_total`: Hardware resource consumption.
 - **Logs**:
   - Structured JSON logs aggregated by Promtail.
-  - Queryable via LogQL in Grafana (e.g., `{job="agent_runtime"} |= "ERROR"`).
+  - Queryable via LogQL in hollerith (e.g., `{job="agent_runtime"} |= "ERROR"`).
+
+

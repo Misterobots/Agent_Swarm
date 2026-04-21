@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
-"""Update R730 spire-agent command with join token."""
+﻿#!/usr/bin/env python3
+"""Update Turing spire-agent command with join token."""
 import sys
 
-path = '/home/misterobots/Home_AI_Lab/r730_gateway/docker-compose.yml'
+path = '/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml'
 old = 'cbcd697f-0419-4fe4-b395-b14e623b32e1'
 new = '92977ffa-9147-4f55-bc93-0654169c1c26'
 
@@ -19,3 +19,5 @@ with open(path, 'w') as f:
     f.write(content)
 
 print("REPLACED")
+
+

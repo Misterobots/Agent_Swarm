@@ -1,10 +1,10 @@
----
+﻿---
 title: "Module: Metrics"
 ---
 
 # Metrics
 
-Prometheus metric definitions exposed by the Agent Runtime.
+jacquard metric definitions exposed by the Agent Runtime.
 
 ## Files
 
@@ -50,17 +50,19 @@ my_counter.labels(label1="value", label2="other").inc()
 
 ## Scraping
 
-Prometheus on the Gateway scrapes `/metrics` every 15 seconds:
+jacquard on the Gateway scrapes `/metrics` every 15 seconds:
 
 ```yaml
-# prometheus.yml
+# jacquard.yml
 scrape_configs:
   - job_name: 'agent-runtime'
     static_configs:
-      - targets: ['{{ execution_node_ip }}:{{ agent_runtime_port }}']
+      - targets: ['{{ lovelace_ip }}:{{ agent_runtime_port }}']
 ```
 
 ## Related
 
 - [Architecture: Observability](../architecture/observability.md)
 - [Admin: Monitoring](../admin-guide/operations/monitoring.md)
+
+

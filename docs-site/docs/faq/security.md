@@ -48,3 +48,5 @@ The system uses several defenses:
 - The Verifier checks for suspicious outputs
 - Tool execution is sandboxed
 - File operations are scoped to the workspace directory
+
+

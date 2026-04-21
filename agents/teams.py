@@ -1,19 +1,19 @@
-import os
+﻿import os
 from phi.agent import Agent
 from phi.model.ollama import Ollama
 
 # Import Specialized Agents
-from architect_agent import get_architect_agent
+from leibniz_agent import get_architect_agent
 from specialized.iot_agent import get_iot_agent
 from specialized.bmo_agent import get_bmo_agent
 
 # Import MarsRL agents
 from verifier_agent import get_verifier
-from corrector_agent import get_corrector
+from dijkstra_agent import get_corrector
 
 # Configuration
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")          # Justin-PC (Solver/Corrector)
-SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", OLLAMA_HOST)  # Dell R730 (Router/Orchestrator)
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")          # Lovelace (Solver/Corrector)
+SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", OLLAMA_HOST)  # Dell Turing (Router/Orchestrator)
 ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", "nemotron-orchestrator:8b")
 
 # --- 1. CODING TEAM ---
@@ -122,7 +122,7 @@ def get_orchestrator():
     """
     The Master Agent that routes tasks to specific Teams.
     Uses Nemotron-Orchestrator-8B: purpose-built for multi-agent coordination.
-    Runs on Dell R730 (RTX 3070 Ti 8GB) via SECONDARY_OLLAMA_HOST.
+    Runs on Dell Turing (RTX 3070 Ti 8GB) via SECONDARY_OLLAMA_HOST.
     """
     coding_team = get_coding_team()
     creative_team = get_creative_team()
@@ -178,3 +178,5 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"Test Failed: {e}")
+
+

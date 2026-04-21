@@ -1,4 +1,4 @@
-# Phase 2: MemPalace Memory Integration — Completion Report
+﻿# Phase 2: MemPalace Memory Integration — Completion Report
 
 **Date:** 2026-04-13
 **Tag:** `phase-2-complete`
@@ -29,7 +29,7 @@ Phase 2 adds hierarchical semantic memory to the Agent Swarm via MemPalace, a de
 | `agents/main.py` | Added background extraction in both streaming and non-streaming paths. Collects `response_parts` during stream, fires `asyncio.create_task()` for extraction after completion. |
 | `agents/coordinator.py` | Added `_team_store()` and `_team_clear()` helpers. Team memory stored at worker results (L486), synthesis (L514), and verification (L604). |
 | `control_plane/docker-compose.yml` | Changed postgres image to `pgvector/pgvector:pg15`. Added mempalace service definition with health check. Added `mempalace_data` volume. |
-| `control_plane/.env` | Added `EXECUTION_NODE_IP=192.168.2.101` for compose interpolation |
+| `control_plane/.env` | Added `LOVELACE_IP=192.168.2.101` for compose interpolation |
 | `execution_plane/docker-compose.yml` | Re-added cAdvisor service (port 8081, privileged mode) — monitoring fix |
 
 ## Architecture
@@ -37,7 +37,7 @@ Phase 2 adds hierarchical semantic memory to the Agent Swarm via MemPalace, a de
 ```
                          ┌────────────────┐
   User Input ───────────►│  Agent Runtime │
-  (memory_enabled=true)  │  (Justin-PC)   │
+  (memory_enabled=true)  │  (Lovelace)   │
                          └──────┬─────────┘
                                 │
                ┌────────────────┼────────────────┐
@@ -62,7 +62,7 @@ Phase 2 adds hierarchical semantic memory to the Agent Swarm via MemPalace, a de
         └──────────┬───────────┘
                    │
         ┌──────────┴───────────┐
-        │ Ollama (Justin-PC     │
+        │ Ollama (Lovelace     │
         │  :11434)              │
         │ • nomic-embed-text    │
         │   (768-dim embed)     │
@@ -111,7 +111,7 @@ Index: IVFFlat with 100 lists, cosine distance on all embedding columns.
 | Round-trip: store → search → recall in next chat | ✅ threshold filtering at 0.5 works |
 | TRAIN intent stores to MemPalace | ✅ (alongside existing JSON file storage) |
 | UI regression (10 Hive routes) | ✅ all return 200 |
-| Prometheus targets (3/3) | ✅ agent-runtime, cadvisor-justin, cadvisor-r730 |
+| Prometheus targets (3/3) | ✅ agent-runtime, cadvisor-justin, cadvisor-turing |
 
 ### Final Memory Stats
 - **Total memories:** 20
@@ -129,17 +129,17 @@ The initial extraction failed because nemotron-mini occasionally returns malform
 
 1. **SPIRE JWT auth** fails with `got an unexpected keyword argument 'audiences'` — falls back to secret-based auth (pre-existing)
 2. **Redis auth required** — falls back to MockRedis (pre-existing)
-3. **R730 GPU offload**: llama3.2:3b runs with `size_vram: 0` (CPU-only on R730), causing ~200s generation times
+3. **Turing GPU offload**: llama3.2:3b runs with `size_vram: 0` (CPU-only on Turing), causing ~200s generation times
 4. **Extraction quality** depends on nemotron-mini's JSON compliance — robust parser mitigates but doesn't eliminate all edge cases
 
 ## Models Used
 
 | Model | Location | Purpose |
 |-------|----------|---------|
-| nomic-embed-text | Justin-PC Ollama :11434 | 768-dim embedding generation |
-| nemotron-mini | Justin-PC Ollama :11434 | Memory extraction from conversations |
-| qwen3:14b | Justin-PC Ollama :11434 | Coordinator decomposition/synthesis |
-| llama3.2:3b | R730 Ollama :11434 | Librarian (research/devops tasks) |
+| nomic-embed-text | Lovelace Ollama :11434 | 768-dim embedding generation |
+| nemotron-mini | Lovelace Ollama :11434 | Memory extraction from conversations |
+| qwen3:14b | Lovelace Ollama :11434 | Coordinator decomposition/synthesis |
+| llama3.2:3b | Turing Ollama :11434 | Librarian (research/devops tasks) |
 
 ---
 

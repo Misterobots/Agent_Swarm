@@ -26,3 +26,5 @@ Welcome to Agent Swarm. This section helps you get oriented regardless of your r
 | **Primary Model** | {{ solver_model }} |
 | **Security** | SPIFFE/SPIRE + JWT-ACE (MAESTRO L1–L7) |
 | **External Dependencies** | None — fully self-hosted |
+
+

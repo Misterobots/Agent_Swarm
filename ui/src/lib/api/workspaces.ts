@@ -11,7 +11,7 @@ import type {
 } from "@/types/workspaces";
 
 const API_BASE = "/api/backend";
-const SWARM_API_KEY = process.env.NEXT_PUBLIC_SWARM_API_KEY ?? "";
+const SWARM_API_KEY = process.env.NEXT_PUBLIC_SWARM_API_KEY ?? "sk-coder-identity";
 
 export async function fetchEvidenceFolders(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/api/v1/ops/evidence/folders`);

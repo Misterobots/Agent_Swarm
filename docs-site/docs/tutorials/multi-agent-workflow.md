@@ -75,3 +75,5 @@ This combines:
 
 - [Architecture: Agent System](../architecture/agent-system.md) — how agents interact
 - [Modules: Coordinator](../modules/coordinator.md) — orchestration details
+
+

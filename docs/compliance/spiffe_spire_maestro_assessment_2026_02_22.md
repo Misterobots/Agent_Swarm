@@ -1,4 +1,4 @@
-# SPIFFE / SPIRE / MAESTRO Security Assessment
+﻿# SPIFFE / SPIRE / MAESTRO Security Assessment
 
 **Date**: 2026-02-22
 **Version**: 2.0 (Post MarsRL Redesign + Gateway Node Addition)
@@ -11,7 +11,7 @@
 
 This assessment evaluates the Home AI Lab Agentic Hive's implementation of SPIFFE (Secure Production Identity Framework for Everyone), SPIRE (SPIFFE Runtime Environment), and the MAESTRO governance framework following the **v3.0 architecture redesign**.
 
-The key change since the last assessment (v1.3, 2026-02-09) is the addition of a **third inference node** — the Gateway Node (Dell PowerEdge R730) — which introduces new identity and trust boundary considerations requiring SPIRE enrollment.
+The key change since the last assessment (v1.3, 2026-02-09) is the addition of a **third inference node** — the Gateway Node (Dell PowerEdge Turing) — which introduces new identity and trust boundary considerations requiring SPIRE enrollment.
 
 ---
 
@@ -95,9 +95,9 @@ Control Plane (Control Node) ──SVID──▶ Execution Plane (Execution Node
 ```bash
 # On Control Node (SPIRE Server):
 # 1. Register Gateway Node as a new agent node
-spire-server agent ban -spiffeID spiffe://home-lab/dell-r730  # clean start
+spire-server agent ban -spiffeID spiffe://home-lab/dell-turing  # clean start
 spire-server entry create \
-  -spiffeID spiffe://home-lab/dell-r730/ollama \
+  -spiffeID spiffe://home-lab/dell-turing/ollama \
   -parentID spiffe://home-lab/spire-agent \
   -selector docker:image:ollama/ollama
 
@@ -110,7 +110,7 @@ docker run -d --name spire-agent \
   -config /etc/spire/agent/agent.conf
 
 # 3. Verify enrollment
-spire-server agent list | grep dell-r730
+spire-server agent list | grep dell-turing
 ```
 
 ---

@@ -1,4 +1,4 @@
-# R730 Monitoring Stack - FIXED VERSION
+﻿# Turing Monitoring Stack - FIXED VERSION
 # Monitoring services only (reuses existing Traefik on port 80)
 # KEY FIXES: 
 # - Removed version: attribute
@@ -13,8 +13,8 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus-r730
-    hostname: prometheus-r730
+    container_name: prometheus-Turing
+    hostname: prometheus-Turing
     restart: unless-stopped
     volumes:
       - ./config/prometheus:/etc/prometheus
@@ -35,8 +35,8 @@ services:
 
   loki:
     image: grafana/loki:latest
-    container_name: loki-r730
-    hostname: loki-r730
+    container_name: loki-Turing
+    hostname: loki-Turing
     restart: unless-stopped
     user: "0:0"  # Run as root to avoid permission issues with /tmp/loki/rules
     ports:
@@ -55,8 +55,8 @@ services:
 
   promtail:
     image: grafana/promtail:latest
-    container_name: promtail-r730
-    hostname: promtail-r730
+    container_name: promtail-Turing
+    hostname: promtail-Turing
     restart: unless-stopped
     ports:
       - "9081:9080"
@@ -70,8 +70,8 @@ services:
       - '-config.file=/etc/promtail/promtail.yml'
       - '-config.expand-env=true'
     environment:
-      - HOSTNAME=r730
-      - LOKI_URL=http://loki-r730:3100
+      - HOSTNAME=Turing
+      - LOKI_URL=http://loki-Turing:3100
     networks:
       - monitoring
     depends_on:
@@ -79,8 +79,8 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor-r730
-    hostname: cadvisor-r730
+    container_name: cadvisor-Turing
+    hostname: cadvisor-Turing
     restart: unless-stopped
     ports:
       - "8889:8080"
@@ -102,8 +102,8 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana-r730
-    hostname: grafana-r730
+    container_name: grafana-Turing
+    hostname: grafana-Turing
     restart: unless-stopped
     ports:
       - "3002:3000"
@@ -130,10 +130,10 @@ services:
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
   # Redis for task queue persistence
-  redis-monitoring-r730:
+  redis-monitoring-Turing:
     image: redis:7.2-alpine
-    container_name: redis-monitoring-r730
-    hostname: redis-monitoring-r730
+    container_name: redis-monitoring-Turing
+    hostname: redis-monitoring-Turing
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -160,4 +160,6 @@ volumes:
 networks:
   monitoring:
     driver: bridge
-    name: monitoring-r730
+    name: monitoring-Turing
+
+

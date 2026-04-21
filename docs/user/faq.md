@@ -1,4 +1,4 @@
-# Frequently Asked Questions
+﻿# Frequently Asked Questions
 
 > **Back to:** [Documentation Index](../INDEX.md)
 
@@ -105,7 +105,7 @@ If you just deployed or restarted services, metrics take up to 15 seconds to app
 | `agents/router.py` | Implementation | Intent routing, MarsRL loop, capability gating |
 | `agents/main.py` | Implementation | FastAPI entry point, health check endpoints |
 | `ui/src/stores/chatStore.ts` | Implementation | Chat state, connection status, stream handling |
-| `r730_gateway/docker-compose.yml` | Infrastructure | Service definitions, port mappings |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Service definitions, port mappings |
 | `config/grafana/` | Infrastructure | Dashboard JSON definitions |
 | [Langfuse Docs](https://langfuse.com/docs) | External | Trace viewer usage reference |
 

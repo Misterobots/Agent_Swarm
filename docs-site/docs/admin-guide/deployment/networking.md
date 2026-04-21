@@ -1,4 +1,4 @@
----
+﻿---
 title: Networking
 ---
 
@@ -11,9 +11,9 @@ Network topology, DNS, remote access, and firewall configuration.
 ```mermaid
 graph LR
     Router["Router<br/>192.168.2.1"] --- HA["Home Assistant<br/>192.168.2.100"]
-    Router --- Exec["Justin-PC<br/>{{ execution_node_ip }}"]
-    Router --- Ctrl["Wyse 5070<br/>{{ control_node_ip }}"]
-    Router --- GW["R730<br/>{{ gateway_node_ip }}"]
+    Router --- Exec["Lovelace<br/>{{ lovelace_ip }}"]
+    Router --- Ctrl["Hopper<br/>{{ hopper_ip }}"]
+    Router --- GW["Turing<br/>{{ turing_ip }}"]
     Router --- iDRAC["iDRAC<br/>192.168.2.104"]
 ```
 
@@ -24,9 +24,9 @@ All nodes sit on a single flat 192.168.2.0/24 subnet.
 | Node | IP | MAC (example) |
 |------|-----|---------------|
 | Home Assistant | 192.168.2.100 | (DHCP reservation) |
-| Justin-PC (Exec) | {{ execution_node_ip }} | (DHCP reservation) |
-| Wyse 5070 (Ctrl) | {{ control_node_ip }} | (DHCP reservation) |
-| R730 (Gateway) | {{ gateway_node_ip }} | (DHCP reservation) |
+| Lovelace (Exec) | {{ lovelace_ip }} | (DHCP reservation) |
+| Hopper (Ctrl) | {{ hopper_ip }} | (DHCP reservation) |
+| Turing (Gateway) | {{ turing_ip }} | (DHCP reservation) |
 | iDRAC | 192.168.2.104 | (static) |
 
 !!! tip "DHCP Reservations"
@@ -50,14 +50,14 @@ Tailscale provides encrypted remote access without port forwarding.
 | Property | Value |
 |----------|-------|
 | **Tailnet DNS** | `*.tail*.ts.net` |
-| **Enabled Nodes** | R730, Justin-PC |
+| **Enabled Nodes** | Turing, Lovelace |
 | **MagicDNS** | Enabled |
 
 Access services remotely:
 
 ```
-http://r730.tail12345.ts.net/swarm/v1/chat/completions
-http://r730.tail12345.ts.net/grafana
+http://Turing.tail12345.ts.net/swarm/v1/chat/completions
+http://Turing.tail12345.ts.net/hollerith
 ```
 
 !!! info "Tailscale Setup"
@@ -76,7 +76,7 @@ http://r730.tail12345.ts.net/grafana
 | Execution | Control | 5432 | TCP | PostgreSQL |
 | Execution | Control | 3000 | TCP | Langfuse |
 | Execution | Control | 8200 | TCP | MemPalace |
-| Gateway | Control | 5432 | TCP | PostgreSQL (Grafana) |
+| Gateway | Control | 5432 | TCP | PostgreSQL (hollerith) |
 | All | Gateway | 80, 443 | TCP | Traefik |
 
 ### External Access
@@ -102,3 +102,5 @@ No custom DNS required. Services reference each other by IP address in `network.
 - [Architecture: Topology](../../architecture/topology.md) — physical layout details
 - [Reference: Port Map](../port-map.md) — complete port registry
 - [Troubleshooting: Network](../../troubleshooting/network.md) — connectivity issues
+
+

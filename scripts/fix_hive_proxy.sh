@@ -1,11 +1,11 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -e
 
-COMPOSE="/home/misterobots/Home_AI_Lab/r730_gateway/docker-compose.yml"
+COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
 NETENV="/home/misterobots/Home_AI_Lab/network.env"
 
 # 1. Populate network.env with Tailscale IP for execution node
-echo "EXECUTION_NODE_IP=100.112.7.31" > "$NETENV"
+echo "LOVELACE_IP=100.112.7.31" > "$NETENV"
 echo "Updated $NETENV:"
 cat "$NETENV"
 
@@ -22,3 +22,4 @@ fi
 echo ""
 echo "Verifying changes:"
 grep -A5 'container_name: hive_ui' "$COMPOSE"
+

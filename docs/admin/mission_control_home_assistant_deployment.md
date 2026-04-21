@@ -1,8 +1,8 @@
-# Mission Control Native Home Assistant Add-on
+﻿# Mission Control Native Home Assistant Add-on
 
 This runbook packages Mission Control as a native Home Assistant add-on for the Home Assistant box at `192.168.2.100`.
 
-Mission Control is **not** part of Hive or the R730 Saltbox stack yet. Keep it isolated on the Home Assistant box for now.
+Mission Control is **not** part of Hive or the Turing Saltbox stack yet. Keep it isolated on the Home Assistant box for now.
 
 ---
 

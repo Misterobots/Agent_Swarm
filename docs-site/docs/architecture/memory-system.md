@@ -1,4 +1,4 @@
----
+﻿---
 title: Memory System
 ---
 
@@ -78,7 +78,7 @@ Semantic memory service running on the Control Node. Provides vector-based simil
 
 | Property | Value |
 |----------|-------|
-| **URL** | `http://{{ control_node_ip }}:8200` |
+| **URL** | `http://{{ hopper_ip }}:8200` |
 | **Backend** | PostgreSQL with pgvector extension |
 | **Embedding** | Sentence transformers |
 
@@ -124,3 +124,5 @@ This is routed to `TRAIN` intent and writes to `general_rules` in Skills Memory.
 - [Module: Memory](../modules/memory.md) — implementation reference
 - [Module: MemPalace Service](../modules/services/mempalace.md)
 - [User Guide: Settings](../user-guide/settings.md) — teaching preferences
+
+

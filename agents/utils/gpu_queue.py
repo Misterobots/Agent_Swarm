@@ -1,4 +1,4 @@
-import os
+﻿import os
 import time
 import requests
 import logging
@@ -32,18 +32,18 @@ TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (2
 def _get_preferred_host(model_name: str) -> str:
     """
     Static hardware-aware routing (no health checks).
-    - Justin-PC (Local): 2x 16GB VRAM (5060 Ti). Primary inference for all task models.
-    - R730 (Secondary): 8GB VRAM (3070 Ti). Dedicated to safety + embeddings only.
+    - Lovelace (Local): 2x 16GB VRAM (5060 Ti). Primary inference for all task models.
+    - Turing (Secondary): 8GB VRAM (3070 Ti). Dedicated to safety + embeddings only.
     
     After model consolidation, qwen3:14b is the primary workhorse and always
-    runs on Justin-PC. Only safety and embedding models route to R730.
+    runs on Lovelace. Only safety and embedding models route to Turing.
     """
-    # R730 models — async safety + embeddings (not latency-critical)
-    r730_models = ["llama-guard", "nomic-embed"]
+    # Turing models — async safety + embeddings (not latency-critical)
+    turing_models = ["llama-guard", "nomic-embed"]
 
-    if any(m in model_name for m in r730_models):
+    if any(m in model_name for m in turing_models):
         return SECONDARY_OLLAMA_HOST
-    # Everything else goes to Justin-PC (fast CPU, dual 5060 Ti)
+    # Everything else goes to Lovelace (fast CPU, dual 5060 Ti)
     return OLLAMA_HOST
 
 
@@ -237,3 +237,5 @@ def request_lock(context: str, timeout: int = 300):
             if client.get(LOCK_KEY) == lock_id:
                 client.delete(LOCK_KEY)
                 logger.info(f"[GPU Queue] Lock released for context: '{context}'.")
+
+

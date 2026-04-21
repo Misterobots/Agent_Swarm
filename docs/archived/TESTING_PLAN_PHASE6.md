@@ -1,4 +1,4 @@
-# Phase 6 Testing Plan: GRPO Training Pipeline
+﻿# Phase 6 Testing Plan: GRPO Training Pipeline
 
 **Date**: 2026-03-21
 **Scope**: Training Data Pipeline, QLoRA Fine-Tuning, A/B Testing, Monitoring Dashboards
@@ -86,7 +86,7 @@
 | I2 | Langfuse export → JSONL | Seed 5 traces in Langfuse with `training_candidate` tag, run export | 5 matching JSONL records with trace_ids |
 | I3 | JSONL → Dataset loading | Load JSONL into HuggingFace Dataset | Correct column schema, tokenizable |
 
-### 2.2 Training Pipeline (Requires GPU — Justin-PC)
+### 2.2 Training Pipeline (Requires GPU — Lovelace)
 
 | # | Test Case | Steps | Expected Result |
 |---|-----------|-------|-----------------|
@@ -116,7 +116,7 @@
 
 ## 3. System Tests
 
-### 3.1 Full Pipeline (End-to-End on Justin-PC)
+### 3.1 Full Pipeline (End-to-End on Lovelace)
 
 | # | Test Case | Pre-conditions | Steps | Expected Result |
 |---|-----------|---------------|-------|-----------------|
@@ -177,7 +177,7 @@ pytest tests/test_training_integration.py -v --tb=short
 # Manual: verify Grafana dashboards at http://192.168.2.103:3002
 ```
 
-### Phase C: System Tests (Requires Justin-PC + GPU)
+### Phase C: System Tests (Requires Lovelace + GPU)
 ```bash
 # Build training runtime
 cd execution_plane
@@ -206,10 +206,10 @@ docker compose --profile training run --rm training-runtime \
 | Requirement | Details |
 |-------------|---------|
 | PostgreSQL | Control plane (192.168.2.102:5432) with swarm schema applied |
-| Ollama | Justin-PC (192.168.2.101:11434) with qwen2.5-coder model |
-| Grafana | R730 (192.168.2.103:3002) with PostgreSQL-Swarm datasource |
-| Docker | Training-runtime image built on Justin-PC |
-| GPU | RTX 5060 Ti (16GB VRAM) on Justin-PC |
+| Ollama | Lovelace (192.168.2.101:11434) with qwen2.5-coder model |
+| Grafana | Turing (192.168.2.103:3002) with PostgreSQL-Swarm datasource |
+| Docker | Training-runtime image built on Lovelace |
+| GPU | RTX 5060 Ti (16GB VRAM) on Lovelace |
 | Network | All 3 nodes reachable on 192.168.2.0/24 |
 
 ---

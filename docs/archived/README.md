@@ -1,4 +1,4 @@
-# Archived Documentation
+﻿# Archived Documentation
 
 This directory contains historical documents that have been **superseded** by the current documentation structure. They are kept for audit trail and historical context.
 
@@ -26,15 +26,15 @@ This directory contains historical documents that have been **superseded** by th
 | `TESTING_PLAN_PHASE6.md` | Phase 6 testing plan | `docs/evidence/phase6_training_pipeline_audit_2026_03_21.md` |
 | `PHASE1_RECOVERY_PLAN.md` | Phase 1 recovery (complete) | Historical only |
 | `PHASE3_DEPLOYMENT_GUIDE.md` | Phase 3 deployment (complete) | Historical only |
-| `R730_MIGRATION_PLAN.md` | R730 migration (complete) | Historical only |
+| `Turing_MIGRATION_PLAN.md` | Turing migration (complete) | Historical only |
 | `MIGRATION_EXECUTION_CHECKLIST.md` | Migration checklist (complete) | Historical only |
 | `SPIRE Architecture Documentation.md` | SPIRE deep-dive (verbose) | `admin/security.md` + `troubleshooting/spire-agent.md` |
 | `Integrating VS Code IDE.md` | VS Code integration chat transcript | Not a spec — transcript only |
 | `engineering_overview.md` | Phase 3 datasheet | `admin/design_framework.md` |
 | `topology.md` | v2 topology (outdated) | `admin/design_framework.md` |
 | `port_map.md` | Port reference | `admin/technical_reference.md` |
-| `r730_gateway_setup.md` | R730 quick setup | `admin/technical_reference.md` |
-| `JUSTIN_PC_COMPOSE_REFERENCE.md` | Justin-PC compose reference | `admin/technical_reference.md` |
+| `turing_gateway_setup.md` | Turing quick setup | `admin/technical_reference.md` |
+| `LOVELACE_COMPOSE_REFERENCE.md` | Lovelace compose reference | `admin/technical_reference.md` |
 | `bmo_troubleshooting.md` | BMO voice troubleshooting | `admin/troubleshooting.md` |
 | `wokwi_research_notes.md` | Wokwi research notes | `specs/wokwi_integration_spec.md` |
 | `RL-SVC_Framework.md` | RL + Voice Control framework research | Future research — not implemented |

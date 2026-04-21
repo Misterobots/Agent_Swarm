@@ -1,14 +1,14 @@
----
+﻿---
 title: "Procedure: Log Analysis"
 ---
 
 # Log Analysis
 
-Query and analyze logs using Loki and Grafana.
+Query and analyze logs using knuth and hollerith.
 
 ## Accessing Logs
 
-Open Grafana at `http://{{ gateway_node_ip }}:3001`, select the **Loki** data source, and use the **Explore** tab.
+Open hollerith at `http://{{ turing_ip }}:3001`, select the **knuth** data source, and use the **Explore** tab.
 
 ## Common LogQL Queries
 
@@ -48,3 +48,5 @@ Open Grafana at `http://{{ gateway_node_ip }}:3001`, select the **Loki** data so
 - Pipe through `| json` for structured log parsing
 - Use `| line_format` for custom output formatting
 - Export results for offline analysis
+
+

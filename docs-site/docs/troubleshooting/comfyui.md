@@ -1,4 +1,4 @@
----
+﻿---
 title: "Troubleshooting: ComfyUI"
 ---
 
@@ -12,7 +12,7 @@ title: "Troubleshooting: ComfyUI"
 
 ```bash
 # Check ComfyUI health
-curl http://{{ execution_node_ip }}:8188/system_stats
+curl http://{{ lovelace_ip }}:8188/system_stats
 
 # Check logs
 docker logs comfyui --tail 50
@@ -73,7 +73,7 @@ docker compose restart comfyui
 
 ## ComfyUI Web Interface Not Loading
 
-**Symptom**: `http://{{ execution_node_ip }}:8188` doesn't respond.
+**Symptom**: `http://{{ lovelace_ip }}:8188` doesn't respond.
 
 **Fix**:
 
@@ -82,3 +82,5 @@ docker compose ps comfyui  # Check status
 docker compose restart comfyui
 docker logs comfyui --tail 20
 ```
+
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ActivitySquare, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { NodeStatus } from "@/components/shared/node-status";
@@ -126,7 +126,7 @@ export default function MonitoringDashboardPage() {
         </button>
       </div>
 
-      <WorkspaceSection title="Cluster Containers" description="Container inventories from Justin-PC, R730, and Control Node.">
+      <WorkspaceSection title="Cluster Containers" description="Container inventories from Lovelace, Turing, and Control Node.">
         <div className="space-y-3">
           {(health?.nodes ?? []).map((node) => (
             <NodeContainerTable key={node.name} node={node} />

@@ -84,3 +84,5 @@ memory.add_rule("general_rules", "format", "Use bullet points in responses")
 - [Architecture: Memory System](../architecture/memory-system.md) — design overview
 - [Module: MemPalace Service](services/mempalace.md) — semantic memory
 - [User Guide: Settings](../user-guide/settings.md) — user-facing memory management
+
+

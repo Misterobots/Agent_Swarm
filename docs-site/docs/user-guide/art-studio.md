@@ -1,4 +1,4 @@
----
+﻿---
 title: Art Studio
 ---
 
@@ -10,7 +10,7 @@ Generate images using ComfyUI with FLUX and Stable Diffusion XL pipelines.
 
 - **UI**: Navigate to **Art Studio** in the Hive Mind sidebar
 - **Chat**: Describe what you want — the router detects `IMAGE` intent automatically
-- **ComfyUI Direct**: `http://{{ execution_node_ip }}:8188` for node-based workflow editing
+- **ComfyUI Direct**: `http://{{ lovelace_ip }}:8188` for node-based workflow editing
 
 ## Quick Example
 
@@ -47,7 +47,7 @@ The system maps these to appropriate ComfyUI workflow parameters (CFG scale, ste
 
 ### Custom Workflows
 
-Power users can access ComfyUI directly at `http://{{ execution_node_ip }}:8188` to:
+Power users can access ComfyUI directly at `http://{{ lovelace_ip }}:8188` to:
 
 - Build node-based generation workflows
 - Import custom pipelines (JSON workflow files)
@@ -93,7 +93,7 @@ Generated images are:
     | `ui/src/components/art-studio/GalleryPanel.tsx` | Implementation | Gallery grid with image/3D tabs |
     | `ui/src/stores/artStudioStore.ts` | Implementation | Client-side state (mode, settings, history) |
     | `agents/router.py` | Implementation | Intent detection routing creative requests |
-    | `r730_gateway/comfyui/` | Infrastructure | ComfyUI workflows for image & 3D generation |
+    | `turing_gateway/comfyui/` | Infrastructure | ComfyUI workflows for image & 3D generation |
     | [TripoSG](https://github.com/VAST-AI-Research/TripoSG) | External | Text/image-to-3D mesh pipeline |
     | [Hunyuan3D](https://github.com/Tencent/Hunyuan3D-2) | External | High-quality textured 3D generation |
     | [ComfyUI](https://github.com/comfyanonymous/ComfyUI) | External | Diffusion model workflow engine |
@@ -143,3 +143,5 @@ Generated images are:
 ---
 
 *[Back to Index](../index.md)*
+
+

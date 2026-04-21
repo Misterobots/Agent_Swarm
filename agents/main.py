@@ -1,4 +1,4 @@
-
+﻿
 import logging
 import sys
 import os
@@ -23,7 +23,7 @@ from mcp.transport import ok_response, error_response, internal_error
 
 logger = setup_logger("Main")
 from dispatcher import dispatcher, Event, EventType
-from router import handle_task_event
+from church import handle_task_event
 # Top-level logging removed to prevent startup crashes
 
 # --- API Models ---
@@ -180,7 +180,7 @@ app.add_middleware(AuthorizationMiddleware)
 
 # --- Global Exception Handler (To capture crashes before uvicorn swallows them) ---
 from fastapi import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -712,7 +712,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     Standard Chat API to allow external tools (Open-WebUI, VS Code) to talk to the Swarm.
     """
     from fastapi.responses import StreamingResponse
-    from router import chat_swarm
+    from church import chat_swarm
     import json
     import asyncio
 
@@ -1189,7 +1189,7 @@ async def ingest_log(request: LogRequest):
     return {"status": "logged"}
 
 # --- Governance Endpoints ---
-from governance import governance_manager, RequestType, RequestStatus, RequestItem
+from liskov import governance_manager, RequestType, RequestStatus, RequestItem
 
 class CreateRequestModel(BaseModel):
     type: RequestType
@@ -1494,7 +1494,7 @@ _active_training: dict = {"run_id": None, "status": "idle", "started_at": None, 
 async def buddy_get_state():
     """Get the current buddy state (XP, level, streak, achievements)."""
     try:
-        from buddy_service import get_state, get_achievements
+        from kay_service import get_state, get_achievements
         state = get_state()
         achievements = get_achievements()
         return {**state, "achievements": achievements}
@@ -1507,7 +1507,7 @@ async def buddy_get_state():
 async def buddy_save_state(request: Request):
     """Persist the full buddy state from the UI."""
     try:
-        from buddy_service import save_state
+        from kay_service import save_state
         body = await request.json()
         result = save_state(body)
         return result
@@ -1520,7 +1520,7 @@ async def buddy_save_state(request: Request):
 async def buddy_award_xp(request: Request):
     """Award XP for an event and return updated level info."""
     try:
-        from buddy_service import award_xp
+        from kay_service import award_xp
         body = await request.json()
         event = body.get("event", "message_sent")
         result = award_xp(event)
@@ -1534,7 +1534,7 @@ async def buddy_award_xp(request: Request):
 async def buddy_get_habits():
     """Get user habit summary for the last 7 days."""
     try:
-        from buddy_service import get_habits_summary
+        from kay_service import get_habits_summary
         return get_habits_summary()
     except Exception as exc:
         logger.warning(f"[Buddy] get_habits failed: {exc}")
@@ -1545,7 +1545,7 @@ async def buddy_get_habits():
 async def buddy_get_tip(context: str = "general"):
     """Get a contextual tip based on buddy state and context."""
     try:
-        from buddy_service import get_state, get_contextual_tip
+        from kay_service import get_state, get_contextual_tip
         state = get_state()
         tip = get_contextual_tip(state, context=context)
         return {"tip": tip}
@@ -1558,7 +1558,7 @@ async def buddy_get_tip(context: str = "general"):
 async def buddy_get_achievements():
     """Get all earned achievements."""
     try:
-        from buddy_service import get_achievements
+        from kay_service import get_achievements
         return {"achievements": get_achievements()}
     except Exception as exc:
         logger.warning(f"[Buddy] get_achievements failed: {exc}")
@@ -3315,7 +3315,7 @@ async def compact_chat(request: CompactRequest):
     Summarize a long conversation into [summary_message] + last 3 exchanges.
     Called by the UI when the user clicks the context meter or auto-compact fires.
     """
-    from router import get_best_host_for_model
+    from church import get_best_host_for_model
     import httpx
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
     if len(messages) <= 6:
@@ -3363,7 +3363,7 @@ async def summarize_session(request: SummarizeSessionRequest):
     Produce a 3-sentence summary of a completed conversation for cross-session memory.
     Only called when the user has opted in to session memory.
     """
-    from router import get_best_host_for_model
+    from church import get_best_host_for_model
     import httpx
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
     if len(messages) < 4:
@@ -3427,7 +3427,7 @@ async def ops_health():
     import subprocess
     import socket
     import requests as _requests
-    from config import CONTROL_NODE_IP, LANGFUSE_HOST, GATEWAY_NODE_IP, EXECUTION_NODE_IP
+    from config import HOPPER_IP, LANGFUSE_HOST, TURING_IP, LOVELACE_IP
 
     def normalize_containers(raw_containers):
         parsed = []
@@ -3492,21 +3492,21 @@ async def ops_health():
             return fetch_local_containers()
         except Exception:
             last_error = None
-            for host in [EXECUTION_NODE_IP, "host.docker.internal"]:
+            for host in [LOVELACE_IP, "host.docker.internal"]:
                 try:
                     return fetch_remote_containers(host)
                 except Exception as e:
                     last_error = e
-            raise RuntimeError(str(last_error) if last_error else "Justin-PC container probe failed")
+            raise RuntimeError(str(last_error) if last_error else "Lovelace container probe failed")
 
     nodes = []
     ctrl_plane = []
     degraded_reasons = []
 
     cluster_defs = [
-        {"name": "Justin-PC", "role": "execution", "ip": EXECUTION_NODE_IP, "fetch": lambda: fetch_justin_containers()},
-        {"name": "R730", "role": "gateway", "ip": GATEWAY_NODE_IP, "fetch": lambda: fetch_remote_containers(GATEWAY_NODE_IP)},
-        {"name": "Control Node", "role": "control", "ip": CONTROL_NODE_IP, "fetch": lambda: fetch_remote_containers(CONTROL_NODE_IP)},
+        {"name": "Lovelace", "role": "execution", "ip": LOVELACE_IP, "fetch": lambda: fetch_justin_containers()},
+        {"name": "Turing", "role": "gateway", "ip": TURING_IP, "fetch": lambda: fetch_remote_containers(TURING_IP)},
+        {"name": "Hopper", "role": "control", "ip": HOPPER_IP, "fetch": lambda: fetch_remote_containers(HOPPER_IP)},
     ]
 
     for node in cluster_defs:
@@ -3532,7 +3532,7 @@ async def ops_health():
         {"name": "Langfuse", "url": f"{LANGFUSE_HOST}/api/public/health", "port": 3000},
         {"name": "PostgreSQL", "url": None, "port": 5432},
         {"name": "SPIRE Server", "url": None, "port": 8081},
-        {"name": "MinIO API", "url": f"http://{CONTROL_NODE_IP}:9190/minio/health/live", "port": 9190},
+        {"name": "MinIO API", "url": f"http://{HOPPER_IP}:9190/minio/health/live", "port": 9190},
         {"name": "MinIO Console", "url": None, "port": 9191},
     ]
     for svc in cp_services:
@@ -3543,7 +3543,7 @@ async def ops_health():
             else:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.settimeout(2)
-                code = s.connect_ex((CONTROL_NODE_IP, svc["port"]))
+                code = s.connect_ex((HOPPER_IP, svc["port"]))
                 s.close()
                 alive = code == 0
             ctrl_plane.append({"name": svc["name"], "port": svc["port"], "healthy": alive})
@@ -3972,23 +3972,46 @@ async def rate_art_job(job_id: str, req: MediaImageRatingRequest):
 
 
 # --- Voice Synthesis Endpoint ---
+class TrainingVoiceSpeakRequest(BaseModel):
+    text: str
+    pitch: int = 3
+    method: str = "rmvpe"
+    speed: float = 1.0
+
+
 @app.post("/api/v1/training/voice/speak")
-async def training_voice_speak():
-    """Synthesize voice clip using BMO voice engine (RVC)."""
-    from fastapi import Request as _Request
-    from starlette.requests import Request
+async def training_voice_speak(req: TrainingVoiceSpeakRequest):
+    """Synthesize a WAV clip via the BMO voice service and return audio bytes."""
     import requests as _requests
-    # Get request body
-    req = Request(scope={"type": "http"})
-    bmo_url = os.getenv("BMO_VOICE_URL", "http://bmo-voice:5111")
+
+    bmo_url = os.getenv("BMO_VOICE_URL", "http://bmo-voice:8000").rstrip("/")
+    text = req.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+
+    params = {
+        "text": text,
+        "pitch": req.pitch,
+        "speed": req.speed,
+        "method": req.method,
+    }
+
     try:
-        body = {"text": "Hello from the swarm", "voice": "default"}
-        resp = _requests.post(f"{bmo_url}/synthesize", json=body, timeout=15)
-        if resp.status_code == 200:
-            return {"audio_url": "/api/v1/training/voice/latest.wav", "status": "ok"}
-        return {"status": "error", "detail": f"BMO returned {resp.status_code}"}
+        resp = _requests.post(f"{bmo_url}/speak", params=params, timeout=90)
+        if resp.status_code != 200:
+            logger.error(
+                "[VoiceSpeak] BMO voice service error status=%s body=%s",
+                resp.status_code,
+                resp.text[:200],
+            )
+            raise HTTPException(status_code=502, detail=f"BMO voice service returned {resp.status_code}")
+
+        return Response(content=resp.content, media_type="audio/wav")
     except Exception as e:
-        return {"status": "error", "detail": str(e)[:120]}
+        logger.error("[VoiceSpeak] Voice synthesis proxy failed: %s", e)
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=502, detail=str(e)[:200])
 
 
 # --- Knowledge Ingestion Endpoints ---
@@ -4012,30 +4035,30 @@ async def knowledge_ingest_file():
 # ---------------------------------------------------------------------------
 
 SERVICE_REGISTRY = [
-    # R730 Gateway services
-    {"id": "grafana",      "name": "Grafana",        "node": "R730",         "ip": "192.168.2.103", "port": 3001, "container": "grafana-r730",      "health_url": "http://192.168.2.103:3001/grafana/api/health"},
-    {"id": "prometheus",   "name": "Prometheus",      "node": "R730",         "ip": "192.168.2.103", "port": 9091, "container": "prometheus-r730",   "health_url": "http://192.168.2.103:9091/prometheus/-/healthy"},
-    {"id": "loki",         "name": "Loki",            "node": "R730",         "ip": "192.168.2.103", "port": 3100, "container": "loki-r730",         "health_url": "http://192.168.2.103:3100/ready"},
-    {"id": "alertmanager", "name": "Alertmanager",    "node": "R730",         "ip": "192.168.2.103", "port": 9093, "container": "alertmanager-r730", "health_url": "http://192.168.2.103:9093/alertmanager/-/healthy"},
-    {"id": "cadvisor",     "name": "cAdvisor",        "node": "R730",         "ip": "192.168.2.103", "port": 8888, "container": "cadvisor-r730",     "health_url": None},
-    {"id": "ollama-r730",  "name": "Ollama (R730)",   "node": "R730",         "ip": "192.168.2.103", "port": 11434,"container": "ollama-r730",       "health_url": "http://192.168.2.103:11434/"},
-    {"id": "redis-r730",   "name": "Redis (R730)",    "node": "R730",         "ip": "192.168.2.103", "port": 6379, "container": "redis-r730",        "health_url": None},
+    # Turing Gateway services
+    {"id": "grafana",      "name": "Grafana",        "node": "Turing",         "ip": "192.168.2.103", "port": 3001, "container": "grafana-Turing",      "health_url": "http://192.168.2.103:3001/grafana/api/health"},
+    {"id": "prometheus",   "name": "Prometheus",      "node": "Turing",         "ip": "192.168.2.103", "port": 9091, "container": "prometheus-Turing",   "health_url": "http://192.168.2.103:9091/prometheus/-/healthy"},
+    {"id": "loki",         "name": "Loki",            "node": "Turing",         "ip": "192.168.2.103", "port": 3100, "container": "loki-Turing",         "health_url": "http://192.168.2.103:3100/ready"},
+    {"id": "alertmanager", "name": "Alertmanager",    "node": "Turing",         "ip": "192.168.2.103", "port": 9093, "container": "alertmanager-Turing", "health_url": "http://192.168.2.103:9093/alertmanager/-/healthy"},
+    {"id": "cadvisor",     "name": "cAdvisor",        "node": "Turing",         "ip": "192.168.2.103", "port": 8888, "container": "cadvisor-Turing",     "health_url": None},
+    {"id": "ollama-Turing",  "name": "Ollama (Turing)",   "node": "Turing",         "ip": "192.168.2.103", "port": 11434,"container": "ollama-Turing",       "health_url": "http://192.168.2.103:11434/"},
+    {"id": "redis-Turing",   "name": "Redis (Turing)",    "node": "Turing",         "ip": "192.168.2.103", "port": 6379, "container": "redis-Turing",        "health_url": None},
     # Control Node services
-    {"id": "langfuse",     "name": "Langfuse",        "node": "Control Node", "ip": "192.168.2.102", "port": 3000, "container": "langfuse-web",      "health_url": "http://192.168.2.102:3000/api/public/health"},
-    {"id": "postgres",     "name": "PostgreSQL",      "node": "Control Node", "ip": "192.168.2.102", "port": 5432, "container": "postgres",          "health_url": None},
-    {"id": "clickhouse",   "name": "ClickHouse",      "node": "Control Node", "ip": "192.168.2.102", "port": 8123, "container": "clickhouse",        "health_url": "http://192.168.2.102:8123/ping"},
-    {"id": "minio",        "name": "MinIO",           "node": "Control Node", "ip": "192.168.2.102", "port": 9190, "container": "minio",             "health_url": "http://192.168.2.102:9190/minio/health/live"},
-    {"id": "redis-ctrl",   "name": "Redis (Control)", "node": "Control Node", "ip": "192.168.2.102", "port": 6379, "container": "redis",             "health_url": None},
-    {"id": "spire",        "name": "SPIRE Server",    "node": "Control Node", "ip": "192.168.2.102", "port": 8081, "container": "spire-server",      "health_url": None},
-    {"id": "mempalace",    "name": "MemPalace",       "node": "Control Node", "ip": "192.168.2.102", "port": 8200, "container": "mempalace",         "health_url": "http://192.168.2.102:8200/health"},
+    {"id": "langfuse",     "name": "Langfuse",        "node": "Hopper", "ip": "192.168.2.102", "port": 3000, "container": "langfuse-web",      "health_url": "http://192.168.2.102:3000/api/public/health"},
+    {"id": "postgres",     "name": "PostgreSQL",      "node": "Hopper", "ip": "192.168.2.102", "port": 5432, "container": "postgres",          "health_url": None},
+    {"id": "clickhouse",   "name": "ClickHouse",      "node": "Hopper", "ip": "192.168.2.102", "port": 8123, "container": "clickhouse",        "health_url": "http://192.168.2.102:8123/ping"},
+    {"id": "minio",        "name": "MinIO",           "node": "Hopper", "ip": "192.168.2.102", "port": 9190, "container": "minio",             "health_url": "http://192.168.2.102:9190/minio/health/live"},
+    {"id": "redis-ctrl",   "name": "Redis (Control)", "node": "Hopper", "ip": "192.168.2.102", "port": 6379, "container": "redis",             "health_url": None},
+    {"id": "spire",        "name": "SPIRE Server",    "node": "Hopper", "ip": "192.168.2.102", "port": 8081, "container": "spire-server",      "health_url": None},
+    {"id": "mempalace",    "name": "MemPalace",       "node": "Hopper", "ip": "192.168.2.102", "port": 8200, "container": "mempalace",         "health_url": "http://192.168.2.102:8200/health"},
     # Execution Node services
-    {"id": "ollama-exec",  "name": "Ollama (Exec)",   "node": "Justin-PC",    "ip": "192.168.2.101", "port": 11434,"container": "ollama",            "health_url": "http://192.168.2.101:11434/"},
+    {"id": "ollama-exec",  "name": "Ollama (Exec)",   "node": "Lovelace",    "ip": "192.168.2.101", "port": 11434,"container": "ollama",            "health_url": "http://192.168.2.101:11434/"},
 ]
 
 NODE_DOCKER_SOCKETS = {
-    "R730":         "http://192.168.2.103:2375",
-    "Control Node": "http://192.168.2.102:2375",
-    "Justin-PC":    "http://192.168.2.101:2375",
+    "Turing":         "http://192.168.2.103:2375",
+    "Hopper": "http://192.168.2.102:2375",
+    "Lovelace":    "http://192.168.2.101:2375",
 }
 
 
@@ -4081,7 +4104,7 @@ async def ops_service_checks():
         for fut in as_completed(futures):
             results.append(fut.result())
 
-    node_order = {"R730": 0, "Control Node": 1, "Justin-PC": 2}
+    node_order = {"Turing": 0, "Hopper": 1, "Lovelace": 2}
     results.sort(key=lambda r: (node_order.get(r["node"], 99), r["name"]))
 
     healthy_count = sum(1 for r in results if r["healthy"])
@@ -4400,3 +4423,7 @@ async def terminal_ws(websocket: WebSocket):
             await websocket.close(code=1011)
         except Exception:
             pass
+
+
+
+

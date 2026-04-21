@@ -1,27 +1,27 @@
-# R730 Storage & Monitoring Offload Plan
+﻿# Turing Storage & Monitoring Offload Plan
 
 **Status**: Planning Phase  
-**Target**: Migrate diagnostic/monitoring stack from Justin-PC (execution_plane) to R730  
+**Target**: Migrate diagnostic/monitoring stack from Lovelace (execution_plane) to Turing  
 **Expected Storage Savings**: ~50-70GB initially, +5GB/month (metrics retention)  
-**CPU Impact**: -15-20% load on Justin-PC, +5-8% on R730
+**CPU Impact**: -15-20% load on Lovelace, +5-8% on Turing
 
 ---
 
 ## 🎯 Strategy Overview
 
-**Cleanest architecture**: Create a **Gateway/Ops layer on R730** with centralized routing and monitoring, leaving **Justin-PC as a pure compute/inference node**.
+**Cleanest architecture**: Create a **Gateway/Ops layer on Turing** with centralized routing and monitoring, leaving **Lovelace as a pure compute/inference node**.
 
 | Component | Current Location | Target | Rationale |
 |-----------|------------------|--------|-----------|
-| **Traefik (Reverse Proxy)** | Justin-PC | R730 | Central routing layer; unified API gateway for all services |
-| **Prometheus** | Justin-PC | R730 | Metrics storage is I/O heavy; R730 has spare disk |
-| **Grafana** | Justin-PC | R730 | Read-only dashboard UI; low resource cost |
-| **Loki** | Justin-PC | R730 | Log aggregation storage; 30-40GB/quarter |
-| **Promtail** | Justin-PC | R730 | Log shipper agent; minimal CPU |
-| **cAdvisor** | Justin-PC | R730 | Container monitoring; lightweight |
-| **Redis (Queue)** | Justin-PC | R730 | Queue persistence; can move with monitoring |
+| **Traefik (Reverse Proxy)** | Lovelace | Turing | Central routing layer; unified API gateway for all services |
+| **Prometheus** | Lovelace | Turing | Metrics storage is I/O heavy; Turing has spare disk |
+| **Grafana** | Lovelace | Turing | Read-only dashboard UI; low resource cost |
+| **Loki** | Lovelace | Turing | Log aggregation storage; 30-40GB/quarter |
+| **Promtail** | Lovelace | Turing | Log shipper agent; minimal CPU |
+| **cAdvisor** | Lovelace | Turing | Container monitoring; lightweight |
+| **Redis (Queue)** | Lovelace | Turing | Queue persistence; can move with monitoring |
 
-**R730 becomes Gateway/Ops Hub**:
+**Turing becomes Gateway/Ops Hub**:
 - Traefik (reverse proxy entry point)
 - Prometheus & Grafana (metrics + dashboards)
 - Loki & Promtail (log aggregation)
@@ -30,7 +30,7 @@
 - Open-WebUI (primary chat gateway)
 - Ollama inference (secondary solver)
 
-**Justin-PC becomes Compute/Inference Node** (GPU-dedicated):
+**Lovelace becomes Compute/Inference Node** (GPU-dedicated):
 - Ollama (primary heavy inference)
 - ComfyUI (generative art workloads)
 - BMO Voice (Home Assistant voice agent with RVC)
@@ -49,7 +49,7 @@
 
 ## 📊 Capacity Analysis
 
-### Current Storage Utilization (Justin-PC)
+### Current Storage Utilization (Lovelace)
 
 ```
 Prometheus data:     ~15-20 GB  (1-month retention)
@@ -62,10 +62,10 @@ Docker volumes:      ~5-10 GB
 ESTIMATED TOTAL:     ~50-75 GB
 ```
 
-### R730 Available Resources
+### Turing Available Resources
 
 ```
-Dell R730 @ 192.168.2.103:
+Dell Turing @ 192.168.2.103:
 - CPU: 24 cores (Intel Xeon E5-2680 v3) - currently ~5-10% used
 - RAM: 384GB - currently ~50GB used (Ollama + Open-WebUI)
 - Storage: 2x 480GB SSD (RAID 1) = ~450GB usable
@@ -74,7 +74,7 @@ Dell R730 @ 192.168.2.103:
 - GPU: Nvidia RTX 3070 Ti (8GB VRAM) - not needed for monitoring
 ```
 
-### Justin-PC Impact Post-Migration
+### Lovelace Impact Post-Migration
 
 ```
 Before:  80-100GB used on 500GB drive (~16% utilization)
@@ -87,32 +87,32 @@ Memory: 32GB (50-60% used) → 32GB (35-45% used)
 
 ## 🏗️ Migration Steps
 
-### Phase 1: Prepare R730 (1-2 hours)
+### Phase 1: Prepare Turing (1-2 hours)
 
-**1.1 Verify R730 Connectivity & Networking**
+**1.1 Verify Turing Connectivity & Networking**
 ```bash
-# From Justin-PC, verify R730 is reachable
+# From Lovelace, verify Turing is reachable
 ping 192.168.2.103
 ssh ubuntu@192.168.2.103  # Test SSH access
 
-# Check R730 disk space
+# Check Turing disk space
 df -h /  # Should show ~150GB+ free
 ```
 
-**1.2 Extend R730 Docker Compose**
-- Update `r730_gateway/docker-compose.yml` to include monitoring stack
-- Add shared volumes for metrics storage → `/data/monitoring` on R730
+**1.2 Extend Turing Docker Compose**
+- Update `turing_gateway/docker-compose.yml` to include monitoring stack
+- Add shared volumes for metrics storage → `/data/monitoring` on Turing
 
 **1.3 Network Configuration**
-- Prometheus on R730 scrapes metrics from Justin-PC by hostname
-- Promtail ships logs to Loki (same R730 network)
+- Prometheus on Turing scrapes metrics from Lovelace by hostname
+- Promtail ships logs to Loki (same Turing network)
 - Grafana dashboard accessible from Tailscale
 
-### Phase 2: Deploy Gateway Stack to R730 (45 mins)
+### Phase 2: Deploy Gateway Stack to Turing (45 mins)
 
-**2.1 Add Traefik + Monitoring to R730 Compose**
+**2.1 Add Traefik + Monitoring to Turing Compose**
 
-File: `r730_gateway/docker-compose.yml`
+File: `turing_gateway/docker-compose.yml`
 ```yaml
 version: '3.8'
 
@@ -139,7 +139,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "justin-pc:192.168.2.101"      # Route to Justin-PC for compute services
+      - "lovelace:192.168.2.101"      # Route to Lovelace for compute services
       - "control-node:192.168.2.102"   # Route to Control Node if needed
     networks:
       - ai_lab_net
@@ -150,7 +150,7 @@ services:
   # METRICS COLLECTION
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus-r730
+    container_name: prometheus-turing
     volumes:
       - ./config/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
@@ -172,7 +172,7 @@ services:
   # LOG AGGREGATION
   loki:
     image: grafana/loki:latest
-    container_name: loki-r730
+    container_name: loki-turing
     volumes:
       - ./config/loki:/etc/loki
       - loki_data:/tmp/loki
@@ -188,10 +188,10 @@ services:
       - "traefik.http.routers.loki.entrypoints=web"
       - "traefik.http.services.loki.loadbalancer.server.port=3100"
 
-  # LOG SHIPPING AGENT (scrapes container logs from Justin-PC via Docker API)
+  # LOG SHIPPING AGENT (scrapes container logs from Lovelace via Docker API)
   promtail:
     image: grafana/promtail:latest
-    container_name: promtail-r730
+    container_name: promtail-turing
     volumes:
       - ./config/promtail:/etc/promtail
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -205,7 +205,7 @@ services:
   # CONTAINER METRICS (scrapes cgroup stats)
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor-r730
+    container_name: cadvisor-turing
     ports:
       - "8888:8080"  # Use 8888 to avoid conflict with Traefik dashboard
     volumes:
@@ -228,7 +228,7 @@ services:
   # ANALYTICS DASHBOARD
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana-r730
+    container_name: grafana-turing
     ports:
       - "3001:3000"  # Port 3001 to avoid conflict with Langfuse @ 3000
     environment:
@@ -253,7 +253,7 @@ services:
   # PERSISTENT QUEUE
   redis:
     image: redis:7.2-alpine
-    container_name: redis-r730
+    container_name: redis-turing
     ports:
       - "6379:6379"
     volumes:
@@ -279,37 +279,37 @@ volumes:
   redis_data:
 ```
 
-**2.2 Copy & Adapt Configs from Justin-PC to R730**
+**2.2 Copy & Adapt Configs from Lovelace to Turing**
 ```bash
-# SSH into R730
+# SSH into Turing
 ssh ubuntu@192.168.2.103
 
-# Copy monitoring configs from Justin-PC
+# Copy monitoring configs from Lovelace
 scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/prometheus \
-  ~/r730_gateway/config/
+  ~/turing_gateway/config/
 
 scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/loki \
-  ~/r730_gateway/config/
+  ~/turing_gateway/config/
 
 scp -r ubuntu@192.168.2.101:~/Home_AI_Lab/execution_plane/config/promtail \
-  ~/r730_gateway/config/
+  ~/turing_gateway/config/
 
-# Update Prometheus targets to scrape Justin-PC containers remotely
-cat ~/r730_gateway/config/prometheus/prometheus.yml | sed 's|localhost:9100|192.168.2.101:9100|g' \
-  > ~/r730_gateway/config/prometheus/prometheus.yml.new && \
-  mv ~/r730_gateway/config/prometheus/prometheus.yml.new ~/r730_gateway/config/prometheus/prometheus.yml
+# Update Prometheus targets to scrape Lovelace containers remotely
+cat ~/turing_gateway/config/prometheus/prometheus.yml | sed 's|localhost:9100|192.168.2.101:9100|g' \
+  > ~/turing_gateway/config/prometheus/prometheus.yml.new && \
+  mv ~/turing_gateway/config/prometheus/prometheus.yml.new ~/turing_gateway/config/prometheus/prometheus.yml
 
-# Add cAdvisor target for Justin-PC
+# Add cAdvisor target for Lovelace
 echo """
   - job_name: 'cadvisor-justin'
     static_configs:
       - targets: ['192.168.2.101:8080']
-""" >> ~/r730_gateway/config/prometheus/prometheus.yml
+""" >> ~/turing_gateway/config/prometheus/prometheus.yml
 ```
 
-**2.3 Deploy to R730**
+**2.3 Deploy to Turing**
 ```bash
-cd ~/r730_gateway
+cd ~/turing_gateway
 docker compose up -d traefik prometheus loki promtail cadvisor grafana redis
 docker compose logs -f traefik  # Verify startup
 ```
@@ -319,28 +319,28 @@ docker compose logs -f traefik  # Verify startup
 # Access Grafana @ http://192.168.2.103:3001 (admin/admin)
 # Create Prometheus datasource:
 #   Name: Prometheus
-#   URL: http://prometheus-r730:9090
+#   URL: http://prometheus-turing:9090
 #   Access: Server
 #
 # Create Loki datasource:
 #   Name: Loki
-#   URL: http://loki-r730:3100
+#   URL: http://loki-turing:3100
 #   Access: Server
 ```
 
 ### Phase 3: Validate Gateway & Metrics (30 mins)
 
-**3.1 Test Traefik Routing to Justin-PC**
+**3.1 Test Traefik Routing to Lovelace**
 ```bash
 # From any machine on network:
 curl -v http://192.168.2.103:80/
 
-# Should resolve through Traefik on R730 to Justin-PC services
+# Should resolve through Traefik on Turing to Lovelace services
 # Check Traefik dashboard
 curl http://192.168.2.103:8080/dashboard/
 
 # Verify Docker network dns
-docker exec traefik-gateway ping justin-pc  # Should resolve to 192.168.2.101
+docker exec traefik-gateway ping lovelace  # Should resolve to 192.168.2.101
 ```
 
 **3.2 Verify Prometheus Scraping**
@@ -351,8 +351,8 @@ curl http://192.168.2.103:9090/api/v1/targets | jq '.data.activeTargets[] | .lab
 # Should show targets from:
 #   - Prometheus itself (localhost:9090)
 #   - cAdvisor (localhost:8888)
-#   - Justin-PC cAdvisor (192.168.2.101:8080)
-#   - Justin-PC Ollama (192.168.2.101:11434)
+#   - Lovelace cAdvisor (192.168.2.101:8080)
+#   - Lovelace Ollama (192.168.2.101:11434)
 ```
 
 **3.3 Check Log Flow**
@@ -363,43 +363,43 @@ curl http://192.168.2.103:9090/api/v1/targets | jq '.data.activeTargets[] | .lab
 # Verify Loki datasource is active
 # Run sample query: {job="docker"}
 
-# Should show logs from containers on both R730 and Justin-PC
+# Should show logs from containers on both Turing and Lovelace
 ```
 
 **3.4 Test Cross-Node Traffic**
 ```bash
-# Verify Traefik can route to Justin-PC
-curl -H "Host: justin-pc" http://192.168.2.103/
+# Verify Traefik can route to Lovelace
+curl -H "Host: lovelace" http://192.168.2.103/
 
-# Should reach Justin-PC services (ComfyUI, Ollama, Agent Runtime, etc.)
+# Should reach Lovelace services (ComfyUI, Ollama, Agent Runtime, etc.)
 ```
 
-### Phase 4: Decommission Justin-PC Monitoring (20 mins, staggered)
+### Phase 4: Decommission Lovelace Monitoring (20 mins, staggered)
 
 **⚠️ CRITICAL: Traefik must migrate FIRST**
 
-The Agent Runtime container on Justin-PC likely has Traefik labels for routing. We need to:
-1. Start R730 Traefik with Justin-PC remote targets configured
-2. Test all routes work through R730 Traefik
-3. **Then** remove Justin-PC Traefik
+The Agent Runtime container on Lovelace likely has Traefik labels for routing. We need to:
+1. Start Turing Traefik with Lovelace remote targets configured
+2. Test all routes work through Turing Traefik
+3. **Then** remove Lovelace Traefik
 
-**4.1 Update Agent Runtime Labels for R730 Traefik**
+**4.1 Update Agent Runtime Labels for Turing Traefik**
 
-Before removing Justin-PC Traefik, update routing labels to be discovered by R730 Traefik:
+Before removing Lovelace Traefik, update routing labels to be discovered by Turing Traefik:
 
 File: `execution_plane/docker-compose.yml` (Agent Runtime service)
 ```yaml
   agent-runtime:
     # ... existing config ...
     labels:
-      # These labels will now be discovered by R730 Traefik via Docker API
+      # These labels will now be discovered by Turing Traefik via Docker API
       - "traefik.enable=true"
       - "traefik.http.routers.agent-runtime.rule=PathPrefix(`/swarm`)"
       - "traefik.http.routers.agent-runtime.entrypoints=web"
       - "traefik.http.services.agent-runtime.loadbalancer.server.port=8000"
 ```
 
-**4.2 Remove Traefik from Justin-PC**
+**4.2 Remove Traefik from Lovelace**
 
 File: `execution_plane/docker-compose.yml` - Delete entire `traefik` service block:
 ```yaml
@@ -410,7 +410,7 @@ File: `execution_plane/docker-compose.yml` - Delete entire `traefik` service blo
     # ... all config ...
 ```
 
-**4.3 Remove Monitoring Services from Justin-PC**
+**4.3 Remove Monitoring Services from Lovelace**
 
 File: `execution_plane/docker-compose.yml` - Delete these service blocks:
 ```yaml
@@ -434,7 +434,7 @@ File: `execution_plane/docker-compose.yml` - Delete volume definitions:
   redis_data:
 ```
 
-**4.5 Reload Justin-PC Stack**
+**4.5 Reload Lovelace Stack**
 ```bash
 ssh ubuntu@192.168.2.101
 cd ~/Home_AI_Lab/execution_plane
@@ -453,12 +453,12 @@ docker-compose ps
 # Should show: spire-agent, ollama, bmo-voice, voice-engine, openhands, agent-runtime, comfyui
 ```
 
-**4.6 Validate Justin-PC Is Still Reachable**
+**4.6 Validate Lovelace Is Still Reachable**
 ```bash
-# From Justin-PC, test R730 can route to it
+# From Lovelace, test Turing can route to it
 curl -v http://192.168.2.103/swarm/docs
 
-# From R730, verify Docker API can still reach Justin-PC containers
+# From Turing, verify Docker API can still reach Lovelace containers
 docker exec traefik-gateway curl http://host.docker.internal:8080/metrics | head -5
 ```
 
@@ -466,23 +466,23 @@ docker exec traefik-gateway curl http://host.docker.internal:8080/metrics | head
 
 **5.1 Update CONNECTION_REFERENCE.md**
 
-Primary entry point changes from Justin-PC to R730:
+Primary entry point changes from Lovelace to Turing:
 
 ```markdown
 ## 🖥️ User Interfaces (Web UIs)
 
 | Interface                | URL                         | Hosted On    | Purpose                                                    |
 | :----------------------- | :-------------------------- | :----------- | :--------------------------------------------------------- |
-| **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell R730    | Central reverse proxy for ALL services (new primary entry) |
-| **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell R730    | Primary chat interface to interact with the Swarm.         |
+| **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell Turing    | Central reverse proxy for ALL services (new primary entry) |
+| **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell Turing    | Primary chat interface to interact with the Swarm.         |
 | **Langfuse Dashboard**   | `http://192.168.2.102:3000` | Control-Node | Live tracking of LLM traces, MarsRL Process Rewards.       |
-| **Grafana Portal** ⭐    | `http://192.168.2.103:3001` | Dell R730    | Ops dashboards, metrics, logs (moved from Justin-PC)       |
-| **Prometheus Metrics**   | `http://192.168.2.103:9090` | Dell R730    | Time-series metrics database (moved from Justin-PC)        |
-| **Loki Logs API**        | `http://192.168.2.103:3100` | Dell R730    | Log aggregation backend (moved from Justin-PC)             |
-| **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell R730    | Live routing and load balancer metrics                     |
-| **cAdvisor Metrics**     | `http://192.168.2.103:8888` | Dell R730    | Container resource monitoring                              |
-| **OpenHands Sandbox**    | `http://192.168.2.103/hands` via Traefik | Dell R730    | Docker-in-Docker sandbox (routed from Justin-PC)           |
-| **ComfyUI**              | `http://192.168.2.103/comfy` via Traefik | Dell R730    | Image/3D generation (routed from Justin-PC)                |
+| **Grafana Portal** ⭐    | `http://192.168.2.103:3001` | Dell Turing    | Ops dashboards, metrics, logs (moved from Lovelace)       |
+| **Prometheus Metrics**   | `http://192.168.2.103:9090` | Dell Turing    | Time-series metrics database (moved from Lovelace)        |
+| **Loki Logs API**        | `http://192.168.2.103:3100` | Dell Turing    | Log aggregation backend (moved from Lovelace)             |
+| **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell Turing    | Live routing and load balancer metrics                     |
+| **cAdvisor Metrics**     | `http://192.168.2.103:8888` | Dell Turing    | Container resource monitoring                              |
+| **OpenHands Sandbox**    | `http://192.168.2.103/hands` via Traefik | Dell Turing    | Docker-in-Docker sandbox (routed from Lovelace)           |
+| **ComfyUI**              | `http://192.168.2.103/comfy` via Traefik | Dell Turing    | Image/3D generation (routed from Lovelace)                |
 ```
 
 **5.2 Network Topology Update**
@@ -490,11 +490,11 @@ Primary entry point changes from Justin-PC to R730:
 ```markdown
 ## 🌐 Architecture After Migration
 
-### Gateway Layer (R730)
+### Gateway Layer (Turing)
 ```
-R730 Traefik (port 80)
+Turing Traefik (port 80)
   ├─ Direct: Prometheus, Grafana, Loki, cAdvisor, Redis
-  └─ Routed: Agent Runtime, ComfyUI, OpenHands, Ollama, BMO Voice (all on Justin-PC)
+  └─ Routed: Agent Runtime, ComfyUI, OpenHands, Ollama, BMO Voice (all on Lovelace)
 
 Control Plane (Dell Wyse)
   ├─ SPIRE Server (zero-trust identity)
@@ -502,9 +502,9 @@ Control Plane (Dell Wyse)
   └─ PostgreSQL, ClickHouse, MinIO
 ```
 
-### Compute Layer (Justin-PC)
+### Compute Layer (Lovelace)
 ```
-Justin-PC (no reverse proxy)
+Lovelace (no reverse proxy)
   ├─ Ollama (primary inference - RTX 5060 Ti)
   ├─ ComfyUI (generative workloads)
   ├─ BMO Voice (Home Assistant agent)
@@ -514,8 +514,8 @@ Justin-PC (no reverse proxy)
 ```
 
 **Benefits of this architecture:**
-- ✅ Single entry point (R730:80) for all UIs
-- ✅ Compute node (Justin-PC) has no external routing overhead
+- ✅ Single entry point (Turing:80) for all UIs
+- ✅ Compute node (Lovelace) has no external routing overhead
 - ✅ Storage/metrics isolated from GPU workloads
 - ✅ Easy to scale: add more compute nodes behind Traefik
 ```
@@ -525,15 +525,15 @@ Justin-PC (no reverse proxy)
 **6.1 Traefik Routing Verification**
 
 ```bash
-# Test each route through R730 Traefik
-echo "Testing routes through R730 Traefik..."
+# Test each route through Turing Traefik
+echo "Testing routes through Turing Traefik..."
 
-# Test metrics services (local to R730)
+# Test metrics services (local to Turing)
 curl -I http://192.168.2.103/prometheus  # Should 200
 curl -I http://192.168.2.103/grafana      # Should redirect or 200
 curl -I http://192.168.2.103/cadvisor     # Should 200
 
-# Test compute services (routed to Justin-PC)
+# Test compute services (routed to Lovelace)
 curl -I http://192.168.2.103/swarm/docs   # Agent Runtime Swagger
 curl -I http://192.168.2.103/comfy        # ComfyUI
 curl -I http://192.168.2.103/hands        # OpenHands
@@ -544,7 +544,7 @@ curl -I http://192.168.2.103/hands        # OpenHands
 **6.2 Metrics Collection Verification**
 
 ```bash
-# Verify Prometheus is scraping from Justin-PC
+# Verify Prometheus is scraping from Lovelace
 curl http://192.168.2.103:9090/api/v1/query?query=up | jq '.data.result[] | {job:.metric.job, instance:.metric.instance}'
 
 # Expected output should include:
@@ -574,14 +574,14 @@ curl "http://192.168.2.103:3100/loki/api/v1/query_range" \
 # Verify:
 #  1. Prometheus datasource is healthy (Settings > Data Sources > Prometheus > Test)
 #  2. Loki datasource is healthy (Settings > Data Sources > Loki > Test)
-#  3. Dashboards show metrics from both R730 and Justin-PC
+#  3. Dashboards show metrics from both Turing and Lovelace
 #  4. Logs appear in Explore > Loki
 ```
 
-**6.5 Justin-PC Isolation Verification**
+**6.5 Lovelace Isolation Verification**
 
 ```bash
-# Verify Justin-PC containers are NOT running Traefik/Monitoring
+# Verify Lovelace containers are NOT running Traefik/Monitoring
 ssh ubuntu@192.168.2.101 "cd ~/Home_AI_Lab/execution_plane && docker-compose ps"
 
 # Expected OUTPUT (should NOT show traefik, prometheus, grafana, loki, promtail, cadvisor, redis_queue):
@@ -598,7 +598,7 @@ ssh ubuntu@192.168.2.101 "cd ~/Home_AI_Lab/execution_plane && docker-compose ps"
 **6.6 Storage Verification**
 
 ```bash
-# Check Justin-PC free space (should be ~50-75GB more)
+# Check Lovelace free space (should be ~50-75GB more)
 ssh ubuntu@192.168.2.101 "df -h / | grep -E '(Filesystem|^/)'
 
 # Expected: should show ~70-80% free (up from ~85% used before)
@@ -622,14 +622,14 @@ done
 ## 📈 Storage Impact Timeline
 
 ```
-Week 1:  Justin-PC gains ~50GB free space
-         R730 used: 120GB → 180GB
+Week 1:  Lovelace gains ~50GB free space
+         Turing used: 120GB → 180GB
          
 Week 2:  Prometheus grows ~1.5GB/week  
          Loki grows ~3GB/week
          
-Month 1: Total monitoring storage: ~35-40GB on R730
-         Justin-PC stress: 60% reduction in I/O
+Month 1: Total monitoring storage: ~35-40GB on Turing
+         Lovelace stress: 60% reduction in I/O
          
 Q1:      Loki archives @ 60 days: ~24GB archived to external storage
 ```
@@ -640,12 +640,12 @@ Q1:      Loki archives @ 60 days: ~24GB archived to external storage
 
 | Risk | Mitigation |
 |------|-----------|
-| **Traefik routing breaks during migration** | Run both Traefik instances in parallel (Justin-PC on :81, R730 on :80) for 1 hour; verify all routes work before shutting down old |
-| **Network latency to Justin-PC services** | Traefik adds ~2-5ms per hop (negligible for home lab); routing happens at L4 (low overhead) |
-| **R730 disk fills with logs** | Set retention: Prometheus 90 days, Loki 60 days; configure log rotation in Promtail |
+| **Traefik routing breaks during migration** | Run both Traefik instances in parallel (Lovelace on :81, Turing on :80) for 1 hour; verify all routes work before shutting down old |
+| **Network latency to Lovelace services** | Traefik adds ~2-5ms per hop (negligible for home lab); routing happens at L4 (low overhead) |
+| **Turing disk fills with logs** | Set retention: Prometheus 90 days, Loki 60 days; configure log rotation in Promtail |
 | **Metrics loss during Traefik switchover** | Both Traefik instances collect metrics in parallel; Prometheus merge query once both are stable |
-| **R730 Traefik fails → all UIs down** | Keep rollback plan; verify R730 stability for 48 hours before full commitment |
-| **Justin-PC containers fail to register with R730 Traefik** | Verify Docker network connectivity; test `docker exec traefik-gateway ping justin-pc` |
+| **Turing Traefik fails → all UIs down** | Keep rollback plan; verify Turing stability for 48 hours before full commitment |
+| **Lovelace containers fail to register with Turing Traefik** | Verify Docker network connectivity; test `docker exec traefik-gateway ping lovelace` |
 | **Promtail loses logs during migration** | Loki has in-memory buffer (configurable); validate no log gaps in Grafana after cutover |
 
 ---
@@ -654,7 +654,7 @@ Q1:      Loki archives @ 60 days: ~24GB archived to external storage
 
 ## 🚀 Quick Reference: Post-Migration Access
 
-All services now accessible through **R730 Traefik Gateway** @ `http://192.168.2.103:80`
+All services now accessible through **Turing Traefik Gateway** @ `http://192.168.2.103:80`
 
 | Service | Direct URL <sup>*</sup> | Routed URL | Purpose |
 |---------|------------------------|-----------|---------|
@@ -662,9 +662,9 @@ All services now accessible through **R730 Traefik Gateway** @ `http://192.168.2
 | **Prometheus** | `http://192.168.2.103:9090` | `http://192.168.2.103/prometheus` | Metrics DB & queries |
 | **Loki** | `http://192.168.2.103:3100` | `http://192.168.2.103/loki` | Log aggregation API |
 | **cAdvisor** | `http://192.168.2.103:8888` | `http://192.168.2.103/cadvisor` | Container metrics |
-| **Agent Runtime** | - | `http://192.168.2.103/swarm` | FastAPI engine (Justin-PC) |
-| **ComfyUI** | - | `http://192.168.2.103/comfy` | Generative (Justin-PC) |
-| **OpenHands** | - | `http://192.168.2.103/hands` | Sandbox dev (Justin-PC) |
+| **Agent Runtime** | - | `http://192.168.2.103/swarm` | FastAPI engine (Lovelace) |
+| **ComfyUI** | - | `http://192.168.2.103/comfy` | Generative (Lovelace) |
+| **OpenHands** | - | `http://192.168.2.103/hands` | Sandbox dev (Lovelace) |
 | **Traefik Dashboard** | `http://192.168.2.103:8080` | - | Gateway metrics |
 
 <sup>*</sup> Direct URLs bypass Traefik routing if needed
@@ -674,9 +674,9 @@ All services now accessible through **R730 Traefik Gateway** @ `http://192.168.2
 ## 📝 Optional: Further Optimizations
 
 **Can also move (lower priority):**
-1. **Open-WebUI UI server** (currently hosted on R730) - move to Control Node for centralization
-2. **Ollama on R730** - can reduce to CPU-only inference mode if needed for storage
-3. **Docker registry/artifact caching** - move to R730 to reduce Justin-PC disk churn
+1. **Open-WebUI UI server** (currently hosted on Turing) - move to Control Node for centralization
+2. **Ollama on Turing** - can reduce to CPU-only inference mode if needed for storage
+3. **Docker registry/artifact caching** - move to Turing to reduce Lovelace disk churn
 
 **Things NOT to move:**
 - ComfyUI (GPU-bound on RTX 5060 Ti)
@@ -691,26 +691,26 @@ All services now accessible through **R730 Traefik Gateway** @ `http://192.168.2
 If critical issues occur during migration:
 
 ```bash
-# ROLLBACK SCENARIO: R730 Traefik is unstable
+# ROLLBACK SCENARIO: Turing Traefik is unstable
 
-# 1. Restore Justin-PC Traefik (5 mins)
+# 1. Restore Lovelace Traefik (5 mins)
 ssh ubuntu@192.168.2.101
 cd ~/Home_AI_Lab/execution_plane
 git checkout docker-compose.yml  # Restore original
 docker-compose up -d traefik prometheus grafana loki promtail cadvisor redis_queue
 
-# 2. Point clients back to Justin-PC
+# 2. Point clients back to Lovelace
 # Update all .env files and agent configs to use:
 #   - Traefik: http://192.168.2.101:81
 #   - Prometheus: http://192.168.2.101:9090
 #   - Grafana: http://192.168.2.101:80
 
-# 3. Stop R730 monitoring (to avoid confusion)
+# 3. Stop Turing monitoring (to avoid confusion)
 ssh ubuntu@192.168.2.103
-cd ~/r730_gateway
+cd ~/turing_gateway
 docker-compose down traefik prometheus grafana loki promtail cadvisor redis
 
-# 4. Verify Justin-PC monitoring is healthy
+# 4. Verify Lovelace monitoring is healthy
 curl -v http://192.168.2.101:81/
 docker-compose logs traefik | grep "error\|ERROR"
 ```
@@ -721,7 +721,7 @@ docker-compose logs traefik | grep "error\|ERROR"
 
 **Timeline**: 3-4 hours total (including testing)  
 **Downtime**: ~10 minutes (monitoring blind spot during cutover)  
-**Early wins**: Immediate Justin-PC storage relief, reduced CPU contention with ComfyUI
+**Early wins**: Immediate Lovelace storage relief, reduced CPU contention with ComfyUI
 
 ---
 
@@ -733,8 +733,8 @@ docker-compose logs traefik | grep "error\|ERROR"
 | Source | Type | Relevance |
 |--------|------|----------|
 | `docs/MIGRATION_EXECUTION_CHECKLIST.md` | Documentation | Execution checklist (companion to this plan) |
-| `execution_plane/docker-compose.yml` | Infrastructure | Justin-PC compose (source) |
-| `r730_gateway/docker-compose.yml` | Infrastructure | R730 compose (destination) |
+| `execution_plane/docker-compose.yml` | Infrastructure | Lovelace compose (source) |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Turing compose (destination) |
 
 </details>
 
@@ -744,7 +744,7 @@ docker-compose logs traefik | grep "error\|ERROR"
 | Date | Author | Changes |
 |------|--------|--------|
 | 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance notes |
-| 2026-03-10 | AI-Copilot | R730 migration planning document |
+| 2026-03-10 | AI-Copilot | Turing migration planning document |
 
 </details>
 

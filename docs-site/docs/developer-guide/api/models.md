@@ -1,4 +1,4 @@
----
+﻿---
 title: Models API
 ---
 
@@ -43,7 +43,9 @@ GET /v1/models
 ### Example
 
 ```bash
-curl http://{{ gateway_node_ip }}/swarm/v1/models | python -m json.tool
+curl http://{{ turing_ip }}/swarm/v1/models | python -m json.tool
 ```
 
 This endpoint proxies to the Ollama `/api/tags` endpoint and transforms the response to OpenAI format.
+
+

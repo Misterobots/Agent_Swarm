@@ -1,4 +1,4 @@
----
+﻿---
 title: ComfyUI Workflows
 ---
 
@@ -57,7 +57,7 @@ ComfyUI workflows are JSON documents describing a directed acyclic graph (DAG) o
 
 ### 1. Design in ComfyUI UI
 
-1. Access ComfyUI at `http://{{ execution_node_ip }}:8188`
+1. Access ComfyUI at `http://{{ lovelace_ip }}:8188`
 2. Build your node graph visually
 3. Click **Save (API Format)** to export the JSON
 
@@ -91,7 +91,7 @@ WORKFLOWS = {
 ### 4. Test
 
 ```bash
-curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+curl -X POST http://{{ turing_ip }}/swarm/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
         "messages": [{"role": "user", "content": "Generate an image of a mountain sunset using custom workflow"}],
@@ -123,3 +123,5 @@ delivered_artifacts/
 - [User Guide: Art Studio](../user-guide/art-studio.md) — user-facing guide
 - [Module: Image Agent](../modules/image-agent.md) — agent implementation
 - [Admin: Scaling](../admin-guide/operations/scaling.md) — GPU considerations
+
+

@@ -10,3 +10,4 @@ echo "GENERIC_HOST_LOC: $code_host"
 
 code_host_slug=$(curl -o /dev/null -s -w "%{http_code}" -H "Host: localhost" -X POST http://authentik_server:9000/application/o/grafana/token/)
 echo "SPECIFIC_HOST_LOC: $code_host_slug"
+

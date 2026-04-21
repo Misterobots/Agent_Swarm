@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from typing import Any, Dict, List
@@ -131,7 +131,7 @@ class MCPBridgeServer:
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "host": {"type": "string", "description": "Target host name (justin-pc, control-plane, r730)"},
+                        "host": {"type": "string", "description": "Target host name (Lovelace, control-plane, Turing)"},
                         "command": {"type": "string", "description": "Shell command to execute"},
                         "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 60},
                     },
@@ -294,3 +294,5 @@ def get_mcp_server() -> MCPBridgeServer:
     if _mcp_server_singleton is None:
         _mcp_server_singleton = MCPBridgeServer()
     return _mcp_server_singleton
+
+

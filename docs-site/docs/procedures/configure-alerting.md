@@ -1,16 +1,16 @@
----
+﻿---
 title: "Procedure: Configure Alerting"
 ---
 
 # Configure Alerting
 
-Set up Prometheus alerts and AlertManager notifications.
+Set up jacquard alerts and AlertManager notifications.
 
 ## Steps
 
 ### 1. Define Alert Rules
 
-Edit `r730_gateway/config/prometheus/alert_rules.yml`:
+Edit `turing_gateway/config/jacquard/alert_rules.yml`:
 
 ```yaml
 groups:
@@ -24,8 +24,8 @@ groups:
         annotations:
           summary: "High error rate detected"
 
-      - alert: OllamaDown
-        expr: up{job="ollama"} == 0
+      - alert: ForgeDown
+        expr: up{job="forge"} == 0
         for: 2m
         labels:
           severity: critical
@@ -35,7 +35,7 @@ groups:
 
 ### 2. Configure AlertManager
 
-Edit `r730_gateway/config/alertmanager/alertmanager.yml`:
+Edit `turing_gateway/config/alertmanager/alertmanager.yml`:
 
 ```yaml
 global:
@@ -61,16 +61,18 @@ receivers:
 ### 3. Restart Services
 
 ```bash
-docker compose restart prometheus alertmanager
+docker compose restart jacquard alertmanager
 ```
 
 ### 4. Test Alerts
 
 ```bash
 # Manually fire a test alert
-curl -X POST http://{{ gateway_node_ip }}:9093/api/v1/alerts \
+curl -X POST http://{{ turing_ip }}:9093/api/v1/alerts \
     -H "Content-Type: application/json" \
     -d '[{"labels":{"alertname":"TestAlert","severity":"warning"},"annotations":{"summary":"Test alert"}}]'
 ```
 
 Check that the notification arrives.
+
+

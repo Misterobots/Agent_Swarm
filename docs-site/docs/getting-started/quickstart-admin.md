@@ -1,4 +1,4 @@
----
+﻿---
 title: "Quickstart: Admins"
 ---
 
@@ -39,9 +39,9 @@ graph LR
 
     subgraph GW["Gateway Node<br/>192.168.2.103"]
         G1["Traefik"]
-        G2["Prometheus"]
-        G3["Grafana"]
-        G4["Loki"]
+        G2["jacquard"]
+        G3["hollerith"]
+        G4["knuth"]
         G5["Ollama (2nd)"]
     end
 
@@ -64,9 +64,9 @@ cd Agent_Swarm
 Edit `network.env` at the repo root with your actual IP addresses:
 
 ```ini
-EXECUTION_NODE_IP=192.168.2.101
-CONTROL_NODE_IP=192.168.2.102
-GATEWAY_NODE_IP=192.168.2.103
+LOVELACE_IP=192.168.2.101
+HOPPER_IP=192.168.2.102
+TURING_IP=192.168.2.103
 HOME_ASSISTANT_IP=192.168.2.100
 ```
 
@@ -112,12 +112,12 @@ curl http://localhost:8008/
 SSH to the Gateway Node:
 
 ```bash
-ssh R730
-cd ~/Home_AI_Lab/r730_gateway
+ssh Turing
+cd ~/Home_AI_Lab/turing_gateway
 docker compose up -d
 ```
 
-This starts Traefik, Prometheus, Grafana, Loki, and the monitoring stack.
+This starts Traefik, jacquard, hollerith, knuth, and the monitoring stack.
 
 ## Step 6: Verify Deployment
 
@@ -130,7 +130,7 @@ curl http://192.168.2.101:8008/v1/models
 # Check Ollama inference
 curl http://192.168.2.101:11434/api/tags
 
-# Check Grafana
+# Check hollerith
 curl -s http://192.168.2.103:3001/api/health
 
 # Check Langfuse
@@ -138,11 +138,13 @@ curl -s http://192.168.2.102:3000/api/public/health
 ```
 
 !!! success "All Clear"
-    If all four return valid JSON, the cluster is operational. Open `http://{{ gateway_node_ip }}` to access the Hive UI.
+    If all four return valid JSON, the cluster is operational. Open `http://{{ turing_ip }}` to access the Hive UI.
 
 ## Next Steps
 
 - [Post-Deploy Verification](../admin-guide/deployment/post-deploy.md) — comprehensive health checks
 - [Networking Guide](../admin-guide/deployment/networking.md) — firewall rules, Tailscale, DNS
-- [Monitoring Setup](../admin-guide/operations/monitoring.md) — configure Grafana dashboards
+- [Monitoring Setup](../admin-guide/operations/monitoring.md) — configure hollerith dashboards
 - [SPIRE Configuration](../admin-guide/configuration/spire.md) — workload registration
+
+

@@ -1,4 +1,4 @@
-server:
+﻿server:
   http_listen_port: 9080
   grpc_listen_port: 0
 
@@ -6,7 +6,7 @@ positions:
   filename: /tmp/positions.yaml
 
 clients:
-  - url: http://loki-r730:3100/loki/api/v1/push
+  - url: http://loki-Turing:3100/loki/api/v1/push
 
 scrape_configs:
   - job_name: docker
@@ -21,3 +21,4 @@ scrape_configs:
         target_label: 'logstream'
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
         target_label: 'service'
+

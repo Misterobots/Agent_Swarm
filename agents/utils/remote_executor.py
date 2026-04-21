@@ -1,8 +1,8 @@
-"""
+﻿"""
 remote_executor.py — SSH Remote Execution Manager
 
 Provides secure, session-pooled SSH command execution across the
-Hive multi-node topology (Justin-PC, Control Plane, R730).
+Hive multi-node topology (Lovelace, Control Plane, Turing).
 
 Security:
     - Commands are validated through bash_classifier before execution
@@ -15,7 +15,7 @@ Usage:
     from utils.remote_executor import get_remote_executor
 
     executor = get_remote_executor()
-    result = executor.execute("r730", "nvidia-smi")
+    result = executor.execute("Turing", "nvidia-smi")
     print(result.stdout)
 """
 
@@ -85,7 +85,7 @@ SSH_USER = os.getenv("SSH_USER", "misterobots")
 HEALTH_CHECK_TTL = 30  # seconds
 
 # Host allowlist — only these names can be targeted
-ALLOWED_HOSTS = {"justin-pc", "control-plane", "r730"}
+ALLOWED_HOSTS = {"Lovelace", "control-plane", "Turing"}
 
 
 class RemoteExecutor:
@@ -98,27 +98,27 @@ class RemoteExecutor:
 
     def _initialize_hosts(self):
         """Build host table from config.py topology."""
-        from config import EXECUTION_NODE_IP, CONTROL_NODE_IP, GATEWAY_NODE_IP
+        from config import LOVELACE_IP, HOPPER_IP, TURING_IP
 
         key_path = SSH_KEY_PATH
         user = SSH_USER
 
         self._hosts = {
-            "justin-pc": RemoteHost(
-                name="justin-pc",
-                host=EXECUTION_NODE_IP,
+            "Lovelace": RemoteHost(
+                name="Lovelace",
+                host=LOVELACE_IP,
                 user=user,
                 key_path=key_path,
             ),
             "control-plane": RemoteHost(
                 name="control-plane",
-                host=CONTROL_NODE_IP,
+                host=HOPPER_IP,
                 user=user,
                 key_path=key_path,
             ),
-            "r730": RemoteHost(
-                name="r730",
-                host=GATEWAY_NODE_IP,
+            "Turing": RemoteHost(
+                name="Turing",
+                host=TURING_IP,
                 user=user,
                 key_path=key_path,
             ),
@@ -171,7 +171,7 @@ class RemoteExecutor:
         Execute a command on a remote host via SSH.
 
         Args:
-            host_name: Target host name (e.g. "r730", "control-plane")
+            host_name: Target host name (e.g. "Turing", "control-plane")
             command: Shell command to execute
             timeout: Max execution time in seconds
             check_safety: If True, run command through bash_classifier first
@@ -328,3 +328,5 @@ def get_remote_executor() -> RemoteExecutor:
     if _executor is None:
         _executor = RemoteExecutor()
     return _executor
+
+

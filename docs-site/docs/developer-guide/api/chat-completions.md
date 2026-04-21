@@ -1,4 +1,4 @@
----
+﻿---
 title: Chat Completions API
 ---
 
@@ -12,7 +12,7 @@ The primary API for interacting with Agent Swarm. OpenAI-compatible format.
 POST /v1/chat/completions
 ```
 
-Via Gateway: `POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions`
+Via Gateway: `POST http://{{ turing_ip }}/swarm/v1/chat/completions`
 
 ## Request
 
@@ -118,7 +118,7 @@ data: [DONE]
 ### cURL
 
 ```bash
-curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+curl -X POST http://{{ turing_ip }}/swarm/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
         "messages": [{"role": "user", "content": "Write a Python fibonacci function"}],
@@ -132,7 +132,7 @@ curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
 import requests
 
 response = requests.post(
-    "http://{{ gateway_node_ip }}/swarm/v1/chat/completions",
+    "http://{{ turing_ip }}/swarm/v1/chat/completions",
     json={
         "messages": [{"role": "user", "content": "Write a Python fibonacci function"}],
         "stream": False,
@@ -147,7 +147,7 @@ print(response.json()["choices"][0]["message"]["content"])
 import requests
 
 with requests.post(
-    "http://{{ gateway_node_ip }}/swarm/v1/chat/completions",
+    "http://{{ turing_ip }}/swarm/v1/chat/completions",
     json={
         "messages": [{"role": "user", "content": "Explain Docker"}],
         "stream": True,
@@ -176,3 +176,5 @@ with requests.post(
     }
 }
 ```
+
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Phase 8: Tests for MONITOR_TOOL, CONTEXT_COLLAPSE helpers, and VERIFICATION_AGENT UI parsing.
 
 All tests run offline — network calls, Docker, and LLM are mocked.
@@ -72,14 +72,14 @@ class TestMonitorTool:
             assert result["status"] == "ONLINE"
             assert len(result["nodes"]) == 3
 
-    def test_check_node_connectivity_r730_down(self):
+    def test_check_node_connectivity_turing_down(self):
         def mock_tcp(host, port, timeout=2.0):
             return host != "192.168.2.103"
         with patch("tools.monitor_tool._tcp_check", side_effect=mock_tcp):
             from tools.monitor_tool import check_node_connectivity
             result = json.loads(check_node_connectivity())
             assert result["status"] == "DEGRADED"
-            assert "R730" in result["summary"]
+            assert "Turing" in result["summary"]
 
     def test_system_health_report_structure(self):
         mock_resp = MagicMock()
@@ -380,3 +380,5 @@ class TestVerifierAgent:
         vr = VerifierResult(passed=False, reason="Truncated response detected", score=0.35)
         assert vr.passed is False
         assert vr.score < 0.6
+
+

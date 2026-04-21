@@ -1,4 +1,4 @@
-"""
+﻿"""
 client.py — OpenClaude gRPC Client
 
 Provides a Python client for calling the OpenClaude gRPC server.
@@ -52,7 +52,7 @@ class GrpcClient:
     Client for the OpenClaude gRPC inference gateway.
 
     When gRPC protobuf stubs are available and the gateway is enabled,
-    routes requests through the gRPC server on R730.  Otherwise falls
+    routes requests through the gRPC server on Turing.  Otherwise falls
     back to the local ModelRouter for direct Ollama calls.
     """
 
@@ -287,3 +287,5 @@ def get_grpc_client() -> GrpcClient:
     if _client_instance is None:
         _client_instance = GrpcClient()
     return _client_instance
+
+

@@ -9,3 +9,4 @@ curl -v http://authentik_server:9000/
 
 echo "\n--- CURL TOKEN ---"
 curl -v -X POST http://authentik_server:9000/application/o/grafana/token/ -d "grant_type=client_credentials"
+

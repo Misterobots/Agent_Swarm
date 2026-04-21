@@ -1,4 +1,4 @@
-"""
+﻿"""
 Phase 7: AutoAgent Routing Regression Tests
 
 Comprehensive test suite for the SemanticRouter, dispatcher keyword classifier,
@@ -458,43 +458,43 @@ class TestKeywordOverrides:
 
     def test_train_override_from_learn_prefix(self):
         """'learn:' prefix should force TRAIN intent regardless of neural output."""
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("learn: always use tabs for indentation") is True
 
     def test_train_override_from_correction(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("correction: the API endpoint is /v2 not /v1") is True
 
     def test_train_override_from_remember_that(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("Remember that I prefer dark themes") is True
 
     def test_train_override_from_remember_this_rule(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("Remember this rule: no semicolons in JS") is True
 
     def test_train_override_store_rule(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("Store this rule: always use TypeScript") is True
 
     def test_train_override_add_rule(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("Add rule: use 2 spaces indentation") is True
 
     def test_not_train_normal_question(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("How do I learn Python?") is False
 
     def test_not_train_correction_midsentence(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("I need a correction on this code") is False
 
     def test_teach_pattern_means(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("Remember that TypeScript means typed JavaScript") is True
 
     def test_teach_pattern_should_be(self):
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         assert _is_explicit_train_request("Correction: API version should be v3") is True
 
 
@@ -565,7 +565,7 @@ class TestConstraintContext:
     """Tests for _extract_constraint_context in router.py."""
 
     def test_extracts_constraint_keywords(self):
-        from router import _extract_constraint_context
+        from church import _extract_constraint_context
         history = [
             {"role": "user", "content": "We have a constraint: no downtime allowed"},
             {"role": "assistant", "content": "Understood."},
@@ -576,7 +576,7 @@ class TestConstraintContext:
         assert "[Active User Constraints" in result
 
     def test_extracts_must_keyword(self):
-        from router import _extract_constraint_context
+        from church import _extract_constraint_context
         history = [
             {"role": "user", "content": "The deployment must happen during the maintenance window at 2am"},
         ]
@@ -584,7 +584,7 @@ class TestConstraintContext:
         assert "maintenance window" in result.lower()
 
     def test_ignores_assistant_messages(self):
-        from router import _extract_constraint_context
+        from church import _extract_constraint_context
         history = [
             {"role": "assistant", "content": "You must follow this constraint"},
             {"role": "user", "content": "Generate a report"},
@@ -594,12 +594,12 @@ class TestConstraintContext:
         assert result == ""
 
     def test_empty_history_returns_empty(self):
-        from router import _extract_constraint_context
+        from church import _extract_constraint_context
         assert _extract_constraint_context(None, "test") == ""
         assert _extract_constraint_context([], "test") == ""
 
     def test_limits_to_recent_constraints(self):
-        from router import _extract_constraint_context
+        from church import _extract_constraint_context
         history = [
             {"role": "user", "content": f"Constraint {i}: requirement {i}"} for i in range(10)
         ]
@@ -697,7 +697,7 @@ class TestSkillAndModeOverrides:
     def test_train_downgrade_without_explicit_prefix(self):
         """TRAIN intent from neural router should downgrade to CONVERSATION
         if the input lacks explicit training prefixes."""
-        from router import _is_explicit_train_request
+        from church import _is_explicit_train_request
         # "How do I train a model?" is NOT an explicit training directive
         assert _is_explicit_train_request("How do I train a model?") is False
         # But "Remember that..." IS explicit

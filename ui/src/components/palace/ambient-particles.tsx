@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -13,7 +13,7 @@ import { usePalaceColors, type PalaceColorTokens } from "@/lib/palace/theme-mate
  *   signal  — horizontal data-stream dashes
  *   grid    — precise upward dots in columns
  *   terminal— falling green "rain" characters
- *   lcars   — orbital arcs around center
+ *   lcars   — lamport arcs around center
  *   neon    — chaotic fast-moving neon sparks
  *   gallery — rare, slow floating dust
  *

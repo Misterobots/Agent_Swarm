@@ -75,3 +75,5 @@ sudo systemctl restart docker
 1. Ollama will auto-unload idle models
 2. Reduce `OLLAMA_KEEP_ALIVE=5m` for faster unloading
 3. Or use queue limits in the Dispatcher to prevent concurrent access
+
+

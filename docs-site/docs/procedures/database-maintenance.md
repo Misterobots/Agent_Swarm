@@ -45,3 +45,5 @@ Add to crontab:
 # Weekly vacuum
 0 4 * * 0 docker compose -f /opt/Agent_Swarm/control_plane/docker-compose.yml exec -T postgres psql -U postgres -c "VACUUM ANALYZE;"
 ```
+
+

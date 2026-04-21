@@ -1,4 +1,4 @@
-# Admin Technical Reference
+﻿# Admin Technical Reference
 
 > **Back to:** [Documentation Index](../INDEX.md)
 > **See also:** [Design Framework](design_framework.md) · [Security](security.md) · [Troubleshooting](troubleshooting.md)
@@ -59,7 +59,7 @@ The Next.js Hive UI uses a shared proxy route at `/api/backend/*`, but it does *
 | `API_BASE_URL` | `http://<execution-node-ip>:8008` | Agent Runtime APIs such as identity, chat, training, ops, and GitHub OAuth |
 | `MEMPALACE_BASE_URL` | `http://<control-node-ip>:8200` | Palace Viewer and memory APIs such as `/v1/palace/*` and `/v1/memories/*` |
 
-For R730 gateway deployment, `r730_gateway/docker-compose.yml` must set **both** environment variables on the `hive-ui` service. Without `MEMPALACE_BASE_URL`, the Palace Viewer loads the shell but cannot reach Palace layout or memory CRUD endpoints through the normal UI proxy.
+For Turing gateway deployment, `turing_gateway/docker-compose.yml` must set **both** environment variables on the `hive-ui` service. Without `MEMPALACE_BASE_URL`, the Palace Viewer loads the shell but cannot reach Palace layout or memory CRUD endpoints through the normal UI proxy.
 
 ---
 
@@ -126,20 +126,20 @@ Raw Ollama (Execution Node):
 
 | Service | Port | Purpose | Compose File |
 |---------|------|---------|--------------|
-| Traefik v3.6 | 80, 443, 8082 | Reverse proxy + routing | `r730_gateway/docker-compose.yml` |
-| Prometheus | 9091 (→9090) | Metrics collection (15s scrape, 90d retention) | `r730_gateway/docker-compose.yml` |
-| Grafana | 3001 | Dashboards (Prometheus + Loki + PostgreSQL-Swarm) | `r730_gateway/docker-compose.yml` |
-| Loki | 3100 | Log aggregation | `r730_gateway/docker-compose.yml` |
-| Promtail | — | Log collector (Docker socket → Loki) | `r730_gateway/docker-compose.yml` |
-| cAdvisor | 8888 (→8080) | Container resource metrics for Gateway Node | `r730_gateway/docker-compose.yml` |
-| Authentik | 9000, 9443 | SSO identity provider | `r730_gateway/docker-compose.yml` |
-| Ollama (Gateway) | 11434 | Secondary inference (nemotron, llama-guard) | `r730_gateway/docker-compose.yml` |
-| Open-WebUI | 3000 | Chat UI connected to Swarm API | `r730_gateway/docker-compose.yml` |
-| OpenHands | 3002 | Code execution sandbox | `r730_gateway/docker-compose.yml` |
-| VS Code (DevOps) | 8445 | Infrastructure IDE | `r730_gateway/docker-compose.yml` |
-| VS Code (Coding) | 8444 | Coding sandbox IDE | `r730_gateway/docker-compose.yml` |
-| Hive UI (Next.js) | 3200 -> 3000 | Unified web UI with split proxy to Agent Runtime + MemPalace | `r730_gateway/docker-compose.yml` |
-| SPIRE Agent (Gateway) | — (Unix socket) | Workload identity agent (pending enrollment) | `r730_gateway/docker-compose.yml` |
+| Traefik v3.6 | 80, 443, 8082 | Reverse proxy + routing | `turing_gateway/docker-compose.yml` |
+| Prometheus | 9091 (→9090) | Metrics collection (15s scrape, 90d retention) | `turing_gateway/docker-compose.yml` |
+| Grafana | 3001 | Dashboards (Prometheus + Loki + PostgreSQL-Swarm) | `turing_gateway/docker-compose.yml` |
+| Loki | 3100 | Log aggregation | `turing_gateway/docker-compose.yml` |
+| Promtail | — | Log collector (Docker socket → Loki) | `turing_gateway/docker-compose.yml` |
+| cAdvisor | 8888 (→8080) | Container resource metrics for Gateway Node | `turing_gateway/docker-compose.yml` |
+| Authentik | 9000, 9443 | SSO identity provider | `turing_gateway/docker-compose.yml` |
+| Ollama (Gateway) | 11434 | Secondary inference (nemotron, llama-guard) | `turing_gateway/docker-compose.yml` |
+| Open-WebUI | 3000 | Chat UI connected to Swarm API | `turing_gateway/docker-compose.yml` |
+| OpenHands | 3002 | Code execution sandbox | `turing_gateway/docker-compose.yml` |
+| VS Code (DevOps) | 8445 | Infrastructure IDE | `turing_gateway/docker-compose.yml` |
+| VS Code (Coding) | 8444 | Coding sandbox IDE | `turing_gateway/docker-compose.yml` |
+| Hive UI (Next.js) | 3200 -> 3000 | Unified web UI with split proxy to Agent Runtime + MemPalace | `turing_gateway/docker-compose.yml` |
+| SPIRE Agent (Gateway) | — (Unix socket) | Workload identity agent (pending enrollment) | `turing_gateway/docker-compose.yml` |
 
 ### Compute Node — Execution Node (<execution-node-ip>)
 
@@ -159,11 +159,11 @@ Raw Ollama (Execution Node):
 
 ## 5. Prometheus Scrape Targets
 
-Configured in `r730_gateway/config/prometheus/prometheus.yml`:
+Configured in `turing_gateway/config/prometheus/prometheus.yml`:
 
 | Job Name | Target | Metrics |
 |----------|--------|---------|
-| `cadvisor-r730` | `cadvisor-r730:8080` | Gateway Node container CPU/memory/net/disk |
+| `cadvisor-turing` | `cadvisor-turing:8080` | Gateway Node container CPU/memory/net/disk |
 | `cadvisor-justin` | `<execution-node-ip>:8081` | Execution Node container metrics (via proxy, with name labels) |
 | `agent-runtime` | `<execution-node-ip>:8008/metrics/` | Agent state, workflow steps, latency, training metrics |
 | `ollama-justin` | `<execution-node-ip>:11434/metrics` | Ollama request rate/latency (requires `OLLAMA_METRICS=1`) |
@@ -288,7 +288,7 @@ Key `.env` files:
 - `network.env` — IP addresses for all nodes (shared across all nodes)
 - `execution_plane/.env` — Agent runtime secrets (DB URLs, Langfuse keys, Redis password)
 - `control_plane/.env` — Control plane secrets (DB passwords, SPIRE config)
-- `r730_gateway/.env` — Gateway secrets (Authentik, Traefik)
+- `turing_gateway/.env` — Gateway secrets (Authentik, Traefik)
 
 **Never commit `.env` files to git.** Secrets are injected at container start via `env_file`.
 
@@ -304,7 +304,7 @@ Key `.env` files:
 | Source | Type | Relevance |
 |--------|------|----------|
 | `network.env` | Configuration | All IP addresses and node roles |
-| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
 | `execution_plane/docker-compose.yml` | Infrastructure | Execution Node services |
 | `control_plane/docker-compose.yml` | Infrastructure | Control Node services |
 | `config/prometheus/prometheus.yml` | Configuration | Scrape targets and intervals |

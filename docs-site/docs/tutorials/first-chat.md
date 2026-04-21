@@ -1,4 +1,4 @@
----
+﻿---
 title: "Tutorial: Your First Chat"
 ---
 
@@ -17,7 +17,7 @@ Send your first message to Agent Swarm and understand how it processes your requ
 Navigate to the Hive UI:
 
 ```
-http://{{ gateway_node_ip }}/
+http://{{ turing_ip }}/
 ```
 
 You'll see the chat interface with a text input at the bottom.
@@ -56,7 +56,7 @@ Each of these triggers a different agent:
 
 ## Step 5: Check the Trace
 
-Open Langfuse at `http://{{ control_node_ip }}:3000` to see the full trace of your conversation, including:
+Open Langfuse at `http://{{ hopper_ip }}:3000` to see the full trace of your conversation, including:
 
 - Intent classification scores
 - Model latency
@@ -67,3 +67,5 @@ Open Langfuse at `http://{{ control_node_ip }}:3000` to see the full trace of yo
 
 - [Generate an Image](generate-image.md) — try creative generation
 - [User Guide: Chat](../user-guide/chat.md) — full chat feature reference
+
+

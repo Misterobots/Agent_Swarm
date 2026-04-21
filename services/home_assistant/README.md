@@ -1,6 +1,6 @@
-# Home Assistant Services
+﻿# Home Assistant Services
 
-Native Home Assistant deployment assets that belong on the Home Assistant box at `192.168.2.100`, not on Hive or the R730 gateway.
+Native Home Assistant deployment assets that belong on the Home Assistant box at `192.168.2.100`, not on Hive or the Turing gateway.
 
 ## Layout
 

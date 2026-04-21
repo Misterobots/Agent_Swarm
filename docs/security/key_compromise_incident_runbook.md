@@ -1,4 +1,4 @@
-# Key Compromise Incident Runbook
+﻿# Key Compromise Incident Runbook
 
 Document ID: SEC-KEY-002
 Domain: Security
@@ -36,14 +36,14 @@ Trigger this runbook when any of these are observed:
 
 ## Alert and Monitoring Mapping
 Use these monitoring hooks for initial triage and escalation:
-1. Prometheus rule file: `r730_gateway/config/prometheus/auth_alert_rules.yml`.
+1. Prometheus rule file: `turing_gateway/config/prometheus/auth_alert_rules.yml`.
 2. Primary detection alert: `AgentRuntimeAuth401RateSpike`.
 3. Secondary alerts:
    - `AgentRuntimeAuth403RateSpike`
    - `AgentRuntimeMetricsUnavailable`
    - `AgentRuntimeRequestVolumeDrop`
 4. Alert labels include `runbook=docs/security/key_compromise_incident_runbook.md` for direct linkage.
-5. Alertmanager path: `r730_gateway/config/alertmanager/alertmanager.yml`.
+5. Alertmanager path: `turing_gateway/config/alertmanager/alertmanager.yml`.
 
 ## Immediate Response (0-5 Minutes)
 1. Declare incident and assign incident commander (solo mode: operator self-assigns).

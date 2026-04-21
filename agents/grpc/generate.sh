@@ -22,3 +22,4 @@ python -m grpc_tools.protoc \
 echo "Generated:"
 echo "  ${SCRIPT_DIR}/openclaude_pb2.py"
 echo "  ${SCRIPT_DIR}/openclaude_pb2_grpc.py"
+

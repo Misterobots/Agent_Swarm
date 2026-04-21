@@ -1,4 +1,4 @@
----
+﻿---
 title: "Procedure: Switch Models"
 ---
 
@@ -35,7 +35,7 @@ docker compose restart agent-runtime
 ### 4. Verify
 
 ```bash
-curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+curl -X POST http://{{ turing_ip }}/swarm/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
         "messages": [{"role": "user", "content": "What model are you using?"}],
@@ -47,7 +47,7 @@ Check the response metadata for the new model name.
 
 ### 5. Monitor
 
-Watch Langfuse traces and Grafana dashboards for:
+Watch Langfuse traces and hollerith dashboards for:
 
 - Response quality changes
 - Latency differences
@@ -60,3 +60,5 @@ If the new model performs poorly:
 1. Revert `network.env` to the previous model
 2. Restart Agent Runtime: `docker compose restart agent-runtime`
 3. The previous model should still be cached in Ollama
+
+

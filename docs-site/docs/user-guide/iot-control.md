@@ -72,3 +72,5 @@ The system generates a Wokwi simulation configuration with parts, wiring, and fi
 - [Module: ESPHome Tool](../modules/tools/mqtt.md)
 - [Tutorial: Control Home Devices](../tutorials/iot-automation.md)
 - [Tutorial: Simulate IoT](../tutorials/iot-automation.md)
+
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Activity, RefreshCw } from "lucide-react";
 import { NodeStatus } from "@/components/shared/node-status";
@@ -14,8 +14,8 @@ import type { ClusterNode, OpsHealth } from "@/types/ops";
 import { useCallback, useEffect, useState } from "react";
 
 const CLUSTER_ORDER: Array<{ name: string; role: ClusterNode["role"]; ip: string }> = [
-  { name: "Justin-PC", role: "execution", ip: "192.168.2.101" },
-  { name: "R730", role: "gateway", ip: "192.168.2.103" },
+  { name: "Lovelace", role: "execution", ip: "192.168.2.101" },
+  { name: "Turing", role: "gateway", ip: "192.168.2.103" },
   { name: "Control Node", role: "control", ip: "192.168.2.102" },
 ];
 
@@ -51,7 +51,7 @@ export default function MonitoringPage() {
     >
       <WorkspaceSection
         title="Cluster Status Overview"
-        description="Justin-PC execution plane, R730 gateway, and control-plane health in one surface."
+        description="Lovelace execution plane, Turing gateway, and control-plane health in one surface."
       >
         <div className="mb-4 flex justify-end">
           <button

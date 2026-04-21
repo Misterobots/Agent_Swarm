@@ -18,3 +18,4 @@ for r in routers:
             print(f'  errors:      {r[\"errors\"]}')
         print()
 "
+

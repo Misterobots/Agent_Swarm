@@ -100,3 +100,5 @@ Every run creates:
 
 - [Architecture: MarsRL](../architecture/marsrl.md) — design document
 - [Architecture: ADR-004](../architecture/decisions/adr-004-marsrl.md) — decision rationale
+
+

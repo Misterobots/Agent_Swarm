@@ -1,10 +1,10 @@
----
+﻿---
 title: Deploy Control Plane
 ---
 
 # Deploy Control Plane
 
-The Control Plane (Dell Wyse 5070, {{ control_node_ip }}) runs identity, databases, tracing, and memory services.
+The Control Plane (Hopper, {{ hopper_ip }}) runs identity, databases, tracing, and memory services.
 
 ## Services
 
@@ -23,7 +23,7 @@ The Control Plane (Dell Wyse 5070, {{ control_node_ip }}) runs identity, databas
 ### 1. Prepare the Node
 
 ```bash
-ssh user@{{ control_node_ip }}
+ssh user@{{ hopper_ip }}
 cd /opt/Agent_Swarm
 git pull origin main
 ```
@@ -106,3 +106,5 @@ docker compose exec postgres psql -U postgres -c "CREATE EXTENSION IF NOT EXISTS
 ## Next
 
 → [Deploy Execution Plane](execution-plane.md)
+
+

@@ -1,4 +1,4 @@
-# Phase 6 Completion Report — OpenClaude gRPC Server
+﻿# Phase 6 Completion Report — OpenClaude gRPC Server
 
 **Date:** 2026-04-13  
 **Tests:** 74 Phase 6 + 434 prior phases = **508 total passing** (16 pre-existing failures in unrelated modules)  
@@ -17,7 +17,7 @@
 | `agents/grpc/server.py` | gRPC server wrapping ModelRouter, protobuf adapter, CLI entrypoint |
 | `agents/grpc/client.py` | gRPC client with automatic fallback to local ModelRouter |
 | `agents/grpc/interceptors.py` | Auth interceptor (Authentik OAuth2 token validation) + request logger |
-| `agents/grpc/Dockerfile` | Container image for R730 deployment with pb2 generation at build |
+| `agents/grpc/Dockerfile` | Container image for Turing deployment with pb2 generation at build |
 
 ### New Test Files (3)
 | File | Tests | Coverage |
@@ -34,7 +34,7 @@
 | `agents/mcp/tool_hooks.py` | Added 4 tool hooks: hive.grpc.infer, hive.grpc.classify, hive.grpc.models, hive.grpc.health (total: 19) |
 | `agents/mcp/server.py` | Added 4 MCP tool descriptors (total: 20) |
 | `agents/registry.py` | Code Developer + Security Agent capabilities += grpc_infer |
-| `r730_gateway/docker-compose.yml` | Added `openclaude-grpc` service with Traefik routing, Authentik auth, SPIFFE ID |
+| `turing_gateway/docker-compose.yml` | Added `openclaude-grpc` service with Traefik routing, Authentik auth, SPIFFE ID |
 
 ---
 
@@ -48,7 +48,7 @@
 ### 2. Model Router (`model_router.py`)
 - **Intent classification** using nemotron-mini via Ollama `/api/generate`
 - **Model routing map:** CODE→qwen2.5-coder:14b, GENERAL/DEFAULT→qwen3:14b, RESEARCH→llama3.2:3b, VISION→moondream
-- **Multi-node inference** across Justin-PC (2× RTX 5060 Ti, 32GB VRAM) and R730 (RTX 3070 Ti, 8GB VRAM)
+- **Multi-node inference** across Lovelace (2× RTX 5060 Ti, 32GB VRAM) and Turing (RTX 3070 Ti, 8GB VRAM)
 - **Health monitoring** with 30s TTL cache per Ollama node
 - **Streaming support** via `iter_lines()` on Ollama `/api/chat` with `stream=true`
 - Context windows tracked per model (4K–40K tokens)
@@ -125,7 +125,7 @@
      ┌──────┘      └──────┐
      ▼                     ▼
 ┌──────────┐        ┌──────────┐
-│Justin-PC │        │  R730    │
+│Lovelace │        │  Turing    │
 │2×5060 Ti │        │3070 Ti   │
 │Ollama    │        │Ollama    │
 │:11434    │        │:11434    │
@@ -171,7 +171,7 @@ Full regression: **508 passed**, 16 failed (all pre-existing in test_mars_loop, 
 | `agents/grpc/client.py` | Implementation | gRPC client library |
 | `agents/grpc/interceptors.py` | Implementation | OAuth2 auth interceptors |
 | `agents/grpc/Dockerfile` | Infrastructure | gRPC server container |
-| `r730_gateway/docker-compose.yml` | Infrastructure | Traefik + gRPC deployment |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Traefik + gRPC deployment |
 
 </details>
 

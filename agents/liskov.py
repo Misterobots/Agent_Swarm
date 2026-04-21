@@ -1,4 +1,4 @@
-
+﻿
 import json
 import os
 import uuid
@@ -74,7 +74,7 @@ class GovernanceManager:
         sec_assessment = sec_agent.evaluate_request(type, description)
         
         # 2. Trigger Architect Compatibility Check
-        from architect_agent import assess_compatibility
+        from leibniz_agent import assess_compatibility
         comp_assessment = assess_compatibility(type, description)
         
         status = RequestStatus.PENDING

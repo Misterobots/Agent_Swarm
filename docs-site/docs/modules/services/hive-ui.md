@@ -1,4 +1,4 @@
----
+﻿---
 title: "Service: Hive UI"
 ---
 
@@ -10,7 +10,7 @@ The web-based frontend for Agent Swarm.
 
 | Property | Value |
 |----------|-------|
-| **URL** | `http://{{ gateway_node_ip }}/` |
+| **URL** | `http://{{ turing_ip }}/` |
 | **Framework** | Web application |
 | **Directory** | `ui/` |
 
@@ -29,7 +29,7 @@ The web-based frontend for Agent Swarm.
 Open a browser and navigate to:
 
 ```
-http://{{ gateway_node_ip }}/
+http://{{ turing_ip }}/
 ```
 
 Or via Tailscale for remote access.
@@ -59,3 +59,5 @@ For deployed gateway environments, the `hive-ui` container must define both `API
 
 - [User Guide: Chat](../../user-guide/chat.md) — using the chat interface
 - [Getting Started: User Quickstart](../../getting-started/quickstart-user.md) — first use
+
+

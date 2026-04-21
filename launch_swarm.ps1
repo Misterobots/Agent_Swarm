@@ -1,4 +1,4 @@
-
+﻿
 # Home AI Lab - Swarm Launcher
 # Run this script to spin up the entire Execution Plane.
 
@@ -67,11 +67,11 @@ Write-Host "⏳ Giving services 10 seconds to warm up..." -ForegroundColor Yello
 Start-Sleep -Seconds 10
 
 # Check Remote Brain (PostgreSQL on Control Plane)
-# Read CONTROL_NODE_IP from network.env (single source of truth)
+# Read HOPPER_IP from network.env (single source of truth)
 $NetworkEnv = Join-Path $Root "network.env"
 $BrainIP = "192.168.2.102"  # fallback
 if (Test-Path $NetworkEnv) {
-    $match = Select-String -Path $NetworkEnv -Pattern "^CONTROL_NODE_IP=(.+)$"
+    $match = Select-String -Path $NetworkEnv -Pattern "^HOPPER_IP=(.+)$"
     if ($match) { $BrainIP = $match.Matches[0].Groups[1].Value.Trim() }
 }
 if (Test-Connection -ComputerName $BrainIP -Count 1 -Quiet) {

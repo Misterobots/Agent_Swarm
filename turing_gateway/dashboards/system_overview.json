@@ -1,4 +1,4 @@
-{
+﻿{
   "annotations": {
     "list": []
   },
@@ -68,7 +68,7 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
       "id": 101,
       "panels": [],
-      "title": "CONTAINER RESOURCES — R730",
+      "title": "CONTAINER RESOURCES — Turing",
       "type": "row"
     },
     {
@@ -109,13 +109,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "editorMode": "code",
-          "expr": "rate(container_cpu_usage_seconds_total{job=\"cadvisor-r730\", name!=\"\"}[1m])",
+          "expr": "rate(container_cpu_usage_seconds_total{job=\"cadvisor-turing\", name!=\"\"}[1m])",
           "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Container CPU — R730",
+      "title": "Container CPU — Turing",
       "type": "timeseries"
     },
     {
@@ -157,13 +157,13 @@
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "editorMode": "code",
-          "expr": "container_memory_usage_bytes{job=\"cadvisor-r730\", name!=\"\"}",
+          "expr": "container_memory_usage_bytes{job=\"cadvisor-turing\", name!=\"\"}",
           "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Container Memory — R730",
+      "title": "Container Memory — Turing",
       "type": "timeseries"
     },
     {
@@ -171,7 +171,7 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
       "id": 102,
       "panels": [],
-      "title": "CONTAINER RESOURCES — Justin-PC",
+      "title": "CONTAINER RESOURCES — Lovelace",
       "type": "row"
     },
     {
@@ -218,7 +218,7 @@
           "refId": "A"
         }
       ],
-      "title": "Container CPU — Justin-PC",
+      "title": "Container CPU — Lovelace",
       "type": "timeseries"
     },
     {
@@ -266,7 +266,7 @@
           "refId": "A"
         }
       ],
-      "title": "Container Memory — Justin-PC",
+      "title": "Container Memory — Lovelace",
       "type": "timeseries"
     },
     {

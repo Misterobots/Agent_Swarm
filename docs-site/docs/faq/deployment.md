@@ -52,3 +52,5 @@ See [Backup & Restore](../admin-guide/operations/backup-restore.md). Key items:
 - **Control Node down**: Langfuse tracing and PostgreSQL are unavailable, but agents can still respond (with degraded observability)
 - **Execution Node down**: All inference stops — this is the critical node
 - **Gateway Node down**: External access is lost, but services still run internally
+
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 ExpertiseTemplate Registry
 ============================
 
@@ -241,10 +241,10 @@ class TemplateRegistry:
     CACHE_TTL_SECONDS = 300  # 5 minutes
 
     def __init__(self, db_url: Optional[str] = None):
-        from config import CONTROL_NODE_IP
+        from config import HOPPER_IP
         self.db_url = db_url or os.getenv(
             "TEMPLATE_DB_URL",
-            f"postgresql://langfuse:langfuse@{CONTROL_NODE_IP}:5432/langfuse"
+            f"postgresql://langfuse:langfuse@{HOPPER_IP}:5432/langfuse"
         )
         self._pool = None
         self._cache: Dict[str, _CacheEntry] = {}

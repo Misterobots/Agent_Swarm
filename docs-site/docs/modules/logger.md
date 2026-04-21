@@ -1,4 +1,4 @@
----
+﻿---
 title: "Module: Logger"
 ---
 
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 |-------------|--------|---------|
 | Console (stdout) | Human-readable | Development |
 | File (`logs/`) | JSON | Persistent storage |
-| Docker logs | JSON | Picked up by Promtail → Loki |
+| Docker logs | JSON | Picked up by Promtail → knuth |
 
 ## Contextual Logging
 
@@ -50,9 +50,11 @@ logger.error(f"Ollama request failed: {error} model={model} session={session_id}
 
 ## Log Aggregation
 
-Docker container logs are collected by Promtail and shipped to Loki on the Gateway node. Query logs in Grafana with LogQL.
+Docker container logs are collected by Promtail and shipped to knuth on the Gateway node. Query logs in hollerith with LogQL.
 
 ## Related
 
 - [Architecture: Observability](../architecture/observability.md) — logging stack
 - [Admin: Monitoring](../admin-guide/operations/monitoring.md) — log querying
+
+

@@ -1,4 +1,4 @@
-from phi.agent import Agent, RunResponse
+﻿from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 import json
 import os
@@ -116,7 +116,7 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
 class SemanticRouter:
     def __init__(self):
         # After TTFT optimization: router uses the primary model (qwen3:14b) on
-        # Justin-PC instead of nemotron-orchestrator on R730. This eliminates
+        # Lovelace instead of nemotron-orchestrator on Turing. This eliminates
         # the cross-network hop and keeps the model already hot in VRAM.
         self.model_name = os.getenv("ROUTER_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b"))
         from utils.gpu_queue import get_best_host_for_model
@@ -282,3 +282,5 @@ def get_semantic_router() -> SemanticRouter:
     if _router_instance is None:
         _router_instance = SemanticRouter()
     return _router_instance
+
+

@@ -1,4 +1,4 @@
----
+﻿---
 title: "Troubleshooting: Agent Runtime"
 ---
 
@@ -52,7 +52,7 @@ Check Langfuse traces for the intent classification scores.
 
 ```bash
 # Check if Ollama is responsive
-curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags
+curl http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags
 
 # Check agent runtime logs
 docker logs agent-runtime --tail 20
@@ -87,3 +87,5 @@ docker logs agent-runtime --tail 20
 - Session ID is being passed correctly
 - Context window isn't exceeded
 - Memory system (PostgreSQL + pgvector) is healthy
+
+

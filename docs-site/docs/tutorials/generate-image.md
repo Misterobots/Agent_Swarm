@@ -1,4 +1,4 @@
----
+﻿---
 title: "Tutorial: Generate an Image"
 ---
 
@@ -14,7 +14,7 @@ Create AI-generated images using natural language prompts.
 
 ## Step 1: Open the Chat
 
-Navigate to `http://{{ gateway_node_ip }}/` and open a new conversation.
+Navigate to `http://{{ turing_ip }}/` and open a new conversation.
 
 ## Step 2: Describe Your Image
 
@@ -30,7 +30,7 @@ The Image Agent:
 
 1. **Enhances your prompt** using the solver model to add artistic details
 2. **Selects a ComfyUI workflow** (e.g., `workflow_hunyuan_paint.json`)
-3. **Queues the job** on ComfyUI at `{{ execution_node_ip }}:8188`
+3. **Queues the job** on ComfyUI at `{{ lovelace_ip }}:8188`
 4. **Returns the image** in the chat
 
 ## Step 4: Iterate
@@ -62,3 +62,5 @@ For more control, specify:
 
 - [User Guide: Art Studio](../user-guide/art-studio.md) — full Art Studio reference
 - [Build a 3D Model](build-3d-model.md) — go from 2D to 3D
+
+

@@ -73,3 +73,4 @@ echo ""
 # List all registered entries
 echo "Registered workloads:"
 docker exec $SPIRE_SERVER /opt/spire/bin/spire-server entry show
+

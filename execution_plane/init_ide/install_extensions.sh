@@ -10,3 +10,4 @@ if [ "${SWARM_API_KEY:-}" = "sk-coder-identity" ]; then
 fi
 
 echo "--- Extension Installation Complete ---"
+

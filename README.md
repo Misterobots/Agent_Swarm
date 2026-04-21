@@ -1,4 +1,4 @@
-# Home AI Lab: Agentic Hive
+﻿# Home AI Lab: Agentic Hive
 
 **Version**: 3.4 (Phase 6 complete) · **Status**: Production · **Updated**: 2026-03-31
 
@@ -29,7 +29,7 @@ A self-hosted, distributed multi-agent AI system for home automation, coding, cr
 
 ```
                 Gateway Node — Reverse Proxy & Monitoring
-                Traefik · Grafana · Prometheus · Loki
+                Traefik · hollerith · jacquard · knuth
                            │              │
          Execution Node (GPU)         Control Node
          RTX 5060 Ti 16GB             SPIRE · Langfuse · PostgreSQL
@@ -99,3 +99,5 @@ python scripts/smoke_mcp_bridge.py --base-url http://127.0.0.1:8008 --bearer <JW
 ---
 
 _Agentic Hive v3.4 · Self-hosted · Private inference · No cloud dependencies_
+
+

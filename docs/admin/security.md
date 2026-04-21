@@ -1,4 +1,4 @@
-# Admin: Security Reference
+﻿# Admin: Security Reference
 
 > **Back to:** [Documentation Index](../INDEX.md)
 > **See also:** [Design Framework](design_framework.md) · [MAESTRO Compliance Status](../compliance/maestro_compliance_status.md)
@@ -79,7 +79,7 @@ Execution Node (<execution-node-ip>)
         └── Agent Runtime reads SVID via SPIFFE_ENDPOINT_SOCKET env var
 
 Gateway Node (<gateway-node-ip>)
-  └── SPIRE Agent (spire-agent-r730 container) — ⚠️ pending enrollment
+  └── SPIRE Agent (spire-agent-turing container) — ⚠️ pending enrollment
 ```
 
 ### Workload Registration
@@ -238,11 +238,11 @@ All secrets are managed via `.env` files, **never** committed to git.
 | `HOME_ASSISTANT_TOKEN` | `execution_plane/.env` | Home Assistant API auth |
 | `SPIRE_JOIN_TOKEN` | `execution_plane/.env` | SPIRE agent enrollment |
 | `JWT_SECRET_KEY` | `execution_plane/.env` | JWT-ACE token signing |
-| `GRAFANA_ADMIN_PASSWORD` | `r730_gateway/.env` | Grafana admin account |
+| `GRAFANA_ADMIN_PASSWORD` | `turing_gateway/.env` | Grafana admin account |
 
 **Default credential audit**: Review the following on every deployment:
 - Grafana: `admin/admin` — **change immediately**
-- PostgreSQL: `langfuse/langfuse` — change in both control_plane and r730_gateway `.env`
+- PostgreSQL: `langfuse/langfuse` — change in both control_plane and turing_gateway `.env`
 - Authentik: set via first-run wizard
 
 ---

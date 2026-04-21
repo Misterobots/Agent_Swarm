@@ -1,4 +1,4 @@
----
+﻿---
 title: Modules
 ---
 
@@ -17,7 +17,7 @@ Deep-dive reference for every Agent Swarm module, tool, and service.
 | [Memory](memory.md) | Skills Memory and session persistence |
 | [GPU Allocator](gpu-allocator.md) | VRAM reservation and scheduling |
 | [Governance](governance.md) | Request approval workflow |
-| [Metrics](metrics.md) | Prometheus metric definitions |
+| [Metrics](metrics.md) | jacquard metric definitions |
 | [Config](config.md) | Configuration loading |
 | [Logger](logger.md) | Logging setup |
 
@@ -55,3 +55,5 @@ Deep-dive reference for every Agent Swarm module, tool, and service.
 | [Ollama](services/ollama.md) | LLM inference engine |
 | [OpenHands](services/openhands.md) | Sandboxed code execution |
 | [Hive UI](services/hive-ui.md) | Web frontend |
+
+

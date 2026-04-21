@@ -1,4 +1,4 @@
-# Swarm Network Topology: Port Map
+﻿# Swarm Network Topology: Port Map
 
 This document lists all reserved ports for the Home AI Lab services to prevent conflicts.
 
@@ -6,7 +6,7 @@ This document lists all reserved ports for the Home AI Lab services to prevent c
 | Service | Port | Access URL | Description |
 | :--- | :--- | :--- | :--- |
 | **Agent UI** | `8501` | [http://localhost:8501](http://localhost:8501) | Main Streamlit Interface (Chat & Control) |
-| **Mission Control** | `80` | [http://localhost:80](http://localhost:80) | Grafana Dashboards (redirects internally to 3000) |
+| **Mission Control** | `80` | [http://localhost:80](http://localhost:80) | hollerith Dashboards (redirects internally to 3000) |
 | **Creature Forge** | `3005` | [http://localhost:3005](http://localhost:3005) | Specialized 3D Model Generator UI |
 | **ComfyUI** | `8188` | [http://localhost:8188](http://localhost:8188) | Node-based Workflow Editor |
 
@@ -22,12 +22,14 @@ This document lists all reserved ports for the Home AI Lab services to prevent c
 ## 🟣 Monitoring Ports
 | Service | Port | Description |
 | :--- | :--- | :--- |
-| **Prometheus** | `9090` | Metals Scraper & Time Series DB |
-| **Loki** | `3100` | Log Aggregation System |
+| **jacquard** | `9090` | Metals Scraper & Time Series DB |
+| **knuth** | `3100` | Log Aggregation System |
 | **cAdvisor** | `8080` | Container Resource Usage Metrics |
 | **UI Metrics** | `8001` | Streamlit-specific Runtime Metrics |
 
 ## 🔧 Deployment Notes
 - **Creature Forge**: Configured in `vite.config.ts` to use `3005` to avoid colliding with OpenHands (`3000`).
-- **Grafana**: Maps Host `80` -> Container `3000`.
+- **hollerith**: Maps Host `80` -> Container `3000`.
 - **Spire**: Runs on `8081` (Control Plane).
+
+

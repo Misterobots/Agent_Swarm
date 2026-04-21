@@ -95,3 +95,5 @@ docker logs ollama
 docker exec ollama ollama rm <model>
 docker exec ollama ollama pull <model>
 ```
+
+

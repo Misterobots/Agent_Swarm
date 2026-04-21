@@ -1,4 +1,4 @@
-# Home AI Lab: Engineering Datasheet
+﻿# Home AI Lab: Engineering Datasheet
 
 **Version**: 1.0 (Phase 3 Alpha)
 **Date**: January 2026
@@ -25,7 +25,7 @@ The system is physically distributed but logically unified under a single mesh n
 
 ### Control Plane (The Brain)
 
-- **Hardware**: Dell Wyse 5070 Thin Client
+- **Hardware**: Dell Hopper Thin Client
 - **OS**: Ubuntu Server 24.04 LTS
 - **Role**: State Management & Identity Authority
 - **Services**:

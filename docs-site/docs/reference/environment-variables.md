@@ -1,4 +1,4 @@
----
+﻿---
 title: Environment Variables
 ---
 
@@ -18,7 +18,7 @@ Complete reference for all environment variables used in `network.env`.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OLLAMA_HOST` | Ollama server address | `{{ execution_node_ip }}` |
+| `OLLAMA_HOST` | Ollama server address | `{{ lovelace_ip }}` |
 | `OLLAMA_PORT` | Ollama API port | `{{ ollama_port }}` |
 | `OLLAMA_FLASH_ATTENTION` | Enable Flash Attention | `1` |
 | `OLLAMA_NUM_PARALLEL` | Max concurrent requests | `4` |
@@ -29,9 +29,9 @@ Complete reference for all environment variables used in `network.env`.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `CONTROL_NODE_IP` | Control Plane address | `{{ control_node_ip }}` |
-| `EXECUTION_NODE_IP` | Execution Plane address | `{{ execution_node_ip }}` |
-| `GATEWAY_NODE_IP` | Gateway / R730 address | `{{ gateway_node_ip }}` |
+| `HOPPER_IP` | Control Plane address | `{{ hopper_ip }}` |
+| `LOVELACE_IP` | Execution Plane address | `{{ lovelace_ip }}` |
+| `TURING_IP` | Gateway / Turing address | `{{ turing_ip }}` |
 
 ## Langfuse
 
@@ -69,7 +69,7 @@ Complete reference for all environment variables used in `network.env`.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `COMFYUI_HOST` | ComfyUI server address | `{{ execution_node_ip }}` |
+| `COMFYUI_HOST` | ComfyUI server address | `{{ lovelace_ip }}` |
 | `COMFYUI_PORT` | ComfyUI API port | `8188` |
 
 ## Agent Runtime
@@ -82,3 +82,5 @@ Complete reference for all environment variables used in `network.env`.
 
 !!! warning "Security"
     Never commit `network.env` to version control. It contains secrets. See [Secrets Management](../admin-guide/operations/secrets.md).
+
+

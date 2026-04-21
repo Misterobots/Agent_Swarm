@@ -1,4 +1,4 @@
-# Phase 0: VISION Intent Fix — Completion Report
+﻿# Phase 0: VISION Intent Fix — Completion Report
 
 **Date:** 2025-06-10  
 **Git Tag:** `phase-0-complete`  
@@ -41,7 +41,7 @@ Two-layer classification failure:
 - Prevents false IMAGE classification for vision-related queries
 
 ### 5. Infrastructure
-- Pulled `moondream:latest` (~1.7GB) on Justin-PC Ollama (GPU 0)
+- Pulled `moondream:latest` (~1.7GB) on Lovelace Ollama (GPU 0)
 
 ## Test Results
 
@@ -51,7 +51,7 @@ Two-layer classification failure:
 | "What do you see in this image?" | IMAGE | VISION ✅ |
 | "Hello, are you working?" | CONVERSATION | CONVERSATION ✅ |
 
-### UI Regression (Hive UI — R730 port 3200)
+### UI Regression (Hive UI — Turing port 3200)
 | Route | Status |
 |---|---|
 | /chat | 200 ✅ |
@@ -76,7 +76,7 @@ Two-layer classification failure:
 - **Git tag:** `phase-0-complete`
 - **Compose backups:** `migration_backup_20260314_163149/phase-0/`
   - `execution_plane_docker-compose.yml`
-  - `r730_gateway_docker-compose.yml`
+  - `turing_gateway_docker-compose.yml`
   - `control_plane_docker-compose.yml`
 - **Rollback:** `git checkout phase-0-complete` or `git revert HEAD`
 
@@ -86,7 +86,7 @@ Two-layer classification failure:
 - Langfuse OTLP export 401 Unauthorized (pre-existing)
 - TemplateRegistry FK constraint for `default` template_id (pre-existing)
 - ComfyUI checkpoint `v1-5-pruned-emaonly.ckpt` not found (no checkpoints installed)
-- R730 Ollama `OLLAMA_GPU_OVERHEAD=512MiB` parsing bug (pre-existing)
+- Turing Ollama `OLLAMA_GPU_OVERHEAD=512MiB` parsing bug (pre-existing)
 
 ## Next Phase
 

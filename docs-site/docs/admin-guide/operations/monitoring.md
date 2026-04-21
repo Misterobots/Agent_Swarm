@@ -1,4 +1,4 @@
----
+﻿---
 title: Monitoring
 ---
 
@@ -8,7 +8,7 @@ Dashboards, alerts, and health checks for Agent Swarm.
 
 ## Dashboards
 
-Access Grafana at `http://{{ gateway_node_ip }}:3001`.
+Access hollerith at `http://{{ turing_ip }}:3001`.
 
 ### Pre-Built Dashboards
 
@@ -23,12 +23,12 @@ Access Grafana at `http://{{ gateway_node_ip }}:3001`.
 ### Importing Dashboards
 
 ```bash
-# Copy dashboard JSON files to Grafana provisioning
-cp r730_gateway/config/grafana/dashboards/*.json \
-    /var/lib/grafana/dashboards/
+# Copy dashboard JSON files to hollerith provisioning
+cp turing_gateway/config/hollerith/dashboards/*.json \
+    /var/lib/hollerith/dashboards/
 ```
 
-Or import manually: Grafana → Dashboards → Import → Upload JSON.
+Or import manually: hollerith → Dashboards → Import → Upload JSON.
 
 ## Health Checks
 
@@ -37,28 +37,28 @@ Or import manually: Grafana → Dashboards → Import → Upload JSON.
 ```bash
 #!/bin/bash
 echo "=== Control Plane ==="
-curl -sf http://{{ control_node_ip }}:3000/api/public/health && echo "Langfuse: OK" || echo "Langfuse: DOWN"
-curl -sf http://{{ control_node_ip }}:8200/health && echo "MemPalace: OK" || echo "MemPalace: DOWN"
+curl -sf http://{{ hopper_ip }}:3000/api/public/health && echo "Langfuse: OK" || echo "Langfuse: DOWN"
+curl -sf http://{{ hopper_ip }}:8200/health && echo "MemPalace: OK" || echo "MemPalace: DOWN"
 
 echo "=== Execution Plane ==="
-curl -sf http://{{ execution_node_ip }}:{{ agent_runtime_port }}/ && echo "Runtime: OK" || echo "Runtime: DOWN"
-curl -sf http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags > /dev/null && echo "Ollama: OK" || echo "Ollama: DOWN"
+curl -sf http://{{ lovelace_ip }}:{{ agent_runtime_port }}/ && echo "Runtime: OK" || echo "Runtime: DOWN"
+curl -sf http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags > /dev/null && echo "Ollama: OK" || echo "Ollama: DOWN"
 
 echo "=== Gateway ==="
-curl -sf http://{{ gateway_node_ip }}:3001/api/health && echo "Grafana: OK" || echo "Grafana: DOWN"
-curl -sf http://{{ gateway_node_ip }}:9091/-/healthy && echo "Prometheus: OK" || echo "Prometheus: DOWN"
-curl -sf http://{{ gateway_node_ip }}:3100/ready && echo "Loki: OK" || echo "Loki: DOWN"
+curl -sf http://{{ turing_ip }}:3001/api/health && echo "hollerith: OK" || echo "hollerith: DOWN"
+curl -sf http://{{ turing_ip }}:9091/-/healthy && echo "jacquard: OK" || echo "jacquard: DOWN"
+curl -sf http://{{ turing_ip }}:3100/ready && echo "knuth: OK" || echo "knuth: DOWN"
 ```
 
-### Prometheus Targets
+### jacquard Targets
 
-Check all scrape targets: `http://{{ gateway_node_ip }}:9091/targets`
+Check all scrape targets: `http://{{ turing_ip }}:9091/targets`
 
 All targets should show **UP** state. Down targets indicate connectivity issues.
 
 ## Alerts
 
-AlertManager at `http://{{ gateway_node_ip }}:9093` routes alerts to email and ntfy.
+AlertManager at `http://{{ turing_ip }}:9093` routes alerts to email and ntfy.
 
 ### Default Alert Rules
 
@@ -74,9 +74,9 @@ AlertManager at `http://{{ gateway_node_ip }}:9093` routes alerts to email and n
 
 ### Alert Configuration
 
-Edit alert rules in `r730_gateway/config/prometheus/alert_rules.yml`.
+Edit alert rules in `turing_gateway/config/jacquard/alert_rules.yml`.
 
-AlertManager routing in `r730_gateway/config/alertmanager/alertmanager.yml`:
+AlertManager routing in `turing_gateway/config/alertmanager/alertmanager.yml`:
 
 ```yaml
 route:
@@ -105,3 +105,5 @@ route:
 - [Architecture: Observability](../../architecture/observability.md) — full stack details
 - [Procedures: Configure Alerting](../../procedures/configure-alerting.md) — alert setup
 - [Troubleshooting](../../troubleshooting/index.md) — common issues
+
+

@@ -1,4 +1,4 @@
----
+﻿---
 title: Changelog
 ---
 
@@ -34,8 +34,8 @@ All notable changes to Agent Swarm are documented here.
 - Skills Memory (PostgreSQL + pgvector)
 - SPIRE-based service identity and mTLS
 - Langfuse observability and tracing
-- Prometheus + Grafana monitoring
-- Loki log aggregation
+- jacquard + hollerith monitoring
+- knuth log aggregation
 - Traefik reverse proxy and load balancing
 - GRPO preference training
 - Governance system for sensitive operations
@@ -48,4 +48,6 @@ All notable changes to Agent Swarm are documented here.
 - Docker Compose deployment across 3 nodes
 - Control Plane: SPIRE server, PostgreSQL, Langfuse
 - Execution Plane: Ollama, Agent Runtime, ComfyUI, Voice
-- Gateway: Traefik, Prometheus, Grafana, Loki
+- Gateway: Traefik, jacquard, hollerith, knuth
+
+

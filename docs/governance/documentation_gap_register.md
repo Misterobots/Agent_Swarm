@@ -1,4 +1,4 @@
-# Documentation Gap Register
+﻿# Documentation Gap Register
 
 Document ID: DOC-GOV-002
 Domain: Governance
@@ -88,17 +88,17 @@ Track unresolved documentation coverage gaps and remediation progress.
 
 ### GAP-002 Implementation Progress (Complete)
 1. Added one-page on-call checklist: `docs/security/key_compromise_incident_checklist.md`.
-2. Added Prometheus alert rule file for auth/key-compromise signals: `r730_gateway/config/prometheus/auth_alert_rules.yml`.
-3. Wired Prometheus rule loading through `r730_gateway/config/prometheus/prometheus.yml` via `rule_files`.
+2. Added Prometheus alert rule file for auth/key-compromise signals: `turing_gateway/config/prometheus/auth_alert_rules.yml`.
+3. Wired Prometheus rule loading through `turing_gateway/config/prometheus/prometheus.yml` via `rule_files`.
 4. Linked runbook, checklist, docs index, admin security page, and docs API allowlist to the new checklist artifact.
 5. Verified docs API exposure for GAP-002 artifacts on active remote entrypoint:
 	- `http://192.168.2.103:3000/api/docs/security/key-compromise-runbook` -> 200
 	- `http://192.168.2.103:3000/api/docs/security/key-compromise-checklist` -> 200
 	- Host default `http://192.168.2.103` returned 404 for both routes, confirming application exposure remains on port 3000.
 6. Validated Prometheus configuration and rule syntax locally using containerized `promtool`:
-	- `docker run --rm --entrypoint promtool -v "${PWD}/r730_gateway/config/prometheus:/etc/prometheus" prom/prometheus check config /etc/prometheus/prometheus.yml`
+	- `docker run --rm --entrypoint promtool -v "${PWD}/turing_gateway/config/prometheus:/etc/prometheus" prom/prometheus check config /etc/prometheus/prometheus.yml`
 	- Result: config valid, 1 rule file found.
-	- `docker run --rm --entrypoint promtool -v "${PWD}/r730_gateway/config/prometheus:/etc/prometheus" prom/prometheus check rules /etc/prometheus/auth_alert_rules.yml`
+	- `docker run --rm --entrypoint promtool -v "${PWD}/turing_gateway/config/prometheus:/etc/prometheus" prom/prometheus check rules /etc/prometheus/auth_alert_rules.yml`
 	- Result: 4 rules found, syntax valid.
 7. Remaining closure blocker: live staged dry-run execution evidence and real alert firing verification are still pending.
 
@@ -110,8 +110,8 @@ Track unresolved documentation coverage gaps and remediation progress.
 |---|---|---|
 | Incident runbook | `docs/security/key_compromise_incident_runbook.md` | Published; SEV-1 4-phase procedure (0-5/5-15/15-30/30-60 min), rollback procedure, evidence template |
 | On-call checklist | `docs/security/key_compromise_incident_checklist.md` | Published; one-page quick reference with numbered steps and time estimates |
-| Prometheus alert rules | `r730_gateway/config/prometheus/auth_alert_rules.yml` | 6 rules: 401 spike (critical), 403 spike, metrics unavailable, request drop, IoT blocked spike, IoT unlock detection |
-| Prometheus config | `r730_gateway/config/prometheus/prometheus.yml` | Rule file loaded; scrape targets configured |
+| Prometheus alert rules | `turing_gateway/config/prometheus/auth_alert_rules.yml` | 6 rules: 401 spike (critical), 403 spike, metrics unavailable, request drop, IoT blocked spike, IoT unlock detection |
+| Prometheus config | `turing_gateway/config/prometheus/prometheus.yml` | Rule file loaded; scrape targets configured |
 | Rule syntax validation | `promtool check rules` | **SUCCESS: 6 rules found** (2026-03-31) |
 | Config validation | `promtool check config` | Config valid, 1 rule file found |
 | Key lifecycle runbook | `docs/security/key_lifecycle_rotation_runbook.md` | Cross-linked to compromise runbook; 6-stage lifecycle with emergency compromise procedure |
@@ -220,10 +220,10 @@ Track unresolved documentation coverage gaps and remediation progress.
 10. Monitoring instrumentation hardening (2026-03-31):
 	- Added Prometheus counters in `agents/metrics.py` for sensitive IoT actions (`iot_sensitive_actions_total`, `iot_sensitive_actions_blocked_total`).
 	- Wired counter increments into sensitive-action audit path in `agents/tools/iot_ops.py`.
-	- Added Prometheus alert rules in `r730_gateway/config/prometheus/auth_alert_rules.yml` for blocked sensitive-action spikes and executed lock-unlock events.
+	- Added Prometheus alert rules in `turing_gateway/config/prometheus/auth_alert_rules.yml` for blocked sensitive-action spikes and executed lock-unlock events.
 11. Extended validation executed: `c:/python314/python.exe -m pytest -q tests/test_iot_controls.py tests/test_cross_user_isolation.py tests/test_authorization_middleware.py tests/test_jwt_lifecycle.py`.
 12. Extended validation result: `41 passed`.
-13. Prometheus rule validation executed: `docker run --rm --entrypoint promtool -v "${PWD}/r730_gateway/config/prometheus:/etc/prometheus" prom/prometheus check rules /etc/prometheus/auth_alert_rules.yml`.
+13. Prometheus rule validation executed: `docker run --rm --entrypoint promtool -v "${PWD}/turing_gateway/config/prometheus:/etc/prometheus" prom/prometheus check rules /etc/prometheus/auth_alert_rules.yml`.
 14. Prometheus rule validation result: `SUCCESS: 6 rules found`.
 15. Remaining closure blocker: reviewer sign-off and centralized dashboard/evidence retention for sensitive-action audit events.
 
@@ -241,7 +241,7 @@ Track unresolved documentation coverage gaps and remediation progress.
 | Sensitive-action confirmation | `agents/tools/iot_ops.py` | Lock/alarm actions require explicit `confirmed=True` |
 | Structured audit logs | `agents/tools/iot_ops.py` | `[IoT-AUDIT]` logs for blocked, executed, and error outcomes |
 | Prometheus counters | `agents/metrics.py` | `iot_sensitive_actions_total`, `iot_sensitive_actions_blocked_total` |
-| Prometheus alert rules | `r730_gateway/config/prometheus/auth_alert_rules.yml` | 2 IoT-specific alerts added; total 6 rules |
+| Prometheus alert rules | `turing_gateway/config/prometheus/auth_alert_rules.yml` | 2 IoT-specific alerts added; total 6 rules |
 | Rule syntax validation | `promtool check rules` | **SUCCESS: 6 rules found** (2026-03-31) |
 | Docs API remote verification | `192.168.2.103:3000` | voice-feature-mapping, iot-feature-mapping, feature-traceability all HTTP 200 |
 | Combined test result | Full focused suite | **41 passed** (2026-03-31) |

@@ -1,4 +1,4 @@
-# Home AI Lab Infrastructure Reference
+﻿# Home AI Lab Infrastructure Reference
 **Last Updated**: March 21, 2026
 **Current Architecture Version**: 3.3 (Post-Phase 6 Training Pipeline)
 **Maintenance Owner**: Engineering Team
@@ -11,9 +11,9 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 
 | Tier | Host | Role | Hardware | Services |
 |------|------|------|----------|----------|
-| **Control** | Wyse 5070 (192.168.2.102) | Orchestration & Observability Backend | 16GB RAM, 512GB SSD | SPIRE, Langfuse, PostgreSQL, ClickHouse, MinIO |
-| **Ops/Gateway** | Dell R730 (192.168.2.103) | Reverse Proxy & Monitoring | 384GB RAM, 24 CPU, 450GB SSD | Traefik, Prometheus, Grafana, Loki, cAdvisor, Redis, Authentik, IDEs, OpenHands |
-| **Compute** | Justin-PC (192.168.2.101) | GPU Inference, Agent Runtime & Training | 32GB RAM, RTX 5060 Ti (16GB), 500GB SSD | Ollama, ComfyUI, Agent Runtime, Voice Services, Training Runtime |
+| **Control** | Hopper (192.168.2.102) | Orchestration & Observability Backend | 16GB RAM, 512GB SSD | SPIRE, Langfuse, PostgreSQL, ClickHouse, MinIO |
+| **Ops/Gateway** | Dell Turing (192.168.2.103) | Reverse Proxy & Monitoring | 384GB RAM, 24 CPU, 450GB SSD | Traefik, Prometheus, Grafana, Loki, cAdvisor, Redis, Authentik, IDEs, OpenHands |
+| **Compute** | Lovelace (192.168.2.101) | GPU Inference, Agent Runtime & Training | 32GB RAM, RTX 5060 Ti (16GB), 500GB SSD | Ollama, ComfyUI, Agent Runtime, Voice Services, Training Runtime |
 
 ---
 
@@ -24,7 +24,7 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 #### SPIRE (Service and Workload Identity Runtime Environment)
 - **Role**: Zero-trust workload identity provider
 - **Port**: 8081 (API), Unix socket for agents
-- **Function**: Issues X.509 SVIDs to processes on Justin-PC and R730
+- **Function**: Issues X.509 SVIDs to processes on Lovelace and Turing
 - **Data Store**: PostgreSQL (workload entries, policy cache)
 - **Health Check**: `spire-server healthcheck`
 - **Integration**: Agent runtime uses SPIFFE_ENDPOINT_SOCKET for mTLS
@@ -54,7 +54,7 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 
 ---
 
-### TIER 2: OPS & GATEWAY (192.168.2.103 - R730)
+### TIER 2: OPS & GATEWAY (192.168.2.103 - Turing)
 
 #### Traefik v3.6 (Reverse Proxy)
 - **Ports**: 80 (HTTP), 443 (HTTPS), 8082 (API)
@@ -106,7 +106,7 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 
 ### TIER 3: COMPUTE (192.168.2.101 - JUSTIN-PC)
 
-#### Compute Services (GPU-bound on Justin-PC)
+#### Compute Services (GPU-bound on Lovelace)
 
 | Service | Port | GPU | Purpose |
 |---------|------|-----|---------|
@@ -119,7 +119,7 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 | Training Runtime | profile | ✓ | QLoRA GRPO fine-tuning (on-demand) |
 | Text Gen WebUI | 7860 | ✓ | Diagnostic token inspection (on-demand) |
 
-**Migrated to R730 (Phase 8)**:
+**Migrated to Turing (Phase 8)**:
 - Authentik (Server, Worker, DB, Redis) — SSO & identity
 - VS Code IDEs (DevOps port 8445, Coding port 8444)
 - OpenHands — code execution sandbox (port 3002)
@@ -141,9 +141,9 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 ### Subnet
 ```
 192.168.2.0/24 - Home Lab Subnet
-├── 192.168.2.101 - Justin-PC (Compute)
-├── 192.168.2.102 - Wyse 5070 (Control)
-└── 192.168.2.103 - R730 (Gateway/Monitoring)
+├── 192.168.2.101 - Lovelace (Compute)
+├── 192.168.2.102 - Hopper (Control)
+└── 192.168.2.103 - Turing (Gateway/Monitoring)
 
 Latency: <1ms (L2 segment)
 ```
@@ -152,12 +152,12 @@ Latency: <1ms (L2 segment)
 ```
 External Request
     ↓
-R730 Traefik:80/443
-    ├─ /ai → Justin-PC:8501 (Agent UI)
-    ├─ /comfy → Justin-PC:8188 (ComfyUI)
-    ├─ /ops → Justin-PC:8502 (Ops Portal)
-    ├─ /prometheus → R730:9091 (Prometheus)
-    ├─ /grafana → R730:3000 (Grafana)
+Turing Traefik:80/443
+    ├─ /ai → Lovelace:8501 (Agent UI)
+    ├─ /comfy → Lovelace:8188 (ComfyUI)
+    ├─ /ops → Lovelace:8502 (Ops Portal)
+    ├─ /prometheus → Turing:9091 (Prometheus)
+    ├─ /grafana → Turing:3000 (Grafana)
     └─ ... (30+ routes)
 ```
 
@@ -166,8 +166,8 @@ R730 Traefik:80/443
 ## Data Flow Patterns
 
 ### User Request → Agent Execution
-1. Client → R730 Traefik `/ai`
-2. Traefik → Justin-PC:8501 (Agent UI)
+1. Client → Turing Traefik `/ai`
+2. Traefik → Lovelace:8501 (Agent UI)
 3. UI submission → Agent Runtime:8000 `/api/v1/execute`
 4. Agent Runtime:
    - Route via semantic_router (intent classification)
@@ -184,7 +184,7 @@ Services (Ollama, ComfyUI, etc.)
 Prometheus:9091 (scrapes 15s)
 Promtail:9080 (ships logs → Loki)
     ↓
-R730 Monitoring Stack
+Turing Monitoring Stack
 ├─ Prometheus (time-series)
 ├─ Loki (logs)
 ├─ Grafana (visualization)
@@ -225,14 +225,14 @@ X.509 SVID issued (mTLS ready)
 
 ## Storage Architecture
 
-### Justin-PC (500GB SSD)
+### Lovelace (500GB SSD)
 - OS: 100GB
 - Docker volumes: 50GB (models, services)
 - ComfyUI output: 50GB
 - Workspace: 80GB
 - **Free**: 120GB (+ 50-75GB freed by Phase 4)
 
-### R730 (450GB SSD)
+### Turing (450GB SSD)
 - Prometheus: 15-20GB
 - Loki: 25-35GB
 - Grafana: 500MB
@@ -257,7 +257,7 @@ X.509 SVID issued (mTLS ready)
 | L6 | Governance.py + A/B Testing | Request policy + model lifecycle management |
 | L4 | Llama-Guard-3:8b + MarsRL | Security scanning + Solver→Verifier→Corrector |
 | L3 | ExpertiseTemplate Registry | Versioned capability lists with performance tracking |
-| L2 | Authentik | User authentication (SSO via R730) |
+| L2 | Authentik | User authentication (SSO via Turing) |
 | L1 | Traefik TLS + GPU Mutex | Transport encryption + GPU resource isolation |
 
 ---
@@ -277,16 +277,16 @@ X.509 SVID issued (mTLS ready)
 | Resource | Current | Alert @ |
 |----------|---------|---------|
 | GPU VRAM | 10GB (idle) | **15GB** |
-| Justin-PC CPU | 15-20% | **80%** |
-| Justin-PC Disk | 350GB | **80%** |
-| R730 CPU | Low | **80%** |
-| R730 Disk | 70GB | **80%** |
+| Lovelace CPU | 15-20% | **80%** |
+| Lovelace Disk | 350GB | **80%** |
+| Turing CPU | Low | **80%** |
+| Turing Disk | 70GB | **80%** |
 
 ---
 
 ## Configuration Locations
 
-### Justin-PC
+### Lovelace
 ```
 ~/execution_plane/
 ├── docker-compose.yml          (GPU services + agent runtime)
@@ -296,9 +296,9 @@ X.509 SVID issued (mTLS ready)
     └── spire/agent.conf
 ```
 
-### R730
+### Turing
 ```
-~/r730_gateway/
+~/turing_gateway/
 ├── docker-compose.yml          (Monitoring + Authentik + IDEs + OpenHands)
 ├── dashboards/
 │   ├── training_pipeline.json  (Training Pipeline — Grafana provisioned)
@@ -333,10 +333,10 @@ curl http://192.168.2.103:3001/api/health
 # Single service
 docker-compose restart ollama
 
-# Full stack restart (Justin-PC)
+# Full stack restart (Lovelace)
 docker-compose down && sleep 5 && docker-compose up -d
 
-# Monitoring stack (R730)
+# Monitoring stack (Turing)
 docker-compose -f docker-compose-monitoring-fixed.yml restart
 ```
 

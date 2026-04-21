@@ -1,4 +1,4 @@
----
+﻿---
 title: Port Map
 ---
 
@@ -6,7 +6,7 @@ title: Port Map
 
 Complete port registry across all Agent Swarm nodes.
 
-## Execution Node â€” {{ execution_node_ip }}
+## Execution Node â€” {{ lovelace_ip }}
 
 | Port | Service | Protocol | Access |
 |------|---------|----------|--------|
@@ -18,7 +18,7 @@ Complete port registry across all Agent Swarm nodes.
 | 3300 | OpenHands | HTTP | LAN |
 | 8081 | cAdvisor | HTTP | Internal |
 
-## Control Node â€” {{ control_node_ip }}
+## Control Node â€” {{ hopper_ip }}
 
 | Port | Service | Protocol | Access |
 |------|---------|----------|--------|
@@ -32,16 +32,16 @@ Complete port registry across all Agent Swarm nodes.
 | 9001 | MinIO Console | HTTP | LAN |
 | 6379 | Redis | TCP | LAN |
 
-## Gateway Node â€” {{ gateway_node_ip }}
+## Gateway Node â€” {{ turing_ip }}
 
 | Port | Service | Protocol | Access |
 |------|---------|----------|--------|
 | 80 | Traefik HTTP | HTTP | LAN + Tailscale |
 | 443 | Traefik HTTPS | HTTPS | LAN + Tailscale |
 | 8080 | Traefik Dashboard | HTTP | LAN |
-| 9091 | Prometheus | HTTP | LAN |
-| 3001 | Grafana | HTTP | LAN |
-| 3100 | Loki | HTTP | Internal |
+| 9091 | jacquard | HTTP | LAN |
+| 3001 | hollerith | HTTP | LAN |
+| 3100 | knuth | HTTP | Internal |
 | 9093 | AlertManager | HTTP | LAN |
 | 11435 | Ollama (secondary) | HTTP | LAN |
 | 6379 | Redis | TCP | Internal |
@@ -70,13 +70,13 @@ Complete port registry across all Agent Swarm nodes.
     | Source | Type | Relevance |
     |--------|------|----------|
     | `network.env` | Configuration | All IP addresses and node roles |
-    | `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
+    | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node services and port mappings |
     | `execution_plane/docker-compose.yml` | Infrastructure | Execution Node services |
     | `control_plane/docker-compose.yml` | Infrastructure | Control Node services |
-    | `config/prometheus/prometheus.yml` | Configuration | Scrape targets and intervals |
-    | `config/grafana/provisioning/dashboards/` | Configuration | Dashboard JSON definitions |
+    | `config/jacquard/jacquard.yml` | Configuration | Scrape targets and intervals |
+    | `config/hollerith/provisioning/dashboards/` | Configuration | Dashboard JSON definitions |
     | `agents/main.py` | Implementation | API endpoint definitions |
-    | `agents/metrics.py` | Implementation | Custom Prometheus metrics |
+    | `agents/metrics.py` | Implementation | Custom jacquard metrics |
 
 
 ---
@@ -88,14 +88,14 @@ Complete port registry across all Agent Swarm nodes.
 1. Update `network.env` with new IP addresses.
 2. Update the Network Topology table in Section 1.
 3. Update `docker-compose.yml` files if port mappings change.
-4. Update Prometheus scrape targets in `config/prometheus/prometheus.yml`.
+4. Update jacquard scrape targets in `config/jacquard/jacquard.yml`.
 
 ### When Services Are Added
 
 1. Add the service to the appropriate node's Service Inventory table.
 2. Add its port to the UI URLs table if it has a web interface.
-3. Add a Prometheus scrape target if it exposes metrics.
-4. Add Loki log labels if it produces structured logs.
+3. Add a jacquard scrape target if it exposes metrics.
+4. Add knuth log labels if it produces structured logs.
 
 ### Keeping Environment Variables Current
 
@@ -112,10 +112,12 @@ Complete port registry across all Agent Swarm nodes.
 
 1. **Network connectivity**: Ping each node IP from the Gateway Node.
 2. **Service health**: `curl` each API endpoint listed in Section 3 ? verify 200 responses.
-3. **Prometheus targets**: Check `http://<gateway-node-ip>:9091/targets` ? all should show UP.
-4. **Grafana dashboards**: Open each dashboard listed in Section 6 ? verify data is flowing.
+3. **jacquard targets**: Check `http://<gateway-node-ip>:9091/targets` ? all should show UP.
+4. **hollerith dashboards**: Open each dashboard listed in Section 6 ? verify data is flowing.
 5. **PostgreSQL schema**: Connect to the swarm database ? verify all tables listed in Section 7 exist.
 
 ---
 
 *See also: Design Framework · Security · [Back to Index](../index.md)*
+
+

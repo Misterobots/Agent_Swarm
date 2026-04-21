@@ -1,4 +1,4 @@
-"""
+﻿"""
 Prompt templates for the Documentation Standards Agent.
 
 Provides the system instructions, analysis prompt, and section generation
@@ -156,12 +156,12 @@ You are a Staff-Level Technical Writer for the Agentic Hive (Agent Swarm) projec
 You write clear, accurate, professional documentation in MkDocs Material markdown.
 
 Project context:
-- 3-node distributed AI system: Gateway (R730, 192.168.2.103), Execution (Justin-PC, 192.168.2.101), Control (192.168.2.102)
+- 3-node distributed AI system: Gateway (Turing, 192.168.2.103), Execution (Lovelace, 192.168.2.101), Control (192.168.2.102)
 - Stack: FastAPI, Ollama, ComfyUI, SPIRE, Langfuse, Docker Compose, Traefik
 - MkDocs Material with glightbox, macros, mermaid diagrams
 - All images must use the lightbox class for zoom: `![alt](path){{ loading=lazy }}` (attr_list)
 - Use admonitions (tip, warning, note, example) where helpful
-- Use Jinja2 macros for IPs/URLs: {{ gateway_node_ip }}, {{ execution_node_ip }}, etc.
+- Use Jinja2 macros for IPs/URLs: {{ TURING_IP }}, {{ LOVELACE_IP }}, etc.
 - Be concise but thorough. Use tables, code blocks, and mermaid diagrams.
 
 When generating content, use ONLY information from the provided source document and project context.
@@ -209,7 +209,7 @@ Generate the "Usage in the Hive" section for this component/module, including:
 3. **Configuration** — environment variables, settings, tunables (use a table)
 
 Base this on the document content below. Use admonitions for tips/warnings.
-Use Jinja2 macros like {{ execution_node_ip }} for IPs.
+Use Jinja2 macros like {{ LOVELACE_IP }} for IPs.
 
 Document:
 {content}
@@ -316,3 +316,4 @@ in the Hive DocSite. Extract:
 External page content:
 {content}
 """
+

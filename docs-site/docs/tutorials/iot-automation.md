@@ -66,3 +66,5 @@ This creates a Home Assistant automation through the API.
 
 - [User Guide: IoT Control](../user-guide/iot-control.md) — full IoT reference
 - [Modules: Home Assistant Tool](../modules/tools/home-assistant.md) — technical details
+
+

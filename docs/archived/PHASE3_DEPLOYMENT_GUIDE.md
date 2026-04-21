@@ -1,14 +1,14 @@
-# Phase 3: Update & Restart Justin-PC
+﻿# Phase 3: Update & Restart Lovelace
 # Remove local Traefik and monitoring stack, keep compute services
 
 ## Changes Made
 ✅ **Removed Services:**
-- traefik (Reverse proxy - now using R730 Traefik)
-- cadvisor (Container metrics - now on R730)
-- prometheus (Metrics DB - now on R730)
-- grafana (Dashboard - now on R730)
-- loki (Log aggregation - now on R730)
-- promtail (Log shipper - now on R730)
+- traefik (Reverse proxy - now using Turing Traefik)
+- cadvisor (Container metrics - now on Turing)
+- prometheus (Metrics DB - now on Turing)
+- grafana (Dashboard - now on Turing)
+- loki (Log aggregation - now on Turing)
+- promtail (Log shipper - now on Turing)
 - redis_queue (Monitoring queue - not needed)
 
 ✅ **Removed Volumes:**
@@ -43,7 +43,7 @@ echo '✅ Backup created'"
 
 ### Step 2: Copy New Compose
 ```powershell
-# From Justin-PC, copy the Phase 3 compose
+# From Lovelace, copy the Phase 3 compose
 scp 'C:\Users\panca\Documents\GitHub\Home_AI_Lab\execution_plane\docker-compose-phase3.yml' `
     misterobots@192.168.2.101:~/execution_plane/docker-compose.yml
 ```
@@ -56,7 +56,7 @@ docker volume rm prometheus_data grafana_data loki_data redis_data 2>/dev/null |
 echo '✅ Pruned old monitoring volumes'"
 ```
 
-### Step 4: Restart Justin-PC Services
+### Step 4: Restart Lovelace Services
 ```bash
 ssh misterobots@192.168.2.101 "cd ~/execution_plane && \
 docker-compose down && \
@@ -92,8 +92,8 @@ Expected output:
 
 ### Step 6: Test Service Connectivity
 ```powershell
-# Test from Justin-PC that services are accessible locally
-# These should work internally at :port but route through R730 for external access
+# Test from Lovelace that services are accessible locally
+# These should work internally at :port but route through Turing for external access
 
 # Test Ollama
 curl -s http://192.168.2.101:11434/api/tags
@@ -105,42 +105,42 @@ curl -s http://192.168.2.101:8188/system_stats
 curl -s http://192.168.2.101:8008/docs
 ```
 
-### Step 7: Verify Metrics Collection on R730
+### Step 7: Verify Metrics Collection on Turing
 ```bash
-# Check that R730 Prometheus is scraping Justin-PC services
+# Check that Turing Prometheus is scraping Lovelace services
 curl -s http://192.168.2.103:9091/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, state: .health}'
 
 # Expected: Some targets should now be DOWN initially (they're on different port)
-# This is OK - R730's Traefik will need to be configured to scrape Justin-PC services
+# This is OK - Turing's Traefik will need to be configured to scrape Lovelace services
 ```
 
 ### Step 8: Git Commit
 ```bash
 ssh misterobots@192.168.2.101 "cd ~/Home_AI_Lab && \
 git add execution_plane/docker-compose.yml && \
-git commit -m 'PHASE 3: Remove local Traefik + monitoring, migrate to R730 gateway'"
+git commit -m 'PHASE 3: Remove local Traefik + monitoring, migrate to Turing gateway'"
 ```
 
 ## Validation Checklist
 
-- [ ] All compute services running on Justin-PC
+- [ ] All compute services running on Lovelace
 - [ ] No local Traefik (no port 81, 443, 8082)
 - [ ] No local Prometheus/Grafana/Loki
 - [ ] Services accessible via http://192.168.2.101:port
-- [ ] R730 Prometheus points to Justin-PC services
-- [ ] Access via R730 Traefik: http://192.168.2.103/comfy, http://192.168.2.103/ai, etc.
+- [ ] Turing Prometheus points to Lovelace services
+- [ ] Access via Turing Traefik: http://192.168.2.103/comfy, http://192.168.2.103/ai, etc.
 
 ## Storage Impact
 
 Before Phase 3:
-- Justin-PC: ~500GB total, ~425GB used (85%)
+- Lovelace: ~500GB total, ~425GB used (85%)
 - Monitoring: ~50-75GB (Prometheus, Grafana, Loki logs, Promtail cache)
 
 After Phase 3:
-- Justin-PC: ~425GB freed → ~500GB used (~60%)
-- R730: Absorbs monitoring (now ~50-75GB used for monitoring)
+- Lovelace: ~425GB freed → ~500GB used (~60%)
+- Turing: Absorbs monitoring (now ~50-75GB used for monitoring)
 
-**Result: Justin-PC freed ~75GB of storage, now focused on COMPUTE only**
+**Result: Lovelace freed ~75GB of storage, now focused on COMPUTE only**
 
 ## Quick Command (All Steps)
 

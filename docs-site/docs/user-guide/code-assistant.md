@@ -1,4 +1,4 @@
----
+﻿---
 title: Code Assistant
 ---
 
@@ -52,7 +52,7 @@ When `dev_mode: true`, these tools become available:
 
 For full code execution with an isolated environment, the system can delegate to OpenHands — a sandboxed VS Code instance with Docker-in-Docker support.
 
-Access OpenHands directly at `http://{{ gateway_node_ip }}:3002`.
+Access OpenHands directly at `http://{{ turing_ip }}:3002`.
 
 ### MarsRL Quality Loop for Code
 
@@ -82,3 +82,5 @@ Pass threshold: score ≥ 0.60. If verification fails, the Corrector agent rewri
 - [Module: Coordinator](../modules/coordinator.md) — multi-worker orchestration
 - [Developer Guide: Adding Tools](../developer-guide/adding-tools.md) — extend the tool set
 - [Troubleshooting: Common Errors](../troubleshooting/agent-runtime.md)
+
+

@@ -1,4 +1,4 @@
-# Agentic Hive: Technical Architecture & Design Specification
+﻿# Agentic Hive: Technical Architecture & Design Specification
 
 ## 1. Executive Summary
 
@@ -20,9 +20,9 @@ The **Agentic Hive** is a decentralized, multi-agent orchestration system design
 
 | Node                                    | Role                          | Hardware                   | Key Services                                          |
 | --------------------------------------- | ----------------------------- | -------------------------- | ----------------------------------------------------- |
-| **Dell Wyse 5070** (192.168.2.102)      | Control Plane                 | x86 low-power              | SPIRE, PostgreSQL, Langfuse, ClickHouse, Redis, MinIO |
-| **Justin-PC** (192.168.2.101)           | Heavy Inference + App Runtime | RTX 5060 Ti 16GB, 32GB RAM | Docker Execution Plane, ComfyUI, qwen3.5:9b           |
-| **Dell PowerEdge R730** (192.168.2.103) | Routing + Offload Inference   | RTX 3070 Ti 8GB            | qwen3.5:9b, nemotron-orchestrator, llama-guard-3:8b   |
+| **Dell Hopper** (192.168.2.102)      | Control Plane                 | x86 low-power              | SPIRE, PostgreSQL, Langfuse, ClickHouse, Redis, MinIO |
+| **Lovelace** (192.168.2.101)           | Heavy Inference + App Runtime | RTX 5060 Ti 16GB, 32GB RAM | Docker Execution Plane, ComfyUI, qwen3.5:9b           |
+| **Dell PowerEdge Turing** (192.168.2.103) | Routing + Offload Inference   | RTX 3070 Ti 8GB            | qwen3.5:9b, nemotron-orchestrator, llama-guard-3:8b   |
 
 ---
 

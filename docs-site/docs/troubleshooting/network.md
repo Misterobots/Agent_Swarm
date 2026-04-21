@@ -1,4 +1,4 @@
----
+﻿---
 title: "Troubleshooting: Network"
 ---
 
@@ -6,16 +6,16 @@ title: "Troubleshooting: Network"
 
 ## Traefik Not Routing
 
-**Symptom**: Requests to `{{ gateway_node_ip }}` return 404 or timeout.
+**Symptom**: Requests to `{{ turing_ip }}` return 404 or timeout.
 
 **Diagnose**:
 
 ```bash
 # Check Traefik dashboard
-curl http://{{ gateway_node_ip }}:8080/api/overview
+curl http://{{ turing_ip }}:8080/api/overview
 
 # Check active routers
-curl http://{{ gateway_node_ip }}:8080/api/http/routers | python -m json.tool
+curl http://{{ turing_ip }}:8080/api/http/routers | python -m json.tool
 ```
 
 **Fix**:
@@ -34,10 +34,10 @@ curl http://{{ gateway_node_ip }}:8080/api/http/routers | python -m json.tool
 
 ```bash
 # Basic connectivity
-ping {{ execution_node_ip }}
+ping {{ lovelace_ip }}
 
 # Port check
-curl -v http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags
+curl -v http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags
 ```
 
 **Fix**:
@@ -88,3 +88,5 @@ sudo ss -tlnp | grep <port>
 - Stop the conflicting process
 - Or remap the port in docker-compose.yml
 - See [Port Map](../admin-guide/port-map.md) for all used ports
+
+

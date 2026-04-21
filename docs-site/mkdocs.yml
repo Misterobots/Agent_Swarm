@@ -150,6 +150,7 @@ nav:
     - Buddy Companion: user-guide/buddy.md
     - Plan & Think Modes: user-guide/plan-think.md
     - Grounding: user-guide/grounding.md
+    - Grounding: user-guide/grounding.md
   - Architecture:
     - architecture/index.md
     - Topology: architecture/topology.md

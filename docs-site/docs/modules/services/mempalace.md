@@ -1,4 +1,4 @@
----
+﻿---
 title: "Service: MemPalace"
 ---
 
@@ -10,9 +10,9 @@ Semantic memory service for vector-based knowledge retrieval.
 
 | Property | Value |
 |----------|-------|
-| **Node** | Control Plane ({{ control_node_ip }}) |
+| **Node** | Control Plane ({{ hopper_ip }}) |
 | **Port** | 8200 |
-| **URL** | `http://{{ control_node_ip }}:8200` |
+| **URL** | `http://{{ hopper_ip }}:8200` |
 | **Backend** | PostgreSQL with pgvector |
 | **Compose** | `control_plane/docker-compose.yml` |
 
@@ -34,7 +34,7 @@ MemPalace complements the rule-based Skills Memory with semantic (vector) search
 ```python
 from agents.mempalace_client import MemPalaceClient
 
-client = MemPalaceClient(url="http://{{ control_node_ip }}:8200")
+client = MemPalaceClient(url="http://{{ hopper_ip }}:8200")
 
 # Store knowledge
 client.store(text="Python best practices for error handling", metadata={"domain": "coding"})
@@ -47,3 +47,5 @@ results = client.search(query="how to handle exceptions", top_k=5)
 
 - [Architecture: Memory System](../../architecture/memory-system.md)
 - [Module: Memory](../memory.md)
+
+

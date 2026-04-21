@@ -7,3 +7,4 @@ for r in routers:
     if 'hive' in name:
         print(f'{name:45s} P:{r.get(\"priority\",\"—\"):>3}  Rule: {r[\"rule\"][:90]}')
 "
+

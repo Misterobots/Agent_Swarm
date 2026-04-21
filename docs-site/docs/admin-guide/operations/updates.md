@@ -1,4 +1,4 @@
----
+﻿---
 title: Updates
 ---
 
@@ -105,4 +105,6 @@ docker compose up -d
 - [ ] Update one node at a time
 - [ ] Verify health after each update
 - [ ] Check Langfuse traces for errors
-- [ ] Monitor Grafana for anomalies
+- [ ] Monitor hollerith for anomalies
+
+

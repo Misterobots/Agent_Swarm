@@ -1,4 +1,4 @@
----
+﻿---
 title: Internal API
 ---
 
@@ -20,13 +20,13 @@ GET /
 }
 ```
 
-## Metrics (Prometheus)
+## Metrics (jacquard)
 
 ```
 GET /metrics
 ```
 
-Returns Prometheus-formatted metrics:
+Returns jacquard-formatted metrics:
 
 ```
 # HELP agent_state Current agent state
@@ -86,3 +86,5 @@ GET /debug/models
 ```
 
 Returns loaded model information from Ollama, including VRAM usage.
+
+

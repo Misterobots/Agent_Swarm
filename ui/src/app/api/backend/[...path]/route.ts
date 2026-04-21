@@ -25,6 +25,11 @@ async function proxyRequest(req: NextRequest) {
   const headers = new Headers();
   headers.set("Content-Type", req.headers.get("Content-Type") || "application/json");
 
+  for (const key of ["x-swarm-source", "authorization", "accept"]) {
+    const val = req.headers.get(key);
+    if (val) headers.set(key, val);
+  }
+
   // Forward Authentik identity headers (set by Traefik forward-auth middleware)
   for (const key of ["x-authentik-username", "x-authentik-groups", "x-authentik-email", "x-authentik-name", "x-authentik-uid"]) {
     const val = req.headers.get(key);

@@ -1,4 +1,4 @@
-# GitHub OAuth App Setup — Hive Mind IDE
+﻿# GitHub OAuth App Setup — Hive Mind IDE
 
 > **Phase 1C prerequisite.** This document covers creating the GitHub OAuth App, generating the encryption key, wiring both into the deployment, and fully recreating everything from scratch if needed.
 
@@ -49,7 +49,7 @@ Check the box: **"Enable Device Flow"**.
 
 ### Step 5 — Wire the Client ID into the Deployment
 
-On **Justin-PC** (192.168.2.101), open `/workspace/network.env` (the repo root `network.env` mounted into containers):
+On **Lovelace** (192.168.2.101), open `/workspace/network.env` (the repo root `network.env` mounted into containers):
 
 ```ini
 # === GitHub OAuth (Phase 1C) ===
@@ -88,7 +88,7 @@ TOKEN_ENCRYPTION_KEY=uLdrFPYjSR3vHKJ2dO4aWt1ZeBm9NcGxQk0pVnIqRsE=
 
 ## Part 3 — Restart the Backend
 
-After saving `network.env`, restart the `agent_runtime` container on Justin-PC to pick up the new env vars:
+After saving `network.env`, restart the `agent_runtime` container on Lovelace to pick up the new env vars:
 
 ```bash
 ssh misterobots@192.168.2.101
@@ -127,7 +127,7 @@ Use this section to recreate the entire GitHub OAuth integration from zero (e.g.
 - [ ] Create new OAuth App on GitHub (Part 1)
 - [ ] Copy new Client ID
 - [ ] Generate new Fernet key (Part 2)
-- [ ] Update `network.env` on Justin-PC
+- [ ] Update `network.env` on Lovelace
 - [ ] Restart `agent_runtime` container
 - [ ] Optionally: clear old tokens from DB (if key changed)
 - [ ] Smoke test
@@ -229,12 +229,12 @@ git checkout checkpoint-phase1d -- ui/src/components/settings/github-connect.tsx
 git checkout checkpoint-phase1d -- ui/src/app/settings/page.tsx
 ```
 
-Then rebuild and redeploy `hive_ui` on R730:
+Then rebuild and redeploy `hive_ui` on Turing:
 
 ```bash
 ssh misterobots@192.168.2.103
 cd /workspace
-docker compose -f r730_gateway/docker-compose.yml up -d --build hive-ui
+docker compose -f turing_gateway/docker-compose.yml up -d --build hive-ui
 ```
 
 ---
@@ -314,12 +314,12 @@ Content-Type: application/json
 | Device Flow enable | Checkbox on app settings page |
 | Client ID env var | `GITHUB_OAUTH_CLIENT_ID` in `network.env` |
 | Encryption key env var | `TOKEN_ENCRYPTION_KEY` in `network.env` |
-| `network.env` location | `/workspace/network.env` (Justin-PC) |
+| `network.env` location | `/workspace/network.env` (Lovelace) |
 | DB table | `swarm.github_oauth_tokens` in `langfuse` DB on 192.168.2.102 |
 | Phase 1C tag | `checkpoint-phase1c` |
 | Phase 1D tag | `checkpoint-phase1d` |
-| Backend container | `agent_runtime` on Justin-PC (192.168.2.101) |
-| UI container | `hive-ui` on R730 (192.168.2.103) |
+| Backend container | `agent_runtime` on Lovelace (192.168.2.101) |
+| UI container | `hive-ui` on Turing (192.168.2.103) |
 
 ---
 
@@ -352,7 +352,7 @@ Content-Type: application/json
 ## Maintenance & Update Guide
 
 - Rotate `GITHUB_CLIENT_SECRET` annually or upon suspicion of compromise.
-- Update callback URLs if the R730 IP or domain changes.
+- Update callback URLs if the Turing IP or domain changes.
 - Update the DB table schema if additional OAuth scopes are needed.
 
 ---

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createConnection } from "net";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ function getBackendUrl() {
   return process.env.API_BASE_URL || "http://localhost:8000";
 }
 function getControlIp() {
-  return process.env.CONTROL_NODE_IP || "control-node";
+  return process.env.HOPPER_IP || "control-node";
 }
 
 interface ServiceCheck {

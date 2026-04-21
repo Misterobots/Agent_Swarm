@@ -27,3 +27,5 @@ Publish and subscribe to MQTT topics for IoT communication.
 ## Allowed Intents
 
 `IOT_DEV`
+
+

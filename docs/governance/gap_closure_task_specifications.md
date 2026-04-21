@@ -1,4 +1,4 @@
-# Documentation Gap Closure Task Specifications
+﻿# Documentation Gap Closure Task Specifications
 
 Document ID: DOC-GOV-006
 Domain: Governance
@@ -573,7 +573,7 @@ Extend feature-to-control traceability matrix to include voice interaction and I
 2. **IoT Feature Inventory Complete**
    - [x] List created: Device provisioning, device authentication, command execution, telemetry collection, etc.
    - [x] Each feature described with use case and data flow
-   - [x] IoT features documented in existing code (r730_gateway modules or similar)
+   - [x] IoT features documented in existing code (turing_gateway modules or similar)
    - [x] Feature list reviewed and approved by Product
 
 3. **Voice Feature Mapping Complete**
@@ -624,7 +624,7 @@ Extend feature-to-control traceability matrix to include voice interaction and I
 - [x] Get Product team sign-off on feature list
 
 **Task T4.2: Inventory IoT Features** (Effort: 3h) ✅
-- [x] Review r730_gateway modules and IoT code
+- [x] Review turing_gateway modules and IoT code
 - [x] List all IoT-related functionality:
   - Device Discovery/Provisioning
   - Device Authentication

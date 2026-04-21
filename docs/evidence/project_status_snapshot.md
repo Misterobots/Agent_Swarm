@@ -1,4 +1,4 @@
-# Project Status Snapshot
+﻿# Project Status Snapshot
 
 Snapshot Date: 2026-03-31
 Branch: feature/neural-router
@@ -21,7 +21,7 @@ Baseline Commit: 982796a4547566ba9316a90671891cc7c91d9227
 - Result:
   - 41 passed in 1.18s
 - Prometheus rule validation:
-  - `promtool check rules r730_gateway/config/prometheus/auth_alert_rules.yml`
+  - `promtool check rules turing_gateway/config/prometheus/auth_alert_rules.yml`
   - SUCCESS: 6 rules found
 
 ## Key Artifacts

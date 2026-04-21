@@ -1,4 +1,4 @@
-# Walkthrough - Creature Forge Ecosystem
+﻿# Walkthrough - Creature Forge Ecosystem
 
 This document provides a comprehensive guide to understanding, visualizing, and implementing the Creature Forge 3D generation system. It covers the dual-pipeline architecture, hardware requirements, and the specific models and services that drive the application.
 
@@ -141,7 +141,7 @@ Successfully integrated `ForgeAgent` and `ImageGenAgent` with local ComfyUI inst
     *   **Solution:** Implemented recursive JSON traversal to replace placeholders with random integers before submission.
 4.  **Logging:**
     *   **Problem:** Docker Desktop prevented Promtail from scraping log files.
-    *   **Solution:** Switched to direct network logging using `python-logging-loki`.
+    *   **Solution:** Switched to direct network logging using `python-logging-knuth`.
 
 **Current Status:**
 *   3D Generation Pipeline is **Active**.
@@ -192,3 +192,5 @@ To achieve true "Pixar-style" quality with seamless texturing, we have transitio
 *   [x] Identified Component Nodes (`TripoSGInference`, `Hy3DSampleMultiView`).
 *   [x] Created Workflow JSON.
 *   [ ] User Verification (Waiting for first generation).
+
+

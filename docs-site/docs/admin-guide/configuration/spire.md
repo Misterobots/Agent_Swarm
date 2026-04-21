@@ -1,4 +1,4 @@
----
+﻿---
 title: SPIRE Configuration
 ---
 
@@ -55,13 +55,13 @@ plugins {
 
 ## Agent Configuration
 
-Location: `execution_plane/config/spire/agent.conf` and `r730_gateway/config/spire/agent.conf`
+Location: `execution_plane/config/spire/agent.conf` and `turing_gateway/config/spire/agent.conf`
 
 ```hcl
 agent {
     data_dir = "/opt/spire/data/agent"
     log_level = "INFO"
-    server_address = "{{ control_node_ip }}"
+    server_address = "{{ hopper_ip }}"
     server_port = "8081"
     trust_domain = "home-ai-lab"
     socket_path = "/var/run/spire/agent.sock"
@@ -101,7 +101,7 @@ docker compose exec spire-server \
 | SPIFFE ID | Parent | Selector |
 |-----------|--------|----------|
 | `spiffe://home-ai-lab/agent-runtime` | execution-node | `unix:uid:1000` |
-| `spiffe://home-ai-lab/traefik` | r730-gateway | `unix:uid:0` |
+| `spiffe://home-ai-lab/traefik` | Turing-gateway | `unix:uid:0` |
 
 ## Join Token Generation
 
@@ -115,7 +115,7 @@ docker compose exec spire-server \
 # Generate token for Gateway Node
 docker compose exec spire-server \
     /opt/spire/bin/spire-server token generate \
-    -spiffeID spiffe://home-ai-lab/r730-gateway \
+    -spiffeID spiffe://home-ai-lab/Turing-gateway \
     -ttl 3600
 ```
 
@@ -140,3 +140,5 @@ docker compose exec spire-server /opt/spire/bin/spire-server entry show
 - [Architecture: Security Model](../../architecture/security-model.md) — security design
 - [Procedures: Rotate SPIRE Keys](../../procedures/rotate-spire-keys.md) — key rotation
 - [Troubleshooting: SPIRE](../../troubleshooting/spire.md) — common issues
+
+

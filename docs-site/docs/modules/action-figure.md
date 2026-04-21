@@ -38,3 +38,5 @@ Designs articulated, posable figures from text descriptions.
 
 - [Module: 3D Pipeline](3d-pipeline.md) — underlying 3D systems
 - [User Guide: 3D Generation](../user-guide/3d-generation.md#action-figures)
+
+

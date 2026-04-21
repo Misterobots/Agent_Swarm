@@ -67,3 +67,5 @@ The router classifies these as `RESEARCH`:
 
 - [Module: Coordinator](../modules/coordinator.md) — multi-worker orchestration details
 - [Architecture: Agent System](../architecture/agent-system.md) — how agents collaborate
+
+

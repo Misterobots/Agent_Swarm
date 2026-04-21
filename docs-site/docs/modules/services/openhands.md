@@ -1,4 +1,4 @@
----
+﻿---
 title: "Service: OpenHands"
 ---
 
@@ -10,7 +10,7 @@ Sandboxed code execution environment.
 
 | Property | Value |
 |----------|-------|
-| **Node** | Execution ({{ execution_node_ip }}) |
+| **Node** | Execution ({{ lovelace_ip }}) |
 | **Port** | 3300 |
 | **Isolation** | Docker-in-Docker |
 | **Compose** | `execution_plane/docker-compose.yml` |
@@ -39,3 +39,5 @@ OpenHands provides a sandboxed environment for executing user code safely. Code 
 
 - [User Guide: Code Assistant](../../user-guide/code-assistant.md)
 - [Architecture: Security Model](../../architecture/security-model.md)
+
+

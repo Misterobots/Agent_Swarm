@@ -16,3 +16,5 @@ Web and document search capabilities.
 ## Allowed Intents
 
 `CONVERSATION`, `CODE`, `RESEARCH`, `COORDINATE`
+
+

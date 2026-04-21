@@ -1,4 +1,4 @@
----
+﻿---
 title: "Procedure: Add a New Model"
 ---
 
@@ -31,7 +31,7 @@ docker exec ollama ollama pull gemma3:12b
 ### 3. Test the Model
 
 ```bash
-curl -X POST http://{{ execution_node_ip }}:{{ ollama_port }}/v1/chat/completions \
+curl -X POST http://{{ lovelace_ip }}:{{ ollama_port }}/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
         "model": "gemma3:12b",
@@ -57,7 +57,7 @@ docker exec ollama ollama create gemma3-custom -f /tmp/Modelfile
 ### 5. Verify
 
 ```bash
-curl http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags | python -m json.tool
+curl http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags | python -m json.tool
 ```
 
 The model should appear in the list.
@@ -66,3 +66,5 @@ The model should appear in the list.
 
 - Model downloads can be large (2–20 GB). Ensure sufficient disk space.
 - The Gateway's secondary Ollama (port 11435) can also host models.
+
+

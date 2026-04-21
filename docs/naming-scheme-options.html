@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>naming-scheme-options.md</title>
+    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+    
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+html,footer,header{
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Custom MD PDF CSS
+ */
+html,footer,header{
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+
+ }
+body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+<link rel="stylesheet" href="file:///r%3A/2.Travail/1.Enseignement/Cours/_1.Outils/2.Developpement/1.SCSS/main.css" type="text/css"><link rel="stylesheet" href="file:///d%3A/rdaros/Cours/_1.Outils/2.Developpement/1.SCSS/main.css" type="text/css">
+</head>
+
+<body>
+    <h1 id="hive-ecosystem--naming-scheme-options">Hive Ecosystem — Naming Scheme Options</h1>
+<p><strong>Date:</strong> April 20, 2026<br>
+<strong>Context:</strong> Replacing informal node/service/agent names (R730, Justin-PC, Wyse 5070, BMO, etc.) with a consistent naming scheme across the full stack — env vars, docker-compose, Prometheus labels, Python source, and documentation.<br>
+<strong>Hive</strong> stays as the top-level brand in all options.</p>
+<hr>
+<h2 id="current-state-baseline">Current State (Baseline)</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Current Name</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Node</td>
+<td>R730</td>
+<td>Gateway, edge ingress, monitoring</td>
+</tr>
+<tr>
+<td>Node</td>
+<td>Justin-PC</td>
+<td>GPU compute, AI inference, ComfyUI</td>
+</tr>
+<tr>
+<td>Node</td>
+<td>Wyse 5070 / Controle Node</td>
+<td>Control plane, identity (SPIRE), observability</td>
+</tr>
+<tr>
+<td>Node</td>
+<td>Pi / BMO</td>
+<td>Voice interface</td>
+</tr>
+<tr>
+<td>Env var</td>
+<td><code>GATEWAY_NODE_IP</code></td>
+<td>R730 IP</td>
+</tr>
+<tr>
+<td>Env var</td>
+<td><code>EXECUTION_NODE_IP</code></td>
+<td>Justin-PC IP</td>
+</tr>
+<tr>
+<td>Env var</td>
+<td><code>CONTROL_NODE_IP</code></td>
+<td>Wyse IP</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>router.py</td>
+<td>Request routing &amp; intent classification</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>architect_agent.py</td>
+<td>Code generation &amp; planning</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>coordinator.py</td>
+<td>Multi-worker orchestration</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>corrector_agent.py</td>
+<td>Error correction</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>governance.py</td>
+<td>Authorization &amp; policy enforcement</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>context_manager.py</td>
+<td>Session state management</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>buddy_service.py</td>
+<td>Voice/ambient layer</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="option-a--celestial-hierarchy-%E2%AD%90-team-vote-approved">Option A — Celestial Hierarchy ⭐ <em>Team Vote: Approved</em></h2>
+<blockquote>
+<p>Nodes named after stars/stellar objects by role. Agents named after astronomical figures. Clean theme with strong functional metaphors.</p>
+</blockquote>
+<h3 id="nodes">Nodes</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option A</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R730</td>
+<td><strong>Helios</strong></td>
+<td>The sun — visible edge, illuminates (monitors) everything</td>
+</tr>
+<tr>
+<td>Justin-PC</td>
+<td><strong>Titan</strong></td>
+<td>Saturn's largest moon — massive gravitational pull, GPU powerhouse</td>
+</tr>
+<tr>
+<td>Wyse 5070</td>
+<td><strong>Polaris</strong></td>
+<td>The north star — fixed reference point, always at center</td>
+</tr>
+<tr>
+<td>Pi / BMO</td>
+<td><strong>Aether</strong></td>
+<td>The ambient fifth element — pervasive, voice layer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="env-vars">Env Vars</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option A</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GATEWAY_NODE_IP</code></td>
+<td><code>HELIOS_IP</code></td>
+</tr>
+<tr>
+<td><code>EXECUTION_NODE_IP</code></td>
+<td><code>TITAN_IP</code></td>
+</tr>
+<tr>
+<td><code>CONTROL_NODE_IP</code></td>
+<td><code>POLARIS_IP</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="services-docker-compose-names">Services (docker-compose names)</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option A</th>
+<th>Node</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>traefik</td>
+<td><strong>transit</strong></td>
+<td>Helios</td>
+</tr>
+<tr>
+<td>prometheus</td>
+<td><strong>luminary</strong></td>
+<td>Helios</td>
+</tr>
+<tr>
+<td>grafana</td>
+<td><strong>observatory</strong></td>
+<td>Helios</td>
+</tr>
+<tr>
+<td>loki</td>
+<td><strong>chronicle</strong></td>
+<td>Helios</td>
+</tr>
+<tr>
+<td>redis</td>
+<td><strong>flux</strong></td>
+<td>shared</td>
+</tr>
+<tr>
+<td>ComfyUI</td>
+<td><strong>nebula</strong></td>
+<td>Titan</td>
+</tr>
+<tr>
+<td>Ollama (gateway)</td>
+<td><strong>relay</strong></td>
+<td>Helios</td>
+</tr>
+<tr>
+<td>Ollama (compute)</td>
+<td><strong>forge</strong></td>
+<td>Titan</td>
+</tr>
+<tr>
+<td>OpenHands</td>
+<td><strong>construct</strong></td>
+<td>Titan</td>
+</tr>
+<tr>
+<td>SPIRE</td>
+<td><strong>sextant</strong></td>
+<td>Polaris</td>
+</tr>
+<tr>
+<td>Langfuse</td>
+<td><strong>spectra</strong></td>
+<td>Polaris</td>
+</tr>
+<tr>
+<td>MemPalace</td>
+<td><strong>vault</strong></td>
+<td>Polaris</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td><strong>stratum</strong></td>
+<td>Polaris</td>
+</tr>
+<tr>
+<td>MinIO</td>
+<td><strong>cosm</strong></td>
+<td>Polaris</td>
+</tr>
+</tbody>
+</table>
+<h3 id="agents">Agents</h3>
+<table>
+<thead>
+<tr>
+<th>Current File</th>
+<th>Option A Name</th>
+<th>Display Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>router.py</td>
+<td><strong>herald.py</strong></td>
+<td>Herald</td>
+</tr>
+<tr>
+<td>architect_agent.py</td>
+<td><strong>kepler_agent.py</strong></td>
+<td>Kepler</td>
+</tr>
+<tr>
+<td>coordinator.py</td>
+<td><strong>orbital.py</strong></td>
+<td>Orbital</td>
+</tr>
+<tr>
+<td>corrector_agent.py</td>
+<td><strong>rectus_agent.py</strong></td>
+<td>Rectus</td>
+</tr>
+<tr>
+<td>governance.py</td>
+<td><strong>aegis.py</strong></td>
+<td>Aegis</td>
+</tr>
+<tr>
+<td>context_manager.py</td>
+<td><strong>codex.py</strong></td>
+<td>Codex</td>
+</tr>
+<tr>
+<td>buddy_service.py</td>
+<td><strong>aether_service.py</strong></td>
+<td>Aether</td>
+</tr>
+</tbody>
+</table>
+<h3 id="topology-diagram-option-a">Topology Diagram (Option A)</h3>
+<pre class="hljs"><code><div>graph TB
+    subgraph Hive[&quot;🌌 HIVE&quot;]
+        subgraph Helios[&quot;☀️ Helios — Gateway Node&quot;]
+            transit[&quot;Transit\n(Traefik)&quot;]
+            luminary[&quot;Luminary\n(Prometheus)&quot;]
+            observatory[&quot;Observatory\n(Grafana)&quot;]
+            chronicle[&quot;Chronicle\n(Loki)&quot;]
+            relay[&quot;Relay\n(Ollama)&quot;]
+        end
+
+        subgraph Titan[&quot;🪐 Titan — Compute Node&quot;]
+            forge[&quot;Forge\n(Ollama GPU)&quot;]
+            nebula[&quot;Nebula\n(ComfyUI)&quot;]
+            construct[&quot;Construct\n(OpenHands)&quot;]
+        end
+
+        subgraph Polaris[&quot;⭐ Polaris — Control Node&quot;]
+            sextant[&quot;Sextant\n(SPIRE)&quot;]
+            spectra[&quot;Spectra\n(Langfuse)&quot;]
+            vault[&quot;Vault\n(MemPalace)&quot;]
+            stratum[&quot;Stratum\n(PostgreSQL)&quot;]
+            cosm[&quot;Cosm\n(MinIO)&quot;]
+        end
+
+        subgraph Aether[&quot;🌫️ Aether — Voice Node&quot;]
+            buddy[&quot;Aether Service\n(Voice/BMO)&quot;]
+        end
+    end
+
+    subgraph Agents[&quot;🤖 Agent Layer&quot;]
+        herald[&quot;Herald\n(Router)&quot;]
+        kepler[&quot;Kepler\n(Architect)&quot;]
+        orbital[&quot;Orbital\n(Coordinator)&quot;]
+        rectus[&quot;Rectus\n(Corrector)&quot;]
+        aegis[&quot;Aegis\n(Governance)&quot;]
+        codex[&quot;Codex\n(Context Manager)&quot;]
+    end
+
+    transit --&gt; herald
+    herald --&gt; kepler &amp; orbital &amp; aegis
+    orbital --&gt; rectus
+    codex -.-&gt;|session state| herald
+    vault -.-&gt;|memory| codex
+    spectra -.-&gt;|observability| herald
+</div></code></pre>
+<hr>
+<h2 id="option-b--installation-codenames">Option B — Installation Codenames</h2>
+<blockquote>
+<p>Nodes named like classified facilities/installations. Services and agents use role-functional ALLCAPS codenames. Military/tech facility feel.</p>
+</blockquote>
+<h3 id="nodes">Nodes</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option B</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R730</td>
+<td><strong>APEX</strong></td>
+<td>Forward-facing, first contact</td>
+</tr>
+<tr>
+<td>Justin-PC</td>
+<td><strong>FORGE</strong></td>
+<td>Where the work happens</td>
+</tr>
+<tr>
+<td>Wyse 5070</td>
+<td><strong>CITADEL</strong></td>
+<td>Authority, policy, identity</td>
+</tr>
+<tr>
+<td>Pi / BMO</td>
+<td><strong>ECHO</strong></td>
+<td>Signal repeater</td>
+</tr>
+</tbody>
+</table>
+<h3 id="env-vars">Env Vars</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GATEWAY_NODE_IP</code></td>
+<td><code>APEX_IP</code></td>
+</tr>
+<tr>
+<td><code>EXECUTION_NODE_IP</code></td>
+<td><code>FORGE_IP</code></td>
+</tr>
+<tr>
+<td><code>CONTROL_NODE_IP</code></td>
+<td><code>CITADEL_IP</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="services">Services</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>traefik</td>
+<td>GATEWAY</td>
+</tr>
+<tr>
+<td>prometheus</td>
+<td>WATCH</td>
+</tr>
+<tr>
+<td>grafana</td>
+<td>LENS</td>
+</tr>
+<tr>
+<td>loki</td>
+<td>ARCHIVE</td>
+</tr>
+<tr>
+<td>redis</td>
+<td>CACHE</td>
+</tr>
+<tr>
+<td>ComfyUI</td>
+<td>CANVAS</td>
+</tr>
+<tr>
+<td>Ollama (compute)</td>
+<td>ENGINE</td>
+</tr>
+<tr>
+<td>OpenHands</td>
+<td>OPERATOR</td>
+</tr>
+<tr>
+<td>SPIRE</td>
+<td>KEYSTONE</td>
+</tr>
+<tr>
+<td>Langfuse</td>
+<td>TRACE</td>
+</tr>
+<tr>
+<td>MemPalace</td>
+<td>VAULT</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>LEDGER</td>
+</tr>
+<tr>
+<td>MinIO</td>
+<td>DEPOT</td>
+</tr>
+</tbody>
+</table>
+<h3 id="agents">Agents</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>router.py</td>
+<td>ROUTER</td>
+</tr>
+<tr>
+<td>architect_agent.py</td>
+<td>BUILDER</td>
+</tr>
+<tr>
+<td>coordinator.py</td>
+<td>COMMAND</td>
+</tr>
+<tr>
+<td>corrector_agent.py</td>
+<td>PATCH</td>
+</tr>
+<tr>
+<td>governance.py</td>
+<td>SENTINEL</td>
+</tr>
+<tr>
+<td>context_manager.py</td>
+<td>CACHE</td>
+</tr>
+<tr>
+<td>buddy_service.py</td>
+<td>RELAY</td>
+</tr>
+</tbody>
+</table>
+<h3 id="topology-diagram-option-b">Topology Diagram (Option B)</h3>
+<pre class="hljs"><code><div>graph TB
+    subgraph Hive[&quot;🔷 HIVE&quot;]
+        subgraph APEX[&quot;🏢 APEX — Gateway&quot;]
+            GATEWAY[&quot;GATEWAY\n(Traefik)&quot;]
+            WATCH[&quot;WATCH\n(Prometheus)&quot;]
+            LENS[&quot;LENS\n(Grafana)&quot;]
+            ARCHIVE[&quot;ARCHIVE\n(Loki)&quot;]
+        end
+
+        subgraph FORGE_NODE[&quot;⚙️ FORGE — Compute&quot;]
+            ENGINE[&quot;ENGINE\n(Ollama)&quot;]
+            CANVAS[&quot;CANVAS\n(ComfyUI)&quot;]
+            OPERATOR[&quot;OPERATOR\n(OpenHands)&quot;]
+        end
+
+        subgraph CITADEL[&quot;🏛️ CITADEL — Control&quot;]
+            KEYSTONE[&quot;KEYSTONE\n(SPIRE)&quot;]
+            TRACE[&quot;TRACE\n(Langfuse)&quot;]
+            VAULT[&quot;VAULT\n(MemPalace)&quot;]
+            LEDGER[&quot;LEDGER\n(PostgreSQL)&quot;]
+            DEPOT[&quot;DEPOT\n(MinIO)&quot;]
+        end
+
+        subgraph ECHO_NODE[&quot;📡 ECHO — Voice&quot;]
+            RELAY[&quot;RELAY\n(Voice)&quot;]
+        end
+    end
+
+    subgraph Agents[&quot;🤖 Agents&quot;]
+        ROUTER --&gt; BUILDER &amp; COMMAND &amp; SENTINEL
+        COMMAND --&gt; PATCH
+    end
+
+    GATEWAY --&gt; ROUTER
+</div></code></pre>
+<hr>
+<h2 id="option-c--greek--norse-mythology">Option C — Greek / Norse Mythology</h2>
+<blockquote>
+<p>Nodes named after deities matched to function. Rich semantic depth; some names are widely recognized in tech (Hermes, Prometheus already common).</p>
+</blockquote>
+<blockquote>
+<p>⚠️ <strong>Conflict:</strong> Prometheus is already a well-known monitoring tool in the stack — naming a node &quot;Prometheus&quot; would clash with the service name.</p>
+</blockquote>
+<h3 id="nodes">Nodes</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option C</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R730</td>
+<td><strong>Hermes</strong></td>
+<td>Messenger, boundary crosser, guide</td>
+</tr>
+<tr>
+<td>Justin-PC</td>
+<td><strong>Hephaestus</strong> (or <strong>Vulcan</strong>)</td>
+<td>God of the forge — GPU/craft</td>
+</tr>
+<tr>
+<td>Wyse 5070</td>
+<td><strong>Athena</strong></td>
+<td>Wisdom, strategy, governance</td>
+</tr>
+<tr>
+<td>Pi / BMO</td>
+<td><strong>Apollo</strong></td>
+<td>Voice, communication, the arts</td>
+</tr>
+</tbody>
+</table>
+<h3 id="env-vars">Env Vars</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GATEWAY_NODE_IP</code></td>
+<td><code>HERMES_IP</code></td>
+</tr>
+<tr>
+<td><code>EXECUTION_NODE_IP</code></td>
+<td><code>HEPHAESTUS_IP</code></td>
+</tr>
+<tr>
+<td><code>CONTROL_NODE_IP</code></td>
+<td><code>ATHENA_IP</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="services">Services</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>traefik</td>
+<td>charon (ferryman at boundaries)</td>
+</tr>
+<tr>
+<td>prometheus</td>
+<td>argus (hundred-eyed watcher)</td>
+</tr>
+<tr>
+<td>grafana</td>
+<td>iris (rainbow, messenger)</td>
+</tr>
+<tr>
+<td>loki</td>
+<td>mnemosyne (goddess of memory/records)</td>
+</tr>
+<tr>
+<td>redis</td>
+<td>hermes-cache</td>
+</tr>
+<tr>
+<td>ComfyUI</td>
+<td>muse</td>
+</tr>
+<tr>
+<td>Ollama (compute)</td>
+<td>prometheus (fire-giver) ⚠️ clash</td>
+</tr>
+<tr>
+<td>OpenHands</td>
+<td>daedalus</td>
+</tr>
+<tr>
+<td>SPIRE</td>
+<td>janus (two-faced, gatekeeper of identity)</td>
+</tr>
+<tr>
+<td>Langfuse</td>
+<td>oracle</td>
+</tr>
+<tr>
+<td>MemPalace</td>
+<td>lethe / mneme</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>styx (foundational, unchanging)</td>
+</tr>
+<tr>
+<td>MinIO</td>
+<td>aether-store</td>
+</tr>
+</tbody>
+</table>
+<h3 id="agents">Agents</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>router.py</td>
+<td>moirai.py (Fates — route destiny)</td>
+</tr>
+<tr>
+<td>architect_agent.py</td>
+<td>daedalus_agent.py</td>
+</tr>
+<tr>
+<td>coordinator.py</td>
+<td>zeus.py</td>
+</tr>
+<tr>
+<td>corrector_agent.py</td>
+<td>nemesis_agent.py</td>
+</tr>
+<tr>
+<td>governance.py</td>
+<td>themis.py (justice/order)</td>
+</tr>
+<tr>
+<td>context_manager.py</td>
+<td>mnemosyne.py ⚠️ clash with service</td>
+</tr>
+<tr>
+<td>buddy_service.py</td>
+<td>apollo_service.py</td>
+</tr>
+</tbody>
+</table>
+<h3 id="notes--risks">Notes / Risks</h3>
+<ul>
+<li>Multiple name clashes (Prometheus service vs node concept, Mnemosyne service vs agent)</li>
+<li>Long names (Hephaestus) create awkward env vars (<code>HEPHAESTUS_IP</code>)</li>
+<li>Strong recognizability in engineering culture</li>
+<li>Requires a myth glossary for onboarding</li>
+</ul>
+<hr>
+<h2 id="option-d--abstract-tiers-infrastructure-style">Option D — Abstract Tiers (Infrastructure-Style)</h2>
+<blockquote>
+<p>Hierarchical, no mythology. Clean for technical documentation and new team members. No external cultural references to learn.</p>
+</blockquote>
+<h3 id="nodes">Nodes</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option D</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R730</td>
+<td><strong>VANTAGE</strong></td>
+<td>At the boundary, high vantage point</td>
+</tr>
+<tr>
+<td>Justin-PC</td>
+<td><strong>CORE</strong></td>
+<td>Raw compute at center</td>
+</tr>
+<tr>
+<td>Wyse 5070</td>
+<td><strong>LOCUS</strong></td>
+<td>The fixed point of control</td>
+</tr>
+<tr>
+<td>Pi / BMO</td>
+<td><strong>RELAY</strong></td>
+<td>Signal repeater</td>
+</tr>
+</tbody>
+</table>
+<h3 id="env-vars">Env Vars</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option D</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GATEWAY_NODE_IP</code></td>
+<td><code>VANTAGE_IP</code></td>
+</tr>
+<tr>
+<td><code>EXECUTION_NODE_IP</code></td>
+<td><code>CORE_IP</code></td>
+</tr>
+<tr>
+<td><code>CONTROL_NODE_IP</code></td>
+<td><code>LOCUS_IP</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="services">Services</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option D</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>traefik</td>
+<td>edge-proxy</td>
+</tr>
+<tr>
+<td>prometheus</td>
+<td>metrics</td>
+</tr>
+<tr>
+<td>grafana</td>
+<td>dashboards</td>
+</tr>
+<tr>
+<td>loki</td>
+<td>logs</td>
+</tr>
+<tr>
+<td>redis</td>
+<td>cache</td>
+</tr>
+<tr>
+<td>ComfyUI</td>
+<td>image-gen</td>
+</tr>
+<tr>
+<td>Ollama (compute)</td>
+<td>inference</td>
+</tr>
+<tr>
+<td>OpenHands</td>
+<td>workbench</td>
+</tr>
+<tr>
+<td>SPIRE</td>
+<td>identity</td>
+</tr>
+<tr>
+<td>Langfuse</td>
+<td>traces</td>
+</tr>
+<tr>
+<td>MemPalace</td>
+<td>memory</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>db</td>
+</tr>
+<tr>
+<td>MinIO</td>
+<td>storage</td>
+</tr>
+</tbody>
+</table>
+<h3 id="agents">Agents</h3>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Option D</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>router.py</td>
+<td>herald.py</td>
+</tr>
+<tr>
+<td>architect_agent.py</td>
+<td>builder_agent.py</td>
+</tr>
+<tr>
+<td>coordinator.py</td>
+<td>arbiter.py</td>
+</tr>
+<tr>
+<td>corrector_agent.py</td>
+<td>corrector_agent.py (unchanged)</td>
+</tr>
+<tr>
+<td>governance.py</td>
+<td>guardian.py</td>
+</tr>
+<tr>
+<td>context_manager.py</td>
+<td>context_manager.py (unchanged)</td>
+</tr>
+<tr>
+<td>buddy_service.py</td>
+<td>voice_service.py</td>
+</tr>
+</tbody>
+</table>
+<h3 id="notes">Notes</h3>
+<ul>
+<li>Most approachable for new engineers — self-documenting names</li>
+<li>Less memorable / distinguishable (CORE, LOCUS are generic)</li>
+<li>Service names risk clashing with k8s/cloud naming conventions</li>
+<li>Weakest team identity / brand feel</li>
+</ul>
+<hr>
+<h2 id="comparison-matrix">Comparison Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Criterion</th>
+<th style="text-align:center">A — Celestial</th>
+<th style="text-align:center">B — Codenames</th>
+<th style="text-align:center">C — Mythology</th>
+<th style="text-align:center">D — Abstract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Memorability</td>
+<td style="text-align:center">⭐⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐</td>
+</tr>
+<tr>
+<td>Functional clarity</td>
+<td style="text-align:center">⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td>Onboarding ease</td>
+<td style="text-align:center">⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td>Brand identity</td>
+<td style="text-align:center">⭐⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐</td>
+</tr>
+<tr>
+<td>Name clashes (fewer = better)</td>
+<td style="text-align:center">⭐⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐</td>
+</tr>
+<tr>
+<td>Env var ergonomics</td>
+<td style="text-align:center">⭐⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐</td>
+<td style="text-align:center">⭐⭐</td>
+<td style="text-align:center">⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td>Implementation risk</td>
+<td style="text-align:center">Low</td>
+<td style="text-align:center">Low</td>
+<td style="text-align:center">High</td>
+<td style="text-align:center">Low</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="implementation-impact-all-options">Implementation Impact (All Options)</h2>
+<p>Regardless of which option is chosen, the following files require changes:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Files</th>
+<th>Estimated Changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Core config</td>
+<td><code>network.env</code>, <code>agents/config.py</code>, <code>docs-site/mkdocs.yml</code></td>
+<td>~40</td>
+</tr>
+<tr>
+<td>Docker Compose</td>
+<td><code>turing_gateway/</code>, <code>execution_plane/</code>, <code>control_plane/</code></td>
+<td>~80</td>
+</tr>
+<tr>
+<td>Prometheus</td>
+<td><code>config/prometheus/prometheus.yml</code></td>
+<td>~15</td>
+</tr>
+<tr>
+<td>Agent files</td>
+<td>7 Python files renamed + all imports updated</td>
+<td>~60</td>
+</tr>
+<tr>
+<td>Agent code</td>
+<td><code>agents/main.py</code>, inference, grpc, mempalace</td>
+<td>~70</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td><code>docs-site/docs/</code>, <code>topology.md</code>, <code>port_map.md</code>, <code>README.md</code></td>
+<td>~200</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>~85–100 files</strong></td>
+<td><strong>~400–500 replacements</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>✅ <code>turing_gateway/</code> — directory renamed from <code>r730_gateway/</code> (April 20, 2026).</p>
+</blockquote>
+<hr>
+<p><em>Generated: April 20, 2026 — Hive v3.4</em></p>
+
+</body>
+
+</html>

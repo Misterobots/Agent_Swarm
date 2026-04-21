@@ -69,3 +69,5 @@ delivered_artifacts/
 ## Related
 
 - [User Guide: 3D Generation](../user-guide/3d-generation.md) — user-facing guide
+
+

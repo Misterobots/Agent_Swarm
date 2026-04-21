@@ -1,4 +1,4 @@
-"""
+﻿"""
 Centralized Network Configuration for the Agentic Hive.
 
 All IP addresses and derived connection strings are loaded from
@@ -6,7 +6,7 @@ the project-root `network.env` file. This module is the ONLY place
 Python agents should read network topology from.
 
 Usage:
-    from config import CONTROL_NODE_IP, AGNO_DB_URL, LANGFUSE_HOST
+    from config import HOPPER_IP, AGNO_DB_URL, LANGFUSE_HOST
 """
 
 import os
@@ -45,26 +45,26 @@ _load_network_env()
 # Node IPs
 # ---------------------------------------------------------------------------
 HOME_ASSISTANT_IP = os.getenv("HOME_ASSISTANT_IP", "192.168.2.100")
-EXECUTION_NODE_IP  = os.getenv("EXECUTION_NODE_IP", os.getenv("JUSTIN_PC_IP", "192.168.2.101"))
-CONTROL_NODE_IP    = os.getenv("CONTROL_NODE_IP",    "192.168.2.102")
-GATEWAY_NODE_IP    = os.getenv("GATEWAY_NODE_IP",  os.getenv("R730_IP", "192.168.2.103"))
+LOVELACE_IP  = os.getenv("LOVELACE_IP", os.getenv("LOVELACE_IP", "192.168.2.101"))
+HOPPER_IP    = os.getenv("HOPPER_IP",    "192.168.2.102")
+TURING_IP    = os.getenv("TURING_IP",  os.getenv("TURING_IP", "192.168.2.103"))
 IDRAC_IP           = os.getenv("IDRAC_IP",           "192.168.2.104")
 
 # ---------------------------------------------------------------------------
 # Derived Connection Strings
 # ---------------------------------------------------------------------------
-AGNO_DB_URL          = os.getenv("AGNO_DB_URL",          f"postgresql://agno:agno_password@{CONTROL_NODE_IP}:5432/agno_memory")
-LANGFUSE_HOST        = os.getenv("LANGFUSE_HOST",        f"http://{CONTROL_NODE_IP}:3000")
-MEMPALACE_URL        = os.getenv("MEMPALACE_URL",        f"http://{CONTROL_NODE_IP}:8200")
+AGNO_DB_URL          = os.getenv("AGNO_DB_URL",          f"postgresql://agno:agno_password@{HOPPER_IP}:5432/agno_memory")
+LANGFUSE_HOST        = os.getenv("LANGFUSE_HOST",        f"http://{HOPPER_IP}:3000")
+MEMPALACE_URL        = os.getenv("MEMPALACE_URL",        f"http://{HOPPER_IP}:8200")
 HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTANT_IP}:8123")
-SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{GATEWAY_NODE_IP}:11434")
+SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{TURING_IP}:11434")
 OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
 # ---------------------------------------------------------------------------
 # Model Consolidation (TTFT Optimization)
 # Primary model: qwen3:14b — handles code, conversation, coordination,
 # research, documentation. Pinned in VRAM (keep_alive=-1) on GPU 0.
 # BMO voice: qwen2.5:3b — lightweight, on-demand.
-# Safety: llama-guard-3:8b — async on R730.
+# Safety: llama-guard-3:8b — async on Turing.
 # Vision: moondream — on-demand.
 # ---------------------------------------------------------------------------
 PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "qwen3:14b")
@@ -76,7 +76,7 @@ LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
 # ---------------------------------------------------------------------------
 # ExpertiseTemplate Database (swarm schema in langfuse DB)
 # ---------------------------------------------------------------------------
-TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse@{CONTROL_NODE_IP}:5432/langfuse")
+TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse@{HOPPER_IP}:5432/langfuse")
 
 # ---------------------------------------------------------------------------
 # Training Pipeline Configuration
@@ -116,7 +116,7 @@ ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6-20250514")
 MCP_BRIDGE_ENABLED = os.getenv("MCP_BRIDGE_ENABLED", "false")
 MCP_SERVER_NAME    = os.getenv("MCP_SERVER_NAME", "home-ai-lab")
-MCP_BASE_URL       = os.getenv("MCP_BASE_URL", f"http://{CONTROL_NODE_IP}:8000")
+MCP_BASE_URL       = os.getenv("MCP_BASE_URL", f"http://{HOPPER_IP}:8000")
 
 # ---------------------------------------------------------------------------
 # Skills & Tools Configuration (Phase 4)
@@ -152,7 +152,7 @@ WORKFLOW_STATE_DIR     = os.getenv("WORKFLOW_STATE_DIR", "/workspace/workflow_st
 # ---------------------------------------------------------------------------
 # OpenClaude gRPC Configuration (Phase 6)
 # ---------------------------------------------------------------------------
-GRPC_SERVER_HOST       = os.getenv("GRPC_SERVER_HOST", GATEWAY_NODE_IP)
+GRPC_SERVER_HOST       = os.getenv("GRPC_SERVER_HOST", TURING_IP)
 GRPC_SERVER_PORT       = int(os.getenv("GRPC_SERVER_PORT", "50051"))
 GRPC_GATEWAY_ENABLED   = os.getenv("GRPC_GATEWAY_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
 GRPC_TIMEOUT           = int(os.getenv("GRPC_TIMEOUT", "120"))

@@ -59,3 +59,5 @@ IoT commands are gated by JWT-ACE tokens with `level: L5`. Only requests classif
 
 - [User Guide: IoT Control](../user-guide/iot-control.md) — user-facing guide
 - [Module: Tools: Home Assistant](tools/home-assistant.md) — tool details
+
+

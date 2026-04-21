@@ -1,18 +1,18 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Test extraction with a longer, more realistic conversation."""
 import json, urllib.request
 
 BASE = "http://localhost:8200"
 
 conversation = (
-    "User: I've been working on setting up my home lab with a Dell R730 server "
+    "User: I've been working on setting up my home lab with a Dell Turing server "
     "running Ubuntu. I use Docker Compose for orchestration and Traefik as my "
     "reverse proxy with Authentik for SSO.\n"
-    "Assistant: That sounds like a solid setup! The R730 is a great workhorse "
+    "Assistant: That sounds like a solid setup! The Turing is a great workhorse "
     "server. Using Traefik with Authentik gives you a nice balance of ease of "
     "configuration and strong authentication.\n"
-    "User: Yeah, I also have three machines - Justin-PC as the execution node "
-    "running Ollama with GPU, a control plane node, and the R730 as the gateway. "
+    "User: Yeah, I also have three machines - Lovelace as the execution node "
+    "running Ollama with GPU, a control plane node, and the Turing as the gateway. "
     "My favorite programming language is Python but I also enjoy Rust for "
     "embedded work.\n"
     "Assistant: Having dedicated nodes for different roles is excellent for "
@@ -54,3 +54,4 @@ with urllib.request.urlopen(req2, timeout=10) as resp:
             print(f"    Hall: {h['name']}")
             for r in h.get("rooms", []):
                 print(f"      Room: {r['name']} ({r['drawer_count']} drawers)")
+

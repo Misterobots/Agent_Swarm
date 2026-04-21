@@ -150,3 +150,5 @@ Templates support:
 - [Module: Router](../modules/router.md) — implementation reference
 - [Module: Coordinator](../modules/coordinator.md) — orchestration details
 - [Developer Guide: Adding Agents](../developer-guide/adding-agents.md) — create new agents
+
+

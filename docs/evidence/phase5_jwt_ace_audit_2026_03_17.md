@@ -1,4 +1,4 @@
-# Phase 5 Audit: JWT-ACE Architecture & ExpertiseTemplate System
+﻿# Phase 5 Audit: JWT-ACE Architecture & ExpertiseTemplate System
 
 **Date**: 2026-03-17
 **Auditor**: Home AI Lab Governance Automation
@@ -119,7 +119,7 @@ SELECT id, name, intent, security_level FROM swarm.expertise_templates;
 ## Open Items Post-Phase 5
 
 1. Langfuse template performance dashboard (not yet created)
-2. R730 SPIRE enrollment (still pending from Phase 4)
+2. Turing SPIRE enrollment (still pending from Phase 4)
 3. Smoke test via actual user request through Open-WebUI (manual verification pending)
 4. Template auto-versioning not yet triggered (requires accumulated performance data)
 

@@ -1,4 +1,4 @@
----
+﻿---
 title: Overview
 ---
 
@@ -36,15 +36,15 @@ The system runs across three nodes:
 
 | Node | Machine | IP | Role |
 |------|---------|-----|------|
-| **Control Plane** | Dell Wyse 5070 | {{ control_node_ip }} | Identity (SPIRE), databases (PostgreSQL, ClickHouse), observability (Langfuse), memory (MemPalace) |
-| **Execution Plane** | Justin-PC (RTX 5060 Ti 16GB) | {{ execution_node_ip }} | GPU inference (Ollama), Agent Runtime (FastAPI), ComfyUI, Voice Engine, OpenHands |
-| **Gateway** | Dell PowerEdge R730 (RTX 3070 Ti 8GB) | {{ gateway_node_ip }} | Reverse proxy (Traefik), monitoring (Prometheus, Grafana, Loki), secondary inference |
+| **Control Plane** | Hopper | {{ hopper_ip }} | Identity (SPIRE), databases (PostgreSQL, ClickHouse), observability (Langfuse), memory (MemPalace) |
+| **Execution Plane** | Lovelace (RTX 5060 Ti 16GB) | {{ lovelace_ip }} | GPU inference (Ollama), Agent Runtime (FastAPI), ComfyUI, Voice Engine, OpenHands |
+| **Gateway** | Dell PowerEdge Turing (RTX 3070 Ti 8GB) | {{ turing_ip }} | Reverse proxy (Traefik), monitoring (jacquard, hollerith, knuth), secondary inference |
 
 ```mermaid
 graph LR
     User([User]) --> Gateway
-    Gateway[Gateway · R730] -->|/swarm/*| Execution[Execution · Justin-PC]
-    Execution -->|identity| Control[Control · Wyse 5070]
+    Gateway[Gateway · Turing] -->|/swarm/*| Execution[Execution · Lovelace]
+    Execution -->|identity| Control[Control · Hopper]
     Execution -->|traces| Control
     Execution -->|memory| Control
     Gateway -->|metrics| Gateway
@@ -62,3 +62,5 @@ graph LR
 - [Quickstart for Users](quickstart-user.md) — start using the system now
 - [Core Concepts](concepts.md) — understand the key mental models
 - [Architecture Deep-Dive](../architecture/index.md) — full technical details
+
+

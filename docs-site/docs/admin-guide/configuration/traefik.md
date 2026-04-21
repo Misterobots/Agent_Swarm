@@ -1,14 +1,14 @@
----
+﻿---
 title: Traefik Configuration
 ---
 
 # Traefik Configuration
 
-Traefik serves as the reverse proxy and API gateway on the Gateway node (R730).
+Traefik serves as the reverse proxy and API gateway on the Gateway node (Turing).
 
 ## Configuration File
 
-Location: `r730_gateway/config/traefik/traefik.yml`
+Location: `turing_gateway/config/traefik/traefik.yml`
 
 ### Entry Points
 
@@ -22,7 +22,7 @@ entryPoints:
 
 ### Dashboard
 
-The Traefik dashboard is available at `http://{{ gateway_node_ip }}:8080` for route inspection and debugging.
+The Traefik dashboard is available at `http://{{ turing_ip }}:8080` for route inspection and debugging.
 
 ```yaml
 api:
@@ -77,8 +77,8 @@ labels:
 | swarm | `PathPrefix(/swarm)` | agent-runtime:{{ agent_runtime_port }} | strip `/swarm` |
 | comfyui | `PathPrefix(/comfyui)` | comfyui:8188 | strip `/comfyui` |
 | docs | `PathPrefix(/docs)` | docs-site:80 | strip `/docs` |
-| grafana | `PathPrefix(/grafana)` | grafana:3001 | — |
-| prometheus | `PathPrefix(/prometheus)` | prometheus:9091 | — |
+| hollerith | `PathPrefix(/hollerith)` | hollerith:3001 | — |
+| jacquard | `PathPrefix(/jacquard)` | jacquard:9091 | — |
 
 ## Middleware
 
@@ -121,3 +121,5 @@ certificatesResolvers:
 - [Admin: Networking](../deployment/networking.md) — network topology
 - [Reference: Port Map](../port-map.md) — all ports
 - [Troubleshooting: Network](../../troubleshooting/network.md) — routing issues
+
+

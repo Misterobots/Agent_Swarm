@@ -63,3 +63,5 @@ The agent generates a structured document you can copy or save.
 
 - [User Guide: Research Mode](../user-guide/research-mode.md) — full reference
 - [Modules: Search Tool](../modules/tools/search.md) — how search works
+
+

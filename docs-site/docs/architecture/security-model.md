@@ -1,4 +1,4 @@
----
+﻿---
 title: Security Model
 ---
 
@@ -13,7 +13,7 @@ graph TB
     subgraph Identity["Layer 1: Workload Identity"]
         SPIRE[SPIRE Server]
         SA1[SPIRE Agent · Execution]
-        SA2[SPIRE Agent · R730]
+        SA2[SPIRE Agent · Turing]
         SPIRE -->|X.509 SVID| SA1
         SPIRE -->|X.509 SVID| SA2
     end
@@ -59,14 +59,14 @@ spiffe://home-ai-lab
 | Workload | SPIFFE ID |
 |----------|-----------|
 | Execution Node | `spiffe://home-ai-lab/execution-node` |
-| Gateway Node | `spiffe://home-ai-lab/r730-gateway` |
+| Gateway Node | `spiffe://home-ai-lab/Turing-gateway` |
 | Agent Runtime | `spiffe://home-ai-lab/agent-runtime` |
 
 ### Configuration
 
 - SPIRE Server: `control_plane/config/spire/server.conf`
 - SPIRE Agent (Execution): `execution_plane/config/spire/agent.conf`
-- SPIRE Agent (Gateway): `r730_gateway/config/spire/agent.conf`
+- SPIRE Agent (Gateway): `turing_gateway/config/spire/agent.conf`
 - Key Manager: `disk` (keys persist across restarts)
 
 !!! warning "Join Tokens"
@@ -129,7 +129,7 @@ The MAESTRO framework defines 7 security layers. Agent Swarm is 98% compliant.
 | **L4** | Input Validation | ✅ Complete — schema validation on all endpoints |
 | **L5** | Output Validation | ✅ Complete — MarsRL 3-layer verifier |
 | **L6** | Active Defense | ✅ Complete — security agent, command blocklist |
-| **L7** | Monitoring | ✅ Complete — Langfuse traces, Prometheus alerts |
+| **L7** | Monitoring | ✅ Complete — Langfuse traces, jacquard alerts |
 
 ## Authorization Middleware
 
@@ -159,7 +159,7 @@ All security-relevant events are logged:
 - Security agent blocks
 - SPIFFE attestation events
 
-Logs flow to Loki for aggregation and Langfuse for trace correlation.
+Logs flow to knuth for aggregation and Langfuse for trace correlation.
 
 ## Key Files
 
@@ -180,3 +180,5 @@ Logs flow to Loki for aggregation and Langfuse for trace correlation.
 - [Procedure: Rotate SPIRE Keys](../procedures/rotate-spire-keys.md) — key rotation runbook
 - [Decision: ADR-001 JWT Profiles](decisions/adr-001-jwt-profiles.md)
 - [Troubleshooting: SPIRE](../troubleshooting/spire.md)
+
+

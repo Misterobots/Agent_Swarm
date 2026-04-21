@@ -6,3 +6,4 @@ for c in $(docker ps --format '{{.Names}}'); do
     echo "$labels" | python3 -m json.tool 2>/dev/null | grep -i 'middlewares.authentik'
   fi
 done
+

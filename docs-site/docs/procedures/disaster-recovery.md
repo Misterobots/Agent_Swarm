@@ -64,3 +64,5 @@ Run the full [Post-Deployment Verification](../admin-guide/deployment/post-deplo
 | SPIRE attestation | 5 min |
 | Verification | 10 min |
 | **Total** | **~75 min** |
+
+

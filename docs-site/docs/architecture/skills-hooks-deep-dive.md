@@ -1,4 +1,4 @@
----
+﻿---
 title: "Skills & Hooks Pipeline Deep Dive"
 ---
 
@@ -35,8 +35,10 @@ Describe how skill execution and hook processing are orchestrated with policy co
 ## Evidence
 - `agents/tools/iot_ops.py`
 - `agents/metrics.py`
-- `r730_gateway/config/prometheus/auth_alert_rules.yml`
+- `turing_gateway/config/jacquard/auth_alert_rules.yml`
 - `tests/test_iot_controls.py`
 
 ## Open Follow-Ups
 - Extend hook evidence retention and dashboarding for long-window audit analytics.
+
+

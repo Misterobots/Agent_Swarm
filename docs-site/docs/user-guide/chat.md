@@ -1,4 +1,4 @@
----
+﻿---
 title: Chat
 ---
 
@@ -10,7 +10,7 @@ The primary interface for interacting with Agent Swarm. Every message goes throu
 
 - **UI**: Navigate to **Chat** in the Hive Mind sidebar
 - **API**: `POST /v1/chat/completions` (OpenAI-compatible)
-- **URL**: `http://{{ gateway_node_ip }}/swarm/v1/chat/completions`
+- **URL**: `http://{{ turing_ip }}/swarm/v1/chat/completions`
 
 ## Quick Example
 
@@ -23,7 +23,7 @@ The primary interface for interacting with Agent Swarm. Every message goes throu
 === "API (cURL)"
 
     ```bash
-    curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+    curl -X POST http://{{ turing_ip }}/swarm/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
         "messages": [
@@ -40,7 +40,7 @@ The primary interface for interacting with Agent Swarm. Every message goes throu
     import requests
 
     response = requests.post(
-        "http://{{ gateway_node_ip }}/swarm/v1/chat/completions",
+        "http://{{ turing_ip }}/swarm/v1/chat/completions",
         json={
             "messages": [{"role": "user", "content": "Write a Python merge sort"}],
             "model": "default",
@@ -127,3 +127,5 @@ The actual model used depends on the classified intent and the ExpertiseTemplate
 - [API Reference: Chat Completions](../developer-guide/api/chat-completions.md) — full API docs
 - [Troubleshooting: Common Errors](../troubleshooting/agent-runtime.md)
 - [Tutorial: Your First Chat](../tutorials/first-chat.md)
+
+

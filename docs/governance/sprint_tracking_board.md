@@ -1,4 +1,4 @@
-# Sprint Tracking Board (Week 1-12)
+﻿# Sprint Tracking Board (Week 1-12)
 
 Document ID: DOC-GOV-005
 Domain: Governance
@@ -172,9 +172,9 @@ Execution Notes:
 - GAP-001 hardening extension: explicit workload-vs-user token profile mismatch rejection implemented in middleware for User/Admin/Internal endpoint classes.
 - Post-validation hardening: replaced deprecated `datetime.utcnow()` in authorization middleware and token issuance, strengthened test HMAC secret length, and re-ran expanded tests (`7 passed`).
 - GAP-001 validator split: middleware now dispatches to explicit user-token and workload-token validators in `agents/security/token_issuer.py`; combined auth suite passed (`25 passed`).
-- GAP-002 operationalization: added `docs/security/key_compromise_incident_checklist.md`, wired Prometheus auth/key-compromise alert rules via `r730_gateway/config/prometheus/auth_alert_rules.yml`, and linked runbook/checklist into docs index and docs API allowlist.
+- GAP-002 operationalization: added `docs/security/key_compromise_incident_checklist.md`, wired Prometheus auth/key-compromise alert rules via `turing_gateway/config/prometheus/auth_alert_rules.yml`, and linked runbook/checklist into docs index and docs API allowlist.
 - GAP-002 verification: remote docs API checks returned HTTP 200 for `security/key-compromise-runbook` and `security/key-compromise-checklist` on `192.168.2.103:3000` and 404 on host default port 80.
-- GAP-002 config validation: containerized `promtool` confirmed `r730_gateway/config/prometheus/prometheus.yml` is valid and `auth_alert_rules.yml` contains 4 syntactically valid rules.
+- GAP-002 config validation: containerized `promtool` confirmed `turing_gateway/config/prometheus/prometheus.yml` is valid and `auth_alert_rules.yml` contains 4 syntactically valid rules.
 - GAP-003 source inspection: confirmed `context_manager.py` is keyed by `session_id`, `memory_system.py` persists a shared `skills_memory.json`, `preferences.py` is user-aware only at the object layer, and `router.py` propagates `session_id` but does not expose a generalized user-scoped hook execution bus in the inspected path.
 - GAP-003 remediation: owner-aware storage was added to `context_manager.py` and session-summary recall in `memory_system.py`, then threaded through `router.py` and `main.py` using an `owner_id` resolved from payload or authenticated request state.
 - GAP-003 validation: `c:/python314/python.exe -m pytest -q tests/test_cross_user_isolation.py tests/test_iot_controls.py tests/test_authorization_middleware.py` completed with `19 passed` in `0.96s` pytest runtime (`2057ms` wall-clock including process startup).
@@ -189,7 +189,7 @@ Execution Notes:
 - GAP-004 framework prep continuation: structured `[IoT-AUDIT]` logs added for sensitive-action attempts, confirmation state, execution, and errors in `agents/tools/iot_ops.py`; tests now include audit-log assertion coverage.
 - GAP-004 monitoring continuation: Prometheus counters added for sensitive IoT actions in `agents/metrics.py`, wired via `iot_ops.py`, and covered by test assertions for blocked-action counter increments.
 - GAP-004 extended validation: `c:/python314/python.exe -m pytest -q tests/test_iot_controls.py tests/test_cross_user_isolation.py tests/test_authorization_middleware.py tests/test_jwt_lifecycle.py` completed with `41 passed` in `1.21s` pytest runtime (`2444ms` wall-clock).
-- GAP-004 alert validation: containerized `promtool` check on `r730_gateway/config/prometheus/auth_alert_rules.yml` succeeded with `6 rules found` after adding IoT-sensitive action alert rules.
+- GAP-004 alert validation: containerized `promtool` check on `turing_gateway/config/prometheus/auth_alert_rules.yml` succeeded with `6 rules found` after adding IoT-sensitive action alert rules.
 
 ---
 

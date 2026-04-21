@@ -1,4 +1,4 @@
----
+﻿---
 title: Voice
 ---
 
@@ -36,7 +36,7 @@ The system:
 ### Voice API
 
 ```bash
-curl -X POST http://{{ gateway_node_ip }}/swarm/v1/voice/chat \
+curl -X POST http://{{ turing_ip }}/swarm/v1/voice/chat \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "Tell me about space"}]}'
 ```
@@ -55,7 +55,7 @@ Response includes both text and an audio file path:
 Pre-recorded BMO voice samples are available at:
 
 ```
-http://{{ execution_node_ip }}:{{ agent_runtime_port }}/voice_samples/{filename}
+http://{{ lovelace_ip }}:{{ agent_runtime_port }}/voice_samples/{filename}
 ```
 
 ### Satellite Devices
@@ -76,3 +76,5 @@ Raspberry Pi voice satellites can connect to the system. See `scripts/voice_sate
 - [Module: Voice Engine](../modules/voice-agent.md) — Qwen3-TTS service
 - [Tutorial: Voice Interaction](../tutorials/voice-assistant.md) — guided walkthrough
 - [Troubleshooting: Voice](../troubleshooting/voice.md)
+
+

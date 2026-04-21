@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import os
 import time
 import logging
@@ -7,7 +7,7 @@ from typing import Dict, Any
 # Ensure agent modules are importable
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../agents")))
 
-from router import chat_swarm
+from church import chat_swarm
 from registry import registry
 from logger_setup import setup_logger
 

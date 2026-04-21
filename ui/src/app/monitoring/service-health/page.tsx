@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   CheckCircle2,
@@ -137,7 +137,7 @@ export default function ServiceHealthPage() {
     return acc;
   }, {});
 
-  const nodeOrder = ["R730", "Control Node", "Justin-PC"];
+  const nodeOrder = ["Turing", "Control Node", "Lovelace"];
   const sortedNodes = nodeOrder.filter((n) => byNode[n]);
 
   return (

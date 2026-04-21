@@ -1,4 +1,4 @@
----
+﻿---
 title: Post-Deployment Verification
 ---
 
@@ -20,11 +20,11 @@ Ensure all three nodes are deployed:
 
 ```bash
 # From Gateway, verify execution node
-curl -s http://{{ execution_node_ip }}:{{ agent_runtime_port }}/ | jq .
+curl -s http://{{ lovelace_ip }}:{{ agent_runtime_port }}/ | jq .
 
 # From Execution, verify control plane
-curl -s http://{{ control_node_ip }}:3000/api/public/health | jq .
-curl -s http://{{ control_node_ip }}:8200/health
+curl -s http://{{ hopper_ip }}:3000/api/public/health | jq .
+curl -s http://{{ hopper_ip }}:8200/health
 ```
 
 ### 2. SPIRE Identity Chain
@@ -40,7 +40,7 @@ docker compose exec spire-agent \
 ### 3. Model Availability
 
 ```bash
-curl -s http://{{ execution_node_ip }}:{{ ollama_port }}/api/tags | \
+curl -s http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags | \
     python -c "import sys,json; [print(m['name']) for m in json.load(sys.stdin)['models']]"
 ```
 
@@ -54,7 +54,7 @@ Expected models:
 ### 4. First Chat Request
 
 ```bash
-curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+curl -X POST http://{{ turing_ip }}/swarm/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
         "messages": [{"role": "user", "content": "Hello, are you working?"}],
@@ -67,7 +67,7 @@ Expected: A response with `"intent": "CONVERSATION"` and a friendly answer.
 ### 5. Image Generation
 
 ```bash
-curl -X POST http://{{ gateway_node_ip }}/swarm/v1/chat/completions \
+curl -X POST http://{{ turing_ip }}/swarm/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
         "messages": [{"role": "user", "content": "Generate an image of a sunset"}],
@@ -81,18 +81,18 @@ Check that ComfyUI executes and an image path is returned.
 
 | Check | URL | Expected |
 |-------|-----|----------|
-| Grafana | `http://{{ gateway_node_ip }}:3001` | Login page |
-| Prometheus | `http://{{ gateway_node_ip }}:9091/targets` | All targets UP |
-| Langfuse | `http://{{ control_node_ip }}:3000` | Traces from step 4 |
+| hollerith | `http://{{ turing_ip }}:3001` | Login page |
+| jacquard | `http://{{ turing_ip }}:9091/targets` | All targets UP |
+| Langfuse | `http://{{ hopper_ip }}:3000` | Traces from step 4 |
 
 ### 7. Traefik Routes
 
 ```bash
-curl -s http://{{ gateway_node_ip }}:8080/api/http/routers | \
+curl -s http://{{ turing_ip }}:8080/api/http/routers | \
     python -c "import sys,json; [print(r['rule']) for r in json.load(sys.stdin)]"
 ```
 
-Should list PathPrefix rules for `/swarm`, `/comfyui`, `/docs`, `/grafana`.
+Should list PathPrefix rules for `/swarm`, `/comfyui`, `/docs`, `/hollerith`.
 
 ## Common First-Run Issues
 
@@ -102,13 +102,15 @@ Should list PathPrefix rules for `/swarm`, `/comfyui`, `/docs`, `/grafana`.
 | Empty model list | Models not pulled | Run `ollama pull` for each model |
 | Langfuse "connection refused" | ClickHouse not ready | Wait 30s, restart Langfuse |
 | SPIRE attestation failure | Expired join token | Generate new token from Control Plane |
-| Prometheus target down | Wrong IP in prometheus.yml | Update scrape config IPs |
+| jacquard target down | Wrong IP in jacquard.yml | Update scrape config IPs |
 
 ## What's Next
 
 Once verification passes:
 
-1. Import Grafana dashboards (see [Monitoring](../operations/monitoring.md))
+1. Import hollerith dashboards (see [Monitoring](../operations/monitoring.md))
 2. Review alert rules (see [Operations: Alerts](../operations/monitoring.md#alerts))
 3. Set up backup schedule (see [Backup & Restore](../operations/backup-restore.md))
 4. Onboard users (see [Getting Started: User Quickstart](../../getting-started/quickstart-user.md))
+
+

@@ -10,3 +10,5 @@ providers:
     allowUiUpdates: true
     options:
       path: /etc/grafana/dashboards
+
+

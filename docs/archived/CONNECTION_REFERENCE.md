@@ -1,4 +1,4 @@
-# Agentic Hive: Connection Reference Guide
+﻿# Agentic Hive: Connection Reference Guide
 
 > **All IP addresses are managed in [`network.env`](../network.env) — edit that single file when IPs change.**
 
@@ -8,46 +8,46 @@ This document serves as the living reference for all User Interfaces and backend
 
 ## 🌐 Network Topology
 
-**Architecture Overview**: R730 serves as the **Gateway/Ops layer** with centralized routing, while Justin-PC focuses on **GPU-intensive inference and generation**.
+**Architecture Overview**: Turing serves as the **Gateway/Ops layer** with centralized routing, while Lovelace focuses on **GPU-intensive inference and generation**.
 
 | Node           | IP Address      | Role                                    |
 | :------------- | :-------------- | :-------------------------------------- |
 | Home Assistant | `192.168.2.100` | Smart Home Hub                          |
-| Justin-PC      | `192.168.2.101` | Compute Node (Inference + ComfyUI + Training) |
+| Lovelace      | `192.168.2.101` | Compute Node (Inference + ComfyUI + Training) |
 | Control-Node   | `192.168.2.102` | Control Plane (SPIRE, Langfuse, DB)     |
-| **R730**       | `192.168.2.103` | **Gateway/Ops Hub** (Traefik, Monitoring) |
-| iDRAC          | `192.168.2.104` | R730 Remote Management                  |
+| **Turing**       | `192.168.2.103` | **Gateway/Ops Hub** (Traefik, Monitoring) |
+| iDRAC          | `192.168.2.104` | Turing Remote Management                  |
 
 ---
 
 ## 🖥️ User Interfaces (Web UIs)
 
-**Primary Entry Point**: All UIs accessible via **R730 Traefik Gateway** @ `http://192.168.2.103`
+**Primary Entry Point**: All UIs accessible via **Turing Traefik Gateway** @ `http://192.168.2.103`
 
 | Interface                | URL                         | Hosted On    | Purpose                                                           |
 | :----------------------- | :-------------------------- | :----------- | :---------------------------------------------------------------- |
-| **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell R730    | Central reverse proxy (primary entry point for all services)       |
-| **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell R730    | Primary chat interface to interact with the Swarm.                |
-| **Grafana / Ops Portal** | `http://192.168.2.103:3001` | Dell R730    | Real-time Docker logs, GPU metrics, training pipeline, template scores. |
-| **Prometheus Metrics**   | `http://192.168.2.103:9091` | Dell R730    | Time-series metrics database + query interface.                   |
-| **Loki Logs API**        | `http://192.168.2.103:3100` | Dell R730    | Log aggregation backend (data source for Grafana).                |
-| **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell R730    | Live routing and load balancer metrics.                           |
+| **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell Turing    | Central reverse proxy (primary entry point for all services)       |
+| **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell Turing    | Primary chat interface to interact with the Swarm.                |
+| **Grafana / Ops Portal** | `http://192.168.2.103:3001` | Dell Turing    | Real-time Docker logs, GPU metrics, training pipeline, template scores. |
+| **Prometheus Metrics**   | `http://192.168.2.103:9091` | Dell Turing    | Time-series metrics database + query interface.                   |
+| **Loki Logs API**        | `http://192.168.2.103:3100` | Dell Turing    | Log aggregation backend (data source for Grafana).                |
+| **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell Turing    | Live routing and load balancer metrics.                           |
 | **Langfuse Dashboard**   | `http://192.168.2.102:3000` | Control-Node | Live tracking of LLM traces, MarsRL Process Rewards, token usage. |
-| **OpenHands Sandbox**    | `http://192.168.2.103:3002` | Dell R730    | Secure code execution sandbox (migrated from Justin-PC).          |
-| **ComfyUI**              | `http://192.168.2.103/comfy` | R730→Justin-PC | Node-based GUI for 3D/Image Generation (routed via Traefik).     |
-| **Authentik SSO**        | `http://192.168.2.103:9000` | Dell R730    | Single Sign-On identity provider.                                 |
-| **VS Code (DevOps)**     | `http://192.168.2.103:8445` | Dell R730    | Full workspace IDE (port remapped from 8443).                     |
-| **VS Code (Coding)**     | `http://192.168.2.103:8444` | Dell R730    | Restricted sandbox IDE.                                           |
+| **OpenHands Sandbox**    | `http://192.168.2.103:3002` | Dell Turing    | Secure code execution sandbox (migrated from Lovelace).          |
+| **ComfyUI**              | `http://192.168.2.103/comfy` | Turing→Lovelace | Node-based GUI for 3D/Image Generation (routed via Traefik).     |
+| **Authentik SSO**        | `http://192.168.2.103:9000` | Dell Turing    | Single Sign-On identity provider.                                 |
+| **VS Code (DevOps)**     | `http://192.168.2.103:8445` | Dell Turing    | Full workspace IDE (port remapped from 8443).                     |
+| **VS Code (Coding)**     | `http://192.168.2.103:8444` | Dell Turing    | Restricted sandbox IDE.                                           |
 
 ---
 
 ## ⚙️ API Endpoints
 
-### 1. The Swarm Engine (via R730 Traefik Gateway)
+### 1. The Swarm Engine (via Turing Traefik Gateway)
 
-**Primary Entrypoint**: All requests route through R730 Traefik to Justin-PC backend
+**Primary Entrypoint**: All requests route through Turing Traefik to Lovelace backend
 
-| Endpoint (Routed via R730)                                 | Method | Description                                              |
+| Endpoint (Routed via Turing)                                 | Method | Description                                              |
 | :--------------------------------------------------------- | :----- | :------------------------------------------------------- |
 | `http://192.168.2.103/swarm/docs`                          | `GET`  | Swagger UI for the FastAPI Swarm backend.                |
 | `http://192.168.2.103/swarm/v1/chat/completions`           | `POST` | OpenAI-compatible endpoint for Open-WebUI / Continue.    |
@@ -55,16 +55,16 @@ This document serves as the living reference for all User Interfaces and backend
 | `http://192.168.2.103/swarm/task`                          | `POST` | Raw task submission (`{"prompt": "string"}`).            |
 | `http://192.168.2.103/swarm/voice/stream`                  | `POST` | BMO Voice Satellite endpoint (PCM → TTS).                |
 
-**Direct Access** (if Traefik unavailable): `http://192.168.2.101:8008/...` (Justin-PC bypass)
+**Direct Access** (if Traefik unavailable): `http://192.168.2.101:8008/...` (Lovelace bypass)
 
 ### 2. Local Inference Services
 
 | Service                      | Endpoint                                  | Hosted On | Purpose                                            |
 | :--------------------------- | :---------------------------------------- | :-------- | :------------------------------------------------- |
-| **Ollama (Primary)**         | `http://192.168.2.101:11434/api/generate` | Justin-PC | `qwen3.5:9b` (Heavy-Local) — Large-scale coding expertise. |
-| **Ollama (Secondary/Gateway)** | `http://192.168.2.103:11434/api/generate` | Dell R730 | `qwen3.5:9b`, `nemotron-orchestrator`, `llama-guard3:8b`. |
-| **RVC Voice Generation**     | `http://192.168.2.101:8100/infer`         | Justin-PC | Physical BMO robot voice reconstruction.          |
-| **Qwen3-TTS Module**         | `http://192.168.2.101:8020/tts`           | Justin-PC | Base Text-to-Speech generation.                   |
+| **Ollama (Primary)**         | `http://192.168.2.101:11434/api/generate` | Lovelace | `qwen3.5:9b` (Heavy-Local) — Large-scale coding expertise. |
+| **Ollama (Secondary/Gateway)** | `http://192.168.2.103:11434/api/generate` | Dell Turing | `qwen3.5:9b`, `nemotron-orchestrator`, `llama-guard3:8b`. |
+| **RVC Voice Generation**     | `http://192.168.2.101:8100/infer`         | Lovelace | Physical BMO robot voice reconstruction.          |
+| **Qwen3-TTS Module**         | `http://192.168.2.101:8020/tts`           | Lovelace | Base Text-to-Speech generation.                   |
 
 ---
 
@@ -72,7 +72,7 @@ This document serves as the living reference for all User Interfaces and backend
 
 To connect **Open-WebUI** or **external agents** to the Swarm:
 
-### Primary Connection ⭐ (via R730 Traefik Gateway)
+### Primary Connection ⭐ (via Turing Traefik Gateway)
 - **Entrypoint:** `http://192.168.2.103/swarm/v1`
 - **Recommended Model:** `Home-AI-Swarm`
 - **Context Window:** `128,000`
@@ -80,8 +80,8 @@ To connect **Open-WebUI** or **external agents** to the Swarm:
 - **API Key:** `sk-swarm` (or leave blank for local-only)
 
 ### Direct Connection (bypass gateway)
-- **Justin-PC Inference:** `http://192.168.2.101:8008/v1`
-- **R730 Inference:** `http://192.168.2.103:11434/api` (Ollama only)
+- **Lovelace Inference:** `http://192.168.2.101:8008/v1`
+- **Turing Inference:** `http://192.168.2.103:11434/api` (Ollama only)
 
 To connect directly to the **Local Expert** (High Performance):
 - **OLLAMA_BASE_URL:** `http://192.168.2.101:11434`
@@ -93,7 +93,7 @@ To connect directly to the **Offload Solver** (Efficient):
 - **Context Window:** `256,000`
 - **Orchestrator Model:** `nemotron-orchestrator:8b` (Context: 4,096)
 
-### 3. Training Pipeline (Justin-PC — On-Demand)
+### 3. Training Pipeline (Lovelace — On-Demand)
 
 The training runtime runs as a profile-gated Docker service. It is NOT always running — start it only when training.
 
@@ -127,15 +127,15 @@ docker compose --profile training run --rm training-runtime \
 
 For off-site access, use your Tailscale IP addresses or MagicDNS names instead of the local `192.168.2.x` addresses.
 
-**Primary Gateway Entry Point**: All services routed through R730 Traefik
+**Primary Gateway Entry Point**: All services routed through Turing Traefik
 
 | Node           | Tailscale Address (Example) | Common Ports          | Purpose |
 | :------------- | :-------------------------- | :-------------------- | :------ |
-| **Dell R730**  | `dell-r730.tail-xxxx.ts.net` | 80, 3000, 3001, 9091, 8080 | Gateway/Ops Hub (Traefik + all monitoring) |
-| **Justin-PC**  | `justin-pc.tail-xxxx.ts.net` | 8008, 8188, 11434 (direct access only) | Compute Node (direct access if needed) |
+| **Dell Turing**  | `dell-turing.tail-xxxx.ts.net` | 80, 3000, 3001, 9091, 8080 | Gateway/Ops Hub (Traefik + all monitoring) |
+| **Lovelace**  | `lovelace.tail-xxxx.ts.net` | 8008, 8188, 11434 (direct access only) | Compute Node (direct access if needed) |
 | **Control-Node**| `control-node.tail-xxxx.ts.net`| 3000 | SPIRE, Langfuse, DB |
 
 > [!TIP]
 > Use `tailscale status` on any node to find the specific IP or hostname. Ensure **MagicDNS** is enabled in your Tailscale admin console for the shortest URLs.
 >
-> **Recommended**: Connect via R730 gateway (`dell-r730.tail-xxxx.ts.net:80`) for all services unless you need direct access to compute node.
+> **Recommended**: Connect via Turing gateway (`dell-turing.tail-xxxx.ts.net:80`) for all services unless you need direct access to compute node.

@@ -1,4 +1,4 @@
-# MarsRL Hive Redesign: Implementation Walkthrough
+﻿# MarsRL Hive Redesign: Implementation Walkthrough
 
 _Date: 2026-03-12 | Version: 3.1 (Qwen 3.5 9B Standard)_
 
@@ -14,10 +14,10 @@ The hive now runs on a **three-node distributed topology** with dedicated hardwa
 
 | Role                         | Model                      | Node      | Hardware         | Notes                         |
 | ---------------------------- | -------------------------- | --------- | ---------------- | ----------------------------- |
-| **Solver** (code generation) | `qwen3.5:9b`               | Dell R730 | RTX 3070 Ti 8GB  | Primary solver; low VRAM      |
-| **Corrector** (fix failures) | `qwen3.5:9b`               | Dell R730 | RTX 3070 Ti 8GB  | Primary corrector             |
-| **Router / Orchestrator**    | `nemotron-orchestrator:8b` | Dell R730 | RTX 3070 Ti 8GB  | Intent classification         |
-| **Safety Verifier**          | `llama-guard-3:8b`         | Dell R730 | RTX 3070 Ti 8GB  | Existing security layer       |
+| **Solver** (code generation) | `qwen3.5:9b`               | Dell Turing | RTX 3070 Ti 8GB  | Primary solver; low VRAM      |
+| **Corrector** (fix failures) | `qwen3.5:9b`               | Dell Turing | RTX 3070 Ti 8GB  | Primary corrector             |
+| **Router / Orchestrator**    | `nemotron-orchestrator:8b` | Dell Turing | RTX 3070 Ti 8GB  | Intent classification         |
+| **Safety Verifier**          | `llama-guard-3:8b`         | Dell Turing | RTX 3070 Ti 8GB  | Existing security layer       |
 
 ### Why These Models?
 
@@ -35,7 +35,7 @@ The hive now runs on a **three-node distributed topology** with dedicated hardwa
 
 ```
 ┌─────────────────────────────────┐
-│  Control Plane — Dell Wyse 5070 │
+│  Control Plane — Dell Hopper │
 │  IP: 192.168.2.102              │
 │  ┌───────────────────────────┐  │
 │  │ SPIRE Server :8081        │  │
@@ -46,7 +46,7 @@ The hive now runs on a **three-node distributed topology** with dedicated hardwa
 └─────────────────────────────────┘
 
 ┌─────────────────────────────────┐
-│  Primary Inference — Justin-PC  │
+│  Primary Inference — Lovelace  │
 │  OLLAMA_HOST=localhost:11434    │
 │  ┌───────────────────────────┐  │
 │  │ RTX 5060 Ti (16GB)        │  │
@@ -62,7 +62,7 @@ The hive now runs on a **three-node distributed topology** with dedicated hardwa
 └─────────────────────────────────┘
 
 ┌──────────────────────────────────────┐
-│  Secondary Inference — Dell R730     │
+│  Secondary Inference — Dell Turing     │
 │  SECONDARY_OLLAMA_HOST=192.168.2.103 │
 │  ┌────────────────────────────────┐  │
 │  │ RTX 3070 Ti (8GB)             │  │
@@ -83,21 +83,21 @@ Every `CODE` intent task flows through the full loop:
 User Request
     │
     ▼
-Nemotron-Orchestrator (Dell R730) ── classifies intent ──▶ IMAGE/3D/IoT routes (unchanged)
+Nemotron-Orchestrator (Dell Turing) ── classifies intent ──▶ IMAGE/3D/IoT routes (unchanged)
     │
     │ CODE intent
     ▼
-Qwen 3.5 9B [SOLVER] (Dell R730 / Justin-PC)
+Qwen 3.5 9B [SOLVER] (Dell Turing / Lovelace)
     │ response
     ▼
 LogicVerifier [VERIFIER]
     ├── Layer 1: Python AST parse
     ├── Layer 2: Coherence (length, repetition, truncation)
-    └── Layer 3: llama-guard-3 safety check (Dell R730)
+    └── Layer 3: llama-guard-3 safety check (Dell Turing)
     │
     ├── PASS ──▶ Langfuse score(solver_score=1.0) ──▶ User
     │
-    └── FAIL ──▶ Qwen 3.5 9B [CORRECTOR] (Dell R730 / Justin-PC)
+    └── FAIL ──▶ Qwen 3.5 9B [CORRECTOR] (Dell Turing / Lovelace)
                     │ corrected response
                     ▼
                 LogicVerifier (2nd pass)
@@ -137,7 +137,7 @@ These scores build a **training dataset** for future fine-tuning.
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | [`agents/architect_agent.py`](../agents/architect_agent.py)       | Standardized on `qwen3.5:9b`                                                           |
 | [`agents/semantic_router.py`](../agents/semantic_router.py)       | `nemotron-orchestrator:8b` via `SECONDARY_OLLAMA_HOST`                                 |
-| [`agents/teams.py`](../agents/teams.py)                           | Orchestrator → Nemotron on R730; removed Devstral accessors                            |
+| [`agents/teams.py`](../agents/teams.py)                           | Orchestrator → Nemotron on Turing; removed Devstral accessors                            |
 | [`agents/router.py`](../agents/router.py)                         | CODE route → MarsRL loop; removed Devstral references                                  |
 | [`execution_plane/.env.example`](../execution_plane/.env.example) | Added `SOLVER_MODEL`, `SECONDARY_OLLAMA_HOST`, `ROUTER_MODEL`, `ORCHESTRATOR_MODEL`    |
 
@@ -145,7 +145,7 @@ These scores build a **training dataset** for future fine-tuning.
 
 ## Deployment Steps
 
-### 5060ti PC / R730 (Inference Nodes)
+### 5060ti PC / Turing (Inference Nodes)
 
 ```bash
 # Pull Solver model
@@ -155,7 +155,7 @@ ollama pull llama-guard-3:8b
 
 # Copy new env vars to .env
 echo 'SOLVER_MODEL=qwen3.5:9b' >> execution_plane/.env
-echo 'SECONDARY_OLLAMA_HOST=http://<r730-ip>:11434' >> execution_plane/.env
+echo 'SECONDARY_OLLAMA_HOST=http://<turing-ip>:11434' >> execution_plane/.env
 echo 'ROUTER_MODEL=nemotron-orchestrator:8b' >> execution_plane/.env
 echo 'ORCHESTRATOR_MODEL=nemotron-orchestrator:8b' >> execution_plane/.env
 
@@ -184,7 +184,7 @@ After deploying, verify in **Langfuse** (http://192.168.2.102:3000):
 
 ---
 
-_Version 3.1 | 2026-03-12 | Qwen 3.5 9B Loop + Dell R730 Topology_
+_Version 3.1 | 2026-03-12 | Qwen 3.5 9B Loop + Dell Turing Topology_
 
 ---
 
@@ -198,7 +198,7 @@ _Version 3.1 | 2026-03-12 | Qwen 3.5 9B Loop + Dell R730 Topology_
 | `agents/mars_loop.py` | Implementation | MarsRL Solver → Verifier → Corrector pipeline |
 | `agents/config.py` | Configuration | Model routing to qwen3.5:9b |
 | `control_plane/docker-compose.yml` | Infrastructure | Langfuse for trace observability |
-| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway and Traefik routing |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Gateway and Traefik routing |
 
 </details>
 

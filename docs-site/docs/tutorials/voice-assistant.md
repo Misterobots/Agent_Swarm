@@ -1,4 +1,4 @@
----
+﻿---
 title: "Tutorial: Voice Assistant"
 ---
 
@@ -21,15 +21,15 @@ Set up voice input and output to talk to Agent Swarm.
 
 ```bash
 # Check Whisper (STT) is running
-curl http://{{ execution_node_ip }}:9000/health
+curl http://{{ lovelace_ip }}:9000/health
 
 # Check Piper (TTS) is running
-curl http://{{ execution_node_ip }}:5500/health
+curl http://{{ lovelace_ip }}:5500/health
 ```
 
 ## Step 2: Enable Voice in the UI
 
-In the Hive UI (`http://{{ gateway_node_ip }}/`):
+In the Hive UI (`http://{{ turing_ip }}/`):
 
 1. Click the **microphone icon** in the chat input area
 2. Grant browser microphone permission when prompted
@@ -77,3 +77,5 @@ The system handles the full loop: speech → text → agent → text → speech.
 
 - [User Guide: Voice](../user-guide/voice.md) — full voice reference
 - [Create IoT Automation](iot-automation.md) — combine voice with smart home
+
+

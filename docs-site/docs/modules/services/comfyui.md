@@ -1,4 +1,4 @@
----
+﻿---
 title: "Service: ComfyUI"
 ---
 
@@ -10,9 +10,9 @@ Node-based image generation engine.
 
 | Property | Value |
 |----------|-------|
-| **Node** | Execution ({{ execution_node_ip }}) |
+| **Node** | Execution ({{ lovelace_ip }}) |
 | **Port** | 8188 |
-| **URL** | `http://{{ execution_node_ip }}:8188` |
+| **URL** | `http://{{ lovelace_ip }}:8188` |
 | **GPU** | Required (CUDA) |
 | **Compose** | `execution_plane/docker-compose.yml` |
 
@@ -27,13 +27,13 @@ import requests
 
 # Queue a workflow
 response = requests.post(
-    f"http://{{ execution_node_ip }}:8188/prompt",
+    f"http://{{ lovelace_ip }}:8188/prompt",
     json={"prompt": workflow_json, "client_id": "agent-swarm"},
 )
 prompt_id = response.json()["prompt_id"]
 
 # Check status
-status = requests.get(f"http://{{ execution_node_ip }}:8188/history/{prompt_id}")
+status = requests.get(f"http://{{ lovelace_ip }}:8188/history/{prompt_id}")
 ```
 
 ## Installed Models
@@ -49,3 +49,5 @@ status = requests.get(f"http://{{ execution_node_ip }}:8188/history/{prompt_id}"
 - [User Guide: Art Studio](../../user-guide/art-studio.md)
 - [Developer: ComfyUI Workflows](../../developer-guide/comfyui-workflows.md)
 - [Module: Image Agent](../image-agent.md)
+
+

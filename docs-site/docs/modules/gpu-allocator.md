@@ -50,3 +50,5 @@ The GPU Allocator complements Ollama by scheduling non-Ollama GPU tasks (ComfyUI
 
 - [Admin: Models Configuration](../admin-guide/configuration/models.md) — VRAM settings
 - [Admin: Scaling](../admin-guide/operations/scaling.md) — adding GPU capacity
+
+

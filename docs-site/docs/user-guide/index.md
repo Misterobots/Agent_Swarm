@@ -1,4 +1,4 @@
----
+﻿---
 title: User Guide
 ---
 
@@ -29,7 +29,7 @@ Feature-by-feature guides for everything Agent Swarm can do. Each page covers wh
 
     | Source | Type | Relevance |
     |--------|------|-----------|
-    | `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
+    | `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
     | `execution_plane/docker-compose.yml` | Infrastructure | Execution Node (GPU + agent runtime) |
     | `control_plane/docker-compose.yml` | Infrastructure | Control Node (Langfuse, SPIRE, PostgreSQL) |
     | `ui/src/app/` | Implementation | Hive Mind UI workspace routing |
@@ -43,7 +43,7 @@ Feature-by-feature guides for everything Agent Swarm can do. Each page covers wh
 
 ### Updating Service URLs Table
 
-When service ports or URLs change, update the "How Do I Access It?" table. Cross-reference `r730_gateway/docker-compose.yml` for current port mappings.
+When service ports or URLs change, update the "How Do I Access It?" table. Cross-reference `turing_gateway/docker-compose.yml` for current port mappings.
 
 ### Updating Workspaces Table
 
@@ -69,3 +69,5 @@ Update the "System Status" section after each phase milestone. Check off complet
 ---
 
 *For technical details, see Admin: Design Framework · [Back to Index](../index.md)*
+
+

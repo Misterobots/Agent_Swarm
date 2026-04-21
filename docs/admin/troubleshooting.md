@@ -1,4 +1,4 @@
-# Admin: Troubleshooting Guide
+﻿# Admin: Troubleshooting Guide
 
 > **Back to:** [Documentation Index](../INDEX.md)
 > **See also:** [Technical Reference](technical_reference.md) · [Security](security.md)
@@ -79,7 +79,7 @@ curl http://<execution-node-ip>:11434/api/tags | python -m json.tool
 | `qwen3.5:9b` not pulled | `ollama pull qwen3.5:9b` (run inside ollama container or via API) |
 | VRAM OOM — model evicted mid-request | Reduce `OLLAMA_KEEP_ALIVE`, restart Ollama |
 | Training runtime holds GPU mutex | Wait for training to finish, or kill it: `docker compose stop training-runtime` |
-| Gateway Node Ollama used but `nemotron` not loaded | `docker exec ollama-r730 ollama pull nemotron-orchestrator:8b` |
+| Gateway Node Ollama used but `nemotron` not loaded | `docker exec ollama-turing ollama pull nemotron-orchestrator:8b` |
 
 ---
 
@@ -143,7 +143,7 @@ docker compose logs promtail --tail=30
 
 ```bash
 # Test connection from Grafana container
-docker exec grafana-r730 psql postgresql://langfuse:langfuse@<control-node-ip>:5432/langfuse \
+docker exec grafana-turing psql postgresql://langfuse:langfuse@<control-node-ip>:5432/langfuse \
   -c "SELECT COUNT(*) FROM swarm.performance_history"
 ```
 
@@ -422,7 +422,7 @@ If Authentik is healthy but blocking, the provider configuration may need updati
 |--------|------|----------|
 | `agents/main.py` | Implementation | Health check endpoints, startup error messages |
 | `agents/router.py` | Implementation | Chat pipeline errors, MarsRL loop failures |
-| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node services, Traefik, Grafana, Prometheus |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node services, Traefik, Grafana, Prometheus |
 | `execution_plane/docker-compose.yml` | Infrastructure | agent-runtime, Ollama, ComfyUI, training containers |
 | `control_plane/docker-compose.yml` | Infrastructure | SPIRE, Langfuse, PostgreSQL, Redis |
 | `config/grafana/` | Infrastructure | Dashboard JSON definitions |

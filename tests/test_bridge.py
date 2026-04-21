@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for the Bridge Mode relay (Phase 5).
 """
 
@@ -26,13 +26,13 @@ class TestRemoteJob(unittest.TestCase):
 
     def test_defaults(self):
         from utils.bridge import RemoteJob
-        job = RemoteJob(job_id="j1", target_node="r730", task="test")
+        job = RemoteJob(job_id="j1", target_node="Turing", task="test")
         self.assertEqual(job.status, "submitted")
         self.assertIsNone(job.result)
 
     def test_to_dict(self):
         from utils.bridge import RemoteJob
-        job = RemoteJob(job_id="j1", target_node="r730", task="hello")
+        job = RemoteJob(job_id="j1", target_node="Turing", task="hello")
         d = job.to_dict()
         self.assertEqual(d["job_id"], "j1")
         self.assertEqual(d["status"], "submitted")
@@ -51,8 +51,8 @@ class TestBridge(unittest.TestCase):
         nodes = bridge.list_nodes()
         self.assertTrue(len(nodes) >= 3)
         names = [n["name"] for n in nodes]
-        self.assertIn("r730", names)
-        self.assertIn("justin-pc", names)
+        self.assertIn("Turing", names)
+        self.assertIn("Lovelace", names)
 
     def test_check_health_unknown_node(self):
         bridge = self._get_bridge()
@@ -62,13 +62,13 @@ class TestBridge(unittest.TestCase):
     def test_check_health_success(self, mock_get):
         mock_get.return_value = MagicMock(status_code=200)
         bridge = self._get_bridge()
-        self.assertTrue(bridge.check_health("r730"))
+        self.assertTrue(bridge.check_health("Turing"))
 
     @patch("requests.get")
     def test_check_health_failure(self, mock_get):
         mock_get.side_effect = ConnectionError("refused")
         bridge = self._get_bridge()
-        self.assertFalse(bridge.check_health("r730"))
+        self.assertFalse(bridge.check_health("Turing"))
 
     @patch("requests.get")
     def test_check_all_health(self, mock_get):
@@ -76,7 +76,7 @@ class TestBridge(unittest.TestCase):
         bridge = self._get_bridge()
         health = bridge.check_all_health()
         self.assertIsInstance(health, dict)
-        self.assertIn("r730", health)
+        self.assertIn("Turing", health)
 
     def test_submit_task_unknown_node(self):
         bridge = self._get_bridge()
@@ -92,7 +92,7 @@ class TestBridge(unittest.TestCase):
             json=lambda: {"status": "queued"},
         )
         bridge = self._get_bridge()
-        result = bridge.submit_task("r730", "run nvidia-smi")
+        result = bridge.submit_task("Turing", "run nvidia-smi")
         self.assertEqual(result["status"], "running")
         self.assertIn("job_id", result)
 
@@ -103,7 +103,7 @@ class TestBridge(unittest.TestCase):
             text="Internal Server Error",
         )
         bridge = self._get_bridge()
-        result = bridge.submit_task("r730", "failing task")
+        result = bridge.submit_task("Turing", "failing task")
         self.assertEqual(result["status"], "failed")
         self.assertIn("500", result["error"])
 
@@ -111,7 +111,7 @@ class TestBridge(unittest.TestCase):
     def test_submit_task_network_error(self, mock_post):
         mock_post.side_effect = ConnectionError("refused")
         bridge = self._get_bridge()
-        result = bridge.submit_task("r730", "unreachable")
+        result = bridge.submit_task("Turing", "unreachable")
         self.assertEqual(result["status"], "failed")
 
     def test_proxy_request_unknown_node(self):
@@ -128,7 +128,7 @@ class TestBridge(unittest.TestCase):
             json=lambda: {"models": ["qwen2.5"]},
         )
         bridge = self._get_bridge()
-        result = bridge.proxy_request("r730", "GET", "/v1/models")
+        result = bridge.proxy_request("Turing", "GET", "/v1/models")
         self.assertEqual(result["status_code"], 200)
         self.assertIn("models", result["body"])
 
@@ -144,7 +144,7 @@ class TestBridge(unittest.TestCase):
             json=lambda: {"status": "queued"},
         )
         bridge = self._get_bridge()
-        result = bridge.submit_task("r730", "tracked task")
+        result = bridge.submit_task("Turing", "tracked task")
         job_id = result["job_id"]
         
         # Verify job shows up
@@ -172,3 +172,5 @@ class TestBridgeSingleton(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+

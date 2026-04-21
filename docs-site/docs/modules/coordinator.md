@@ -88,3 +88,5 @@ User: *"Compare Python web frameworks for a REST API and build a prototype"*
 
 - [Architecture: Agent System](../architecture/agent-system.md) — routing to coordinator
 - [User Guide: Research Mode](../user-guide/research-mode.md) — user-facing guide
+
+

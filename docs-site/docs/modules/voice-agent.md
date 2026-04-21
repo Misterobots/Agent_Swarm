@@ -52,3 +52,5 @@ The satellite captures audio → sends to Agent Runtime → gets TTS response.
 
 - [User Guide: Voice](../user-guide/voice.md) — user-facing guide
 - [User Guide: IoT Control](../user-guide/iot-control.md) — device integration
+
+

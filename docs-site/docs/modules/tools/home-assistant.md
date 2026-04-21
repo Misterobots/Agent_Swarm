@@ -34,3 +34,5 @@ Functions for controlling smart home devices via Home Assistant.
 ## Allowed Intents
 
 `IOT_CONTROL`
+
+

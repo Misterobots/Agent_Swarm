@@ -1,4 +1,4 @@
----
+﻿---
 title: "Troubleshooting: Langfuse"
 ---
 
@@ -6,7 +6,7 @@ title: "Troubleshooting: Langfuse"
 
 ## Langfuse Dashboard Not Loading
 
-**Symptom**: `http://{{ control_node_ip }}:3000` doesn't respond.
+**Symptom**: `http://{{ hopper_ip }}:3000` doesn't respond.
 
 **Diagnose**:
 
@@ -34,7 +34,7 @@ Check agent runtime logs for Langfuse connection errors.
 **Fix**:
 
 1. Verify `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` in `network.env`
-2. Test connectivity from agent runtime: `curl http://{{ control_node_ip }}:3000/api/public/health`
+2. Test connectivity from agent runtime: `curl http://{{ hopper_ip }}:3000/api/public/health`
 3. Check that the Langfuse SDK is initialized in the agent code
 
 ---
@@ -66,3 +66,5 @@ Check agent runtime logs for Langfuse connection errors.
    ```bash
    docker compose exec postgres psql -U postgres -c "VACUUM FULL;"
    ```
+
+

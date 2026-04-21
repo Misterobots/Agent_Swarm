@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # sync-spire-bundle.sh — Pull fresh SPIRE trust bundle from control plane
 # Runs as cron job to prevent CA rotation drift breaking agent attestation
 set -euo pipefail
 
 CONTROL_HOST="misterobots@192.168.2.102"
 SSH_KEY="/home/misterobots/.ssh/id_rsa_sync"
-BUNDLE_PATH="/home/misterobots/Home_AI_Lab/r730_gateway/config/spire/certs/spire-server-bundle.crt"
+BUNDLE_PATH="/home/misterobots/Home_AI_Lab/turing_gateway/config/spire/certs/spire-server-bundle.crt"
 LOG_TAG="spire-bundle-sync"
 
 log() { logger -t "$LOG_TAG" "$*"; echo "$(date -Is) $*"; }
@@ -52,3 +52,4 @@ if ! openssl s_client -connect 192.168.2.102:8081 -CAfile "$BUNDLE_PATH" </dev/n
 fi
 
 log "VERIFIED: TLS handshake to SPIRE server passes with new bundle"
+

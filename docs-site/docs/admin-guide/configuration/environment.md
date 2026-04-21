@@ -1,4 +1,4 @@
----
+﻿---
 title: Environment Variables
 ---
 
@@ -10,9 +10,9 @@ Reference for all variables in `network.env`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CONTROL_NODE_IP` | `{{ control_node_ip }}` | Control Plane IP |
-| `EXECUTION_NODE_IP` | `{{ execution_node_ip }}` | Execution Plane IP |
-| `GATEWAY_NODE_IP` | `{{ gateway_node_ip }}` | Gateway Node IP |
+| `HOPPER_IP` | `{{ hopper_ip }}` | Control Plane IP |
+| `LOVELACE_IP` | `{{ lovelace_ip }}` | Execution Plane IP |
+| `TURING_IP` | `{{ turing_ip }}` | Gateway Node IP |
 | `AGENT_RUNTIME_PORT` | `{{ agent_runtime_port }}` | Agent Runtime FastAPI port |
 | `OLLAMA_PORT` | `{{ ollama_port }}` | Ollama API port |
 
@@ -50,13 +50,13 @@ Reference for all variables in `network.env`.
 |----------|---------|-------------|
 | `LANGFUSE_SECRET_KEY` | *(secret)* | Session encryption key |
 | `LANGFUSE_PUBLIC_KEY` | *(generated)* | Public API key |
-| `LANGFUSE_HOST` | `http://{{ control_node_ip }}:3000` | Langfuse URL |
+| `LANGFUSE_HOST` | `http://{{ hopper_ip }}:3000` | Langfuse URL |
 
 ## SPIRE
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SPIRE_SERVER_ADDRESS` | `{{ control_node_ip }}:8081` | SPIRE server endpoint |
+| `SPIRE_SERVER_ADDRESS` | `{{ hopper_ip }}:8081` | SPIRE server endpoint |
 | `SPIRE_TRUST_DOMAIN` | `home-ai-lab` | Trust domain name |
 
 ## Home Assistant
@@ -72,7 +72,7 @@ Reference for all variables in `network.env`.
 |----------|---------|-------------|
 | `MINIO_ROOT_USER` | `minio` | MinIO admin username |
 | `MINIO_ROOT_PASSWORD` | *(secret)* | MinIO admin password |
-| `MINIO_ENDPOINT` | `{{ control_node_ip }}:9000` | MinIO API endpoint |
+| `MINIO_ENDPOINT` | `{{ hopper_ip }}:9000` | MinIO API endpoint |
 
 ## Usage
 
@@ -88,7 +88,7 @@ Variables are interpolated into compose files:
 services:
   agent-runtime:
     environment:
-      - OLLAMA_HOST=http://${EXECUTION_NODE_IP}:${OLLAMA_PORT}
+      - OLLAMA_HOST=http://${LOVELACE_IP}:${OLLAMA_PORT}
       - SOLVER_MODEL=${SOLVER_MODEL}
 ```
 
@@ -96,3 +96,5 @@ services:
 
 - [Admin: Secrets Management](../operations/secrets.md) — credential security
 - [Admin: Docker Compose](docker-compose.md) — compose file reference
+
+

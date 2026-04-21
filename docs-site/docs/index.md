@@ -1,4 +1,4 @@
----
+﻿---
 title: Home
 ---
 
@@ -22,21 +22,21 @@ Agent Swarm (also called **Agentic Hive** or **Home AI Lab**) is a production mu
 
 ```mermaid
 graph TB
-    subgraph Gateway["Gateway Node · R730<br/>{{ gateway_node_ip }}"]
+    subgraph Gateway["Gateway Node · Turing<br/>{{ turing_ip }}"]
         Traefik[Traefik Reverse Proxy]
-        Grafana[Grafana Dashboards]
-        Prometheus[Prometheus Metrics]
-        Loki[Loki Logs]
+        hollerith[hollerith Dashboards]
+        jacquard[jacquard Metrics]
+        knuth[knuth Logs]
     end
 
-    subgraph Execution["Execution Node · Justin-PC<br/>{{ execution_node_ip }}"]
+    subgraph Execution["Execution Node · Lovelace<br/>{{ lovelace_ip }}"]
         Runtime[Agent Runtime · FastAPI]
         Ollama[Ollama · LLM Inference]
         ComfyUI[ComfyUI · Image Gen]
         Voice[Voice Engine · TTS]
     end
 
-    subgraph Control["Control Node<br/>{{ control_node_ip }}"]
+    subgraph Control["Control Node<br/>{{ hopper_ip }}"]
         SPIRE[SPIRE Server]
         Langfuse[Langfuse · Tracing]
         PostgreSQL[(PostgreSQL)]
@@ -109,3 +109,5 @@ graph TB
 | [FAQ](faq/index.md) | Frequently asked questions |
 | [Troubleshooting](troubleshooting/index.md) | Symptom-based problem resolution |
 | [Reference](admin-guide/port-map.md) | Port map, env vars, glossary |
+
+

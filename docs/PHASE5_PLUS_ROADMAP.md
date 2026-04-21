@@ -1,4 +1,4 @@
-# Phase 5+ Implementation Roadmap
+﻿# Phase 5+ Implementation Roadmap
 **Planning Date**: March 15, 2026
 **Updated**: March 21, 2026
 **Current Status**: Phase 6 Complete (GRPO Training Pipeline Deployed)
@@ -376,9 +376,9 @@ Threshold: 2% improvement to version bump
 | Router A/B testing hooks | `agents/router.py` | ✅ Modified |
 | Template updater A/B eval | `agents/expertise/async_template_updater.py` | ✅ Modified |
 | Training DB schema | `agents/expertise/schema.sql` | ✅ Applied (4 new tables) |
-| Training Pipeline dashboard | `r730_gateway/dashboards/training_pipeline.json` | ✅ Provisioned |
-| Template Scores dashboard | `r730_gateway/dashboards/template_performance.json` | ✅ Provisioned |
-| PostgreSQL-Swarm datasource | `r730_gateway/provisioning/datasources/datasource.yml` | ✅ Configured |
+| Training Pipeline dashboard | `turing_gateway/dashboards/training_pipeline.json` | ✅ Provisioned |
+| Template Scores dashboard | `turing_gateway/dashboards/template_performance.json` | ✅ Provisioned |
+| PostgreSQL-Swarm datasource | `turing_gateway/provisioning/datasources/datasource.yml` | ✅ Configured |
 | Training config variables | `agents/config.py` | ✅ Modified (14 new vars) |
 
 **Deployment**: Training pipeline code-complete, dashboards live on Gateway Node Grafana, schema applied to control plane, training-runtime Docker image ready to build on Execution Node.
@@ -415,7 +415,7 @@ Threshold: 2% improvement to version bump
 
 Key responsibilities:
 - InferenceNodePool
-  - Register nodes: [ollama:11434, r730_ollama:11434]
+  - Register nodes: [ollama:11434, turing_ollama:11434]
   - Health check each (periodic /api/tags)
   - Round-robin or weighted selection
   - Failover on node down

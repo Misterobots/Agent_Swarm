@@ -1,19 +1,19 @@
-# execution_plane/docker-compose.yml (AFTER MIGRATION)
+﻿# execution_plane/docker-compose.yml (AFTER MIGRATION)
 # 
-# This is the REFERENCE structure for Justin-PC after moving Traefik + monitoring to R730.
-# Only compute/inference services remain on Justin-PC.
+# This is the REFERENCE structure for Lovelace after moving Traefik + monitoring to Turing.
+# Only compute/inference services remain on Lovelace.
 #
 # Original full config remains in execution_plane/docker-compose.yml
 # To apply this, remove the deleted services section by  section from your current compose file.
 #
 # SERVICES REMOVED FROM JUSTIN-PC:
-#   - traefik (→ moved to R730)
-#   - prometheus (→ moved to R730)
-#   - grafana (→ moved to R730)
-#   - loki (→ moved to R730)
-#   - promtail (→ moved to R730)
-#   - cadvisor (→ moved to R730)
-#   - redis_queue (→ moved to R730)
+#   - traefik (→ moved to Turing)
+#   - prometheus (→ moved to Turing)
+#   - grafana (→ moved to Turing)
+#   - loki (→ moved to Turing)
+#   - promtail (→ moved to Turing)
+#   - cadvisor (→ moved to Turing)
+#   - redis_queue (→ moved to Turing)
 #
 # SERVICES REMAINING ON JUSTIN-PC:
 #   ✓ spire-agent (identity)
@@ -39,8 +39,8 @@ services:
     image: ollama/ollama:latest
     container_name: ollama_gpu
     # ... keep existing config ...
-    # NOTE: This is the primary (heavy) inference engine for Justin-PC
-    # All inference requests should prefer this over R730
+    # NOTE: This is the primary (heavy) inference engine for Lovelace
+    # All inference requests should prefer this over Turing
 
   # VOICE SYNTHESIS & GENERATION
   bmo-voice:
@@ -83,11 +83,11 @@ services:
       - spire-agent
     environment:
       # ... existing config ...
-      # NOTE: Now routes metrics/logs to R730 instead of local stack
-      - METRICS_ENDPOINT=http://192.168.2.103:9090  # Prometheus on R730
-      - LOGS_ENDPOINT=http://192.168.2.103:3100     # Loki on R730
+      # NOTE: Now routes metrics/logs to Turing instead of local stack
+      - METRICS_ENDPOINT=http://192.168.2.103:9090  # Prometheus on Turing
+      - LOGS_ENDPOINT=http://192.168.2.103:3100     # Loki on Turing
     labels:
-      # CRITICAL: These labels enable Traefik on R730 to route requests to this service
+      # CRITICAL: These labels enable Traefik on Turing to route requests to this service
       - "traefik.enable=true"
       - "traefik.http.routers.agent-runtime.rule=PathPrefix(`/swarm`)"
       - "traefik.http.routers.agent-runtime.entrypoints=web"
@@ -101,7 +101,7 @@ services:
     hostname: comfyui
     # ... keep existing config ...
     labels:
-      # CRITICAL: These labels enable Traefik on R730 to route requests to this service
+      # CRITICAL: These labels enable Traefik on Turing to route requests to this service
       - "traefik.enable=true"
       - "traefik.http.routers.comfyui.rule=PathPrefix(`/comfy`)"
       - "traefik.http.routers.comfyui.entrypoints=web"
@@ -112,10 +112,10 @@ services:
 # VOLUMES (MONITORING VOLUMES REMOVED)
 # ═══════════════════════════════════════════════════════════════════════════════
 # DELETED VOLUMES:
-#   ✗ prometheus_data (→ moved to R730)
-#   ✗ grafana_data (→ moved to R730)
-#   ✗ loki_data (→ moved to R730)
-#   ✗ redis_data (→ moved to R730)
+#   ✗ prometheus_data (→ moved to Turing)
+#   ✗ grafana_data (→ moved to Turing)
+#   ✗ loki_data (→ moved to Turing)
+#   ✗ redis_data (→ moved to Turing)
 
 volumes:
   ollama_models: {}
@@ -135,7 +135,7 @@ networks:
 
 | Source | Type | Relevance |
 |--------|------|----------|
-| `execution_plane/docker-compose.yml` | Infrastructure | Actual compose file for Justin-PC |
+| `execution_plane/docker-compose.yml` | Infrastructure | Actual compose file for Lovelace |
 | `network.env` | Configuration | Node IPs, environment variables |
 
 </details>
@@ -146,7 +146,7 @@ networks:
 | Date | Author | Changes |
 |------|--------|--------|
 | 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide |
-| 2026-03-14 | AI-Copilot | Post-migration compose reference (monitoring offloaded to R730) |
+| 2026-03-14 | AI-Copilot | Post-migration compose reference (monitoring offloaded to Turing) |
 
 </details>
 
@@ -154,6 +154,6 @@ networks:
 
 ## Maintenance & Update Guide
 
-- Update when services are added or removed from Justin-PC.
+- Update when services are added or removed from Lovelace.
 - Cross-reference with `execution_plane/docker-compose.yml` to ensure this reference matches reality.
 - Update volume list when new persistent storage is added.

@@ -1,4 +1,4 @@
----
+﻿---
 title: Local Development
 ---
 
@@ -50,9 +50,9 @@ cp network.env.example network.env
 Edit `network.env` for local development:
 
 ```bash
-EXECUTION_NODE_IP=127.0.0.1
-CONTROL_NODE_IP=127.0.0.1
-GATEWAY_NODE_IP=127.0.0.1
+LOVELACE_IP=127.0.0.1
+HOPPER_IP=127.0.0.1
+TURING_IP=127.0.0.1
 OLLAMA_HOST=http://localhost:{{ ollama_port }}
 AGENT_RUNTIME_PORT={{ agent_runtime_port }}
 ```
@@ -125,3 +125,5 @@ Access at `http://localhost:3000`.
 
 - [Getting Started: Developer Quickstart](../getting-started/quickstart-developer.md) — condensed setup
 - [Developer: Adding Agents](adding-agents.md) — extend the agent system
+
+

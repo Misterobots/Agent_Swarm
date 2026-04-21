@@ -1,7 +1,7 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -e
 
-COMPOSE="/home/misterobots/Home_AI_Lab/r730_gateway/docker-compose.yml"
+COMPOSE="/home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml"
 UI_DIR="/home/misterobots/Home_AI_Lab/ui"
 PATCH_DIR="$UI_DIR/patched-next"
 
@@ -40,3 +40,4 @@ fi
 echo ""
 echo "Verifying volumes:"
 grep -A8 'volumes:' "$COMPOSE" | grep -A8 'docs'
+

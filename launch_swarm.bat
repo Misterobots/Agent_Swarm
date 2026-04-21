@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 SETLOCAL EnableDelayedExpansion
 
 TITLE Home AI Lab - Swarm Launcher
@@ -66,7 +66,7 @@ timeout /t 10 /nobreak >nul
 :: Check Brain IP — read from network.env (single source of truth)
 SET "BRAIN_IP=192.168.2.102"
 FOR /F "tokens=1,2 delims==" %%A IN (%ROOT%network.env) DO (
-    IF "%%A"=="CONTROL_NODE_IP" SET "BRAIN_IP=%%B"
+    IF "%%A"=="HOPPER_IP" SET "BRAIN_IP=%%B"
 )
 ping -n 1 %BRAIN_IP% >nul 2>&1
 IF %ERRORLEVEL% EQU 0 (

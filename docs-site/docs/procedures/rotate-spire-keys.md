@@ -1,4 +1,4 @@
----
+﻿---
 title: "Procedure: Rotate SPIRE Keys"
 ---
 
@@ -28,7 +28,7 @@ docker compose exec spire-server \
 # Token for Gateway Node
 docker compose exec spire-server \
     /opt/spire/bin/spire-server token generate \
-    -spiffeID spiffe://home-ai-lab/r730-gateway \
+    -spiffeID spiffe://home-ai-lab/Turing-gateway \
     -ttl 3600
 ```
 
@@ -51,9 +51,9 @@ docker compose up -d spire-agent
 ### 3. Update Gateway Node
 
 ```bash
-# Same process on R730
+# Same process on Turing
 docker compose stop spire-agent
-nano r730_gateway/config/spire/agent.conf
+nano turing_gateway/config/spire/agent.conf
 docker compose up -d spire-agent
 ```
 
@@ -71,3 +71,5 @@ Both agents should report healthy.
 - Join tokens are single-use — each agent needs its own token
 - Tokens expire after TTL — use them promptly
 - Existing SVIDs remain valid until their TTL expires
+
+

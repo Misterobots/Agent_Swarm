@@ -1,4 +1,4 @@
----
+﻿---
 title: "ADR-002: Local Hook Execution Model"
 ---
 
@@ -20,9 +20,9 @@ Two approaches were considered:
 
 Adopt a **local hook execution model** where each node is responsible for its own workloads, and Traefik handles routing.
 
-- **Execution Node** (Justin-PC): All GPU compute — Ollama, ComfyUI, Voice Engine, Agent Runtime
-- **Control Node** (Wyse 5070): All coordination — SPIRE, databases, Langfuse, MemPalace
-- **Gateway Node** (R730): All ingress — Traefik, monitoring stack, secondary Ollama
+- **Execution Node** (Lovelace): All GPU compute — Ollama, ComfyUI, Voice Engine, Agent Runtime
+- **Control Node** (Hopper): All coordination — SPIRE, databases, Langfuse, MemPalace
+- **Gateway Node** (Turing): All ingress — Traefik, monitoring stack, secondary Ollama
 
 Services are started via Docker Compose on each node. Inter-node communication uses direct HTTP over the LAN.
 
@@ -47,3 +47,5 @@ Services are started via Docker Compose on each node. Inter-node communication u
 
 - [Architecture: Topology](../topology.md) — physical node layout
 - [Admin: Deployment](../../admin-guide/index.md) — per-node setup
+
+

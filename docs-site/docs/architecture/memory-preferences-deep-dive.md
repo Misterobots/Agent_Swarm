@@ -43,3 +43,5 @@ Explain data isolation and retrieval behavior for conversational memory and user
 
 ## Open Follow-Ups
 - Partition global rule-memory stores by owner in Sprint 2 memory hardening.
+
+

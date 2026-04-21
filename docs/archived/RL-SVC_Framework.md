@@ -1,4 +1,4 @@
-# Engineering Framework: MarsRL Inference Execution & MAESTRO-SPIFFE/SPIRE Zero-Trust Identity
+﻿# Engineering Framework: MarsRL Inference Execution & MAESTRO-SPIFFE/SPIRE Zero-Trust Identity
 
 **Authors**: Home AI Lab
 **Date**: February 2026
@@ -29,7 +29,7 @@ The pipeline is orchestrated primarily within `agents/mars_loop.py` and consists
 
 - **Model**: `qwen3.5:9b`.
 - **Role**: Primary generator for complex coding and multi-file software engineering tasks.
-- **Offloading**: Automatically routed to the Dell R730 (8GB VRAM) to prevent local thrashing.
+- **Offloading**: Automatically routed to the Dell Turing (8GB VRAM) to prevent local thrashing.
 - **Execution**: Generates the initial `RunResponse` based on the user's task and injected memory rules.
 
 #### 2.2.2 The Verifier (`verifier_agent.py`)
@@ -46,7 +46,7 @@ _Threshold_: The response must achieve a score $\geq 0.60$ to pass.
 
 - **Model**: `qwen3.5:9b` (Low temperature: `0.05`).
 - **Role**: Targeted refinement.
-- **Offloading**: Same as solver, executes on R730 side to maintain cache consistency.
+- **Offloading**: Same as solver, executes on Turing side to maintain cache consistency.
 - **Execution**: If the Verifier fails the response, the Corrector receives the original task, the failed response, and the exact failure reason (e.g., "SyntaxError on line 42"). It is instructed to perform _surgical_ fixes without altering working components.
 
 ### 2.3 Process-Level Rewards and Langfuse Tracing

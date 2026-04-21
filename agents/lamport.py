@@ -1,4 +1,4 @@
-"""
+﻿"""
 Coordinator Mode — Multi-Worker Orchestration System
 
 Phase 1 Integration: Hybrid Python mechanics + LLM synthesis
@@ -30,7 +30,7 @@ from logger_setup import setup_logger
 from config import AGNO_DB_URL, ARCHITECT_MODEL
 from utils.gpu_queue import request_lock, get_best_host_for_model
 
-logger = setup_logger("Coordinator")
+logger = setup_logger("Lamport")
 
 # --- JWT-ACE child card derivation (graceful fallback if unavailable) ---
 try:
@@ -43,7 +43,7 @@ except ImportError:
     _JWT_AVAILABLE = False
 
 # --- MemPalace team memory (graceful fallback if unavailable) ---
-def _team_store(team_id: str, key: str, value: str, author: str = "coordinator"):
+def _team_store(team_id: str, key: str, value: str, author: str = "lamport"):
     try:
         from mempalace_client import mempalace
         mempalace.team_store(team_id, key, value, author_agent=author)
@@ -315,7 +315,7 @@ def _get_agent_for_role(role: str, session_id: str = None) -> Agent:
     OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
     if role_lower in ("architect", "coder", "devops"):
-        from architect_agent import get_architect_agent
+        from leibniz_agent import get_architect_agent
         return get_architect_agent(session_id=session_id)
 
     elif role_lower == "analyst":
@@ -356,8 +356,8 @@ def _get_agent_for_role(role: str, session_id: str = None) -> Agent:
         )
 
     else:
-        # Default: architect agent
-        from architect_agent import get_architect_agent
+        # Default: leibniz agent
+        from leibniz_agent import get_architect_agent
         return get_architect_agent(session_id=session_id)
 
 

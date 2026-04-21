@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import os
 import json
@@ -6,7 +6,7 @@ import time
 import requests
 from datetime import datetime
 import plotly.express as px
-from config import CONTROL_NODE_IP, LANGFUSE_HOST
+from config import HOPPER_IP, LANGFUSE_HOST
 
 # Setup Page
 st.set_page_config(
@@ -121,10 +121,10 @@ def get_system_health():
     
     # --- Control Plane: HTTP Health Checks ---
     cp_services = [
-        {"name": "Langfuse",     "url": f"http://{CONTROL_NODE_IP}:3000/api/public/health", "port": 3000},
+        {"name": "Langfuse",     "url": f"http://{HOPPER_IP}:3000/api/public/health", "port": 3000},
         {"name": "PostgreSQL",   "url": None,                                          "port": 5432},
         {"name": "SPIRE Server", "url": None,                                          "port": 8081},
-        {"name": "MinIO API",    "url": f"http://{CONTROL_NODE_IP}:9190/minio/health/live", "port": 9190},
+        {"name": "MinIO API",    "url": f"http://{HOPPER_IP}:9190/minio/health/live", "port": 9190},
         {"name": "MinIO Console","url": None,                                          "port": 9191},
     ]
     # Note: ClickHouse has no host-exposed port (internal to swarm_net only)
@@ -139,7 +139,7 @@ def get_system_health():
                 import socket
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.settimeout(2)
-                result_code = s.connect_ex((CONTROL_NODE_IP, svc["port"]))
+                result_code = s.connect_ex((HOPPER_IP, svc["port"]))
                 s.close()
                 alive = (result_code == 0)
                 
@@ -214,7 +214,7 @@ def get_recent_traces():
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/shield.png", width=60)
     st.title("Ops Portal")
-    st.caption(f"v1.3.0 | Control Plane: {CONTROL_NODE_IP}")
+    st.caption(f"v1.3.0 | Control Plane: {HOPPER_IP}")
     
     nav = st.radio("Navigation", ["Dashboard", "Swarm Observer", "Evidence Locker", "Control Room", "AI Tuning Studio"], label_visibility="collapsed")
     
@@ -253,7 +253,7 @@ if nav == "Dashboard":
             st.warning("No container data available.")
         
     with c_ctrl:
-        st.markdown(f"### 🎮 Control Plane ({CONTROL_NODE_IP})")
+        st.markdown(f"### 🎮 Control Plane ({HOPPER_IP})")
         ctrl_data = health["containers"]["control_plane"]
         if ctrl_data:
             df_ctrl = pd.DataFrame(ctrl_data)
@@ -571,4 +571,5 @@ elif nav == "AI Tuning Studio":
                 except Exception as e:
                     st.error(f"Connection Error: {e}")
                     st.caption(f"Failed to reach BMO Voice at {bmo_url}. Ensure service is running.")
+
 

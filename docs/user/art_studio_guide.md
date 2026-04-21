@@ -1,4 +1,4 @@
-# Art Studio Guide
+﻿# Art Studio Guide
 
 > **Back to:** [Documentation Index](../INDEX.md)
 
@@ -150,7 +150,7 @@ A chronological generation log listing all completed generations with mode icons
 | `ui/src/components/art-studio/GalleryPanel.tsx` | Implementation | Gallery grid with image/3D tabs |
 | `ui/src/stores/artStudioStore.ts` | Implementation | Client-side state (mode, settings, history) |
 | `agents/router.py` | Implementation | Intent detection routing creative requests |
-| `r730_gateway/comfyui/` | Infrastructure | ComfyUI workflows for image & 3D generation |
+| `turing_gateway/comfyui/` | Infrastructure | ComfyUI workflows for image & 3D generation |
 | [TripoSG](https://github.com/VAST-AI-Research/TripoSG) | External | Text/image-to-3D mesh pipeline |
 | [Hunyuan3D](https://github.com/Tencent/Hunyuan3D-2) | External | High-quality textured 3D generation |
 | [ComfyUI](https://github.com/comfyanonymous/ComfyUI) | External | Diffusion model workflow engine |

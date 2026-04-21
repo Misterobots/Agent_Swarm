@@ -1,4 +1,4 @@
----
+﻿---
 title: Core Concepts
 ---
 
@@ -126,9 +126,9 @@ stateDiagram-v2
 
 | Tier | Node | Purpose |
 |------|------|---------|
-| **Control Plane** | Dell Wyse 5070 ({{ control_node_ip }}) | Identity, databases, observability, memory |
-| **Execution Plane** | Justin-PC ({{ execution_node_ip }}) | GPU inference, agent runtime, creative tools |
-| **Gateway** | Dell R730 ({{ gateway_node_ip }}) | Reverse proxy, monitoring, secondary inference |
+| **Control Plane** | Hopper ({{ hopper_ip }}) | Identity, databases, observability, memory |
+| **Execution Plane** | Lovelace ({{ lovelace_ip }}) | GPU inference, agent runtime, creative tools |
+| **Gateway** | Turing ({{ turing_ip }}) | Reverse proxy, monitoring, secondary inference |
 
 The tiers are connected over a flat LAN (192.168.2.0/24). Traefik on the Gateway routes external traffic to the appropriate backend.
 
@@ -137,3 +137,5 @@ The tiers are connected over a flat LAN (192.168.2.0/24). Traefik on the Gateway
 - [Architecture Deep-Dive](../architecture/index.md) — full technical details
 - [Data Flow](../architecture/data-flow.md) — how a request travels through the system
 - [Security Model](../architecture/security-model.md) — SPIFFE, JWT-ACE, MAESTRO in depth
+
+

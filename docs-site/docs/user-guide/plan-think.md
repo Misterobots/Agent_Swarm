@@ -348,3 +348,5 @@ curl -X POST http://localhost:8008/v1/chat \
     | Think tag parser | `agents/router.py` — `_parse_think_tags()` |
     | ChatRequest model | `agents/main.py` — `ChatRequest` class |
 
+
+

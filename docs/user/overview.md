@@ -1,4 +1,4 @@
-# Home AI Lab — System Overview
+﻿# Home AI Lab — System Overview
 
 > **Back to:** [Documentation Index](../INDEX.md)
 
@@ -98,7 +98,7 @@ The current system is running **Version 3.4** (Phase 6 complete):
 
 | Source | Type | Relevance |
 |--------|------|-----------|
-| `r730_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
+| `turing_gateway/docker-compose.yml` | Infrastructure | Gateway Node service definitions |
 | `execution_plane/docker-compose.yml` | Infrastructure | Execution Node (GPU + agent runtime) |
 | `control_plane/docker-compose.yml` | Infrastructure | Control Node (Langfuse, SPIRE, PostgreSQL) |
 | `ui/src/app/` | Implementation | Hive Mind UI workspace routing |
@@ -126,7 +126,7 @@ The current system is running **Version 3.4** (Phase 6 complete):
 
 ### Updating Service URLs Table
 
-When service ports or URLs change, update the "How Do I Access It?" table. Cross-reference `r730_gateway/docker-compose.yml` for current port mappings.
+When service ports or URLs change, update the "How Do I Access It?" table. Cross-reference `turing_gateway/docker-compose.yml` for current port mappings.
 
 ### Updating Workspaces Table
 
