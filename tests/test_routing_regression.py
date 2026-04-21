@@ -450,7 +450,7 @@ class TestConfidenceCascade:
 
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  4. KEYWORD OVERRIDES IN MAIN ROUTER (router.py chat_swarm)            ║
+# ║  4. KEYWORD OVERRIDES IN MAIN ROUTER (church.py chat_swarm)            ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 class TestKeywordOverrides:
@@ -562,7 +562,7 @@ class TestVisionImageRegression:
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 class TestConstraintContext:
-    """Tests for _extract_constraint_context in router.py."""
+    """Tests for _extract_constraint_context in church.py."""
 
     def test_extracts_constraint_keywords(self):
         from church import _extract_constraint_context
@@ -679,7 +679,7 @@ class TestIntentCapabilities:
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 class TestSkillAndModeOverrides:
-    """Tests for skill hint override and research mode override logic in router.py."""
+    """Tests for skill hint override and research mode override logic in church.py."""
 
     def test_skill_hint_mapping_keys(self):
         """Verify the skill-to-intent mapping dictionary."""

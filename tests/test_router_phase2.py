@@ -44,7 +44,7 @@ def mock_mempalace_module():
 
 class TestMemPalaceRecall:
     """
-    Tests the recall logic from router.py ~line 644:
+    Tests the recall logic from church.py ~line 644:
         from mempalace_client import mempalace as _mp
         relevant = _mp.search(user_input, owner_id=owner_id, limit=5)
         strong = [m for m in relevant if (m.get("score") or 0) > 0.5]

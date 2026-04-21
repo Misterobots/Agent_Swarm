@@ -5,11 +5,11 @@ import time
 # Add root to path so we can import agents
 # Add root to path so we can import agents
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-# Add agents dir to path for internal agent imports (e.g. router importing architect_agent)
+# Add agents dir to path for internal agent imports (e.g. church importing leibniz_agent)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../agents")))
 
 from agents.registry import registry
-from agents.router import detect_intent
+from agents.dispatcher import detect_intent
 from agents.security_agent import get_security_agent
 
 def test_registry():

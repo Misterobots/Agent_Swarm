@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
-logger = logging.getLogger("agents.buddy_service")
+logger = logging.getLogger("agents.kay_service")
 
 DB_PATH = os.getenv("BUDDY_DB_PATH", os.path.expanduser("~/.hive/buddy.db"))
 

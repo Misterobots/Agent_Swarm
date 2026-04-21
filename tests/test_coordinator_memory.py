@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "agents"))
 
 
 # ---------------------------------------------------------------------------
-# Pre-import patches: mock heavy deps that coordinator.py imports at module level
+# Pre-import patches: mock heavy deps that lamport.py imports at module level
 # ---------------------------------------------------------------------------
 # phi.agent, phi.model.ollama, gpu_queue, etc.
 mock_phi_agent = MagicMock()
@@ -36,7 +36,7 @@ mock_config.AGNO_DB_URL = "sqlite:///test.db"
 mock_config.ARCHITECT_MODEL = "test-model"
 mock_config.HOPPER_IP = "127.0.0.1"
 
-# Install mocks before importing coordinator
+# Install mocks before importing lamport
 for mod_name, mock_obj in {
     "phi": MagicMock(),
     "phi.agent": mock_phi_agent,
@@ -49,7 +49,7 @@ for mod_name, mock_obj in {
     sys.modules.setdefault(mod_name, mock_obj)
 
 
-from coordinator import _team_store, _team_clear, WorkerInfo, WorkerState
+from lamport import _team_store, _team_clear, WorkerInfo, WorkerState
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -86,7 +86,7 @@ class TestTeamStoreHelper:
         with patch.dict(sys.modules, {"mempalace_client": MagicMock(mempalace=mock_mp)}):
             _team_store("coord-abc", "key", "value")
             mock_mp.team_store.assert_called_once_with(
-                "coord-abc", "key", "value", author_agent="coordinator"
+                "coord-abc", "key", "value", author_agent="lamport"
             )
 
 

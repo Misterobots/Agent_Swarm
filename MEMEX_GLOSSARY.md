@@ -12,7 +12,7 @@
 | **Turing** | Gateway · Monitoring · Reverse Proxy | 192.168.2.103 | `TURING_IP` | R730 |
 | **Lovelace** | Compute · GPU · AI Inference | 192.168.2.101 | `LOVELACE_IP` | Justin-PC |
 | **Hopper** | Control Plane · Orchestration | 192.168.2.102 | `HOPPER_IP` | Wyse 5070 / Controle Node |
-| **Shannon** | Voice · IoT · Edge | 192.168.2.157 | `SHANNON_IP` | Pi / BMO |
+| **BMO** | Voice · IoT · Edge | 192.168.2.106 | `BMO_IP` | Pi / BMO (retains original name) |
 
 ---
 
@@ -83,7 +83,7 @@
 | R730 | Turing | Node |
 | Justin-PC | Lovelace | Node |
 | Wyse 5070 / Controle Node | Hopper | Node |
-| Pi / BMO | Shannon | Node |
+| Pi / BMO | BMO (name retained) | Node |
 | r730_gateway/ | turing_gateway/ | Directory |
 | traefik | babbage | Container |
 | prometheus | jacquard | Container |

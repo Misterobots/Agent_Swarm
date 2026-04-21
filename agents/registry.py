@@ -33,7 +33,7 @@ class AgentRegistry:
             description="Autonomous coding, refactoring, and system architecture specialist.",
             security_level="L3_ADMIN",
             capabilities=["file_ops.write", "file_ops.read", "terminal.exec", "terminal.classify", "terminal.parse", "git.ops", "browser.fetch", "browser.search", "skill_exec", "remote_exec", "bridge_submit", "bridge_proxy", "workflow_exec", "grpc_infer"],
-            endpoint="local://agents.architect_agent"
+            endpoint="local://agents.leibniz_agent"
         ))
 
         # 2. The Art Director (Creative)
