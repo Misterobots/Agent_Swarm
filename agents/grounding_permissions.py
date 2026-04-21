@@ -93,6 +93,7 @@ class GroundingPermissionsStore:
             "owner_id": owner_id,
             "web_grounding": self.is_permitted(owner_id, "web_grounding"),
             "docs_grounding": self.is_permitted(owner_id, "docs_grounding"),
+            "file_grounding": self.is_permitted(owner_id, "file_grounding"),
         }
 
     def reload(self) -> None:

@@ -91,7 +91,7 @@ export default function GovernancePage() {
             onChange={(e) => setNewType(e.target.value as GovernanceRequest["type"])}
             className="rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
           >
-            {(["PACKAGE", "MODEL", "PERMISSION", "FEATURE", "OTHER"] as const).map((type) => (
+            {(["PACKAGE", "MODEL", "PERMISSION", "FEATURE", "GROUNDING_WEB", "GROUNDING_DOCS", "GROUNDING_FILE", "OTHER"] as const).map((type) => (
               <option key={type} value={type}>{type}</option>
             ))}
           </select>

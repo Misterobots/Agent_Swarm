@@ -387,6 +387,7 @@ class ChatRequest(BaseModel):
     dev_mode: bool = False            # Phase 2: enable AI agentic coding tools in dev workspace
     grounding_web: bool = False       # inject live web search results (requires governance permission)
     grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
+    grounding_file: bool = False      # inject local workspace file content (requires governance permission)
 
 
 # ---------------------------------------------------------------------------
@@ -873,6 +874,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     attachments=request.attachments,
                     grounding_web=request.grounding_web,
                     grounding_docs=request.grounding_docs,
+                    grounding_file=request.grounding_file,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -1084,6 +1086,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             attachments=request.attachments,
             grounding_web=request.grounding_web,
             grounding_docs=request.grounding_docs,
+            grounding_file=request.grounding_file,
         )
         full_resp = ""
         for update in gen:
@@ -1273,6 +1276,9 @@ async def update_request_status(req_id: str, update: UpdateRequestModel):
             elif _type in ("GROUNDING_DOCS", "grounding_docs"):
                 _gp.grant(item.user, "docs_grounding")
                 logger.info(f"[Grounding] docs_grounding granted to {item.user}")
+            elif _type in ("GROUNDING_FILE", "grounding_file"):
+                _gp.grant(item.user, "file_grounding")
+                logger.info(f"[Grounding] file_grounding granted to {item.user}")
         except Exception as _perm_err:
             logger.error(f"[Grounding] Failed to write permission on approval: {_perm_err}")
 
@@ -1294,7 +1300,7 @@ async def health_nodes():
 from grounding_permissions import grounding_permissions as _grounding_perm_store
 
 class GroundingRequestModel(BaseModel):
-    permission: str  # "web_grounding" or "docs_grounding"
+    permission: str  # "web_grounding", "docs_grounding", or "file_grounding"
     reason: str = ""
 
 @app.get("/api/v1/grounding/status")
@@ -1312,17 +1318,18 @@ async def request_grounding_permission(
 ):
     """Submit a governance request to unlock a grounding capability.
 
-    The request is stored as a GROUNDING_WEB or GROUNDING_DOCS governance item.
+    The request is stored as a GROUNDING_WEB, GROUNDING_DOCS, or GROUNDING_FILE governance item.
     An admin can approve it via POST /api/v1/request/{id}/status which will
     automatically write the permission to the grounding store.
     """
-    if req.permission not in ("web_grounding", "docs_grounding"):
-        raise HTTPException(status_code=400, detail="permission must be 'web_grounding' or 'docs_grounding'")
+    if req.permission not in ("web_grounding", "docs_grounding", "file_grounding"):
+        raise HTTPException(status_code=400, detail="permission must be 'web_grounding', 'docs_grounding', or 'file_grounding'")
 
     owner_id = _resolve_owner_id(None, http_request)
     req_type_map = {
         "web_grounding": "GROUNDING_WEB",
         "docs_grounding": "GROUNDING_DOCS",
+        "file_grounding": "GROUNDING_FILE",
     }
     gov_type = req_type_map[req.permission]
     description = (

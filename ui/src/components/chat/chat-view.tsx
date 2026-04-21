@@ -13,6 +13,7 @@ import { UltraplanToggle } from "./ultraplan-toggle";
 import { UltrathinkToggle } from "./ultrathink-toggle";
 import { WebGroundingToggle } from "./web-grounding-toggle";
 import { DocGroundingToggle } from "./doc-grounding-toggle";
+import { FileGroundingToggle } from "./file-grounding-toggle";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
 import { Bot, Brain, Code2, X, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -164,6 +165,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           {!isMobile && <UltrathinkToggle />}
           {!isMobile && <WebGroundingToggle />}
           {!isMobile && <DocGroundingToggle />}
+          {!isMobile && <FileGroundingToggle />}
           {!isMobile && activeConversationId && (
             <button
               type="button"
@@ -201,6 +203,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                   <div className="px-2 py-1.5"><UltrathinkToggle /></div>
                   <div className="px-2 py-1.5"><WebGroundingToggle /></div>
                   <div className="px-2 py-1.5"><DocGroundingToggle /></div>
+                  <div className="px-2 py-1.5"><FileGroundingToggle /></div>
                   {activeConversationId && (
                     <button
                       type="button"

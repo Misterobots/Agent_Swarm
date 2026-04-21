@@ -17,6 +17,7 @@ export interface ChatStreamOptions {
   attachments?: FileAttachment[];
   groundingWeb?: boolean;
   groundingDocs?: boolean;
+  groundingFile?: boolean;
 }
 
 export async function* sendChatStream(
@@ -34,6 +35,7 @@ export async function* sendChatStream(
   devMode?: boolean,
   groundingWeb?: boolean,
   groundingDocs?: boolean,
+  groundingFile?: boolean,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -51,6 +53,7 @@ export async function* sendChatStream(
   if (devMode) body.dev_mode = true;
   if (groundingWeb) body.grounding_web = true;
   if (groundingDocs) body.grounding_docs = true;
+  if (groundingFile) body.grounding_file = true;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",

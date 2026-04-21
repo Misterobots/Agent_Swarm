@@ -75,10 +75,11 @@
     "description": "test",
     "user": "coding_user",
     "timestamp": "2026-04-20T22:44:36.515632",
-    "status": "PENDING",
+    "status": "APPROVED",
     "assessment_notes": [
       "Security Assessment: MANUAL_REVIEW: Non-standard request type.",
-      "Technical Check: COMPATIBLE"
+      "Technical Check: COMPATIBLE",
+      "Updated in Next UI to APPROVED"
     ],
     "admin_notes": null
   },
@@ -88,10 +89,11 @@
     "description": "ui retest after fix",
     "user": "coding_user",
     "timestamp": "2026-04-20T22:49:38.861028",
-    "status": "PENDING",
+    "status": "APPROVED",
     "assessment_notes": [
       "Security Assessment: MANUAL_REVIEW: Non-standard request type.",
-      "Technical Check: COMPATIBLE"
+      "Technical Check: COMPATIBLE",
+      "Updated in Next UI to APPROVED"
     ],
     "admin_notes": null
   }

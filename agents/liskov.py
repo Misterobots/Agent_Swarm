@@ -18,6 +18,7 @@ class RequestType(str, Enum):
     FEATURE = "FEATURE"          # Request new feature
     GROUNDING_WEB = "GROUNDING_WEB"    # Grant internet/web grounding access
     GROUNDING_DOCS = "GROUNDING_DOCS"  # Grant document/library grounding access
+    GROUNDING_FILE = "GROUNDING_FILE"  # Grant local workspace/filespace grounding access
     OTHER = "OTHER"
 
 class RequestStatus(str, Enum):

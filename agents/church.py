@@ -699,6 +699,7 @@ def chat_swarm(
     attachments: list | None = None,
     grounding_web: bool = False,
     grounding_docs: bool = False,
+    grounding_file: bool = False,
 ):
     """
     Generator that yields status updates and final response for UI.
@@ -714,6 +715,8 @@ def chat_swarm(
       and inject top results as [Web Grounding Context] before the prompt.
     - grounding_docs: If True and owner has permission, query the knowledge base and
       inject relevant chunks as [Document Context] before the prompt.
+    - grounding_file: If True and owner has permission, scan the workspace for relevant
+      files and inject matched content as [File Context] before the prompt.
     """
     AGENT_STATE.labels(agent_name="Router").set(2)
     WORKFLOW_STEPS.labels(status="started", agent_type="Router").inc()
@@ -923,7 +926,59 @@ def chat_swarm(
             except Exception as _dg_err:
                 logger.error("[Router] Doc grounding failed (non-fatal): %s", _dg_err)
 
-        # 2. Security Check (on the Merged Input)
+        # 1f. File Grounding — inject workspace file content when permitted
+        if grounding_file:
+            try:
+                from grounding_permissions import grounding_permissions as _gp
+                if _gp.is_permitted(owner_id or "", "file_grounding"):
+                    import os as _os
+                    _workspace_root = _os.environ.get("WORKSPACE_PATH", "/workspace")
+                    yield {"type": "status", "content": "📁 File Grounding: Scanning workspace..."}
+                    _query_words = set(user_input.lower().split())
+                    _file_snippets: list[str] = []
+                    try:
+                        for _root, _dirs, _files in _os.walk(_workspace_root):
+                            # Skip hidden dirs and common noise dirs
+                            _dirs[:] = [d for d in _dirs if not d.startswith(".") and d not in (
+                                "__pycache__", "node_modules", ".git", ".venv", "venv"
+                            )]
+                            for _fname in _files:
+                                if not _fname.endswith((".py", ".md", ".txt", ".json", ".yaml", ".yml", ".sh", ".env")):
+                                    continue
+                                _fpath = _os.path.join(_root, _fname)
+                                _rel = _os.path.relpath(_fpath, _workspace_root)
+                                # Relevance: filename or path words must intersect query
+                                _path_words = set(_rel.lower().replace("/", " ").replace("_", " ").replace("-", " ").split())
+                                if not _query_words.intersection(_path_words):
+                                    continue
+                                try:
+                                    with open(_fpath, "r", encoding="utf-8", errors="ignore") as _fh:
+                                        _content = _fh.read(2000)  # cap at 2 KB per file
+                                    _file_snippets.append(f"[File: {_rel}]\n{_content}")
+                                    if len(_file_snippets) >= 5:
+                                        break
+                                except Exception:
+                                    pass
+                            if len(_file_snippets) >= 5:
+                                break
+                    except Exception as _walk_err:
+                        logger.warning("[Router] File grounding walk error: %s", _walk_err)
+                    if _file_snippets:
+                        file_msg = {"role": "system", "content": "[File Context]\n" + "\n\n".join(_file_snippets)}
+                        if history is None:
+                            history = [file_msg]
+                        else:
+                            history.append(file_msg)
+                        yield _t(f"→ File grounding: {len(_file_snippets)} file(s) injected")
+                    else:
+                        yield _t("→ File grounding: no matching files found")
+                else:
+                    logger.warning(
+                        "[Router] File grounding requested by %s but permission not granted", owner_id
+                    )
+                    yield {"type": "status", "content": "⚠️ File grounding not permitted — submit a governance request."}
+            except Exception as _fg_err:
+                logger.error("[Router] File grounding failed (non-fatal): %s", _fg_err)
         yield {"type": "status", "content": "🔒 Security Agent: Scanning input..."}
         security = get_security_agent()
         AGENT_STATE.labels(agent_name="Security").set(2)

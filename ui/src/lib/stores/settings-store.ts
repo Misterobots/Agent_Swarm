@@ -16,6 +16,7 @@ interface SettingsState {
   autoFeedPlan: boolean;
   groundingWeb: boolean;
   groundingDocs: boolean;
+  groundingFile: boolean;
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
@@ -27,6 +28,7 @@ interface SettingsState {
   setAutoFeedPlan: (on: boolean) => void;
   setGroundingWeb: (on: boolean) => void;
   setGroundingDocs: (on: boolean) => void;
+  setGroundingFile: (on: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -43,6 +45,7 @@ export const useSettingsStore = create<SettingsState>()(
       autoFeedPlan: false,
       groundingWeb: false,
       groundingDocs: false,
+      groundingFile: false,
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),
@@ -54,6 +57,7 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoFeedPlan: (autoFeedPlan) => set({ autoFeedPlan }),
       setGroundingWeb: (groundingWeb) => set({ groundingWeb }),
       setGroundingDocs: (groundingDocs) => set({ groundingDocs }),
+      setGroundingFile: (groundingFile) => set({ groundingFile }),
     }),
     { name: "hive-settings" }
   )
