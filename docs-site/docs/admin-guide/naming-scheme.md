@@ -70,35 +70,35 @@ graph TB
 
 ## Containers by Node
 
-=== "Turing"
+### Turing
 
-    | Pioneer Name | Tool | Purpose |
-    |---|---|---|
-    | `babbage` | Traefik | Reverse proxy / TLS termination |
-    | `jacquard` | Prometheus | Metrics collection |
-    | `hollerith` | Grafana | Metrics visualization |
-    | `knuth` | Loki | Log aggregation |
-    | `mccarthy` | Ollama (gateway) | LLM request routing |
-    | `diffie` | SPIRE agent | Identity attestation |
+| Pioneer Name | Tool | Purpose |
+|---|---|---|
+| `babbage` | Traefik | Reverse proxy / TLS termination |
+| `jacquard` | Prometheus | Metrics collection |
+| `hollerith` | Grafana | Metrics visualization |
+| `knuth` | Loki | Log aggregation |
+| `mccarthy` | Ollama (gateway) | LLM request routing |
+| `diffie` | SPIRE agent | Identity attestation |
 
-=== "Lovelace"
+### Lovelace
 
-    | Pioneer Name | Tool | Purpose |
-    |---|---|---|
-    | `minsky` | Ollama (compute) | GPU-backed LLM inference |
-    | `wozniak` | ComfyUI | Image/video generation |
-    | `engelbart` | OpenHands | AI coding agent |
+| Pioneer Name | Tool | Purpose |
+|---|---|---|
+| `minsky` | Ollama (compute) | GPU-backed LLM inference |
+| `wozniak` | ComfyUI | Image/video generation |
+| `engelbart` | OpenHands | AI coding agent |
 
-=== "Hopper"
+### Hopper
 
-    | Pioneer Name | Tool | Purpose |
-    |---|---|---|
-    | `diffie` | SPIRE server | SPIFFE identity authority |
-    | `floyd` | Langfuse | LLM observability/tracing |
-    | `bush` | MemPalace | Vector memory store |
-    | `codd` | PostgreSQL | Relational database |
-    | `backus` | MinIO | Object storage |
-    | `ritchie` | Redis | Message bus / cache |
+| Pioneer Name | Tool | Purpose |
+|---|---|---|
+| `diffie` | SPIRE server | SPIFFE identity authority |
+| `floyd` | Langfuse | LLM observability/tracing |
+| `bush` | MemPalace | Vector memory store |
+| `codd` | PostgreSQL | Relational database |
+| `backus` | MinIO | Object storage |
+| `ritchie` | Redis | Message bus / cache |
 
 ---
 
