@@ -8,6 +8,13 @@ Everything needed to deploy, configure, operate, and maintain Agent Swarm.
 
 ## Sections
 
+### Overview
+
+| Guide | Description |
+|-------|-------------|
+| [Naming Scheme](naming-scheme.md) | Pioneer naming map — nodes, containers, agents |
+| [Port Map](port-map.md) | All ports across all nodes |
+
 ### Deployment
 
 Step-by-step guides for deploying each node from scratch.

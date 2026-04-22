@@ -195,6 +195,7 @@ nav:
       - SPIRE: admin-guide/configuration/spire.md
       - Models: admin-guide/configuration/models.md
     - Port Map: admin-guide/port-map.md
+    - Naming Scheme: admin-guide/naming-scheme.md
   - Developer Guide:
     - developer-guide/index.md
     - Local Development: developer-guide/local-dev.md
