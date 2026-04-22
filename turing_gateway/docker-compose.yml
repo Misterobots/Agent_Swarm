@@ -314,7 +314,7 @@ services:
     hostname: open-webui
     restart: unless-stopped
     depends_on:
-      - ollama
+      - mccarthy
     environment:
       # Point to local Ollama
       - OLLAMA_BASE_URL=http://mccarthy:11434
