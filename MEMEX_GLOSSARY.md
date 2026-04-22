@@ -1,7 +1,7 @@
 # Memex — Pioneer Naming Glossary
 
 > **Naming scheme adopted:** April 20, 2026  
-> All infrastructure components use names from Computing Pioneers. Named projects (MemPalace, ComfyUI, etc.) retain their original names with the Pioneer container name as a parenthetical reference.
+> Generic infrastructure and widely-used platforms use Pioneer names as container handles. Specialized developer projects (e.g. MemPalace) retain their original names out of respect for the developers.
 
 ---
 
@@ -40,7 +40,7 @@
 |---|---|---|
 | `diffie` | SPIRE server | SPIFFE identity authority |
 | `floyd` | Langfuse | LLM observability/tracing |
-| `bush` | MemPalace | Vector memory store |
+| `mempalace` | MemPalace | Vector memory store *(name retained)* |
 | `codd` | PostgreSQL | Relational database |
 | `backus` | MinIO | Object storage |
 
@@ -69,9 +69,10 @@
 
 | Category | Rule | Example |
 |---|---|---|
-| Generic infrastructure | Use Pioneer container name only | "check `jacquard` metrics" |
-| Named projects / addons | Original name + Pioneer ref in parens | "MemPalace (`bush`)", "ComfyUI (`wozniak`)" |
-| Physical nodes | Pioneer name only | "deploy to Turing", "SSH into Lovelace" |
+| Generic infrastructure tools | Pioneer container name | `jacquard` (Prometheus), `ritchie` (Redis) |
+| Popular platforms | Pioneer container name | `wozniak` (ComfyUI), `floyd` (Langfuse) |
+| Specialized developer projects | Retain original name | `mempalace` (MemPalace) |
+| Physical nodes | Pioneer name only | "deploy to Turing", "SSH into Hopper" |
 | Env vars | Pioneer prefix | `TURING_IP`, `HOPPER_IP` |
 
 ---
@@ -96,7 +97,7 @@
 | OpenHands container | engelbart | Container |
 | SPIRE | diffie | Container |
 | Langfuse | floyd | Container |
-| MemPalace container | bush | Container |
+| MemPalace container | mempalace *(name retained)* | Container |
 | postgres container | codd | Container |
 | minio container | backus | Container |
 | router.py / herald.py | church.py | Agent |

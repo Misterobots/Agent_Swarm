@@ -4,7 +4,7 @@ title: Naming Scheme
 
 # Pioneer Naming Scheme
 
-All infrastructure components use names from Computing Pioneers. Named projects (MemPalace, ComfyUI, etc.) retain their original names; the Pioneer container name is used as the operational handle.
+All infrastructure components use names from Computing Pioneers. Generic tools and widely-used platforms use Pioneer names as their operational handle. Specialized developer projects retain their original names out of respect for the developers.
 
 > **Adopted:** April 20, 2026
 
@@ -38,7 +38,7 @@ graph TB
         H_role["Control Plane · Orchestration"]
         diffie_h["diffie / SPIRE server"]
         floyd["floyd / Langfuse"]
-        bush["bush / MemPalace"]
+        mempalace["mempalace / MemPalace"]
         codd["codd / PostgreSQL"]
         backus["backus / MinIO"]
         ritchie["ritchie / Redis"]
@@ -95,7 +95,7 @@ graph TB
 |---|---|---|
 | `diffie` | SPIRE server | SPIFFE identity authority |
 | `floyd` | Langfuse | LLM observability/tracing |
-| `bush` | MemPalace | Vector memory store |
+| `mempalace` | MemPalace | Vector memory store *(name retained)* |
 | `codd` | PostgreSQL | Relational database |
 | `backus` | MinIO | Object storage |
 | `ritchie` | Redis | Message bus / cache |
@@ -147,8 +147,9 @@ graph LR
 | Category | Rule | Example |
 |---|---|---|
 | Physical nodes | Pioneer name only | `deploy to Turing`, `SSH into Hopper` |
-| Containers | Pioneer name only | `check jacquard metrics`, `restart bush` |
-| Named projects | Original name + Pioneer ref | `MemPalace (bush)`, `ComfyUI (wozniak)` |
+| Generic infrastructure tools | Pioneer container name | `jacquard` (Prometheus), `ritchie` (Redis) |
+| Popular platforms | Pioneer container name | `wozniak` (ComfyUI), `floyd` (Langfuse) |
+| Specialized developer projects | Retain original name | `mempalace` (MemPalace) |
 | Env vars | Pioneer prefix + `_IP` / `_HOST` | `HOPPER_IP`, `TURING_HOST` |
 | Agent files | Pioneer last name | `church.py`, `liskov.py` |
 
@@ -174,7 +175,7 @@ graph LR
 | OpenHands container | engelbart | Container |
 | SPIRE | diffie | Container |
 | Langfuse | floyd | Container |
-| MemPalace container | bush | Container |
+| MemPalace container | mempalace *(name retained)* | Container |
 | postgres container | codd | Container |
 | minio container | backus | Container |
 | router.py / herald.py | church.py | Agent |
