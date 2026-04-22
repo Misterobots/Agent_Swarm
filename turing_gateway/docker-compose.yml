@@ -478,9 +478,8 @@ services:
     env_file:
       - ../network.env
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://ollama-r730:11434
       - SECONDARY_OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
-      - ROUTER_MODEL=${ROUTER_MODEL:-nemotron-mini}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen2.5-coder:14b-instruct-q4_k_m}
       - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
       - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-llama3.2:3b}
@@ -490,9 +489,6 @@ services:
       - AUTHENTIK_URL=${AUTHENTIK_URL:-http://authentik:9000}
     ports:
       - "50051:50051"
-    depends_on:
-      ollama:
-        condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
