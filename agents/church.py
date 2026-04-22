@@ -847,7 +847,7 @@ def chat_swarm(
         if memory_enabled:
             try:
                 import httpx as _httpx_recall
-                _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.103:8200")
+                _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
                 with _httpx_recall.Client(timeout=10.0) as _mp_client:
                     _mp_resp = _mp_client.post(
                         f"{_mp_url}/v1/memories/search",

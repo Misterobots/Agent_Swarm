@@ -395,7 +395,7 @@ class ChatRequest(BaseModel):
 # ---------------------------------------------------------------------------
 import httpx as _httpx
 
-_MEMPALACE_API_URL = os.getenv("MEMPALACE_API_URL", "http://192.168.2.103:8200")
+_MEMPALACE_API_URL = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
 
 
 async def _mempalace_extract_http(conversation: str, owner_id: str | None = None) -> int:
