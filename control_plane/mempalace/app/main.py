@@ -591,6 +591,91 @@ async def palace_layout(
     return PalaceLayoutOut(wings=wings, total_memories=total)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# MCP / SSE — Model Context Protocol endpoint for VS Code + agents
+# Mounted at /mcp; SSE endpoint accessible at /mcp/sse
+# ═══════════════════════════════════════════════════════════════════════════
+
+from mcp.server.fastmcp import FastMCP
+
+_mcp = FastMCP("MemPalace")
+
+
+@_mcp.tool()
+async def search_memories_mcp(
+    query: str,
+    owner_id: str = "",
+    agent_id: str = "",
+    limit: int = 10,
+) -> str:
+    """Semantic search over memories in MemPalace. Returns top matches with scores."""
+    query_embedding = await embed_text(query)
+    distance = Memory.embedding.cosine_distance(query_embedding).label("distance")
+    stmt = select(Memory, distance).order_by(distance)
+    if owner_id:
+        stmt = stmt.where(Memory.owner_id == owner_id)
+    if agent_id:
+        stmt = stmt.where(Memory.agent_id == agent_id)
+    stmt = stmt.limit(limit)
+    async with async_session() as session:
+        rows = (await session.execute(stmt)).all()
+    if not rows:
+        return "No memories found."
+    lines = []
+    for mem, dist in rows:
+        score = round(1.0 - (dist or 0.0), 4)
+        lines.append(f"[{score}] ({mem.memory_type}/{mem.domain}) {mem.content}")
+    return "\n".join(lines)
+
+
+@_mcp.tool()
+async def store_memory_mcp(
+    content: str,
+    memory_type: str = "semantic",
+    domain: str = "general",
+    agent_id: str = "",
+    owner_id: str = "",
+) -> str:
+    """Store a new memory in MemPalace with an auto-generated embedding."""
+    embedding = await embed_text(content)
+    mem = Memory(
+        content=content,
+        memory_type=memory_type,
+        domain=domain,
+        agent_id=agent_id or None,
+        owner_id=owner_id or None,
+        embedding=embedding,
+        metadata_={},
+    )
+    async with async_session() as session:
+        session.add(mem)
+        await session.commit()
+        await session.refresh(mem)
+    logger.info("[MCP] Stored memory %s [%s/%s]", mem.id, memory_type, domain)
+    return f"Stored memory {mem.id} [{memory_type}/{domain}]"
+
+
+@_mcp.tool()
+async def get_memory_stats_mcp() -> str:
+    """Return total memory count and breakdown by type and domain."""
+    async with async_session() as session:
+        rows = (await session.execute(
+            select(
+                Memory.memory_type,
+                Memory.domain,
+                func.count(Memory.id),
+            ).group_by(Memory.memory_type, Memory.domain)
+        )).all()
+    total = sum(r[2] for r in rows)
+    lines = [f"Total: {total}"]
+    for mtype, domain, cnt in sorted(rows):
+        lines.append(f"  {mtype}/{domain}: {cnt}")
+    return "\n".join(lines)
+
+
+app.mount("/mcp", _mcp.sse_app())
+
+
 @app.get("/v1/palace/room", response_model=list[MemoryOut])
 async def palace_room_memories(
     wing: str,

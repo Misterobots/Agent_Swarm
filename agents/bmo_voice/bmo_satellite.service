@@ -1,0 +1,16 @@
+[Unit]
+Description=BMO Voice Satellite (Wake Word + STT)
+After=network.target sound.target bmo.service
+BindsTo=bmo.service
+
+[Service]
+User=misterobots
+WorkingDirectory=/home/misterobots/bmo_client
+EnvironmentFile=/home/misterobots/bmo_client/network.env
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/misterobots/bmo_client/venv/bin/python voice_satellite.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
