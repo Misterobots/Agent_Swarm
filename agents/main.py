@@ -589,6 +589,14 @@ def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optio
     if payload_user_id:
         return payload_user_id
 
+    # Check Authentik forward-auth headers (injected by Traefik forwardAuth middleware)
+    authentik_uid = request.headers.get("X-authentik-uid", "").strip()
+    if authentik_uid:
+        return authentik_uid
+    authentik_user = request.headers.get("X-authentik-username", "").strip()
+    if authentik_user:
+        return authentik_user
+
     agent_card = getattr(request.state, "agent_card", None)
     if not agent_card:
         return None
