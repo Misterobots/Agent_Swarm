@@ -344,6 +344,47 @@ services:
       - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
 
   # ═══════════════════════════════════════════════════════════════════════════════
+  # AGENT RUNTIME — FastAPI Backend (uvicorn :8000, exposed :8008)
+  # Runs on Turing; hive_ui and Traefik reach it via ai_lab_net DNS (agent_runtime)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  agent-runtime:
+    image: home-ai-lab/agent-runtime:latest
+    container_name: agent_runtime
+    hostname: execution-node
+    restart: unless-stopped
+    env_file:
+      - ../network.env
+    environment:
+      - OLLAMA_HOST=http://ollama-r730:11434
+      - PYTHONPATH=/app
+      - MEMPALACE_API_URL=http://mempalace:8200
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}
+      - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
+      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:14b}
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
+      - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+    ports:
+      - "8008:8000"
+    networks:
+      - ai_lab_net
+
+  # ═══════════════════════════════════════════════════════════════════════════════
   # UNIFIED UI (Hive Mind — Next.js)
   # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -357,7 +398,7 @@ services:
     env_file:
       - ../network.env
     environment:
-      - API_BASE_URL=http://${LOVELACE_HOST:-lovelace}:8008
+      - API_BASE_URL=http://agent_runtime:8000
       - MEMPALACE_BASE_URL=http://mempalace:8200
       - LANGFUSE_URL=http://${HOPPER_IP:-192.168.2.102}:3000
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
@@ -366,8 +407,6 @@ services:
       - NEXT_PUBLIC_GATEWAY_URL=http://${TURING_IP:-192.168.2.103}
       - NEXT_PUBLIC_GRAFANA_URL=http://${TURING_IP:-192.168.2.103}/grafana
       - GRAFANA_INTERNAL_URL=http://hollerith-turing:3000/grafana
-    extra_hosts:
-      - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
     volumes:
       - ../docs:/app/docs:ro
     ports:
@@ -416,7 +455,7 @@ services:
       - "traefik.http.routers.terminal-ws.priority=30"
       - "traefik.http.routers.terminal-ws.service=terminal-ws"
       - "traefik.http.routers.terminal-ws.middlewares=authentik@docker"
-      - "traefik.http.services.terminal-ws.loadbalancer.server.url=http://${LOVELACE_HOST:-lovelace}:8008"
+      - "traefik.http.services.terminal-ws.loadbalancer.server.url=http://agent_runtime:8000"
       - "traefik.http.routers.terminal-ws-ext.rule=Host(`hive.shivelymedia.com`) && PathPrefix(`/ws/terminal`)"
       - "traefik.http.routers.terminal-ws-ext.entrypoints=websecure"
       - "traefik.http.routers.terminal-ws-ext.priority=30"
