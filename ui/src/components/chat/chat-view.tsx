@@ -272,6 +272,11 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         ) : (
           <div className="max-w-3xl mx-auto px-3 md:px-0">
             {messages.map((msg, idx) => {
+              // Don't render an empty assistant placeholder while ThinkingIndicator is visible —
+              // it would show a lone blinking cursor on its own row.
+              if (showThinking && idx === messages.length - 1 && msg.role === "assistant" && !msg.content) {
+                return null;
+              }
               // Find the preceding user message for creative-redirect links
               let precedingUserPrompt: string | undefined;
               if (msg.role === "assistant") {
