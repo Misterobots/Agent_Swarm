@@ -10,64 +10,49 @@ All infrastructure components use names from Computing Pioneers. Named projects 
 
 ---
 
-## Overview Map
+## Node Overview
 
 ```mermaid
 graph TB
-    subgraph NODES["🖥️ Physical Nodes"]
-        T["<b>Turing</b><br/>192.168.2.103<br/><i>Gateway · Monitoring · Proxy</i><br/><small>formerly: R730</small>"]
-        L["<b>Lovelace</b><br/>192.168.2.101<br/><i>Compute · GPU · AI Inference</i><br/><small>formerly: Justin-PC</small>"]
-        H["<b>Hopper</b><br/>192.168.2.102<br/><i>Control Plane · Orchestration</i><br/><small>formerly: Wyse 5070</small>"]
-        B["<b>BMO</b><br/>192.168.2.106<br/><i>Voice · IoT · Edge</i><br/><small>name retained</small>"]
+    subgraph TURING["Turing — 192.168.2.103"]
+        direction TB
+        T_role["Gateway · Monitoring · Proxy"]
+        babbage["babbage / Traefik"]
+        jacquard["jacquard / Prometheus"]
+        hollerith["hollerith / Grafana"]
+        knuth["knuth / Loki"]
+        mccarthy["mccarthy / Ollama gateway"]
+        diffie_t["diffie / SPIRE agent"]
     end
 
-    subgraph TURING_SERVICES["Turing — Containers"]
-        babbage["babbage<br/><small>Traefik</small>"]
-        jacquard["jacquard<br/><small>Prometheus</small>"]
-        hollerith["hollerith<br/><small>Grafana</small>"]
-        knuth["knuth<br/><small>Loki</small>"]
-        mccarthy["mccarthy<br/><small>Ollama gateway</small>"]
-        diffie_t["diffie<br/><small>SPIRE agent</small>"]
+    subgraph LOVELACE["Lovelace — 192.168.2.101"]
+        direction TB
+        L_role["Compute · GPU · AI Inference"]
+        minsky["minsky / Ollama compute"]
+        wozniak["wozniak / ComfyUI"]
+        engelbart["engelbart / OpenHands"]
     end
 
-    subgraph LOVELACE_SERVICES["Lovelace — Containers"]
-        minsky["minsky<br/><small>Ollama compute</small>"]
-        wozniak["wozniak<br/><small>ComfyUI</small>"]
-        engelbart["engelbart<br/><small>OpenHands</small>"]
+    subgraph HOPPER["Hopper — 192.168.2.102"]
+        direction TB
+        H_role["Control Plane · Orchestration"]
+        diffie_h["diffie / SPIRE server"]
+        floyd["floyd / Langfuse"]
+        bush["bush / MemPalace"]
+        codd["codd / PostgreSQL"]
+        backus["backus / MinIO"]
+        ritchie["ritchie / Redis"]
     end
 
-    subgraph HOPPER_SERVICES["Hopper — Containers"]
-        diffie_h["diffie<br/><small>SPIRE server</small>"]
-        floyd["floyd<br/><small>Langfuse</small>"]
-        bush["bush<br/><small>MemPalace</small>"]
-        codd["codd<br/><small>PostgreSQL</small>"]
-        backus["backus<br/><small>MinIO</small>"]
-        ritchie["ritchie<br/><small>Redis</small>"]
+    subgraph BMO["BMO — 192.168.2.106"]
+        direction TB
+        B_role["Voice · IoT · Edge"]
     end
 
-    subgraph AGENTS["🤖 Agent Modules"]
-        church["church.py<br/><small>Router · Alonzo Church</small>"]
-        leibniz["leibniz_agent.py<br/><small>Architect · Leibniz</small>"]
-        lamport["lamport.py<br/><small>Coordinator · Leslie Lamport</small>"]
-        dijkstra["dijkstra_agent.py<br/><small>Corrector · Dijkstra</small>"]
-        liskov["liskov.py<br/><small>Governance · Barbara Liskov</small>"]
-        brooks["brooks.py<br/><small>Context Mgr · Fred Brooks</small>"]
-        kay["kay_service.py<br/><small>Voice Bridge · Alan Kay</small>"]
-    end
-
-    T --> babbage & jacquard & hollerith & knuth & mccarthy & diffie_t
-    L --> minsky & wozniak & engelbart
-    H --> diffie_h & floyd & bush & codd & backus & ritchie
-
-    style T fill:#4a2080,color:#fff,stroke:#8855cc
-    style L fill:#1a5080,color:#fff,stroke:#3388cc
-    style H fill:#1a6040,color:#fff,stroke:#33aa66
-    style B fill:#804020,color:#fff,stroke:#cc7733
-    style NODES fill:#1a1a2e,stroke:#444,color:#ccc
-    style TURING_SERVICES fill:#2a1040,stroke:#6633aa,color:#ccc
-    style LOVELACE_SERVICES fill:#0a2840,stroke:#2266aa,color:#ccc
-    style HOPPER_SERVICES fill:#0a3020,stroke:#226644,color:#ccc
-    style AGENTS fill:#2a1a0a,stroke:#aa6622,color:#ccc
+    style TURING fill:#2a1040,stroke:#8855cc,color:#ddd
+    style LOVELACE fill:#0a2840,stroke:#3388cc,color:#ddd
+    style HOPPER fill:#0a3020,stroke:#33aa66,color:#ddd
+    style BMO fill:#3a1a00,stroke:#cc7733,color:#ddd
 ```
 
 ---
@@ -75,7 +60,7 @@ graph TB
 ## Nodes
 
 | Pioneer | Former Name | Role | IP | Env Var |
-|---------|-------------|------|-----|---------|
+|---------|-------------|------|----|---------|
 | **Turing** | R730 | Gateway · Monitoring · Reverse Proxy | `192.168.2.103` | `TURING_IP` |
 | **Lovelace** | Justin-PC | Compute · GPU · AI Inference | `192.168.2.101` | `LOVELACE_IP` |
 | **Hopper** | Wyse 5070 | Control Plane · Orchestration | `192.168.2.102` | `HOPPER_IP` |
@@ -122,16 +107,16 @@ graph TB
 ```mermaid
 graph LR
     subgraph PIPELINE["Request Pipeline"]
-        church["⚡ church.py<br/><small>Router</small>"]
-        leibniz["🗺️ leibniz_agent.py<br/><small>Architect</small>"]
-        lamport["🔄 lamport.py<br/><small>Coordinator</small>"]
-        dijkstra["✅ dijkstra_agent.py<br/><small>Corrector</small>"]
+        church["church.py / Router"]
+        leibniz["leibniz_agent.py / Architect"]
+        lamport["lamport.py / Coordinator"]
+        dijkstra["dijkstra_agent.py / Corrector"]
     end
 
     subgraph SUPPORT["Support Agents"]
-        liskov["🛡️ liskov.py<br/><small>Governance</small>"]
-        brooks["📚 brooks.py<br/><small>Context Mgr</small>"]
-        kay["🎤 kay_service.py<br/><small>Voice Bridge</small>"]
+        liskov["liskov.py / Governance"]
+        brooks["brooks.py / Context Mgr"]
+        kay["kay_service.py / Voice Bridge"]
     end
 
     church -->|plan| leibniz
@@ -141,8 +126,8 @@ graph LR
     church -.->|memory| brooks
     kay -.->|voice input| church
 
-    style PIPELINE fill:#1a1a2e,stroke:#6644aa,color:#ccc
-    style SUPPORT fill:#1a2a1a,stroke:#446644,color:#ccc
+    style PIPELINE fill:#1a1a2e,stroke:#6644aa,color:#ddd
+    style SUPPORT fill:#1a2a1a,stroke:#446644,color:#ddd
 ```
 
 | File | Pioneer | Role |
