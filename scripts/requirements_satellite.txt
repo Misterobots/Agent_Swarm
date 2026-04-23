@@ -1,7 +1,7 @@
 openwakeword
 pyaudio
 numpy
-requests
+requests>=2.32.4
 sounddevice
 soundfile
 scipy
