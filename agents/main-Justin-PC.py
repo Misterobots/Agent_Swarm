@@ -388,6 +388,7 @@ class ChatRequest(BaseModel):
     grounding_web: bool = False       # inject live web search results (requires governance permission)
     grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
+    swarm_mode: bool = False          # route through Lamport multi-agent coordinator
 
 
 # ---------------------------------------------------------------------------
@@ -883,6 +884,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     grounding_web=request.grounding_web,
                     grounding_docs=request.grounding_docs,
                     grounding_file=request.grounding_file,
+                    swarm_mode=request.swarm_mode,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -1095,6 +1097,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             grounding_web=request.grounding_web,
             grounding_docs=request.grounding_docs,
             grounding_file=request.grounding_file,
+            swarm_mode=request.swarm_mode,
         )
         full_resp = ""
         for update in gen:

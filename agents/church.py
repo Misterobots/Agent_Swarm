@@ -700,6 +700,7 @@ def chat_swarm(
     grounding_web: bool = False,
     grounding_docs: bool = False,
     grounding_file: bool = False,
+    swarm_mode: bool = False,
 ):
     """
     Generator that yields status updates and final response for UI.
@@ -1126,6 +1127,11 @@ def chat_swarm(
         if research_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "TRAIN"):
             intent = "RESEARCH"
             yield _t("→ Research mode activated: forcing RESEARCH intent")
+
+        # --- SWARM MODE OVERRIDE ---
+        if swarm_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "TRAIN"):
+            intent = "COORDINATE"
+            yield _t("→ Swarm Mode: routing to multi-agent coordinator")
 
         # --- ULTRAPLAN MODE: Plan-Only (no execution) ---
         if ultraplan_mode:
