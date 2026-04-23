@@ -14,6 +14,7 @@ import { UltrathinkToggle } from "./ultrathink-toggle";
 import { WebGroundingToggle } from "./web-grounding-toggle";
 import { DocGroundingToggle } from "./doc-grounding-toggle";
 import { FileGroundingToggle } from "./file-grounding-toggle";
+import { SwarmToggle } from "./swarm-toggle";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
 import { Bot, Brain, Code2, X, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -163,6 +164,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           {!isMobile && <ThemeSelector />}
           {!isMobile && <UltraplanToggle />}
           {!isMobile && <UltrathinkToggle />}
+          {!isMobile && <SwarmToggle />}
           {!isMobile && <WebGroundingToggle />}
           {!isMobile && <DocGroundingToggle />}
           {!isMobile && <FileGroundingToggle />}
@@ -201,6 +203,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                   <div className="px-2 py-1.5"><ThemeSelector /></div>
                   <div className="px-2 py-1.5"><UltraplanToggle /></div>
                   <div className="px-2 py-1.5"><UltrathinkToggle /></div>
+                  <div className="px-2 py-1.5"><SwarmToggle /></div>
                   <div className="px-2 py-1.5"><WebGroundingToggle /></div>
                   <div className="px-2 py-1.5"><DocGroundingToggle /></div>
                   <div className="px-2 py-1.5"><FileGroundingToggle /></div>

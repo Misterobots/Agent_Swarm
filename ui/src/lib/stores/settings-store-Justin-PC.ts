@@ -14,6 +14,7 @@ interface SettingsState {
   ultraplanMode: boolean;
   ultrathinkMode: boolean;
   autoFeedPlan: boolean;
+  swarmMode: boolean;
   groundingWeb: boolean;
   groundingDocs: boolean;
   groundingFile: boolean;
@@ -26,6 +27,7 @@ interface SettingsState {
   setUltraplanMode: (on: boolean) => void;
   setUltrathinkMode: (on: boolean) => void;
   setAutoFeedPlan: (on: boolean) => void;
+  setSwarmMode: (on: boolean) => void;
   setGroundingWeb: (on: boolean) => void;
   setGroundingDocs: (on: boolean) => void;
   setGroundingFile: (on: boolean) => void;
@@ -43,6 +45,7 @@ export const useSettingsStore = create<SettingsState>()(
       ultraplanMode: false,
       ultrathinkMode: false,
       autoFeedPlan: false,
+      swarmMode: false,
       groundingWeb: false,
       groundingDocs: false,
       groundingFile: false,
@@ -55,6 +58,7 @@ export const useSettingsStore = create<SettingsState>()(
       setUltraplanMode: (ultraplanMode) => set({ ultraplanMode }),
       setUltrathinkMode: (ultrathinkMode) => set({ ultrathinkMode }),
       setAutoFeedPlan: (autoFeedPlan) => set({ autoFeedPlan }),
+      setSwarmMode: (swarmMode) => set({ swarmMode }),
       setGroundingWeb: (groundingWeb) => set({ groundingWeb }),
       setGroundingDocs: (groundingDocs) => set({ groundingDocs }),
       setGroundingFile: (groundingFile) => set({ groundingFile }),

@@ -77,6 +77,7 @@ export function useChatStream(options?: {
   const researchMode = useSettingsStore((s) => s.researchMode);
   const ultraplanMode = useSettingsStore((s) => s.ultraplanMode);
   const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
+  const swarmMode = useSettingsStore((s) => s.swarmMode);
   const groundingWeb = useSettingsStore((s) => s.groundingWeb);
   const groundingDocs = useSettingsStore((s) => s.groundingDocs);
   const groundingFile = useSettingsStore((s) => s.groundingFile);
@@ -201,7 +202,7 @@ export function useChatStream(options?: {
       abortRef.current = controller;
 
       try {
-        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile)) {
+        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
@@ -376,6 +377,7 @@ export function useChatStream(options?: {
       researchMode,
       ultraplanMode,
       ultrathinkMode,
+      swarmMode,
       isStreaming,
       setMessageThoughtTrace,
       setMessageToolCalls,

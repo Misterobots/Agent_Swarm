@@ -14,6 +14,7 @@ export interface ChatStreamOptions {
   researchMode?: boolean;
   ultraplanMode?: boolean;
   ultrathinkMode?: boolean;
+  swarmMode?: boolean;
   attachments?: FileAttachment[];
   groundingWeb?: boolean;
   groundingDocs?: boolean;
@@ -36,6 +37,7 @@ export async function* sendChatStream(
   groundingWeb?: boolean,
   groundingDocs?: boolean,
   groundingFile?: boolean,
+  swarmMode?: boolean,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -54,6 +56,7 @@ export async function* sendChatStream(
   if (groundingWeb) body.grounding_web = true;
   if (groundingDocs) body.grounding_docs = true;
   if (groundingFile) body.grounding_file = true;
+  if (swarmMode) body.swarm_mode = true;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",
