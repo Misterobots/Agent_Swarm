@@ -48,7 +48,8 @@ HOME_ASSISTANT_IP = os.getenv("HOME_ASSISTANT_IP", "192.168.2.100")
 LOVELACE_IP  = os.getenv("LOVELACE_IP", os.getenv("LOVELACE_IP", "192.168.2.101"))
 HOPPER_IP    = os.getenv("HOPPER_IP",    "192.168.2.102")
 TURING_IP    = os.getenv("TURING_IP",  os.getenv("TURING_IP", "192.168.2.103"))
-IDRAC_IP           = os.getenv("IDRAC_IP",           "192.168.2.104")
+BMO_IP       = os.getenv("BMO_IP", "192.168.2.157")
+IDRAC_IP     = os.getenv("IDRAC_IP",   "192.168.2.104")
 
 # ---------------------------------------------------------------------------
 # Derived Connection Strings

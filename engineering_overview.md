@@ -14,7 +14,7 @@ The **Home AI Lab** is a private, air-gapped capable AI orchestration platform d
 
 - **Zero-Shared State**: Agents communicate via stateless APIs (Ollama/REST), with persistent memory isolated in the Control Plane.
 - **Sandboxed Execution**: All code generation occurs within isolated Docker-in-Docker (DinD) environments (OpenHands).
-- **Observability First**: Full-stack monitoring via jacquard (Metrics) and knuth (Logs), visualized in hollerith.
+- **Observability First**: Full-stack monitoring via Prometheus (Metrics) and Loki (Logs), visualized in hollerith (Grafana).
 - **Enterprise Identity**: SPIRE (SPIFFE) integration for workload identity and zero-trust authentication.
 
 ---
@@ -45,7 +45,7 @@ The system is physically distributed but logically unified under a single mesh n
   - **Ollama**: Accelerated LLM Inference API.
   - **Agent Runtime**: Python-based Agno agents (Architect, Security, Router).
   - **ComfyUI**: Node-based Stable Diffusion backend for Image Generation.
-  - **Monitoring Stack**: jacquard, knuth, hollerith, cAdvisor.
+  - **Monitoring Stack**: Prometheus, Loki, hollerith (Grafana), cAdvisor.
 
 ---
 

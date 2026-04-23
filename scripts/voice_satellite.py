@@ -26,6 +26,64 @@ CHUNK_SIZE = 1280 # 80ms
 THRESHOLD = 0.5
 POST_INTERACTION_COOLDOWN = 2.0  # seconds to ignore audio after speaking
 
+def _normalize_model_key(name):
+    """Normalize wake-word model identifiers for robust matching."""
+    return os.path.basename(str(name)).lower().replace(".onnx", "")
+
+def _resolve_wake_word_models(model_names):
+    """Resolve wake-word model files from common locations and built-ins."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.abspath(os.path.join(script_dir, ".."))
+    candidate_dirs = [
+        os.getcwd(),
+        script_dir,
+        repo_root,
+        os.path.join(repo_root, "agents", "bmo_voice"),
+    ]
+
+    local_onnx = []
+    seen_paths = set()
+    for d in candidate_dirs:
+        try:
+            if not os.path.isdir(d):
+                continue
+            for f in os.listdir(d):
+                if f.lower().endswith(".onnx"):
+                    p = os.path.abspath(os.path.join(d, f))
+                    if p not in seen_paths:
+                        seen_paths.add(p)
+                        local_onnx.append(p)
+        except Exception as e:
+            print(f"⚠️ Model scan warning: dir='{d}' err='{e}'")
+
+    try:
+        builtin_models = openwakeword.get_pretrained_model_paths()
+    except Exception as e:
+        print(f"⚠️ Failed to query built-in wake models: {e}")
+        builtin_models = []
+
+    resolved_paths = []
+    resolved_names = []
+    for model_name in model_names:
+        token = _normalize_model_key(model_name)
+        local_match = next((p for p in local_onnx if token in _normalize_model_key(p)), None)
+        builtin_match = next((p for p in builtin_models if token in _normalize_model_key(p)), None)
+
+        chosen = local_match or builtin_match
+        if chosen:
+            resolved_paths.append(chosen)
+            resolved_names.append(_normalize_model_key(chosen))
+
+    if resolved_paths:
+        return resolved_paths, resolved_names
+
+    fallback = next((p for p in builtin_models if "hey_jarvis_v0.1" in _normalize_model_key(p)), None)
+    if fallback:
+        print(f"⚠️ Wake model(s) not found: {model_names}. Falling back to hey_jarvis_v0.1")
+        return [fallback], [_normalize_model_key(fallback)]
+
+    return [], []
+
 # --- NETWORK CONFIGURATION ---
 # Load from network.env (single source of truth) or environment variable
 _script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -295,26 +353,7 @@ def main():
     # 1. Load Model
     print("Loading Wake Word Model...")
     
-    # Resolve absolute paths for older openwakeword versions
-    import openwakeword
-    all_models = openwakeword.get_pretrained_model_paths()
-    
-    # Check for local models first
-    local_models = [f for f in os.listdir(".") if f.endswith(".onnx") and any(m in f for m in WAKE_WORD_MODELS)]
-    model_paths = [os.path.abspath(f) for f in local_models]
-    
-    if not model_paths:
-        # Fallback to built-ins
-        model_paths = [p for p in all_models if any(m in p for m in WAKE_WORD_MODELS)]
-    
-    if not model_paths:
-        print(f"⚠️ Warning: Could not find model {WAKE_WORD_MODELS} in local directory or built-ins.")
-        print("Falling back to 'hey_jarvis_v0.1' for now so you can use the manual trigger.")
-        model_paths = [p for p in all_models if "hey_jarvis_v0.1" in p]
-        # Update the active models list to match the fallback
-        active_models = ["hey_jarvis_v0.1"]
-    else:
-        active_models = WAKE_WORD_MODELS
+    model_paths, active_models = _resolve_wake_word_models(WAKE_WORD_MODELS)
         
     if not model_paths:
         print("❌ Critical Error: No built-in models found at all.")
@@ -322,6 +361,7 @@ def main():
         
     owwModel = Model(wakeword_model_paths=model_paths)
     print(f"Model Loaded: {[os.path.basename(p) for p in model_paths]}")
+    print(f"Wake model keys: {active_models}")
     
     # Use the active models for prediction checks
     WW_TO_CHECK = active_models
@@ -408,12 +448,13 @@ def main():
                             processed_chunk = processed_chunk.flatten()
 
                         prediction = owwModel.predict(processed_chunk)
+                        normalized_scores = {
+                            _normalize_model_key(k): v for k, v in prediction.items()
+                        }
                     
                         for mdl in WW_TO_CHECK:
-                            # Extract basic name for key check (e.g. 'hey_beeMo' from 'hey_beeMo.onnx')
-                            # Match both raw name and name with extension to be safe
-                            mdl_raw = mdl.replace(".onnx", "")
-                            score = prediction.get(mdl, prediction.get(mdl_raw, 0))
+                            mdl_raw = _normalize_model_key(mdl)
+                            score = normalized_scores.get(mdl_raw, 0)
                             
                             if score >= THRESHOLD:
                                 print(f"⚡ Wake Word Detected: {mdl_raw}!")

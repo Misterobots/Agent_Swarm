@@ -1,7 +1,7 @@
 ﻿# Turing Gateway & Ops Hub Docker Compose
 # Routing handled by Saltbox's Traefik (connected to ai_lab_net externally)
-# Hosts: Monitoring (Jacquard/Prometheus, Knuth/Loki, Hollerith/Grafana), Mccarthy/Ollama
-# Compute services (Minsky/Ollama, Wozniak/ComfyUI, etc.) remain on the Lovelace Execution Node
+# Hosts: Monitoring (prometheus, loki, hollerith/Grafana), ollama (Turing GPU)
+# Compute services (Ollama, ComfyUI, etc.) remain on the Lovelace Execution Node
 
 services:
   # Docker Sidecar Probe - exposes read-only container metadata for central monitoring
@@ -33,10 +33,10 @@ services:
   # WORKLOAD IDENTITY (SPIRE Agent)
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  diffie-agent:
+  spire-agent:
     image: ghcr.io/spiffe/spire-agent:1.10.1
-    container_name: diffie-agent-turing
-    hostname: diffie-agent-turing
+    container_name: spire-agent-turing
+    hostname: spire-agent-turing
     restart: unless-stopped
     volumes:
       - ./config/spire:/etc/spire/agent
@@ -58,10 +58,10 @@ services:
   # METRICS & OBSERVABILITY
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  jacquard:
+  prometheus:
     image: prom/prometheus:latest
-    container_name: jacquard-turing
-    hostname: jacquard-turing
+    container_name: prometheus-turing
+    hostname: prometheus-turing
     restart: unless-stopped
     volumes:
       - ./config/prometheus:/etc/prometheus
@@ -132,10 +132,10 @@ services:
     networks:
       - ai_lab_net
 
-  knuth:
+  loki:
     image: grafana/loki:latest
-    container_name: knuth-turing
-    hostname: knuth-turing
+    container_name: loki-turing
+    hostname: loki-turing
     restart: unless-stopped
     ports:
       - "3100:3100"
@@ -216,8 +216,8 @@ services:
       - ./provisioning:/etc/grafana/provisioning:ro
       - ./dashboards:/etc/grafana/dashboards:ro
     depends_on:
-      - jacquard
-      - knuth
+      - prometheus
+      - loki
       - alertmanager
     networks:
       - ai_lab_net
@@ -247,10 +247,10 @@ services:
   # TASK QUEUE & PERSISTENCE
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  ritchie:
+  redis:
     image: redis:7.2-alpine
-    container_name: ritchie-turing
-    hostname: ritchie-turing
+    container_name: redis-turing
+    hostname: redis-turing
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -272,13 +272,13 @@ services:
   # Turing handles only: llama-guard-3:8b (async safety), nomic-embed (embeddings).
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  mccarthy:
+  ollama:
     image: ollama/ollama:latest
-    container_name: mccarthy-turing
-    hostname: mccarthy-turing
+    container_name: ollama-turing
+    hostname: ollama-turing
     restart: always
     depends_on:
-      diffie-agent:
+      spire-agent:
         condition: service_started
     deploy:
       resources:
@@ -306,7 +306,7 @@ services:
       - "traefik.http.routers.ollama.rule=PathPrefix(`/ollama`)"
       - "traefik.http.routers.ollama.entrypoints=web"
       - "traefik.http.services.ollama.loadbalancer.server.port=11434"
-      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/mccarthy-turing"
+      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/ollama-turing"
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
@@ -317,7 +317,7 @@ services:
       - mccarthy
     environment:
       # Point to local Ollama
-      - OLLAMA_BASE_URL=http://mccarthy:11434
+      - OLLAMA_BASE_URL=http://ollama:11434
       # Disable default OpenAI integration
       - OPENAI_API_BASE_URL=
       - OPENAI_API_KEY=

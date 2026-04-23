@@ -2,7 +2,9 @@
 remote_executor.py — SSH Remote Execution Manager
 
 Provides secure, session-pooled SSH command execution across the
-Hive multi-node topology (Lovelace, Control Plane, Turing).
+Hive multi-node topology (Turing, BMO).
+
+Note: Hopper and Lovelace are excluded — agents always run locally on those nodes.
 
 Security:
     - Commands are validated through bash_classifier before execution
@@ -82,10 +84,26 @@ SSH_DEFAULT_TIMEOUT = int(os.getenv("SSH_DEFAULT_TIMEOUT", "60"))
 SSH_CONNECT_TIMEOUT = int(os.getenv("SSH_CONNECT_TIMEOUT", "10"))
 SSH_KEY_PATH = os.getenv("SSH_KEY_PATH", os.path.expanduser("~/.ssh/id_ed25519"))
 SSH_USER = os.getenv("SSH_USER", "misterobots")
+
+# Resolve SSH binary: prefer system PATH, fall back to Git for Windows bundled ssh
+def _find_ssh_binary() -> str:
+    import shutil
+    if shutil.which("ssh"):
+        return "ssh"
+    git_ssh = r"C:\Program Files\Git\usr\bin\ssh.exe"
+    if os.path.isfile(git_ssh):
+        return git_ssh
+    raise FileNotFoundError(
+        "No ssh binary found. Install OpenSSH or Git for Windows, "
+        "or set SSH_BINARY env var."
+    )
+
+SSH_BINARY = os.getenv("SSH_BINARY", _find_ssh_binary())
 HEALTH_CHECK_TTL = 30  # seconds
 
-# Host allowlist — only these names can be targeted
-ALLOWED_HOSTS = {"Lovelace", "control-plane", "Turing"}
+# Host allowlist — only these names can be targeted (lowercase; matched via host_name.lower())
+# Hopper and Lovelace are excluded: agents run locally on those nodes.
+ALLOWED_HOSTS = {"turing", "bmo"}
 
 
 class RemoteExecutor:
@@ -98,27 +116,21 @@ class RemoteExecutor:
 
     def _initialize_hosts(self):
         """Build host table from config.py topology."""
-        from config import LOVELACE_IP, HOPPER_IP, TURING_IP
+        from config import TURING_IP, BMO_IP
 
         key_path = SSH_KEY_PATH
         user = SSH_USER
 
         self._hosts = {
-            "Lovelace": RemoteHost(
-                name="Lovelace",
-                host=LOVELACE_IP,
-                user=user,
-                key_path=key_path,
-            ),
-            "control-plane": RemoteHost(
-                name="control-plane",
-                host=HOPPER_IP,
-                user=user,
-                key_path=key_path,
-            ),
-            "Turing": RemoteHost(
+            "turing": RemoteHost(
                 name="Turing",
                 host=TURING_IP,
+                user=user,
+                key_path=key_path,
+            ),
+            "bmo": RemoteHost(
+                name="BMO",
+                host=BMO_IP,
                 user=user,
                 key_path=key_path,
             ),
@@ -239,7 +251,7 @@ class RemoteExecutor:
     ) -> ExecutionResult:
         """Run a command via subprocess ssh (uses system SSH config + agent)."""
         ssh_args = [
-            "ssh",
+            SSH_BINARY,
             "-o", "StrictHostKeyChecking=accept-new",
             "-o", f"ConnectTimeout={SSH_CONNECT_TIMEOUT}",
             "-o", "BatchMode=yes",

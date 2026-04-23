@@ -92,11 +92,11 @@ def detect_emotion(text):
 # ---------------------------------------------------------------------------
 
 def call_ollama(prompt, model, host, port, system_prompt):
-    """Call Ollama /api/chat directly — no phi library needed."""
+    """Call Ollama, preferring /api/chat and falling back to /api/generate."""
     import requests
 
-    url = f"http://{host}:{port}/api/chat"
-    payload = {
+    chat_url = f"http://{host}:{port}/api/chat"
+    chat_payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -108,19 +108,43 @@ def call_ollama(prompt, model, host, port, system_prompt):
 
     t0 = time.time()
     try:
-        resp = requests.post(url, json=payload, timeout=30)
+        resp = requests.post(chat_url, json=chat_payload, timeout=30)
+        if resp.status_code == 404:
+            raise requests.HTTPError("/api/chat unavailable", response=resp)
         resp.raise_for_status()
-    except Exception as e:
-        return None, 0, str(e)
 
-    elapsed = time.time() - t0
-    data = resp.json()
-    content = data.get("message", {}).get("content", "")
+        elapsed = time.time() - t0
+        data = resp.json()
+        content = data.get("message", {}).get("content", "")
 
-    # Strip thinking tags if model uses them (qwen3)
-    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        # Strip thinking tags if model uses them (qwen3)
+        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        return content, elapsed, None
+    except Exception as chat_err:
+        # Compatibility fallback for Ollama variants that only expose /api/generate.
+        gen_url = f"http://{host}:{port}/api/generate"
+        gen_prompt = f"{system_prompt}\n\n{prompt}"
+        gen_payload = {
+            "model": model,
+            "prompt": gen_prompt,
+            "stream": False,
+            "options": {"num_predict": 256},
+        }
+        try:
+            resp = requests.post(gen_url, json=gen_payload, timeout=45)
+            resp.raise_for_status()
 
-    return content, elapsed, None
+            elapsed = time.time() - t0
+            data = resp.json()
+            content = data.get("response", "")
+            content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+            return content, elapsed, None
+        except Exception as gen_err:
+            err = (
+                f"Ollama request failed (host={host}:{port}, model={model}). "
+                f"chat_err={chat_err}; generate_err={gen_err}"
+            )
+            return None, 0, err
 
 
 def call_tts(text, host, port=8100, pitch=3):
@@ -276,6 +300,69 @@ def run_single(user_input, model, host, port, tts_enabled, tts_host, tts_port):
 # Modes
 # ---------------------------------------------------------------------------
 
+def run_preflight(args):
+    """Check all required services and print a summary table. Returns True if all critical checks pass."""
+    import requests
+
+    tts_host = args.tts_host or args.host
+    checks = []
+
+    # 1. Ollama reachability
+    ollama_url = f"http://{args.host}:{args.port}/api/tags"
+    try:
+        r = requests.get(ollama_url, timeout=6)
+        r.raise_for_status()
+        models = [m["name"] for m in r.json().get("models", [])]
+        model_ok = any(args.model.split(":")[0] in m for m in models)
+        checks.append(("Ollama API",       True,  f"http://{args.host}:{args.port}"))
+        checks.append((f"Model {args.model}", model_ok,
+                        "available" if model_ok else f"NOT FOUND — available: {', '.join(models) or 'none'}"))
+    except Exception as e:
+        checks.append(("Ollama API",       False, str(e)))
+        checks.append((f"Model {args.model}", False, "skipped (Ollama unreachable)"))
+
+    # 2. BMO voice / TTS (optional, only warn)
+    tts_url = f"http://{tts_host}:{args.tts_port}/health"
+    try:
+        r = requests.get(tts_url, timeout=4)
+        tts_ok = r.status_code < 500
+        checks.append(("BMO Voice (TTS)",  tts_ok, f"http://{tts_host}:{args.tts_port}"))
+    except Exception as e:
+        checks.append(("BMO Voice (TTS)",  None,  f"http://{tts_host}:{args.tts_port} — {e}"))
+
+    # 3. Imports
+    checks.append(("Agent imports",     IMPORTS_OK, "ok" if IMPORTS_OK else "using fallback stubs"))
+
+    # --- Print table ---
+    col_w = 26
+    print()
+    print("  +-----------+")
+    print("  |   o . o   |    BMO Preflight Check")
+    print("  |     -     |    " + time.strftime("%Y-%m-%d %H:%M:%S"))
+    print("  |   \\___/   |")
+    print("  +-----------+")
+    print()
+    print(f"  {'SERVICE':<{col_w}}  {'STATUS':<8}  DETAIL")
+    print("  " + "-" * 70)
+    all_critical_ok = True
+    for name, status, detail in checks:
+        if status is True:
+            icon = "✅ OK   "
+        elif status is False:
+            icon = "❌ FAIL "
+            if name != "BMO Voice (TTS)":   # TTS is optional
+                all_critical_ok = False
+        else:
+            icon = "⚠️  WARN "
+        print(f"  {name:<{col_w}}  {icon}  {detail}")
+    print("  " + "-" * 70)
+    if all_critical_ok:
+        print("  All critical services OK — sandbox is ready.\n")
+    else:
+        print("  One or more critical services are DOWN. Resolve issues above.\n")
+    return all_critical_ok
+
+
 def interactive_mode(args):
     """REPL chat loop."""
     print()
@@ -347,7 +434,7 @@ def batch_mode(args):
 
 def main():
     parser = argparse.ArgumentParser(description="BMO Test Sandbox")
-    parser.add_argument("--host", default="192.168.2.101", help="Ollama host (default: 192.168.2.101)")
+    parser.add_argument("--host", default="192.168.2.103", help="Ollama host (default: 192.168.2.103)")
     parser.add_argument("--port", type=int, default=11434, help="Ollama port (default: 11434)")
     parser.add_argument("--model", default=os.getenv("BMO_LLM_MODEL", "qwen3:14b"),
                         help="LLM model (default: qwen3:14b)")
@@ -356,11 +443,17 @@ def main():
     parser.add_argument("--tts-port", type=int, default=8100, help="BMO voice port (default: 8100)")
     parser.add_argument("--prompt", type=str, help="Single prompt to test (non-interactive)")
     parser.add_argument("--batch", type=str, help="File of prompts to test (one per line)")
+    parser.add_argument("--preflight", action="store_true", help="Check service availability and exit")
     args = parser.parse_args()
 
     if not IMPORTS_OK:
         print("  Note: Running with fallback stubs (voice_samples_map/bmo_persona not found).")
         print("  For full functionality, run from the project root.\n")
+
+    if args.preflight or args.prompt is None and args.batch is None:
+        preflight_ok = run_preflight(args)
+        if args.preflight:
+            sys.exit(0 if preflight_ok else 1)
 
     if args.prompt:
         run_single(args.prompt, args.model, args.host, args.port,
