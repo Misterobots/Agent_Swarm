@@ -472,6 +472,7 @@ services:
       context: ..
       dockerfile: agents/grpc/Dockerfile
     image: home-ai-lab/openclaude-grpc:latest
+    pull_policy: build
     container_name: openclaude_grpc
     hostname: openclaude-grpc
     restart: unless-stopped
