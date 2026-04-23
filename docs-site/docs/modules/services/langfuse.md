@@ -1,4 +1,4 @@
-﻿---
+---
 title: "Service: Langfuse"
 ---
 
@@ -18,11 +18,11 @@ LLM observability and tracing service.
 
 ## Purpose
 
-Langfuse captures end-to-end traces for every LLM interaction in Agent Swarm:
+Langfuse captures end-to-end traces for every LLM interaction in Memex:
 
 - **Traces**: One per user request
 - **Spans**: Solver, Verifier, Corrector steps
-- **Scores**: Process-reward scores (0.0–1.0)
+- **Scores**: Process-reward scores (0.0�1.0)
 - **Generations**: Individual LLM calls with tokens/latency
 - **Metadata**: Intent, model, template version
 

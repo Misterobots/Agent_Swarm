@@ -1,4 +1,4 @@
-﻿---
+---
 title: "Service: Ollama"
 ---
 
@@ -15,7 +15,7 @@ Local LLM inference engine.
 
 ## Purpose
 
-Ollama serves all LLM inference for Agent Swarm — chat, routing, verification, and safety checks.
+Ollama serves all LLM inference for Memex � chat, routing, verification, and safety checks.
 
 ## API
 

@@ -1,10 +1,10 @@
-﻿---
+---
 title: "Tutorial: Your First Chat"
 ---
 
 # Your First Chat
 
-Send your first message to Agent Swarm and understand how it processes your request.
+Send your first message to Memex and understand how it processes your request.
 
 ## What You'll Learn
 
@@ -34,11 +34,11 @@ Press **Enter** or click the send button.
 
 Behind the scenes, your message flows through:
 
-1. **Hive UI** → sends to Agent Runtime API
-2. **Router** ({{ router_model }}) → classifies your intent as `general_chat`
-3. **Coordinator** → dispatches to the solver
-4. **Solver** ({{ solver_model }}) → generates a response
-5. **MarsRL Verifier** ({{ verifier_model }}) → checks safety and quality
+1. **Hive UI** ? sends to Agent Runtime API
+2. **Router** ({{ router_model }}) ? classifies your intent as `general_chat`
+3. **Coordinator** ? dispatches to the solver
+4. **Solver** ({{ solver_model }}) ? generates a response
+5. **MarsRL Verifier** ({{ verifier_model }}) ? checks safety and quality
 6. **Response** streams back to the UI
 
 You should see a streaming response appear in real-time.
@@ -65,7 +65,7 @@ Open Langfuse at `http://{{ hopper_ip }}:3000` to see the full trace of your con
 
 ## Next Steps
 
-- [Generate an Image](generate-image.md) — try creative generation
-- [User Guide: Chat](../user-guide/chat.md) — full chat feature reference
+- [Generate an Image](generate-image.md) � try creative generation
+- [User Guide: Chat](../user-guide/chat.md) � full chat feature reference
 
 

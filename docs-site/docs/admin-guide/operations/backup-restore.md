@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: Backup & Restore
 ---
 
 # Backup & Restore
 
-Strategies for backing up and recovering Agent Swarm data.
+Strategies for backing up and recovering Memex data.
 
 ## What to Back Up
 
@@ -113,7 +113,7 @@ docker compose exec agent-runtime tar xzf /tmp/memory-backup.tar.gz -C /
 
 ## Related
 
-- [Procedures: Disaster Recovery](../../procedures/disaster-recovery.md) â€” full recovery runbook
-- [Architecture: Memory System](../../architecture/memory-system.md) â€” what's stored where
+- [Procedures: Disaster Recovery](../../procedures/disaster-recovery.md) — full recovery runbook
+- [Architecture: Memory System](../../architecture/memory-system.md) — what's stored where
 
 

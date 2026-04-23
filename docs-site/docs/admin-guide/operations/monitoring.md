@@ -1,10 +1,10 @@
-﻿---
+---
 title: Monitoring
 ---
 
 # Monitoring
 
-Dashboards, alerts, and health checks for Agent Swarm.
+Dashboards, alerts, and health checks for Memex.
 
 ## Dashboards
 
@@ -28,7 +28,7 @@ cp turing_gateway/config/hollerith/dashboards/*.json \
     /var/lib/hollerith/dashboards/
 ```
 
-Or import manually: hollerith → Dashboards → Import → Upload JSON.
+Or import manually: hollerith ? Dashboards ? Import ? Upload JSON.
 
 ## Health Checks
 
@@ -102,8 +102,8 @@ route:
 
 ## Related
 
-- [Architecture: Observability](../../architecture/observability.md) — full stack details
-- [Procedures: Configure Alerting](../../procedures/configure-alerting.md) — alert setup
-- [Troubleshooting](../../troubleshooting/index.md) — common issues
+- [Architecture: Observability](../../architecture/observability.md) � full stack details
+- [Procedures: Configure Alerting](../../procedures/configure-alerting.md) � alert setup
+- [Troubleshooting](../../troubleshooting/index.md) � common issues
 
 

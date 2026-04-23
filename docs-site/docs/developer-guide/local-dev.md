@@ -1,10 +1,10 @@
-﻿---
+---
 title: Local Development
 ---
 
 # Local Development
 
-Set up Agent Swarm for local development and testing.
+Set up Memex for local development and testing.
 
 ## Prerequisites
 
@@ -83,16 +83,16 @@ curl http://localhost:{{ agent_runtime_port }}/
 
 ```
 agents/
-├── main.py                    # FastAPI app entry point
-├── router.py                  # Request handling, dispatch
-├── semantic_router.py         # Intent classification
-├── mars_loop.py              # MarsRL verification pipeline
-├── coordinator.py            # Multi-agent orchestration
-├── config.py                 # Configuration loading
-├── security/                 # SPIFFE, JWT-ACE, auth middleware
-├── specialized/              # Image, voice, IoT, 3D agents
-├── expertise/                # Template registry, A/B testing
-└── tools/                    # Agent tools (file_ops, terminal, etc.)
++-- main.py                    # FastAPI app entry point
++-- router.py                  # Request handling, dispatch
++-- semantic_router.py         # Intent classification
++-- mars_loop.py              # MarsRL verification pipeline
++-- coordinator.py            # Multi-agent orchestration
++-- config.py                 # Configuration loading
++-- security/                 # SPIFFE, JWT-ACE, auth middleware
++-- specialized/              # Image, voice, IoT, 3D agents
++-- expertise/                # Template registry, A/B testing
++-- tools/                    # Agent tools (file_ops, terminal, etc.)
 ```
 
 ## Development Workflow
@@ -123,7 +123,7 @@ Access at `http://localhost:3000`.
 
 ## Related
 
-- [Getting Started: Developer Quickstart](../getting-started/quickstart-developer.md) — condensed setup
-- [Developer: Adding Agents](adding-agents.md) — extend the agent system
+- [Getting Started: Developer Quickstart](../getting-started/quickstart-developer.md) � condensed setup
+- [Developer: Adding Agents](adding-agents.md) � extend the agent system
 
 

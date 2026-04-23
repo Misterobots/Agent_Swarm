@@ -1,10 +1,10 @@
-﻿---
+---
 title: User Guide
 ---
 
 # User Guide
 
-Feature-by-feature guides for everything Agent Swarm can do. Each page covers what a feature does, how to access it, and how to get the most out of it.
+Feature-by-feature guides for everything Memex can do. Each page covers what a feature does, how to access it, and how to get the most out of it.
 
 ## Features
 
@@ -25,7 +25,7 @@ Feature-by-feature guides for everything Agent Swarm can do. Each page covers wh
 
 ## Source References
 
-??? info "Source of Truth â€” Canonical Files"
+??? info "Source of Truth — Canonical Files"
 
     | Source | Type | Relevance |
     |--------|------|-----------|
@@ -68,6 +68,6 @@ Update the "System Status" section after each phase milestone. Check off complet
 
 ---
 
-*For technical details, see Admin: Design Framework · [Back to Index](../index.md)*
+*For technical details, see Admin: Design Framework � [Back to Index](../index.md)*
 
 

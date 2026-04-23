@@ -1,4 +1,4 @@
-ï»¿---
+---
 title: "FAQ: Models"
 ---
 
@@ -8,12 +8,12 @@ title: "FAQ: Models"
 
 Any model available through Ollama. Popular choices:
 
-- **Qwen** series (2.5, 3.5) â€” strong general performance
-- **Llama** series (3.1, 3.3, Guard) â€” Meta's open models
-- **Gemma** series â€” Google's efficient models
-- **Mistral/Mixtral** â€” fast inference
-- **DeepSeek** â€” coding-focused
-- **Nemotron** â€” NVIDIA's optimized models
+- **Qwen** series (2.5, 3.5) — strong general performance
+- **Llama** series (3.1, 3.3, Guard) — Meta's open models
+- **Gemma** series — Google's efficient models
+- **Mistral/Mixtral** — fast inference
+- **DeepSeek** — coding-focused
+- **Nemotron** — NVIDIA's optimized models
 
 ## How do I add a new model?
 
@@ -27,9 +27,9 @@ See [Add a New Model](../procedures/add-model.md).
 
 Yes. The system uses three model roles:
 
-- **Solver** â€” handles the main response generation
-- **Router** â€” classifies user intent  
-- **Verifier** â€” checks response quality and safety
+- **Solver** — handles the main response generation
+- **Router** — classifies user intent  
+- **Verifier** — checks response quality and safety
 
 Each can be a different model. Configure in `network.env`.
 
@@ -38,11 +38,11 @@ Each can be a different model. Configure in `network.env`.
 | Model Size | VRAM (q4_K_M) | VRAM (FP16) |
 |-----------|---------------|-------------|
 | 3B | ~2 GB | ~6 GB |
-| 7â€“9B | ~5 GB | ~18 GB |
+| 7–9B | ~5 GB | ~18 GB |
 | 14B | ~9 GB | ~28 GB |
 | 32B | ~20 GB | ~64 GB |
 
-Agent Swarm loads up to 3 models by default. Plan VRAM accordingly.
+Memex loads up to 3 models by default. Plan VRAM accordingly.
 
 ## Can I use API-based models (OpenAI, Anthropic)?
 

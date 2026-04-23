@@ -1,4 +1,4 @@
-ï»¿---
+---
 title: "ADR-002: Local Hook Execution Model"
 ---
 
@@ -9,7 +9,7 @@ title: "ADR-002: Local Hook Execution Model"
 
 ## Context
 
-Agent Swarm runs across three physical nodes. Code execution (sandboxed environments, ComfyUI workflows, voice synthesis) must run on nodes with GPUs. The system needs a model for how and where tasks execute.
+Memex runs across three physical nodes. Code execution (sandboxed environments, ComfyUI workflows, voice synthesis) must run on nodes with GPUs. The system needs a model for how and where tasks execute.
 
 Two approaches were considered:
 
@@ -20,9 +20,9 @@ Two approaches were considered:
 
 Adopt a **local hook execution model** where each node is responsible for its own workloads, and Traefik handles routing.
 
-- **Execution Node** (Lovelace): All GPU compute â€” Ollama, ComfyUI, Voice Engine, Agent Runtime
-- **Control Node** (Hopper): All coordination â€” SPIRE, databases, Langfuse, MemPalace
-- **Gateway Node** (Turing): All ingress â€” Traefik, monitoring stack, secondary Ollama
+- **Execution Node** (Lovelace): All GPU compute — Ollama, ComfyUI, Voice Engine, Agent Runtime
+- **Control Node** (Hopper): All coordination — SPIRE, databases, Langfuse, MemPalace
+- **Gateway Node** (Turing): All ingress — Traefik, monitoring stack, secondary Ollama
 
 Services are started via Docker Compose on each node. Inter-node communication uses direct HTTP over the LAN.
 
@@ -45,7 +45,7 @@ Services are started via Docker Compose on each node. Inter-node communication u
 
 ## Related
 
-- [Architecture: Topology](../topology.md) â€” physical node layout
-- [Admin: Deployment](../../admin-guide/index.md) â€” per-node setup
+- [Architecture: Topology](../topology.md) — physical node layout
+- [Admin: Deployment](../../admin-guide/index.md) — per-node setup
 
 

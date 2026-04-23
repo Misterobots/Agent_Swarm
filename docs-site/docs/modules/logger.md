@@ -1,10 +1,10 @@
-﻿---
+---
 title: "Module: Logger"
 ---
 
 # Logger
 
-Structured logging setup for Agent Swarm.
+Structured logging setup for Memex.
 
 ## Files
 
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 |-------------|--------|---------|
 | Console (stdout) | Human-readable | Development |
 | File (`logs/`) | JSON | Persistent storage |
-| Docker logs | JSON | Picked up by Promtail → knuth |
+| Docker logs | JSON | Picked up by Promtail ? knuth |
 
 ## Contextual Logging
 
@@ -54,7 +54,7 @@ Docker container logs are collected by Promtail and shipped to knuth on the Gate
 
 ## Related
 
-- [Architecture: Observability](../architecture/observability.md) — logging stack
-- [Admin: Monitoring](../admin-guide/operations/monitoring.md) — log querying
+- [Architecture: Observability](../architecture/observability.md) � logging stack
+- [Admin: Monitoring](../admin-guide/operations/monitoring.md) � log querying
 
 

@@ -9,7 +9,7 @@ title: "ADR-001: JWT-ACE Profiles over RBAC"
 
 ## Context
 
-Agent Swarm agents need per-request authorization that controls which tools, models, and actions are available. Traditional RBAC (Role-Based Access Control) assigns static permissions to user roles. However, in an AI agent system:
+Memex agents need per-request authorization that controls which tools, models, and actions are available. Traditional RBAC (Role-Based Access Control) assigns static permissions to user roles. However, in an AI agent system:
 
 - The same user may issue requests requiring wildly different permissions (code execution vs. reading a file)
 - Agents act autonomously and need fine-grained, ephemeral permissions

@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: "Tutorial: Train Preferences"
 ---
 
 # Train Model Preferences
 
-Teach Agent Swarm your preferences using GRPO training.
+Teach Memex your preferences using GRPO training.
 
 ## What You'll Learn
 
@@ -20,9 +20,9 @@ Use the system normally. Over time, you'll notice responses you like and respons
 
 When you see a response you like or dislike:
 
-- **Thumbs up** â€” marks the response as preferred
-- **Thumbs down** â€” marks it as rejected
-- **Edit and resubmit** â€” teaches the correct response
+- **Thumbs up** — marks the response as preferred
+- **Thumbs down** — marks it as rejected
+- **Edit and resubmit** — teaches the correct response
 
 ## Step 3: Teach Preferences via Chat
 
@@ -72,7 +72,7 @@ graph LR
 
 ## Next Steps
 
-- [User Guide: Training](../user-guide/training-interface.md) â€” full training reference
-- [Architecture: MarsRL](../architecture/marsrl.md) â€” how MarsRL works
+- [User Guide: Training](../user-guide/training-interface.md) — full training reference
+- [Architecture: MarsRL](../architecture/marsrl.md) — how MarsRL works
 
 

@@ -1,4 +1,4 @@
-﻿---
+---
 title: ComfyUI Workflows
 ---
 
@@ -8,7 +8,7 @@ How to create and deploy custom image generation workflows.
 
 ## Overview
 
-Agent Swarm uses ComfyUI for all image generation. Workflows are JSON files that define the node graph for generation pipelines.
+Memex uses ComfyUI for all image generation. Workflows are JSON files that define the node graph for generation pipelines.
 
 ## Workflow Location
 
@@ -113,15 +113,15 @@ Generated images are saved to `delivered_artifacts/images/` with metadata:
 
 ```
 delivered_artifacts/
-└── images/
-    ├── img_20260410_143022_abc123.png
-    └── img_20260410_143022_abc123.json  # metadata
++-- images/
+    +-- img_20260410_143022_abc123.png
+    +-- img_20260410_143022_abc123.json  # metadata
 ```
 
 ## Related
 
-- [User Guide: Art Studio](../user-guide/art-studio.md) — user-facing guide
-- [Module: Image Agent](../modules/image-agent.md) — agent implementation
-- [Admin: Scaling](../admin-guide/operations/scaling.md) — GPU considerations
+- [User Guide: Art Studio](../user-guide/art-studio.md) � user-facing guide
+- [Module: Image Agent](../modules/image-agent.md) � agent implementation
+- [Admin: Scaling](../admin-guide/operations/scaling.md) � GPU considerations
 
 

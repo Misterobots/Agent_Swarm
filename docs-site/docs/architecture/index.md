@@ -1,14 +1,14 @@
-ï»¿---
+---
 title: Architecture
 ---
 
 # Architecture
 
-Technical design documentation for the Agent Swarm system.
+Technical design documentation for the Memex system.
 
 ```mermaid
 graph TB
-    subgraph Gateway["Gateway Node Â· Turing Â· {{ turing_ip }}"]
+    subgraph Gateway["Gateway Node · Turing · {{ turing_ip }}"]
         Traefik[Traefik]
         jacquard[jacquard]
         hollerith[hollerith]
@@ -16,7 +16,7 @@ graph TB
         OllamaGW[Ollama Secondary]
     end
 
-    subgraph Execution["Execution Node Â· Lovelace Â· {{ lovelace_ip }}"]
+    subgraph Execution["Execution Node · Lovelace · {{ lovelace_ip }}"]
         Runtime[Agent Runtime]
         Ollama[Ollama Primary]
         ComfyUI[ComfyUI]
@@ -24,7 +24,7 @@ graph TB
         OpenHands[OpenHands]
     end
 
-    subgraph Control["Control Node Â· Hopper Â· {{ hopper_ip }}"]
+    subgraph Control["Control Node · Hopper · {{ hopper_ip }}"]
         SPIRE[SPIRE Server]
         PG[(PostgreSQL)]
         Langfuse[Langfuse]

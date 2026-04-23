@@ -4,7 +4,7 @@ title: Reference
 
 # Reference
 
-Supplementary reference material for Agent Swarm.
+Supplementary reference material for Memex.
 
 - [Glossary](glossary.md) — definitions of terms and acronyms
 - [Environment Variables](environment-variables.md) — complete variable reference

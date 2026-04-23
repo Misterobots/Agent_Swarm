@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: Observability
 ---
 
 # Observability
 
-Agent Swarm uses a multi-layer observability stack: Langfuse for LLM tracing, jacquard + hollerith for metrics, and knuth for centralized logging.
+Memex uses a multi-layer observability stack: Langfuse for LLM tracing, jacquard + hollerith for metrics, and knuth for centralized logging.
 
 ## Stack Overview
 
@@ -25,7 +25,7 @@ graph LR
     subgraph Storage["Storage"]
         TSDB[(jacquard TSDB)]
         knuth[(knuth)]
-        LFDB[(Langfuse Â· ClickHouse)]
+        LFDB[(Langfuse · ClickHouse)]
     end
 
     subgraph Visualization["Visualization"]
@@ -47,7 +47,7 @@ graph LR
     LFDB --> LFUI
 ```
 
-## Langfuse â€” LLM Tracing
+## Langfuse — LLM Tracing
 
 Langfuse provides end-to-end tracing for every LLM interaction.
 
@@ -63,7 +63,7 @@ Every MarsRL invocation creates a Langfuse trace containing:
 
 - **Trace**: One per user request (session, intent, model)
 - **Spans**: Solver generation, Verifier checks, Corrector fixes
-- **Scores**: Process-reward scores (0.0â€“1.0) at each step
+- **Scores**: Process-reward scores (0.0–1.0) at each step
 - **Metadata**: Intent, template version, token scope, iteration count
 
 ### Accessing Traces
@@ -72,7 +72,7 @@ Every MarsRL invocation creates a Langfuse trace containing:
 2. Navigate to **Traces**
 3. Filter by session ID, model, or score
 
-## jacquard â€” Metrics
+## jacquard — Metrics
 
 Time-series metrics collected via scraping.
 
@@ -102,7 +102,7 @@ Time-series metrics collected via scraping.
 | `http_requests_total` | Counter | API request count by endpoint |
 | `http_request_duration_seconds` | Histogram | Request latency distribution |
 
-## hollerith â€” Dashboards
+## hollerith — Dashboards
 
 | Property | Value |
 |----------|-------|
@@ -117,7 +117,7 @@ Pre-built dashboards cover:
 - **GPU Utilization**: VRAM usage, model loading, inference times
 - **Alerts**: Active alert status and history
 
-## knuth â€” Logs
+## knuth — Logs
 
 Centralized log aggregation via Promtail.
 
@@ -143,7 +143,7 @@ In hollerith, use the knuth data source with LogQL:
 | **URL** | `http://{{ turing_ip }}:9093` |
 | **Notifications** | Email (SMTP) + ntfy push |
 
-Alert routing: jacquard â†’ AlertManager â†’ Email + ntfy.
+Alert routing: jacquard ? AlertManager ? Email + ntfy.
 
 ## Key Files
 
@@ -157,8 +157,8 @@ Alert routing: jacquard â†’ AlertManager â†’ Email + ntfy.
 
 ## Related
 
-- [Admin: Monitoring](../admin-guide/operations/monitoring.md) â€” dashboard setup
-- [Admin: Configure Alerting](../procedures/configure-alerting.md) â€” alert configuration
-- [Module: Langfuse Service](../modules/services/langfuse.md) â€” service details
+- [Admin: Monitoring](../admin-guide/operations/monitoring.md) — dashboard setup
+- [Admin: Configure Alerting](../procedures/configure-alerting.md) — alert configuration
+- [Module: Langfuse Service](../modules/services/langfuse.md) — service details
 
 

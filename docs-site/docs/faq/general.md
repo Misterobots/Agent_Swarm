@@ -4,9 +4,9 @@ title: "FAQ: General"
 
 # General FAQ
 
-## What is Agent Swarm?
+## What is Memex?
 
-Agent Swarm is a self-hosted, multi-agent AI platform that runs on your own hardware. It orchestrates multiple specialized AI agents — for chat, image generation, 3D modeling, voice, IoT control, and more — through a unified interface.
+Memex is a self-hosted, multi-agent AI platform that runs on your own hardware. It orchestrates multiple specialized AI agents — for chat, image generation, 3D modeling, voice, IoT control, and more — through a unified interface.
 
 ## Who is it for?
 
@@ -28,7 +28,7 @@ The recommended setup uses three nodes (Control, Execution, Gateway). See [Prere
 
 ## Is it free?
 
-Yes. Agent Swarm is open source. The LLMs run locally via Ollama — no API keys or subscriptions required.
+Yes. Memex is open source. The LLMs run locally via Ollama — no API keys or subscriptions required.
 
 ## What models does it use?
 

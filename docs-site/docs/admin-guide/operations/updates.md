@@ -1,10 +1,10 @@
-﻿---
+---
 title: Updates
 ---
 
 # Updates
 
-How to update models, container images, and Agent Swarm code.
+How to update models, container images, and Memex code.
 
 ## Model Updates
 

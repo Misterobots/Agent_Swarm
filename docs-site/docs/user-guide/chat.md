@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: Chat
 ---
 
 # Chat
 
-The primary interface for interacting with Agent Swarm. Every message goes through intent classification, agent routing, and the MarsRL quality verification loop.
+The primary interface for interacting with Memex. Every message goes through intent classification, agent routing, and the MarsRL quality verification loop.
 
 ## How to Access
 
@@ -18,7 +18,7 @@ The primary interface for interacting with Agent Swarm. Every message goes throu
 
     1. Open Chat workspace
     2. Type: *"Write a Python function to merge two sorted lists"*
-    3. Observe status indicators: routing â†’ solving â†’ verifying â†’ streaming
+    3. Observe status indicators: routing ? solving ? verifying ? streaming
 
 === "API (cURL)"
 
@@ -65,7 +65,7 @@ The primary interface for interacting with Agent Swarm. Every message goes throu
 | `skill` | `string` | `null` | Force a specific skill |
 | `style` | `string` | `null` | Response style hints |
 | `research_mode` | `bool` | `false` | Enable multi-source research mode |
-| `ultraplan_mode` | `bool` | `false` | Decompose task into a plan only â€” no execution |
+| `ultraplan_mode` | `bool` | `false` | Decompose task into a plan only — no execution |
 | `ultrathink_mode` | `bool` | `false` | Deep reasoning with visible chain-of-thought |
 | `dev_mode` | `bool` | `false` | Enable Phase 2 dev tools (file ops, terminal) |
 | `attachments` | `List[dict]` | `null` | File attachments for context |
@@ -89,7 +89,7 @@ Event types: `status`, `thought`, `response`, `tool_call`, `error`.
 
 ### Intent-Based Routing
 
-The Semantic Router ({{ router_model }}) classifies your message and routes it to the appropriate agent. You don't need to specify the intent â€” it's detected automatically.
+The Semantic Router ({{ router_model }}) classifies your message and routes it to the appropriate agent. You don't need to specify the intent — it's detected automatically.
 
 The confidence threshold is **0.60**. Below that, the router retries with additional context or falls back to `CONVERSATION`.
 
@@ -121,10 +121,10 @@ The actual model used depends on the classified intent and the ExpertiseTemplate
 
 ## Related
 
-- [Architecture: Data Flow](../architecture/data-flow.md) â€” how a request travels through the system
-- [Architecture: MarsRL](../architecture/marsrl.md) â€” the quality verification loop
-- [Module: Router](../modules/router.md) â€” semantic routing internals
-- [API Reference: Chat Completions](../developer-guide/api/chat-completions.md) â€” full API docs
+- [Architecture: Data Flow](../architecture/data-flow.md) — how a request travels through the system
+- [Architecture: MarsRL](../architecture/marsrl.md) — the quality verification loop
+- [Module: Router](../modules/router.md) — semantic routing internals
+- [API Reference: Chat Completions](../developer-guide/api/chat-completions.md) — full API docs
 - [Troubleshooting: Common Errors](../troubleshooting/agent-runtime.md)
 - [Tutorial: Your First Chat](../tutorials/first-chat.md)
 

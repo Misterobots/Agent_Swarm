@@ -1,16 +1,16 @@
-ï»¿---
+---
 title: Topology
 ---
 
 # Topology
 
-Agent Swarm runs across three physical nodes on a flat LAN (192.168.2.0/24).
+Memex runs across three physical nodes on a flat LAN (192.168.2.0/24).
 
 ## Physical Layout
 
 ```mermaid
 graph LR
-    subgraph LAN["Local Network Â· 192.168.2.0/24"]
+    subgraph LAN["Local Network · 192.168.2.0/24"]
         HA["Home Assistant<br/>192.168.2.100"]
         Exec["Lovelace<br/>192.168.2.101<br/>RTX 5060 Ti 16GB"]
         Ctrl["Hopper<br/>192.168.2.102<br/>Low-power x86"]
@@ -21,7 +21,7 @@ graph LR
 
 ## Node Specifications
 
-### Execution Node â€” Lovelace ({{ lovelace_ip }})
+### Execution Node — Lovelace ({{ lovelace_ip }})
 
 | Spec | Value |
 |------|-------|
@@ -31,7 +31,7 @@ graph LR
 | **RAM** | 32GB |
 | **Services** | Ollama, Agent Runtime, ComfyUI, Voice Engine, BMO Voice, OpenHands |
 
-### Control Node â€” Hopper ({{ hopper_ip }})
+### Control Node — Hopper ({{ hopper_ip }})
 
 | Spec | Value |
 |------|-------|
@@ -41,7 +41,7 @@ graph LR
 | **RAM** | 8GB |
 | **Services** | SPIRE Server, PostgreSQL (pgvector), Langfuse, ClickHouse, MemPalace, Redis, MinIO |
 
-### Gateway Node â€” Dell PowerEdge Turing ({{ turing_ip }})
+### Gateway Node — Dell PowerEdge Turing ({{ turing_ip }})
 
 | Spec | Value |
 |------|-------|
@@ -58,19 +58,19 @@ graph TB
     subgraph Execution["Execution Plane"]
         direction TB
         E1[SPIRE Agent]
-        E2[Ollama Â· GPU]
-        E3[Agent Runtime Â· FastAPI]
-        E4[ComfyUI Â· GPU]
-        E5[Voice Engine Â· GPU]
-        E6[BMO Voice Â· GPU]
-        E7[OpenHands Â· DinD]
+        E2[Ollama · GPU]
+        E3[Agent Runtime · FastAPI]
+        E4[ComfyUI · GPU]
+        E5[Voice Engine · GPU]
+        E6[BMO Voice · GPU]
+        E7[OpenHands · DinD]
         E8[Dev Sandbox]
     end
 
     subgraph Control["Control Plane"]
         direction TB
         C1[SPIRE Server]
-        C2[PostgreSQL Â· pgvector]
+        C2[PostgreSQL · pgvector]
         C3[Langfuse]
         C4[ClickHouse]
         C5[MemPalace]
@@ -97,19 +97,19 @@ All inter-node traffic flows over the LAN. Key communication paths:
 
 | Source | Destination | Protocol | Purpose |
 |--------|-------------|----------|---------|
-| Gateway â†’ Execution | HTTP :{{ agent_runtime_port }} | Agent Runtime API |
-| Execution â†’ Control | TCP :8081 | SPIRE identity attestation |
-| Execution â†’ Control | HTTP :3000 | Langfuse trace submission |
-| Execution â†’ Control | TCP :5432 | PostgreSQL queries |
-| Execution â†’ Control | HTTP :8200 | MemPalace memory API |
-| Gateway â†’ Execution | HTTP :{{ ollama_port }} | Ollama inference (if cross-node) |
-| jacquard â†’ Execution | HTTP :{{ agent_runtime_port }} | Metrics scraping |
-| Promtail â†’ knuth | HTTP :3100 | Log shipping |
+| Gateway ? Execution | HTTP :{{ agent_runtime_port }} | Agent Runtime API |
+| Execution ? Control | TCP :8081 | SPIRE identity attestation |
+| Execution ? Control | HTTP :3000 | Langfuse trace submission |
+| Execution ? Control | TCP :5432 | PostgreSQL queries |
+| Execution ? Control | HTTP :8200 | MemPalace memory API |
+| Gateway ? Execution | HTTP :{{ ollama_port }} | Ollama inference (if cross-node) |
+| jacquard ? Execution | HTTP :{{ agent_runtime_port }} | Metrics scraping |
+| Promtail ? knuth | HTTP :3100 | Log shipping |
 
 ## Related
 
-- [Data Flow](data-flow.md) â€” how a request travels through the topology
-- [Admin: Networking](../admin-guide/deployment/networking.md) â€” firewall rules and DNS
-- [Reference: Port Map](../admin-guide/port-map.md) â€” complete port registry
+- [Data Flow](data-flow.md) — how a request travels through the topology
+- [Admin: Networking](../admin-guide/deployment/networking.md) — firewall rules and DNS
+- [Reference: Port Map](../admin-guide/port-map.md) — complete port registry
 
 

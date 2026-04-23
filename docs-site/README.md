@@ -1,6 +1,6 @@
-# Agent Swarm Docs Site
+# Memex Docs Site
 
-Local development and deployment for the Agent Swarm documentation library.
+Local development and deployment for the Memex documentation library.
 
 ## Local Development
 

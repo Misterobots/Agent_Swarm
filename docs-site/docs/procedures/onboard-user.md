@@ -1,10 +1,10 @@
-﻿---
+---
 title: "Procedure: Onboard User"
 ---
 
 # Onboard a User
 
-Set up a new user with access to Agent Swarm.
+Set up a new user with access to Memex.
 
 ## Steps
 

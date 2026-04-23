@@ -1,10 +1,10 @@
-﻿---
+---
 title: Admin Guide
 ---
 
 # Admin Guide
 
-Everything needed to deploy, configure, operate, and maintain Agent Swarm.
+Everything needed to deploy, configure, operate, and maintain Memex.
 
 ## Sections
 
@@ -12,7 +12,7 @@ Everything needed to deploy, configure, operate, and maintain Agent Swarm.
 
 | Guide | Description |
 |-------|-------------|
-| [Naming Scheme](naming-scheme.md) | Pioneer naming map — nodes, containers, agents |
+| [Naming Scheme](naming-scheme.md) | Pioneer naming map � nodes, containers, agents |
 | [Port Map](port-map.md) | All ports across all nodes |
 
 ### Deployment

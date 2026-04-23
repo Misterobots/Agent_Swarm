@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: Scaling
 ---
 
 # Scaling
 
-Strategies for adding capacity to Agent Swarm.
+Strategies for adding capacity to Memex.
 
 ## Vertical Scaling
 
@@ -14,9 +14,9 @@ Upgrade the GPU on the Execution Node to load more models simultaneously:
 
 | GPU | VRAM | Concurrent Models |
 |-----|------|--------------------|
-| RTX 3070 Ti | 8 GB | 1â€“2 |
-| RTX 5060 Ti | 16 GB | 2â€“3 |
-| RTX 4090 | 24 GB | 3â€“4 |
+| RTX 3070 Ti | 8 GB | 1–2 |
+| RTX 5060 Ti | 16 GB | 2–3 |
+| RTX 4090 | 24 GB | 3–4 |
 | A100 | 80 GB | 8+ |
 
 After GPU upgrade:
@@ -102,7 +102,7 @@ command:
 
 ## Related
 
-- [Architecture: Topology](../../architecture/topology.md) â€” current node layout
-- [Admin: Prerequisites](../deployment/prerequisites.md) â€” hardware recommendations
+- [Architecture: Topology](../../architecture/topology.md) — current node layout
+- [Admin: Prerequisites](../deployment/prerequisites.md) — hardware recommendations
 
 

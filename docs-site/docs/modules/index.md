@@ -1,10 +1,10 @@
-﻿---
+---
 title: Modules
 ---
 
 # Modules
 
-Deep-dive reference for every Agent Swarm module, tool, and service.
+Deep-dive reference for every Memex module, tool, and service.
 
 ## Core Modules
 

@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: Core Concepts
 ---
 
 # Core Concepts
 
-Key mental models for understanding Agent Swarm.
+Key mental models for understanding Memex.
 
 ## Agents
 
@@ -43,13 +43,13 @@ Every user message is classified into an **intent** by the Semantic Router. The 
 
 ## MarsRL Loop
 
-**MarsRL** (Mars Reinforcement Learning) is the inference-time quality verification loop at the heart of Agent Swarm. Every coding request passes through it:
+**MarsRL** (Mars Reinforcement Learning) is the inference-time quality verification loop at the heart of Memex. Every coding request passes through it:
 
 ```mermaid
 graph LR
     A[User Request] --> B[Solver]
     B -->|Initial Response| C[Verifier]
-    C -->|Score â‰¥ 0.60| D[Pass âœ“]
+    C -->|Score = 0.60| D[Pass ?]
     C -->|Score < 0.60| E[Corrector]
     E -->|Fixed Response| C
     C -->|Max 2 iterations| D
@@ -59,9 +59,9 @@ graph LR
 
 | Layer | What It Checks | Score Penalty | Hard Block? |
 |-------|----------------|---------------|-------------|
-| **AST Parse** | Python syntax validity | âˆ’0.40 | No |
-| **Coherence** | Non-empty, no repetition loops | âˆ’0.25 | No |
-| **Safety** | Content safety (llama-guard-3) | Score â†’ 0.0 | **Yes** |
+| **AST Parse** | Python syntax validity | -0.40 | No |
+| **Coherence** | Non-empty, no repetition loops | -0.25 | No |
+| **Safety** | Content safety (llama-guard-3) | Score ? 0.0 | **Yes** |
 
 The pass threshold is **0.60**. Every interaction is traced in Langfuse with its process-reward score.
 
@@ -71,17 +71,17 @@ The pass threshold is **0.60**. Every interaction is traced in Langfuse with its
 
 - Every Docker container gets an X.509 certificate (SVID) proving its identity
 - Trust domain: `home-ai-lab`
-- Services authenticate to each other using mutual TLS â€” no passwords or API keys
+- Services authenticate to each other using mutual TLS — no passwords or API keys
 - Example SPIFFE ID: `spiffe://home-ai-lab/execution-node`
 
 ## JWT-ACE Tokens
 
-**JWT-ACE** (JSON Web Token â€” Authorization for Constrained Environments) are ephemeral, per-request capability tokens.
+**JWT-ACE** (JSON Web Token — Authorization for Constrained Environments) are ephemeral, per-request capability tokens.
 
 - Generated when a request is routed to an agent
 - Scoped to the specific intent and tools needed
-- Short-lived â€” they expire after the request completes
-- Encode the security level required (L1â€“L7)
+- Short-lived — they expire after the request completes
+- Encode the security level required (L1–L7)
 
 ```mermaid
 sequenceDiagram
@@ -134,8 +134,8 @@ The tiers are connected over a flat LAN (192.168.2.0/24). Traefik on the Gateway
 
 ## Next Steps
 
-- [Architecture Deep-Dive](../architecture/index.md) â€” full technical details
-- [Data Flow](../architecture/data-flow.md) â€” how a request travels through the system
-- [Security Model](../architecture/security-model.md) â€” SPIFFE, JWT-ACE, MAESTRO in depth
+- [Architecture Deep-Dive](../architecture/index.md) — full technical details
+- [Data Flow](../architecture/data-flow.md) — how a request travels through the system
+- [Security Model](../architecture/security-model.md) — SPIFFE, JWT-ACE, MAESTRO in depth
 
 

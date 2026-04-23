@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: Security Model
 ---
 
 # Security Model
 
-Agent Swarm implements a defense-in-depth security architecture using SPIFFE/SPIRE for workload identity, JWT-ACE for per-request capability tokens, and the MAESTRO framework for layered security controls.
+Memex implements a defense-in-depth security architecture using SPIFFE/SPIRE for workload identity, JWT-ACE for per-request capability tokens, and the MAESTRO framework for layered security controls.
 
 ## Overview
 
@@ -12,8 +12,8 @@ Agent Swarm implements a defense-in-depth security architecture using SPIFFE/SPI
 graph TB
     subgraph Identity["Layer 1: Workload Identity"]
         SPIRE[SPIRE Server]
-        SA1[SPIRE Agent Â· Execution]
-        SA2[SPIRE Agent Â· Turing]
+        SA1[SPIRE Agent · Execution]
+        SA2[SPIRE Agent · Turing]
         SPIRE -->|X.509 SVID| SA1
         SPIRE -->|X.509 SVID| SA2
     end
@@ -39,14 +39,14 @@ graph TB
 
 ## SPIFFE / SPIRE
 
-Every service in Agent Swarm has a cryptographic identity.
+Every service in Memex has a cryptographic identity.
 
 ### How It Works
 
 1. **SPIRE Server** (Control Node, port 8081) is the certificate authority
 2. **SPIRE Agents** run on Execution and Gateway nodes
 3. Each workload receives an **X.509 SVID** (SPIFFE Verifiable Identity Document)
-4. Services authenticate via **mutual TLS** â€” no passwords or API keys needed
+4. Services authenticate via **mutual TLS** — no passwords or API keys needed
 
 ### Trust Domain
 
@@ -89,9 +89,9 @@ sequenceDiagram
     Issuer-->>Router: JWT-ACE {tools: [file_ops, terminal], level: L4}
     Router->>Agent: Execute with token
     Agent->>Gate: Can I use terminal?
-    Gate-->>Agent: âœ“ Allowed by token
+    Gate-->>Agent: ? Allowed by token
     Agent->>Gate: Can I use mqtt_publish?
-    Gate-->>Agent: âœ— Not in token scope
+    Gate-->>Agent: ? Not in token scope
 ```
 
 ### Token Contents
@@ -100,7 +100,7 @@ sequenceDiagram
 |-------|-------------|
 | `intent` | The classified intent (CODE, IMAGE, etc.) |
 | `tools` | List of allowed tool names |
-| `level` | Security level (L1â€“L7) |
+| `level` | Security level (L1–L7) |
 | `session_id` | Conversation session identifier |
 | `owner_id` | User identity |
 | `exp` | Expiration timestamp |
@@ -119,33 +119,33 @@ sequenceDiagram
 
 ## MAESTRO Framework
 
-The MAESTRO framework defines 7 security layers. Agent Swarm is 98% compliant.
+The MAESTRO framework defines 7 security layers. Memex is 98% compliant.
 
 | Layer | Domain | Status |
 |-------|--------|--------|
-| **L1** | Asset Inventory | âœ… Complete â€” all services cataloged |
-| **L2** | Threat Modeling | âœ… Complete â€” attack surfaces documented |
-| **L3** | Access Control | âœ… Complete â€” SPIFFE + JWT-ACE |
-| **L4** | Input Validation | âœ… Complete â€” schema validation on all endpoints |
-| **L5** | Output Validation | âœ… Complete â€” MarsRL 3-layer verifier |
-| **L6** | Active Defense | âœ… Complete â€” security agent, command blocklist |
-| **L7** | Monitoring | âœ… Complete â€” Langfuse traces, jacquard alerts |
+| **L1** | Asset Inventory | ? Complete — all services cataloged |
+| **L2** | Threat Modeling | ? Complete — attack surfaces documented |
+| **L3** | Access Control | ? Complete — SPIFFE + JWT-ACE |
+| **L4** | Input Validation | ? Complete — schema validation on all endpoints |
+| **L5** | Output Validation | ? Complete — MarsRL 3-layer verifier |
+| **L6** | Active Defense | ? Complete — security agent, command blocklist |
+| **L7** | Monitoring | ? Complete — Langfuse traces, jacquard alerts |
 
 ## Authorization Middleware
 
 The `authorization_middleware.py` enforces security on every request:
 
-- **Public routes**: `/`, `/v1/models`, `/log` â€” no auth required
-- **Protected routes**: All others â€” SPIFFE authentication required
+- **Public routes**: `/`, `/v1/models`, `/log` — no auth required
+- **Protected routes**: All others — SPIFFE authentication required
 - **Socket path**: `unix:///var/run/spire/agent.sock`
 
 ### Command Blocklist
 
 The security agent maintains a blocklist of dangerous commands:
 
-- `rm -rf /`, `mkfs`, `dd if=/dev/zero` â€” filesystem destruction
-- `curl | bash`, `wget | sh` â€” arbitrary code execution
-- `chmod 777`, `chown root` â€” permission escalation
+- `rm -rf /`, `mkfs`, `dd if=/dev/zero` — filesystem destruction
+- `curl | bash`, `wget | sh` — arbitrary code execution
+- `chmod 777`, `chown root` — permission escalation
 
 Blocked commands trigger a governance request instead of execution.
 
@@ -175,9 +175,9 @@ Logs flow to knuth for aggregation and Langfuse for trace correlation.
 
 ## Related
 
-- [Getting Started: Concepts](../getting-started/concepts.md#spiffe--spire) â€” simplified explanation
-- [Admin: SPIRE Configuration](../admin-guide/configuration/spire.md) â€” setup details
-- [Procedure: Rotate SPIRE Keys](../procedures/rotate-spire-keys.md) â€” key rotation runbook
+- [Getting Started: Concepts](../getting-started/concepts.md#spiffe--spire) — simplified explanation
+- [Admin: SPIRE Configuration](../admin-guide/configuration/spire.md) — setup details
+- [Procedure: Rotate SPIRE Keys](../procedures/rotate-spire-keys.md) — key rotation runbook
 - [Decision: ADR-001 JWT Profiles](decisions/adr-001-jwt-profiles.md)
 - [Troubleshooting: SPIRE](../troubleshooting/spire.md)
 

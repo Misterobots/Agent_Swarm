@@ -1,10 +1,10 @@
-﻿---
+---
 title: Chat Completions API
 ---
 
 # Chat Completions API
 
-The primary API for interacting with Agent Swarm. OpenAI-compatible format.
+The primary API for interacting with Memex. OpenAI-compatible format.
 
 ## Endpoint
 

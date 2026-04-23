@@ -1,10 +1,10 @@
-﻿---
+---
 title: "Quickstart: Developers"
 ---
 
 # Quickstart: Developers
 
-Get the Agent Swarm codebase running locally for development.
+Get the Memex codebase running locally for development.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ export LANGFUSE_HOST=http://localhost:3000  # or disable tracing
 ```
 
 !!! tip "Minimal Setup"
-    You only need Ollama running locally to work on the agent runtime. The control plane services (SPIRE, Langfuse, PostgreSQL) are optional for development — the runtime falls back gracefully when they're unavailable.
+    You only need Ollama running locally to work on the agent runtime. The control plane services (SPIRE, Langfuse, PostgreSQL) are optional for development � the runtime falls back gracefully when they're unavailable.
 
 ## Step 3: Pull Required Models
 
@@ -84,44 +84,44 @@ pytest tests/ -v
 
 ```
 Agent_Swarm/
-├── agents/                  # Core runtime (FastAPI server, agents, routing)
-│   ├── main.py              # FastAPI app, endpoints, lifecycle
-│   ├── router.py            # Intent-based request routing
-│   ├── semantic_router.py   # Intent classifier (14 categories)
-│   ├── mars_loop.py         # MarsRL: Solver → Verifier → Corrector
-│   ├── coordinator.py       # Multi-worker orchestration
-│   ├── config.py            # All configuration constants
-│   ├── tools/               # MCP tools (file, terminal, web, IoT)
-│   ├── specialized/         # Domain agents (image, voice, IoT, 3D)
-│   ├── security/            # SPIFFE auth, JWT-ACE, capability gates
-│   ├── training/            # GRPO trainer, A/B testing, datasets
-│   └── mcp/                 # Model Context Protocol server
-├── control_plane/           # Control Node Docker Compose
-├── execution_plane/         # Execution Node Docker Compose
-├── turing_gateway/            # Gateway Node Docker Compose
-├── ui/                      # Next.js frontend (Hive Mind UI)
-├── services/                # Standalone services (voice_engine, saltbox)
-├── scripts/                 # Deployment and utility scripts
-├── docs-site/               # This documentation site
-└── tests/                   # Test suite
++-- agents/                  # Core runtime (FastAPI server, agents, routing)
+�   +-- main.py              # FastAPI app, endpoints, lifecycle
+�   +-- router.py            # Intent-based request routing
+�   +-- semantic_router.py   # Intent classifier (14 categories)
+�   +-- mars_loop.py         # MarsRL: Solver ? Verifier ? Corrector
+�   +-- coordinator.py       # Multi-worker orchestration
+�   +-- config.py            # All configuration constants
+�   +-- tools/               # MCP tools (file, terminal, web, IoT)
+�   +-- specialized/         # Domain agents (image, voice, IoT, 3D)
+�   +-- security/            # SPIFFE auth, JWT-ACE, capability gates
+�   +-- training/            # GRPO trainer, A/B testing, datasets
+�   +-- mcp/                 # Model Context Protocol server
++-- control_plane/           # Control Node Docker Compose
++-- execution_plane/         # Execution Node Docker Compose
++-- turing_gateway/            # Gateway Node Docker Compose
++-- ui/                      # Next.js frontend (Hive Mind UI)
++-- services/                # Standalone services (voice_engine, saltbox)
++-- scripts/                 # Deployment and utility scripts
++-- docs-site/               # This documentation site
++-- tests/                   # Test suite
 ```
 
 ## Key Files to Know
 
 | File | Purpose |
 |------|---------|
-| `agents/main.py` | FastAPI app — all HTTP endpoints, startup lifecycle |
-| `agents/router.py` | Request routing — intent detection → agent dispatch |
-| `agents/mars_loop.py` | MarsRL quality loop — Solver → Verifier → Corrector |
-| `agents/config.py` | Every configuration constant — IPs, models, URLs, thresholds |
-| `agents/semantic_router.py` | Intent classifier — 14 categories using {{ router_model }} |
-| `agents/coordinator.py` | Multi-worker orchestration — decompose, research, synthesize, implement |
+| `agents/main.py` | FastAPI app � all HTTP endpoints, startup lifecycle |
+| `agents/router.py` | Request routing � intent detection ? agent dispatch |
+| `agents/mars_loop.py` | MarsRL quality loop � Solver ? Verifier ? Corrector |
+| `agents/config.py` | Every configuration constant � IPs, models, URLs, thresholds |
+| `agents/semantic_router.py` | Intent classifier � 14 categories using {{ router_model }} |
+| `agents/coordinator.py` | Multi-worker orchestration � decompose, research, synthesize, implement |
 
 ## Next Steps
 
-- [Adding Agents](../developer-guide/adding-agents.md) — create a new specialized agent
-- [Adding Tools](../developer-guide/adding-tools.md) — register an MCP tool
-- [API Reference](../developer-guide/api/chat-completions.md) — full endpoint documentation
-- [Architecture](../architecture/index.md) — understand the system design
+- [Adding Agents](../developer-guide/adding-agents.md) � create a new specialized agent
+- [Adding Tools](../developer-guide/adding-tools.md) � register an MCP tool
+- [API Reference](../developer-guide/api/chat-completions.md) � full endpoint documentation
+- [Architecture](../architecture/index.md) � understand the system design
 
 

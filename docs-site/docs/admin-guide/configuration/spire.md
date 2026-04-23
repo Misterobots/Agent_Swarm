@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: SPIRE Configuration
 ---
 
 # SPIRE Configuration
 
-SPIFFE/SPIRE provides workload identity for all Agent Swarm services.
+SPIFFE/SPIRE provides workload identity for all Memex services.
 
 ## Server Configuration
 
@@ -137,8 +137,8 @@ docker compose exec spire-server /opt/spire/bin/spire-server entry show
 
 ## Related
 
-- [Architecture: Security Model](../../architecture/security-model.md) â€” security design
-- [Procedures: Rotate SPIRE Keys](../../procedures/rotate-spire-keys.md) â€” key rotation
-- [Troubleshooting: SPIRE](../../troubleshooting/spire.md) â€” common issues
+- [Architecture: Security Model](../../architecture/security-model.md) — security design
+- [Procedures: Rotate SPIRE Keys](../../procedures/rotate-spire-keys.md) — key rotation
+- [Troubleshooting: SPIRE](../../troubleshooting/spire.md) — common issues
 
 

@@ -7,7 +7,7 @@ title: Tutorials
 Hands-on, narrative walkthroughs that guide you through complete tasks from start to finish.
 
 !!! tip "Prerequisites"
-    All tutorials assume you have a running Agent Swarm deployment. If not, start with the [Getting Started](../getting-started/index.md) guide.
+    All tutorials assume you have a running Memex deployment. If not, start with the [Getting Started](../getting-started/index.md) guide.
 
 ## Beginner
 

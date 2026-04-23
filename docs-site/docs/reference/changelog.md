@@ -1,10 +1,10 @@
-﻿---
+---
 title: Changelog
 ---
 
 # Changelog
 
-All notable changes to Agent Swarm are documented here.
+All notable changes to Memex are documented here.
 
 ## [Unreleased]
 
@@ -20,12 +20,12 @@ All notable changes to Agent Swarm are documented here.
 
 ---
 
-## [1.0.0] — Initial Release
+## [1.0.0] � Initial Release
 
 ### Features
 
-- Multi-agent orchestration (Router → Coordinator → Solver)
-- MarsRL verification loop (solve → verify → reward)
+- Multi-agent orchestration (Router ? Coordinator ? Solver)
+- MarsRL verification loop (solve ? verify ? reward)
 - Image generation via ComfyUI integration
 - 3D model generation pipeline
 - Voice interface (Whisper STT + Piper TTS)

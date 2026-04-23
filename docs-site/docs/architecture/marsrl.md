@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: MarsRL Loop
 ---
 
 # MarsRL Loop
 
-MarsRL (Mars Reinforcement Learning) is the inference-time quality verification loop at the core of Agent Swarm. It implements a Solver â†’ Verifier â†’ Corrector pipeline that catches and fixes errors before they reach the user.
+MarsRL (Mars Reinforcement Learning) is the inference-time quality verification loop at the core of Memex. It implements a Solver ? Verifier ? Corrector pipeline that catches and fixes errors before they reach the user.
 
 ## Design
 
@@ -12,7 +12,7 @@ MarsRL (Mars Reinforcement Learning) is the inference-time quality verification 
 graph TD
     A[User Request] --> B["Solver<br/>{{ solver_model }}"]
     B -->|Initial Response| C{Verifier}
-    C -->|"Score â‰¥ 0.60"| D[Pass âœ“ â†’ Return]
+    C -->|"Score = 0.60"| D[Pass ? ? Return]
     C -->|"Score < 0.60"| E["Corrector<br/>{{ solver_model }}"]
     E -->|Fixed Response| C
     C -->|"Iteration > 2"| F[Return Best Attempt]
@@ -35,14 +35,14 @@ The Verifier runs three sequential checks. Each adds or subtracts from the score
 
 | Layer | Check | Score Impact | Hard Block? |
 |-------|-------|-------------|-------------|
-| **1. AST Parse** | Python syntax validity via `ast.parse()` | âˆ’0.40 if invalid | No |
-| **2. Coherence** | Non-empty output, no repetition loops | âˆ’0.25 if failed | No |
-| **3. Safety** | Content safety via {{ verifier_model }} | Score â†’ 0.0 | **Yes** |
+| **1. AST Parse** | Python syntax validity via `ast.parse()` | -0.40 if invalid | No |
+| **2. Coherence** | Non-empty output, no repetition loops | -0.25 if failed | No |
+| **3. Safety** | Content safety via {{ verifier_model }} | Score ? 0.0 | **Yes** |
 
 ### Scoring
 
 - Starting score: **1.0**
-- Pass threshold: **â‰¥ 0.60**
+- Pass threshold: **= 0.60**
 - Maximum correction iterations: **2**
 - Safety failure: Hard block, score forced to 0.0
 
@@ -51,19 +51,19 @@ The Verifier runs three sequential checks. Each adds or subtracts from the score
 ```python
 @dataclass
 class VerifierResult:
-    passed: bool      # True if score â‰¥ 0.60
+    passed: bool      # True if score = 0.60
     reason: str       # Failure explanation (if failed)
-    score: float      # 0.0 â€“ 1.0
+    score: float      # 0.0 – 1.0
 ```
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `agents/mars_loop.py` | `MarsRLLoop` class â€” orchestrates the Solver â†’ Verifier â†’ Corrector cycle |
-| `agents/verifier_agent.py` | Verifier implementation â€” AST, coherence, safety checks |
-| `agents/corrector_agent.py` | Corrector implementation â€” rewrites failed responses |
-| `agents/architect_agent.py` | Solver/Architect agent â€” generates initial responses |
+| `agents/mars_loop.py` | `MarsRLLoop` class — orchestrates the Solver ? Verifier ? Corrector cycle |
+| `agents/verifier_agent.py` | Verifier implementation — AST, coherence, safety checks |
+| `agents/corrector_agent.py` | Corrector implementation — rewrites failed responses |
+| `agents/architect_agent.py` | Solver/Architect agent — generates initial responses |
 
 ## Configuration
 
@@ -106,21 +106,21 @@ Access traces at `http://{{ hopper_ip }}:3000`.
 
 MarsRL runs for:
 
-- `CODE` intent â€” full AST + coherence + safety verification
-- `CONVERSATION` intent â€” coherence + safety verification (AST skipped for non-code)
-- `DEVOPS`, `DATA`, `DOCUMENTATION` â€” coherence + safety
+- `CODE` intent — full AST + coherence + safety verification
+- `CONVERSATION` intent — coherence + safety verification (AST skipped for non-code)
+- `DEVOPS`, `DATA`, `DOCUMENTATION` — coherence + safety
 
 MarsRL does **not** run for:
 
-- `IMAGE`, `3D`, `ACTION_FIGURE` â€” routed to creative pipelines
-- `IOT_CONTROL` â€” routed directly to Home Assistant tools
-- `VISION` â€” routed to VLM
+- `IMAGE`, `3D`, `ACTION_FIGURE` — routed to creative pipelines
+- `IOT_CONTROL` — routed directly to Home Assistant tools
+- `VISION` — routed to VLM
 
 ## Related
 
-- [Architecture: Data Flow](data-flow.md) â€” where MarsRL fits in the request lifecycle
-- [Getting Started: Concepts](../getting-started/concepts.md) â€” simplified explanation
-- [Module: MarsRL Loop](../modules/mars-loop.md) â€” implementation reference
-- [Decision: ADR-004 MarsRL](decisions/adr-004-marsrl.md) â€” design rationale
+- [Architecture: Data Flow](data-flow.md) — where MarsRL fits in the request lifecycle
+- [Getting Started: Concepts](../getting-started/concepts.md) — simplified explanation
+- [Module: MarsRL Loop](../modules/mars-loop.md) — implementation reference
+- [Decision: ADR-004 MarsRL](decisions/adr-004-marsrl.md) — design rationale
 
 

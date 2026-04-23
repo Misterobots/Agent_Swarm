@@ -1,4 +1,4 @@
-site_name: Agent Swarm Documentation
+site_name: Memex — Home AI Lab Documentation
 site_description: Documentation library for the Home AI Lab Agentic Hive — a self-hosted, distributed multi-agent AI system.
 repo_url: https://github.com/Misterobots/Agent_Swarm
 repo_name: Misterobots/Agent_Swarm
@@ -101,7 +101,7 @@ extra:
   generator: false
   # Reusable variables via macros plugin
   vars:
-    project_name: "Agent Swarm"
+    project_name: "Memex"
     version: "3.4"
     phase: "Phase 6 Complete"
     control_node_ip: "192.168.2.102"

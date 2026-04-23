@@ -4,7 +4,7 @@ title: Developer Guide
 
 # Developer Guide
 
-Guides for developers extending, customizing, and integrating with Agent Swarm.
+Guides for developers extending, customizing, and integrating with Memex.
 
 ## Sections
 

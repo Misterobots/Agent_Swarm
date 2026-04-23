@@ -1,10 +1,10 @@
-﻿---
+---
 title: "Tutorial: Voice Assistant"
 ---
 
 # Build a Voice Assistant
 
-Set up voice input and output to talk to Agent Swarm.
+Set up voice input and output to talk to Memex.
 
 ## What You'll Learn
 
@@ -55,7 +55,7 @@ Speak naturally:
 > "Turn on the living room lights"
 > "Tell me a joke"
 
-The system handles the full loop: speech → text → agent → text → speech.
+The system handles the full loop: speech ? text ? agent ? text ? speech.
 
 ## Step 5: Adjust Voice Settings
 
@@ -75,7 +75,7 @@ The system handles the full loop: speech → text → agent → text → speech.
 
 ## Next Steps
 
-- [User Guide: Voice](../user-guide/voice.md) — full voice reference
-- [Create IoT Automation](iot-automation.md) — combine voice with smart home
+- [User Guide: Voice](../user-guide/voice.md) � full voice reference
+- [Create IoT Automation](iot-automation.md) � combine voice with smart home
 
 

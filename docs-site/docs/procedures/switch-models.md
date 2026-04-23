@@ -1,10 +1,10 @@
-﻿---
+---
 title: "Procedure: Switch Models"
 ---
 
 # Switch Models
 
-Change the solver, router, or verifier model used by Agent Swarm.
+Change the solver, router, or verifier model used by Memex.
 
 ## Steps
 

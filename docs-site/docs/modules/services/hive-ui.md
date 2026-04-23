@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: "Service: Hive UI"
 ---
 
 # Hive UI
 
-The web-based frontend for Agent Swarm.
+The web-based frontend for Memex.
 
 ## Deployment
 
@@ -57,7 +57,7 @@ For deployed gateway environments, the `hive-ui` container must define both `API
 
 ## Related
 
-- [User Guide: Chat](../../user-guide/chat.md) â€” using the chat interface
-- [Getting Started: User Quickstart](../../getting-started/quickstart-user.md) â€” first use
+- [User Guide: Chat](../../user-guide/chat.md) — using the chat interface
+- [Getting Started: User Quickstart](../../getting-started/quickstart-user.md) — first use
 
 

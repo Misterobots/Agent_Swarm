@@ -14,7 +14,7 @@ LLM outputs can contain errors: syntax bugs in code, hallucinated facts, unsafe 
 1. **Training-time**: Fine-tune the model to make fewer errors (RLHF, DPO, GRPO)
 2. **Inference-time**: Verify and fix outputs before returning them
 
-Agent Swarm already uses GRPO training for model improvement, but training cycles are slow (hours/days) and models can still produce bad outputs.
+Memex already uses GRPO training for model improvement, but training cycles are slow (hours/days) and models can still produce bad outputs.
 
 ## Decision
 

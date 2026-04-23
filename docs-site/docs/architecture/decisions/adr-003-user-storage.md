@@ -9,7 +9,7 @@ title: "ADR-003: Filesystem User Storage"
 
 ## Context
 
-Agent Swarm stores persistent data per user: session histories, learned rules, preferences, generated artifacts (images, 3D models), and project files. Options considered:
+Memex stores persistent data per user: session histories, learned rules, preferences, generated artifacts (images, 3D models), and project files. Options considered:
 
 1. **Database-only**: Store everything in PostgreSQL
 2. **Object storage**: Use MinIO for all user data

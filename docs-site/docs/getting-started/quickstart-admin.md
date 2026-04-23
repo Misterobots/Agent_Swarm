@@ -1,18 +1,18 @@
-ï»¿---
+---
 title: "Quickstart: Admins"
 ---
 
 # Quickstart: Admins
 
-Deploy the full Agent Swarm stack across three nodes from scratch.
+Deploy the full Memex stack across three nodes from scratch.
 
 ## Prerequisites
 
 | Requirement | Details |
 |-------------|---------|
-| **3 machines** | Control Node (low-power x86), Execution Node (NVIDIA GPU â‰¥ 16GB VRAM), Gateway Node (NVIDIA GPU â‰¥ 8GB VRAM optional) |
+| **3 machines** | Control Node (low-power x86), Execution Node (NVIDIA GPU = 16GB VRAM), Gateway Node (NVIDIA GPU = 8GB VRAM optional) |
 | **Network** | All nodes on the same subnet with static IPs |
-| **OS** | Ubuntu 22.04+ (Control, Gateway) Â· Windows 11 or Ubuntu (Execution) |
+| **OS** | Ubuntu 22.04+ (Control, Gateway) · Windows 11 or Ubuntu (Execution) |
 | **Docker** | Docker Engine 24+ with Compose v2 on all nodes |
 | **NVIDIA Drivers** | 550+ with NVIDIA Container Toolkit on GPU nodes |
 | **SSH** | Key-based SSH access from your dev machine to all nodes |
@@ -142,9 +142,9 @@ curl -s http://192.168.2.102:3000/api/public/health
 
 ## Next Steps
 
-- [Post-Deploy Verification](../admin-guide/deployment/post-deploy.md) â€” comprehensive health checks
-- [Networking Guide](../admin-guide/deployment/networking.md) â€” firewall rules, Tailscale, DNS
-- [Monitoring Setup](../admin-guide/operations/monitoring.md) â€” configure hollerith dashboards
-- [SPIRE Configuration](../admin-guide/configuration/spire.md) â€” workload registration
+- [Post-Deploy Verification](../admin-guide/deployment/post-deploy.md) — comprehensive health checks
+- [Networking Guide](../admin-guide/deployment/networking.md) — firewall rules, Tailscale, DNS
+- [Monitoring Setup](../admin-guide/operations/monitoring.md) — configure hollerith dashboards
+- [SPIRE Configuration](../admin-guide/configuration/spire.md) — workload registration
 
 

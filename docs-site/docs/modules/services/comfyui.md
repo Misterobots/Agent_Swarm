@@ -1,4 +1,4 @@
-﻿---
+---
 title: "Service: ComfyUI"
 ---
 
@@ -18,7 +18,7 @@ Node-based image generation engine.
 
 ## Purpose
 
-ComfyUI runs image generation workflows as directed acyclic graphs (DAGs) of processing nodes. Agent Swarm submits workflows via the ComfyUI API.
+ComfyUI runs image generation workflows as directed acyclic graphs (DAGs) of processing nodes. Memex submits workflows via the ComfyUI API.
 
 ## API Usage
 

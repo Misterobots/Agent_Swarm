@@ -1,22 +1,22 @@
-ï»¿---
+---
 title: Memory System
 ---
 
 # Memory System
 
-Agent Swarm provides persistent knowledge storage across sessions through multiple memory subsystems.
+Memex provides persistent knowledge storage across sessions through multiple memory subsystems.
 
 ## Architecture
 
 ```mermaid
 graph TB
-    subgraph Local["Local Memory Â· Execution Node"]
+    subgraph Local["Local Memory · Execution Node"]
         SM[Skills Memory<br/>skills_memory.json]
         Prefs[User Preferences<br/>preferences.py]
         Sessions[Session Context<br/>context_sessions/]
     end
 
-    subgraph Remote["Remote Memory Â· Control Node"]
+    subgraph Remote["Remote Memory · Control Node"]
         MP[MemPalace<br/>Semantic Memory]
         PG[(PostgreSQL<br/>pgvector)]
     end
@@ -113,16 +113,16 @@ This is routed to `TRAIN` intent and writes to `general_rules` in Skills Memory.
 
 | File | Purpose |
 |------|---------|
-| `agents/memory_system.py` | Skills Memory â€” rule storage and retrieval |
+| `agents/memory_system.py` | Skills Memory — rule storage and retrieval |
 | `agents/preferences.py` | User preference management |
 | `agents/mempalace_client.py` | MemPalace API client |
 | `control_plane/mempalace/` | MemPalace service (Control Node) |
 
 ## Related
 
-- [Getting Started: Concepts](../getting-started/concepts.md) â€” simplified overview
-- [Module: Memory](../modules/memory.md) â€” implementation reference
+- [Getting Started: Concepts](../getting-started/concepts.md) — simplified overview
+- [Module: Memory](../modules/memory.md) — implementation reference
 - [Module: MemPalace Service](../modules/services/mempalace.md)
-- [User Guide: Settings](../user-guide/settings.md) â€” teaching preferences
+- [User Guide: Settings](../user-guide/settings.md) — teaching preferences
 
 

@@ -4,7 +4,7 @@ title: Adding Agents
 
 # Adding Agents
 
-How to create a new specialized agent in Agent Swarm.
+How to create a new specialized agent in Memex.
 
 ## Overview
 

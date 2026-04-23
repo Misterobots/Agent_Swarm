@@ -10,7 +10,7 @@ Yes. All data stays on your local network. No telemetry or data is sent external
 
 ## How is authentication handled?
 
-Agent Swarm uses JWT profiles managed through SPIRE for service-to-service authentication. The Hive UI currently operates on the local network without user authentication (it's designed for trusted, private networks).
+Memex uses JWT profiles managed through SPIRE for service-to-service authentication. The Hive UI currently operates on the local network without user authentication (it's designed for trusted, private networks).
 
 ## What is SPIRE?
 

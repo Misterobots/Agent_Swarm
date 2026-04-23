@@ -1,10 +1,10 @@
-ï»¿---
+---
 title: Overview
 ---
 
 # Overview
 
-Agent Swarm is a self-hosted, distributed multi-agent AI system that runs entirely on local hardware. No data leaves your network. No external AI APIs are called. Everything â€” inference, storage, identity, monitoring â€” runs on three physical machines connected over a local LAN.
+Memex is a self-hosted, distributed multi-agent AI system that runs entirely on local hardware. No data leaves your network. No external AI APIs are called. Everything — inference, storage, identity, monitoring — runs on three physical machines connected over a local LAN.
 
 ## What It Does
 
@@ -20,7 +20,7 @@ Every request goes through a **MarsRL quality loop**: a Solver generates a respo
 
 ### Voice Interaction
 
-BMO â€” a physical robot character â€” responds with a cloned voice via RVC synthesis. Text-to-speech is handled by Qwen3-TTS (1.7B parameters) running locally.
+BMO — a physical robot character — responds with a cloned voice via RVC synthesis. Text-to-speech is handled by Qwen3-TTS (1.7B parameters) running locally.
 
 ### Smart Home Control
 
@@ -43,8 +43,8 @@ The system runs across three nodes:
 ```mermaid
 graph LR
     User([User]) --> Gateway
-    Gateway[Gateway Â· Turing] -->|/swarm/*| Execution[Execution Â· Lovelace]
-    Execution -->|identity| Control[Control Â· Hopper]
+    Gateway[Gateway · Turing] -->|/swarm/*| Execution[Execution · Lovelace]
+    Execution -->|identity| Control[Control · Hopper]
     Execution -->|traces| Control
     Execution -->|memory| Control
     Gateway -->|metrics| Gateway
@@ -54,13 +54,13 @@ graph LR
 
 - **SPIFFE/SPIRE**: Every service gets a cryptographic workload identity (X.509 SVID)
 - **JWT-ACE**: Each request gets an ephemeral capability token scoped to its intent
-- **MAESTRO**: L1â€“L7 security framework (98% compliant)
-- **Output Validation**: 3-layer verification â€” AST parse, coherence heuristics, llama-guard-3 safety check
+- **MAESTRO**: L1–L7 security framework (98% compliant)
+- **Output Validation**: 3-layer verification — AST parse, coherence heuristics, llama-guard-3 safety check
 
 ## What's Next
 
-- [Quickstart for Users](quickstart-user.md) â€” start using the system now
-- [Core Concepts](concepts.md) â€” understand the key mental models
-- [Architecture Deep-Dive](../architecture/index.md) â€” full technical details
+- [Quickstart for Users](quickstart-user.md) — start using the system now
+- [Core Concepts](concepts.md) — understand the key mental models
+- [Architecture Deep-Dive](../architecture/index.md) — full technical details
 
 

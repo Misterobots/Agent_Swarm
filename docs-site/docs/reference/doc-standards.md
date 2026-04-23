@@ -13,7 +13,7 @@ Version: 1.0
 Last Updated: 2026-04-16
 ```
 
-Every page in the Agent Swarm DocSite must follow this standard template to ensure consistency, traceability, and completeness.
+Every page in the Memex DocSite must follow this standard template to ensure consistency, traceability, and completeness.
 
 ---
 

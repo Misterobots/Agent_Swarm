@@ -8,7 +8,7 @@ Control smart home devices through natural language chat commands.
 
 ## What You'll Learn
 
-- How Agent Swarm connects to Home Assistant
+- How Memex connects to Home Assistant
 - How to issue device commands via chat
 - How to create automation routines
 

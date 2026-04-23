@@ -4,7 +4,7 @@ title: Prerequisites
 
 # Prerequisites
 
-Hardware and software requirements for deploying Agent Swarm.
+Hardware and software requirements for deploying Memex.
 
 ## Hardware
 

@@ -538,7 +538,7 @@ def render_chat_workspace():
     swarm_col, _ = st.columns([3, 5])
     with swarm_col:
         swarm_on = st.toggle(
-            "🤖 Agent Swarm Mode",
+            "🤖 Swarm Mode",
             value=st.session_state.get("swarm_mode_toggle", False),
             key="swarm_mode_toggle",
             help="Force routing through Lamport's multi-agent coordinator. "

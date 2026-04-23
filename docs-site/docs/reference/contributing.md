@@ -4,7 +4,7 @@ title: Contributing
 
 # Contributing
 
-Thank you for your interest in contributing to Agent Swarm.
+Thank you for your interest in contributing to Memex.
 
 ## Getting Started
 

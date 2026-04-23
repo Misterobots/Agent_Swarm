@@ -4,7 +4,7 @@ title: Agent System
 
 # Agent System
 
-How Agent Swarm classifies user intent, selects the right agent, and orchestrates complex tasks.
+How Memex classifies user intent, selects the right agent, and orchestrates complex tasks.
 
 ## Semantic Router
 

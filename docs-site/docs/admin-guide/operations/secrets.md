@@ -4,7 +4,7 @@ title: Secrets Management
 
 # Secrets Management
 
-How credentials are managed across Agent Swarm nodes.
+How credentials are managed across Memex nodes.
 
 ## Secret Categories
 

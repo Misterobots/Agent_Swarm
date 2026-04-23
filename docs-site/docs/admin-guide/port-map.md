@@ -1,12 +1,12 @@
-﻿---
+---
 title: Port Map
 ---
 
 # Port Map
 
-Complete port registry across all Agent Swarm nodes.
+Complete port registry across all Memex nodes.
 
-## Execution Node â€” {{ lovelace_ip }}
+## Execution Node — {{ lovelace_ip }}
 
 | Port | Service | Protocol | Access |
 |------|---------|----------|--------|
@@ -18,7 +18,7 @@ Complete port registry across all Agent Swarm nodes.
 | 3300 | OpenHands | HTTP | LAN |
 | 8081 | cAdvisor | HTTP | Internal |
 
-## Control Node â€” {{ hopper_ip }}
+## Control Node — {{ hopper_ip }}
 
 | Port | Service | Protocol | Access |
 |------|---------|----------|--------|
@@ -32,7 +32,7 @@ Complete port registry across all Agent Swarm nodes.
 | 9001 | MinIO Console | HTTP | LAN |
 | 6379 | Redis | TCP | LAN |
 
-## Gateway Node â€” {{ turing_ip }}
+## Gateway Node — {{ turing_ip }}
 
 | Port | Service | Protocol | Access |
 |------|---------|----------|--------|
@@ -47,7 +47,7 @@ Complete port registry across all Agent Swarm nodes.
 | 6379 | Redis | TCP | Internal |
 | 8080 | cAdvisor | HTTP | Internal |
 
-## Home Assistant â€” 192.168.2.100
+## Home Assistant — 192.168.2.100
 
 | Port | Service | Protocol | Access |
 |------|---------|----------|--------|
@@ -65,7 +65,7 @@ Complete port registry across all Agent Swarm nodes.
 
 ## Source References
 
-??? info "Source of Truth â€” Canonical Files"
+??? info "Source of Truth — Canonical Files"
 
     | Source | Type | Relevance |
     |--------|------|----------|
@@ -100,7 +100,7 @@ Complete port registry across all Agent Swarm nodes.
 ### Keeping Environment Variables Current
 
 - After adding new env vars, add them to the Environment Variables table in Section 10.
-- Never commit `.env` files â€” document the variable names and purposes only.
+- Never commit `.env` files — document the variable names and purposes only.
 
 ---
 
@@ -118,6 +118,6 @@ Complete port registry across all Agent Swarm nodes.
 
 ---
 
-*See also: Design Framework · Security · [Back to Index](../index.md)*
+*See also: Design Framework � Security � [Back to Index](../index.md)*
 
 
