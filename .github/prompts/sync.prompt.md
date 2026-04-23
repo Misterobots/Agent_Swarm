@@ -1,10 +1,11 @@
 ---
 name: Sync — Commit, Push & Pull All Nodes
 description: >
-  Commit all local changes, push to GitHub, then SSH into each pioneer node
-  (Turing, Lovelace, Hopper, BMO) and run git pull to sync. Use this when you
-  want to push code and deploy to all nodes. Trigger phrases: /sync, sync nodes,
-  push and sync, deploy to all nodes, sync all pioneers.
+  Commit all local changes, push to GitHub, then SSH into each remote pioneer
+  node (Turing, Hopper, BMO) and run git pull to sync. Lovelace is the LOCAL
+  machine — no SSH needed there. Use this when you want to push code and deploy
+  to all nodes. Trigger phrases: /sync, sync nodes, push and sync, deploy to all
+  nodes, sync all pioneers.
 argument-hint: "Optional commit message (default: auto-generated)"
 agent: agent
 tools:
@@ -15,6 +16,24 @@ tools:
 You are executing a full repository sync across all Memex pioneer nodes.
 
 ## Steps
+
+### 0 — Create rollback point
+
+Before making any changes, tag the current HEAD as a rollback point so any sync can be cleanly undone.
+
+```powershell
+cd C:\Users\panca\OneDrive\Documents\GitHub\Agent_Swarm
+$rollbackTag = "rollback/" + (Get-Date -Format "yyyy-MM-ddTHH-mm-ss")
+git tag $rollbackTag
+git push origin $rollbackTag
+```
+
+Report the tag name to the user (e.g. `rollback/2026-04-23T14-30-00`). If the repo is completely clean and there is no need to commit, the tag still gets created — it marks the last known good state.
+
+To roll back to this point later:
+```powershell
+git reset --hard <tag-name>   # local only — then force-push if needed (ask user first)
+```
 
 ### 1 — Stage and commit local changes
 
@@ -44,23 +63,25 @@ Report the push result. If the push is rejected (non-fast-forward), **stop and a
 
 ### 3 — Sync each pioneer node via SSH
 
-For each node below, SSH in and run `git pull`. Use `misterobots` as the SSH user (or whatever is already in the user's SSH config). The repo path on each node is assumed to be `~/Agent_Swarm` unless the node is BMO (Pi), where it may be `/home/misterobots/Agent_Swarm`.
+**Lovelace is the LOCAL machine** — the push in step 2 already updated it. No SSH needed.
 
-| Pioneer | IP            | SSH user      | Repo path                          |
-|---------|---------------|---------------|------------------------------------|
-| Turing  | 192.168.2.103 | misterobots   | ~/Agent_Swarm                      |
-| Lovelace| 192.168.2.101 | misterobots   | ~/Agent_Swarm                      |
-| Hopper  | 192.168.2.102 | misterobots   | ~/Agent_Swarm                      |
-| BMO     | 192.168.2.106 | misterobots   | /home/misterobots/Agent_Swarm      |
+For the 3 remote nodes, SSH in and run `git pull`. SSH user is `misterobots`.
+On Windows the OpenSSH binary is `C:\Windows\System32\OpenSSH\ssh.exe` — not in PATH.
 
-Run each pull sequentially:
+| Pioneer | IP            | Type   | Repo path       |
+|---------|---------------|--------|-----------------|
+| Turing  | 192.168.2.103 | Remote | ~/Home_AI_Lab   |
+| Hopper  | 192.168.2.102 | Remote | ~/Agent_Swarm   |
+| BMO     | 192.168.2.106 | Pi     | ~/Home_AI_Lab   |
 
 ```powershell
-ssh misterobots@192.168.2.103 "cd ~/Agent_Swarm && git pull --ff-only"
-ssh misterobots@192.168.2.101 "cd ~/Agent_Swarm && git pull --ff-only"
-ssh misterobots@192.168.2.102 "cd ~/Agent_Swarm && git pull --ff-only"
-ssh misterobots@192.168.2.106 "cd /home/misterobots/Agent_Swarm && git pull --ff-only"
+$ssh = 'C:\Windows\System32\OpenSSH\ssh.exe'
+& $ssh misterobots@192.168.2.103 'cd $HOME/Home_AI_Lab && git pull --ff-only 2>&1'
+& $ssh misterobots@192.168.2.102 'cd $HOME/Agent_Swarm && git pull --ff-only 2>&1'
+& $ssh misterobots@192.168.2.106 'cd $HOME/Home_AI_Lab && git pull --ff-only 2>&1'
 ```
+
+Note: use **single quotes** around the remote command so PowerShell does not expand `$HOME` locally.
 
 Capture and report each exit code and last line of output. If a node is unreachable (connection refused / timeout), log it as **OFFLINE** and continue — do not abort.
 
@@ -68,12 +89,12 @@ Capture and report each exit code and last line of output. If a node is unreacha
 
 After all steps, output a markdown table:
 
-| Step | Node | Result |
-|------|------|--------|
-| Push  | GitHub        | ✅ pushed / ⏭️ nothing to push |
-| Pull  | Turing        | ✅ up-to-date / 🔄 updated / ⚠️ OFFLINE |
-| Pull  | Lovelace      | … |
-| Pull  | Hopper        | … |
-| Pull  | BMO           | … |
+| Step          | Node          | Result |
+|---------------|---------------|--------|
+| Rollback tag  | GitHub        | ✅ `rollback/YYYY-MM-DDTHH-MM-SS` created |
+| Push          | GitHub        | ✅ pushed / ⏭️ nothing to push |
+| Pull          | Turing        | ✅ up-to-date / 🔄 updated / ⚠️ OFFLINE |
+| Pull          | Hopper        | … |
+| Pull          | BMO           | … |
 
 If any node failed with a merge conflict or non-fast-forward error (not just OFFLINE), flag it clearly and recommend the user SSH in manually to resolve.
