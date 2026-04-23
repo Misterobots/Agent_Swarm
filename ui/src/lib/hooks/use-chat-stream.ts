@@ -5,6 +5,7 @@ import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } fro
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import type { ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment } from "@/types/chat";
+import { useSwarmStore } from "@/lib/stores/swarm-store";
 
 const MODEL_WINDOWS: Record<string, number> = {
   "qwen2.5-coder:14b": 32768,
@@ -302,6 +303,26 @@ export function useChatStream(options?: {
                 traceId: incoming.traceId || snap.traceId,
               };
             }
+          } else if (event.type === "swarm_phase") {
+            const { setActive, setSwarmPhase, reset } = useSwarmStore.getState();
+            if ((event.phase_num ?? 0) === 1) { reset(); setActive(true); }
+            setSwarmPhase(event.phase_num ?? 0, event.phase_name ?? "");
+          } else if (event.type === "swarm_worker_created") {
+            const { addWorker } = useSwarmStore.getState();
+            addWorker({
+              worker_id: event.worker_id ?? "",
+              role: event.role ?? "",
+              pioneer_name: event.pioneer_name ?? "",
+              pioneer_full_name: event.pioneer_full_name,
+              pioneer_motto: event.pioneer_motto,
+              task: event.task ?? "",
+              phase: event.phase_num !== undefined ? String(event.phase_num) : "1",
+              state: "pending",
+            });
+          } else if (event.type === "swarm_task_list") {
+            const { updateWorkers, setTheaterPhase } = useSwarmStore.getState();
+            if (event.workers) updateWorkers(event.workers);
+            setTheaterPhase("working");
           } else if (event.type === "continuation") {
             continuationHintRef.current = event.continuationHint || "await_user";
           } else if (event.type === "turn_boundary") {
@@ -355,6 +376,11 @@ export function useChatStream(options?: {
         setStatusMessage(null);
         setLatestThought(null);
         setStreamMode(null);
+        // Mark swarm complete so drawer can auto-dismiss
+        const swarmState = useSwarmStore.getState();
+        if (swarmState.active && swarmState.theaterPhase !== "idle") {
+          swarmState.setTheaterPhase("complete");
+        }
         thoughtTraceRef.current = [];
         toolCallTraceRef.current = [];
         toolLifecycleRef.current = [];

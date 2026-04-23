@@ -10,7 +10,18 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
+      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list";
+      // Swarm theater fields
+      phase_num?: number;
+      phase_name?: string;
+      total_phases?: number;
+      worker_id?: string;
+      role?: string;
+      pioneer_name?: string;
+      pioneer_full_name?: string;
+      pioneer_motto?: string;
+      task?: string;
+      workers?: Array<Record<string, unknown>>;
       tool_name?: string;
       tool_input?: Record<string, unknown>;
       tool_call_id?: string;
@@ -143,6 +154,33 @@ export async function* streamSSE(
               type: "continuation",
               content: delta.content || "Ready to continue",
               continuationHint: delta.continuationHint,
+            };
+          }
+          // Swarm theater events
+          else if (delta.type === "swarm_phase") {
+            yield {
+              type: "swarm_phase",
+              content: delta.content || "",
+              phase_num: delta.phase_num,
+              phase_name: delta.phase_name,
+              total_phases: delta.total_phases,
+            };
+          } else if (delta.type === "swarm_worker_created") {
+            yield {
+              type: "swarm_worker_created",
+              content: delta.content || "",
+              worker_id: delta.worker_id,
+              role: delta.role,
+              pioneer_name: delta.pioneer_name,
+              pioneer_full_name: delta.pioneer_full_name,
+              pioneer_motto: delta.pioneer_motto,
+              task: delta.task,
+            };
+          } else if (delta.type === "swarm_task_list") {
+            yield {
+              type: "swarm_task_list",
+              content: delta.content || "",
+              workers: delta.workers as any,
             };
           }
           // Legacy tool call format (backward compatible)

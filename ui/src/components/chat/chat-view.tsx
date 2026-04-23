@@ -15,6 +15,7 @@ import { WebGroundingToggle } from "./web-grounding-toggle";
 import { DocGroundingToggle } from "./doc-grounding-toggle";
 import { FileGroundingToggle } from "./file-grounding-toggle";
 import { SwarmToggle } from "./swarm-toggle";
+import { SwarmDrawer } from "@/components/swarm/swarm-drawer";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
 import { Bot, Brain, Code2, X, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -156,7 +157,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   }, []);
 
   return (
-    <div className="chat-shell flex flex-col h-full" data-route="chat">
+    <div className="chat-shell flex flex-col h-full relative" data-route="chat">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-3 md:px-4 py-2 min-w-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
@@ -364,6 +365,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         isStreaming={isStreaming}
         latestThought={latestThought}
       />
+      {/* Swarm theater drawer */}
+      <SwarmDrawer />
     </div>
   );
 }
