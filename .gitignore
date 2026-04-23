@@ -51,6 +51,9 @@ execution_plane/spire_logs.txt
 agents/swarm_context.json
 agents/context_sessions/
 
+# Lamport coordinator scratchpad (ephemeral runtime artifacts)
+agents/scratchpad/
+
 # Backups
 *.backup.*
 backups/
@@ -89,6 +92,3 @@ execution_plane/training_data/
 
 # Runtime workflow state
 workflow_state/
-
-# Lamport coordinator scratchpad (ephemeral per-run artifacts)
-agents/scratchpad/

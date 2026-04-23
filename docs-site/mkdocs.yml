@@ -118,6 +118,10 @@ extra:
     router_model: "nemotron-orchestrator:8b"
     verifier_model: "llama-guard-3:8b"
     coordinator_model: "qwen3:14b"
+    # Node name aliases (used across docs as {{ turing_ip }} etc.)
+    turing_ip: "192.168.2.103"
+    lovelace_ip: "192.168.2.101"
+    hopper_ip: "192.168.2.102"
 
 extra_css:
   - stylesheets/extra.css
@@ -150,7 +154,7 @@ nav:
     - Buddy Companion: user-guide/buddy.md
     - Plan & Think Modes: user-guide/plan-think.md
     - Grounding: user-guide/grounding.md
-    - Grounding: user-guide/grounding.md
+    - Memory Palace: user-guide/palace.md
   - Architecture:
     - architecture/index.md
     - Topology: architecture/topology.md
@@ -196,6 +200,7 @@ nav:
       - Models: admin-guide/configuration/models.md
     - Port Map: admin-guide/port-map.md
     - Naming Scheme: admin-guide/naming-scheme.md
+    - BMO Guide: admin-guide/bmo.md
   - Developer Guide:
     - developer-guide/index.md
     - Local Development: developer-guide/local-dev.md
