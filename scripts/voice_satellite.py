@@ -5,8 +5,7 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 import requests
-import openwakeword
-from openwakeword.model import Model
+import pvporcupine
 import tempfile
 import threading
 import queue
@@ -20,18 +19,11 @@ face_queue = queue.Queue()
 udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # --- Configuration ---
-WAKE_WORD_MODELS = ["hey_beeMo"] # Custom BMO model
 SAMPLE_RATE = 16000
-CHUNK_SIZE = 1280 # 80ms
-THRESHOLD = 0.5
 POST_INTERACTION_COOLDOWN = 2.0  # seconds to ignore audio after speaking
 
-def _normalize_model_key(name):
-    """Normalize wake-word model identifiers for robust matching."""
-    return os.path.basename(str(name)).lower().replace(".onnx", "")
-
-def _resolve_wake_word_models(model_names):
-    """Resolve wake-word model files from common locations and built-ins."""
+def _find_ppn_model():
+    """Find the Beem-Moe .ppn file from common locations."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.abspath(os.path.join(script_dir, ".."))
     candidate_dirs = [
@@ -40,49 +32,14 @@ def _resolve_wake_word_models(model_names):
         repo_root,
         os.path.join(repo_root, "agents", "bmo_voice"),
     ]
-
-    local_onnx = []
-    seen_paths = set()
     for d in candidate_dirs:
         try:
-            if not os.path.isdir(d):
-                continue
             for f in os.listdir(d):
-                if f.lower().endswith(".onnx"):
-                    p = os.path.abspath(os.path.join(d, f))
-                    if p not in seen_paths:
-                        seen_paths.add(p)
-                        local_onnx.append(p)
-        except Exception as e:
-            print(f"⚠️ Model scan warning: dir='{d}' err='{e}'")
-
-    try:
-        builtin_models = openwakeword.get_pretrained_model_paths()
-    except Exception as e:
-        print(f"⚠️ Failed to query built-in wake models: {e}")
-        builtin_models = []
-
-    resolved_paths = []
-    resolved_names = []
-    for model_name in model_names:
-        token = _normalize_model_key(model_name)
-        local_match = next((p for p in local_onnx if token in _normalize_model_key(p)), None)
-        builtin_match = next((p for p in builtin_models if token in _normalize_model_key(p)), None)
-
-        chosen = local_match or builtin_match
-        if chosen:
-            resolved_paths.append(chosen)
-            resolved_names.append(_normalize_model_key(chosen))
-
-    if resolved_paths:
-        return resolved_paths, resolved_names
-
-    fallback = next((p for p in builtin_models if "hey_jarvis_v0.1" in _normalize_model_key(p)), None)
-    if fallback:
-        print(f"⚠️ Wake model(s) not found: {model_names}. Falling back to hey_jarvis_v0.1")
-        return [fallback], [_normalize_model_key(fallback)]
-
-    return [], []
+                if f.lower().endswith(".ppn"):
+                    return os.path.join(d, f)
+        except Exception:
+            pass
+    return None
 
 # --- NETWORK CONFIGURATION ---
 # Load from network.env (single source of truth) or environment variable
@@ -117,6 +74,17 @@ def update_bmo_face(expression):
         udp_sock.sendto(f"BMO_STATE:{expression}".encode('utf-8'), (HOST_IP, 8123))
     except Exception:
         pass
+
+def send_rms_to_face(rms_value):
+    """Write mic RMS level to the FIFO for bmo_driver's mic indicator (non-blocking)."""
+    if not os.path.exists(BMO_FIFO):
+        return
+    try:
+        fd = os.open(BMO_FIFO, os.O_WRONLY | os.O_NONBLOCK)
+        os.write(fd, f"rms:{rms_value}\n".encode())
+        os.close(fd)
+    except OSError:
+        pass  # Not readable (nobody on the other end) or busy — skip silently
 
 def face_worker():
     """Background worker to handle persistent FIFO writes."""
@@ -349,31 +317,45 @@ def detect_emotion(text):
 # --- Main Logic ---
 def main():
     print("--- 🛰️ AI Lab Voice Satellite Online ---")
-    
-    # 1. Load Model
-    print("Loading Wake Word Model...")
-    
-    model_paths, active_models = _resolve_wake_word_models(WAKE_WORD_MODELS)
-        
-    if not model_paths:
-        print("❌ Critical Error: No built-in models found at all.")
+
+    # 1. Load Porcupine wake word engine
+    print("Loading Wake Word Model (Porcupine)...")
+    access_key = os.getenv("PICOVOICE_KEY", "")
+    if not access_key:
+        print("❌ Critical Error: PICOVOICE_KEY not set in environment/network.env")
         sys.exit(1)
-        
-    owwModel = Model(wakeword_model_paths=model_paths)
-    print(f"Model Loaded: {[os.path.basename(p) for p in model_paths]}")
-    print(f"Wake model keys: {active_models}")
-    
-    # Use the active models for prediction checks
-    WW_TO_CHECK = active_models
+
+    ppn_path = _find_ppn_model()
+    if not ppn_path:
+        print("❌ Critical Error: No .ppn wake word model file found.")
+        sys.exit(1)
+    print(f"🐷 PPN model: {os.path.basename(ppn_path)}")
+
+    try:
+        porcupine = pvporcupine.create(
+            access_key=access_key,
+            keyword_paths=[ppn_path],
+            sensitivities=[0.7],
+        )
+    except Exception as e:
+        print(f"❌ Failed to initialize Porcupine: {e}")
+        sys.exit(1)
+
+    # Porcupine requires exactly frame_length 16kHz int16 samples
+    FRAME_LENGTH = porcupine.frame_length  # typically 512
+    HARDWARE_RATE = 48000
+    # 48kHz chunk that decimates to exactly FRAME_LENGTH 16kHz samples
+    HARDWARE_CHUNK = FRAME_LENGTH * 3  # 48kHz / 16kHz = 3
+    print(f"✅ Porcupine ready. frame_length={FRAME_LENGTH}, hw_chunk={HARDWARE_CHUNK}")
 
     # 2. Queues & Threads
     audio_queue = queue.Queue()
     trigger_queue = queue.Queue()
-    
+
     # Start Face worker
     threading.Thread(target=face_worker, daemon=True).start()
 
-    def callback(indata, frames, time, status):
+    def callback(indata, frames, time_info, status):
         if status and 'input overflow' not in str(status):
             print(f"Audio Status: {status}")
         audio_queue.put(indata.copy())
@@ -386,36 +368,36 @@ def main():
                 print("🛠️ DEBUG: Keyboard Input Detected. Sending trigger...")
                 trigger_queue.put("manual")
             except EOFError:
-                # Running as a background service without a terminal
-                time.sleep(3600)  # Wait forever without burning CPU
+                time.sleep(3600)
 
     threading.Thread(target=keyboard_listener, daemon=True).start()
 
     # 4. Detect MIC device and start Main Loop
     MIC_DEVICE = detect_mic_device()
-    HARDWARE_RATE = 48000
-    HARDWARE_CHUNK = int(CHUNK_SIZE * (HARDWARE_RATE / SAMPLE_RATE))
-    
+
     print(f"\n🛰️  Satellite Listening at {HARDWARE_RATE}Hz...")
     print("⌨️   Trigger: Press ENTER in this terminal.")
-    print("🎙️   Wake Word: 'Hey Jarvis' (or custom hey_bmo.onnx)\n")
+    print("🎙️   Wake Word: 'Beemo' (Porcupine custom model)\n")
     update_bmo_face("neutral")
 
     last_heartbeat = time.time()
+    last_rms_log = time.time()
+    last_rms_face = time.time()
+    rms_max = 0
     while True:
+        interacted = False
         try:
-            print(f"🛠️ DEBUG: Attempting to open sd.InputStream on Mic {MIC_DEVICE} (This may hang if device is busy)...")
-            # We wrap the listener in a context manager so it stops/releases the mic during interaction
-            with sd.InputStream(samplerate=HARDWARE_RATE, blocksize=HARDWARE_CHUNK, device=MIC_DEVICE, channels=1, callback=callback, dtype='int16', latency='high'):
-                print("🛠️ DEBUG: InputStream SUCCESS! Loop entering active state...")
+            with sd.InputStream(samplerate=HARDWARE_RATE, blocksize=HARDWARE_CHUNK,
+                                device=MIC_DEVICE, channels=1, callback=callback,
+                                dtype='int16', latency='high'):
+                print("🛠️ DEBUG: InputStream open. Listening for wake word...")
                 interacted = False
                 while not interacted:
-                    # Loop Heartbeat every 5s
                     if time.time() - last_heartbeat > 5:
-                        print(f"🛠️ DEBUG: Main loop is alive. Q sizes: audio={audio_queue.qsize()}, trigger={trigger_queue.qsize()}")
+                        print(f"🛠️ DEBUG: alive. Q={audio_queue.qsize()}")
                         last_heartbeat = time.time()
 
-                    # 1. Check for manual/keyboard trigger (High Priority)
+                    # 1. Check for manual/keyboard trigger
                     while not trigger_queue.empty():
                         trigger = trigger_queue.get_nowait()
                         if trigger == "manual":
@@ -423,83 +405,76 @@ def main():
                             update_bmo_face("listening")
                             interacted = True
                             break
-                    if interacted: break
+                    if interacted:
+                        break
 
-                    # 2. Check for audio data (Wake Word)
+                    # 2. Check for audio data — Porcupine wake word
                     try:
-                        # Timeout must be short to keep manual trigger reactive
                         chunk = audio_queue.get(timeout=0.05)
-                        
-                        # Handle potential audio overflow - if the queue is backing up, 
-                        # just skip wake word processing to let it catch up without crashing
-                        if audio_queue.qsize() > 5:
-                            # Still take the item out to drain the queue quickly, 
-                            # but skip the expensive prediction step
-                            continue
 
-                        # PERFORMANCE OPTIMIZATION: 
-                        # Raspberry Pi chokes on scipy.signal.resample for live 48k audio.
-                        # Since 48000 / 16000 = 3, we simply take every 3rd sample (decimation).
-                        # This is nearly 100x faster than FFT-based resampling.
-                        processed_chunk = chunk[::3]
-                        
-                        # Ensure correct shape for ONNX
-                        if len(processed_chunk.shape) > 1:
-                            processed_chunk = processed_chunk.flatten()
+                        # Drain stale chunks; keep only the freshest
+                        while audio_queue.qsize() > 1:
+                            audio_queue.get_nowait()
 
-                        prediction = owwModel.predict(processed_chunk)
-                        normalized_scores = {
-                            _normalize_model_key(k): v for k, v in prediction.items()
-                        }
-                    
-                        for mdl in WW_TO_CHECK:
-                            mdl_raw = _normalize_model_key(mdl)
-                            score = normalized_scores.get(mdl_raw, 0)
-                            
-                            if score >= THRESHOLD:
-                                print(f"⚡ Wake Word Detected: {mdl_raw}!")
-                                
-                                # 1. Visual Confirmation — "acknowledged" flash
-                                update_bmo_face("acknowledged")
-                                
-                                # 2. Auditory Confirmation — two-tone chime
-                                play_wake_ping()
-                                
-                                # 3. Transition to "listening" for recording phase
-                                update_bmo_face("listening")
-                                
-                                # 4. Brief sleep so face_worker thread can push FIFO 
-                                time.sleep(0.1)
-                                
-                                interacted = True
+                        # Decimate 48kHz → 16kHz (factor 3, no anti-alias needed for
+                        # a wake word detector working on mel features)
+                        pcm = chunk[::3].flatten()
+
+                        # RMS monitoring
+                        rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
+                        if rms > rms_max:
+                            rms_max = rms
+                        if time.time() - last_rms_log > 10:
+                            print(f"🎙️ Mic RMS (peak 10s): {rms_max}  (silent if <50, low if <500)")
+                            rms_max = 0
+                            last_rms_log = time.time()
+                        # Send live RMS to BMO face display every 0.5s
+                        if time.time() - last_rms_face >= 0.5:
+                            send_rms_to_face(rms)
+                            last_rms_face = time.time()
+
+                        # Porcupine needs exactly frame_length samples
+                        # Feed any extra samples in FRAME_LENGTH windows
+                        detected = False
+                        for i in range(0, len(pcm) - FRAME_LENGTH + 1, FRAME_LENGTH):
+                            frame = pcm[i:i + FRAME_LENGTH]
+                            result = porcupine.process(frame)
+                            if result >= 0:
+                                detected = True
                                 break
-                                
+
+                        if detected:
+                            print("⚡ Wake Word Detected: Beemo!")
+                            update_bmo_face("acknowledged")
+                            play_wake_ping()
+                            update_bmo_face("listening")
+                            time.sleep(0.1)
+                            interacted = True
+
                     except queue.Empty:
                         pass
         except Exception as e:
-            print(f"🛠️ DEBUG: ALSA Error or Busy Device: {e}")
-            print("Tip: Make sure no other program (like bmo_driver.py) is using the microphone.")
+            print(f"🛠️ DEBUG: Stream error: {e}")
+            print("Tip: Make sure no other program is using the microphone.")
             time.sleep(2)
 
         # --- OUTSIDE MIC STREAM ---
         if interacted:
             wants_reply = handle_interaction()
-            # Flush queues to ensure we don't process stale audio/triggers
-            with audio_queue.mutex: audio_queue.queue.clear()
-            with trigger_queue.mutex: trigger_queue.queue.clear()
-            
-            # Reset the wake word model to clear any internal state
-            owwModel.reset()
-            
+            with audio_queue.mutex:
+                audio_queue.queue.clear()
+            with trigger_queue.mutex:
+                trigger_queue.queue.clear()
+
             if wants_reply:
                 print("❓ BMO asked a question. Triggering continuous conversation...")
-                # Instantly queue a manual trigger to loop listening
                 trigger_queue.put("manual")
             else:
-                # Cooldown: wait before listening again to avoid speaker feedback
                 print(f"💤 Cooldown ({POST_INTERACTION_COOLDOWN}s)...")
                 time.sleep(POST_INTERACTION_COOLDOWN)
                 print("\nListening...")
+
+    porcupine.delete()
 
 def handle_interaction():
     # Wait briefly for the listener stream to release the hardware

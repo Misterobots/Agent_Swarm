@@ -89,3 +89,6 @@ execution_plane/training_data/
 
 # Runtime workflow state
 workflow_state/
+
+# Lamport coordinator scratchpad (ephemeral per-run artifacts)
+agents/scratchpad/

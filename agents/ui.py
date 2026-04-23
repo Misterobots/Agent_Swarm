@@ -17,6 +17,16 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
     logger.info(f"[UI] New session initialized: {st.session_state.session_id}")
 
+# --- Swarm mode session state defaults ---
+if "swarm_active" not in st.session_state:
+    st.session_state.swarm_active = False
+if "swarm_workers" not in st.session_state:
+    st.session_state.swarm_workers = []
+if "swarm_phase" not in st.session_state:
+    st.session_state.swarm_phase = {"num": 0, "name": ""}
+if "swarm_pending_badge" not in st.session_state:
+    st.session_state.swarm_pending_badge = None
+
 st.set_page_config(page_title="Home AI Lab Swarm", page_icon="🧠", layout="wide")
 
 from prometheus_client import start_http_server
@@ -106,7 +116,145 @@ def render_artifact(artifact):
          st.success(f"🦾 **Action Figure Ready:** `{artifact['name']}`")
          st.caption("Posable STL parts with ball-socket joints — check action_figures/ directory")
 
-# Load CSS
+
+# =============================================================================
+# SWARM MODE RENDER HELPERS
+# =============================================================================
+
+def render_agent_badge_card(worker: dict):
+    """ID badge card — pop-in animation on worker creation."""
+    pioneer_name  = worker.get("pioneer_name", worker.get("role", "Agent"))
+    pioneer_full  = worker.get("pioneer_full_name", pioneer_name)
+    role          = worker.get("role", "worker")
+    motto         = worker.get("pioneer_motto", "")
+    task_excerpt  = worker.get("task", "")[:80]
+    initial       = pioneer_name[0].upper() if pioneer_name else "?"
+    phase_label   = worker.get("phase", "").title()
+
+    st.markdown(f"""
+    <div class="agent-badge">
+        <div class="agent-badge-avatar">{initial}</div>
+        <div class="agent-badge-name">{pioneer_name}</div>
+        <div class="agent-badge-role">{role}</div>
+        <div class="agent-badge-motto">{motto}</div>
+        <div style="font-size:0.68em;color:#555;margin-bottom:8px;padding:0 4px;">
+            {task_excerpt}…
+        </div>
+        <div class="agent-badge-brand">Pioneer Agent · {phase_label}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    with st.expander("Role Description", expanded=False):
+        st.caption(f"**{pioneer_full}** — {role} worker assigned to: {worker.get('task', '')}")
+
+
+def render_agent_roster_grid(workers: list):
+    """3-column roster grid of all live workers (research phase view)."""
+    if not workers:
+        return
+    st.markdown('<div class="agent-roster-grid">', unsafe_allow_html=True)
+    for w in workers:
+        state    = w.get("state", "pending")
+        name     = w.get("pioneer_name", w.get("role", "?"))
+        role     = w.get("role", "worker")
+        initial  = name[0].upper() if name else "?"
+        css_cls  = state if state in ("active", "running", "completed", "failed") else "pending"
+        # map running→active for CSS class
+        if css_cls == "running":
+            css_cls = "active"
+        st.markdown(f"""
+        <div class="roster-agent-card {css_cls}">
+            <div class="roster-avatar">{initial}</div>
+            <div class="roster-name">{name}</div>
+            <div class="roster-role">{role}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def render_swarm_task_list(workers: list):
+    """Numbered task cards with pioneer name, task excerpt, and state chip."""
+    if not workers:
+        return
+    count = len(workers)
+    st.markdown(
+        f'<div class="swarm-task-header">Lamport Swarm &nbsp;·&nbsp; {count} Task{"s" if count != 1 else ""}</div>',
+        unsafe_allow_html=True,
+    )
+    for i, w in enumerate(workers, 1):
+        name    = w.get("pioneer_name", w.get("role", "Worker"))
+        task    = w.get("task", "")[:72]
+        state   = w.get("state", "pending")
+        chip_cls = state if state in ("pending", "running", "completed", "failed") else "pending"
+        st.markdown(f"""
+        <div class="swarm-task-card">
+            <div class="swarm-task-num">{i:02d}</div>
+            <div class="swarm-task-body">
+                <div class="swarm-task-pioneer">{name}</div>
+                <div class="swarm-task-text">{task}…</div>
+            </div>
+            <div class="swarm-task-chip {chip_cls}">{state}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def render_phase_progress_strip(phase_num: int):
+    """5-step phase progress bar at the bottom of the swarm panel."""
+    phases = ["Decompose", "Research", "Synthesize", "Implement", "Verify"]
+    steps_html = ""
+    for i, name in enumerate(phases, 1):
+        if i < phase_num:
+            css_cls = "completed"
+        elif i == phase_num:
+            css_cls = "active"
+        else:
+            css_cls = ""
+        steps_html += f"""
+        <div class="phase-step {css_cls}">
+            <div class="phase-step-circle">{i:02d}</div>
+            <div class="phase-step-label">{name}</div>
+        </div>
+        """
+        if i < len(phases):
+            steps_html += '<div class="phase-connector"></div>'
+
+    st.markdown(f'<div class="phase-strip">{steps_html}</div>', unsafe_allow_html=True)
+
+
+def render_swarm_activity_panel(swarm_phase: dict, swarm_workers: list, swarm_pending_badge: dict | None):
+    """Right-hand Swarm Activity Panel — renders inside a st.container."""
+    phase_num  = swarm_phase.get("num", 0)
+    phase_name = swarm_phase.get("name", "Idle")
+    is_active  = phase_num > 0
+
+    dot_cls  = "active" if is_active else "idle"
+    dot_text = f"Executing — {phase_name}" if is_active else "Idle"
+
+    st.markdown(f"""
+    <div class="swarm-panel">
+        <div class="swarm-header">
+            <span class="swarm-header-title">⚡ Swarm Operations</span>
+            <span>
+                <span class="swarm-status-dot {dot_cls}"></span>
+                <span style="font-size:0.72em;color:#888;">{dot_text}</span>
+            </span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Badge pop-in: most recently created worker
+    if swarm_pending_badge:
+        render_agent_badge_card(swarm_pending_badge)
+
+    # Roster grid during research (phases 1-2), task list from phase 3 onward
+    if swarm_workers:
+        if phase_num <= 2:
+            render_agent_roster_grid(swarm_workers)
+        else:
+            render_swarm_task_list(swarm_workers)
+
+    # Phase strip — always shown when swarm has started
+    if phase_num > 0:
+        render_phase_progress_strip(phase_num)
 def load_css(file_name):
     with open(file_name) as f:
         return f.read()
@@ -135,6 +283,17 @@ with st.sidebar:
         st.success("● System Online")
     except:
         st.error("● System Offline")
+
+    # Swarm status indicator
+    if st.session_state.swarm_active:
+        phase_name = st.session_state.swarm_phase.get("name", "")
+        st.markdown(
+            f'<span style="font-size:0.8em;color:#00ffc8;">🤖 Swarm Active</span>'
+            f'<span style="font-size:0.72em;color:#555;"> — {phase_name}</span>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown('<span style="font-size:0.8em;color:#555;">🤖 Swarm Idle</span>', unsafe_allow_html=True)
         
     st.markdown("---")
     
@@ -374,7 +533,20 @@ def render_chat_workspace():
         initial_input = st.session_state.force_run
         run_now = True
         del st.session_state.force_run
-    
+
+    # --- Swarm Mode Toggle (outside form so it persists across reruns) ---
+    swarm_col, _ = st.columns([3, 5])
+    with swarm_col:
+        swarm_on = st.toggle(
+            "🤖 Agent Swarm Mode",
+            value=st.session_state.get("swarm_mode_toggle", False),
+            key="swarm_mode_toggle",
+            help="Force routing through Lamport's multi-agent coordinator. "
+                 "Complex tasks activate this automatically.",
+        )
+    if swarm_on:
+        st.caption("Routing via **Lamport** · Dispatched by **Church**")
+
     with st.form(key="chat_form", clear_on_submit=True):
         cols = st.columns([8, 1])
         with cols[0]:
@@ -391,6 +563,12 @@ def render_chat_workspace():
     # Trigger if Button Clicked OR Quick Action fired
     if (submit_button and user_input) or (run_now and initial_input):
         final_input = user_input if submit_button else initial_input
+
+        # Reset swarm state for this new turn (clean slate)
+        st.session_state.swarm_active = False
+        st.session_state.swarm_workers = []
+        st.session_state.swarm_phase = {"num": 0, "name": ""}
+        st.session_state.swarm_pending_badge = None
         
         # Add User Message
         if not run_now:
@@ -399,166 +577,214 @@ def render_chat_workspace():
         with st.chat_message("user"):
             st.markdown(final_input)
     
-        # Agent Response Container
-        with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            status_box = st.status("Swarm Operations", expanded=True)
-            
-            full_response = ""
-            trace_logs = []
-            artifacts = [] # Track artifacts for persistence
-            
-            # Stream updates from the Swarm
-            thought_stream = st.expander("🕵️ Thought Stream", expanded=True)
-            with thought_stream:
-                log_placeholder = st.empty()
-            
-            for update in chat_swarm(final_input, session_id=st.session_state.session_id):
-                # Log to Dashboard
-                logger.info(f"[{update['type'].upper()}] {update['content']}")
+        # --- Split layout: chat on left, swarm panel on right ---
+        chat_col, swarm_col_right = st.columns([3, 2])
+
+        with chat_col:
+            # Agent Response Container
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                status_box = st.status("Swarm Operations", expanded=True)
                 
-                if update["type"] == "status":
-                    status_box.write(update["content"])
-                    trace_logs.append(f"ℹ️ {update['content']}")
-                    with thought_stream:
-                        st.caption(f"ℹ️ {update['content']}")
-                elif update["type"] == "log":
-                    # Filter out heartbeat character from logs if needed, though they usually go to status/message
-                    trace_logs.append(f"⚙️ {update['content']}")
-                    with thought_stream:
-                        st.caption(f"⚙️ {update['content']}")
-                elif update["type"] == "workspace_offer":
-                    # Creative intent detected — offer to switch to Art Studio
-                    import json as _json
-                    offer = _json.loads(update["content"]) if isinstance(update["content"], str) else update["content"]
-                    st.session_state._workspace_offer = offer
-                    trace_logs.append(f"🎨 Creative intent detected: {offer.get('intent', 'unknown')}")
-                    # Don't break — let the pipeline continue generating in chat
-                    # The offer will be rendered after the response completes
-                elif update["type"] == "artifact":
-                     artifact = update["content"]
-                     artifacts.append(artifact)
-                     trace_logs.append(f"📦 Artifact Generated: {artifact['name']}")
-                     render_artifact(artifact)
-                elif update["type"] == "message":
-                    # Real-time message streaming
-                    content = update["content"]
-                    # FILTER heartbeat character to prevent UI artifacts
-                    content = content.replace("\u200B", "")
-                    
-                    if content:
-                        full_response += content
-                        message_placeholder.markdown(full_response + "▌")
-                elif update["type"] == "error":
-                    status_box.error(update["content"])
-                    trace_logs.append(f"🔥 {update['content']}")
-                    full_response = f"🚨 {update['content']}"
-                elif update["type"] == "response":
-                    full_response = update["content"]
-                    # Final cleanup of the response content
-                    full_response = full_response.replace("\u200B", "")
-                    # BREAK the loop as soon as we have final response to allow UI cleanup
-                    break
-            
-            # Finalize response UI
-            message_placeholder.markdown(full_response)
-            status_box.update(label="Mission Complete ✨", state="complete", expanded=False)
-            
-            # --- Smart Rendering of Final Response ---
-            import json
-            is_tool_call = False
-            
-            # Attempt to parse as Tool Call JSON
-            try:
-                clean_content = full_response.strip()
-                if clean_content.startswith("{") or clean_content.startswith("```json"):
-                    # Clean markdown blocks if present
-                    if clean_content.startswith("```json"):
-                        clean_content = clean_content.replace("```json", "").replace("```", "")
-                    
-                    data = json.loads(clean_content)
-                    
-                    # Check for Tool Call Signature (name + arguments)
-                    if isinstance(data, dict) and "name" in data and "arguments" in data:
-                        is_tool_call = True
-                        tool_name = data.get("name")
-                        tool_args = data.get("arguments")
-                        
-                        # Render as "Action Card"
-                        with message_placeholder.container():
-                            st.markdown(f"**🤖 Agent Action:** `{tool_name}`")
-                            with st.expander(f"View Details: {tool_name}", expanded=False):
-                                st.json(tool_args)
-                                
-                        # Store clean history
-                        st.session_state.messages.append({
-                            "role": "assistant", 
-                            "content": f"**Action Taken:** `{tool_name}`\n\n(See trace for details)",
-                            "trace": trace_logs,
-                            "artifacts": artifacts
-                        })
-            except Exception:
-                # Not JSON or malformed, continue to standard render
-                pass
-    
-            # Standard Text Rendering (if not a tool call)
-            if not is_tool_call:
+                full_response = ""
+                trace_logs = []
+                artifacts = []
+                
+                # Stream updates from the Swarm
+                thought_stream = st.expander("🕵️ Thought Stream", expanded=True)
+                with thought_stream:
+                    log_placeholder = st.empty()
+
+                # Swarm panel placeholder (rendered in right column, updated live)
+                swarm_panel_placeholder = swarm_col_right.empty()
+
+                def _refresh_swarm_panel():
+                    with swarm_panel_placeholder.container():
+                        render_swarm_activity_panel(
+                            st.session_state.swarm_phase,
+                            st.session_state.swarm_workers,
+                            st.session_state.swarm_pending_badge,
+                        )
+
+                for update in chat_swarm(
+                    final_input,
+                    session_id=st.session_state.session_id,
+                    research_mode=swarm_on,
+                ):
+                    update_type = update.get("type", "")
+                    # Log to Dashboard (guard against missing 'content' on swarm events)
+                    log_content = update.get("content", "")
+                    if log_content:
+                        logger.info(f"[{update_type.upper()}] {log_content}")
+
+                    # --- Swarm event handlers ---
+                    if update_type == "swarm_phase":
+                        st.session_state.swarm_active = True
+                        st.session_state.swarm_phase = {
+                            "num": update.get("phase_num", 0),
+                            "name": update.get("phase_name", ""),
+                        }
+                        trace_logs.append(f"⚡ Phase {update.get('phase_num')}: {update.get('phase_name')}")
+                        _refresh_swarm_panel()
+
+                    elif update_type == "swarm_worker_created":
+                        st.session_state.swarm_active = True
+                        worker_dict = {
+                            "worker_id":         update.get("worker_id", ""),
+                            "pioneer_name":      update.get("pioneer_name", ""),
+                            "pioneer_full_name": update.get("pioneer_full_name", ""),
+                            "pioneer_motto":     update.get("pioneer_motto", ""),
+                            "role":              update.get("role", ""),
+                            "task":              update.get("task", ""),
+                            "phase":             update.get("phase", ""),
+                            "state":             "pending",
+                        }
+                        # Don't duplicate existing worker
+                        existing_ids = {w["worker_id"] for w in st.session_state.swarm_workers}
+                        if worker_dict["worker_id"] not in existing_ids:
+                            st.session_state.swarm_workers.append(worker_dict)
+                        st.session_state.swarm_pending_badge = worker_dict
+                        trace_logs.append(f"🤖 Spawned: {worker_dict['pioneer_name']} ({worker_dict['role']})")
+                        _refresh_swarm_panel()
+
+                    elif update_type == "swarm_task_list":
+                        # Replace workers list with latest snapshot from Lamport
+                        updated = update.get("workers", [])
+                        # Merge pioneer metadata from existing session state (Lamport only sends state snapshots)
+                        existing_map = {w["worker_id"]: w for w in st.session_state.swarm_workers}
+                        merged = []
+                        for w in updated:
+                            wid = w.get("worker_id", "")
+                            base = existing_map.get(wid, {})
+                            merged.append({**base, **w})
+                        st.session_state.swarm_workers = merged
+                        st.session_state.swarm_pending_badge = None
+                        _refresh_swarm_panel()
+
+                    # --- Existing event handlers ---
+                    elif update_type == "status":
+                        status_box.write(update["content"])
+                        trace_logs.append(f"ℹ️ {update['content']}")
+                        with thought_stream:
+                            st.caption(f"ℹ️ {update['content']}")
+                    elif update_type == "log":
+                        trace_logs.append(f"⚙️ {update['content']}")
+                        with thought_stream:
+                            st.caption(f"⚙️ {update['content']}")
+                    elif update_type == "workspace_offer":
+                        import json as _json
+                        offer = _json.loads(update["content"]) if isinstance(update["content"], str) else update["content"]
+                        st.session_state._workspace_offer = offer
+                        trace_logs.append(f"🎨 Creative intent detected: {offer.get('intent', 'unknown')}")
+                    elif update_type == "artifact":
+                         artifact = update["content"]
+                         artifacts.append(artifact)
+                         trace_logs.append(f"📦 Artifact Generated: {artifact['name']}")
+                         render_artifact(artifact)
+                    elif update_type == "message":
+                        content = update["content"].replace("\u200B", "")
+                        if content:
+                            full_response += content
+                            message_placeholder.markdown(full_response + "▌")
+                    elif update_type == "error":
+                        status_box.error(update["content"])
+                        trace_logs.append(f"🔥 {update['content']}")
+                        full_response = f"🚨 {update['content']}"
+                    elif update_type == "response":
+                        full_response = update["content"].replace("\u200B", "")
+                        break
+                
+                # Finalize swarm panel (mark idle)
+                if st.session_state.swarm_active:
+                    st.session_state.swarm_pending_badge = None
+                    _refresh_swarm_panel()
+
+                # Finalize response UI
                 message_placeholder.markdown(full_response)
-                st.session_state.messages.append({
-                    "role": "assistant", 
-                    "content": full_response,
-                    "trace": trace_logs,
-                    "artifacts": artifacts
-                })
+                status_box.update(label="Mission Complete ✨", state="complete", expanded=False)
                 
-                # Show trace immediately for this run
-                with st.expander("🕵️ Trace / Logs", expanded=False):
-                    for log in trace_logs:
-                        if "🔥" in log:
-                            st.error(log)
-                        else:
-                            st.caption(log)
+                # --- Smart Rendering of Final Response ---
+                import json
+                is_tool_call = False
                 
-                # Art Studio Offer Card (shown after creative intent responses)
-                if "_workspace_offer" in st.session_state and st.session_state._workspace_offer:
-                    offer = st.session_state._workspace_offer
-                    st.markdown("---")
-                    st.markdown("""
-                    <div style="background: linear-gradient(135deg, rgba(161,140,209,0.2) 0%, rgba(251,194,235,0.2) 100%);
-                                border: 1px solid rgba(161,140,209,0.5); border-radius: 12px; padding: 20px; margin: 10px 0;">
-                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                            <span style="font-size: 1.5em;">🎨</span>
-                            <span style="font-size: 1.1em; font-weight: 600; color: #e0e0e0;">Open Art Studio?</span>
+                try:
+                    clean_content = full_response.strip()
+                    if clean_content.startswith("{") or clean_content.startswith("```json"):
+                        if clean_content.startswith("```json"):
+                            clean_content = clean_content.replace("```json", "").replace("```", "")
+                        data = json.loads(clean_content)
+                        if isinstance(data, dict) and "name" in data and "arguments" in data:
+                            is_tool_call = True
+                            tool_name = data.get("name")
+                            tool_args = data.get("arguments")
+                            with message_placeholder.container():
+                                st.markdown(f"**🤖 Agent Action:** `{tool_name}`")
+                                with st.expander(f"View Details: {tool_name}", expanded=False):
+                                    st.json(tool_args)
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": f"**Action Taken:** `{tool_name}`\n\n(See trace for details)",
+                                "trace": trace_logs,
+                                "artifacts": artifacts
+                            })
+                except Exception:
+                    pass
+        
+                if not is_tool_call:
+                    message_placeholder.markdown(full_response)
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": full_response,
+                        "trace": trace_logs,
+                        "artifacts": artifacts
+                    })
+                    
+                    with st.expander("🕵️ Trace / Logs", expanded=False):
+                        for log in trace_logs:
+                            if "🔥" in log:
+                                st.error(log)
+                            else:
+                                st.caption(log)
+                    
+                    # Art Studio Offer Card
+                    if "_workspace_offer" in st.session_state and st.session_state._workspace_offer:
+                        offer = st.session_state._workspace_offer
+                        st.markdown("---")
+                        st.markdown("""
+                        <div style="background: linear-gradient(135deg, rgba(161,140,209,0.2) 0%, rgba(251,194,235,0.2) 100%);
+                                    border: 1px solid rgba(161,140,209,0.5); border-radius: 12px; padding: 20px; margin: 10px 0;">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                <span style="font-size: 1.5em;">🎨</span>
+                                <span style="font-size: 1.1em; font-weight: 600; color: #e0e0e0;">Open Art Studio?</span>
+                            </div>
+                            <p style="color: #bbb; margin: 0; font-size: 0.9em;">
+                                Switch to the full Art Studio workspace for advanced generation controls,
+                                3D model preview, gallery management, and export tools.
+                            </p>
                         </div>
-                        <p style="color: #bbb; margin: 0; font-size: 0.9em;">
-                            Switch to the full Art Studio workspace for advanced generation controls,
-                            3D model preview, gallery management, and export tools.
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    col_enter, col_stay = st.columns(2)
-                    with col_enter:
-                        if st.button("🎨 Enter Art Studio", type="primary", key="enter_art_studio"):
-                            # Transfer prompt and intent to art studio
-                            st.session_state.art_studio_prompt = offer["prompt"]
-                            st.session_state.art_studio_intent = offer["intent"]
-                            st.session_state.workspace = "Art Studio"
-                            del st.session_state._workspace_offer
-                            st.rerun()
-                    with col_stay:
-                        if st.button("💬 Stay in Chat", key="stay_in_chat"):
-                            del st.session_state._workspace_offer
-                            st.rerun()
-                    # Don't auto-rerun — wait for user choice
-                    return
+                        """, unsafe_allow_html=True)
+                        col_enter, col_stay = st.columns(2)
+                        with col_enter:
+                            if st.button("🎨 Enter Art Studio", type="primary", key="enter_art_studio"):
+                                st.session_state.art_studio_prompt = offer["prompt"]
+                                st.session_state.art_studio_intent = offer["intent"]
+                                st.session_state.workspace = "Art Studio"
+                                del st.session_state._workspace_offer
+                                st.rerun()
+                        with col_stay:
+                            if st.button("💬 Stay in Chat", key="stay_in_chat"):
+                                del st.session_state._workspace_offer
+                                st.rerun()
+                        # Don't auto-rerun — wait for user choice
+                        return
 
-                # FINAL STEP: Reset the input field in session state and rerun to clean up live widgets
-                if "user_prompt_input" in st.session_state:
-                    st.session_state["user_prompt_input"] = ""
+                    # FINAL STEP: Reset the input field and rerun to clean up live widgets
+                    if "user_prompt_input" in st.session_state:
+                        st.session_state["user_prompt_input"] = ""
 
-                # Brief pause to show "Mission Complete" then refresh
-                time.sleep(0.5)
-                st.rerun()
+                    # Brief pause to show "Mission Complete" then refresh
+                    time.sleep(0.5)
+                    st.rerun()
 
 def render_art_workspace():
     """

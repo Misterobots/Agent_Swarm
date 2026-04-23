@@ -143,6 +143,8 @@ services:
     image: home-ai-lab/dev-sandbox:latest
     container_name: dev_sandbox
     restart: unless-stopped
+    stdin_open: true
+    tty: true
     volumes:
       - dev_sandbox_workspace:/workspace
     networks:

@@ -189,3 +189,360 @@ div[data-testid="stSelectbox"] div[data-baseweb="select"] {
 
 /* Floating Input Bar (Optional - if we want to mimic the sticky footer correctly) */
 /* currently standard form is used, so no sticky footer needed */
+
+/* ==========================================================================
+   AGENT SWARM MODE COMPONENTS
+   Kimi k2.5-style split panel — right-side activity panel + badge cards
+   ========================================================================== */
+
+/* --- Right-panel container --- */
+.swarm-panel {
+    background: rgba(10, 12, 20, 0.85);
+    border: 1px solid rgba(0, 255, 200, 0.2);
+    border-radius: 14px;
+    padding: 18px 16px 14px;
+    backdrop-filter: blur(18px);
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* --- Panel header with status dot --- */
+.swarm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+}
+
+.swarm-header-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #e0e0e0;
+    text-transform: uppercase;
+}
+
+.swarm-status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.swarm-status-dot.active {
+    background: #00ffc8;
+    box-shadow: 0 0 6px #00ffc8;
+    animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+.swarm-status-dot.idle {
+    background: #555;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+}
+
+/* --- Agent ID Badge Card (pop-in on worker create) --- */
+.agent-badge {
+    background: linear-gradient(145deg, #0d0f1a 0%, #141828 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 20px 18px 16px;
+    text-align: center;
+    max-width: 240px;
+    margin: 0 auto;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+    animation: badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes badge-pop {
+    from { opacity: 0; transform: scale(0.75) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.agent-badge-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1a2a4a 0%, #2a1a4a 100%);
+    border: 2px solid rgba(0, 255, 200, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #00ffc8;
+    font-family: 'Orbitron', sans-serif;
+    margin: 0 auto 12px;
+}
+
+.agent-badge-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+}
+
+.agent-badge-role {
+    font-size: 0.75em;
+    color: #00ffc8;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+}
+
+.agent-badge-motto {
+    font-size: 0.72em;
+    color: #888;
+    font-style: italic;
+    line-height: 1.4;
+    margin-bottom: 12px;
+    padding: 0 4px;
+}
+
+.agent-badge-brand {
+    font-size: 0.65em;
+    font-family: 'Orbitron', sans-serif;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+/* --- Agent Roster Grid (shown during research phase) --- */
+.agent-roster-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.roster-agent-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 8px;
+    text-align: center;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.roster-agent-card.active {
+    border-color: rgba(0, 255, 200, 0.5);
+    background: rgba(0, 255, 200, 0.05);
+}
+
+.roster-agent-card.completed {
+    border-color: rgba(0, 200, 120, 0.4);
+    background: rgba(0, 200, 120, 0.04);
+}
+
+.roster-agent-card.failed {
+    border-color: rgba(255, 80, 80, 0.4);
+    background: rgba(255, 80, 80, 0.04);
+}
+
+.roster-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(0, 255, 200, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #00ffc8;
+    font-family: 'Orbitron', sans-serif;
+    margin: 0 auto 6px;
+}
+
+.roster-name {
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #ddd;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.04em;
+}
+
+.roster-role {
+    font-size: 0.62em;
+    color: #666;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* --- Swarm Task List --- */
+.swarm-task-header {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.78em;
+    font-weight: 700;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+}
+
+.swarm-task-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+}
+
+.swarm-task-card:hover {
+    border-color: rgba(0, 255, 200, 0.25);
+}
+
+.swarm-task-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 255, 200, 0.12);
+    border: 1px solid rgba(0, 255, 200, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65em;
+    font-weight: 700;
+    color: #00ffc8;
+    font-family: 'Orbitron', sans-serif;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.swarm-task-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.swarm-task-pioneer {
+    font-size: 0.78em;
+    font-weight: 600;
+    color: #e0e0e0;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+}
+
+.swarm-task-text {
+    font-size: 0.70em;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.swarm-task-chip {
+    font-size: 0.60em;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+.swarm-task-chip.pending   { background: rgba(120,120,120,0.2); color: #999; }
+.swarm-task-chip.running   { background: rgba(0,200,255,0.15);  color: #00c8ff; }
+.swarm-task-chip.completed { background: rgba(0,200,120,0.15);  color: #00c878; }
+.swarm-task-chip.failed    { background: rgba(255,80,80,0.15);  color: #ff5050; }
+
+/* --- Phase Progress Strip --- */
+.phase-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    padding-top: 12px;
+    margin-top: auto;
+    gap: 4px;
+}
+
+.phase-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+    opacity: 0.35;
+    transition: opacity 0.3s;
+}
+
+.phase-step.active, .phase-step.completed {
+    opacity: 1;
+}
+
+.phase-step-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65em;
+    font-weight: 700;
+    color: #aaa;
+    font-family: 'Orbitron', sans-serif;
+    position: relative;
+}
+
+.phase-step.active .phase-step-circle {
+    border-color: #00ffc8;
+    background: rgba(0, 255, 200, 0.1);
+    color: #00ffc8;
+    box-shadow: 0 0 8px rgba(0, 255, 200, 0.4);
+    animation: phase-pulse 1.4s ease-in-out infinite;
+}
+
+.phase-step.completed .phase-step-circle {
+    border-color: rgba(0, 200, 120, 0.6);
+    background: rgba(0, 200, 120, 0.08);
+    color: #00c878;
+}
+
+@keyframes phase-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 200, 0.4); }
+    50%       { box-shadow: 0 0 16px rgba(0, 255, 200, 0.7); }
+}
+
+.phase-step-label {
+    font-size: 0.58em;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: 'Inter', sans-serif;
+    text-align: center;
+}
+
+.phase-step.active .phase-step-label,
+.phase-step.completed .phase-step-label {
+    color: #aaa;
+}
+
+/* Phase connector line between steps */
+.phase-connector {
+    height: 1px;
+    flex: 0.4;
+    background: rgba(255, 255, 255, 0.08);
+    margin-bottom: 16px;
+}

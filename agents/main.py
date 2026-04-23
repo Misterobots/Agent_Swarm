@@ -893,8 +893,41 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             update_count = 0
             response_parts = []  # Collect response text for memory extraction
             _in_think_block = False  # Track <think> tag state across chunks
+
+            # Run church.py's synchronous generator in a background thread so the
+            # asyncio event loop stays free during long LLM calls.  Without this,
+            # the loop is blocked for 10–120 s and Cloudflare/Traefik (100 s timeout)
+            # kills the connection before the first token arrives.
+            import asyncio as _aio_sg
+            import threading as _thr_sg
+            _loop = _aio_sg.get_running_loop()
+            _update_q: _aio_sg.Queue = _aio_sg.Queue(maxsize=64)
+            _GEN_DONE = object()  # sentinel — signals the generator is exhausted
+
+            def _gen_worker():
+                try:
+                    for _u in gen:
+                        _aio_sg.run_coroutine_threadsafe(_update_q.put(_u), _loop).result()
+                except Exception as _exc:
+                    _aio_sg.run_coroutine_threadsafe(
+                        _update_q.put({"type": "error", "content": f"Stream error: {_exc}"}),
+                        _loop,
+                    ).result()
+                finally:
+                    _aio_sg.run_coroutine_threadsafe(_update_q.put(_GEN_DONE), _loop).result()
+
+            _thr_sg.Thread(target=_gen_worker, daemon=True, name="church-stream").start()
+
             try:
-                for update in gen:
+                while True:
+                    try:
+                        update = await _aio_sg.wait_for(_update_q.get(), timeout=30.0)
+                    except _aio_sg.TimeoutError:
+                        # SSE comment — ignored by clients but resets Cloudflare/Traefik idle timer
+                        yield ": keepalive\n\n"
+                        continue
+                    if update is _GEN_DONE:
+                        break
                     update_count += 1
                     logger.debug(f"[Stream] update #{update_count}: {update}")
                     # Update is expected to be a dict: {"type": ..., "content": ...}
@@ -1069,7 +1102,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         count = await _mempalace_extract_http(conv, owner_id=oid)
                         logger.info(f"[MemPalace] Extraction complete: {count} memories stored")
 
-                    asyncio.get_event_loop().create_task(_bg_extract(conversation[:8000], owner_id))
+                    _aio_sg.get_running_loop().create_task(_bg_extract(conversation[:8000], owner_id))
                 except Exception as e:
                     logger.warning(f"[MemPalace] Failed to schedule extraction: {e}")
 

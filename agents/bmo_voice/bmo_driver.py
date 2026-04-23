@@ -339,6 +339,11 @@ class BMODriver:
             expression = cmd[5:].strip()
             logger.info(f"🎭 External Face CMD: {expression}")
             self.face.set_expression(expression)
+        elif cmd.startswith("rms:"):
+            try:
+                self.face.set_mic_rms(int(cmd[4:].strip()))
+            except (ValueError, AttributeError):
+                pass
         else:
             # Treat as chat input
             asyncio.run_coroutine_threadsafe(self.handle_text_interaction(cmd), self.loop)

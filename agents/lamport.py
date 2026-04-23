@@ -61,6 +61,50 @@ def _team_clear(team_id: str):
 # --- Scratchpad Root ---
 SCRATCHPAD_ROOT = Path(__file__).parent / "scratchpad"
 
+# ---------------------------------------------------------------------------
+# Pioneer persona pool — display names for ephemeral Lamport workers
+# ---------------------------------------------------------------------------
+WORKER_PIONEERS: dict[str, dict] = {
+    "researcher": {
+        "name": "Shannon",
+        "full_name": "Claude Shannon",
+        "motto": "Information is the resolution of uncertainty.",
+    },
+    "architect": {
+        "name": "Babbage",
+        "full_name": "Charles Babbage",
+        "motto": "Errors using inadequate data are far less than those using no data at all.",
+    },
+    "coder": {
+        "name": "Knuth",
+        "full_name": "Donald Knuth",
+        "motto": "Programs are meant to be read by humans.",
+    },
+    "devops": {
+        "name": "Cerf",
+        "full_name": "Vint Cerf",
+        "motto": "The internet is a reflection of our society.",
+    },
+    "analyst": {
+        "name": "Codd",
+        "full_name": "Edgar Codd",
+        "motto": "Data is a precious thing and will last longer than the systems themselves.",
+    },
+    "verifier": {
+        "name": "Hoare",
+        "full_name": "Tony Hoare",
+        "motto": "There are two ways to write error-free programs; only the third works.",
+    },
+}
+
+def _pioneer_for_role(role: str) -> dict:
+    """Return the pioneer persona dict for a given worker role."""
+    return WORKER_PIONEERS.get(role.lower(), {
+        "name": role.title(),
+        "full_name": role.title(),
+        "motto": "",
+    })
+
 
 class WorkerState(Enum):
     PENDING = "pending"
@@ -434,6 +478,7 @@ def coordinate_task(
 
     try:
         # === PHASE 1: DECOMPOSE ===
+        yield {"type": "swarm_phase", "phase_num": 1, "phase_name": "Decompose", "total_phases": 5}
         yield {"type": "status", "content": "🧩 Coordinator: Decomposing task..."}
         yield {"type": "thought", "content": "→ Phase 1/5: Task Decomposition (LLM)"}
 
@@ -482,6 +527,7 @@ def coordinate_task(
         session.write_to_scratchpad("00_plan.json", json.dumps(plan, indent=2))
 
         # === PHASE 2: RESEARCH (parallel) ===
+        yield {"type": "swarm_phase", "phase_num": 2, "phase_name": "Research", "total_phases": 5}
         yield {
             "type": "status",
             "content": f"🔬 Coordinator: Launching {len(research_tasks)} research workers...",
@@ -520,13 +566,42 @@ def coordinate_task(
                         child_token=child_token,
                     )
                     futures[future] = (worker_id, role, task_text)
+                    pioneer = _pioneer_for_role(role)
+                    yield {
+                        "type": "swarm_worker_created",
+                        "worker_id": worker_id,
+                        "role": role,
+                        "pioneer_name": pioneer["name"],
+                        "pioneer_full_name": pioneer["full_name"],
+                        "pioneer_motto": pioneer["motto"],
+                        "task": task_text,
+                        "phase": "research",
+                        "content": f"Spawned {pioneer['name']} ({role})",
+                    }
                     yield {
                         "type": "log",
                         "content": (
-                            f"[Coordinator] Spawned worker {worker_id} ({role}): "
+                            f"[Coordinator] Spawned worker {worker_id} ({role}) → {pioneer['name']}: "
                             f"{task_text[:80]}..."
                         ),
                     }
+
+                # Emit initial task list snapshot (all workers queued)
+                yield {
+                    "type": "swarm_task_list",
+                    "workers": [
+                        {
+                            "worker_id": w.worker_id,
+                            "pioneer_name": _pioneer_for_role(w.role)["name"],
+                            "role": w.role,
+                            "task": w.task,
+                            "state": w.state.value,
+                        }
+                        for w in session.workers.values()
+                        if w.phase == "research"
+                    ],
+                    "content": "Research workers queued",
+                }
 
                 # Collect results as they complete
                 for future in as_completed(futures):
@@ -546,9 +621,26 @@ def coordinate_task(
                                 f"completed in {elapsed:.1f}s"
                             ),
                         }
+                        pioneer = _pioneer_for_role(role)
                         yield {
                             "type": "message",
-                            "content": f"✅ Research worker **{role}** completed\n\n",
+                            "content": f"✅ **{pioneer['name']}** ({role}) completed\n\n",
+                        }
+                        # Emit updated task list snapshot after each completion
+                        yield {
+                            "type": "swarm_task_list",
+                            "workers": [
+                                {
+                                    "worker_id": w.worker_id,
+                                    "pioneer_name": _pioneer_for_role(w.role)["name"],
+                                    "role": w.role,
+                                    "task": w.task,
+                                    "state": w.state.value,
+                                }
+                                for w in session.workers.values()
+                                if w.phase == "research"
+                            ],
+                            "content": f"{pioneer['name']} completed",
                         }
                         # Store worker finding in team memory
                         _team_store(
@@ -568,8 +660,25 @@ def coordinate_task(
                             "type": "message",
                             "content": f"⚠️ Research worker **{role}** failed: {e}\n\n",
                         }
+                        # Emit updated snapshot on failure too
+                        yield {
+                            "type": "swarm_task_list",
+                            "workers": [
+                                {
+                                    "worker_id": w.worker_id,
+                                    "pioneer_name": _pioneer_for_role(w.role)["name"],
+                                    "role": w.role,
+                                    "task": w.task,
+                                    "state": w.state.value,
+                                }
+                                for w in session.workers.values()
+                                if w.phase == "research"
+                            ],
+                            "content": f"{role} failed",
+                        }
 
         # === PHASE 3: SYNTHESIZE (LLM) ===
+        yield {"type": "swarm_phase", "phase_num": 3, "phase_name": "Synthesize", "total_phases": 5}
         yield {"type": "status", "content": "🧠 Coordinator: Synthesizing research findings..."}
         yield {"type": "thought", "content": "→ Phase 3/5: Synthesis (LLM — reading all findings)"}
 
@@ -585,6 +694,7 @@ def coordinate_task(
         yield {"type": "log", "content": f"[Coordinator] Synthesis: {len(synthesis)} chars"}
 
         # === PHASE 4: IMPLEMENTATION (serial) ===
+        yield {"type": "swarm_phase", "phase_num": 4, "phase_name": "Implement", "total_phases": 5}
         yield {
             "type": "status",
             "content": f"🔨 Coordinator: Executing {len(impl_tasks)} implementation tasks...",
@@ -601,6 +711,18 @@ def coordinate_task(
 
             worker_id = session.register_worker(role, task_text, "implementation")
             agent = _get_agent_for_role(role, session_id=session_id)
+            _impl_pioneer = _pioneer_for_role(role)
+            yield {
+                "type": "swarm_worker_created",
+                "worker_id": worker_id,
+                "role": role,
+                "pioneer_name": _impl_pioneer["name"],
+                "pioneer_full_name": _impl_pioneer["full_name"],
+                "pioneer_motto": _impl_pioneer["motto"],
+                "task": task_text,
+                "phase": "implementation",
+                "content": f"Spawned {_impl_pioneer['name']} ({role})",
+            }
 
             # Implementation workers get the synthesis as context
             impl_prompt = (
@@ -631,20 +753,38 @@ def coordinate_task(
                 - (worker.started_at or time.time())
             )
 
+            _done_pioneer = _pioneer_for_role(role)
             if worker.state == WorkerState.COMPLETED:
                 yield {
                     "type": "message",
-                    "content": f"✅ Implementation step {i+1} completed ({elapsed:.1f}s)\n\n",
+                    "content": f"✅ **{_done_pioneer['name']}** — step {i+1} completed ({elapsed:.1f}s)\n\n",
                 }
             else:
                 yield {
                     "type": "message",
                     "content": (
-                        f"⚠️ Implementation step {i+1} failed: {worker.error}\n\n"
+                        f"⚠️ **{_done_pioneer['name']}** — step {i+1} failed: {worker.error}\n\n"
                     ),
                 }
+            # Emit implementation task list snapshot
+            yield {
+                "type": "swarm_task_list",
+                "workers": [
+                    {
+                        "worker_id": w.worker_id,
+                        "pioneer_name": _pioneer_for_role(w.role)["name"],
+                        "role": w.role,
+                        "task": w.task,
+                        "state": w.state.value,
+                    }
+                    for w in session.workers.values()
+                    if w.phase == "implementation"
+                ],
+                "content": f"Implementation step {i+1} done",
+            }
 
         # === PHASE 5: VERIFICATION ===
+        yield {"type": "swarm_phase", "phase_num": 5, "phase_name": "Verify", "total_phases": 5}
         yield {"type": "status", "content": "🔍 Coordinator: Verification in progress..."}
         yield {"type": "thought", "content": "→ Phase 5/5: Verification (fresh-eyes worker)"}
 
@@ -662,6 +802,18 @@ def coordinate_task(
         verify_worker_id = session.register_worker(
             "verifier", "Final verification", "verification"
         )
+        _verify_pioneer = _pioneer_for_role("verifier")
+        yield {
+            "type": "swarm_worker_created",
+            "worker_id": verify_worker_id,
+            "role": "verifier",
+            "pioneer_name": _verify_pioneer["name"],
+            "pioneer_full_name": _verify_pioneer["full_name"],
+            "pioneer_motto": _verify_pioneer["motto"],
+            "task": "Final verification",
+            "phase": "verification",
+            "content": f"Spawned {_verify_pioneer['name']} (verifier)",
+        }
         verifier = _get_agent_for_role("verifier")
         verify_result = _run_worker(
             session, verify_worker_id, verifier, verify_prompt,

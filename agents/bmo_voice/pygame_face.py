@@ -244,6 +244,10 @@ class PygameFace:
         self._expression_timeout = 30.0  # seconds
         self._expression_timer = 0.0
 
+        # Mic level indicator (0–32767 int16 RMS)
+        self.mic_rms = 0
+        self._mic_rms_lock = threading.Lock()
+
         # Time
         self.time = 0
 
@@ -259,6 +263,11 @@ class PygameFace:
     def set_expression(self, name, mouth_sync=None):
         """Thread-safe: change expression."""
         self._cmd_queue.put(("expression", name, mouth_sync))
+
+    def set_mic_rms(self, value: int):
+        """Thread-safe: update mic RMS level for the level indicator."""
+        with self._mic_rms_lock:
+            self.mic_rms = max(0, int(value))
 
     def stop(self):
         """Signal the renderer to stop."""
@@ -382,6 +391,9 @@ class PygameFace:
             
             # Draw face on canvas
             self._draw_face(canvas, bounce_y)
+
+            # Draw mic level indicator (bottom-left corner)
+            self._draw_mic_indicator(canvas)
             
             # FPS on canvas
             if fps_font and fps_display > 0:
@@ -399,8 +411,36 @@ class PygameFace:
         pygame.quit()
         logger.info("Pygame Face stopped")
 
-    def _handle_cmd(self, cmd):
-        try:
+    def _draw_mic_indicator(self, surface):
+        """Draw a small mic level bar in the bottom-left corner."""
+        with self._mic_rms_lock:
+            rms = self.mic_rms
+
+        # Bar geometry (placed top-left in upright canvas; after 180° flip → bottom-right on screen)
+        bar_x = 8
+        bar_y = 8
+        bar_w = 120
+        bar_h = 18
+
+        # Background
+        pygame.draw.rect(surface, (0, 0, 0), (bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2))
+
+        # Fill level: scale RMS against practical speech max (~5000).
+        # Silent ambient ≈ 200-400, quiet speech ≈ 1000, normal ≈ 3000, loud ≈ 5000+
+        level = min(rms / 5000.0, 1.0)
+        fill_w = int(bar_w * level)
+
+        if fill_w > 0:
+            # Color: green <25%, yellow 25–75%, red >75%
+            if level < 0.25:
+                color = (0, 220, 80)
+            elif level < 0.75:
+                color = (220, 200, 0)
+            else:
+                color = (220, 40, 40)
+            pygame.draw.rect(surface, color, (bar_x, bar_y, fill_w, bar_h))
+
+    def _handle_cmd(self, cmd):        try:
             # Handle variable length tuple depending on caller
             if len(cmd) == 3:
                 kind, name, mouth_sync = cmd
