@@ -541,22 +541,33 @@ class TemplateRegistry:
                 ),
             )
 
-            # Update version invocation count and running average
-            cur.execute(
-                """UPDATE swarm.expertise_template_versions
-                   SET total_invocations = total_invocations + 1,
-                       successful_invocations = successful_invocations +
-                           CASE WHEN %s >= 0.7 THEN 1 ELSE 0 END,
-                       avg_score = (avg_score * total_invocations + %s)
-                                   / (total_invocations + 1)
-                   WHERE template_id = %s AND version = %s""",
-                (
-                    record.final_score or 0.0,
-                    record.final_score or 0.0,
-                    record.template_id,
-                    record.template_version,
-                ),
-            )
+            # Update version invocation count and running average.
+            # Only update avg_score when final_score is explicitly provided —
+            # null scores (no feedback yet) must not drag the average to 0.
+            if record.final_score is not None:
+                cur.execute(
+                    """UPDATE swarm.expertise_template_versions
+                       SET total_invocations = total_invocations + 1,
+                           successful_invocations = successful_invocations +
+                               CASE WHEN %s >= 0.7 THEN 1 ELSE 0 END,
+                           avg_score = (avg_score * total_invocations + %s)
+                                       / (total_invocations + 1)
+                       WHERE template_id = %s AND version = %s""",
+                    (
+                        record.final_score,
+                        record.final_score,
+                        record.template_id,
+                        record.template_version,
+                    ),
+                )
+            else:
+                # Unscored invocation — increment counter only, leave avg_score unchanged
+                cur.execute(
+                    """UPDATE swarm.expertise_template_versions
+                       SET total_invocations = total_invocations + 1
+                       WHERE template_id = %s AND version = %s""",
+                    (record.template_id, record.template_version),
+                )
             conn.commit()
             return True
         except Exception as e:

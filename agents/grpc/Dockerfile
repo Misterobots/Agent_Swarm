@@ -24,12 +24,16 @@ COPY agents/__init__.py /app/agents/__init__.py
 COPY network.env /app/network.env
 
 # Generate protobuf stubs at build time
+# The protoc tool generates bare `import openclaude_pb2` in the grpc file, but
+# at runtime the module is in the agents.grpc package (sys.path = /app), so we
+# patch the import to the fully-qualified package path after generation.
 RUN cd /app/agents/grpc && \
     python -m grpc_tools.protoc \
         -I. \
         --python_out=. \
         --grpc_python_out=. \
-        openclaude.proto
+        openclaude.proto && \
+    sed -i 's/^import openclaude_pb2/from agents.grpc import openclaude_pb2/' openclaude_pb2_grpc.py
 
 # Non-root user
 RUN useradd -m -u 1000 app && chown -R app:app /app

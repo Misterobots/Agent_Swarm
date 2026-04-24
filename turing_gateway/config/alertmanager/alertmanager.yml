@@ -1,15 +1,7 @@
 global:
   resolve_timeout: 5m
-  slack_api_url: ''
   pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
   opsgenie_api_url: 'https://api.opsgenie.com/'
-  opsgenie_api_key: ''
-  wechat_api_url: 'https://qyapi.weixin.qq.com/cgi-bin/'
-  wechat_api_secret: ''
-  wechat_api_corp_id: ''
-  victorops_api_url: 'https://alert.victorops.com/alerting/notifications/victorops/20141015/alert/'
-  victorops_api_key: ''
-  geniekey: ''
 
 route:
   receiver: "default-receiver"

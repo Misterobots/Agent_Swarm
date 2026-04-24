@@ -111,16 +111,13 @@ services:
       dockerfile: Dockerfile
     container_name: mempalace
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
     env_file:
       - .env
       - ../network.env
     environment:
       - MEMPALACE_DB_USER=${LANGFUSE_DB_USER}
       - MEMPALACE_DB_PASSWORD=${LANGFUSE_DB_PASSWORD}
-      - MEMPALACE_DB_HOST=postgres
+      - MEMPALACE_DB_HOST=${HOPPER_IP:-192.168.2.102}
       - MEMPALACE_DB_PORT=5432
       - MEMPALACE_DB_NAME=${LANGFUSE_DB_NAME}
       - OLLAMA_HOST=http://192.168.2.101:11434

@@ -132,8 +132,11 @@ class AsyncTemplateUpdater:
         new_avg = summary.avg_score
         total = summary.total_invocations
 
-        # Log warning for degraded templates
-        if new_avg < LOW_SCORE_WARNING and total >= 10:
+        # Log warning for degraded templates.
+        # Only fire when avg_score > 0: a zero average means no invocations have
+        # been explicitly scored yet (all final_scores were None), not that the
+        # template is actually performing badly.
+        if 0 < new_avg < LOW_SCORE_WARNING and total >= 10:
             logger.warning(
                 f"[TemplateUpdater] DEGRADED: {template_id} v{current_version} "
                 f"avg_score={new_avg:.3f} (threshold={LOW_SCORE_WARNING}) "
