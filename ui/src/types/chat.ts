@@ -82,9 +82,32 @@ export interface ToolResult {
 /**
  * Enriched stream event supporting tool lifecycle, continuity, and UI state.
  */
+/** Worker info emitted by the Lamport coordinator. */
+export interface SwarmWorker {
+  worker_id: string;
+  role: string;
+  pioneer_name: string;
+  pioneer_full_name?: string;
+  pioneer_motto?: string;
+  task: string;
+  phase: string;
+  state: "pending" | "running" | "completed" | "failed" | "cancelled";
+}
+
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list";
   content?: string;
+  // Swarm theater
+  phase_num?: number;
+  phase_name?: string;
+  total_phases?: number;
+  worker_id?: string;
+  role?: string;
+  pioneer_name?: string;
+  pioneer_full_name?: string;
+  pioneer_motto?: string;
+  task?: string;
+  workers?: SwarmWorker[];
   
   // Tool lifecycle
   tool_name?: string;
