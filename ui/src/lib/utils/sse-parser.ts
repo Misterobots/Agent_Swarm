@@ -16,7 +16,6 @@ export interface ChatCompletionChunk {
       phase_name?: string;
       total_phases?: number;
       worker_id?: string;
-      role?: string;
       pioneer_name?: string;
       pioneer_full_name?: string;
       pioneer_motto?: string;
