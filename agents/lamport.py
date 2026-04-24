@@ -28,7 +28,7 @@ from phi.model.ollama import Ollama
 
 from logger_setup import setup_logger
 from config import AGNO_DB_URL, ARCHITECT_MODEL
-from utils.gpu_queue import request_lock, get_best_host_for_model
+from utils.gpu_queue import request_lock, get_best_host_for_model, get_swarm_worker_host
 
 logger = setup_logger("Lamport")
 
@@ -363,7 +363,7 @@ def _get_agent_for_role(role: str, session_id: str = None) -> Agent:
         return get_architect_agent(session_id=session_id)
 
     elif role_lower == "analyst":
-        host = get_best_host_for_model(ARCHITECT_MODEL)
+        host = get_swarm_worker_host(ARCHITECT_MODEL)
         return Agent(
             name="Data Analyst Worker",
             model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
@@ -372,7 +372,7 @@ def _get_agent_for_role(role: str, session_id: str = None) -> Agent:
         )
 
     elif role_lower == "researcher":
-        host = get_best_host_for_model(ARCHITECT_MODEL)
+        host = get_swarm_worker_host(ARCHITECT_MODEL)
         return Agent(
             name="Research Worker",
             model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
@@ -386,7 +386,7 @@ def _get_agent_for_role(role: str, session_id: str = None) -> Agent:
         )
 
     elif role_lower == "verifier":
-        host = get_best_host_for_model(ARCHITECT_MODEL)
+        host = get_swarm_worker_host(ARCHITECT_MODEL)
         return Agent(
             name="Verification Worker",
             model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),

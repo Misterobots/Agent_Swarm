@@ -1,5 +1,7 @@
 ﻿import os
 import time
+import itertools
+import threading
 import requests
 import logging
 from datetime import datetime
@@ -115,6 +117,50 @@ def get_best_host_for_model(model_name: str) -> str:
     # Fallback: health-aware static routing
     logger.info(f"[GPU Queue] '{model_name}' not found on any node, using health-aware fallback.")
     return get_ollama_host(model_name)
+
+# ---------------------------------------------------------------------------
+# Swarm round-robin: distribute workers across all available GPU hosts so
+# they execute in parallel instead of serializing on a single Ollama instance.
+# ---------------------------------------------------------------------------
+_swarm_rr_counter = itertools.count()
+_swarm_rr_lock = threading.Lock()
+
+
+def get_swarm_worker_host(model_name: str) -> str:
+    """
+    Round-robin host selector for swarm coordinator workers.
+
+    Instead of routing every worker to the single "best" host (which causes
+    them to queue internally on one GPU), this distributes successive worker
+    requests across all *healthy* Ollama endpoints — OLLAMA_HOST (Turing) and
+    SECONDARY_OLLAMA_HOST (Lovelace) — so multiple workers can run in true
+    GPU-level parallel.
+    """
+    candidates = [OLLAMA_HOST]
+    if SECONDARY_OLLAMA_HOST and SECONDARY_OLLAMA_HOST != OLLAMA_HOST:
+        candidates.append(SECONDARY_OLLAMA_HOST)
+
+    if len(candidates) == 1:
+        logger.debug(f"[GPU Round-Robin] Only one host available; using {candidates[0]}.")
+        return candidates[0]
+
+    # Filter to healthy hosts; fall back to all candidates if health check fails
+    try:
+        from inference.node_health import get_node_monitor
+        monitor = get_node_monitor()
+        healthy = [h for h in candidates if monitor.is_healthy(h)]
+    except Exception:
+        healthy = []
+
+    pool = healthy if healthy else candidates
+
+    with _swarm_rr_lock:
+        idx = next(_swarm_rr_counter)
+        host = pool[idx % len(pool)]
+
+    logger.info(f"[GPU Round-Robin] Worker slot {idx}: '{model_name}' → {host} ({len(pool)} hosts in pool).")
+    return host
+
 
 def is_training_window() -> bool:
     """
