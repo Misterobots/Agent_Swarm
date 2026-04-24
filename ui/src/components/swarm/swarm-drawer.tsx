@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { AgentIdCard } from "./agent-id-card";
@@ -30,13 +30,27 @@ export function SwarmDrawer() {
     }
   }, [theaterPhase, setActive, setTheaterPhase]);
 
+  // After roster reveal, auto-advance to the working checklist view (2s hold)
+  useEffect(() => {
+    if (theaterPhase === "roster") {
+      const t = setTimeout(() => setTheaterPhase("working"), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [theaterPhase, setTheaterPhase]);
+
+  // Stable callback so AgentIdCard's useEffect doesn't re-fire on every render
+  const handleCardDone = useCallback(() => {
+    setLatestCard(null);
+    setTheaterPhase("roster");
+  }, [setLatestCard, setTheaterPhase]);
+
   const visible = active && theaterPhase !== "idle";
 
   return (
     <div
       aria-hidden={!visible}
       className={cn(
-        "absolute inset-y-0 right-0 z-40 w-72 flex flex-col",
+        "absolute inset-y-0 right-0 z-40 w-96 flex flex-col",
         "bg-[var(--chat-bg)] border-l border-white/8",
         "shadow-2xl transition-transform duration-500 ease-[cubic-bezier(.32,1.4,.64,1)]",
         visible ? "translate-x-0" : "translate-x-full",
@@ -59,13 +73,9 @@ export function SwarmDrawer() {
         {/* ID card drop-in — shown when spawning_card */}
         {theaterPhase === "spawning_card" && latestCard && (
           <AgentIdCard
+            key={latestCard.worker_id}
             worker={latestCard}
-            onDone={() => {
-              setLatestCard(null);
-              // After card: go to roster to show the growing grid,
-              // then let the next swarm_phase event advance further.
-              setTheaterPhase("roster");
-            }}
+            onDone={handleCardDone}
           />
         )}
 

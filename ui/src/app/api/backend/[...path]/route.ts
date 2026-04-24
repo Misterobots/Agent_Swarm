@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 300; // Allow long-running streaming responses
+export const maxDuration = 3600; // Allow long-running swarm streaming responses (up to 1hr)
 
 function getBackendUrl() {
   return process.env.API_BASE_URL || "http://localhost:8000";
@@ -58,8 +58,15 @@ async function proxyRequest(req: NextRequest) {
     // not JSON, that's fine
   }
 
-  // Chat streaming can legitimately run longer than a minute; keep non-stream calls tighter.
-  const timeoutMs = wantsStream ? 300_000 : 55_000;
+  // Swarm mode can run for 15+ minutes; regular streaming up to 10 min; non-stream 55s.
+  let wantsSwarm = false;
+  try {
+    if (bodyText) {
+      const parsed = JSON.parse(bodyText);
+      wantsSwarm = parsed.swarm_mode === true;
+    }
+  } catch { /* not JSON */ }
+  const timeoutMs = wantsSwarm ? 3_600_000 : wantsStream ? 600_000 : 55_000;
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), timeoutMs);
 

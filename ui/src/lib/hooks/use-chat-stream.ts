@@ -329,9 +329,13 @@ export function useChatStream(options?: {
               state: "pending",
             });
           } else if (event.type === "swarm_task_list") {
-            const { updateWorkers, setTheaterPhase } = useSwarmStore.getState();
-            if (event.workers) updateWorkers(event.workers);
-            setTheaterPhase("working");
+            const store = useSwarmStore.getState();
+            if (event.workers) store.updateWorkers(event.workers);
+            // Only advance to working if we're not mid-card-animation; let the
+            // card's onDone callback handle the roster → working transition.
+            if (store.theaterPhase !== "spawning_card") {
+              store.setTheaterPhase("working");
+            }
           } else if (event.type === "continuation") {
             continuationHintRef.current = event.continuationHint || "await_user";
           } else if (event.type === "turn_boundary") {
