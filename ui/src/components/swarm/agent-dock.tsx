@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import type { SwarmWorker } from "@/types/chat";
-
-const ROLE_INITIALS: Record<string, string> = {
-  researcher: "SH", architect: "BA", coder: "KN",
-  devops: "CE", analyst: "CO", verifier: "HO",
-};
+import { PioneerPortrait } from "./pioneer-portrait";
 
 // Status labels that cycle per worker
 const STATUS_CYCLE = [
@@ -15,10 +11,6 @@ const STATUS_CYCLE = [
   "Evaluating", "Designing", "Writing", "Verifying",
   "Identifying", "Acquiring", "Optimizing", "Integrating",
 ];
-
-function initials(w: SwarmWorker) {
-  return ROLE_INITIALS[w.role?.toLowerCase() ?? ""] ?? w.pioneer_name?.slice(0, 2).toUpperCase() ?? "??";
-}
 
 interface AgentDockProps {
   workers: SwarmWorker[];
@@ -57,12 +49,12 @@ export function AgentDock({ workers }: AgentDockProps) {
             )}
           >
             <div className={cn(
-              "relative w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold border",
+              "relative w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold border overflow-hidden",
               isRunning
                 ? "bg-[var(--chat-accent)]/20 border-[var(--chat-accent)]/50 text-[var(--chat-accent)]"
                 : "bg-white/5 border-white/20 text-white/50",
             )}>
-              {initials(w)}
+              <PioneerPortrait role={w.role ?? ""} />
               {isRunning && (
                 <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[var(--chat-bg)] animate-pulse" />
               )}

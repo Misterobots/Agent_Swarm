@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import type { SwarmWorker } from "@/types/chat";
-
-const ROLE_INITIALS: Record<string, string> = {
-  researcher: "SH", architect: "BA", coder: "KN",
-  devops: "CE", analyst: "CO", verifier: "HO",
-};
+import { PioneerPortrait } from "./pioneer-portrait";
 
 const ROLE_THEME: Record<string, { stripe: string; avatar: string; text: string; glow: string }> = {
   researcher: { stripe: "from-amber-400 via-amber-300 to-orange-400",   avatar: "bg-amber-500/10 border-amber-500/50",    text: "text-amber-400",   glow: "shadow-amber-500/20" },
@@ -33,7 +29,6 @@ interface AgentIdCardProps {
 export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
   const [stage, setStage] = useState<"drop" | "straight" | "exit">("drop");
   const role = worker.role?.toLowerCase() ?? "";
-  const initials = ROLE_INITIALS[role] ?? worker.pioneer_name?.slice(0, 2).toUpperCase() ?? "??";
   const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
 
   useEffect(() => {
@@ -69,11 +64,12 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
         <div className="px-6 pb-6 pt-6 flex flex-col items-center gap-4">
           {/* Avatar */}
           <div className={cn(
-            "relative w-24 h-24 rounded-full flex items-center justify-center border-2 shadow-xl",
+            "relative w-24 h-24 rounded-full flex items-center justify-center border-2 shadow-xl overflow-hidden",
             theme.avatar,
             theme.glow,
+            theme.text,
           )}>
-            <span className={cn("font-black text-3xl tracking-tight", theme.text)}>{initials}</span>
+            <PioneerPortrait role={role} />
             <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-[var(--chat-surface)] animate-pulse" />
           </div>
 

@@ -3,15 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import type { SwarmWorker } from "@/types/chat";
-
-const ROLE_INITIALS: Record<string, string> = {
-  researcher: "SH", architect: "BA", coder: "KN",
-  devops: "CE", analyst: "CO", verifier: "HO",
-};
-
-function initials(worker: SwarmWorker) {
-  return ROLE_INITIALS[worker.role?.toLowerCase() ?? ""] ?? worker.pioneer_name?.slice(0, 2).toUpperCase() ?? "??";
-}
+import { PioneerPortrait } from "./pioneer-portrait";
 
 interface AgentRosterProps {
   workers: SwarmWorker[];
@@ -53,13 +45,13 @@ export function AgentRoster({ workers }: AgentRosterProps) {
               )}
             >
               <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border transition-all",
+                "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border transition-all overflow-hidden",
                 w.state === "completed" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300" :
                 w.state === "running" ? "bg-[var(--chat-accent)]/20 border-[var(--chat-accent)]/40 text-[var(--chat-accent)]" :
                 w.state === "failed" ? "bg-red-500/20 border-red-500/40 text-red-300" :
                 "bg-white/10 border-white/20 text-white/60",
               )}>
-                {isGhost ? "" : initials(w)}
+                {!isGhost && <PioneerPortrait role={w.role ?? ""} />}
               </div>
               {!isGhost && (
                 <>
