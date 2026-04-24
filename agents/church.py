@@ -1059,15 +1059,22 @@ def chat_swarm(
                 model = None
 
         # 3. Intent Routing (Neural Upgrade)
-        from semantic_router import get_semantic_router
-        
-        yield {"type": "status", "content": "🧠 Neural Cortex: Analyzing intent..."}
-        
-        router_inst = get_semantic_router()
-        routing_decision = router_inst.route(user_input)
-        intent = routing_decision.get("intent", "RESEARCH") # Fail safe default
-        confidence = routing_decision.get("confidence", 0.0)
-        reasoning = routing_decision.get("reasoning", "No reasoning provided.")
+        # Short-circuit: swarm_mode has a fixed intent, skip the LLM neural router
+        if swarm_mode:
+            intent = "COORDINATE"
+            confidence = 1.0
+            reasoning = "swarm_mode=True bypasses neural router"
+            yield {"type": "status", "content": "🧩 Swarm Mode: Routing directly to multi-agent coordinator..."}
+        else:
+            from semantic_router import get_semantic_router
+            
+            yield {"type": "status", "content": "🧠 Neural Cortex: Analyzing intent..."}
+            
+            router_inst = get_semantic_router()
+            routing_decision = router_inst.route(user_input)
+            intent = routing_decision.get("intent", "RESEARCH") # Fail safe default
+            confidence = routing_decision.get("confidence", 0.0)
+            reasoning = routing_decision.get("reasoning", "No reasoning provided.")
 
         constraint_context = _extract_constraint_context(history, user_input)
 
