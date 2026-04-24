@@ -96,6 +96,7 @@ TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION",
 # ---------------------------------------------------------------------------
 CONTEXT_WINDOWS: dict[str, int] = {
     "qwen3:14b": 40960,
+    "qwen3:8b": 32768,
     "qwen2.5-coder:14b": 32768,
     "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
     "qwen3.5:9b": 32768,
