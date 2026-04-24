@@ -50,9 +50,9 @@ export function SwarmDrawer() {
     <div
       aria-hidden={!visible}
       className={cn(
-        "absolute inset-y-0 right-0 z-40 w-96 flex flex-col",
+        "absolute inset-y-0 right-0 z-40 w-[min(540px,48vw)] flex flex-col",
         "bg-[var(--chat-bg)] border-l border-white/8",
-        "shadow-2xl transition-transform duration-500 ease-[cubic-bezier(.32,1.4,.64,1)]",
+        "shadow-[−24px_0_80px_rgba(0,0,0,0.5)] transition-transform duration-500 ease-[cubic-bezier(.32,1.4,.64,1)]",
         visible ? "translate-x-0" : "translate-x-full",
       )}
     >
