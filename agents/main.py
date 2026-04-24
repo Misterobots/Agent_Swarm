@@ -986,6 +986,19 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     # In standard mode, forward status/thought as typed chunks;
                     # only yield assistant segments, errors, status, and thoughts.
                     if is_standard_mode:
+                        # Swarm theater events always pass through regardless of mode
+                        if msg_type in ("swarm_phase", "swarm_worker_created", "swarm_task_list"):
+                            # Blank content — narrative text comes from message-type events
+                            swarm_delta: dict = {"type": msg_type, "content": ""}
+                            for _k in ("phase_num", "phase_name", "total_phases",
+                                       "worker_id", "role", "pioneer_name",
+                                       "pioneer_full_name", "pioneer_motto",
+                                       "task", "phase", "workers"):
+                                if _k in update:
+                                    swarm_delta[_k] = update[_k]
+                            yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':int(time.time()),'model':request.model,'choices':[{'index':0,'delta':swarm_delta,'finish_reason':None}]})}\n\n"
+                            continue
+
                         if msg_type == "status":
                             status_chunk = {
                                 "id": "chatcmpl-swarm",
@@ -1053,6 +1066,19 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         # stream_mode are UI-routing signals — forward as
                         # typed chunks so the hook handles them, not the
                         # content appender.
+                        # --- SWARM THEATER EVENTS: forward all metadata fields ---
+                        if msg_type in ("swarm_phase", "swarm_worker_created", "swarm_task_list"):
+                            # Blank content — narrative text comes from message-type events
+                            swarm_delta: dict = {"type": msg_type, "content": ""}
+                            for _k in ("phase_num", "phase_name", "total_phases",
+                                       "worker_id", "role", "pioneer_name",
+                                       "pioneer_full_name", "pioneer_motto",
+                                       "task", "phase", "workers"):
+                                if _k in update:
+                                    swarm_delta[_k] = update[_k]
+                            yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':int(time.time()),'model':request.model,'choices':[{'index':0,'delta':swarm_delta,'finish_reason':None}]})}\n\n"
+                            continue
+
                         if msg_type in ("status", "thought", "log", "plan",
                                         "turn_boundary", "turn_metadata",
                                         "continuation", "stream_mode"):
