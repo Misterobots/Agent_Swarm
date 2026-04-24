@@ -14,7 +14,7 @@ export function BuddyTips() {
 
   const fetchTip = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/buddy/tip?context=general");
+      const res = await fetch("/api/backend/v1/buddy/tip?context=general");
       if (!res.ok) return;
       const data = await res.json();
       if (data.tip) setTip(data.tip);

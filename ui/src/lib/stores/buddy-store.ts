@@ -134,7 +134,7 @@ function evolutionStageForLevel(level: number): EvolutionStage {
 /** Fire-and-forget XP award to backend */
 async function _backendXp(event: string) {
   try {
-    const resp = await fetch("/api/v1/buddy/xp", {
+    const resp = await fetch("/api/backend/v1/buddy/xp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event }),

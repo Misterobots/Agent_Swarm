@@ -55,7 +55,7 @@ export function BuddyWidget() {
   /* Sync from backend on mount */
   const doSync = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/buddy");
+      const res = await fetch("/api/backend/v1/buddy");
       if (!res.ok) return;
       const data = await res.json();
       if (data && typeof data === "object") syncFromBackend(data);
