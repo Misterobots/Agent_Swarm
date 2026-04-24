@@ -686,7 +686,6 @@ async def list_models(request: Request):
     OpenAI-compatible /v1/models.
     Returns local swarm models + GitHub Models if the user has a connected account.
     """
-    import time
     try:
         base_models = [
             {"id": "swarm-standard",  "object": "model", "created": int(time.time()), "owned_by": "MarsRL"},
@@ -843,7 +842,6 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             return StreamingResponse(github_stream(), media_type="text/event-stream")
         else:
             chunk = provider.generate(msgs)
-            import time
             return {
                 "id": "chatcmpl-github",
                 "object": "chat.completion",
