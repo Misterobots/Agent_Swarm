@@ -50,7 +50,12 @@ export const useSwarmStore = create<SwarmState>()((set) => ({
     else if (phaseNum === 2) theaterPhase = "roster";
     else if (phaseNum === 3) theaterPhase = "synthesizing";
     else if (phaseNum >= 4) theaterPhase = "working";
-    set({ phaseNum, phaseName, theaterPhase });
+    // Don't overwrite spawning_card — let the card animation finish
+    set((s) => ({
+      phaseNum,
+      phaseName,
+      ...(s.theaterPhase !== "spawning_card" ? { theaterPhase } : {}),
+    }));
   },
   addWorker: (worker) =>
     set((s) => ({

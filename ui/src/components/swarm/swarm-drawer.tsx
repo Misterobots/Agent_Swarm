@@ -62,8 +62,9 @@ export function SwarmDrawer() {
             worker={latestCard}
             onDone={() => {
               setLatestCard(null);
-              // Transition to roster after last card was shown
-              setTheaterPhase(workers.length >= 2 ? "roster" : "working");
+              // After card: go to roster to show the growing grid,
+              // then let the next swarm_phase event advance further.
+              setTheaterPhase("roster");
             }}
           />
         )}

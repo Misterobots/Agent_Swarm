@@ -190,6 +190,16 @@ export function useChatStream(options?: {
       setStatusMessage(null);
       setLatestThought(null);
       setStreamMode(null);
+
+      // Activate swarm theater immediately if swarm mode is on — don't wait
+      // for the first swarm_phase event, which may arrive late or be missed.
+      if (swarmMode) {
+        const sw = useSwarmStore.getState();
+        sw.reset();
+        sw.setActive(true);
+        sw.setTheaterPhase("decomposing");
+      }
+
       thoughtTraceRef.current = [];
       toolCallTraceRef.current = [];
       toolLifecycleRef.current = [];
@@ -304,8 +314,7 @@ export function useChatStream(options?: {
               };
             }
           } else if (event.type === "swarm_phase") {
-            const { setActive, setSwarmPhase, reset } = useSwarmStore.getState();
-            if ((event.phase_num ?? 0) === 1) { reset(); setActive(true); }
+            const { setSwarmPhase } = useSwarmStore.getState();
             setSwarmPhase(event.phase_num ?? 0, event.phase_name ?? "");
           } else if (event.type === "swarm_worker_created") {
             const { addWorker } = useSwarmStore.getState();
