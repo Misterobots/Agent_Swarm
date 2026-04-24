@@ -92,6 +92,7 @@ export interface SwarmWorker {
   task: string;
   phase: string;
   state: "pending" | "running" | "completed" | "failed" | "cancelled";
+  output?: string;
 }
 
 export interface StreamEvent {

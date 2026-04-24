@@ -18,6 +18,7 @@ interface SwarmState {
   workers: SwarmWorker[];
   latestCard: SwarmWorker | null;
   taskSummary: string;
+  selectedWorkerId: string | null;
 
   setActive: (active: boolean) => void;
   setTheaterPhase: (phase: SwarmTheaterPhase) => void;
@@ -26,10 +27,11 @@ interface SwarmState {
   updateWorkers: (workers: SwarmWorker[]) => void;
   setLatestCard: (worker: SwarmWorker | null) => void;
   setTaskSummary: (s: string) => void;
+  setSelectedWorker: (id: string | null) => void;
   reset: () => void;
 }
 
-const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase" | "phaseNum" | "phaseName" | "workers" | "latestCard" | "taskSummary">> = {
+const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase" | "phaseNum" | "phaseName" | "workers" | "latestCard" | "taskSummary" | "selectedWorkerId">> = {
   active: false,
   theaterPhase: "idle",
   phaseNum: 0,
@@ -37,6 +39,7 @@ const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase"
   workers: [],
   latestCard: null,
   taskSummary: "",
+  selectedWorkerId: null,
 };
 
 export const useSwarmStore = create<SwarmState>()((set) => ({
@@ -71,5 +74,6 @@ export const useSwarmStore = create<SwarmState>()((set) => ({
     }),
   setLatestCard: (latestCard) => set({ latestCard }),
   setTaskSummary: (taskSummary) => set({ taskSummary }),
+  setSelectedWorker: (selectedWorkerId) => set({ selectedWorkerId }),
   reset: () => set({ ...INITIAL }),
 }));

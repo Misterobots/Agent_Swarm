@@ -14,9 +14,10 @@ const STATUS_CYCLE = [
 
 interface AgentDockProps {
   workers: SwarmWorker[];
+  onSelect?: (id: string) => void;
 }
 
-export function AgentDock({ workers }: AgentDockProps) {
+export function AgentDock({ workers, onSelect }: AgentDockProps) {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -40,9 +41,11 @@ export function AgentDock({ workers }: AgentDockProps) {
         return (
           <div
             key={w.worker_id}
+            onClick={() => onSelect?.(w.worker_id)}
             className={cn(
               "flex flex-col items-center gap-2 px-5 py-4 rounded-2xl transition-all min-w-[6rem]",
               "bg-white/5 border",
+              onSelect && "cursor-pointer hover:bg-white/8",
               isRunning
                 ? "border-[var(--chat-accent)]/35 shadow-[0_0_20px_var(--chat-accent)]/10"
                 : "border-white/10",

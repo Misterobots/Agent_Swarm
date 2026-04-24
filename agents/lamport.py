@@ -633,9 +633,12 @@ def coordinate_task(
                                 {
                                     "worker_id": w.worker_id,
                                     "pioneer_name": _pioneer_for_role(w.role)["name"],
+                                    "pioneer_full_name": _pioneer_for_role(w.role)["full_name"],
+                                    "pioneer_motto": _pioneer_for_role(w.role)["motto"],
                                     "role": w.role,
                                     "task": w.task,
                                     "state": w.state.value,
+                                    "output": (research_results.get(w.worker_id, "") or "")[:600],
                                 }
                                 for w in session.workers.values()
                                 if w.phase == "research"
@@ -667,9 +670,12 @@ def coordinate_task(
                                 {
                                     "worker_id": w.worker_id,
                                     "pioneer_name": _pioneer_for_role(w.role)["name"],
+                                    "pioneer_full_name": _pioneer_for_role(w.role)["full_name"],
+                                    "pioneer_motto": _pioneer_for_role(w.role)["motto"],
                                     "role": w.role,
                                     "task": w.task,
                                     "state": w.state.value,
+                                    "output": (research_results.get(w.worker_id, "") or "")[:600],
                                 }
                                 for w in session.workers.values()
                                 if w.phase == "research"
