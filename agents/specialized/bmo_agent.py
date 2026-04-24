@@ -8,8 +8,8 @@ def get_bmo_agent() -> Agent:
     """
     Returns the BMO Voice Agent.
     """
-    MODEL_NAME = os.getenv("PRIMARY_MODEL", "qwen3:14b")
-    OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    MODEL_NAME = os.getenv("BMO_LLM_MODEL", "llama3.2:3b")
+    OLLAMA_HOST = os.getenv("BMO_OLLAMA_HOST", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
     BMO_VOICE_URL = "http://bmo-voice-gpu:8000/speak" # Container name in docker-compose
 
     def generate_bmo_speech(text: str, pitch: int = 3, method: str = "rmvpe") -> str:

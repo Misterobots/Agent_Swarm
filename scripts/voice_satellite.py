@@ -61,7 +61,7 @@ if not HOST_IP:
 print(f"🌐 Host IP: {HOST_IP}")
 
 VOICE_ENGINE_URL = f"http://{HOST_IP}:8020/stt"
-AGENT_URL = f"http://{HOST_IP}:8000/v1/voice/chat"
+AGENT_URL = f"http://{HOST_IP}:8008/v1/voice/chat"
 
 # --- BMO Face Sync ---
 BMO_FIFO = "/tmp/bmo_cmd.fifo"
@@ -134,9 +134,9 @@ def play_audio(file_path, face_cmd="speaking"):
             print(f"📥 Downloading: {filename} from server...")
             # Route to the correct static mount based on the container path
             if "voice_samples" in file_path:
-                url = f"http://{HOST_IP}:8000/voice_samples/{filename}"
+                url = f"http://{HOST_IP}:8008/voice_samples/{filename}"
             else:
-                url = f"http://{HOST_IP}:8000/delivered_artifacts/{filename}"
+                url = f"http://{HOST_IP}:8008/delivered_artifacts/{filename}"
             r = requests.get(url, timeout=10)
             if r.status_code == 200:
                 with open(local_tmp, 'wb') as f:
@@ -335,18 +335,17 @@ def main():
         porcupine = pvporcupine.create(
             access_key=access_key,
             keyword_paths=[ppn_path],
-            sensitivities=[0.7],
+            sensitivities=[0.85],
         )
     except Exception as e:
         print(f"❌ Failed to initialize Porcupine: {e}")
         sys.exit(1)
 
-    # Porcupine requires exactly frame_length 16kHz int16 samples
+    # Capture directly at 16kHz — no decimation, cleaner audio for Porcupine
     FRAME_LENGTH = porcupine.frame_length  # typically 512
-    HARDWARE_RATE = 48000
-    # 48kHz chunk that decimates to exactly FRAME_LENGTH 16kHz samples
-    HARDWARE_CHUNK = FRAME_LENGTH * 3  # 48kHz / 16kHz = 3
-    print(f"✅ Porcupine ready. frame_length={FRAME_LENGTH}, hw_chunk={HARDWARE_CHUNK}")
+    HARDWARE_RATE = 16000
+    HARDWARE_CHUNK = FRAME_LENGTH  # 512 samples = 32ms at 16kHz
+    print(f"✅ Porcupine ready. frame_length={FRAME_LENGTH}, hw_rate={HARDWARE_RATE}")
 
     # 2. Queues & Threads
     audio_queue = queue.Queue()
@@ -360,23 +359,25 @@ def main():
             print(f"Audio Status: {status}")
         audio_queue.put(indata.copy())
 
-    # 3. Keyboard Trigger Thread
-    def keyboard_listener():
-        while True:
-            try:
-                input("\n⌨️ Press ENTER to trigger BMO manually...\n")
-                print("🛠️ DEBUG: Keyboard Input Detected. Sending trigger...")
-                trigger_queue.put("manual")
-            except EOFError:
-                time.sleep(3600)
+    # 3. Keyboard Trigger Thread (only in interactive/debug mode, not as a service)
+    if sys.stdin and sys.stdin.isatty():
+        def keyboard_listener():
+            while True:
+                try:
+                    input("\n⌨️ Press ENTER to trigger BMO manually...\n")
+                    print("🛠️ DEBUG: Keyboard Input Detected. Sending trigger...")
+                    trigger_queue.put("manual")
+                except EOFError:
+                    time.sleep(3600)
 
-    threading.Thread(target=keyboard_listener, daemon=True).start()
+        threading.Thread(target=keyboard_listener, daemon=True).start()
 
     # 4. Detect MIC device and start Main Loop
     MIC_DEVICE = detect_mic_device()
 
-    print(f"\n🛰️  Satellite Listening at {HARDWARE_RATE}Hz...")
-    print("⌨️   Trigger: Press ENTER in this terminal.")
+    print(f"\n🛰️  Satellite Listening at {HARDWARE_RATE}Hz (direct 16kHz, no decimation)...")
+    if sys.stdin and sys.stdin.isatty():
+        print("⌨️   Trigger: Press ENTER in this terminal.")
     print("🎙️   Wake Word: 'Beemo' (Porcupine custom model)\n")
     update_bmo_face("neutral")
 
@@ -384,6 +385,40 @@ def main():
     last_rms_log = time.time()
     last_rms_face = time.time()
     rms_max = 0
+    speech_frames = 0  # consecutive frames above speech threshold
+    SPEECH_THRESHOLD = 10000  # default; overwritten by calibration below
+    SPEECH_FRAMES_NEEDED = 8  # ~256ms of sustained speech
+
+    # ── Calibrate ambient noise floor ─────────────────────────────────────────
+    # Measure for 3s then set threshold at 2.5× ambient mean so speech (louder
+    # than ambient) reliably triggers while continuous background noise does not.
+    print("📏 Calibrating ambient noise floor — please stay quiet for 3 seconds...")
+    _cal_rms_samples = []
+    _cal_start = time.time()
+    try:
+        def _cal_callback(indata, frames, time_info, status):
+            _cal_rms_samples.append(int(np.sqrt(np.mean(indata.astype(np.float32) ** 2))))
+        with sd.InputStream(samplerate=HARDWARE_RATE, blocksize=HARDWARE_CHUNK,
+                            device=MIC_DEVICE, channels=1, callback=_cal_callback,
+                            dtype='int16', latency='high'):
+            while time.time() - _cal_start < 3.0:
+                time.sleep(0.05)
+    except Exception as _e:
+        print(f"⚠️ Calibration failed: {_e} — using default threshold {SPEECH_THRESHOLD}")
+        _cal_rms_samples = []
+
+    if _cal_rms_samples:
+        _ambient_mean = int(np.mean(_cal_rms_samples))
+        _ambient_std  = int(np.std(_cal_rms_samples))
+        # mean + 2×std: statistically, 10 consecutive frames at this level from
+        # ambient alone has probability ~(0.023)^10 ≈ 0 — but speech sustains it.
+        # Cap at 30000 so we never go above int16 max (32767).
+        SPEECH_THRESHOLD = min(max(int(_ambient_mean + 2.0 * _ambient_std), 5000), 30000)
+        print(f"📏 Ambient RMS: mean={_ambient_mean}, std={_ambient_std} → SPEECH_THRESHOLD={SPEECH_THRESHOLD}")
+    else:
+        print(f"📏 Using default threshold: {SPEECH_THRESHOLD}")
+    # ──────────────────────────────────────────────────────────────────────────
+
     while True:
         interacted = False
         try:
@@ -416,9 +451,8 @@ def main():
                         while audio_queue.qsize() > 1:
                             audio_queue.get_nowait()
 
-                        # Decimate 48kHz → 16kHz (factor 3, no anti-alias needed for
-                        # a wake word detector working on mel features)
-                        pcm = chunk[::3].flatten()
+                        # Direct 16kHz capture — no decimation needed
+                        pcm = chunk.flatten()
 
                         # RMS monitoring
                         rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
@@ -433,11 +467,13 @@ def main():
                             send_rms_to_face(rms)
                             last_rms_face = time.time()
 
-                        # Porcupine needs exactly frame_length samples
-                        # Feed any extra samples in FRAME_LENGTH windows
+                        # Porcupine needs exactly frame_length samples.
+                        # Attenuate before passing: mic RMS ~30k clips at int16 max (32767)
+                        # which destroys spectral features. Scale to ~25% to unclip.
+                        pcm_ppn = (pcm.astype(np.float32) * 0.25).clip(-32768, 32767).astype(np.int16)
                         detected = False
-                        for i in range(0, len(pcm) - FRAME_LENGTH + 1, FRAME_LENGTH):
-                            frame = pcm[i:i + FRAME_LENGTH]
+                        for i in range(0, len(pcm_ppn) - FRAME_LENGTH + 1, FRAME_LENGTH):
+                            frame = pcm_ppn[i:i + FRAME_LENGTH]
                             result = porcupine.process(frame)
                             if result >= 0:
                                 detected = True
@@ -445,11 +481,29 @@ def main():
 
                         if detected:
                             print("⚡ Wake Word Detected: Beemo!")
+                            speech_frames = 0
                             update_bmo_face("acknowledged")
                             play_wake_ping()
                             update_bmo_face("listening")
                             time.sleep(0.1)
                             interacted = True
+
+                        else:
+                            # Sustained speech fallback: require consecutive frames above threshold
+                            # Ignores transients (claps, doors, TV) which are single-frame spikes
+                            if rms > SPEECH_THRESHOLD:
+                                speech_frames += 1
+                            else:
+                                speech_frames = max(0, speech_frames - 1)  # decay
+
+                            if speech_frames >= SPEECH_FRAMES_NEEDED:
+                                print(f"⚡ Sustained Speech Detected ({speech_frames} frames, RMS={rms}) — fallback trigger!")
+                                speech_frames = 0
+                                update_bmo_face("acknowledged")
+                                play_wake_ping()
+                                update_bmo_face("listening")
+                                time.sleep(0.1)
+                                interacted = True
 
                     except queue.Empty:
                         pass
@@ -460,6 +514,7 @@ def main():
 
         # --- OUTSIDE MIC STREAM ---
         if interacted:
+            speech_frames = 0  # reset counter so we don't re-trigger immediately
             wants_reply = handle_interaction()
             with audio_queue.mutex:
                 audio_queue.queue.clear()
@@ -479,8 +534,8 @@ def main():
 def handle_interaction():
     # Wait briefly for the listener stream to release the hardware
     time.sleep(0.3)
-    # Using Hardware Rate for the G933
-    HW_RATE = 48000
+    # Record directly at 16kHz (mic now captures at 16kHz natively — no resampling needed)
+    HW_RATE = 16000
     STT_RATE = 16000
     duration = 3.8 # Reduced from 5 to decrease latency
     
@@ -488,17 +543,13 @@ def handle_interaction():
     update_bmo_face("listening")
     print(f"🎤 Recording Command ({duration}s)...")
     
-    recording = sd.rec(int(duration * HW_RATE), samplerate=HW_RATE, channels=1, dtype='int16')
+    recording = sd.rec(int(duration * HW_RATE), samplerate=HW_RATE, channels=1, dtype='int16',
+                       device=detect_mic_device())
     sd.wait()
     
-    # Resample to 16k for the STT engine
-    import scipy.signal
-    num_samples = int(len(recording) * (STT_RATE / HW_RATE))
-    recording_resampled = scipy.signal.resample(recording, num_samples)
-    
-    # Save to temp
+    # Save to temp (already 16kHz, no resampling)
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        sf.write(tmp.name, recording_resampled.astype(np.int16), STT_RATE)
+        sf.write(tmp.name, recording.astype(np.int16), STT_RATE)
         temp_path = tmp.name
         
     print("Sending to STT...")
@@ -514,28 +565,35 @@ def handle_interaction():
             print(f"📝 Transcribed: {text}")
             
             if text:
+                update_bmo_face("thinking")
                 return process_agent_response(text)
             else:
                 print("No speech detected.")
+                update_bmo_face("neutral")
                 return False
         else:
             print(f"STT Error: {response.text}")
+            update_bmo_face("neutral")
             return False
             
     except Exception as e:
         print(f"Interaction Error: {e}")
+        update_bmo_face("neutral")
         return False
     finally:
-        os.remove(temp_path)
-        update_bmo_face("neutral")
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
 
 def process_agent_response(text):
     """Sends text to LLM and plays response. Returns True if BMO asked a question."""
     print("🤖 Sending to Agent...")
+    update_bmo_face("thinking")
     t_start = time.time()
     try:
         payload = {"text": text}
-        response = requests.post(AGENT_URL, json=payload)
+        response = requests.post(AGENT_URL, json=payload, timeout=120)
         t_resp = time.time()
         print(f"⏱  Agent Response Time: {t_resp - t_start:.2f}s")
         
@@ -575,6 +633,7 @@ def process_agent_response(text):
                 update_bmo_face("neutral")
             else:
                 print("(No Audio Response)")
+                update_bmo_face("neutral")
                 
             # Check if it was a question so we can keep the conversation going
             if "?" in reply or "what do you think" in reply.lower() or "how about" in reply.lower():
@@ -583,10 +642,12 @@ def process_agent_response(text):
                 
         else:
             print(f"Agent Error: {response.text}")
+            update_bmo_face("neutral")
             return False
             
     except Exception as e:
         print(f"Agent Request Error: {e}")
+        update_bmo_face("neutral")
         return False
 
 if __name__ == "__main__":

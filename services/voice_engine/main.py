@@ -60,10 +60,10 @@ stt_model = None
 
 def load_model():
     global model, tokenizer, stt_model
+
+    # Load TTS model independently so a failure doesn't block STT
     try:
-        print(f"Loading Model: {MODEL_PATH}...")
-        
-        # Try loading with trust_remote_code=True which is key for Qwen
+        print(f"Loading TTS Model: {MODEL_PATH}...")
         tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
         model = AutoModel.from_pretrained(
             MODEL_PATH,
@@ -71,18 +71,25 @@ def load_model():
             trust_remote_code=True,
             torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32
         )
-        
-        # Load STT (SenseVoiceSmall)
+        print("TTS Model Loaded Successfully.")
+    except Exception as e:
+        print(f"WARNING: TTS Model failed to load: {e}")
+        model = None
+        tokenizer = None
+
+    # Load STT model independently so a TTS failure doesn't prevent transcription
+    try:
         print("Loading STT Model: iic/SenseVoiceSmall...")
+        stt_device = "cuda" if torch.cuda.is_available() else "cpu"
         stt_model = FunASRModel(
             model="iic/SenseVoiceSmall",
             trust_remote_code=True,
-            device="cuda",
+            device=stt_device,
         )
-        
-        print("Models Loaded Successfully.")
+        print("STT Model Loaded Successfully.")
     except Exception as e:
-        print(f"CRITICAL ERROR Loading Model: {e}")
+        print(f"CRITICAL ERROR: STT Model failed to load: {e}")
+        stt_model = None
         # We don't crash app so we can see logs, but inference will fail
         pass
 

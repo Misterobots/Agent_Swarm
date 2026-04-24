@@ -30,7 +30,7 @@ export function AgentRoster({ workers }: AgentRosterProps) {
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 w-full h-full px-6">
-      <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-xs">
         {slots.map((w) => {
           const isGhost = w.worker_id.startsWith("ghost-");
           const shown = visible.has(w.worker_id);

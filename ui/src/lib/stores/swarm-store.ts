@@ -19,6 +19,10 @@ interface SwarmState {
   latestCard: SwarmWorker | null;
   taskSummary: string;
   selectedWorkerId: string | null;
+  /** Soft-collapsed: drawer hidden but state preserved — recall via FAB */
+  dismissed: boolean;
+  /** True while content is displayed in a detached popup window */
+  popoutOpen: boolean;
 
   setActive: (active: boolean) => void;
   setTheaterPhase: (phase: SwarmTheaterPhase) => void;
@@ -28,10 +32,12 @@ interface SwarmState {
   setLatestCard: (worker: SwarmWorker | null) => void;
   setTaskSummary: (s: string) => void;
   setSelectedWorker: (id: string | null) => void;
+  setDismissed: (dismissed: boolean) => void;
+  setPopoutOpen: (open: boolean) => void;
   reset: () => void;
 }
 
-const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase" | "phaseNum" | "phaseName" | "workers" | "latestCard" | "taskSummary" | "selectedWorkerId">> = {
+const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase" | "phaseNum" | "phaseName" | "workers" | "latestCard" | "taskSummary" | "selectedWorkerId" | "dismissed" | "popoutOpen">> = {
   active: false,
   theaterPhase: "idle",
   phaseNum: 0,
@@ -40,6 +46,8 @@ const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase"
   latestCard: null,
   taskSummary: "",
   selectedWorkerId: null,
+  dismissed: false,
+  popoutOpen: false,
 };
 
 export const useSwarmStore = create<SwarmState>()((set) => ({
@@ -75,5 +83,7 @@ export const useSwarmStore = create<SwarmState>()((set) => ({
   setLatestCard: (latestCard) => set({ latestCard }),
   setTaskSummary: (taskSummary) => set({ taskSummary }),
   setSelectedWorker: (selectedWorkerId) => set({ selectedWorkerId }),
+  setDismissed: (dismissed) => set({ dismissed }),
+  setPopoutOpen: (popoutOpen) => set({ popoutOpen }),
   reset: () => set({ ...INITIAL }),
 }));

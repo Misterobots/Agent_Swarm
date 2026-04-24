@@ -3,6 +3,8 @@ Description=BMO Voice Agent
 After=network.target sound.target
 # Stop desktop to free GPU/Screen for Pygame KMSDRM
 Conflicts=lightdm.service
+# Also start the voice satellite whenever this service starts
+Wants=bmo_satellite.service
 
 [Service]
 User=misterobots

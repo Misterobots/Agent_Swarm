@@ -18,7 +18,8 @@ logger = logging.getLogger("VoiceAssistant")
 logger.setLevel(logging.INFO)
 
 # --- Config ---
-BMO_MODEL = os.getenv("BMO_LLM_MODEL", "qwen2.5:3b")
+BMO_MODEL = os.getenv("BMO_LLM_MODEL", "llama3.2:3b")
+BMO_OLLAMA_HOST = os.getenv("BMO_OLLAMA_HOST", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
 MAX_MEMORY = 10  # Keep last 10 exchanges
 
 
@@ -99,7 +100,7 @@ class VoiceAssistantAgent:
         
         # LLM Agent with all tools
         self.llm_agent = Agent(
-            model=Ollama(id=BMO_MODEL),
+            model=Ollama(id=BMO_MODEL, host=BMO_OLLAMA_HOST),
             description=BMO_SYSTEM_PROMPT,
             tools=[self.smart_home, self.weather, self.time_tool, self.news],
             show_tool_calls=False,

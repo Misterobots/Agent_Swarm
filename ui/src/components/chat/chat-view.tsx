@@ -16,6 +16,8 @@ import { DocGroundingToggle } from "./doc-grounding-toggle";
 import { FileGroundingToggle } from "./file-grounding-toggle";
 import { SwarmToggle } from "./swarm-toggle";
 import { SwarmDrawer } from "@/components/swarm/swarm-drawer";
+import { useSwarmStore } from "@/lib/stores/swarm-store";
+import { useSwarmBroadcast } from "@/lib/hooks/use-swarm-broadcast";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
 import { Bot, Brain, Code2, X, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -78,6 +80,14 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const buddyReact = useBuddyStore((s) => s.react);
   const { awayEvents, pushEvent, dismiss: dismissAway } = useAwaySummary();
 
+  // Swarm state — used for showThinking extension + recall FAB
+  useSwarmBroadcast();
+  const swarmActive = useSwarmStore((s) => s.active);
+  const swarmDismissed = useSwarmStore((s) => s.dismissed);
+  const setSwarmDismissed = useSwarmStore((s) => s.setDismissed);
+  const theaterPhase = useSwarmStore((s) => s.theaterPhase);
+  const swarmWorkers = useSwarmStore((s) => s.workers);
+
   // Close mobile overflow menu on outside tap
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -98,8 +108,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   // message or the assistant message is still empty (waiting for first content)
   const lastMsg = messages[messages.length - 1];
   const showThinking =
-    isStreaming &&
-    (statusMessage !== null || (lastMsg?.role === "assistant" && !lastMsg.content));
+    (isStreaming && (statusMessage !== null || (lastMsg?.role === "assistant" && !lastMsg.content))) ||
+    (swarmActive && theaterPhase !== "complete" && theaterPhase !== "idle");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -165,7 +175,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           {!isMobile && <ThemeSelector />}
           {!isMobile && <UltraplanToggle />}
           {!isMobile && <UltrathinkToggle />}
-          {!isMobile && <SwarmToggle />}
+          <SwarmToggle />
           {!isMobile && <WebGroundingToggle />}
           {!isMobile && <DocGroundingToggle />}
           {!isMobile && <FileGroundingToggle />}
@@ -200,11 +210,10 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                 <MoreHorizontal size={18} />
               </button>
               {mobileMenuOpen && (
-                <div className="absolute top-full left-0 mt-1 z-30 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-lg p-2 space-y-1 min-w-[160px]">
-                  <div className="px-2 py-1.5"><ThemeSelector /></div>
+                <div className="absolute top-full left-0 mt-1 z-30 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-lg p-2 space-y-1 min-w-[160px] max-h-[60vh] overflow-y-auto">
                   <div className="px-2 py-1.5"><UltraplanToggle /></div>
                   <div className="px-2 py-1.5"><UltrathinkToggle /></div>
-                  <div className="px-2 py-1.5"><SwarmToggle /></div>
+                  <div className="px-2 py-1.5"><ThemeSelector /></div>
                   <div className="px-2 py-1.5"><WebGroundingToggle /></div>
                   <div className="px-2 py-1.5"><DocGroundingToggle /></div>
                   <div className="px-2 py-1.5"><FileGroundingToggle /></div>
@@ -316,6 +325,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                 statusMessage={statusMessage}
                 latestThought={latestThought}
                 streamMode={streamMode}
+                swarmPhase={theaterPhase}
               />
             )}
             <div ref={bottomRef} />
@@ -365,6 +375,21 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         isStreaming={isStreaming}
         latestThought={latestThought}
       />
+      {/* Mobile recall FAB — visible when swarm is dismissed and active */}
+      {isMobile && swarmActive && swarmDismissed && theaterPhase !== "idle" && theaterPhase !== "complete" && (
+        <button
+          type="button"
+          onClick={() => setSwarmDismissed(false)}
+          className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+8px)] right-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-[var(--chat-surface)] border border-white/10 shadow-lg text-sm font-semibold text-white/70 hover:text-white/90 active:scale-95 transition-all"
+          aria-label="Recall swarm panel"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+          Swarm &middot; {swarmWorkers.length} pioneer{swarmWorkers.length !== 1 ? "s" : ""}
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/>
+          </svg>
+        </button>
+      )}
       {/* Swarm theater drawer */}
       <SwarmDrawer />
     </div>

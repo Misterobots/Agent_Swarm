@@ -27,7 +27,7 @@ class WeatherTool(Toolkit):
         self.register(self.get_current_weather)
         self.register(self.get_forecast)
 
-    def get_current_weather(self) -> str:
+    def get_current_weather(self, **kwargs) -> str:
         """Get the current weather conditions and temperature.
         Use this when the user asks 'what's the weather like?' or 'is it hot outside?'"""
         try:
@@ -55,7 +55,7 @@ class WeatherTool(Toolkit):
             logger.error(f"Weather fetch failed: {e}")
             return "I couldn't get the weather right now."
 
-    def get_forecast(self) -> str:
+    def get_forecast(self, **kwargs) -> str:
         """Get the weather forecast for today and tomorrow.
         Use this when the user asks 'will it rain today?' or 'what's the weather tomorrow?'"""
         try:
@@ -97,11 +97,11 @@ class TimeTool(Toolkit):
         self.register(self.get_current_time)
         self.register(self.get_current_date)
 
-    def get_current_time(self) -> str:
+    def get_current_time(self, **kwargs) -> str:
         """Get the current time. Use when the user asks 'what time is it?'"""
         return datetime.now().strftime("%-I:%M %p")
 
-    def get_current_date(self) -> str:
+    def get_current_date(self, **kwargs) -> str:
         """Get today's date and day of week. Use when user asks 'what day is it?' or 'what's the date?'"""
         return datetime.now().strftime("%A, %B %-d, %Y")
 

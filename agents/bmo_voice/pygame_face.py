@@ -425,22 +425,24 @@ class PygameFace:
         # Background
         pygame.draw.rect(surface, (0, 0, 0), (bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2))
 
-        # Fill level: scale RMS against practical speech max (~5000).
-        # Silent ambient ≈ 200-400, quiet speech ≈ 1000, normal ≈ 3000, loud ≈ 5000+
-        level = min(rms / 5000.0, 1.0)
+        # Fill level: scale RMS against int16 max (~32767).
+        # With hardware AGC mic: ambient ≈ 16000 (≈50%), speech ≈ 28000 (≈85%)
+        level = min(rms / 32767.0, 1.0)
         fill_w = int(bar_w * level)
 
         if fill_w > 0:
-            # Color: green <25%, yellow 25–75%, red >75%
-            if level < 0.25:
+            # Color: green <40%, yellow 40–70%, red >70%
+            # With AGC mic: ambient ≈ 50% (green/yellow border), speech ≈ 85% (yellow)
+            if level < 0.40:
                 color = (0, 220, 80)
-            elif level < 0.75:
+            elif level < 0.70:
                 color = (220, 200, 0)
             else:
                 color = (220, 40, 40)
             pygame.draw.rect(surface, color, (bar_x, bar_y, fill_w, bar_h))
 
-    def _handle_cmd(self, cmd):        try:
+    def _handle_cmd(self, cmd):
+        try:
             # Handle variable length tuple depending on caller
             if len(cmd) == 3:
                 kind, name, mouth_sync = cmd

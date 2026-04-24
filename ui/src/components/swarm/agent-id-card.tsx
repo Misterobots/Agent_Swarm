@@ -42,7 +42,7 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
     <div className="flex items-center justify-center w-full h-full">
       <div
         className={cn(
-          "relative w-72 rounded-2xl overflow-hidden transition-all",
+          "relative w-[min(288px,85vw)] rounded-2xl overflow-hidden transition-all",
           "duration-500 ease-[cubic-bezier(.32,1.4,.64,1)]",
           "bg-[var(--chat-surface)] border border-white/10",
           "shadow-[0_28px_72px_rgba(0,0,0,0.75)]",

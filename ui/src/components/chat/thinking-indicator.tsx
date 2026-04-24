@@ -48,9 +48,10 @@ interface ThinkingIndicatorProps {
   statusMessage: string | null;
   latestThought?: string | null;
   streamMode?: string | null;
+  swarmPhase?: string | null;
 }
 
-export function ThinkingIndicator({ statusMessage, latestThought, streamMode }: ThinkingIndicatorProps) {
+export function ThinkingIndicator({ statusMessage, latestThought, streamMode, swarmPhase }: ThinkingIndicatorProps) {
   const theme = useSettingsStore((s) => s.theme) as ChatTheme;
   const verbs = THEME_AMBIENT_VERBS[theme] ?? THEME_AMBIENT_VERBS.ember;
   const [verb, setVerb] = useState(() => pickRandom(verbs));
@@ -64,6 +65,14 @@ export function ThinkingIndicator({ statusMessage, latestThought, streamMode }: 
     "Composing answer",
     "Validating details",
   ];
+
+  const SWARM_PHASE_LABEL: Record<string, string> = {
+    decomposing:   "Decomposing task",
+    spawning_card: "Deploying pioneer",
+    roster:        "Assembling swarm",
+    working:       "Swarm at work",
+    synthesizing:  "Synthesizing findings",
+  };
 
   // Rotate the ambient verb every 3 seconds
   useEffect(() => {
@@ -113,6 +122,10 @@ export function ThinkingIndicator({ statusMessage, latestThought, streamMode }: 
                 </span>
               )}
             </div>
+          ) : swarmPhase && SWARM_PHASE_LABEL[swarmPhase] ? (
+            <span className="text-sm font-semibold text-[var(--chat-accent-strong)]">
+              {SWARM_PHASE_LABEL[swarmPhase]}
+            </span>
           ) : (
             <span className="text-sm font-semibold text-[var(--chat-accent-strong)]">
               {THINKING_PHASES[thinkingPhase]}

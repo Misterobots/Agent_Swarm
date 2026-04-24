@@ -59,16 +59,6 @@ services:
       context: ../agents/bmo_voice
       dockerfile: Dockerfile
     container_name: bmo_voice_gpu
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [ gpu ]
     ports:
       - "8100:8000"
     volumes:
@@ -87,16 +77,6 @@ services:
       context: ../services/voice_engine
       dockerfile: Dockerfile
     container_name: voice_engine_gpu
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [ gpu ]
     ports:
       - "8020:8020"
     volumes:
@@ -166,7 +146,10 @@ services:
     env_file:
       - ../network.env
     environment:
+      # Lovelace local Ollama — 2x 5060 Ti (32GB VRAM) handles all heavy models
       - OLLAMA_HOST=http://ollama:11434
+      # Turing Ollama — 3070 Ti (8GB VRAM) handles BMO voice only (llama3.2:3b = 2GB)
+      - BMO_OLLAMA_HOST=http://192.168.2.103:11434
       - OPENHANDS_URL=http://openhands:3000
       - OPENHANDS_API_KEY=sk-sandbox-local
       - COMFYUI_HOST=http://comfyui_gpu:8188
@@ -187,12 +170,12 @@ services:
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
       # BMO Voice LLM — small 3B model that fits alongside comfyui
       # Heavy models may OOM when ComfyUI is loaded
-      - BMO_LLM_MODEL=qwen2.5:3b
+      - BMO_LLM_MODEL=llama3.2:3b
       # BMO Weather location (Open-Meteo, no API key needed)
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}
       - HOME_CITY=${HOME_CITY:-your area}
-      # MarsRL / Secondary inference
+      # Heavy models — all served by Lovelace Ollama (2x 5060 Ti, 32GB combined)
       - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
       - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:14b}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
@@ -218,13 +201,6 @@ services:
       - "8008:8000"
     networks:
       - execution_net
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     labels:
       # Labels for SPIRE workload attestation
       - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/runtime"
