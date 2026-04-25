@@ -299,6 +299,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                   <MessageBubble
                     message={msg}
                     userPrompt={precedingUserPrompt}
+                    isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"}
                     onEditMessage={handleEditMessage}
                     onRetryMessage={() => handleRetryMessage(idx)}
                     onApprove={devMode ? handleApprove : undefined}

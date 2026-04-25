@@ -405,6 +405,15 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Streaming cursor */
+.streaming-cursor {
+  animation: cursorBlink 1s step-end infinite;
+}
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
 /* Away summary banner slide-in */
 .away-banner-enter {
   animation: awayBannerIn 0.3s ease-out;

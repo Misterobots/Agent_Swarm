@@ -20,6 +20,7 @@ interface VerificationBadge {
 interface MessageBubbleProps {
   message: ChatMessage;
   userPrompt?: string;
+  isStreaming?: boolean;
   onEditMessage?: (content: string) => void;
   onRetryMessage?: () => void;
   onBranchMessage?: () => void;
@@ -31,7 +32,7 @@ function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
 }
 
-export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny }: MessageBubbleProps) {
+export function MessageBubble({ message, userPrompt, isStreaming, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -113,7 +114,7 @@ export function MessageBubble({ message, userPrompt, onEditMessage, onRetryMessa
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : message.content ? (
           <>
-            <MarkdownRenderer content={message.content} />
+            <MarkdownRenderer content={message.content} isStreaming={isStreaming} />
             {showArtButton && (
               <Link
                 href={artStudioHref}
