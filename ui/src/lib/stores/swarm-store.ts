@@ -45,7 +45,7 @@ export interface SwarmState {
   reset: () => void;
 }
 
-const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase" | "phaseNum" | "phaseName" | "workers" | "latestCard" | "badgeQueue" | "taskSummary" | "selectedWorkerId" | "dismissed" | "popoutOpen">> = {
+const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase" | "phaseNum" | "phaseName" | "workers" | "latestCard" | "badgeQueue" | "revealedWorkerIds" | "phaseNameMap" | "taskSummary" | "selectedWorkerId" | "dismissed" | "popoutOpen">> = {
   active: false,
   theaterPhase: "idle",
   phaseNum: 0,
