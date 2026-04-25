@@ -1,9 +1,10 @@
-const CACHE_NAME = "hive-mind-v1";
+const CACHE_NAME = "hive-mind-v2";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
   "/offline",
-  "/manifest.json",
+  // manifest.json is excluded — it is fetched behind Authentik and will be
+  // redirected to auth.shivelymedia.com during install, causing a CORS error.
 ];
 
 // Install: cache offline fallback
@@ -66,15 +67,25 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Other assets (fonts, images): stale-while-revalidate
+  // Guard: if the response was redirected to a different origin (e.g. Authentik
+  // OAuth), do NOT cache it and let the browser handle it natively so CORS
+  // policy doesn't block the service worker's opaque fetch.
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) =>
       cache.match(request).then((cached) => {
+        const requestOrigin = new URL(request.url).origin;
         const fetched = fetch(request).then((response) => {
+          // If redirected cross-origin (e.g. to Authentik), skip caching and
+          // return the cached version (if any) or a simple network error so
+          // the browser can handle auth normally.
+          if (response.redirected && new URL(response.url).origin !== requestOrigin) {
+            return cached || Response.error();
+          }
           if (response.ok) {
             cache.put(request, response.clone());
           }
           return response;
-        });
+        }).catch(() => cached || Response.error());
         return cached || fetched;
       })
     )
