@@ -99,9 +99,30 @@ export const useSwarmStore = create<SwarmState>()((set) => ({
     }),
   updateWorkers: (incoming) =>
     set((s) => {
+      // Any worker not already in the workers list AND not already queued/showing
+      // must go through the badge animation queue — same as addWorker.
+      const existingIds = new Set(s.workers.map((w) => w.worker_id));
+      const queuedIds = new Set([
+        ...(s.latestCard ? [s.latestCard.worker_id] : []),
+        ...s.badgeQueue.map((w) => w.worker_id),
+      ]);
+      const brandNew = incoming.filter(
+        (w) => !existingIds.has(w.worker_id) && !queuedIds.has(w.worker_id),
+      );
+
       const map = new Map(s.workers.map((w) => [w.worker_id, w]));
       for (const w of incoming) map.set(w.worker_id, { ...map.get(w.worker_id), ...w } as SwarmWorker);
-      return { workers: Array.from(map.values()) };
+
+      const newQueue = [...s.badgeQueue, ...brandNew];
+      const alreadyAnimating = s.theaterPhase === "spawning_card";
+
+      return {
+        workers: Array.from(map.values()),
+        badgeQueue: newQueue,
+        ...(brandNew.length > 0 && !alreadyAnimating && newQueue.length > 0
+          ? { latestCard: newQueue[0], theaterPhase: "spawning_card" as SwarmTheaterPhase }
+          : {}),
+      };
     }),
   setLatestCard: (latestCard) => set({ latestCard }),
   setTaskSummary: (taskSummary) => set({ taskSummary }),

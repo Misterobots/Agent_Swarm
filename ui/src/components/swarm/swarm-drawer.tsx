@@ -109,11 +109,11 @@ function WorkerRow({ worker, expanded, onClick }: { worker: SwarmWorker; expande
         expanded && "bg-[var(--chat-soft)]",
       )}
     >
-      {/* State indicator stripe */}
+      {/* State indicator stripe — role color when running */}
       <div className={cn(
         "w-0.5 h-8 rounded-full flex-shrink-0",
         worker.state === "completed" ? "bg-emerald-400" :
-        worker.state === "running" ? "bg-[var(--chat-accent)] animate-pulse" :
+        worker.state === "running" ? cn(theme.stripe, "animate-pulse") :
         worker.state === "failed" ? "bg-red-400" : "bg-[var(--chat-border)]",
       )} />
 
@@ -137,7 +137,7 @@ function WorkerRow({ worker, expanded, onClick }: { worker: SwarmWorker; expande
       {/* State badge + chevron */}
       <div className="flex items-center gap-2 flex-shrink-0">
         {worker.state === "completed" && <span className="text-emerald-400 text-[10px] font-bold">✓</span>}
-        {worker.state === "running" && <span className="text-[var(--chat-accent)] text-[10px] animate-pulse">●</span>}
+        {worker.state === "running" && <span className={cn("text-[10px] animate-pulse", theme.text)}>●</span>}
         {worker.state === "failed" && <span className="text-red-400 text-[10px]">✗</span>}
         {worker.state === "pending" && <span className="text-[var(--chat-muted)] text-[10px]">○</span>}
         <svg

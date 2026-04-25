@@ -15,6 +15,16 @@ const ROLE_THEME: Record<string, { text: string; bg: string; border: string; str
 };
 const DEFAULT_THEME = { text: "text-[var(--chat-muted)]", bg: "bg-[var(--chat-soft)]", border: "border-[var(--chat-border)]", stripe: "bg-[var(--chat-muted)]", accent: "" };
 
+/** What each role does — shown as the active-state label */
+const ROLE_VERB: Record<string, string> = {
+  researcher: "Researching",
+  architect:  "Designing",
+  coder:      "Coding",
+  devops:     "Deploying",
+  analyst:    "Analyzing",
+  verifier:   "Verifying",
+};
+
 interface AgentRosterProps {
   workers: SwarmWorker[];
 }
@@ -44,10 +54,15 @@ export function AgentRoster({ workers }: AgentRosterProps) {
           const shown = visible.has(w.worker_id);
           const role = w.role?.toLowerCase() ?? "";
           const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
-          const stateColor =
+          const isRunning = w.state === "running";
+          const stateDot =
             w.state === "completed" ? "bg-emerald-400" :
-            w.state === "running"   ? "bg-[var(--chat-accent)] animate-pulse" :
-            w.state === "failed"    ? "bg-red-400" : "bg-[var(--chat-muted)]";
+            isRunning ? cn(theme.stripe, "animate-pulse") :
+            w.state === "failed" ? "bg-red-400" : "bg-[var(--chat-muted)]";
+          const stateLabel =
+            isRunning ? (ROLE_VERB[role] ?? "Active") :
+            w.state === "completed" ? "Done" :
+            w.state === "failed" ? "Error" : "Queued";
 
           return (
             <div
@@ -58,41 +73,62 @@ export function AgentRoster({ workers }: AgentRosterProps) {
                 isGhost
                   ? "opacity-0 border-[var(--chat-border)]"
                   : shown
-                  ? "opacity-100 translate-y-0 border-[var(--chat-border)]"
-                  : "opacity-0 translate-y-3 border-[var(--chat-border)]",
-                !isGhost && w.state === "running" && "ring-1 ring-[var(--chat-accent)]/40",
+                  ? "opacity-100 translate-y-0"
+                  : "opacity-0 translate-y-3",
+                !isGhost && theme.border,
               )}
+              style={!isGhost && isRunning && theme.accent
+                ? { boxShadow: `0 0 0 1px ${theme.accent}35, 0 0 12px ${theme.accent}15` }
+                : undefined}
             >
-              {/* Role accent top stripe */}
-              {!isGhost && (
-                <div className={cn("h-0.5 w-full flex-shrink-0", theme.stripe)} />
-              )}
+              {/* Role accent top stripe — always role color */}
+              <div className={cn(
+                "h-[3px] w-full flex-shrink-0",
+                isGhost ? "bg-[var(--chat-border)]" : theme.stripe,
+              )} />
 
-              {/* Portrait */}
+              {/* Portrait — always role color, regardless of state */}
               <div className="flex justify-center pt-2.5 pb-1">
                 <div className={cn(
-                  "w-10 h-10 rounded-full border overflow-hidden flex-shrink-0",
-                  isGhost ? "bg-[var(--chat-soft)] border-[var(--chat-border)]" :
-                  w.state === "completed" ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400" :
-                  w.state === "running"   ? "bg-[var(--chat-accent)]/15 border-[var(--chat-accent)]/40 text-[var(--chat-accent)]" :
-                  w.state === "failed"    ? "bg-red-500/15 border-red-500/40 text-red-400" :
-                  cn(theme.bg, theme.border, theme.text),
+                  "w-10 h-10 rounded-full border-2 overflow-hidden flex-shrink-0",
+                  isGhost
+                    ? "bg-[var(--chat-soft)] border-[var(--chat-border)]"
+                    : cn(theme.bg, theme.border, theme.text),
                 )}>
                   {!isGhost && <PioneerPortrait role={role} />}
                 </div>
               </div>
 
-              {/* Name + role */}
+              {/* Name + role label + task snippet */}
               {!isGhost && (
-                <div className="px-1.5 pb-2 text-center">
-                  <p className="text-[10px] font-bold text-[var(--chat-text)] truncate leading-snug">{w.pioneer_name}</p>
-                  <p className={cn("text-[8px] uppercase tracking-wider mt-0.5 font-semibold", theme.text)}>{w.role}</p>
+                <div className="px-2 pb-1.5 text-center">
+                  <p className="text-[10px] font-bold text-[var(--chat-text)] truncate leading-snug">
+                    {w.pioneer_name}
+                  </p>
+                  <p className={cn("text-[8px] uppercase tracking-[0.14em] mt-0.5 font-black", theme.text)}>
+                    {w.role}
+                  </p>
+                  {w.task && (
+                    <p className="text-[8px] text-[var(--chat-muted)] mt-1.5 leading-tight text-left line-clamp-2">
+                      {w.task}
+                    </p>
+                  )}
                 </div>
               )}
 
-              {/* State dot at bottom */}
+              {/* State indicator — dot + role-specific activity label */}
               {!isGhost && (
-                <div className={cn("h-0.5 w-full flex-shrink-0 opacity-60", stateColor)} />
+                <div className="mt-auto px-2 pb-2 pt-1">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", stateDot)} />
+                    <span className={cn(
+                      "text-[7px] uppercase tracking-[0.16em] truncate font-semibold",
+                      isRunning ? theme.text : "text-[var(--chat-muted)]",
+                    )}>
+                      {stateLabel}
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
           );
