@@ -19,6 +19,8 @@ export interface SwarmState {
   latestCard: SwarmWorker | null;
   /** FIFO queue of workers waiting to show their ID-badge animation */
   badgeQueue: SwarmWorker[];
+  /** Workers whose badge animation has completed — used to progressively fill roster */
+  revealedWorkerIds: string[];
   taskSummary: string;
   selectedWorkerId: string | null;
   /** Soft-collapsed: drawer hidden but state preserved — recall via FAB */
@@ -49,6 +51,7 @@ const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase"
   workers: [],
   latestCard: null,
   badgeQueue: [],
+  revealedWorkerIds: [],
   taskSummary: "",
   selectedWorkerId: null,
   dismissed: false,
@@ -90,11 +93,15 @@ export const useSwarmStore = create<SwarmState>()((set) => ({
     }),
   dequeueBadge: () =>
     set((s) => {
+      const justDone = s.latestCard?.worker_id ?? null;
       const remaining = s.badgeQueue.slice(1);
       return {
         badgeQueue: remaining,
         latestCard: remaining[0] ?? null,
         theaterPhase: (remaining.length > 0 ? "spawning_card" : "roster") as SwarmTheaterPhase,
+        revealedWorkerIds: justDone
+          ? [...s.revealedWorkerIds, justDone]
+          : s.revealedWorkerIds,
       };
     }),
   updateWorkers: (incoming) =>

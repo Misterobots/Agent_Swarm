@@ -170,6 +170,7 @@ export function SwarmPanelContent({
   selectedWorkerId, onCardDone, onSelectWorker, onPhaseChange,
 }: SwarmPanelContentProps) {
   const selectedWorker = selectedWorkerId ? workers.find((w) => w.worker_id === selectedWorkerId) : null;
+  const revealedWorkerIds = useSwarmStore((s) => s.revealedWorkerIds);
 
   // Auto-advance roster → working after 2 s
   useEffect(() => {
@@ -190,9 +191,20 @@ export function SwarmPanelContent({
 
       {/* Main theater area */}
       <div className="flex-1 relative overflow-hidden">
-        {/* ID card drop-in */}
+        {/* ID card drop-in + growing roster below */}
         {theaterPhase === "spawning_card" && latestCard && (
-          <AgentIdCard key={latestCard.worker_id} worker={latestCard} onDone={onCardDone} />
+          <div className="flex flex-col h-full">
+            {/* Badge takes the upper portion */}
+            <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+              <AgentIdCard key={latestCard.worker_id} worker={latestCard} onDone={onCardDone} />
+            </div>
+            {/* Partial roster — revealed workers only, grows as badges complete */}
+            {revealedWorkerIds.length > 0 && (
+              <div className="flex-shrink-0 pb-3">
+                <AgentRoster workers={workers} revealedIds={revealedWorkerIds} />
+              </div>
+            )}
+          </div>
         )}
 
         {/* Roster grid */}

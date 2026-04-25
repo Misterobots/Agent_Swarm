@@ -458,6 +458,16 @@ body {
   90%  { opacity: 1; }
   100% { transform: translateY(100%); opacity: 0; }
 }
+@keyframes id-spawn-flash {
+  0%   { opacity: 0.9; transform: scale(1); }
+  40%  { opacity: 0.6; transform: scale(1.2); }
+  100% { opacity: 0; transform: scale(1.7); }
+}
+@keyframes id-card-enter {
+  0%   { opacity: 0; transform: translateY(-10px) scale(0.82); }
+  60%  { opacity: 1; transform: translateY(2px) scale(1.04); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 /* ═══════════════════════════════════════════════════════════════
    MOBILE UTILITIES

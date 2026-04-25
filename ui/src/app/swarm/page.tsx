@@ -41,6 +41,7 @@ export default function SwarmPopupPage() {
           workers: payload.workers,
           latestCard: payload.latestCard,
           badgeQueue: payload.badgeQueue ?? [],
+          revealedWorkerIds: payload.revealedWorkerIds ?? [],
           taskSummary: payload.taskSummary,
         });
       }

@@ -88,7 +88,7 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
           stage === "hidden" && "opacity-0 -translate-y-16",
           stage === "hang"   && "opacity-100 -translate-y-2 [animation:id-badge-swing_0.55s_ease-out_forwards]",
           stage === "rest"   && "opacity-100 translate-y-0",
-          stage === "exit"   && "opacity-0 -translate-y-8 scale-95 duration-500",
+          stage === "exit"   && "opacity-0 translate-y-14 scale-50 duration-500",
           stage !== "hidden" && stage !== "exit" && "duration-[420ms] ease-[cubic-bezier(.32,1.4,.64,1)]",
         )}
       >
@@ -107,6 +107,16 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
             boxShadow: `0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px ${theme.accent}18, inset 0 1px 0 rgba(255,255,255,0.04)`,
           }}
         >
+          {/* Colorful spawn flash — role-colored radial burst on card entry */}
+          {stage === "hang" && (
+            <div
+              className="absolute inset-0 rounded-xl pointer-events-none z-20 [animation:id-spawn-flash_0.85s_ease-out_forwards]"
+              style={{
+                background: `radial-gradient(ellipse at 50% 40%, ${theme.accent}80 0%, ${theme.accent}30 35%, transparent 65%)`,
+                boxShadow: `inset 0 0 40px 8px ${theme.accent}50`,
+              }}
+            />
+          )}
           {/* Holographic foil stripe — top edge */}
           <div
             className="h-1 w-full"

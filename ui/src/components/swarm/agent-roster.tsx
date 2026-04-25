@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import type { SwarmWorker } from "@/types/chat";
 import { PioneerPortrait } from "./pioneer-portrait";
@@ -15,50 +15,95 @@ const ROLE_THEME: Record<string, { text: string; bg: string; border: string; str
 };
 const DEFAULT_THEME = { text: "text-[var(--chat-muted)]", bg: "bg-[var(--chat-soft)]", border: "border-[var(--chat-border)]", stripe: "bg-[var(--chat-muted)]", accent: "" };
 
-/** What each role does — shown as the active-state label */
 const ROLE_VERB: Record<string, string> = {
-  researcher: "Researching",
-  architect:  "Designing",
-  coder:      "Coding",
-  devops:     "Deploying",
-  analyst:    "Analyzing",
-  verifier:   "Verifying",
+  researcher: "Researching", architect: "Designing", coder: "Coding",
+  devops: "Deploying", analyst: "Analyzing", verifier: "Verifying",
 };
+
+const ROLE_CLEARANCE: Record<string, string> = {
+  researcher: "LEVEL 3", architect: "LEVEL 4", coder: "LEVEL 3",
+  devops: "LEVEL 5", analyst: "LEVEL 3", verifier: "LEVEL 5",
+};
+
+/** Compact barcode from first 6 chars of worker_id */
+function MiniBarcode({ seed }: { seed: string }) {
+  const bars = Array.from({ length: 14 }, (_, i) => {
+    const c = seed.charCodeAt(i % seed.length) ^ (i * 37);
+    return (c % 5 === 0) ? 3 : (c % 3 === 0) ? 1.5 : 0.8;
+  });
+  return (
+    <svg viewBox="0 0 40 10" className="w-10 h-2.5 opacity-25" xmlns="http://www.w3.org/2000/svg">
+      {bars.reduce<{ x: number; els: React.ReactElement[] }>(
+        ({ x, els }, w, i) => ({
+          x: x + w + 0.5,
+          els: [...els, i % 2 === 0
+            ? <rect key={i} x={x} y={0} width={w} height={10} fill="currentColor" />
+            : <rect key={i} x={x} y={0} width={w} height={10} fill="none" />],
+        }),
+        { x: 0, els: [] }
+      ).els}
+    </svg>
+  );
+}
 
 interface AgentRosterProps {
   workers: SwarmWorker[];
+  /** When set, only workers in this list are shown (others appear as ghosts). Used during badge spawning. */
+  revealedIds?: string[];
 }
 
-export function AgentRoster({ workers }: AgentRosterProps) {
-  const [visible, setVisible] = useState<Set<string>>(new Set());
+export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
+  // Track which cards should use the bounce-in animation vs stagger fade-in
+  const prevRevealedRef = useRef<Set<string>>(new Set(revealedIds ?? []));
+  const [justRevealed, setJustRevealed] = useState<Set<string>>(new Set());
 
+  // When a new ID appears in revealedIds, mark it for the card-enter bounce animation
   useEffect(() => {
-    workers.forEach((w, i) => {
-      setTimeout(() => setVisible((s) => new Set([...s, w.worker_id])), i * 120);
-    });
-  }, [workers]);
+    if (!revealedIds) return;
+    const newIds = revealedIds.filter((id) => !prevRevealedRef.current.has(id));
+    if (newIds.length > 0) {
+      setJustRevealed((s) => new Set([...s, ...newIds]));
+      prevRevealedRef.current = new Set(revealedIds);
+      // Clear "just revealed" after animation completes
+      const t = setTimeout(() => setJustRevealed(new Set()), 700);
+      return () => clearTimeout(t);
+    }
+  }, [revealedIds]);
 
-  const slots = workers.length >= 6 ? workers : [
+  // Normal roster: stagger all workers in
+  const [staggerVisible, setStaggerVisible] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (revealedIds) return; // skip stagger when in badge-spawning mode
+    workers.forEach((w, i) => {
+      setTimeout(() => setStaggerVisible((s) => new Set([...s, w.worker_id])), i * 120);
+    });
+  }, [workers, revealedIds]);
+
+  const maxSlots = Math.max(workers.length, 3);
+  const slots = workers.length >= maxSlots ? workers : [
     ...workers,
-    ...Array.from({ length: 6 - workers.length }, (_, i) => ({
+    ...Array.from({ length: maxSlots - workers.length }, (_, i) => ({
       worker_id: `ghost-${i}`, role: "", pioneer_name: "···", pioneer_motto: "",
       task: "", phase: "", state: "pending" as const,
     })),
   ];
 
+  const isSpawning = !!revealedIds;
+
   return (
-    <div className="flex flex-col items-center justify-center gap-4 w-full h-full px-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full max-w-sm">
+    <div className={cn(
+      "flex flex-col items-center justify-center gap-4 w-full px-4",
+      isSpawning ? "" : "h-full",
+    )}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full max-w-sm">
         {slots.map((w) => {
           const isGhost = w.worker_id.startsWith("ghost-");
-          const shown = visible.has(w.worker_id);
+          const isRevealed = isSpawning ? (revealedIds!.includes(w.worker_id)) : staggerVisible.has(w.worker_id);
+          const isNewlyRevealed = justRevealed.has(w.worker_id);
           const role = w.role?.toLowerCase() ?? "";
           const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
           const isRunning = w.state === "running";
-          const stateDot =
-            w.state === "completed" ? "bg-emerald-400" :
-            isRunning ? cn(theme.stripe, "animate-pulse") :
-            w.state === "failed" ? "bg-red-400" : "bg-[var(--chat-muted)]";
+          const badgeNum = w.worker_id.replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase().padStart(6, "0");
           const stateLabel =
             isRunning ? (ROLE_VERB[role] ?? "Active") :
             w.state === "completed" ? "Done" :
@@ -68,65 +113,110 @@ export function AgentRoster({ workers }: AgentRosterProps) {
             <div
               key={w.worker_id}
               className={cn(
-                "flex flex-col rounded-lg overflow-hidden border transition-all duration-300",
+                "flex flex-col rounded-lg overflow-hidden border transition-all",
                 "bg-[var(--chat-panel)]",
                 isGhost
-                  ? "opacity-0 border-[var(--chat-border)]"
-                  : shown
-                  ? "opacity-100 translate-y-0"
-                  : "opacity-0 translate-y-3",
+                  ? "opacity-20 border-[var(--chat-border)]"
+                  : isNewlyRevealed
+                  ? "[animation:id-card-enter_0.55s_cubic-bezier(.32,1.4,.64,1)_forwards]"
+                  : isRevealed
+                  ? "opacity-100 translate-y-0 duration-300"
+                  : "opacity-0 translate-y-3 duration-300",
                 !isGhost && theme.border,
               )}
               style={!isGhost && isRunning && theme.accent
-                ? { boxShadow: `0 0 0 1px ${theme.accent}35, 0 0 12px ${theme.accent}15` }
+                ? { boxShadow: `0 0 0 1px ${theme.accent}35, 0 0 14px ${theme.accent}20` }
                 : undefined}
             >
-              {/* Role accent top stripe — always role color */}
-              <div className={cn(
-                "h-[3px] w-full flex-shrink-0",
-                isGhost ? "bg-[var(--chat-border)]" : theme.stripe,
-              )} />
-
-              {/* Portrait — always role color, regardless of state */}
-              <div className="flex justify-center pt-2.5 pb-1">
-                <div className={cn(
-                  "w-10 h-10 rounded-full border-2 overflow-hidden flex-shrink-0",
-                  isGhost
-                    ? "bg-[var(--chat-soft)] border-[var(--chat-border)]"
-                    : cn(theme.bg, theme.border, theme.text),
-                )}>
-                  {!isGhost && <PioneerPortrait role={role} />}
-                </div>
-              </div>
-
-              {/* Name + role label + task snippet */}
+              {/* Holographic foil stripe */}
               {!isGhost && (
-                <div className="px-2 pb-1.5 text-center">
-                  <p className="text-[10px] font-bold text-[var(--chat-text)] truncate leading-snug">
-                    {w.pioneer_name}
-                  </p>
-                  <p className={cn("text-[8px] uppercase tracking-[0.14em] mt-0.5 font-black", theme.text)}>
-                    {w.role}
-                  </p>
-                  {w.task && (
-                    <p className="text-[8px] text-[var(--chat-muted)] mt-1.5 leading-tight text-left line-clamp-2">
-                      {w.task}
-                    </p>
-                  )}
+                <div
+                  className="h-[3px] w-full flex-shrink-0"
+                  style={{ background: `linear-gradient(90deg, transparent 0%, ${theme.accent} 20%, #fff 50%, ${theme.accent} 80%, transparent 100%)`, opacity: 0.75 }}
+                />
+              )}
+              {isGhost && <div className="h-[3px] w-full bg-[var(--chat-border)] flex-shrink-0" />}
+
+              {/* Org mini-header — role-colored tint */}
+              {!isGhost && (
+                <div
+                  className="px-2 py-1 flex items-center justify-between flex-shrink-0"
+                  style={{ background: `${theme.accent}14`, borderBottom: `1px solid ${theme.accent}20` }}
+                >
+                  <span className="text-[6px] font-black tracking-[0.2em] text-white/40 uppercase">Hive Mind</span>
+                  <span className="text-[5px] font-mono tracking-widest" style={{ color: `${theme.accent}80` }}>PIONEER</span>
                 </div>
               )}
 
-              {/* State indicator — dot + role-specific activity label */}
+              {/* Photo + Info — horizontal ID-card layout */}
+              {!isGhost ? (
+                <div className="flex gap-1.5 px-2 pt-2 pb-1.5">
+                  {/* Photo */}
+                  <div
+                    className={cn(
+                      "w-9 h-11 rounded-sm border overflow-hidden flex-shrink-0",
+                      theme.bg, theme.border, theme.text,
+                    )}
+                    style={{ boxShadow: `0 0 8px ${theme.accent}25` }}
+                  >
+                    <PioneerPortrait role={role} />
+                  </div>
+
+                  {/* Info column */}
+                  <div className="flex flex-col justify-between min-w-0 flex-1 py-0.5">
+                    {/* Name */}
+                    <p className="text-[9px] font-bold text-[var(--chat-text)] truncate leading-tight">
+                      {w.pioneer_name}
+                    </p>
+                    {/* Role badge */}
+                    <div
+                      className="inline-flex items-center rounded-sm px-1 py-0.5 self-start mt-0.5"
+                      style={{ background: `${theme.accent}18`, border: `1px solid ${theme.accent}40` }}
+                    >
+                      <span
+                        className="text-[6.5px] font-bold uppercase tracking-wider"
+                        style={{ color: theme.accent }}
+                      >
+                        {w.role}
+                      </span>
+                    </div>
+                    {/* Clearance */}
+                    <p className="text-[6px] font-mono mt-0.5" style={{ color: `${theme.accent}70` }}>
+                      {ROLE_CLEARANCE[role] ?? "LEVEL 1"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-12 flex items-center justify-center">
+                  <span className="text-[8px] text-[var(--chat-muted)] opacity-30">···</span>
+                </div>
+              )}
+
+              {/* Status footer */}
               {!isGhost && (
-                <div className="mt-auto px-2 pb-2 pt-1">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", stateDot)} />
-                    <span className={cn(
-                      "text-[7px] uppercase tracking-[0.16em] truncate font-semibold",
-                      isRunning ? theme.text : "text-[var(--chat-muted)]",
-                    )}>
+                <div
+                  className="px-2 py-1.5 border-t flex items-center justify-between flex-shrink-0"
+                  style={{ borderColor: `${theme.accent}18`, background: `${theme.accent}06` }}
+                >
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={cn("w-1 h-1 rounded-full flex-shrink-0",
+                        w.state === "completed" ? "bg-emerald-400" :
+                        isRunning ? cn(theme.stripe, "animate-pulse") :
+                        w.state === "failed" ? "bg-red-400" : "bg-[var(--chat-muted)]"
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "text-[6px] uppercase tracking-[0.14em] font-semibold truncate",
+                        isRunning ? theme.text : "text-[var(--chat-muted)]",
+                      )}
+                    >
                       {stateLabel}
                     </span>
+                  </div>
+                  <div className={cn("flex items-center", theme.text)}>
+                    <MiniBarcode seed={badgeNum} />
                   </div>
                 </div>
               )}
@@ -134,7 +224,9 @@ export function AgentRoster({ workers }: AgentRosterProps) {
           );
         })}
       </div>
-      <p className="text-[11px] text-[var(--chat-muted)] animate-pulse">Assembling swarm&hellip;</p>
+      {!isSpawning && (
+        <p className="text-[11px] text-[var(--chat-muted)] animate-pulse">Assembling swarm&hellip;</p>
+      )}
     </div>
   );
 }
