@@ -4,15 +4,20 @@ import { Panel, Group, Separator } from "react-resizable-panels";
 import { ChatView } from "@/components/chat/chat-view";
 import { EditorPane } from "./editor-pane";
 import { TerminalPane } from "./terminal-pane";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 
 export function DevWorkspace() {
   const { isMobile } = useIsMobile();
+  const router = useRouter();
 
-  // On mobile, show only the chat pane (editor+terminal are impractical)
-  if (isMobile) {
-    return <ChatView showDevContext />;
-  }
+  // Redirect to chat on mobile — Dev workspace is desktop-only
+  useEffect(() => {
+    if (isMobile) router.replace("/chat");
+  }, [isMobile, router]);
+
+  if (isMobile) return null;
 
   return (
     <Group orientation="horizontal" className="h-full">

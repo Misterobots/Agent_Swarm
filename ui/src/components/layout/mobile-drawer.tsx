@@ -9,9 +9,10 @@ import {
   isConversationRoute,
   isNavigationItemActive,
   primaryNavigation,
-  secondaryNavigation,
-  utilityNavigation,
 } from "@/lib/config/navigation";
+
+// Items shown in the More drawer (Media + Palace only)
+const MOBILE_MORE_HREFS = new Set(["/media", "/palace"]);
 import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, MessageSquare, X, LogOut, LogIn, User, ChevronDown } from "lucide-react";
@@ -35,13 +36,9 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
   const { isAdmin, authenticated, displayName } = useAccess();
   const showConversations = isConversationRoute(pathname);
 
-  const visiblePrimary = useMemo(
-    () => primaryNavigation.filter((item) => !item.adminOnly || isAdmin),
-    [isAdmin]
-  );
-  const visibleSecondary = useMemo(
-    () => secondaryNavigation.filter((item) => !item.adminOnly || isAdmin),
-    [isAdmin]
+  const visibleExplore = useMemo(
+    () => primaryNavigation.filter((item) => MOBILE_MORE_HREFS.has(item.href)),
+    []
   );
 
   // Close drawer on route change
@@ -108,32 +105,8 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin">
-          <DrawerSection title="Workspaces">
-            {visiblePrimary.map((item) => (
-              <DrawerNavItem
-                key={item.href}
-                item={item}
-                pathname={pathname}
-                onNavigate={onClose}
-              />
-            ))}
-          </DrawerSection>
-
-          {visibleSecondary.length > 0 && (
-            <DrawerSection title="Operations">
-              {visibleSecondary.map((item) => (
-                <DrawerNavItem
-                  key={item.href}
-                  item={item}
-                  pathname={pathname}
-                  onNavigate={onClose}
-                />
-              ))}
-            </DrawerSection>
-          )}
-
-          <DrawerSection title="Preferences">
-            {utilityNavigation.map((item) => (
+          <DrawerSection title="Explore">
+            {visibleExplore.map((item) => (
               <DrawerNavItem
                 key={item.href}
                 item={item}

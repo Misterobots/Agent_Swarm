@@ -17,7 +17,7 @@ interface TabItem {
 const TAB_ITEMS: TabItem[] = [
   { label: "Chat", href: "/chat", icon: MessageSquare, matchPrefixes: ["/chat"] },
   { label: "Art", href: "/art-studio", icon: Palette, matchPrefixes: ["/art-studio", "/media"] },
-  { label: "Tools", href: "/dev", icon: Wrench, matchPrefixes: ["/dev"] },
+  { label: "Tools", href: "/tools", icon: Wrench, matchPrefixes: ["/tools", "/monitoring", "/training", "/operations", "/governance", "/docs"] },
   { label: "Settings", href: "/settings", icon: Settings, matchPrefixes: ["/settings"] },
 ];
 
