@@ -102,9 +102,9 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
         <div
           className="relative w-[min(268px,82vw)] rounded-xl overflow-hidden"
           style={{
-            background: "linear-gradient(160deg, #0f1420 0%, #131926 60%, #0d1018 100%)",
+            background: "linear-gradient(160deg, var(--chat-panel) 0%, var(--chat-surface) 60%, var(--chat-bg) 100%)",
             border: `1px solid ${theme.accent}33`,
-            boxShadow: `0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px ${theme.accent}18, inset 0 1px 0 rgba(255,255,255,0.06)`,
+            boxShadow: `0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px ${theme.accent}18, inset 0 1px 0 rgba(255,255,255,0.04)`,
           }}
         >
           {/* Holographic foil stripe — top edge */}
@@ -155,10 +155,10 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
             <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
               {/* Name */}
               <div>
-                <p className="font-black text-white text-sm leading-tight tracking-tight truncate">
+                <p className="font-black text-[var(--chat-text)] text-sm leading-tight tracking-tight truncate">
                   {worker.pioneer_name ?? role}
                 </p>
-                <p className="text-[10px] text-white/40 font-medium truncate leading-tight">
+                <p className="text-[10px] text-[var(--chat-muted)] font-medium truncate leading-tight">
                   {worker.pioneer_full_name && worker.pioneer_full_name !== worker.pioneer_name
                     ? worker.pioneer_full_name
                     : ""}
@@ -178,17 +178,17 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
               {/* Clearance + phase */}
               <div className="mt-2 space-y-0.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[7px] font-mono text-white/30 uppercase tracking-wider">Clearance</span>
+                  <span className="text-[7px] font-mono text-[var(--chat-muted)] uppercase tracking-wider">Clearance</span>
                   <span className="text-[7px] font-mono font-bold" style={{ color: `${theme.accent}cc` }}>{theme.clearance}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[7px] font-mono text-white/30 uppercase tracking-wider">Phase</span>
-                  <span className="text-[7px] font-mono text-white/50 uppercase">{worker.phase ?? "active"}</span>
+                  <span className="text-[7px] font-mono text-[var(--chat-muted)] uppercase tracking-wider">Phase</span>
+                  <span className="text-[7px] font-mono text-[var(--chat-muted)] uppercase">{worker.phase ?? "active"}</span>
                 </div>
               </div>
 
               {/* Badge number */}
-              <p className="text-[8px] font-mono text-white/20 mt-1 tracking-widest"># {badgeNum}</p>
+              <p className="text-[8px] font-mono text-[var(--chat-muted)] opacity-50 mt-1 tracking-widest"># {badgeNum}</p>
             </div>
           </div>
 
@@ -198,7 +198,7 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
               className="mx-4 mb-3 px-2.5 py-1.5 rounded-sm"
               style={{ background: `${theme.accent}0c`, borderLeft: `2px solid ${theme.accent}50` }}
             >
-              <p className="text-[9px] text-white/35 italic leading-snug">
+              <p className="text-[9px] text-[var(--chat-muted)] italic leading-snug">
                 &ldquo;{worker.pioneer_motto}&rdquo;
               </p>
             </div>
@@ -207,7 +207,7 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
           {/* Machine-readable / barcode zone */}
           <div
             className="px-4 py-2.5 border-t flex items-center justify-between"
-            style={{ borderColor: `${theme.accent}15`, background: "rgba(0,0,0,0.3)" }}
+            style={{ borderColor: `${theme.accent}15`, background: "var(--chat-soft)" }}
           >
             <div className={cn("flex items-center", theme.text)}>
               <Barcode seed={worker.worker_id ?? "000000"} />

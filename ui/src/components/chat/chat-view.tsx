@@ -167,8 +167,9 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   }, []);
 
   return (
-    <div className="chat-shell flex flex-col h-full relative" data-route="chat">
-      {/* Header */}
+    <div className="chat-shell flex h-full overflow-hidden" data-route="chat">
+      <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
+      {/* Header */
       <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-3 md:px-4 py-2 min-w-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <ModelSelector />
@@ -392,7 +393,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           </svg>
         </button>
       )}
-      {/* Swarm theater drawer */}
+      </div>{/* end chat column */}
+      {/* Swarm theater drawer — sibling column, squeezes chat */}
       <SwarmDrawer />
     </div>
   );
