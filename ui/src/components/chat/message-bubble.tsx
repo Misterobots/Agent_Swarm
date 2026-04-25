@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type { ChatMessage } from "@/types/chat";
 import { MarkdownRenderer } from "@/components/shared/markdown-renderer";
 import { cn } from "@/lib/utils/cn";
@@ -21,6 +21,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
   userPrompt?: string;
   isStreaming?: boolean;
+  isLatest?: boolean;
   onEditMessage?: (content: string) => void;
   onRetryMessage?: () => void;
   onBranchMessage?: () => void;
@@ -28,14 +29,29 @@ interface MessageBubbleProps {
   onDeny?: (callId: string) => void;
 }
 
+const COLLAPSE_THRESHOLD = 600;
+
 function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
 }
 
-export function MessageBubble({ message, userPrompt, isStreaming, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny }: MessageBubbleProps) {
+export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
   const [traceOpen, setTraceOpen] = useState(false);
+
+  // Collapsible body
+  const canCollapse = !isUser && message.content.length > COLLAPSE_THRESHOLD;
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const prevIsLatestRef = useRef(isLatest);
+  useEffect(() => {
+    // Auto-collapse when this message transitions from latest → previous
+    if (prevIsLatestRef.current && !isLatest && canCollapse) {
+      setIsCollapsed(true);
+    }
+    prevIsLatestRef.current = isLatest;
+  }, [isLatest, canCollapse]);
+
   const artStudioHref = userPrompt
     ? `/art-studio?prompt=${encodeURIComponent(userPrompt)}`
     : "/art-studio";
@@ -111,10 +127,28 @@ export function MessageBubble({ message, userPrompt, isStreaming, onEditMessage,
           </div>
         )}
         {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <p className="whitespace-pre-wrap text-[13px] leading-[1.65]">{message.content}</p>
         ) : message.content ? (
           <>
-            <MarkdownRenderer content={message.content} isStreaming={isStreaming} />
+            {/* Collapsible response body */}
+            <div className="relative">
+              <div className={cn(isCollapsed && "max-h-[108px] overflow-hidden")}>
+                <MarkdownRenderer content={message.content} isStreaming={isStreaming} />
+              </div>
+              {isCollapsed && (
+                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[var(--chat-surface)] to-transparent pointer-events-none" />
+              )}
+            </div>
+            {canCollapse && !isStreaming && (
+              <button
+                type="button"
+                onClick={() => setIsCollapsed((v) => !v)}
+                className="mt-1 mb-0.5 flex items-center gap-1 text-[11px] text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
+              >
+                <ChevronDown size={11} className={cn("transition-transform duration-200", !isCollapsed && "rotate-180")} />
+                {isCollapsed ? "Show full response" : "Collapse"}
+              </button>
+            )}
             {showArtButton && (
               <Link
                 href={artStudioHref}

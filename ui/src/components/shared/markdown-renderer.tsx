@@ -3,6 +3,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./code-block";
+import { useStreamingText } from "@/lib/hooks/use-streaming-text";
 import type { Components } from "react-markdown";
 
 interface MarkdownRendererProps {
@@ -89,12 +90,14 @@ const components: Components = {
 };
 
 export function MarkdownRenderer({ content, isStreaming }: MarkdownRendererProps) {
+  const { text: displayContent, isTyping } = useStreamingText(content, isStreaming ?? false);
+
   return (
     <div className="prose prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-pre:p-0 prose-pre:bg-transparent prose-pre:my-2">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {content}
+        {displayContent}
       </ReactMarkdown>
-      {isStreaming && (
+      {isTyping && (
         <span className="streaming-cursor inline-block ml-0.5 w-[2px] h-[13px] bg-[var(--chat-accent)] align-middle" aria-hidden="true" />
       )}
     </div>
