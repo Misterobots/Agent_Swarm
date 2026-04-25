@@ -40,6 +40,14 @@ self.addEventListener("fetch", (event) => {
   // API calls: network-only (never cache stale chat data)
   if (url.pathname.startsWith("/api/")) return;
 
+  // Skip Authentik-proxied paths — these redirect to auth.shivelymedia.com
+  // (a private-network host), causing CORS / Private Network Access errors
+  // if the service worker intercepts them. Let the browser handle them directly.
+  if (
+    url.pathname === "/manifest.json" ||
+    url.pathname.startsWith("/outpost.goauthentik.io/")
+  ) return;
+
   // Static assets (_next/static): cache-first
   if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(

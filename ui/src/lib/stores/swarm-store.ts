@@ -10,7 +10,7 @@ export type SwarmTheaterPhase =
   | "synthesizing"
   | "complete";
 
-interface SwarmState {
+export interface SwarmState {
   active: boolean;
   theaterPhase: SwarmTheaterPhase;
   phaseNum: number;
