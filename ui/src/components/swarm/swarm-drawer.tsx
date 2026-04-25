@@ -405,7 +405,7 @@ function SwarmMobilePanel() {
           "bg-[var(--chat-bg)] rounded-t-3xl",
           "shadow-[0_-24px_80px_rgba(0,0,0,0.7)]",
           "transition-transform duration-500 ease-[cubic-bezier(.32,1.4,.64,1)]",
-          visible ? "translate-y-0" : "translate-y-full",
+          visible ? "translate-y-0" : "translate-y-full pointer-events-none",
         )}
       >
         {/* Drag handle */}

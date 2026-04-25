@@ -36,7 +36,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [theme]);
 
   return (
-    <div data-theme={theme} className="flex h-dvh overflow-x-hidden bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
+    <div data-theme={theme} className="flex h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
       {/* Desktop/Tablet Sidebar */}
       {!isMobile && (
         <div
@@ -52,7 +52,7 @@ export function AppShell({ children }: AppShellProps) {
       )}
 
       {/* Main content */}
-      <div className={cn("flex-1 flex flex-col min-w-0", isMobile && "pb-14")}>
+      <div className={cn("flex-1 flex flex-col min-w-0 overflow-x-hidden", isMobile && "pb-14")}>
         {/* Toggle button — desktop/tablet only */}
         {!isMobile && (
           <button
