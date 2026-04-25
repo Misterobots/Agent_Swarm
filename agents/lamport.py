@@ -1,4 +1,4 @@
-﻿"""
+"""
 Coordinator Mode — Multi-Worker Orchestration System
 
 Phase 1 Integration: Hybrid Python mechanics + LLM synthesis
@@ -63,47 +63,59 @@ SCRATCHPAD_ROOT = Path(__file__).parent / "scratchpad"
 
 # ---------------------------------------------------------------------------
 # Pioneer persona pool — display names for ephemeral Lamport workers
+# Each role has a ranked pool; workers pick the first name not already in use.
 # ---------------------------------------------------------------------------
-WORKER_PIONEERS: dict[str, dict] = {
-    "researcher": {
-        "name": "Shannon",
-        "full_name": "Claude Shannon",
-        "motto": "Information is the resolution of uncertainty.",
-    },
-    "architect": {
-        "name": "Babbage",
-        "full_name": "Charles Babbage",
-        "motto": "Errors using inadequate data are far less than those using no data at all.",
-    },
-    "coder": {
-        "name": "Knuth",
-        "full_name": "Donald Knuth",
-        "motto": "Programs are meant to be read by humans.",
-    },
-    "devops": {
-        "name": "Cerf",
-        "full_name": "Vint Cerf",
-        "motto": "The internet is a reflection of our society.",
-    },
-    "analyst": {
-        "name": "Codd",
-        "full_name": "Edgar Codd",
-        "motto": "Data is a precious thing and will last longer than the systems themselves.",
-    },
-    "verifier": {
-        "name": "Hoare",
-        "full_name": "Tony Hoare",
-        "motto": "There are two ways to write error-free programs; only the third works.",
-    },
+WORKER_PIONEERS: dict[str, list[dict]] = {
+    "researcher": [
+        {"name": "Shannon",  "full_name": "Claude Shannon",   "motto": "Information is the resolution of uncertainty."},
+        {"name": "Curie",    "full_name": "Marie Curie",       "motto": "Nothing in life is to be feared, only to be understood."},
+        {"name": "Feynman",  "full_name": "Richard Feynman",   "motto": "I would rather have questions that can't be answered than answers that can't be questioned."},
+    ],
+    "architect": [
+        {"name": "Babbage",  "full_name": "Charles Babbage",   "motto": "Errors using inadequate data are far less than those using no data at all."},
+        {"name": "Dijkstra", "full_name": "Edsger Dijkstra",   "motto": "Simplicity is a prerequisite for reliability."},
+        {"name": "Brooks",   "full_name": "Fred Brooks",        "motto": "The bearing of a child takes nine months, no matter how many women are assigned."},
+    ],
+    "coder": [
+        {"name": "Knuth",    "full_name": "Donald Knuth",      "motto": "Programs are meant to be read by humans."},
+        {"name": "Lovelace", "full_name": "Ada Lovelace",       "motto": "The Analytical Engine weaves algebraic patterns just as the Jacquard loom weaves flowers."},
+        {"name": "Ritchie",  "full_name": "Dennis Ritchie",     "motto": "UNIX is basically a simple operating system, but you have to be a genius to understand the simplicity."},
+    ],
+    "devops": [
+        {"name": "Cerf",     "full_name": "Vint Cerf",          "motto": "The internet is a reflection of our society."},
+        {"name": "Torvalds", "full_name": "Linus Torvalds",      "motto": "Talk is cheap. Show me the code."},
+        {"name": "Thompson", "full_name": "Ken Thompson",        "motto": "One of my most productive days was throwing away 1000 lines of code."},
+    ],
+    "analyst": [
+        {"name": "Codd",     "full_name": "Edgar Codd",         "motto": "Data is a precious thing and will last longer than the systems themselves."},
+        {"name": "Hopper",   "full_name": "Grace Hopper",        "motto": "The most dangerous phrase in the language is: we've always done it this way."},
+        {"name": "Boole",    "full_name": "George Boole",        "motto": "No matter how correct a mathematical theorem may appear, it may be disproved by a single contradiction."},
+    ],
+    "verifier": [
+        {"name": "Hoare",    "full_name": "Tony Hoare",          "motto": "There are two ways to write error-free programs; only the third works."},
+        {"name": "Turing",   "full_name": "Alan Turing",         "motto": "We can only see a short distance ahead, but we can see plenty there that needs to be done."},
+        {"name": "McCarthy", "full_name": "John McCarthy",       "motto": "He who refuses to do arithmetic is doomed to talk nonsense."},
+    ],
 }
 
 def _pioneer_for_role(role: str) -> dict:
-    """Return the pioneer persona dict for a given worker role."""
-    return WORKER_PIONEERS.get(role.lower(), {
-        "name": role.title(),
-        "full_name": role.title(),
-        "motto": "",
-    })
+    """Return the primary pioneer persona dict for a given worker role (no dedup)."""
+    pool = WORKER_PIONEERS.get(role.lower())
+    if pool:
+        return pool[0]
+    return {"name": role.title(), "full_name": role.title(), "motto": ""}
+
+
+def _pick_unique_pioneer(role: str, used_names: set[str]) -> dict:
+    """Pick the first pioneer from the pool whose name is not in used_names."""
+    pool = WORKER_PIONEERS.get(role.lower(), [])
+    for candidate in pool:
+        if candidate["name"] not in used_names:
+            return candidate
+    # All names in pool are taken — append a numeric suffix to the first entry
+    base = pool[0] if pool else {"name": role.title(), "full_name": role.title(), "motto": ""}
+    suffix = len([n for n in used_names if n.startswith(base["name"])]) + 1
+    return {**base, "name": f"{base['name']}-{suffix}", "full_name": f"{base['full_name']} ({suffix})"}
 
 
 class WorkerState(Enum):
@@ -117,11 +129,12 @@ class WorkerState(Enum):
 class WorkerInfo:
     """Tracks a single worker's lifecycle."""
 
-    def __init__(self, worker_id: str, role: str, task: str, phase: str):
+    def __init__(self, worker_id: str, role: str, task: str, phase: str, pioneer: dict | None = None):
         self.worker_id = worker_id
         self.role = role
         self.task = task
         self.phase = phase
+        self.pioneer: dict = pioneer or _pioneer_for_role(role)
         self.state = WorkerState.PENDING
         self.result: Optional[str] = None
         self.error: Optional[str] = None
@@ -148,7 +161,9 @@ class CoordinatorSession:
 
     def register_worker(self, role: str, task: str, phase: str) -> str:
         worker_id = f"w-{uuid.uuid4().hex[:6]}"
-        self.workers[worker_id] = WorkerInfo(worker_id, role, task, phase)
+        used_names = {w.pioneer["name"] for w in self.workers.values()}
+        pioneer = _pick_unique_pioneer(role, used_names)
+        self.workers[worker_id] = WorkerInfo(worker_id, role, task, phase, pioneer=pioneer)
         return worker_id
 
     def write_to_scratchpad(self, filename: str, content: str):
@@ -566,7 +581,7 @@ def coordinate_task(
                         child_token=child_token,
                     )
                     futures[future] = (worker_id, role, task_text)
-                    pioneer = _pioneer_for_role(role)
+                    pioneer = session.workers[worker_id].pioneer
                     yield {
                         "type": "swarm_worker_created",
                         "worker_id": worker_id,
@@ -592,7 +607,7 @@ def coordinate_task(
                     "workers": [
                         {
                             "worker_id": w.worker_id,
-                            "pioneer_name": _pioneer_for_role(w.role)["name"],
+                            "pioneer_name": w.pioneer["name"],
                             "role": w.role,
                             "task": w.task,
                             "state": w.state.value,
@@ -621,7 +636,7 @@ def coordinate_task(
                                 f"completed in {elapsed:.1f}s"
                             ),
                         }
-                        pioneer = _pioneer_for_role(role)
+                        pioneer = worker.pioneer
                         yield {
                             "type": "message",
                             "content": f"✅ **{pioneer['name']}** ({role}) completed\n\n",
@@ -632,9 +647,9 @@ def coordinate_task(
                             "workers": [
                                 {
                                     "worker_id": w.worker_id,
-                                    "pioneer_name": _pioneer_for_role(w.role)["name"],
-                                    "pioneer_full_name": _pioneer_for_role(w.role)["full_name"],
-                                    "pioneer_motto": _pioneer_for_role(w.role)["motto"],
+                                    "pioneer_name": w.pioneer["name"],
+                                    "pioneer_full_name": w.pioneer["full_name"],
+                                    "pioneer_motto": w.pioneer["motto"],
                                     "role": w.role,
                                     "task": w.task,
                                     "state": w.state.value,
@@ -669,9 +684,9 @@ def coordinate_task(
                             "workers": [
                                 {
                                     "worker_id": w.worker_id,
-                                    "pioneer_name": _pioneer_for_role(w.role)["name"],
-                                    "pioneer_full_name": _pioneer_for_role(w.role)["full_name"],
-                                    "pioneer_motto": _pioneer_for_role(w.role)["motto"],
+                                    "pioneer_name": w.pioneer["name"],
+                                    "pioneer_full_name": w.pioneer["full_name"],
+                                    "pioneer_motto": w.pioneer["motto"],
                                     "role": w.role,
                                     "task": w.task,
                                     "state": w.state.value,
@@ -717,7 +732,7 @@ def coordinate_task(
 
             worker_id = session.register_worker(role, task_text, "implementation")
             agent = _get_agent_for_role(role, session_id=session_id)
-            _impl_pioneer = _pioneer_for_role(role)
+            _impl_pioneer = session.workers[worker_id].pioneer
             yield {
                 "type": "swarm_worker_created",
                 "worker_id": worker_id,
@@ -759,7 +774,7 @@ def coordinate_task(
                 - (worker.started_at or time.time())
             )
 
-            _done_pioneer = _pioneer_for_role(role)
+            _done_pioneer = worker.pioneer
             if worker.state == WorkerState.COMPLETED:
                 yield {
                     "type": "message",
@@ -778,7 +793,7 @@ def coordinate_task(
                 "workers": [
                     {
                         "worker_id": w.worker_id,
-                        "pioneer_name": _pioneer_for_role(w.role)["name"],
+                        "pioneer_name": w.pioneer["name"],
                         "role": w.role,
                         "task": w.task,
                         "state": w.state.value,
@@ -808,7 +823,7 @@ def coordinate_task(
         verify_worker_id = session.register_worker(
             "verifier", "Final verification", "verification"
         )
-        _verify_pioneer = _pioneer_for_role("verifier")
+        _verify_pioneer = session.workers[verify_worker_id].pioneer
         yield {
             "type": "swarm_worker_created",
             "worker_id": verify_worker_id,
