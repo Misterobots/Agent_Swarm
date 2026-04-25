@@ -18,85 +18,85 @@ const ROLE_THEME: Record<string, { text: string; bg: string; border: string; str
   analyst:    { text: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/30",    stripe: "bg-cyan-400" },
   verifier:   { text: "text-rose-400",    bg: "bg-rose-500/10",    border: "border-rose-500/30",    stripe: "bg-rose-400" },
 };
-const DEFAULT_THEME = { text: "text-white/60", bg: "bg-white/5", border: "border-white/20", stripe: "bg-white/40" };
+const DEFAULT_THEME = { text: "text-[var(--chat-muted)]", bg: "bg-[var(--chat-soft)]", border: "border-[var(--chat-border)]", stripe: "bg-[var(--chat-muted)]" };
 
-function WorkerDetailPanel({ worker, onClose }: { worker: SwarmWorker; onClose: () => void }) {
+/** Full detail view — rendered as a normal scrollable column (no absolute overlay) */
+function WorkerDetailContent({ worker, onClose }: { worker: SwarmWorker; onClose: () => void }) {
   const role = worker.role?.toLowerCase() ?? "";
   const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col bg-[var(--chat-bg)] animate-in slide-in-from-right duration-300">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--chat-border)] flex-shrink-0">
+    <div className="flex flex-col h-full">
+      {/* Mini close header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--chat-border)] flex-shrink-0">
+        <span className={cn("text-[10px] font-bold uppercase tracking-[0.18em]", theme.text)}>{worker.role}</span>
         <button
           onClick={onClose}
-          className="flex items-center gap-1.5 text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors text-[11px]"
+          className="p-0.5 rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
+          aria-label="Close detail"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
           </svg>
-          Back
         </button>
-        <div className="flex items-center gap-2 ml-auto">
-          <span className={cn("w-1.5 h-1.5 rounded-full",
-            worker.state === "completed" ? "bg-emerald-400" :
-            worker.state === "running" ? "bg-[var(--chat-accent)] animate-pulse" :
-            worker.state === "failed" ? "bg-red-400" : "bg-[var(--chat-muted)]"
-          )} />
-          <span className="text-[10px] text-[var(--chat-muted)] uppercase tracking-widest">{worker.state}</span>
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {/* Pioneer hero */}
-        <div className={cn("px-6 py-6 flex items-center gap-4 border-b border-[var(--chat-border)]", theme.bg)}>
+        <div className={cn("px-3 py-4 flex flex-col items-center gap-2 border-b border-[var(--chat-border)]", theme.bg)}>
           <div className={cn(
-            "w-16 h-16 rounded-full border-2 overflow-hidden flex-shrink-0",
+            "w-14 h-14 rounded-full border-2 overflow-hidden flex-shrink-0",
             theme.border, theme.text,
           )}>
             <PioneerPortrait role={role} />
           </div>
-          <div className="min-w-0">
-            <p className="font-black text-[var(--chat-text)] text-base leading-tight">
+          <div className="text-center min-w-0 w-full">
+            <p className="font-black text-[var(--chat-text)] text-[13px] leading-tight truncate px-1">
               {worker.pioneer_full_name ?? worker.pioneer_name}
             </p>
-            <p className={cn("text-[11px] mt-0.5 uppercase tracking-[0.16em] font-bold", theme.text)}>
-              {worker.role}
-            </p>
+            <div className="flex items-center gap-1.5 justify-center mt-1.5">
+              <span className={cn(
+                "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                worker.state === "completed" ? "bg-emerald-400" :
+                worker.state === "running" ? "bg-[var(--chat-accent)] animate-pulse" :
+                worker.state === "failed" ? "bg-red-400" : "bg-[var(--chat-muted)]"
+              )} />
+              <span className="text-[9px] text-[var(--chat-muted)] uppercase tracking-widest">{worker.state}</span>
+            </div>
             {worker.pioneer_motto && (
-              <p className="text-[var(--chat-muted)] text-[10px] mt-1.5 italic leading-snug">
+              <p className="text-[var(--chat-muted)] text-[9px] mt-1.5 italic leading-snug px-1">
                 &ldquo;{worker.pioneer_motto}&rdquo;
               </p>
             )}
           </div>
         </div>
 
-        {/* Task assigned */}
-        <div className="px-5 py-4 border-b border-[var(--chat-border)]">
-          <p className="text-[10px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mb-2">Task Assigned</p>
-          <p className="text-[13px] text-[var(--chat-text)] leading-relaxed">{worker.task}</p>
+        {/* Task */}
+        <div className="px-3 py-3 border-b border-[var(--chat-border)]">
+          <p className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mb-1.5">Task</p>
+          <p className="text-[11px] text-[var(--chat-text)] leading-relaxed">{worker.task}</p>
         </div>
 
         {/* Output / findings */}
         {worker.output ? (
-          <div className="px-5 py-4">
-            <p className="text-[10px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mb-2">Findings</p>
-            <p className="text-[12px] text-[var(--chat-muted)] leading-relaxed whitespace-pre-wrap">{worker.output}</p>
+          <div className="px-3 py-3">
+            <p className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mb-1.5">Findings</p>
+            <p className="text-[11px] text-[var(--chat-muted)] leading-relaxed whitespace-pre-wrap break-words">{worker.output}</p>
           </div>
         ) : worker.state === "running" ? (
-          <div className="px-5 py-4 flex items-center gap-2 text-[12px] text-[var(--chat-muted)]">
-            <div className="w-3.5 h-3.5 rounded-full border-2 border-[var(--chat-border)] border-t-[var(--chat-accent)] animate-spin flex-shrink-0" />
+          <div className="px-3 py-3 flex items-center gap-2 text-[11px] text-[var(--chat-muted)]">
+            <div className="w-3 h-3 rounded-full border-2 border-[var(--chat-border)] border-t-[var(--chat-accent)] animate-spin flex-shrink-0" />
             Researching&hellip;
           </div>
         ) : worker.state === "pending" ? (
-          <div className="px-5 py-4 text-[12px] text-[var(--chat-muted)]">Queued — waiting for previous workers</div>
+          <div className="px-3 py-3 text-[11px] text-[var(--chat-muted)]">Queued &mdash; waiting</div>
         ) : null}
       </div>
     </div>
   );
 }
 
-function WorkerRow({ worker, selected, onClick }: { worker: SwarmWorker; selected: boolean; onClick: () => void }) {
+function WorkerRow({ worker, expanded, onClick }: { worker: SwarmWorker; expanded: boolean; onClick: () => void }) {
   const role = worker.role?.toLowerCase() ?? "";
   const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
 
@@ -105,8 +105,8 @@ function WorkerRow({ worker, selected, onClick }: { worker: SwarmWorker; selecte
       onClick={onClick}
       className={cn(
         "w-full flex items-center gap-3 px-4 py-3 text-left transition-all",
-        "border-b border-[var(--chat-border)] hover:bg-[var(--chat-soft)]",
-        selected && "bg-[var(--chat-soft)]",
+        "hover:bg-[var(--chat-soft)]",
+        expanded && "bg-[var(--chat-soft)]",
       )}
     >
       {/* State indicator stripe */}
@@ -140,7 +140,10 @@ function WorkerRow({ worker, selected, onClick }: { worker: SwarmWorker; selecte
         {worker.state === "running" && <span className="text-[var(--chat-accent)] text-[10px] animate-pulse">●</span>}
         {worker.state === "failed" && <span className="text-red-400 text-[10px]">✗</span>}
         {worker.state === "pending" && <span className="text-[var(--chat-muted)] text-[10px]">○</span>}
-        <svg className="w-3 h-3 text-[var(--chat-muted)]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <svg
+          className={cn("w-3 h-3 text-[var(--chat-muted)] transition-transform duration-300", expanded && "rotate-90")}
+          fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
         </svg>
       </div>
@@ -197,7 +200,8 @@ export function SwarmPanelContent({
 
         {/* Working / synthesizing / complete */}
         {(theaterPhase === "working" || theaterPhase === "synthesizing" || theaterPhase === "complete") && (
-          <div className="relative h-full flex flex-col">
+          <div className="h-full flex flex-col overflow-hidden">
+            {/* AgentDock + complete banner: full width, above the split */}
             {theaterPhase !== "complete" && (
               <AgentDock workers={workers} onSelect={onSelectWorker} />
             )}
@@ -211,19 +215,40 @@ export function SwarmPanelContent({
                 </span>
               </div>
             )}
-            <div className="flex-1 overflow-y-auto">
-              {workers.map((w) => (
-                <WorkerRow
-                  key={w.worker_id}
-                  worker={w}
-                  selected={selectedWorkerId === w.worker_id}
-                  onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
-                />
-              ))}
+
+            {/* Horizontal split: list left, detail right */}
+            <div className="flex-1 flex flex-row overflow-hidden">
+              {/* Worker list — flex-1 shrinks naturally as detail opens */}
+              <div className="flex-1 min-w-0 overflow-y-auto">
+                {workers.map((w) => (
+                  <div key={w.worker_id} className="border-b border-[var(--chat-border)]">
+                    <WorkerRow
+                      worker={w}
+                      expanded={selectedWorkerId === w.worker_id}
+                      onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Detail panel — outer div animates width; inner keeps content from reflowing */}
+              <div
+                style={{ transition: "width 400ms cubic-bezier(.32,1.4,.64,1)" }}
+                className={cn(
+                  "flex-shrink-0 h-full overflow-hidden border-l border-[var(--chat-border)]",
+                  selectedWorkerId ? "w-[55%]" : "w-0",
+                )}
+              >
+                <div className="w-[55vw] max-w-[300px] min-w-[220px] h-full">
+                  {selectedWorker && (
+                    <WorkerDetailContent
+                      worker={selectedWorker}
+                      onClose={() => onSelectWorker(null)}
+                    />
+                  )}
+                </div>
+              </div>
             </div>
-            {selectedWorker && (
-              <WorkerDetailPanel worker={selectedWorker} onClose={() => onSelectWorker(null)} />
-            )}
           </div>
         )}
 
@@ -244,13 +269,12 @@ export function SwarmPanelContent({
 function SwarmMobilePanel() {
   const {
     active, theaterPhase, phaseName, workers, latestCard, selectedWorkerId,
-    dismissed, setDismissed, setLatestCard, setTheaterPhase, setSelectedWorker,
+    dismissed, setDismissed, dequeueBadge, setTheaterPhase, setSelectedWorker,
   } = useSwarmStore();
 
   const handleCardDone = useCallback(() => {
-    setLatestCard(null);
-    setTheaterPhase("roster");
-  }, [setLatestCard, setTheaterPhase]);
+    dequeueBadge();
+  }, [dequeueBadge]);
 
   const visible = active && theaterPhase !== "idle" && !dismissed;
 

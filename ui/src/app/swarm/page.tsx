@@ -40,6 +40,7 @@ export default function SwarmPopupPage() {
           phaseName: payload.phaseName,
           workers: payload.workers,
           latestCard: payload.latestCard,
+          badgeQueue: payload.badgeQueue ?? [],
           taskSummary: payload.taskSummary,
         });
       }
@@ -49,7 +50,7 @@ export default function SwarmPopupPage() {
   }, []);
 
   const handleCardDone = useCallback(() => {
-    useSwarmStore.setState({ latestCard: null, theaterPhase: "roster" });
+    useSwarmStore.getState().dequeueBadge();
   }, []);
 
   const handleSelectWorker = useCallback((id: string | null) => {
