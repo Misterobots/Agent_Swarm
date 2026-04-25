@@ -830,6 +830,24 @@ def coordinate_task(
             "99_verification.md", f"# Verification\n\n{verify_result}"
         )
 
+        # Emit task list update so the UI reflects the verifier's final state
+        verify_worker = session.workers[verify_worker_id]
+        yield {
+            "type": "swarm_task_list",
+            "workers": [
+                {
+                    "worker_id": verify_worker.worker_id,
+                    "pioneer_name": _verify_pioneer["name"],
+                    "pioneer_full_name": _verify_pioneer["full_name"],
+                    "pioneer_motto": _verify_pioneer["motto"],
+                    "role": verify_worker.role,
+                    "task": verify_worker.task,
+                    "state": verify_worker.state.value,
+                }
+            ],
+            "content": "Verification complete",
+        }
+
         yield {"type": "message", "content": f"**🔍 Verification**\n\n{verify_result}\n\n"}
 
         # Store verification in team memory
