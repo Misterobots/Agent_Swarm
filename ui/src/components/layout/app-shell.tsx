@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Sidebar } from "./sidebar";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { MobileDrawer } from "./mobile-drawer";
@@ -34,6 +34,11 @@ export function AppShell({ children }: AppShellProps) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  // Stable callbacks — must not recreate on every render or MobileDrawer's
+  // useEffect([pathname, onClose]) will fire and immediately close the drawer.
+  const handleOpenDrawer = useCallback(() => setDrawerOpen(true), []);
+  const handleCloseDrawer = useCallback(() => setDrawerOpen(false), []);
 
   return (
     <div data-theme={theme} className="flex h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
@@ -69,12 +74,12 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Mobile Bottom Tab Bar */}
       {isMobile && (
-        <BottomTabBar onMenuPress={() => setDrawerOpen(true)} />
+        <BottomTabBar onMenuPress={handleOpenDrawer} />
       )}
 
       {/* Mobile Drawer */}
       {isMobile && (
-        <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+        <MobileDrawer open={drawerOpen} onClose={handleCloseDrawer} />
       )}
     </div>
   );
