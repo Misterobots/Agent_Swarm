@@ -80,7 +80,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
       <div
         className={cn(
           "fixed top-0 left-0 bottom-0 z-50 w-72 bg-[var(--chat-bg)] border-r border-[var(--chat-border)] flex flex-col transition-transform duration-200 ease-out",
-          open ? "translate-x-0" : "-translate-x-full"
+          open ? "translate-x-0" : "-translate-x-full pointer-events-none"
         )}
       >
         {/* Header */}

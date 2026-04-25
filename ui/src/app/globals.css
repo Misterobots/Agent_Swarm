@@ -474,7 +474,7 @@ body {
    ═══════════════════════════════════════════════════════════════ */
 
 /* Prevent horizontal overflow on mobile */
-html, body {
+html {
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
 }
