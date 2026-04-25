@@ -20,6 +20,7 @@ function serializeSwarmState(state: SwarmState) {
     latestCard: state.latestCard,
     badgeQueue: state.badgeQueue,
     revealedWorkerIds: state.revealedWorkerIds,
+    phaseNameMap: state.phaseNameMap,
     taskSummary: state.taskSummary,
     selectedWorkerId: state.selectedWorkerId,
     dismissed: state.dismissed,

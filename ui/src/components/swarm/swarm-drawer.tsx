@@ -171,6 +171,26 @@ export function SwarmPanelContent({
 }: SwarmPanelContentProps) {
   const selectedWorker = selectedWorkerId ? workers.find((w) => w.worker_id === selectedWorkerId) : null;
   const revealedWorkerIds = useSwarmStore((s) => s.revealedWorkerIds);
+  const badgeQueue = useSwarmStore((s) => s.badgeQueue);
+  const phaseNameMap = useSwarmStore((s) => s.phaseNameMap);
+
+  // Workers NOT in the current badge-spawn batch — shown during spawning/decomposing as history
+  const currentBatchIds = new Set([
+    ...(latestCard ? [latestCard.worker_id] : []),
+    ...badgeQueue.map((w) => w.worker_id),
+    ...revealedWorkerIds,
+  ]);
+  const previousPhaseWorkers = workers.filter((w) => !currentBatchIds.has(w.worker_id));
+
+  // Group all workers by their phase field for the timeline working list
+  const phaseGroups = workers.reduce<Record<string, SwarmWorker[]>>((acc, w) => {
+    const key = w.phase ?? "1";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(w);
+    return acc;
+  }, {});
+  const sortedPhaseKeys = Object.keys(phaseGroups).sort((a, b) => Number(a) - Number(b));
+  const showPhaseDividers = sortedPhaseKeys.length > 1;
 
   // Auto-advance roster → working after 2 s
   useEffect(() => {
@@ -195,13 +215,35 @@ export function SwarmPanelContent({
         {theaterPhase === "spawning_card" && latestCard && (
           <div className="flex flex-col h-full">
             {/* Badge takes the upper portion */}
-            <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+            <div className={cn(
+              "flex items-center justify-center min-h-0 overflow-hidden",
+              previousPhaseWorkers.length > 0 ? "flex-[3]" : "flex-1",
+            )}>
               <AgentIdCard key={latestCard.worker_id} worker={latestCard} onDone={onCardDone} />
             </div>
             {/* Partial roster — revealed workers only, grows as badges complete */}
             {revealedWorkerIds.length > 0 && (
-              <div className="flex-shrink-0 pb-3">
+              <div className="flex-shrink-0 pb-2 border-t border-[var(--chat-border)]">
                 <AgentRoster workers={workers} revealedIds={revealedWorkerIds} />
+              </div>
+            )}
+            {/* Previous phase workers — scrollable history panel */}
+            {previousPhaseWorkers.length > 0 && (
+              <div className="flex-shrink-0 overflow-y-auto border-t border-[var(--chat-border)] max-h-[35%]">
+                <div className="flex items-center gap-2 px-4 py-1.5 sticky top-0 bg-[var(--chat-surface)] border-b border-[var(--chat-border)]">
+                  <div className="h-px flex-1 bg-[var(--chat-border)]" />
+                  <span className="text-[7px] font-black tracking-[0.25em] text-[var(--chat-muted)] uppercase flex-shrink-0">Prior phase activity</span>
+                  <div className="h-px flex-1 bg-[var(--chat-border)]" />
+                </div>
+                {previousPhaseWorkers.map((w) => (
+                  <div key={w.worker_id} className="border-b border-[var(--chat-border)]">
+                    <WorkerRow
+                      worker={w}
+                      expanded={selectedWorkerId === w.worker_id}
+                      onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
+                    />
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -230,17 +272,48 @@ export function SwarmPanelContent({
 
             {/* Horizontal split: list left, detail right */}
             <div className="flex-1 flex flex-row overflow-hidden">
-              {/* Worker list — flex-1 shrinks naturally as detail opens */}
+              {/* Worker list — grouped by phase with timeline dividers */}
               <div className="flex-1 min-w-0 overflow-y-auto">
-                {workers.map((w) => (
-                  <div key={w.worker_id} className="border-b border-[var(--chat-border)]">
-                    <WorkerRow
-                      worker={w}
-                      expanded={selectedWorkerId === w.worker_id}
-                      onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
-                    />
-                  </div>
-                ))}
+                {showPhaseDividers ? (
+                  sortedPhaseKeys.map((phaseKey) => {
+                    const group = phaseGroups[phaseKey];
+                    const label = phaseNameMap[phaseKey] || `Phase ${phaseKey}`;
+                    const doneCount = group.filter((w) => w.state === "completed").length;
+                    return (
+                      <div key={phaseKey}>
+                        {/* Phase timeline divider */}
+                        <div className="flex items-center gap-2 px-4 py-1.5 border-b border-[var(--chat-border)] bg-[var(--chat-soft)]/40 sticky top-0 z-10">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--chat-muted)] flex-shrink-0" />
+                          <span className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase truncate">
+                            {label}
+                          </span>
+                          <span className="text-[8px] text-[var(--chat-muted)] flex-shrink-0 ml-auto">
+                            {doneCount}/{group.length} done
+                          </span>
+                        </div>
+                        {group.map((w) => (
+                          <div key={w.worker_id} className="border-b border-[var(--chat-border)]">
+                            <WorkerRow
+                              worker={w}
+                              expanded={selectedWorkerId === w.worker_id}
+                              onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })
+                ) : (
+                  workers.map((w) => (
+                    <div key={w.worker_id} className="border-b border-[var(--chat-border)]">
+                      <WorkerRow
+                        worker={w}
+                        expanded={selectedWorkerId === w.worker_id}
+                        onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
+                      />
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Detail panel — outer div animates width; inner keeps content from reflowing */}
@@ -264,11 +337,34 @@ export function SwarmPanelContent({
           </div>
         )}
 
-        {/* Decomposing spinner */}
+        {/* Decomposing spinner + optional previous-phase history */}
         {theaterPhase === "decomposing" && (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-[var(--chat-accent)] animate-spin" />
-            <p className="text-xs text-white/40">Decomposing task&hellip;</p>
+          <div className="flex flex-col h-full">
+            <div className={cn(
+              "flex flex-col items-center justify-center gap-3",
+              previousPhaseWorkers.length > 0 ? "py-6 flex-shrink-0" : "h-full",
+            )}>
+              <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-[var(--chat-accent)] animate-spin" />
+              <p className="text-xs text-white/40">Decomposing task&hellip;</p>
+            </div>
+            {previousPhaseWorkers.length > 0 && (
+              <div className="flex-1 overflow-y-auto border-t border-[var(--chat-border)]">
+                <div className="flex items-center gap-2 px-4 py-1.5 sticky top-0 bg-[var(--chat-surface)] border-b border-[var(--chat-border)]">
+                  <div className="h-px flex-1 bg-[var(--chat-border)]" />
+                  <span className="text-[7px] font-black tracking-[0.25em] text-[var(--chat-muted)] uppercase flex-shrink-0">Prior phase activity</span>
+                  <div className="h-px flex-1 bg-[var(--chat-border)]" />
+                </div>
+                {previousPhaseWorkers.map((w) => (
+                  <div key={w.worker_id} className="border-b border-[var(--chat-border)]">
+                    <WorkerRow
+                      worker={w}
+                      expanded={selectedWorkerId === w.worker_id}
+                      onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

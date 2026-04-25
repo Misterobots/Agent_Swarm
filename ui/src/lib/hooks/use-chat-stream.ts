@@ -331,9 +331,8 @@ export function useChatStream(options?: {
           } else if (event.type === "swarm_task_list") {
             const store = useSwarmStore.getState();
             if (event.workers) store.updateWorkers(event.workers);
-            // Only advance to working if we're not mid-card-animation; let the
-            // card's onDone callback handle the roster → working transition.
-            if (store.theaterPhase !== "spawning_card") {
+            // Re-read phase AFTER updateWorkers — it may have started spawning_card
+            if (useSwarmStore.getState().theaterPhase !== "spawning_card") {
               store.setTheaterPhase("working");
             }
           } else if (event.type === "continuation") {

@@ -67,11 +67,10 @@ export function AgentDock({ workers, onSelect }: AgentDockProps) {
                 : cn("bg-[var(--chat-soft)]/40 border-[var(--chat-border)]", onSelect && "hover:bg-[var(--chat-soft)]"),
             )}
           >
-            {/* Portrait — role color always, dimmed if not running */}
+            {/* Portrait — always full role color; pending state shown by card bg */}
             <div className={cn(
               "relative w-12 h-12 rounded-full flex items-center justify-center border-2 overflow-hidden",
               theme.bg, theme.border, theme.text,
-              !isRunning && "opacity-50",
             )}>
               <PioneerPortrait role={role} />
               {isRunning && (

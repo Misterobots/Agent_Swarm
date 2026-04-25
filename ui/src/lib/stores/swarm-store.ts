@@ -21,6 +21,8 @@ export interface SwarmState {
   badgeQueue: SwarmWorker[];
   /** Workers whose badge animation has completed — used to progressively fill roster */
   revealedWorkerIds: string[];
+  /** Maps phase number (as string) → phase name for display in timeline dividers */
+  phaseNameMap: Record<string, string>;
   taskSummary: string;
   selectedWorkerId: string | null;
   /** Soft-collapsed: drawer hidden but state preserved — recall via FAB */
@@ -52,6 +54,7 @@ const INITIAL: Omit<SwarmState, keyof Omit<SwarmState, "active" | "theaterPhase"
   latestCard: null,
   badgeQueue: [],
   revealedWorkerIds: [],
+  phaseNameMap: {},
   taskSummary: "",
   selectedWorkerId: null,
   dismissed: false,
@@ -73,21 +76,31 @@ export const useSwarmStore = create<SwarmState>()((set) => ({
     set((s) => ({
       phaseNum,
       phaseName,
+      // Record phase name for timeline dividers
+      phaseNameMap: phaseName ? { ...s.phaseNameMap, [String(phaseNum)]: phaseName } : s.phaseNameMap,
       ...(s.theaterPhase !== "spawning_card" ? { theaterPhase } : {}),
     }));
   },
   addWorker: (worker) =>
     set((s) => {
-      const newQueue = [...s.badgeQueue, worker];
+      // Dedup: if updateWorkers already added this worker to both workers list
+      // AND the badge queue, skip entirely to avoid double-animation.
+      const alreadyInWorkers = s.workers.some((w) => w.worker_id === worker.worker_id);
+      const alreadyQueued =
+        s.latestCard?.worker_id === worker.worker_id ||
+        s.badgeQueue.some((w) => w.worker_id === worker.worker_id);
+      if (alreadyInWorkers && alreadyQueued) return s;
+
+      const newWorkers = alreadyInWorkers ? s.workers : [...s.workers, worker];
+      const newQueue = alreadyQueued ? s.badgeQueue : [...s.badgeQueue, worker];
       const alreadyAnimating = s.theaterPhase === "spawning_card";
       return {
-        workers: [...s.workers, worker],
+        workers: newWorkers,
         badgeQueue: newQueue,
-        // Only start showing the first card if not already animating;
-        // subsequent cards are driven by dequeueBadge as each animation finishes
         ...(alreadyAnimating ? {} : {
-          latestCard: worker,
+          latestCard: newQueue[0] ?? worker,
           theaterPhase: "spawning_card" as SwarmTheaterPhase,
+          revealedWorkerIds: [], // Reset for fresh badge cycle
         }),
       };
     }),
@@ -127,7 +140,11 @@ export const useSwarmStore = create<SwarmState>()((set) => ({
         workers: Array.from(map.values()),
         badgeQueue: newQueue,
         ...(brandNew.length > 0 && !alreadyAnimating && newQueue.length > 0
-          ? { latestCard: newQueue[0], theaterPhase: "spawning_card" as SwarmTheaterPhase }
+          ? {
+              latestCard: newQueue[0],
+              theaterPhase: "spawning_card" as SwarmTheaterPhase,
+              revealedWorkerIds: [], // Reset for fresh badge cycle
+            }
           : {}),
       };
     }),
