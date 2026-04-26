@@ -68,8 +68,8 @@ SCRATCHPAD_ROOT = Path(__file__).parent / "scratchpad"
 WORKER_PIONEERS: dict[str, list[dict]] = {
     "researcher": [
         {"name": "Shannon",  "full_name": "Claude Shannon",   "motto": "Information is the resolution of uncertainty."},
-        {"name": "Curie",    "full_name": "Marie Curie",       "motto": "Nothing in life is to be feared, only to be understood."},
-        {"name": "Feynman",  "full_name": "Richard Feynman",   "motto": "I would rather have questions that can't be answered than answers that can't be questioned."},
+        {"name": "Minsky",   "full_name": "Marvin Minsky",    "motto": "Minds are what brains do."},
+        {"name": "Feynman",  "full_name": "Richard Feynman",  "motto": "I would rather have questions that can't be answered than answers that can't be questioned."},
     ],
     "architect": [
         {"name": "Babbage",  "full_name": "Charles Babbage",   "motto": "Errors using inadequate data are far less than those using no data at all."},

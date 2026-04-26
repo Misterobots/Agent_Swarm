@@ -25,6 +25,36 @@ const ROLE_CLEARANCE: Record<string, string> = {
   devops: "LEVEL 5", analyst: "LEVEL 3", verifier: "LEVEL 5",
 };
 
+// ─── Pioneer biography data ───────────────────────────────────────────────────
+// Keyed by the short pioneer_name emitted by the backend.
+// bio = CS background + why they matter to Memex's multi-agent architecture.
+const PIONEER_BIOS: Record<string, { cs_role: string; bio: string }> = {
+  // Researcher pool
+  "Shannon":  { cs_role: "Father of Information Theory", bio: "Claude Shannon published 'A Mathematical Theory of Communication' in 1948, defining entropy, channel capacity, and data encoding. Every AI model's probability distributions—including the sampling strategies Memex uses—are quantified in exactly the terms Shannon formalised." },
+  "Minsky":   { cs_role: "AI Pioneer & Cognitive Scientist", bio: "Marvin Minsky co-founded MIT's Artificial Intelligence Laboratory and wrote 'Society of Mind'—the theory that intelligence emerges from many interacting, specialised sub-agents. Memex's multi-agent swarm is a direct software realisation of that vision." },
+  "Feynman":  { cs_role: "Physicist & Computation Theorist", bio: "Richard Feynman pioneered the theory of quantum computing and delivered landmark lectures on computation. His habit of decomposing intractable problems into parallel concurrent sub-problems mirrors exactly how Memex's researcher agents attack complex tasks." },
+  // Architect pool
+  "Babbage":  { cs_role: "Inventor of the Programmable Computer", bio: "Charles Babbage designed the Analytical Engine in the 1830s—the first mechanical general-purpose programmable computer. As computing's original systems architect, his vision of a machine that could execute any algorithm makes him the patron saint of Memex's architect agents." },
+  "Dijkstra": { cs_role: "Structured Programming Pioneer", bio: "Edsger Dijkstra invented the shortest-path algorithm, defined structured programming, and wrote seminal proofs of program correctness. Memex's architect agents apply his principle of clean layered decomposition whenever they plan multi-phase task execution." },
+  "Brooks":   { cs_role: "Software Engineering Founding Father", bio: "Fred Brooks managed the IBM System/360 project and authored 'The Mythical Man-Month,' establishing software engineering as a discipline. His insight that system complexity must be architecturally managed shaped how Memex serialises dependent implementation tasks." },
+  // Coder pool
+  "Knuth":    { cs_role: "Author of The Art of Computer Programming", bio: "Donald Knuth wrote the multi-volume 'Art of Computer Programming'—the definitive reference for algorithms—and created the TeX typesetting system. Memex's coder agents stand on Knuth's shoulders whenever they analyse algorithmic complexity or generate precise code." },
+  "Lovelace": { cs_role: "World's First Programmer", bio: "Ada Lovelace wrote the first algorithm intended for a computing machine in 1843, foreseeing that Babbage's Analytical Engine could do far more than arithmetic. Memex's coder agents carry her legacy every time they translate a high-level goal into executable instructions." },
+  "Ritchie":  { cs_role: "Creator of C and Co-Creator of UNIX", bio: "Dennis Ritchie created the C programming language and co-developed UNIX with Ken Thompson, establishing the foundation for virtually all modern operating systems. The containers running Memex's agent runtime on Turing trace their lineage directly to Ritchie's designs." },
+  // DevOps pool
+  "Cerf":     { cs_role: "Co-Father of the Internet (TCP/IP)", bio: "Vint Cerf co-designed TCP/IP in the 1970s, giving the internet its fundamental protocols. Memex's devops agents operate on the networked infrastructure Cerf made possible; every streaming API response travels through his protocol." },
+  "Torvalds": { cs_role: "Creator of Linux", bio: "Linus Torvalds created the Linux kernel in 1991, which now powers the servers running Memex's Docker containers on Turing. His open-source philosophy also shapes Memex's transparent, community-driven development model." },
+  "Thompson": { cs_role: "Co-Creator of UNIX and Go", bio: "Ken Thompson co-created UNIX and the B language, later co-designing Go at Google. His maxim—throw away 1,000 lines of code for a more elegant solution—guides how Memex's devops agents favour minimal, reliable infrastructure over complexity." },
+  // Analyst pool
+  "Codd":     { cs_role: "Inventor of the Relational Database", bio: "Edgar Codd invented the relational database model and normalisation theory in 1970, establishing how structured data should be stored and queried. Memex's analyst agents apply Codd's relational thinking every time they extract and cross-reference information from multiple sources." },
+  "Hopper":   { cs_role: "Creator of the First Compiler", bio: "Grace Hopper created the A-0 compiler—the first program to translate human-readable code into machine instructions—and co-developed COBOL. Her conviction that computers should understand human language directly prefigures how Memex's analyst agents turn natural-language queries into data operations." },
+  "Boole":    { cs_role: "Inventor of Boolean Algebra", bio: "George Boole invented Boolean algebra in 1854—the TRUE/FALSE logic underlying every digital circuit and conditional statement. Every branching decision made by a Memex agent is expressed in the calculus Boole formalised." },
+  // Verifier pool
+  "Hoare":    { cs_role: "Inventor of Hoare Logic & Quicksort", bio: "Tony Hoare invented Hoare Logic—the formal method for proving program correctness—and created the quicksort algorithm. Memex's verifier agents apply his axiomatic reasoning to assert that agent outputs meet stated requirements before synthesis." },
+  "Turing":   { cs_role: "Father of Computer Science & AI", bio: "Alan Turing formalised computation itself with the Turing Machine, cracked Enigma during WWII, and posed 'Can machines think?' in 1950. That question is the philosophical north star every Memex agent pursues." },
+  "McCarthy": { cs_role: "Coined 'Artificial Intelligence' & Created LISP", bio: "John McCarthy coined the term 'Artificial Intelligence' at the 1956 Dartmouth Conference and invented LISP—the first AI programming language. Memex's verifier agents carry his conviction that machine intelligence can and should be formally specified, tested, and verified." },
+};
+
 /** Compact barcode from first 6 chars of worker_id */
 function MiniBarcode({ seed }: { seed: string }) {
   const bars = Array.from({ length: 14 }, (_, i) => {
@@ -56,6 +86,7 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
   // Track which cards should use the bounce-in animation vs stagger fade-in
   const prevRevealedRef = useRef<Set<string>>(new Set(revealedIds ?? []));
   const [justRevealed, setJustRevealed] = useState<Set<string>>(new Set());
+  const [selectedPioneer, setSelectedPioneer] = useState<string | null>(null);
 
   // When a new ID appears in revealedIds, mark it for the card-enter bounce animation
   useEffect(() => {
@@ -164,10 +195,15 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
 
                   {/* Info column */}
                   <div className="flex flex-col justify-between min-w-0 flex-1 py-0.5">
-                    {/* Name */}
-                    <p className="text-[9px] font-bold text-[var(--chat-text)] truncate leading-tight">
+                    {/* Name — click to show pioneer bio */}
+                    <button
+                      className="text-[9px] font-bold text-[var(--chat-text)] truncate leading-tight text-left hover:underline focus:outline-none"
+                      style={{ color: theme.accent }}
+                      onClick={() => setSelectedPioneer(w.pioneer_name)}
+                      title="About this pioneer"
+                    >
                       {w.pioneer_name}
-                    </p>
+                    </button>
                     {/* Role badge */}
                     <div
                       className="inline-flex items-center rounded-sm px-1 py-0.5 self-start mt-0.5"
@@ -227,6 +263,82 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
       {!isSpawning && (
         <p className="text-[11px] text-[var(--chat-muted)] animate-pulse">Assembling swarm&hellip;</p>
       )}
+
+      {/* Pioneer bio modal */}
+      {selectedPioneer && (() => {
+        const worker = workers.find(w => w.pioneer_name === selectedPioneer);
+        const role = worker?.role?.toLowerCase() ?? "";
+        const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
+        const bio = PIONEER_BIOS[selectedPioneer];
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedPioneer(null)}
+          >
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+            <div
+              className="relative z-10 w-full max-w-xs rounded-xl overflow-hidden"
+              style={{
+                background: "linear-gradient(160deg, var(--chat-panel) 0%, var(--chat-surface,#1a1c2a) 100%)",
+                border: `1px solid ${theme.accent}45`,
+                boxShadow: `0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px ${theme.accent}20`,
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Foil stripe */}
+              <div
+                className="h-1 w-full flex-shrink-0"
+                style={{ background: `linear-gradient(90deg, transparent 0%, ${theme.accent} 20%, #fff 50%, ${theme.accent} 80%, transparent 100%)`, opacity: 0.85 }}
+              />
+
+              {/* Header */}
+              <div
+                className="px-4 pt-3 pb-3 flex items-start justify-between gap-2"
+                style={{ borderBottom: `1px solid ${theme.accent}20` }}
+              >
+                <div className="min-w-0">
+                  <p className="text-[var(--chat-text)] font-black text-sm leading-tight">
+                    {worker?.pioneer_full_name ?? selectedPioneer}
+                  </p>
+                  {bio && (
+                    <p className="text-[9px] font-mono mt-0.5" style={{ color: theme.accent }}>
+                      {bio.cs_role}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSelectedPioneer(null)}
+                  className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
+                  style={{ background: `${theme.accent}18` }}
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Bio */}
+              <div className="px-4 py-3">
+                <p className="text-[11px] text-[var(--chat-muted)] leading-relaxed">
+                  {bio?.bio ?? "A pioneering figure in the history of computer science."}
+                </p>
+              </div>
+
+              {/* Motto */}
+              {worker?.pioneer_motto && (
+                <div
+                  className="mx-4 mb-4 px-2.5 py-1.5 rounded-sm"
+                  style={{ background: `${theme.accent}0c`, borderLeft: `2px solid ${theme.accent}50` }}
+                >
+                  <p className="text-[9px] text-[var(--chat-muted)] italic leading-snug">
+                    &ldquo;{worker.pioneer_motto}&rdquo;
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
