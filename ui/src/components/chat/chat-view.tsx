@@ -392,15 +392,15 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         isStreaming={isStreaming}
         latestThought={latestThought}
       />
-      {/* Mobile recall FAB — visible when swarm is dismissed and active */}
-      {isMobile && swarmActive && swarmDismissed && theaterPhase !== "idle" && theaterPhase !== "complete" && (
+      {/* Recall FAB — visible on all screen sizes when swarm is dismissed and active */}
+      {swarmActive && swarmDismissed && theaterPhase !== "idle" && (
         <button
           type="button"
           onClick={() => setSwarmDismissed(false)}
           className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+8px)] right-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-[var(--chat-surface)] border border-white/10 shadow-lg text-sm font-semibold text-white/70 hover:text-white/90 active:scale-95 transition-all"
           aria-label="Recall swarm panel"
         >
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${theaterPhase === "complete" ? "bg-emerald-400" : "bg-emerald-400 animate-pulse"}`} />
           Swarm &middot; {swarmWorkers.length} pioneer{swarmWorkers.length !== 1 ? "s" : ""}
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/>
