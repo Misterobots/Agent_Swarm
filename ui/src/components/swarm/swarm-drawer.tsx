@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
@@ -25,6 +25,7 @@ const DEFAULT_THEME = { text: "text-[var(--chat-muted)]", bg: "bg-[var(--chat-so
 function WorkerDetailContent({ worker, onClose }: { worker: SwarmWorker; onClose: () => void }) {
   const role = worker.role?.toLowerCase() ?? "";
   const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
+  const [bioOpen, setBioOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-full">
@@ -72,37 +73,60 @@ function WorkerDetailContent({ worker, onClose }: { worker: SwarmWorker; onClose
           </div>
         </div>
 
-        {/* Pioneer bio + history + Wikipedia */}
+        {/* Pioneer bio + history + Wikipedia — collapsible */}
         {(() => {
           const bio = PIONEER_BIOS[worker.pioneer_name ?? ""];
           if (!bio) return null;
           return (
-            <>
-              <div className="px-3 py-3 border-b border-[var(--chat-border)]">
-                <p className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mb-1.5">About</p>
-                <p className="text-[11px] text-[var(--chat-muted)] leading-relaxed">{bio.bio}</p>
-              </div>
-              <div className="px-3 py-3 border-b border-[var(--chat-border)]">
-                <p className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mb-1.5">Historical Context</p>
-                <p className="text-[10px] text-[var(--chat-muted)] leading-relaxed opacity-80">{bio.historical_context}</p>
-              </div>
-              <div className="px-3 py-2 border-b border-[var(--chat-border)]">
-                <a
-                  href={bio.wikipedia_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    "inline-flex items-center gap-1.5 text-[9px] font-semibold px-2 py-1 rounded-sm transition-opacity hover:opacity-70",
-                    theme.text, theme.bg, theme.border, "border",
-                  )}
+            <div className="border-b border-[var(--chat-border)]">
+              {/* Accordion toggle */}
+              <button
+                onClick={() => setBioOpen(o => !o)}
+                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[var(--chat-soft)] transition-colors"
+              >
+                <span className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase">
+                  Pioneer Profile
+                </span>
+                <svg
+                  className={cn("w-3 h-3 text-[var(--chat-muted)] transition-transform duration-200", bioOpen && "rotate-180")}
+                  fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
                 >
-                  <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z" />
-                  </svg>
-                  Learn more on Wikipedia
-                </a>
-              </div>
-            </>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Collapsible body */}
+              {bioOpen && (
+                <>
+                  <div className="px-3 pb-3 border-t border-[var(--chat-border)]">
+                    <p className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mt-2.5 mb-1.5">About</p>
+                    <p className="text-[11px] text-[var(--chat-muted)] leading-relaxed">{bio.bio}</p>
+                  </div>
+                  <div className="px-3 pb-3 border-t border-[var(--chat-border)]">
+                    <p className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mt-2.5 mb-1.5">Historical Context</p>
+                    <p className="text-[10px] text-[var(--chat-muted)] leading-relaxed opacity-80">{bio.historical_context}</p>
+                  </div>
+                  <div className="px-3 pb-3 border-t border-[var(--chat-border)]">
+                    <div className="mt-2.5">
+                      <a
+                        href={bio.wikipedia_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(
+                          "inline-flex items-center gap-1.5 text-[9px] font-semibold px-2 py-1 rounded-sm transition-opacity hover:opacity-70",
+                          theme.text, theme.bg, theme.border, "border",
+                        )}
+                      >
+                        <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z" />
+                        </svg>
+                        Learn more on Wikipedia
+                      </a>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           );
         })()}
 
