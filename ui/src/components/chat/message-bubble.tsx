@@ -8,6 +8,7 @@ import { Bot, User, Palette, ChevronDown, ShieldCheck, ShieldAlert, ShieldX } fr
 import Link from "next/link";
 import { ToolCallBlock } from "./tool-call-block";
 import { ToolApprovalCard } from "./tool-approval-card";
+import { ClarificationCard } from "./clarification-card";
 import { MessageActions } from "./message-actions";
 
 // ---------------------------------------------------------------------------
@@ -162,6 +163,7 @@ interface MessageBubbleProps {
   onBranchMessage?: () => void;
   onApprove?: (callId: string, toolName: string, scope: "once" | "session" | "workspace") => void;
   onDeny?: (callId: string) => void;
+  onSelectClarification?: (value: string) => void;
 }
 
 const COLLAPSE_THRESHOLD = 600;
@@ -170,7 +172,7 @@ function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
 }
 
-export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny }: MessageBubbleProps) {
+export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny, onSelectClarification }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -357,6 +359,13 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
                   />
                 ))}
               </div>
+            )}
+            {message.pendingClarification && onSelectClarification && (
+              <ClarificationCard
+                card={message.pendingClarification}
+                onSelect={onSelectClarification}
+                disabled={isStreaming}
+              />
             )}
           </>
         ) : (

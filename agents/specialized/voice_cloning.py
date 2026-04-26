@@ -16,6 +16,17 @@ MODEL_NAME = "qwen2.5-coder:14b" # Logic model for the agent itself
 BMO_ENGINE_URL = os.getenv("BMO_ENGINE_URL", "http://bmo_voice_gpu:8000/speak")
 DEFAULT_REF_AUDIO = "/app/agents/bmo_voice/voice_samples/Intro02_Hello_ItsMeBEEMO.wav"
 
+# Multiple reference samples give the cloner a richer picture of BMO's voice.
+# Using varied natural conversation clips rather than a single intro line.
+DEFAULT_REF_AUDIO_MULTI = [
+    "/app/agents/bmo_voice/voice_samples/Conversation_Parade_Interested01.wav",
+    "/app/agents/bmo_voice/voice_samples/Conversation_Parade_Interested02.wav",
+    "/app/agents/bmo_voice/voice_samples/Conversation_Parade_Interested03.wav",
+    "/app/agents/bmo_voice/voice_samples/Conversation_Parade_Interested04.wav",
+    "/app/agents/bmo_voice/voice_samples/Conversation_Parade_Interested05.wav",
+    "/app/agents/bmo_voice/voice_samples/Intro02_Hello_ItsMeBEEMO.wav",
+]
+
 # Fish Audio (band-aid until local RVC is trained)
 # Set FISH_AUDIO_API_KEY env var to enable. When set, overrides local RVC for BMO voice.
 FISH_AUDIO_API_KEY = os.getenv("FISH_AUDIO_API_KEY", "")
@@ -79,10 +90,15 @@ def clone_voice(
         elif os.path.isfile(reference_audio_path):
              audio_files.append(reference_audio_path)
     
-    # Fallback to default reference if none provided
-    if not audio_files and os.path.exists(DEFAULT_REF_AUDIO):
-        logger.info(f"--- [Voice Cloning] No reference audio provided. Using Default: {DEFAULT_REF_AUDIO} ---")
-        audio_files.append(DEFAULT_REF_AUDIO)
+    # Fallback to multi-reference samples if none provided — better cloning quality than single file
+    if not audio_files:
+        multi = [p for p in DEFAULT_REF_AUDIO_MULTI if os.path.exists(p)]
+        if multi:
+            logger.info(f"--- [Voice Cloning] Using {len(multi)} multi-reference samples ---")
+            audio_files.extend(multi)
+        elif os.path.exists(DEFAULT_REF_AUDIO):
+            logger.info(f"--- [Voice Cloning] Falling back to single default reference ---")
+            audio_files.append(DEFAULT_REF_AUDIO)
     
     logger.info(f"--- [Voice Cloning] Request: '{text}' (Refs: {len(audio_files)}) Effect: {effect} ---")
     

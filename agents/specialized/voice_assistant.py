@@ -1,5 +1,7 @@
 import logging
 import os
+import re
+import threading
 from datetime import datetime
 from collections import deque
 from pydantic import BaseModel
@@ -18,9 +20,15 @@ logger = logging.getLogger("VoiceAssistant")
 logger.setLevel(logging.INFO)
 
 # --- Config ---
-BMO_MODEL = os.getenv("BMO_LLM_MODEL", "llama3.2:3b")
+BMO_MODEL = os.getenv("BMO_LLM_MODEL", "qwen3:8b")
 BMO_OLLAMA_HOST = os.getenv("BMO_OLLAMA_HOST", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
 MAX_MEMORY = 10  # Keep last 10 exchanges
+MEMPALACE_API_URL = os.getenv("MEMPALACE_API_URL", "http://mempalace:8200")
+
+
+def _strip_think_tags(text: str) -> str:
+    """Remove <think>...</think> blocks emitted by qwen3 before TTS."""
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
 # --- HA Tool Wrapper for phi Agent ---
@@ -107,8 +115,42 @@ class VoiceAssistantAgent:
             markdown=False,
         )
 
-    def _build_context(self, user_text: str) -> str:
-        """Build context-enriched prompt with time."""
+    def _recall_memories(self, user_text: str) -> str:
+        """Query MemPalace for facts relevant to this turn. Non-fatal, 3s timeout."""
+        try:
+            import httpx
+            with httpx.Client(timeout=3.0) as client:
+                resp = client.post(
+                    f"{MEMPALACE_API_URL}/v1/memories/search",
+                    json={"query": user_text, "agent_id": "bmo", "limit": 4},
+                )
+            if resp.status_code == 200:
+                results = resp.json()
+                if results:
+                    return "\n".join(f"- {m['content']}" for m in results[:4])
+        except Exception as e:
+            logger.debug(f"MemPalace recall failed (non-fatal): {e}")
+        return ""
+
+    def _store_memory_async(self, user_text: str, response_text: str):
+        """Fire-and-forget: send exchange to MemPalace /v1/extract (LLM-based, runs in background)."""
+        def _run():
+            try:
+                import httpx
+                with httpx.Client(timeout=60.0) as client:
+                    client.post(
+                        f"{MEMPALACE_API_URL}/v1/extract",
+                        json={
+                            "conversation": f"User: {user_text}\nBMO: {response_text}",
+                            "agent_id": "bmo",
+                        },
+                    )
+            except Exception as e:
+                logger.debug(f"MemPalace store failed (non-fatal): {e}")
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _build_context(self, user_text: str, memories: str = "") -> str:
+        """Build context-enriched prompt with time and persistent memories."""
         now = datetime.now()
         hour = now.hour
         if 5 <= hour < 12:
@@ -121,9 +163,11 @@ class VoiceAssistantAgent:
             greeting_hint = "It's nighttime."
         
         time_str = now.strftime("%A, %B %d at %I:%M %p")
-        context = f"[System Context: Current time: {time_str}. {greeting_hint}]\n"
-        context += f"User: {user_text}"
-        return context
+        parts = [f"[System Context: Current time: {time_str}. {greeting_hint}]"]
+        if memories:
+            parts.append(f"\n[What BMO knows about you]\n{memories}")
+        parts.append(f"\n{user_text}")
+        return "\n".join(parts)
 
     def _build_sandbox_metadata(
         self,
@@ -172,13 +216,15 @@ class VoiceAssistantAgent:
             return Message(role="assistant", content=user_text, metadata=sandbox)
 
         # 2. LLM with Tool Calling (handles HA + general conversation)
-        context = self._build_context(user_text)
+        memories = self._recall_memories(user_text)
+        context = self._build_context(user_text, memories)
         response = self.llm_agent.run(context)
-        response_text = response.content
+        response_text = _strip_think_tags(response.content)
 
-        # Update memory
+        # Update in-session memory and kick off persistent MemPalace store
         self.conversation_history.append({"role": "user", "content": user_text})
         self.conversation_history.append({"role": "assistant", "content": response_text})
+        self._store_memory_async(user_text, response_text)
 
         # 3. Scan LLM response for embedded sample phrases
         response_sample = find_sample_in_response(response_text)

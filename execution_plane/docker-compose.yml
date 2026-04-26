@@ -126,7 +126,7 @@ services:
     stdin_open: true
     tty: true
     volumes:
-      - dev_sandbox_workspace:/workspace
+      - ../:/workspace  # Live repo bind mount — Dev terminal operates on real files
     networks:
       - execution_net
 
@@ -150,6 +150,9 @@ services:
       - OLLAMA_HOST=http://ollama:11434
       # Turing Ollama — 3070 Ti (8GB VRAM) handles BMO voice only (llama3.2:3b = 2GB)
       - BMO_OLLAMA_HOST=http://192.168.2.103:11434
+      # Fish Audio cloud TTS for BMO voice (overrides local RVC)
+      - FISH_AUDIO_API_KEY=9c84d88f61174cdba215e69e65daff4d
+      - FISH_AUDIO_MODEL_ID=323847d4c5394c678e5909c2206725f6
       - OPENHANDS_URL=http://openhands:3000
       - OPENHANDS_API_KEY=sk-sandbox-local
       - COMFYUI_HOST=http://comfyui_gpu:8188
@@ -170,7 +173,7 @@ services:
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
       # BMO Voice LLM — small 3B model that fits alongside comfyui
       # Heavy models may OOM when ComfyUI is loaded
-      - BMO_LLM_MODEL=llama3.2:3b
+      - BMO_LLM_MODEL=qwen3:8b
       # BMO Weather location (Open-Meteo, no API key needed)
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}
@@ -477,6 +480,50 @@ services:
       - "traefik.http.middlewares.strip-ops.stripprefix.prefixes=/ops"
       - "traefik.http.services.ops-portal.loadbalancer.server.port=8502"
 
+  # HIVE UI - Memex Interface (Lovelace-local, direct 2×5060Ti + live repo access)
+  hive-ui:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+      args:
+        # Bake Lovelace agent_runtime address so browser WS terminal connects directly
+        NEXT_PUBLIC_GATEWAY_URL: "http://192.168.2.101:8008"
+    image: home-ai-lab/hive-ui:latest
+    container_name: hive_ui_local
+    restart: unless-stopped
+    depends_on:
+      - agent-runtime
+    env_file:
+      - ../network.env
+    environment:
+      - API_BASE_URL=http://agent_runtime:8000
+      - MEMPALACE_BASE_URL=http://${HOPPER_IP:-192.168.2.102}:8200
+      - LANGFUSE_URL=http://${HOPPER_IP:-192.168.2.102}:3000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - HOPPER_IP=${HOPPER_IP:-192.168.2.102}
+      - NEXT_PUBLIC_GRAFANA_URL=http://${TURING_IP:-192.168.2.103}/grafana
+      - GRAFANA_INTERNAL_URL=http://${TURING_IP:-192.168.2.103}/grafana
+    extra_hosts:
+      - "${HOPPER_HOST:-hopper}:${HOPPER_IP:-192.168.2.102}"
+    volumes:
+      - ../docs:/app/docs:ro
+    ports:
+      - "3300:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hive-ui-local.rule=PathPrefix(`/hive`)"
+      - "traefik.http.routers.hive-ui-local.entrypoints=web"
+      - "traefik.http.services.hive-ui-local.loadbalancer.server.port=3000"
+
   # --- IDENTITY - Authentik DB ---
   authentik_db:
     image: postgres:12-alpine
@@ -630,4 +677,3 @@ volumes:
   tgw_models:
   tgw_loras:
   tgw_presets:
-  dev_sandbox_workspace:

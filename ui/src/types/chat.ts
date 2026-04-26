@@ -95,8 +95,24 @@ export interface SwarmWorker {
   output?: string;
 }
 
+export interface ClarificationOption {
+  label: string;
+  value: string;
+  description?: string;
+  /** If set, router.push() to this path after selecting */
+  redirect?: string;
+}
+
+export interface ClarificationCard {
+  question: string;
+  context?: string;
+  options: ClarificationOption[];
+  allow_freetext: boolean;
+  card_type: "ambiguity" | "dev_project" | "onboarding";
+}
+
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -131,6 +147,9 @@ export interface StreamEvent {
   // Error details
   errorCode?: string;
   errorDetails?: string;
+
+  // Clarification card
+  clarification?: ClarificationCard;
 }
 
 export interface ChatMessage {
@@ -145,6 +164,7 @@ export interface ChatMessage {
   artifacts?: Artifact[];
   turnMetadata?: TurnMetadata;
   pendingApprovals?: ToolApprovalEvent[];
+  pendingClarification?: ClarificationCard;
 }
 
 export interface Conversation {

@@ -16,6 +16,7 @@ import re
 import os
 import json
 import requests
+from pathlib import Path
 from dispatcher import Event, EventType
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock, get_best_host_for_model
@@ -833,6 +834,117 @@ def chat_swarm(
             yield {"type": "log", "content": f"[Context Manager] Ambiguity Resolved. Analying composite input..."}
             clear_context(session_id=session_id, owner_id=owner_id)
 
+        elif pending_ctx.get("type") == "project_onboarding_step_1":
+            original_prompt = pending_ctx.get("original_prompt", "")
+            project_type_answer = user_input  # e.g. "type:web" or freetext
+            clear_context(session_id=session_id, owner_id=owner_id)
+            try:
+                from brooks import save_pending_context as _save_ctx
+                _save_ctx(
+                    {
+                        "type": "project_onboarding_step_2",
+                        "original_prompt": original_prompt,
+                        "project_type": project_type_answer,
+                    },
+                    session_id=session_id,
+                    owner_id=owner_id,
+                )
+            except Exception as _e:
+                logger.warning(f"[Onboarding] Could not save step 2 context: {_e}")
+            yield {
+                "type": "clarification_card",
+                "clarification": {
+                    "question": "What's the project name?",
+                    "context": f"Project type: *{project_type_answer}*",
+                    "options": [],
+                    "allow_freetext": True,
+                    "card_type": "onboarding",
+                },
+            }
+            return
+
+        elif pending_ctx.get("type") == "project_onboarding_step_2":
+            original_prompt = pending_ctx.get("original_prompt", "")
+            project_type_answer = pending_ctx.get("project_type", "")
+            project_name = user_input.strip().replace(" ", "-").lower()
+            clear_context(session_id=session_id, owner_id=owner_id)
+
+            # Create workspace directory
+            workspace_path = Path(__file__).parent.parent / "workspace" / project_name
+            try:
+                workspace_path.mkdir(parents=True, exist_ok=True)
+                (workspace_path / "README.md").write_text(
+                    f"# {project_name}\n\n{original_prompt}\n",
+                    encoding="utf-8",
+                )
+                logger.info(f"[Onboarding] Created workspace at {workspace_path}")
+            except Exception as _e:
+                logger.warning(f"[Onboarding] Could not create workspace: {_e}")
+
+            yield {
+                "type": "clarification_card",
+                "clarification": {
+                    "question": f"Project **{project_name}** is ready. Open the developer workspace to start building?",
+                    "context": f"Workspace created at `workspace/{project_name}/`",
+                    "options": [
+                        {
+                            "label": "Open Dev Workspace",
+                            "value": f"open_dev:{project_name}",
+                            "description": "Switch to editor + terminal",
+                            "redirect": "/dev",
+                        },
+                        {
+                            "label": "Generate starter code",
+                            "value": f"generate_starter:{project_name}",
+                            "description": "Let me scaffold the project first",
+                        },
+                    ],
+                    "allow_freetext": False,
+                    "card_type": "onboarding",
+                },
+            }
+            return
+
+        elif pending_ctx.get("type") == "dev_project_clarification":
+            original_prompt = pending_ctx.get("prompt", "")
+            clear_context(session_id=session_id, owner_id=owner_id)
+
+            if user_input.startswith("existing_project"):
+                logger.info("[Router] Dev project: routing as existing codebase task.")
+                user_input = original_prompt
+                yield {"type": "log", "content": "[Context Manager] Routing to existing project coordinator..."}
+                # Re-route as codebase coordinate with scope already established
+                from lamport import coordinate_task as _coord
+                yield {"type": "status", "content": "🛠️ Launching codebase coordinator..."}
+                for chunk in _coord(
+                    user_input,
+                    session_id=session_id,
+                    owner_id=owner_id,
+                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
+                    extracted_context=extracted_context,
+                    ace_token=ace_token,
+                ):
+                    yield chunk
+                return
+
+            elif user_input.startswith("new_project"):
+                logger.info("[Router] Dev project: launching onboarding flow.")
+                from lamport import coordinate_project_onboarding as _onboard
+                for chunk in _onboard(
+                    original_prompt,
+                    session_id=session_id,
+                    owner_id=owner_id,
+                ):
+                    yield chunk
+                return
+
+            else:
+                # plan_only or freetext — treat as external research
+                logger.info("[Router] Dev project: plan-only mode, routing as external.")
+                user_input = original_prompt
+                yield {"type": "log", "content": "[Context Manager] Plan-only mode — research and plan without code changes."}
+                # Fall through to normal routing below
+
     try:
         yield _emit_turn_metadata(turn_id, "Router", ["thinking"])
         yield _emit_stream_mode("thinking")
@@ -1627,7 +1739,16 @@ def chat_swarm(
                  "question": question
              }, session_id=session_id, owner_id=owner_id)
              
-             yield {"type": "response", "content": f"🤔 **Ambiguous Request:** {question}"}
+             yield {
+                 "type": "clarification_card",
+                 "clarification": {
+                     "question": question,
+                     "context": None,
+                     "options": [],
+                     "allow_freetext": True,
+                     "card_type": "ambiguity",
+                 },
+             }
              _score_trace(lf_trace, langfuse, 0.7, output=question)
              AGENT_STATE.labels(agent_name="Router").set(1)
              return

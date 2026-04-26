@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useBuddyStore, type BuddyMood } from "@/lib/stores/buddy-store";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useBuddyStore, type BuddyMood, STAGE_JOKES, STAGE_OBSERVATIONS } from "@/lib/stores/buddy-store";
 import { BuddySprite } from "./buddy-sprite";
 import { BuddyTips } from "./buddy-tips";
 import { cn } from "@/lib/utils/cn";
@@ -15,6 +15,9 @@ import {
   Flame,
   Trophy,
   Star,
+  Zap,
+  MessageCircle,
+  Sparkles,
 } from "lucide-react";
 
 const MOOD_EMOJI: Record<BuddyMood, string> = {
@@ -26,31 +29,67 @@ const MOOD_EMOJI: Record<BuddyMood, string> = {
 };
 
 const STAGE_LABEL: Record<number, string> = {
-  0: "Egg",
+  0: "Baby",
   1: "Hatchling",
   2: "Juvenile",
-  3: "Elder",
+  3: "Adult",
+  4: "Legendary",
 };
+
+/** Idle timer: after N ms of no reactions, emit an idle quip */
+const IDLE_INTERVAL_MS = 45_000;
 
 export function BuddyWidget() {
   const store = useBuddyStore();
   const {
     hatched, name, species, personality, mood, muted, lastReaction, totalPets,
-    xp, level, xpNext, evolutionStage, streak, achievements,
-    hatch, pet, mute, unmute, reset, syncFromBackend,
+    xp, level, xpNext, evolutionStage, streak, achievements, isEvolving,
+    hatch, pet, poke, mute, unmute, react, reset, syncFromBackend, setMood,
   } = store;
 
   const [showReaction, setShowReaction] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [showEvolutionBanner, setShowEvolutionBanner] = useState(false);
+  const prevStageRef = useRef(evolutionStage);
 
   /* Reaction bubble auto-hide */
   useEffect(() => {
     if (lastReaction) {
       setShowReaction(true);
-      const timer = setTimeout(() => setShowReaction(false), 3000);
+      const timer = setTimeout(() => setShowReaction(false), 4000);
       return () => clearTimeout(timer);
     }
   }, [lastReaction]);
+
+  /* Evolution fanfare */
+  useEffect(() => {
+    if (evolutionStage > prevStageRef.current) {
+      setShowEvolutionBanner(true);
+      const timer = setTimeout(() => setShowEvolutionBanner(false), 4000);
+      prevStageRef.current = evolutionStage;
+      return () => clearTimeout(timer);
+    }
+    prevStageRef.current = evolutionStage;
+  }, [evolutionStage]);
+
+  /* Idle timer — random quip when no reaction for a while */
+  useEffect(() => {
+    if (!hatched || muted) return;
+    const id = setInterval(() => {
+      react("idle");
+    }, IDLE_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [hatched, muted, react]);
+
+  /* Periodic random observation injection (every ~3 min, stage 2+) */
+  useEffect(() => {
+    if (!hatched || muted || evolutionStage < 2) return;
+    const id = setInterval(() => {
+      const pool = STAGE_OBSERVATIONS[evolutionStage] ?? STAGE_OBSERVATIONS[2];
+      store.setComment(pool[Math.floor(Math.random() * pool.length)]);
+    }, 3 * 60_000);
+    return () => clearInterval(id);
+  }, [hatched, muted, evolutionStage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Sync from backend on mount */
   const doSync = useCallback(async () => {
@@ -91,6 +130,13 @@ export function BuddyWidget() {
 
   return (
     <div className="border-t border-[var(--chat-border)]">
+      {/* Evolution fanfare banner */}
+      {showEvolutionBanner && (
+        <div className="mx-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] border border-[var(--chat-accent)]/40 text-xs text-[var(--chat-accent)] animate-in fade-in duration-300">
+          <Sparkles size={12} className="shrink-0" />
+          <span className="font-semibold">{name} evolved into {STAGE_LABEL[evolutionStage]}!</span>
+        </div>
+      )}
       {/* === Collapsed header === */}
       <button
         onClick={() => setExpanded((e) => !e)}
@@ -102,7 +148,7 @@ export function BuddyWidget() {
           className="flex-shrink-0 cursor-pointer hover:scale-110 transition-transform"
           title={`Pet ${name}`}
         >
-          <BuddySprite species={species} stage={evolutionStage} mood={mood} size={32} />
+          <BuddySprite species={species} stage={evolutionStage} mood={mood} size={32} evolving={isEvolving} />
         </div>
 
         <div className="flex-1 min-w-0 text-left">
@@ -152,14 +198,14 @@ export function BuddyWidget() {
               className="cursor-pointer hover:scale-105 transition-transform"
               title={`Pet ${name}`}
             >
-              <BuddySprite species={species} stage={evolutionStage} mood={mood} size={64} />
+              <BuddySprite species={species} stage={evolutionStage} mood={mood} size={80} evolving={isEvolving} />
             </div>
           </div>
 
           {/* Info grid */}
           <div className="grid grid-cols-2 gap-2 text-[10px]">
             <InfoItem label="Species" value={species} />
-            <InfoItem label="Stage" value={`${STAGE_LABEL[evolutionStage] ?? "?"} (${evolutionStage}/3)`} />
+            <InfoItem label="Stage" value={`${STAGE_LABEL[evolutionStage] ?? "?"} (${evolutionStage}/4)`} />
             <InfoItem label="XP" value={`${xp} / ${nextLevelXp}`} />
             <InfoItem label="Pets" value={String(totalPets)} />
             <InfoItem label="Personality" value={personality} span2 />
@@ -196,6 +242,13 @@ export function BuddyWidget() {
                 {muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
               </button>
               <button
+                onClick={() => poke()}
+                className="p-1 text-[var(--chat-muted)] hover:text-[var(--chat-accent)] transition-colors rounded"
+                title="Tell me a joke!"
+              >
+                <MessageCircle size={12} />
+              </button>
+              <button
                 onClick={reset}
                 className="p-1 text-[var(--chat-muted)] hover:text-red-400 transition-colors rounded"
                 title="Release companion"
@@ -204,7 +257,7 @@ export function BuddyWidget() {
               </button>
             </div>
             <span className="text-[9px] text-[var(--chat-muted)]">
-              {species} · Lv.{level}
+              {species} · Lv.{level} · {STAGE_LABEL[evolutionStage]}
             </span>
           </div>
         </div>

@@ -210,6 +210,8 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "Output ONLY valid JSON with this structure:\n"
         "{\n"
         '  "summary": "One-sentence summary of the task",\n'
+        '  "scope": "codebase|external|unknown",\n'
+        '  "project_type": "existing|new|unknown",\n'
         '  "clarification_needed": false,\n'
         '  "clarification_question": null,\n'
         '  "research_tasks": [\n'
@@ -226,6 +228,13 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "- Keep tasks focused and actionable\n"
         "- Use role names: researcher, architect, coder, devops, analyst\n"
         "- 2-5 research tasks, 1-4 implementation tasks, 1-3 verification criteria\n\n"
+        "SCOPE RULES:\n"
+        "- scope='codebase': task involves writing, reading, or modifying code in an existing or new project\n"
+        "- scope='external': task involves research, explanation, analysis, or web lookups with no code changes\n"
+        "- scope='unknown': cannot determine without more information\n"
+        "- project_type='existing': working with/inside an existing codebase\n"
+        "- project_type='new': creating a brand new project/app from scratch\n"
+        "- project_type='unknown': cannot determine (use only when scope='codebase')\n\n"
         "AMBIGUITY CHECK: Before decomposing, evaluate whether the task has enough context to\n"
         "produce a correct and useful plan. If a single critical piece of information is missing\n"
         "that would fundamentally change the research approach (e.g. target platform, language,\n"
@@ -406,16 +415,34 @@ def _run_worker(
         return f"ERROR: {e}"
 
 
-def _get_agent_for_role(role: str, session_id: str = None) -> Agent:
+def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown") -> Agent:
     """
     Factory: Map coordinator roles to existing Agent_Swarm team agents.
+
+    When scope=='codebase', architect/coder/devops roles use Leibniz (which has
+    file system tools).  For external/research scope they use a plain LLM agent
+    so we don't attempt live file edits against the research output.
     """
     role_lower = role.lower()
     OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
     if role_lower in ("architect", "coder", "devops"):
-        from leibniz_agent import get_architect_agent
-        return get_architect_agent(session_id=session_id)
+        if scope == "codebase":
+            from leibniz_agent import get_architect_agent
+            return get_architect_agent(session_id=session_id)
+        else:
+            # external/unknown scope — use a plain planning agent, no file tools
+            host = get_swarm_worker_host(ARCHITECT_MODEL)
+            return Agent(
+                name=f"{role.title()} Worker",
+                model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
+                instructions=[
+                    f"You are a {role_lower} expert. Analyse the problem and produce a clear, actionable plan.",
+                    "Do NOT attempt to access files or execute commands.",
+                    "Focus on research-quality output: recommendations, step-by-step plans, and rationale.",
+                ],
+                show_tool_calls=False,
+            )
 
     elif role_lower == "analyst":
         host = get_swarm_worker_host(ARCHITECT_MODEL)
@@ -502,6 +529,50 @@ def _derive_worker_token(
 
 
 # ---------------------------------------------------------------------------
+# Project onboarding flow — multi-step clarification sequence
+# ---------------------------------------------------------------------------
+
+def coordinate_project_onboarding(
+    original_prompt: str,
+    session_id: str = "default_session",
+    owner_id: str = None,
+) -> Generator[dict, None, None]:
+    """
+    Multi-step onboarding flow for brand-new projects.
+    Emits a sequence of clarification_card events and on completion
+    creates a workspace/<project-name>/ directory.
+    """
+    try:
+        from brooks import save_pending_context as _save_ctx
+        _save_ctx(
+            {
+                "type": "project_onboarding_step_1",
+                "original_prompt": original_prompt,
+            },
+            session_id=session_id,
+            owner_id=owner_id,
+        )
+    except Exception as _e:
+        logger.warning(f"[Onboarding] Could not save step 1 context: {_e}")
+
+    yield {
+        "type": "clarification_card",
+        "clarification": {
+            "question": "What would you like to call this project, and what type is it?",
+            "context": f"Let's set up your new project: *{original_prompt[:120]}*",
+            "options": [
+                {"label": "Web App", "value": "type:web", "description": "Next.js / React"},
+                {"label": "API / Backend", "value": "type:api", "description": "FastAPI / Node"},
+                {"label": "CLI Tool", "value": "type:cli", "description": "Python / Bash"},
+                {"label": "Library / Package", "value": "type:lib", "description": "Reusable module"},
+            ],
+            "allow_freetext": True,
+            "card_type": "onboarding",
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main orchestration generator
 # ---------------------------------------------------------------------------
 
@@ -542,6 +613,8 @@ def coordinate_task(
         research_tasks = plan.get("research_tasks", [])
         impl_tasks = plan.get("implementation_tasks", [])
         verification_criteria = plan.get("verification_criteria", [])
+        scope = plan.get("scope", "unknown")
+        project_type = plan.get("project_type", "unknown")
 
         # --- AMBIGUITY GATE: ask before spending worker budget ---
         if plan.get("clarification_needed", False):
@@ -560,11 +633,55 @@ def coordinate_task(
             except Exception as _e:
                 logger.warning(f"[Coordinator] Could not save clarification context: {_e}")
             yield {
-                "type": "response",
-                "content": (
-                    f"🤔 **Before I assemble the research team —** {question}\n\n"
-                    f"*(Reply with your answer and I'll launch the full investigation.)*"
-                ),
+                "type": "clarification_card",
+                "clarification": {
+                    "question": question,
+                    "context": "I need a little more information before assembling the research team.",
+                    "options": [],
+                    "allow_freetext": True,
+                    "card_type": "ambiguity",
+                },
+            }
+            return
+
+        # --- DEV PROJECT GATE: detect new codebase tasks and route to onboarding ---
+        if scope == "codebase" and project_type in ("new", "unknown"):
+            logger.info(f"[Coordinator] Codebase task detected (project_type={project_type}), asking for project routing.")
+            try:
+                from brooks import save_pending_context as _save_ctx
+                _save_ctx(
+                    {"type": "dev_project_clarification", "prompt": user_input, "summary": summary},
+                    session_id=session_id,
+                    owner_id=owner_id,
+                )
+            except Exception as _e:
+                logger.warning(f"[Coordinator] Could not save dev project context: {_e}")
+            yield {
+                "type": "clarification_card",
+                "clarification": {
+                    "question": "Is this for an existing project or a new one?",
+                    "context": f"I detected a coding task: *{summary}*",
+                    "options": [
+                        {
+                            "label": "Existing project",
+                            "value": "existing_project",
+                            "description": "I'll work within your current codebase",
+                        },
+                        {
+                            "label": "New project",
+                            "value": "new_project",
+                            "description": "Walk me through setup",
+                            "redirect": None,
+                        },
+                        {
+                            "label": "Just plan it",
+                            "value": "plan_only",
+                            "description": "Research and plan, no files changed",
+                        },
+                    ],
+                    "allow_freetext": False,
+                    "card_type": "dev_project",
+                },
             }
             return
 
@@ -629,7 +746,7 @@ def coordinate_task(
                     task_text = task_def.get("task", "")
 
                     worker_id = session.register_worker(role, task_text, "research")
-                    agent = _get_agent_for_role(role, session_id=session_id)
+                    agent = _get_agent_for_role(role, session_id=session_id, scope=scope)
 
                     # Derive a child JWT card for this worker
                     child_token = _derive_worker_token(ace_token, role, task_text)
@@ -797,7 +914,7 @@ def coordinate_task(
 
             worker_id = session.register_worker(role, task_text, "implementation")
             try:
-                agent = _get_agent_for_role(role, session_id=session_id)
+                agent = _get_agent_for_role(role, session_id=session_id, scope=scope)
             except Exception as _agent_err:
                 logger.warning(
                     f"[Coordinator] Agent init failed for role '{role}' (falling back to simple agent): {_agent_err}"

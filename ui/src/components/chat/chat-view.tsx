@@ -6,6 +6,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { MessageBubble } from "./message-bubble";
 import { ThinkingIndicator } from "./thinking-indicator";
+import { BuddyComment } from "@/components/buddy/buddy-comment";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
 import { InputToolbar } from "./input-toolbar";
@@ -78,6 +79,9 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { isMobile } = useIsMobile();
   const buddyReact = useBuddyStore((s) => s.react);
+  const buddyStage = useBuddyStore((s) => s.evolutionStage);
+  const buddySetComment = useBuddyStore((s) => s.setComment);
+  const buddyMuted = useBuddyStore((s) => s.muted);
   const { awayEvents, pushEvent, dismiss: dismissAway } = useAwaySummary();
 
   // Swarm state — used for showThinking extension + recall FAB
@@ -125,6 +129,13 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
     if (!isStreaming && prevStreamingRef.current) {
       buddyReact("response_received");
       pushEvent("message", "Response received");
+      // Fetch a contextual buddy comment from backend (stage 2+ only)
+      if (buddyStage >= 2 && !buddyMuted) {
+        fetch("/api/backend/v1/buddy/comment?context=response_received")
+          .then((r) => r.ok ? r.json() : null)
+          .then((data) => { if (data?.comment) buddySetComment(data.comment); })
+          .catch(() => { /* non-fatal */ });
+      }
     }
     prevStreamingRef.current = isStreaming;
   }, [isStreaming, buddyReact, pushEvent]);
@@ -319,6 +330,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                     onRetryMessage={() => handleRetryMessage(idx)}
                     onApprove={devMode ? handleApprove : undefined}
                     onDeny={devMode ? handleDeny : undefined}
+                    onSelectClarification={(val) => sendMessage(val)}
                   />
                 </div>
               );
@@ -331,6 +343,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                 swarmPhase={theaterPhase}
               />
             )}
+            {/* Buddy inline comment — appears after last message */}
+            {!showThinking && <BuddyComment />}
             <div ref={bottomRef} />
           </div>
         )}

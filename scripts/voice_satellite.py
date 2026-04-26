@@ -20,7 +20,13 @@ udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # --- Configuration ---
 SAMPLE_RATE = 16000
-POST_INTERACTION_COOLDOWN = 2.0  # seconds to ignore audio after speaking
+POST_INTERACTION_COOLDOWN = 0.5  # brief cooldown after playback to absorb echo
+FOLLOWUP_WINDOW = 8.0            # seconds BMO stays in conversation mode after a response
+FOLLOWUP_SPEECH_FRAMES = 15      # ~480ms of confirmed speech needed (harder to false-trigger)
+SILENCE_GATE_FRAMES = 12         # ~384ms of quiet required BEFORE follow-up speech counts
+                                 # TV audio is continuous and never passes this gate;
+                                 # conversation speech comes after a pause.
+_speech_threshold = 10000         # calibrated at startup in main(); used by record_with_vad()
 
 def _find_ppn_model():
     """Find the Beem-Moe .ppn file from common locations."""
@@ -61,6 +67,8 @@ if not HOST_IP:
 print(f"🌐 Host IP: {HOST_IP}")
 
 VOICE_ENGINE_URL = f"http://{HOST_IP}:8020/stt"
+SPEAKER_VERIFY_URL = f"http://{HOST_IP}:8020/verify_speaker"
+SPEAKER_VERIFY_ENABLED = os.getenv("BMO_SPEAKER_VERIFY", "false").lower() == "true"
 AGENT_URL = f"http://{HOST_IP}:8008/v1/voice/chat"
 
 # --- BMO Face Sync ---
@@ -208,6 +216,9 @@ def play_wake_ping():
                             f.writeframesraw(struct.pack('<h', 0))
                     
         aplay_device = detect_hdmi_device()
+        # Wake the HDMI receiver first (same trick as play_audio) so the chime isn't dropped
+        silence_wav = generate_silence(0.5)
+        subprocess.run(["aplay", "-D", aplay_device, silence_wav], check=False, capture_output=True)
         subprocess.run(["aplay", "-D", aplay_device, ping_wav], check=False, capture_output=True)
     except Exception as e:
         print(f"Wake Ping Error: {e}")
@@ -247,6 +258,36 @@ def detect_mic_device():
         print(f"Mic detection failed: {e}")
     print("⚠️ No USB Mic found, falling back to System Default.")
     return None # None tells sounddevice to use system default
+
+def _verify_speaker(wav_path: str) -> bool:
+    """
+    POST the audio to voice_engine's /verify_speaker endpoint.
+    Returns True if the speaker is recognized OR if no profiles are enrolled yet.
+    Returns False only when a profile exists and the speaker doesn't match.
+    Fails open (returns True) on network/service errors so BMO isn't silently broken.
+    """
+    try:
+        with open(wav_path, "rb") as f:
+            resp = requests.post(
+                SPEAKER_VERIFY_URL,
+                files={"audio": (os.path.basename(wav_path), f, "audio/wav")},
+                timeout=5.0,
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("no_profiles"):
+                return True  # Nothing enrolled yet — allow all (setup mode)
+            accepted = data.get("accepted", False)
+            score = data.get("score", 0.0)
+            speaker = data.get("matched_speaker") or "unknown"
+            print(f"🔐 Speaker: {speaker}  score={score:.3f}  {'✅ allowed' if accepted else '🚫 rejected'}")
+            return accepted
+        else:
+            print(f"⚠️ Speaker verify returned {resp.status_code} — failing open")
+            return True
+    except Exception as e:
+        print(f"⚠️ Speaker verify error: {e} — failing open")
+        return True
 
 def clean_stt_text(text):
     """Remove special model tags like <|en|><|Speech|> from transcription."""
@@ -314,8 +355,88 @@ def detect_emotion(text):
 
     return "neutral"
 
+
+def record_with_vad(device, sample_rate=16000, frame_size=512,
+                   silence_frames_needed=20, max_duration=15.0):
+    """
+    Record audio dynamically using Voice Activity Detection.
+    Stops when the speaker pauses (silence_frames_needed × ~32ms of quiet)
+    or max_duration is reached. Returns numpy int16 array, or None if no
+    speech starts within a 3-second timeout.
+    """
+    buf = queue.Queue()
+    collected = []
+    speech_started = False
+    silent_frames = 0
+    total_frames = 0
+    speech_frame_count = 0
+    max_frames = int(max_duration * sample_rate / frame_size)
+    no_speech_timeout_frames = int(3.0 * sample_rate / frame_size)  # give up after 3s silence
+    min_speech_frames = int(0.3 * sample_rate / frame_size)          # at least 0.3s of content
+
+    def _cb(indata, frames, time_info, status):
+        buf.put(indata.copy())
+
+    try:
+        with sd.InputStream(samplerate=sample_rate, blocksize=frame_size,
+                            device=device, channels=1, dtype='int16',
+                            callback=_cb, latency='high'):
+            while total_frames < max_frames:
+                try:
+                    chunk = buf.get(timeout=0.5)
+                except queue.Empty:
+                    break
+
+                pcm = chunk.flatten()
+                rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
+                collected.append(pcm)
+                total_frames += 1
+
+                if rms > _speech_threshold:
+                    speech_started = True
+                    silent_frames = 0
+                    speech_frame_count += 1
+                elif speech_started:
+                    silent_frames += 1
+                    if silent_frames >= silence_frames_needed and speech_frame_count >= min_speech_frames:
+                        print(f"🔇 End of speech ({speech_frame_count * frame_size / sample_rate:.1f}s spoken)")
+                        break
+                else:
+                    # No speech yet — abort if timeout exceeded
+                    if total_frames > no_speech_timeout_frames:
+                        return None
+    except Exception as e:
+        print(f"VAD Error: {e}")
+        return None
+
+    if not collected or speech_frame_count < min_speech_frames:
+        return None
+
+    return np.concatenate(collected)
+
+
+def _is_speech_frame(pcm: np.ndarray, threshold: int) -> bool:
+    """
+    Lightweight speech discriminator: RMS above threshold AND zero-crossing rate
+    within the voiced-speech range (roughly 20-250 ZCR per 512 samples at 16kHz).
+    Music and TV audio typically have ZCR outside this window (very high for
+    broadband noise/music, very low for low-frequency rumble).
+    """
+    rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
+    if rms < threshold:
+        return False
+    # Zero-crossing rate: count sign changes, normalised to per-512-sample range
+    signs = np.sign(pcm.astype(np.float32))
+    signs[signs == 0] = 1  # treat silence as positive
+    crossings = int(np.sum(np.abs(np.diff(signs))) // 2)
+    # Voiced speech: ~20–250 crossings per 512 samples. Broadband TV/music
+    # is often higher; low-frequency thumps are lower.
+    return 20 <= crossings <= 350
+
+
 # --- Main Logic ---
 def main():
+    global _speech_threshold
     print("--- 🛰️ AI Lab Voice Satellite Online ---")
 
     # 1. Load Porcupine wake word engine
@@ -335,7 +456,7 @@ def main():
         porcupine = pvporcupine.create(
             access_key=access_key,
             keyword_paths=[ppn_path],
-            sensitivities=[0.85],
+            sensitivities=[0.65],  # 0.99 causes TV/ambient false positives; 0.65 is reliable
         )
     except Exception as e:
         print(f"❌ Failed to initialize Porcupine: {e}")
@@ -375,12 +496,23 @@ def main():
     # 4. Detect MIC device and start Main Loop
     MIC_DEVICE = detect_mic_device()
 
+    # Force mic capture gain to a sane level — this USB codec resets to max (42/42)
+    # every time the device is opened. Set it here so it applies on every restart.
+    try:
+        subprocess.run(["amixer", "-c", "2", "sset", "Mic", "35", "cap"],
+                       capture_output=True, check=False)
+        print("🎚️  Mic capture gain set to 35/42 (+21dB)")
+    except Exception as _e:
+        print(f"⚠️  Could not set mic gain: {_e}")
+
     print(f"\n🛰️  Satellite Listening at {HARDWARE_RATE}Hz (direct 16kHz, no decimation)...")
     if sys.stdin and sys.stdin.isatty():
         print("⌨️   Trigger: Press ENTER in this terminal.")
     print("🎙️   Wake Word: 'Beemo' (Porcupine custom model)\n")
     update_bmo_face("neutral")
 
+    followup_until = 0.0  # timestamp until which conversation mode is active
+    silence_gate = 0       # consecutive quiet frames accumulated before follow-up speech
     last_heartbeat = time.time()
     last_rms_log = time.time()
     last_rms_face = time.time()
@@ -414,6 +546,7 @@ def main():
         # ambient alone has probability ~(0.023)^10 ≈ 0 — but speech sustains it.
         # Cap at 30000 so we never go above int16 max (32767).
         SPEECH_THRESHOLD = min(max(int(_ambient_mean + 2.0 * _ambient_std), 5000), 30000)
+        _speech_threshold = SPEECH_THRESHOLD  # expose to record_with_vad()
         print(f"📏 Ambient RMS: mean={_ambient_mean}, std={_ambient_std} → SPEECH_THRESHOLD={SPEECH_THRESHOLD}")
     else:
         print(f"📏 Using default threshold: {SPEECH_THRESHOLD}")
@@ -468,8 +601,9 @@ def main():
                             last_rms_face = time.time()
 
                         # Porcupine needs exactly frame_length samples.
-                        # Attenuate before passing: mic RMS ~30k clips at int16 max (32767)
-                        # which destroys spectral features. Scale to ~25% to unclip.
+                        # Attenuate to 25% before passing: mic AGC saturates output at ~30k
+                        # RMS regardless of room volume, destroying spectral features at full
+                        # scale. 25% brings it to ~7.5k which matches Porcupine's trained range.
                         pcm_ppn = (pcm.astype(np.float32) * 0.25).clip(-32768, 32767).astype(np.int16)
                         detected = False
                         for i in range(0, len(pcm_ppn) - FRAME_LENGTH + 1, FRAME_LENGTH):
@@ -489,21 +623,33 @@ def main():
                             interacted = True
 
                         else:
-                            # Sustained speech fallback: require consecutive frames above threshold
-                            # Ignores transients (claps, doors, TV) which are single-frame spikes
-                            if rms > SPEECH_THRESHOLD:
-                                speech_frames += 1
+                            # Follow-up conversation window — re-trigger without wake word.
+                            # GATE: requires SILENCE_GATE_FRAMES of quiet before speech.
+                            # This rejects continuous TV audio (no silence → no gate)
+                            # and accepts conversational speech (pause → then speak).
+                            if followup_until > time.time():
+                                if rms < SPEECH_THRESHOLD:
+                                    # Quiet frame — advance silence gate, reset speech counter
+                                    silence_gate = min(silence_gate + 1, SILENCE_GATE_FRAMES + 1)
+                                    speech_frames = 0
+                                elif silence_gate >= SILENCE_GATE_FRAMES:
+                                    # Pre-silence gate passed — check it's speech-like (ZCR)
+                                    if _is_speech_frame(pcm, SPEECH_THRESHOLD):
+                                        speech_frames += 1
+                                        if speech_frames >= FOLLOWUP_SPEECH_FRAMES:
+                                            print(f"💬 Follow-up speech detected (gate={silence_gate}, frames={speech_frames})")
+                                            speech_frames = 0
+                                            silence_gate = 0
+                                            update_bmo_face("acknowledged")
+                                            interacted = True
+                                    else:
+                                        speech_frames = 0  # ZCR check failed (probably TV/music)
+                                else:
+                                    # Loud but no pre-silence — TV/continuous noise, ignore
+                                    speech_frames = 0
                             else:
-                                speech_frames = max(0, speech_frames - 1)  # decay
-
-                            if speech_frames >= SPEECH_FRAMES_NEEDED:
-                                print(f"⚡ Sustained Speech Detected ({speech_frames} frames, RMS={rms}) — fallback trigger!")
+                                silence_gate = 0
                                 speech_frames = 0
-                                update_bmo_face("acknowledged")
-                                play_wake_ping()
-                                update_bmo_face("listening")
-                                time.sleep(0.1)
-                                interacted = True
 
                     except queue.Empty:
                         pass
@@ -515,19 +661,15 @@ def main():
         # --- OUTSIDE MIC STREAM ---
         if interacted:
             speech_frames = 0  # reset counter so we don't re-trigger immediately
-            wants_reply = handle_interaction()
+            handle_interaction()
+            followup_until = time.time() + FOLLOWUP_WINDOW
             with audio_queue.mutex:
                 audio_queue.queue.clear()
             with trigger_queue.mutex:
                 trigger_queue.queue.clear()
-
-            if wants_reply:
-                print("❓ BMO asked a question. Triggering continuous conversation...")
-                trigger_queue.put("manual")
-            else:
-                print(f"💤 Cooldown ({POST_INTERACTION_COOLDOWN}s)...")
-                time.sleep(POST_INTERACTION_COOLDOWN)
-                print("\nListening...")
+            time.sleep(POST_INTERACTION_COOLDOWN)  # absorb echo before follow-up detection starts
+            print(f"\n💬 Conversation mode active for {FOLLOWUP_WINDOW:.0f}s — speak to continue without wake word...")
+            print("\nListening...")
 
     porcupine.delete()
 
@@ -537,21 +679,35 @@ def handle_interaction():
     # Record directly at 16kHz (mic now captures at 16kHz natively — no resampling needed)
     HW_RATE = 16000
     STT_RATE = 16000
-    duration = 3.8 # Reduced from 5 to decrease latency
-    
     # Ensure the face is definitely listening while recording
     update_bmo_face("listening")
-    print(f"🎤 Recording Command ({duration}s)...")
-    
-    recording = sd.rec(int(duration * HW_RATE), samplerate=HW_RATE, channels=1, dtype='int16',
-                       device=detect_mic_device())
-    sd.wait()
+    print("🎤 Recording (VAD — stops on silence)...")
+
+    recording = record_with_vad(device=detect_mic_device(), sample_rate=HW_RATE)
+    if recording is None:
+        print("⚠️ No speech detected — skipping.")
+        update_bmo_face("neutral")
+        return False
+
+    rec_rms = int(np.sqrt(np.mean(recording.astype(np.float32) ** 2)))
+    print(f"🎙️ Recording RMS: {rec_rms} | {len(recording)/HW_RATE:.1f}s captured")
     
     # Save to temp (already 16kHz, no resampling)
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         sf.write(tmp.name, recording.astype(np.int16), STT_RATE)
         temp_path = tmp.name
-        
+
+    # --- Speaker verification gate ---
+    if SPEAKER_VERIFY_ENABLED:
+        if not _verify_speaker(temp_path):
+            print("🚫 Unrecognized speaker — ignoring interaction.")
+            update_bmo_face("neutral")
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+            return False
+
     print("Sending to STT...")
     update_bmo_face("thinking")
     try:
@@ -606,22 +762,14 @@ def process_agent_response(text):
             print(f"🗣️ Agent: {reply}")
             
             if audio_path:
-                print(f"🔊 Playing Audio: {audio_path}")
-                # Use a specific tool or just play locally if path is accessible?
-                # The path returned is inside the container: /app/agents/bmo_voice/voice_samples/... or delivered_artifacts
-                # The Host maps ../agents -> /app/agents
-                # We need to map container path to host path.
-                
-                # Container: /app/agents/... -> Host: scripts/../agents/...
-                # Container: /app/delivered_artifacts/... -> Host: scripts/../delivered_artifacts/...
-                # Container: /workspace/delivered_artifacts/... -> Host: scripts/../delivered_artifacts/...
-                
                 host_path = audio_path.replace("/app/agents", os.path.abspath(os.path.join(os.path.dirname(__file__), "../agents")))
                 host_path = host_path.replace("/app", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
                 host_path = host_path.replace("/workspace", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-                
-                # Also handle Windows path separators if needed
                 host_path = os.path.normpath(host_path)
+                
+                print(f"🔊 Audio path (raw): {audio_path}")
+                print(f"🔊 Audio path (host): {host_path}")
+                print(f"🔊 File exists locally: {os.path.exists(host_path)}")
                 
                 emotion = detect_emotion(reply)
                 if emotion == "neutral":

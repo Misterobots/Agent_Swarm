@@ -14,6 +14,12 @@ COPY . .
 
 ARG API_BASE_URL=http://localhost:8000
 ENV API_BASE_URL=${API_BASE_URL}
+# NEXT_PUBLIC_* vars are inlined at build time by Next.js.
+# Pass NEXT_PUBLIC_GATEWAY_URL as a build arg so each deployment target
+# (Lovelace: http://192.168.2.101:8008, Turing: leave empty → uses window.location.host fallback)
+# bakes the correct WebSocket base URL into the client bundle.
+ARG NEXT_PUBLIC_GATEWAY_URL=""
+ENV NEXT_PUBLIC_GATEWAY_URL=${NEXT_PUBLIC_GATEWAY_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

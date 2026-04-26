@@ -21,6 +21,7 @@ import tempfile
 import io
 import subprocess
 from funasr import AutoModel as FunASRModel # For STT (Renamed to avoid collision with Qwen3TTSModel)
+import numpy as np
 
 # Initialize FastAPI
 app = FastAPI(title="Qwen3-TTS Voice Engine")
@@ -29,6 +30,11 @@ app = FastAPI(title="Qwen3-TTS Voice Engine")
 MODEL_PATH = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"  # Base model supports zero-shot cloning
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PORT = int(os.getenv("PORT", 8020))
+
+# Speaker verification config
+SPEAKER_PROFILES_DIR = "/app/speaker_profiles"
+SPEAKER_MODEL_CACHE_DIR = "/app/models"
+SPEAKER_THRESHOLD_DEFAULT = float(os.getenv("BMO_SPEAKER_THRESHOLD", "0.65"))
 
 print(f"--- [Voice Engine] Starting on {DEVICE} ---")
 
@@ -57,9 +63,14 @@ EFFECTS = {
 model = None
 tokenizer = None
 stt_model = None
+sv_model = None  # CAM++ speaker verification model
 
 def load_model():
-    global model, tokenizer, stt_model
+    global model, tokenizer, stt_model, sv_model
+
+    # Ensure persistent dirs exist (mounted volume)
+    os.makedirs(SPEAKER_PROFILES_DIR, exist_ok=True)
+    os.makedirs(SPEAKER_MODEL_CACHE_DIR, exist_ok=True)
 
     # Load TTS model independently so a failure doesn't block STT
     try:
@@ -92,6 +103,21 @@ def load_model():
         stt_model = None
         # We don't crash app so we can see logs, but inference will fail
         pass
+
+    # Load CAM++ speaker verification model (language-agnostic speaker embeddings)
+    try:
+        print("Loading Speaker Verification Model: iic/speech_campplus_sv_zh-cn_16k-common...")
+        # Point modelscope cache to the volume-mounted /app/models/ so it persists across rebuilds
+        os.environ.setdefault("MODELSCOPE_CACHE", SPEAKER_MODEL_CACHE_DIR)
+        sv_model = FunASRModel(
+            model="iic/speech_campplus_sv_zh-cn_16k-common",
+            trust_remote_code=True,
+            disable_update=True,
+        )
+        print("Speaker Verification Model Loaded Successfully.")
+    except Exception as e:
+        print(f"WARNING: Speaker Verification Model failed to load: {e}")
+        sv_model = None
 
 @app.on_event("startup")
 async def startup_event():
@@ -257,6 +283,140 @@ async def speech_to_text(
     except Exception as e:
         print(f"STT Error: {e}")
         return Response(content=f"Error: {str(e)}", status_code=500)
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+def _extract_speaker_embedding(wav_path: str) -> np.ndarray:
+    """Extract a 192-dim CAM++ speaker embedding from an audio file."""
+    if sv_model is None:
+        raise RuntimeError("Speaker verification model not loaded")
+    res = sv_model.generate(input=wav_path, output_emb=True)
+    # FunASR returns list of dicts; embedding may be under 'spk_embedding' or first tensor
+    if isinstance(res, list) and len(res) > 0:
+        item = res[0]
+        if isinstance(item, dict):
+            emb = item.get("spk_embedding")
+            if emb is None:
+                emb = item.get("embedding")
+        else:
+            emb = item
+    else:
+        emb = res
+    if hasattr(emb, "numpy"):
+        emb = emb.numpy()
+    arr = np.array(emb, dtype=np.float32).flatten()
+    # Normalise to unit vector so dot product == cosine similarity
+    norm = np.linalg.norm(arr)
+    if norm > 0:
+        arr = arr / norm
+    return arr
+
+@app.post("/enroll_speaker")
+async def enroll_speaker(
+    speaker_id: str = Form(...),
+    audio: UploadFile = File(...)
+):
+    """
+    Enroll a speaker by storing their voice embedding.
+    Call multiple times with different utterances to build a robust profile.
+    Embeddings are averaged so each new call refines the profile.
+    """
+    if sv_model is None:
+        raise HTTPException(status_code=503, detail="Speaker verification model not loaded")
+
+    temp_path = ""
+    try:
+        suffix = os.path.splitext(audio.filename)[1] or ".wav"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await audio.read())
+            temp_path = tmp.name
+
+        new_emb = _extract_speaker_embedding(temp_path)
+
+        profile_path = os.path.join(SPEAKER_PROFILES_DIR, f"{speaker_id}.npy")
+        if os.path.exists(profile_path):
+            existing = np.load(profile_path)
+            # Average and re-normalise for incremental enrollment
+            merged = (existing + new_emb) / 2.0
+            norm = np.linalg.norm(merged)
+            if norm > 0:
+                merged = merged / norm
+            np.save(profile_path, merged)
+            action = "updated"
+        else:
+            np.save(profile_path, new_emb)
+            action = "created"
+
+        enrolled = [f[:-4] for f in os.listdir(SPEAKER_PROFILES_DIR) if f.endswith(".npy")]
+        print(f"[ENROLL] {action} profile for '{speaker_id}'  enrolled speakers: {enrolled}")
+        return {"speaker_id": speaker_id, "action": action, "enrolled_speakers": enrolled}
+
+    except Exception as e:
+        print(f"[ENROLL] Error for '{speaker_id}': {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+@app.post("/verify_speaker")
+async def verify_speaker(
+    audio: UploadFile = File(...),
+    threshold: float = Form(None)
+):
+    """
+    Verify whether the speaker in the audio matches any enrolled profile.
+    Returns {accepted, score, matched_speaker, no_profiles}.
+    'accepted' is always True when no profiles are enrolled (fail-open during setup).
+    """
+    effective_threshold = threshold if threshold is not None else SPEAKER_THRESHOLD_DEFAULT
+
+    profiles = [f for f in os.listdir(SPEAKER_PROFILES_DIR) if f.endswith(".npy")]
+    if not profiles:
+        return {"accepted": True, "score": 0.0, "matched_speaker": None, "no_profiles": True}
+
+    if sv_model is None:
+        # Model not loaded — fail open so BMO keeps working
+        return {"accepted": True, "score": 0.0, "matched_speaker": None, "no_profiles": False}
+
+    temp_path = ""
+    try:
+        suffix = os.path.splitext(audio.filename)[1] or ".wav"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await audio.read())
+            temp_path = tmp.name
+
+        query_emb = _extract_speaker_embedding(temp_path)
+
+        best_score = -1.0
+        best_name = None
+        for fname in profiles:
+            speaker_id = fname[:-4]
+            stored = np.load(os.path.join(SPEAKER_PROFILES_DIR, fname))
+            score = float(np.dot(query_emb, stored))  # both unit-norm → cosine similarity
+            if score > best_score:
+                best_score = score
+                best_name = speaker_id
+
+        accepted = best_score >= effective_threshold
+        print(f"[VERIFY] best={best_name} score={best_score:.3f} threshold={effective_threshold} accepted={accepted}")
+        return {
+            "accepted": accepted,
+            "score": round(best_score, 4),
+            "matched_speaker": best_name if accepted else None,
+            "no_profiles": False,
+        }
+
+    except Exception as e:
+        print(f"[VERIFY] Error: {e}")
+        # Fail open — let the interaction through rather than silently blocking
+        return {"accepted": True, "score": 0.0, "matched_speaker": None, "no_profiles": False}
     finally:
         if temp_path and os.path.exists(temp_path):
             try:

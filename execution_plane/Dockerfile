@@ -97,6 +97,11 @@ RUN useradd -m -u 1000 app
 # Copy the agent code
 COPY agents /app/agents
 
+# Patch phidata bug: KeyError 'type' when Ollama returns a list for the type field
+# See: phi/model/ollama/chat.py line ~140
+RUN sed -i 's/if isinstance(obj\["type"\], list):/if "type" in obj and isinstance(obj["type"], list):/' \
+    /usr/local/lib/python3.11/site-packages/phi/model/ollama/chat.py
+
 # Ensure permissions
 RUN chown -R app:app /app
 

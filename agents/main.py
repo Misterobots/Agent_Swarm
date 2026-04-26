@@ -1625,6 +1625,19 @@ async def buddy_get_tip(context: str = "general"):
         return {"tip": None, "error": str(exc)}
 
 
+@app.get("/v1/buddy/comment")
+async def buddy_get_comment(context: str = "response_received"):
+    """Get a stage-appropriate inline comment to inject into the chat thread."""
+    try:
+        from kay_service import get_state, get_contextual_comment
+        state = get_state()
+        comment = get_contextual_comment(state, context=context)
+        return {"comment": comment}
+    except Exception as exc:
+        logger.warning(f"[Buddy] get_comment failed: {exc}")
+        return {"comment": None, "error": str(exc)}
+
+
 @app.get("/v1/buddy/achievements")
 async def buddy_get_achievements():
     """Get all earned achievements."""

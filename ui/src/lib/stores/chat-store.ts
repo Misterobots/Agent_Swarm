@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
   ChatMessage,
+  ClarificationCard,
   Conversation,
   ThoughtEvent,
   ToolCallEvent,
@@ -37,6 +38,7 @@ interface ChatState {
   setMessageToolResults: (conversationId: string, messageId: string, results: ToolResult[]) => void;
   setMessageTurnMetadata: (conversationId: string, messageId: string, metadata: TurnMetadata) => void;
   setMessagePendingApprovals: (conversationId: string, messageId: string, approvals: import("@/types/chat").ToolApprovalEvent[]) => void;
+  setMessagePendingClarification: (conversationId: string, messageId: string, card: ClarificationCard | undefined) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -215,6 +217,19 @@ export const useChatStore = create<ChatState>()(
               ...c,
               messages: c.messages.map((m) =>
                 m.id === messageId ? { ...m, pendingApprovals: approvals } : m
+              ),
+            };
+          }),
+        })),
+
+      setMessagePendingClarification: (conversationId, messageId, card) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, pendingClarification: card } : m
               ),
             };
           }),

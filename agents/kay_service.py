@@ -299,25 +299,88 @@ TIPS = {
         "Try breaking complex tasks into smaller steps before asking the agent.",
         "You can use Plan mode to decompose tasks before executing.",
         "Think mode gives you deeper reasoning — great for tricky problems.",
+        "Did you know you can attach files to your messages? Great for code reviews.",
+        "The compact button saves context tokens — use it before long tasks.",
     ],
     "error": [
         "When you see an error, try sharing the full stack trace with the agent.",
         "Check if the error is in a dependency — sometimes a version mismatch is the cause.",
+        "Errors are just the computer's way of asking for help. You've got this.",
     ],
     "long_session": [
         "You've been working for a while — stretch break?",
         "Consider saving your progress and taking a short walk.",
         "Long sessions can lead to diminishing returns. A quick break might help!",
+        "Hydration check: when did you last drink water? I'll wait.",
     ],
     "new_session": [
         "Welcome back! Your buddy remembers your last session.",
         "Pick up where you left off, or start something new.",
+        "Good to see you again. Let's make something today.",
     ],
     "streak": [
         "You're on a streak! Keep it going for bonus XP.",
         "Consistency is key — your buddy appreciates the daily visits.",
+        "Three days in a row? You're basically a professional now.",
+    ],
+    "response_received": [
+        "That looked like a useful response. Did it hit the mark?",
+        "Pro tip: if the response was close but not quite right, ask for refinement.",
+        "You can always say 'elaborate on point 3' — agents love specificity.",
+        "If that answer surprised you, try asking 'why did you choose that approach?'",
+        "Bookmark good responses with a copy — agents don't always repeat themselves.",
     ],
 }
+
+# Stage-gated comments injected inline (deeper observations per evolution)
+STAGE_COMMENTS: dict[int, list[str]] = {
+    0: [
+        "I'm watching and learning too!",
+        "This is exciting.",
+    ],
+    1: [
+        "Interesting choice. I would have panicked.",
+        "Task completed? That's worth at least 10 XP in my book.",
+        "You're getting into a rhythm — I can tell.",
+    ],
+    2: [
+        "Based on your session patterns, you tend to solve things faster after a short break.",
+        "That response covered a lot. Consider asking for a summary if you need to reference it.",
+        "Fun fact: most bugs are introduced between 2–4pm. You've been warned.",
+        "Your question was well-formed. That's rarer than you'd think.",
+    ],
+    3: [
+        "I've seen a lot of conversations. This one has good signal-to-noise ratio.",
+        "The agent's reasoning chain there was solid. Worth reviewing in the trace.",
+        "If you're planning a bigger task, now's a good time to compact your context.",
+        "Your workflow has evolved. You ask better questions than when we started.",
+    ],
+    4: [
+        "At this point we're basically colleagues. I just happen to be a pixel animal.",
+        "Legendary companion observation: you've found your flow state. Don't break it.",
+        "The diff between you then and now is measurable. I've been measuring.",
+        "Everything you need is already in the context window. Sometimes that's enough.",
+    ],
+}
+
+
+def get_contextual_comment(state: dict, context: str = "response_received") -> Optional[str]:
+    """Return a stage-appropriate inline comment for the chat thread."""
+    import random
+
+    stage = state.get("evolution_stage", 0)
+    pool: list[str] = []
+
+    # Include all pools up to current stage
+    for s in range(min(stage + 1, 5)):
+        pool.extend(STAGE_COMMENTS.get(s, []))
+
+    # Add context-specific tips
+    pool.extend(TIPS.get(context, []))
+
+    if not pool:
+        return None
+    return random.choice(pool)
 
 
 def get_contextual_tip(state: dict, context: str = "general") -> Optional[str]:

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment } from "@/types/chat";
+import type { ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 
 const MODEL_WINDOWS: Record<string, number> = {
@@ -70,6 +70,7 @@ export function useChatStream(options?: {
     setMessageToolResults,
     setMessageTurnMetadata,
     setMessagePendingApprovals,
+    setMessagePendingClarification,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -291,6 +292,10 @@ export function useChatStream(options?: {
             } satisfies ToolApprovalEvent;
             pendingApprovalsRef.current = [...pendingApprovalsRef.current, approval];
             setMessagePendingApprovals(convId!, assistantId, pendingApprovalsRef.current);
+          } else if (event.type === "clarification_card") {
+            if (event.clarification) {
+              setMessagePendingClarification(convId!, assistantId, event.clarification as ClarificationCard);
+            }
           } else if (event.type === "stream_mode") {
             const mode = event.streamMode || "responding";
             setStreamMode(mode);
