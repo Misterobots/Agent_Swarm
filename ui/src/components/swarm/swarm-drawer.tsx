@@ -460,15 +460,14 @@ function SwarmMobilePanel() {
 function SwarmDesktopDrawer() {
   const {
     active, theaterPhase, phaseName, workers, latestCard, selectedWorkerId,
-    dismissed, popoutOpen, setDismissed, setPopoutOpen, setLatestCard, setTheaterPhase, setSelectedWorker,
+    dismissed, popoutOpen, setDismissed, setPopoutOpen, setTheaterPhase, setSelectedWorker, dequeueBadge,
   } = useSwarmStore();
 
   const popupRef = useRef<Window | null>(null);
 
   const handleCardDone = useCallback(() => {
-    setLatestCard(null);
-    setTheaterPhase("roster");
-  }, [setLatestCard, setTheaterPhase]);
+    dequeueBadge();
+  }, [dequeueBadge]);
 
   // Poll popup closed state
   useEffect(() => {
