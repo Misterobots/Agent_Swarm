@@ -366,23 +366,24 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
           >
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
             <div
-              className="relative z-10 w-full max-w-xs rounded-xl overflow-hidden"
+              className="relative z-10 w-full max-w-xs rounded-xl overflow-hidden flex flex-col"
               style={{
+                maxHeight: "85vh",
                 background: "linear-gradient(160deg, var(--chat-panel) 0%, var(--chat-surface,#1a1c2a) 100%)",
                 border: `1px solid ${theme.accent}45`,
                 boxShadow: `0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px ${theme.accent}20`,
               }}
               onClick={e => e.stopPropagation()}
             >
-              {/* Foil stripe */}
+              {/* Foil stripe — always visible at top */}
               <div
                 className="h-1 w-full flex-shrink-0"
                 style={{ background: `linear-gradient(90deg, transparent 0%, ${theme.accent} 20%, #fff 50%, ${theme.accent} 80%, transparent 100%)`, opacity: 0.85 }}
               />
 
-              {/* Header */}
+              {/* Header — pinned, never scrolls away */}
               <div
-                className="px-4 pt-3 pb-3 flex items-start justify-between gap-2"
+                className="px-4 pt-3 pb-3 flex items-start justify-between gap-2 flex-shrink-0"
                 style={{ borderBottom: `1px solid ${theme.accent}20` }}
               >
                 <div className="min-w-0">
@@ -406,52 +407,55 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
                 </button>
               </div>
 
-              {/* Bio */}
-              <div className="px-4 pt-3 pb-0">
-                <p className="text-[11px] text-[var(--chat-muted)] leading-relaxed">
-                  {bio?.bio ?? "A pioneering figure in the history of computer science."}
-                </p>
-              </div>
-
-              {/* Historical context */}
-              {bio?.historical_context && (
-                <div className="px-4 pt-2 pb-0">
-                  <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-1" style={{ color: `${theme.accent}80` }}>Historical Context</p>
-                  <p className="text-[10px] text-[var(--chat-muted)] leading-relaxed opacity-80">
-                    {bio.historical_context}
+              {/* Scrollable body */}
+              <div className="overflow-y-auto flex-1">
+                {/* Bio */}
+                <div className="px-4 pt-3 pb-0">
+                  <p className="text-[11px] text-[var(--chat-muted)] leading-relaxed">
+                    {bio?.bio ?? "A pioneering figure in the history of computer science."}
                   </p>
                 </div>
-              )}
 
-              {/* Motto */}
-              {worker?.pioneer_motto && (
-                <div
-                  className="mx-4 mt-3 px-2.5 py-1.5 rounded-sm"
-                  style={{ background: `${theme.accent}0c`, borderLeft: `2px solid ${theme.accent}50` }}
-                >
-                  <p className="text-[9px] text-[var(--chat-muted)] italic leading-snug">
-                    &ldquo;{worker.pioneer_motto}&rdquo;
-                  </p>
-                </div>
-              )}
+                {/* Historical context */}
+                {bio?.historical_context && (
+                  <div className="px-4 pt-3 pb-0">
+                    <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-1" style={{ color: `${theme.accent}80` }}>Historical Context</p>
+                    <p className="text-[10px] text-[var(--chat-muted)] leading-relaxed opacity-80">
+                      {bio.historical_context}
+                    </p>
+                  </div>
+                )}
 
-              {/* Wikipedia link */}
-              {bio?.wikipedia_url && (
-                <div className="px-4 py-3">
-                  <a
-                    href={bio.wikipedia_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-[9px] font-semibold rounded-sm px-2 py-1 transition-colors hover:opacity-80"
-                    style={{ background: `${theme.accent}18`, border: `1px solid ${theme.accent}40`, color: theme.accent }}
+                {/* Motto */}
+                {worker?.pioneer_motto && (
+                  <div
+                    className="mx-4 mt-3 px-2.5 py-1.5 rounded-sm"
+                    style={{ background: `${theme.accent}0c`, borderLeft: `2px solid ${theme.accent}50` }}
                   >
-                    <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    Learn more on Wikipedia
-                  </a>
-                </div>
-              )}
+                    <p className="text-[9px] text-[var(--chat-muted)] italic leading-snug">
+                      &ldquo;{worker.pioneer_motto}&rdquo;
+                    </p>
+                  </div>
+                )}
+
+                {/* Wikipedia link */}
+                {bio?.wikipedia_url && (
+                  <div className="px-4 py-3">
+                    <a
+                      href={bio.wikipedia_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[9px] font-semibold rounded-sm px-2 py-1 transition-colors hover:opacity-80"
+                      style={{ background: `${theme.accent}18`, border: `1px solid ${theme.accent}40`, color: theme.accent }}
+                    >
+                      <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      Learn more on Wikipedia
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
