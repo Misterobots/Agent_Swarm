@@ -67,14 +67,14 @@ SCRATCHPAD_ROOT = Path(__file__).parent / "scratchpad"
 # ---------------------------------------------------------------------------
 WORKER_PIONEERS: dict[str, list[dict]] = {
     "researcher": [
-        {"name": "Shannon",  "full_name": "Claude Shannon",   "motto": "Information is the resolution of uncertainty."},
-        {"name": "Minsky",   "full_name": "Marvin Minsky",    "motto": "Minds are what brains do."},
-        {"name": "Feynman",  "full_name": "Richard Feynman",  "motto": "I would rather have questions that can't be answered than answers that can't be questioned."},
+        {"name": "Shannon",  "full_name": "Claude Shannon",     "motto": "Information is the resolution of uncertainty."},
+        {"name": "Minsky",   "full_name": "Marvin Minsky",      "motto": "Minds are what brains do."},
+        {"name": "Johnson",  "full_name": "Katherine Johnson",  "motto": "Like what you do, and then you will do your best."},
     ],
     "architect": [
-        {"name": "Babbage",  "full_name": "Charles Babbage",   "motto": "Errors using inadequate data are far less than those using no data at all."},
-        {"name": "Dijkstra", "full_name": "Edsger Dijkstra",   "motto": "Simplicity is a prerequisite for reliability."},
-        {"name": "Brooks",   "full_name": "Fred Brooks",        "motto": "The bearing of a child takes nine months, no matter how many women are assigned."},
+        {"name": "Babbage",  "full_name": "Charles Babbage",    "motto": "Errors using inadequate data are far less than those using no data at all."},
+        {"name": "Dijkstra", "full_name": "Edsger Dijkstra",    "motto": "Simplicity is a prerequisite for reliability."},
+        {"name": "Hamilton", "full_name": "Margaret Hamilton",  "motto": "There was no choice but to be pioneers."},
     ],
     "coder": [
         {"name": "Knuth",    "full_name": "Donald Knuth",      "motto": "Programs are meant to be read by humans."},
@@ -82,9 +82,9 @@ WORKER_PIONEERS: dict[str, list[dict]] = {
         {"name": "Ritchie",  "full_name": "Dennis Ritchie",     "motto": "UNIX is basically a simple operating system, but you have to be a genius to understand the simplicity."},
     ],
     "devops": [
-        {"name": "Cerf",     "full_name": "Vint Cerf",          "motto": "The internet is a reflection of our society."},
-        {"name": "Torvalds", "full_name": "Linus Torvalds",      "motto": "Talk is cheap. Show me the code."},
-        {"name": "Thompson", "full_name": "Ken Thompson",        "motto": "One of my most productive days was throwing away 1000 lines of code."},
+        {"name": "Cerf",     "full_name": "Vint Cerf",         "motto": "The internet is a reflection of our society."},
+        {"name": "Torvalds", "full_name": "Linus Torvalds",    "motto": "Talk is cheap. Show me the code."},
+        {"name": "Perlman",  "full_name": "Radia Perlman",     "motto": "The world would be a better place if more engineers cared about the broader context of their work."},
     ],
     "analyst": [
         {"name": "Codd",     "full_name": "Edgar Codd",         "motto": "Data is a precious thing and will last longer than the systems themselves."},
@@ -92,9 +92,9 @@ WORKER_PIONEERS: dict[str, list[dict]] = {
         {"name": "Boole",    "full_name": "George Boole",        "motto": "No matter how correct a mathematical theorem may appear, it may be disproved by a single contradiction."},
     ],
     "verifier": [
-        {"name": "Hoare",    "full_name": "Tony Hoare",          "motto": "There are two ways to write error-free programs; only the third works."},
-        {"name": "Turing",   "full_name": "Alan Turing",         "motto": "We can only see a short distance ahead, but we can see plenty there that needs to be done."},
-        {"name": "McCarthy", "full_name": "John McCarthy",       "motto": "He who refuses to do arithmetic is doomed to talk nonsense."},
+        {"name": "Hoare",  "full_name": "Tony Hoare",        "motto": "There are two ways to write error-free programs; only the third works."},
+        {"name": "Turing", "full_name": "Alan Turing",       "motto": "We can only see a short distance ahead, but we can see plenty there that needs to be done."},
+        {"name": "Liskov", "full_name": "Barbara Liskov",    "motto": "Abstraction is the key to simplicity."},
     ],
 }
 

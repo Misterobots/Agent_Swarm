@@ -51,18 +51,24 @@ interface AgentIdCardProps {
 export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
   const [stage, setStage] = useState<"hidden" | "hang" | "rest" | "exit">("hidden");
   const scanRef = useRef<HTMLDivElement>(null);
+  // Keep a stable ref to onDone so the animation timers are never reset
+  // when the parent re-renders as new workers arrive.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
   const role = worker.role?.toLowerCase() ?? "";
   const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
   const badgeNum = (worker.worker_id ?? "").replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase().padStart(6, "0");
 
   useEffect(() => {
     // Stagger: hidden → hang (drop in with pendulum) → rest → scan → exit
+    // Empty deps: timers are set once on mount and never reset mid-animation.
     const t0 = setTimeout(() => setStage("hang"),  80);
     const t1 = setTimeout(() => setStage("rest"),  600);
     const t2 = setTimeout(() => setStage("exit"), 4000);
-    const t3 = setTimeout(() => onDone?.(),        4600);
+    const t3 = setTimeout(() => onDoneRef.current?.(), 4600);
     return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [onDone]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Trigger scan-light sweep once card is at rest
   useEffect(() => {
