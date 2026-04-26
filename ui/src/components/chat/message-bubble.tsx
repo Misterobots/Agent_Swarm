@@ -10,6 +10,141 @@ import { ToolCallBlock } from "./tool-call-block";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { MessageActions } from "./message-actions";
 
+// ---------------------------------------------------------------------------
+// Swarm response parser — splits coordinator output into collapsible phases
+// ---------------------------------------------------------------------------
+
+const SWARM_MARKER = "**📋 Task Plan:";
+const SUMMARY_MARKER = "---\n**📊 Coordination Summary";
+const FOLLOWUP_MARKER = "\n---\n**💡 What would you like to do next?**";
+
+const PHASE_SPLITS: { marker: string; title: string }[] = [
+  { marker: "**📋 Task Plan:", title: "📋 Task Plan" },
+  { marker: "**🔬 Research Phase", title: "🔬 Research & Planning" },
+  { marker: "**🔨 Implementation Phase", title: "🔨 Implementation" },
+  { marker: "**🧠 Synthesis Complete", title: "🧠 Synthesis" },
+  { marker: "**🔍 Verification", title: "🔍 Verification" },
+  { marker: "---\n**📊 Coordination Summary", title: "📊 Coordination Summary" },
+];
+
+interface SwarmParsed {
+  processBlocks: { title: string; content: string }[];
+  synthesisContent: string;
+  followupContent: string;
+}
+
+function parseSwarmContent(content: string): SwarmParsed | null {
+  if (!content.includes(SWARM_MARKER)) return null;
+
+  // The synthesis is everything from the end of the coordination summary to the follow-up
+  const summaryStart = content.indexOf(SUMMARY_MARKER);
+  if (summaryStart === -1) return null; // Still streaming process phases
+
+  // End of summary block: look for double-newline after summary
+  const afterSummary = content.indexOf("\n\n", summaryStart + SUMMARY_MARKER.length);
+  if (afterSummary === -1) return null;
+
+  const processRaw = content.substring(0, afterSummary).trim();
+  const remainder = content.substring(afterSummary).trim();
+
+  // Split follow-up section if present
+  const followupIdx = remainder.indexOf(FOLLOWUP_MARKER);
+  const synthesisContent = followupIdx !== -1
+    ? remainder.substring(0, followupIdx).trim()
+    : remainder;
+  const followupContent = followupIdx !== -1
+    ? remainder.substring(followupIdx).trim()
+    : "";
+
+  // Split process text into labelled phase blocks
+  const processBlocks: { title: string; content: string }[] = [];
+  let remaining = processRaw;
+
+  // Find all phase marker positions
+  const positions: { idx: number; title: string; marker: string }[] = [];
+  for (const { marker, title } of PHASE_SPLITS) {
+    const idx = remaining.indexOf(marker);
+    if (idx !== -1) positions.push({ idx, title, marker });
+  }
+  positions.sort((a, b) => a.idx - b.idx);
+
+  for (let i = 0; i < positions.length; i++) {
+    const start = positions[i].idx;
+    const end = i + 1 < positions.length ? positions[i + 1].idx : remaining.length;
+    const blockContent = remaining.substring(start, end).trim();
+    if (blockContent) {
+      processBlocks.push({ title: positions[i].title, content: blockContent });
+    }
+  }
+
+  return { processBlocks, synthesisContent, followupContent };
+}
+
+// ---------------------------------------------------------------------------
+// SwarmResponseRenderer — renders parsed swarm output with collapsible phases
+// ---------------------------------------------------------------------------
+
+function SwarmResponseRenderer({
+  content,
+  isStreaming,
+}: {
+  content: string;
+  isStreaming?: boolean;
+}) {
+  const parsed = useMemo(() => (!isStreaming ? parseSwarmContent(content) : null), [content, isStreaming]);
+
+  if (!parsed) {
+    // Streaming or not yet fully parsed — render flat
+    return <MarkdownRenderer content={content} isStreaming={isStreaming} />;
+  }
+
+  return (
+    <div>
+      {/* Main synthesis plan — shown first and prominently */}
+      {parsed.synthesisContent && (
+        <MarkdownRenderer content={parsed.synthesisContent} />
+      )}
+
+      {/* Follow-up suggestions */}
+      {parsed.followupContent && (
+        <div className="mt-3">
+          <MarkdownRenderer content={parsed.followupContent} />
+        </div>
+      )}
+
+      {/* Collapsible process phases */}
+      {parsed.processBlocks.length > 0 && (
+        <div className="mt-4 space-y-1">
+          {parsed.processBlocks.map((block) => (
+            <CollapsiblePhase key={block.title} title={block.title} content={block.content} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CollapsiblePhase({ title, content }: { title: string; content: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-md border border-[var(--chat-border)] overflow-hidden text-[12px]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-1.5 bg-[var(--chat-panel)] hover:bg-[var(--chat-soft)] text-[var(--chat-muted)] transition-colors"
+      >
+        <span className="font-medium">{title}</span>
+        <ChevronDown size={12} className={cn("transition-transform duration-150", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="px-3 py-2 bg-[var(--chat-soft)] border-t border-[var(--chat-border)]">
+          <MarkdownRenderer content={content} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface VerificationBadge {
   passed: boolean;
   score: number;
@@ -133,7 +268,11 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
             {/* Collapsible response body */}
             <div className="relative">
               <div className={cn(isCollapsed && "max-h-[108px] overflow-hidden")}>
-                <MarkdownRenderer content={message.content} isStreaming={isStreaming} />
+                {message.content.includes(SWARM_MARKER) ? (
+                  <SwarmResponseRenderer content={message.content} isStreaming={isStreaming} />
+                ) : (
+                  <MarkdownRenderer content={message.content} isStreaming={isStreaming} />
+                )}
               </div>
               {isCollapsed && (
                 <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[var(--chat-surface)] to-transparent pointer-events-none" />

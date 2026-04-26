@@ -811,6 +811,17 @@ def chat_swarm(
             # This was saved for the Art Studio workspace — clear it, don't merge
             clear_context(session_id=session_id, owner_id=owner_id)
 
+        elif pending_ctx.get("type") == "swarm_clarification":
+            original = pending_ctx.get("prompt", "")
+            question = pending_ctx.get("question", "")
+            logger.info(
+                f"--- [Router] Resolving Swarm Clarification. "
+                f"Original: '{original[:80]}' + Answer: '{user_input[:80]}' ---"
+            )
+            user_input = f"{original}\n\nAdditional context: {user_input}"
+            yield {"type": "log", "content": "[Context Manager] Swarm clarification resolved. Launching coordinator..."}
+            clear_context(session_id=session_id, owner_id=owner_id)
+
         elif pending_ctx.get("type") == "ambiguity_resolution":
             original = pending_ctx.get("prompt")
             question = pending_ctx.get("question")

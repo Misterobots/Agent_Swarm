@@ -210,6 +210,8 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "Output ONLY valid JSON with this structure:\n"
         "{\n"
         '  "summary": "One-sentence summary of the task",\n'
+        '  "clarification_needed": false,\n'
+        '  "clarification_question": null,\n'
         '  "research_tasks": [\n'
         '    {"role": "researcher|architect|analyst", "task": "specific research question"}\n'
         "  ],\n"
@@ -223,7 +225,13 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "- implementation_tasks run SERIALLY\n"
         "- Keep tasks focused and actionable\n"
         "- Use role names: researcher, architect, coder, devops, analyst\n"
-        "- 2-5 research tasks, 1-4 implementation tasks, 1-3 verification criteria"
+        "- 2-5 research tasks, 1-4 implementation tasks, 1-3 verification criteria\n\n"
+        "AMBIGUITY CHECK: Before decomposing, evaluate whether the task has enough context to\n"
+        "produce a correct and useful plan. If a single critical piece of information is missing\n"
+        "that would fundamentally change the research approach (e.g. target platform, language,\n"
+        "intended audience, desired outcome), set clarification_needed=true and provide a single,\n"
+        "specific clarification_question. Only set this when truly necessary — most tasks should\n"
+        "proceed. Default: clarification_needed=false, clarification_question=null."
     )
 
     prompt = f"{history_context}\n\nTask to decompose:\n{user_input}" if history_context else user_input
@@ -308,6 +316,38 @@ def _synthesize_findings(findings: str, original_task: str) -> str:
         logger.error(f"[Coordinator] Synthesis failed: {e}")
 
     return f"Synthesis failed. Raw findings:\n{findings}"
+
+
+def _generate_followups(synthesis: str, impl_tasks: list) -> str:
+    """
+    Build a short 'What next?' section appended to the final synthesis.
+    Suggestions are contextual based on what the coordinator produced.
+    """
+    code_roles = {"coder", "devops", "architect"}
+    has_code = any(t.get("role", "") in code_roles for t in impl_tasks)
+
+    suggestions = []
+    if has_code:
+        suggestions.append(
+            "**🛠 Build it** — Ask me to implement a specific step from the plan above"
+        )
+        suggestions.append(
+            "**🚀 DevOps** — Deploy and test this in the dev environment"
+        )
+    else:
+        suggestions.append(
+            "**📝 Draft it** — Have me write up a detailed spec or document for this plan"
+        )
+    suggestions.append("**🔍 Dig deeper** — Ask me to expand on any specific section")
+    suggestions.append("**🔄 Alternative** — Explore a completely different approach")
+
+    lines = [
+        "\n---",
+        "**💡 What would you like to do next?**",
+    ]
+    for s in suggestions[:3]:
+        lines.append(f"- {s}")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -502,6 +542,31 @@ def coordinate_task(
         research_tasks = plan.get("research_tasks", [])
         impl_tasks = plan.get("implementation_tasks", [])
         verification_criteria = plan.get("verification_criteria", [])
+
+        # --- AMBIGUITY GATE: ask before spending worker budget ---
+        if plan.get("clarification_needed", False):
+            question = plan.get(
+                "clarification_question",
+                "Could you provide more context about what you're trying to achieve?",
+            )
+            logger.info(f"[Coordinator] Clarification needed: {question}")
+            try:
+                from brooks import save_pending_context as _save_ctx
+                _save_ctx(
+                    {"type": "swarm_clarification", "prompt": user_input, "question": question},
+                    session_id=session_id,
+                    owner_id=owner_id,
+                )
+            except Exception as _e:
+                logger.warning(f"[Coordinator] Could not save clarification context: {_e}")
+            yield {
+                "type": "response",
+                "content": (
+                    f"🤔 **Before I assemble the research team —** {question}\n\n"
+                    f"*(Reply with your answer and I'll launch the full investigation.)*"
+                ),
+            }
+            return
 
         yield {
             "type": "log",
@@ -711,7 +776,7 @@ def coordinate_task(
         # Persist synthesis to team memory for cross-coordination recall
         _team_store(session.coordination_id, "synthesis", synthesis)
 
-        yield {"type": "message", "content": f"**🧠 Synthesis Complete**\n\n{synthesis}\n\n"}
+        yield {"type": "message", "content": "**🧠 Synthesis Complete** ✓\n\n"}
         yield {"type": "log", "content": f"[Coordinator] Synthesis: {len(synthesis)} chars"}
 
         # === PHASE 4: IMPLEMENTATION (serial) ===
@@ -890,7 +955,8 @@ def coordinate_task(
             ),
         }
 
-        yield {"type": "response", "content": synthesis}
+        followup_section = _generate_followups(synthesis, impl_tasks)
+        yield {"type": "response", "content": f"{synthesis}{followup_section}"}
 
         logger.info(
             f"[Coordinator] Coordination {session.coordination_id} complete: "
