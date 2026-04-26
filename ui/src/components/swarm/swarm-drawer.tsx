@@ -8,6 +8,7 @@ import { AgentIdCard } from "./agent-id-card";
 import { AgentRoster } from "./agent-roster";
 import { AgentDock } from "./agent-dock";
 import { PioneerPortrait } from "./pioneer-portrait";
+import { PIONEER_BIOS } from "@/lib/data/pioneer-bios";
 import type { SwarmWorker } from "@/types/chat";
 
 const ROLE_THEME: Record<string, { text: string; bg: string; border: string; stripe: string }> = {
@@ -70,6 +71,40 @@ function WorkerDetailContent({ worker, onClose }: { worker: SwarmWorker; onClose
             )}
           </div>
         </div>
+
+        {/* Pioneer bio + history + Wikipedia */}
+        {(() => {
+          const bio = PIONEER_BIOS[worker.pioneer_name ?? ""];
+          if (!bio) return null;
+          return (
+            <>
+              <div className="px-3 py-3 border-b border-[var(--chat-border)]">
+                <p className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mb-1.5">About</p>
+                <p className="text-[11px] text-[var(--chat-muted)] leading-relaxed">{bio.bio}</p>
+              </div>
+              <div className="px-3 py-3 border-b border-[var(--chat-border)]">
+                <p className="text-[8px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase mb-1.5">Historical Context</p>
+                <p className="text-[10px] text-[var(--chat-muted)] leading-relaxed opacity-80">{bio.historical_context}</p>
+              </div>
+              <div className="px-3 py-2 border-b border-[var(--chat-border)]">
+                <a
+                  href={bio.wikipedia_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "inline-flex items-center gap-1.5 text-[9px] font-semibold px-2 py-1 rounded-sm transition-opacity hover:opacity-70",
+                    theme.text, theme.bg, theme.border, "border",
+                  )}
+                >
+                  <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z" />
+                  </svg>
+                  Learn more on Wikipedia
+                </a>
+              </div>
+            </>
+          );
+        })()}
 
         {/* Task */}
         <div className="px-3 py-3 border-b border-[var(--chat-border)]">
