@@ -903,6 +903,16 @@ def chat_swarm(
                             yield _t("→ Web grounding: no results returned")
                     else:
                         yield _t("→ Web grounding: skipped (query does not need live data)")
+                    # Append web results to extracted_context so coordinator workers can use them
+                    if results:
+                        web_ctx = "\n".join(
+                            f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('snippet','')}"
+                            for i, r in enumerate(results)
+                        )
+                        if extracted_context:
+                            extracted_context += f"\n\n[Web Grounding Results]\n{web_ctx}"
+                        else:
+                            extracted_context = f"[Web Grounding Results]\n{web_ctx}"
                 else:
                     logger.warning(
                         "[Router] Web grounding requested by %s but permission not granted", owner_id

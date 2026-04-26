@@ -210,14 +210,14 @@ def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
         return []
 
     # Parse DuckDuckGo Lite results (table-based HTML)
+    # DDG Lite uses single-quoted class attributes: class='result-link' / class='result-snippet'
     results = []
-    # DDG Lite uses <a> tags with class "result-link" inside table rows
     link_pattern = re.compile(
-        r'<a[^>]+rel="nofollow"[^>]+href="([^"]+)"[^>]*class="result-link"[^>]*>(.*?)</a>',
+        r'<a[^>]+href="([^"]+)"[^>]+class=["\']result-link["\'][^>]*>(.*?)</a>',
         re.DOTALL | re.IGNORECASE,
     )
     snippet_pattern = re.compile(
-        r'<td\s+class="result-snippet"[^>]*>(.*?)</td>',
+        r'<td[^>]+class=["\']result-snippet["\'][^>]*>(.*?)</td>',
         re.DOTALL | re.IGNORECASE,
     )
 

@@ -796,7 +796,25 @@ def coordinate_task(
             task_text = task_def.get("task", "")
 
             worker_id = session.register_worker(role, task_text, "implementation")
-            agent = _get_agent_for_role(role, session_id=session_id)
+            try:
+                agent = _get_agent_for_role(role, session_id=session_id)
+            except Exception as _agent_err:
+                logger.warning(
+                    f"[Coordinator] Agent init failed for role '{role}' (falling back to simple agent): {_agent_err}"
+                )
+                _fb_host = get_swarm_worker_host(ARCHITECT_MODEL)
+                from agno.agent import Agent as _Agent
+                from agno.models.ollama import Ollama as _Ollama
+                agent = _Agent(
+                    name=f"{role.capitalize()} Worker",
+                    model=_Ollama(id=ARCHITECT_MODEL, host=_fb_host, client_kwargs={"timeout": 300.0}),
+                    instructions=[
+                        f"You are a {role} worker producing a detailed plan.",
+                        "Produce written plans, designs, and documentation only.",
+                        "Do NOT execute commands, SSH to servers, or make live connections.",
+                    ],
+                    show_tool_calls=False,
+                )
             _impl_pioneer = session.workers[worker_id].pioneer
             yield {
                 "type": "swarm_worker_created",
@@ -810,10 +828,14 @@ def coordinate_task(
                 "content": f"Spawned {_impl_pioneer['name']} ({role})",
             }
 
-            # Implementation workers get the synthesis as context
+            # Implementation workers get the synthesis as context.
+            # IMPORTANT: produce written plans/designs/docs only — do NOT execute
+            # commands, connect to live services, or modify infrastructure.
             impl_prompt = (
                 f"[Implementation Task {i+1}/{len(impl_tasks)}]\n"
                 f"{task_text}\n\n"
+                f"IMPORTANT: Produce a detailed written plan, design, or documentation for this "
+                f"task. Do NOT execute commands, SSH to servers, or make live connections.\n\n"
                 f"[Synthesis / Implementation Plan]:\n{synthesis}\n\n"
             )
             if extracted_context:
