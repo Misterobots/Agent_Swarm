@@ -514,3 +514,89 @@ nav, .nav-item { -webkit-user-select: none; user-select: none; }
 @media (max-width: 767px) {
   .chat-shell { -webkit-overflow-scrolling: touch; }  
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE NAVIGATION & LAYOUT FIXES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Ensure navigation bars handle overflow properly on all viewport sizes */
+nav, [role="navigation"] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+nav::-webkit-scrollbar,
+[role="navigation"]::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Horizontal flex containers should wrap or scroll gracefully */
+.flex.flex-row, .flex.items-center {
+  flex-wrap: nowrap;
+  min-width: 0; /* Allow flex items to shrink below content size */
+}
+
+/* Prevent fixed-width elements from breaking responsive layouts */
+.sidebar-wrapper {
+  flex-shrink: 0;
+  max-width: 100vw;
+}
+
+/* Ensure main content areas don't overflow */
+main, .main-content {
+  max-width: 100%;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* Tab bars and horizontal navigation */
+.tab-bar, [data-tab-bar] {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.tab-bar > *, [data-tab-bar] > * {
+  flex-shrink: 0; /* Prevent tabs from compressing too much */
+  white-space: nowrap;
+}
+
+/* Responsive breakpoints for viewport changes */
+@media (max-width: 1024px) {
+  /* Tablet: ensure sidebars don't take too much space */
+  .sidebar-wrapper {
+    max-width: min(256px, 40vw);
+  }
+}
+
+@media (max-width: 768px) {
+  /* Mobile: stack layouts vertically */
+  .flex-row {
+    flex-direction: column;
+  }
+  
+  /* Full-width navigation on mobile */
+  nav, [role="navigation"] {
+    width: 100%;
+  }
+}
+
+/* Fix z-index stacking during viewport resize */
+.app-shell > * {
+  position: relative;
+  z-index: auto;
+}
+
+/* Ensure modals and overlays stay on top */
+[data-overlay], [role="dialog"], .modal {
+  z-index: 1000;
+}

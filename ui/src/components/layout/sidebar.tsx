@@ -102,10 +102,12 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Mode Switcher */}
-      <div className="px-3 py-3 border-b border-[var(--chat-border)]">
-        <ModeSwitcher />
-      </div>
+      {/* Mode Switcher - Admin only */}
+      {isAdmin && (
+        <div className="px-3 py-3 border-b border-[var(--chat-border)]">
+          <ModeSwitcher />
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin">
         <SidebarSection title="Workspaces">

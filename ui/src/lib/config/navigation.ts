@@ -38,12 +38,6 @@ export const primaryNavigation: NavigationItem[] = [
     matchPrefixes: ["/chat"],
   },
   {
-    label: "Developer",
-    href: "/dev",
-    icon: Bot,
-    matchPrefixes: ["/dev"],
-  },
-  {
     label: "Monitoring",
     href: "/monitoring",
     icon: Radar,
