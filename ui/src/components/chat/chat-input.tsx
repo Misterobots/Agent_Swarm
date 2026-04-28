@@ -151,7 +151,8 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
               )}
             >
               <Send size={16} />
-          </button>
+            </button>
+          </>
         )}
       </div>
     </div>
