@@ -10,21 +10,14 @@ import { BuddyComment } from "@/components/buddy/buddy-comment";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
 import { InputToolbar } from "./input-toolbar";
-import { UltraplanToggle } from "./ultraplan-toggle";
-import { UltrathinkToggle } from "./ultrathink-toggle";
-import { WebGroundingToggle } from "./web-grounding-toggle";
-import { DocGroundingToggle } from "./doc-grounding-toggle";
-import { FileGroundingToggle } from "./file-grounding-toggle";
-import { SwarmToggle } from "./swarm-toggle";
 import { SwarmDrawer } from "@/components/swarm/swarm-drawer";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useSwarmBroadcast } from "@/lib/hooks/use-swarm-broadcast";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
-import { Bot, Brain, Code2, X, MoreHorizontal } from "lucide-react";
+import { Bot } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import { ThemeSelector } from "./theme-selector";
 import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import { useBuddyStore } from "@/lib/stores/buddy-store";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
@@ -75,8 +68,6 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { isMobile } = useIsMobile();
   const buddyReact = useBuddyStore((s) => s.react);
   const buddyStage = useBuddyStore((s) => s.evolutionStage);
@@ -91,22 +82,6 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const setSwarmDismissed = useSwarmStore((s) => s.setDismissed);
   const theaterPhase = useSwarmStore((s) => s.theaterPhase);
   const swarmWorkers = useSwarmStore((s) => s.workers);
-
-  // Close mobile overflow menu on outside tap
-  useEffect(() => {
-    if (!mobileMenuOpen) return;
-    const handleTouch = (e: MouseEvent | TouchEvent) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
-        setMobileMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleTouch);
-    document.addEventListener("touchstart", handleTouch);
-    return () => {
-      document.removeEventListener("mousedown", handleTouch);
-      document.removeEventListener("touchstart", handleTouch);
-    };
-  }, [mobileMenuOpen]);
 
   // Show the thinking indicator when streaming and either we have a status
   // message or the assistant message is still empty (waiting for first content)
@@ -184,75 +159,6 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-3 md:px-4 py-2 min-w-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <ModelSelector />
-          {!isMobile && <ThemeSelector />}
-          {!isMobile && <UltraplanToggle />}
-          {!isMobile && <UltrathinkToggle />}
-          <SwarmToggle />
-          {!isMobile && <WebGroundingToggle />}
-          {!isMobile && <DocGroundingToggle />}
-          {!isMobile && <FileGroundingToggle />}
-          {!isMobile && activeConversationId && (
-            <button
-              type="button"
-              onClick={() =>
-                updateConversation(activeConversationId, {
-                  memoryEnabled: !(activeConv?.memoryEnabled ?? false),
-                })
-              }
-              className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs border transition-colors",
-                activeConv?.memoryEnabled
-                  ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
-                  : "bg-[var(--chat-panel)] text-[var(--chat-muted)] border-[var(--chat-border)]"
-              )}
-              title="Toggle cross-session memory recall"
-            >
-              <Brain size={14} />
-              Memory
-            </button>
-          )}
-          {/* Mobile overflow menu trigger */}
-          {isMobile && (
-            <div className="relative" ref={mobileMenuRef}>
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-1.5 rounded-md text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
-              >
-                <MoreHorizontal size={18} />
-              </button>
-              {mobileMenuOpen && (
-                <div className="absolute top-full left-0 mt-1 z-30 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-lg p-2 space-y-1 min-w-[160px] max-h-[60vh] overflow-y-auto">
-                  <div className="px-2 py-1.5"><UltraplanToggle /></div>
-                  <div className="px-2 py-1.5"><UltrathinkToggle /></div>
-                  <div className="px-2 py-1.5"><ThemeSelector /></div>
-                  <div className="px-2 py-1.5"><WebGroundingToggle /></div>
-                  <div className="px-2 py-1.5"><DocGroundingToggle /></div>
-                  <div className="px-2 py-1.5"><FileGroundingToggle /></div>
-                  {activeConversationId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        updateConversation(activeConversationId, {
-                          memoryEnabled: !(activeConv?.memoryEnabled ?? false),
-                        });
-                        setMobileMenuOpen(false);
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-colors",
-                        activeConv?.memoryEnabled
-                          ? "text-[var(--chat-accent-strong)]"
-                          : "text-[var(--chat-muted)]"
-                      )}
-                    >
-                      <Brain size={14} />
-                      Memory {activeConv?.memoryEnabled ? "On" : "Off"}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           <button

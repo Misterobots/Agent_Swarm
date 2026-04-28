@@ -7,6 +7,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useAccess } from "@/lib/hooks/use-access";
 import { canSelectModel } from "@/lib/utils/model-access";
+import { ChatSettingsMenu } from "./chat-settings-menu";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -137,17 +138,19 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
             <Square size={16} />
           </button>
         ) : (
-          <button
-            onClick={handleSend}
-            disabled={!input.trim()}
-            className={cn(
-              "flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md flex items-center justify-center transition-colors",
-              input.trim()
-                ? "bg-[var(--chat-accent)] hover:bg-[var(--chat-accent-strong)] text-white"
-                : "bg-[var(--chat-soft)] text-[var(--chat-muted)] cursor-not-allowed"
-            )}
-          >
-            <Send size={16} />
+          <>
+            <ChatSettingsMenu />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim()}
+              className={cn(
+                "flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md flex items-center justify-center transition-colors",
+                input.trim()
+                  ? "bg-[var(--chat-accent)] hover:bg-[var(--chat-accent-strong)] text-white"
+                  : "bg-[var(--chat-soft)] text-[var(--chat-muted)] cursor-not-allowed"
+              )}
+            >
+              <Send size={16} />
           </button>
         )}
       </div>
