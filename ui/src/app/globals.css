@@ -570,11 +570,54 @@ main, .main-content {
   white-space: nowrap;
 }
 
+/* Chat header toolbar with toggle buttons */
+.chat-shell .flex.items-center.justify-between {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--chat-border) transparent;
+}
+
+.chat-shell .flex.items-center.justify-between::-webkit-scrollbar {
+  height: 4px;
+}
+
+.chat-shell .flex.items-center.justify-between::-webkit-scrollbar-thumb {
+  background: var(--chat-border);
+  border-radius: 2px;
+}
+
+.chat-shell .flex.items-center.justify-between::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Ensure toggle buttons don't wrap or compress */
+.chat-shell .flex.items-center.gap-2,
+.chat-shell .flex.items-center.gap-3 {
+  flex-wrap: nowrap;
+  min-width: fit-content;
+  gap: 0.5rem; /* Reduce gap slightly on smaller screens */
+}
+
+.chat-shell button,
+.chat-shell select {
+  flex-shrink: 0; /* Prevent buttons from shrinking below readable size */
+  white-space: nowrap;
+}
+
 /* Responsive breakpoints for viewport changes */
 @media (max-width: 1024px) {
   /* Tablet: ensure sidebars don't take too much space */
   .sidebar-wrapper {
     max-width: min(256px, 40vw);
+  }
+  
+  /* Reduce gaps and padding in chat header */
+  .chat-shell .flex.items-center.gap-2,
+  .chat-shell .flex.items-center.gap-3 {
+    gap: 0.375rem;
   }
 }
 
@@ -587,6 +630,12 @@ main, .main-content {
   /* Full-width navigation on mobile */
   nav, [role="navigation"] {
     width: 100%;
+  }
+  
+  /* Minimal gaps on mobile */
+  .chat-shell .flex.items-center.gap-2,
+  .chat-shell .flex.items-center.gap-3 {
+    gap: 0.25rem;
   }
 }
 
