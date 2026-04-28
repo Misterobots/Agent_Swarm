@@ -79,6 +79,17 @@ LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
 # ---------------------------------------------------------------------------
 TEMPLATE_DB_URL      = os.getenv("TEMPLATE_DB_URL",      f"postgresql://langfuse:langfuse@{HOPPER_IP}:5432/langfuse")
 
+
+# ---------------------------------------------------------------------------
+# Swarm Planning & Solving Limits
+# ---------------------------------------------------------------------------
+# These control the maximum iterations and/or time (in seconds) for planning and solving phases.
+# Set to 0 for unlimited. Both can be set; the phase will stop at whichever comes first.
+PLANNING_MAX_ITER = int(os.getenv("PLANNING_MAX_ITER", "0"))  # 0 = unlimited
+PLANNING_MAX_TIME = int(os.getenv("PLANNING_MAX_TIME", "0"))  # seconds, 0 = unlimited
+SOLVING_MAX_ITER = int(os.getenv("SOLVING_MAX_ITER", "2"))    # default 2 for MarsRL
+SOLVING_MAX_TIME = int(os.getenv("SOLVING_MAX_TIME", "0"))    # seconds, 0 = unlimited
+
 # ---------------------------------------------------------------------------
 # Training Pipeline Configuration
 # ---------------------------------------------------------------------------

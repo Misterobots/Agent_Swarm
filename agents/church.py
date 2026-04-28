@@ -21,7 +21,7 @@ from dispatcher import Event, EventType
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock, get_best_host_for_model
 from phi.storage.agent.postgres import PgAgentStorage
-from config import AGNO_DB_URL
+from config import AGNO_DB_URL, PLANNING_MAX_ITER, PLANNING_MAX_TIME
 
 logger = setup_logger("Router")
 security_audit_logger = setup_logger("SecurityAudit")
@@ -1320,9 +1320,20 @@ def chat_swarm(
                 with request_lock(context="text"):
                     yield _emit_stream_mode("responding")
                     response_stream = planner.run(user_input, stream=True)
+                    plan_chunks = 0
+                    start_time = time.time()
                     for chunk in response_stream:
                         if chunk.content:
                             yield {"type": "plan", "content": chunk.content}
+                            plan_chunks += 1
+                        # Check iteration limit
+                        if PLANNING_MAX_ITER and plan_chunks >= PLANNING_MAX_ITER:
+                            yield {"type": "status", "content": f"🛑 Planning iteration limit reached ({PLANNING_MAX_ITER}). Stopping."}
+                            break
+                        # Check time limit
+                        if PLANNING_MAX_TIME and (time.time() - start_time) > PLANNING_MAX_TIME:
+                            yield {"type": "status", "content": f"⏰ Planning time limit reached ({PLANNING_MAX_TIME}s). Stopping."}
+                            break
             except Exception as e:
                 yield {"type": "error", "content": f"Plan generation failed: {e}"}
                 logger.error(f"[Router] UltraPlan failed: {e}", exc_info=True)

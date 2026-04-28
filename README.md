@@ -1,4 +1,14 @@
-﻿# Home AI Lab: Memex
+﻿# Swarm Planning & Solving Limits
+
+You can control how long the swarm spends on planning and solving phases using these environment variables (set in your environment or network.env):
+
+- `PLANNING_MAX_ITER`: Maximum number of planning output chunks (0 = unlimited)
+- `PLANNING_MAX_TIME`: Maximum planning time in seconds (0 = unlimited)
+- `SOLVING_MAX_ITER`: Maximum number of solving/verification/correction iterations (default: 2)
+- `SOLVING_MAX_TIME`: Maximum solving time in seconds (0 = unlimited)
+
+If both a time and iteration limit are set, the phase will stop at whichever comes first. If 100% confidence is reached before the limit, the swarm proceeds to final steps immediately.
+# Home AI Lab: Memex
 
 **Version**: 3.4 (Phase 6 complete) · **Status**: Production · **Updated**: 2026-03-31
 

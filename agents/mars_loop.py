@@ -70,6 +70,8 @@ class MarsLoopResult:
 # Core Loop
 # ---------------------------------------------------------------------------
 
+from config import SOLVING_MAX_TIME
+
 class MarsRLLoop:
     """
     Inference-time MarsRL loop.
@@ -89,6 +91,7 @@ class MarsRLLoop:
         session_id: Optional[str] = None,
         token: Optional[str] = None,
         template_metadata: Optional[dict] = None,
+        max_time: Optional[int] = None,  # seconds
     ):
         self.solver = solver
         self.verifier = verifier
@@ -98,6 +101,8 @@ class MarsRLLoop:
         self.session_id = session_id
         self.token = token
         self.template_metadata = template_metadata or {}
+        # Use config default if not provided
+        self.max_time = max_time if max_time is not None else SOLVING_MAX_TIME
 
     @observe(name="mars_loop")
     def run(self, task: str, event_callback: Optional[Callable[[dict], None]] = None, stream_timeout: float = 60.0) -> MarsLoopResult:
@@ -138,6 +143,7 @@ class MarsRLLoop:
         corrector_invoked = False
         final_score = 0.0
         solver_score = 0.0
+        start_time = time.time()
 
         # --- Step 1: Solver ---
         if event_callback:
@@ -239,6 +245,12 @@ class MarsRLLoop:
 
         # --- Step 2: Verify → Correct loop ---
         for attempt in range(self.max_iter):
+            # Check time limit before each iteration
+            if self.max_time and (time.time() - start_time) > self.max_time:
+                logger.info(f"[MarsLoop] Time limit reached: {self.max_time}s. Stopping iterations.")
+                if event_callback:
+                    event_callback({"type": "status", "content": f"⏰ MarsRL: Time limit reached ({self.max_time}s). Stopping."})
+                break
             if event_callback:
                 event_callback({"type": "status", "content": f"🔍 MarsRL: Verifying attempt {attempt + 1}/{self.max_iter}..."})
 
