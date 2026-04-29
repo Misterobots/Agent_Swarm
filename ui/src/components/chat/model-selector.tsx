@@ -21,11 +21,11 @@ export function ModelSelector() {
       <select
         value={MEMEX_MODEL_ID}
         onChange={() => {/* single option — no-op */}}
-        className="appearance-none bg-[var(--chat-panel)] text-[var(--chat-text)] text-sm border border-[var(--chat-border)] rounded-lg pl-3 pr-8 py-1.5 focus:border-[var(--chat-accent)] focus:outline-none cursor-pointer max-w-[140px] md:max-w-none truncate"
+        className="appearance-none bg-[var(--chat-panel)] text-[var(--chat-text)] text-sm border border-[var(--chat-border)] rounded-lg pl-3 pr-10 py-1.5 focus:border-[var(--chat-accent)] focus:outline-none cursor-pointer max-w-[140px] md:max-w-none"
       >
         <option value={MEMEX_MODEL_ID}>Memex</option>
       </select>
-      <ChevronDown size={14} className="absolute right-2 text-[var(--chat-muted)] pointer-events-none" />
+      <ChevronDown size={14} className="absolute right-3 text-[var(--chat-muted)] pointer-events-none" />
     </div>
   );
 }
