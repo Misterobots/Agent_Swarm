@@ -102,6 +102,13 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
         r"|end-?to-?end|full\s+stack|set\s+up\s+a\s+system|design\s+and\s+implement)\b",
         re.I,
     ), "COORDINATE", 0.85),
+    
+    # ANTI-COORDINATE: Simple list requests should NOT trigger multi-agent coordination
+    (re.compile(
+        r"\b(list|show|what)\s+(tools?|files?|capabilities|access|have)\b"
+        r"|\b(provide|give)\s+(a\s+)?(succinct|brief|short|quick|simple)\s+(list|summary)\b",
+        re.I,
+    ), "CONVERSATION", 0.92),
 
     # CONVERSATION — greetings, meta-questions, casual chat (broad catch)
     (re.compile(
@@ -137,7 +144,7 @@ class SemanticRouter:
             If the input contains "Original Request", "System Question", and "User Answer", merge the "User Answer" into the "Original Request" context to deduce the final intent.
             
             CATEGORIES:
-            1. **CONVERSATION**: Greetings, casual chat, small talk, simple factual questions, meta-questions about the AI system itself, or anything social in nature. Default for any message that is unclear but does not require specialized tools. (Keywords: "hello", "hi", "how are you", "what is", "tell me about", "who are you", "what can you do", "what do you have access to", "what files do you have", "what tools", "what are your capabilities", "tell me about yourself", "how do you work", "help me understand you")
+            1. **CONVERSATION**: Greetings, casual chat, small talk, simple factual questions, meta-questions about the AI system itself, simple list requests, or anything social in nature. Default for any message that is unclear but does not require specialized tools. ALWAYS use this for requests to "list", "show", "what tools", "what files", "what access" especially if user adds "succinct", "brief", "quick", or "short". (Keywords: "hello", "hi", "how are you", "what is", "tell me about", "who are you", "what can you do", "what do you have access to", "what files do you have", "what tools", "what are your capabilities", "tell me about yourself", "how do you work", "help me understand you", "list the", "show me", "succinct", "brief", "quick list")
             2. **CODE**: Software engineering, writing scripts (Python/JS/etc.), debugging, fixing errors, or building apps. The user must be asking you to BUILD, WRITE, FIX, or MODIFY software — not merely asking about files or capabilities. (Keywords: "write script", "fix bug", "function", "develop", "code", "implement", "refactor")
             3. **DEVOPS**: Infrastructure, Docker, Kubernetes, CI/CD pipelines, Linux administration, networking, shell scripts, server configuration, or cloud deployment. (Keywords: "docker", "kubernetes", "deploy", "nginx", "server", "firewall", "pipeline", "bash script", "systemd", "compose")
             4. **DATA**: Data analysis, SQL queries, CSV/JSON processing, statistics, charts, dashboards, or data transformation. (Keywords: "query", "sql", "analyze data", "csv", "dataframe", "statistics", "chart", "pandas", "aggregate")
@@ -150,7 +157,7 @@ class SemanticRouter:
             11. **IOT_CONTROL**: Turning on/off smart home devices, lights, sending raw commands to home automation. (Keywords: "turn on", "lights", "temperature", "unlock", "scene", "home assistant")
             12. **IOT_DEV**: Developing firmware, simulating circuits, or raw MQTT backend development. (Keywords: "simulate", "wokwi", "flash esp32", "compile firmware", "mqtt", "arduino")
             13. **VISION**: Analyzing, describing, or answering questions about an existing image or screenshot. The user is asking the AI to LOOK AT an image they provide, NOT to generate a new one. (Keywords: "what do you see", "describe this image", "analyze this image", "what is in this picture", "read this screenshot", "OCR", "identify", "what's happening in this photo", "look at this")
-            14. **COORDINATE**: The user is requesting a complex, multi-step task that requires decomposition into subtasks, parallel research, synthesis of findings, and coordinated implementation. This is NOT for simple one-shot requests — only for tasks that genuinely need multiple workers collaborating. (Keywords: "plan and build", "coordinate", "multi-step", "build a full", "design and implement", "create a complete", "end-to-end", "full stack", "set up a system")
+            14. **COORDINATE**: The user is requesting a complex, multi-step task that requires decomposition into subtasks, parallel research, synthesis of findings, and coordinated implementation. This is NOT for simple one-shot requests — only for tasks that genuinely need multiple workers collaborating. DO NOT USE for simple information requests like "list X" or "what tools" even if they mention planning/building. (Keywords: "plan and build", "coordinate", "multi-step", "build a full", "design and implement", "create a complete", "end-to-end", "full stack", "set up a system"). ANTI-PATTERNS: "list tools", "show me", "what do you have", "succinct list" → these are CONVERSATION, not COORDINATE.
 
             OUTPUT FORMAT CHECKLIST (JSON ONLY):
             {

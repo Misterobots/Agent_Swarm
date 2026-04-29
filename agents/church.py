@@ -457,6 +457,7 @@ def _extract_constraint_context(history: list | None, user_input: str) -> str:
     if not history:
         return ""
 
+    # Include brevity keywords to detect user frustration with verbose responses
     keywords = (
         "constraint",
         "must",
@@ -465,8 +466,19 @@ def _extract_constraint_context(history: list | None, user_input: str) -> str:
         "no-downtime",
         "no downtime",
         "requirement",
+        "succinct",
+        "brief",
+        "concise",
+        "short",
+        "quick",
+        "simple list",
+        "just list",
+        "keep it short",
+        "don't elaborate",
     )
     constraints = []
+    brevity_count = 0  # Track if user keeps asking for brevity
+    
     for msg in history:
         _role = msg.get("role", "user") if isinstance(msg, dict) else getattr(msg, "role", "user")
         if _role != "user":
@@ -478,6 +490,9 @@ def _extract_constraint_context(history: list | None, user_input: str) -> str:
         lowered = content.lower()
         if any(k in lowered for k in keywords):
             constraints.append(content)
+            # Count brevity requests
+            if any(brev in lowered for brev in ("succinct", "brief", "concise", "short", "quick", "simple list")):
+                brevity_count += 1
 
     if not constraints:
         return ""
@@ -485,6 +500,11 @@ def _extract_constraint_context(history: list | None, user_input: str) -> str:
     # Keep only the most recent few constraints to reduce prompt bloat.
     recent = constraints[-3:]
     block = "\n".join([f"- {c}" for c in recent])
+    
+    # If user has requested brevity multiple times, escalate the constraint
+    if brevity_count >= 2:
+        block += "\n- CRITICAL: User has requested brevity MULTIPLE times. Provide ONLY a concise bulleted list. NO explanations, NO elaboration, NO project plans."
+    
     return (
         "[Active User Constraints - Must Respect]\n"
         f"{block}\n"
