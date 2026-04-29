@@ -2,6 +2,7 @@
 
 import { ModelSelector } from "@/components/chat/model-selector";
 import { GitHubConnect } from "@/components/settings/github-connect";
+import { ProviderKeysConnect } from "@/components/settings/provider-keys-connect";
 import { useToolsStore } from "@/lib/stores/tools-store";
 import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DASHBOARDS } from "@/components/monitor/dashboard-selector";
@@ -48,10 +49,24 @@ export default function SettingsPage() {
 
           {/* Connected Accounts */}
           <section>
-            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Connected Accounts</h2>
-            <GitHubConnect />
-            <p className="mt-2 text-xs text-[var(--chat-muted)]">
-              Connect your GitHub account to access GitHub Models (GPT-4o, Claude, Llama, and more) directly in the chat and editor.
+            
+            {/* GitHub OAuth */}
+            <div className="mb-6">
+              <h3 className="text-sm text-[var(--chat-text)] mb-2 font-medium">GitHub Models</h3>
+              <GitHubConnect />
+              <p className="mt-2 text-xs text-[var(--chat-muted)]">
+                Connect your GitHub account to access GitHub Models (GPT-4o, Claude, Llama, and more) directly in the chat and editor.
+              </p>
+            </div>
+
+            {/* Provider API Keys */}
+            <div>
+              <h3 className="text-sm text-[var(--chat-text)] mb-2 font-medium">Provider API Keys</h3>
+              <ProviderKeysConnect />
+              <p className="mt-2 text-xs text-[var(--chat-muted)]">
+                Store your own API keys for Anthropic (Claude) and Google (Gemini) to access premium models with your subscription.
+              </p>
+            </divonnect your GitHub account to access GitHub Models (GPT-4o, Claude, Llama, and more) directly in the chat and editor.
             </p>
           </section>
 

@@ -4243,6 +4243,85 @@ if __name__ == "__main__":
 
 
 # ---------------------------------------------------------------------------
+# PROVIDER KEYS — Per-user API key management for external LLM providers
+# ---------------------------------------------------------------------------
+
+class _ProviderKeyRequest(BaseModel):
+    provider: str
+    api_key: str
+    label: str = ""
+
+
+@app.get("/api/v1/provider-keys/providers")
+async def provider_keys_catalog():
+    """Return the catalog of supported providers and their models."""
+    try:
+        from provider_keys import PROVIDERS
+        # Don't expose internal fields like key_prefix
+        return {
+            provider_id: {
+                "label": info["label"],
+                "models": info.get("models", []),
+            }
+            for provider_id, info in PROVIDERS.items()
+        }
+    except Exception as e:
+        logger.error(f"provider_keys_catalog error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/provider-keys/list")
+async def provider_keys_list(http_request: Request):
+    """List the providers the current user has connected (no keys exposed)."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        from provider_keys import list_connected
+        return {"providers": list_connected(uid)}
+    except Exception as e:
+        logger.error(f"provider_keys_list error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/provider-keys/connect")
+async def provider_keys_connect(body: _ProviderKeyRequest, http_request: Request):
+    """Store or update a provider API key for the current user."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        from provider_keys import upsert_key, PROVIDERS
+        if body.provider not in PROVIDERS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown provider: {body.provider}. Supported: {list(PROVIDERS.keys())}"
+            )
+        upsert_key(uid, body.provider, body.api_key, body.label)
+        return {"status": "connected", "provider": body.provider}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"provider_keys_connect error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/v1/provider-keys/{provider}")
+async def provider_keys_disconnect(provider: str, http_request: Request):
+    """Remove a stored provider key for the current user."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        from provider_keys import delete_key
+        deleted = delete_key(uid, provider)
+        return {"disconnected": deleted, "provider": provider}
+    except Exception as e:
+        logger.error(f"provider_keys_disconnect error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
 # GITHUB OAUTH — Device Flow endpoints (Phase 1C)
 # ---------------------------------------------------------------------------
 
