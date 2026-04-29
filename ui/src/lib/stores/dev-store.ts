@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+interface TerminalTabInfo {
+  id: string;
+  title: string;
+}
+
 interface DevState {
   editorContent: string;
   editorLanguage: string;
@@ -14,6 +19,19 @@ interface DevState {
   editorSyncEnabled: boolean;
   /** Tool names the user has auto-approved for the current session */
   sessionAutoApprove: string[];
+  
+  // Phase 2: Terminal tabs
+  terminalTabs: TerminalTabInfo[];
+  activeTerminalId: string;
+  
+  // Phase 2: Admin features
+  selectedNode: "lovelace" | "turing" | "hopper" | "workspace";
+  gitBranch: { [node: string]: string };
+  
+  // Phase 2: Output preview
+  previewUrl: string;
+  showFileTree: boolean;
+  showOutputPreview: boolean;
 
   setEditorContent: (content: string) => void;
   setEditorLanguage: (language: string) => void;
@@ -23,6 +41,20 @@ interface DevState {
   setEditorSyncEnabled: (enabled: boolean) => void;
   addSessionAutoApprove: (toolName: string) => void;
   clearSessionAutoApprove: () => void;
+  
+  // Terminal tab actions
+  addTerminalTab: (id: string, title: string) => void;
+  removeTerminalTab: (id: string) => void;
+  setActiveTerminal: (id: string) => void;
+  
+  // Admin actions
+  setSelectedNode: (node: "lovelace" | "turing" | "hopper" | "workspace") => void;
+  setGitBranch: (node: string, branch: string) => void;
+  
+  // Preview actions
+  setPreviewUrl: (url: string) => void;
+  setShowFileTree: (show: boolean) => void;
+  setShowOutputPreview: (show: boolean) => void;
 }
 
 export const useDevStore = create<DevState>()(
@@ -35,6 +67,14 @@ export const useDevStore = create<DevState>()(
       agentEnabled: true,
       editorSyncEnabled: true,
       sessionAutoApprove: [],
+      terminalTabs: [],
+      activeTerminalId: "",
+      selectedNode: "workspace",
+      gitBranch: {},
+      previewUrl: "http://localhost:3000",
+      showFileTree: true,
+      showOutputPreview: true,
+      
       setEditorContent: (content) => set({ editorContent: content }),
       setEditorLanguage: (language) => set({ editorLanguage: language }),
       setActiveFile: (file) => set({ activeFile: file }),
@@ -44,14 +84,36 @@ export const useDevStore = create<DevState>()(
       addSessionAutoApprove: (toolName) =>
         set((s) => ({ sessionAutoApprove: [...new Set([...s.sessionAutoApprove, toolName])] })),
       clearSessionAutoApprove: () => set({ sessionAutoApprove: [] }),
+      
+      addTerminalTab: (id, title) =>
+        set((s) => ({ terminalTabs: [...s.terminalTabs, { id, title }] })),
+      removeTerminalTab: (id) =>
+        set((s) => ({
+          terminalTabs: s.terminalTabs.filter((t) => t.id !== id),
+          activeTerminalId: s.activeTerminalId === id ? (s.terminalTabs[0]?.id || "") : s.activeTerminalId,
+        })),
+      setActiveTerminal: (id) => set({ activeTerminalId: id }),
+      
+      setSelectedNode: (node) => set({ selectedNode: node }),
+      setGitBranch: (node, branch) =>
+        set((s) => ({ gitBranch: { ...s.gitBranch, [node]: branch } })),
+      
+      setPreviewUrl: (url) => set({ previewUrl: url }),
+      setShowFileTree: (show) => set({ showFileTree: show }),
+      setShowOutputPreview: (show) => set({ showOutputPreview: show }),
     }),
     {
       name: "hive-dev-store",
-      // Only persist settings, not transient editor state
+      // Persist settings and state
       partialize: (state) => ({
         agentEnabled: state.agentEnabled,
         editorSyncEnabled: state.editorSyncEnabled,
+        selectedNode: state.selectedNode,
+        previewUrl: state.previewUrl,
+        showFileTree: state.showFileTree,
+        showOutputPreview: state.showOutputPreview,
       }),
     }
   )
 );
+

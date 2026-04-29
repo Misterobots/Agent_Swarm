@@ -3,14 +3,18 @@
 import { Panel, Group, Separator } from "react-resizable-panels";
 import { ChatView } from "@/components/chat/chat-view";
 import { EditorPane } from "./editor-pane";
-import { TerminalPane } from "./terminal-pane";
+import { TabbedTerminal } from "./tabbed-terminal";
+import { FileTree } from "./file-tree";
+import { OutputPreview } from "./output-preview";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
+import { useDevStore } from "@/lib/stores/dev-store";
 
 export function DevWorkspace() {
   const { isMobile } = useIsMobile();
   const router = useRouter();
+  const { showFileTree, showOutputPreview } = useDevStore();
 
   // Redirect to chat on mobile — Dev workspace is desktop-only
   useEffect(() => {
@@ -21,15 +25,18 @@ export function DevWorkspace() {
 
   return (
     <Group orientation="horizontal" className="h-full">
-      {/* Chat pane */}
-      <Panel defaultSize="35%" minSize="25%">
-        <ChatView showDevContext />
-      </Panel>
+      {/* File Tree (collapsible) */}
+      {showFileTree && (
+        <>
+          <Panel defaultSize="15%" minSize="10%" maxSize="30%">
+            <FileTree />
+          </Panel>
+          <Separator className="w-1 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors" />
+        </>
+      )}
 
-      <Separator className="w-1 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors" />
-
-      {/* Right side: editor + terminal stacked */}
-      <Panel defaultSize="65%" minSize="30%">
+      {/* Editor + Chat stacked */}
+      <Panel defaultSize={showFileTree ? "50%" : "60%"} minSize="30%">
         <Group orientation="vertical">
           {/* Editor pane */}
           <Panel defaultSize="65%" minSize="20%">
@@ -38,10 +45,33 @@ export function DevWorkspace() {
 
           <Separator className="h-1 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors" />
 
-          {/* Terminal pane */}
-          <Panel defaultSize="35%" minSize="15%">
-            <TerminalPane />
+          {/* Chat pane */}
+          <Panel defaultSize="35%" minSize="20%">
+            <ChatView showDevContext />
           </Panel>
+        </Group>
+      </Panel>
+
+      <Separator className="w-1 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors" />
+
+      {/* Terminal + Preview stacked */}
+      <Panel defaultSize="35%" minSize="20%">
+        <Group orientation="vertical">
+          {/* Terminal pane with tabs */}
+          <Panel defaultSize={showOutputPreview ? "60%" : "100%"} minSize="30%">
+            <TabbedTerminal />
+          </Panel>
+
+          {showOutputPreview && (
+            <>
+              <Separator className="h-1 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors" />
+
+              {/* Output preview */}
+              <Panel defaultSize="40%" minSize="20%">
+                <OutputPreview />
+              </Panel>
+            </>
+          )}
         </Group>
       </Panel>
     </Group>
