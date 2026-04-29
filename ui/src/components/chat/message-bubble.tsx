@@ -10,6 +10,7 @@ import { ToolCallBlock } from "./tool-call-block";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { ClarificationCard } from "./clarification-card";
 import { MessageActions } from "./message-actions";
+import { MediaPreview } from "./media-preview";
 
 // ---------------------------------------------------------------------------
 // Swarm response parser — splits coordinator output into collapsible phases
@@ -312,6 +313,14 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
                 <Palette size={16} />
                 Open Art Studio
               </Link>
+            )}
+            {/* Media Attachments (Images, Videos, 3D Models) */}
+            {message.mediaAttachments && message.mediaAttachments.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {message.mediaAttachments.map((media) => (
+                  <MediaPreview key={media.id} media={media} />
+                ))}
+              </div>
             )}
             {(!!message.thoughtTrace?.length || message.turnMetadata) && (
               <div className="mt-3 border border-[var(--chat-border)] rounded-lg overflow-hidden">

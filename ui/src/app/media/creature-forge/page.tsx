@@ -146,7 +146,7 @@ export default function CreatureForgePage() {
                     <p className="text-sm font-medium text-[var(--chat-text)]">{item.name}</p>
                     <p className="text-xs text-[var(--chat-muted)]">{new Date(item.updated_at * 1000).toLocaleString()}</p>
                   </div>
-                  <a href={item.url} download={item.name} className="text-xs text-[var(--chat-accent)]">
+                  <a href={item.download_url || item.url} download={item.name} className="text-xs text-[var(--chat-accent)]">
                     Download
                   </a>
                 </div>

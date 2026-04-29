@@ -16,6 +16,7 @@ export interface GalleryItem {
   size_mb: number;
   updated_at: number;
   url: string;
+  download_url?: string;
   metadata?: Record<string, unknown> | null;
 }
 

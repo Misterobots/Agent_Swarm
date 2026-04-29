@@ -194,7 +194,7 @@ export default function ActionFigurePage() {
                 <div className="space-y-1 p-3">
                   <p className="truncate text-sm font-medium text-[var(--chat-text)]">{item.name}</p>
                   <p className="text-xs text-[var(--chat-muted)]">{new Date(item.updated_at * 1000).toLocaleString()}</p>
-                  <a href={item.url} download={item.name} className="inline-block text-xs text-[var(--chat-accent)]">
+                  <a href={item.download_url || item.url} download={item.name} className="inline-block text-xs text-[var(--chat-accent)]">
                     Download
                   </a>
                 </div>

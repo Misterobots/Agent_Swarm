@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment } from "@/types/chat";
+import type { ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 
 const MODEL_WINDOWS: Record<string, number> = {
@@ -55,6 +55,7 @@ export function useChatStream(options?: {
   const streamModesRef = useRef<StreamMode[]>([]);
   const turnMetadataRef = useRef<TurnMetadata | null>(null);
   const continuationHintRef = useRef<"auto_continue" | "await_user" | "compacting" | null>(null);
+  const mediaAttachmentsRef = useRef<MediaAttachment[]>([]);
 
   const {
     conversations,
@@ -70,6 +71,7 @@ export function useChatStream(options?: {
     setMessageToolResults,
     setMessageTurnMetadata,
     setMessagePendingApprovals,
+    setMessageMediaAttachments,
     setMessagePendingClarification,
   } = useChatStore();
 
@@ -211,6 +213,7 @@ export function useChatStream(options?: {
       streamModesRef.current = [];
       turnMetadataRef.current = null;
       continuationHintRef.current = null;
+      mediaAttachmentsRef.current = [];
       
       const controller = new AbortController();
       abortRef.current = controller;
@@ -297,7 +300,14 @@ export function useChatStream(options?: {
           } else if (event.type === "clarification_card") {
             if (event.clarification) {
               setMessagePendingClarification(convId!, assistantId, event.clarification as ClarificationCard);
+            }media_attachment") {
+            // Handle generated media (images, videos, 3D models)
+            if (event.media) {
+              mediaAttachmentsRef.current = [...mediaAttachmentsRef.current, event.media];
+              // Update message immediately so preview appears during streaming
+              setMessageMediaAttachments(convId!, assistantId, mediaAttachmentsRef.current);
             }
+          } else if (event.type === "
           } else if (event.type === "stream_mode") {
             const mode = event.streamMode || "responding";
             setStreamMode(mode);

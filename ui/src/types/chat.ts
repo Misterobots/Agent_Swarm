@@ -112,7 +112,7 @@ export interface ClarificationCard {
 }
 
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -150,6 +150,25 @@ export interface StreamEvent {
 
   // Clarification card
   clarification?: ClarificationCard;
+
+  // Media attachment
+  media?: MediaAttachment;
+}
+
+/**
+ * Generated media attachment (image, audio, video, etc.)
+ */
+export interface MediaAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  url: string;
+  downloadUrl: string;
+  size: number;
+  width?: number;
+  height?: number;
+  duration?: number;
+  previewable: boolean;
 }
 
 export interface ChatMessage {
@@ -165,6 +184,7 @@ export interface ChatMessage {
   turnMetadata?: TurnMetadata;
   pendingApprovals?: ToolApprovalEvent[];
   pendingClarification?: ClarificationCard;
+  mediaAttachments?: MediaAttachment[];
 }
 
 export interface Conversation {

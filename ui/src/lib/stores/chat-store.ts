@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   ClarificationCard,
   Conversation,
+  MediaAttachment,
   ThoughtEvent,
   ToolCallEvent,
   ToolLifecycleEvent,
@@ -39,6 +40,7 @@ interface ChatState {
   setMessageTurnMetadata: (conversationId: string, messageId: string, metadata: TurnMetadata) => void;
   setMessagePendingApprovals: (conversationId: string, messageId: string, approvals: import("@/types/chat").ToolApprovalEvent[]) => void;
   setMessagePendingClarification: (conversationId: string, messageId: string, card: ClarificationCard | undefined) => void;
+  setMessageMediaAttachments: (conversationId: string, messageId: string, attachments: MediaAttachment[]) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -233,6 +235,20 @@ export const useChatStore = create<ChatState>()(
               ),
             };
           }),
+
+      setMessageMediaAttachments: (conversationId, messageId, attachments) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, mediaAttachments: attachments } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
         })),
     }),
     { name: "hive-chats" }

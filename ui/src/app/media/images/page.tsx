@@ -74,7 +74,7 @@ export default function MediaImagesPage() {
                       </p>
                     )}
                     <a
-                      href={item.url}
+                      href={item.download_url || item.url}
                       download={item.name}
                       className="inline-block pt-1 text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)]"
                     >

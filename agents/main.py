@@ -3097,6 +3097,44 @@ async def art_serve_file(filepath: str, dl: int = 0):
     return FileResponse(full_path, media_type=media_type, headers=headers)
 
 
+@app.get("/delivered_artifacts/{filepath:path}")
+async def serve_delivered_artifact(filepath: str, dl: int = 0):
+    """
+    Serve files from delivered_artifacts with optional download forcing.
+    Pass ?dl=1 to force browser download instead of inline display.
+    This complements the StaticFiles mount by supporting Content-Disposition headers.
+    """
+    import mimetypes
+    
+    full_path = os.path.normpath(os.path.join("/workspace/delivered_artifacts", filepath))
+    
+    # Security check: prevent directory traversal
+    if not full_path.startswith("/workspace/delivered_artifacts"):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail=f"File not found: {filepath}")
+    
+    # Determine MIME type
+    mime_type, _ = mimetypes.guess_type(full_path)
+    if not mime_type:
+        ext = full_path.rsplit(".", 1)[-1].lower()
+        mime_map = {
+            "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+            "webp": "image/webp", "gif": "image/gif",
+            "mp4": "video/mp4", "webm": "video/webm",
+            "mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg",
+            "glb": "model/gltf-binary", "gltf": "model/gltf+json",
+            "obj": "text/plain", "stl": "model/stl", "3mf": "model/3mf"
+        }
+        mime_type = mime_map.get(ext, "application/octet-stream")
+    
+    filename = os.path.basename(full_path)
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'} if dl else {}
+    
+    return FileResponse(full_path, media_type=mime_type, headers=headers)
+
+
 @app.get("/v1/art/jobs/{job_id}/download")
 async def art_job_download(job_id: str, dl: int = 1):
     """
@@ -3861,7 +3899,9 @@ async def media_gallery(kind: str = "all"):
             "name": f.name, "kind": media_kind,
             "size_mb": round(f.stat().st_size / 1_048_576, 2),
             "updated_at": f.stat().st_mtime,
-            "url": f"/delivered_artifacts/{f.name}", "metadata": meta,
+            "url": f"/delivered_artifacts/{f.name}",
+            "download_url": f"/delivered_artifacts/{f.name}?dl=1",
+            "metadata": meta,
         })
     return {"items": items}
 
