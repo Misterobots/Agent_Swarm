@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Settings2, Brain } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ThemeSelector } from "./theme-selector";
+import { ResearchToggle } from "./research-toggle";
 import { UltraplanToggle } from "./ultraplan-toggle";
 import { UltrathinkToggle } from "./ultrathink-toggle";
 import { WebGroundingToggle } from "./web-grounding-toggle";
@@ -17,9 +18,7 @@ export function ChatSettingsMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
   const updateConversation = useChatStore((s) => s.updateConversation);
-  const activeConv = useChatStore((s) =>
-    s.activeConversationId ? s.conversations[s.activeConversationId] : null
-  );
+  const activeConv = useChatStore((s) => s.activeConversation());
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -68,6 +67,7 @@ export function ChatSettingsMenu() {
           <div className="space-y-2">
             <label className="text-xs text-[var(--chat-muted)]">Modes</label>
             <div className="space-y-1.5">
+              <ResearchToggle />
               <UltraplanToggle />
               <UltrathinkToggle />
               <SwarmToggle />
