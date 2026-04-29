@@ -52,21 +52,21 @@ export function ChatSettingsMenu() {
 
       {/* Settings menu dropdown */}
       {isOpen && (
-        <div className="absolute bottom-full right-0 mb-2 w-64 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-lg p-3 space-y-3 z-30 max-h-[70vh] overflow-y-auto scrollbar-thin">
-          <div className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wide mb-2">
+        <div className="absolute bottom-full right-0 mb-2 w-56 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-lg p-2.5 space-y-2 z-30 max-h-[55vh] overflow-y-auto scrollbar-thin">
+          <div className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wide mb-1">
             Chat Settings
           </div>
 
           {/* Theme */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label className="text-xs text-[var(--chat-muted)]">Theme</label>
             <ThemeSelector />
           </div>
 
           {/* Modes */}
-          <div className="space-y-2">
+          <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
             <label className="text-xs text-[var(--chat-muted)]">Modes</label>
-            <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-1">
               <ResearchToggle />
               <UltraplanToggle />
               <UltrathinkToggle />
@@ -75,9 +75,9 @@ export function ChatSettingsMenu() {
           </div>
 
           {/* Grounding */}
-          <div className="space-y-2">
+          <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
             <label className="text-xs text-[var(--chat-muted)]">Grounding</label>
-            <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-1">
               <WebGroundingToggle />
               <DocGroundingToggle />
               <FileGroundingToggle />
@@ -86,7 +86,7 @@ export function ChatSettingsMenu() {
 
           {/* Memory toggle */}
           {activeConversationId && (
-            <div className="space-y-2 pt-2 border-t border-[var(--chat-border)]">
+            <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
               <button
                 type="button"
                 onClick={() => {
@@ -95,7 +95,7 @@ export function ChatSettingsMenu() {
                   });
                 }}
                 className={cn(
-                  "w-full inline-flex items-center gap-2 px-3 py-2 rounded-md text-xs border transition-colors",
+                  "w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs border transition-colors",
                   activeConv?.memoryEnabled
                     ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
                     : "bg-[var(--chat-panel)] text-[var(--chat-muted)] border-[var(--chat-border)] hover:text-[var(--chat-text)]"
