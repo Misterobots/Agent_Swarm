@@ -722,6 +722,7 @@ def chat_swarm(
     grounding_docs: bool = False,
     grounding_file: bool = False,
     swarm_mode: bool = False,
+    dev_mode: bool = False,
 ):
     """
     Generator that yields status updates and final response for UI.
@@ -733,6 +734,7 @@ def chat_swarm(
     - ultraplan_mode: If True, decompose task into plan only — no execution.
     - ultrathink_mode: If True, use deeper reasoning with visible chain-of-thought.
     - attachments: File attachments from the UI.
+    - dev_mode: If True, enable workspace-scoped file/terminal tools (developer mode).
     - grounding_web: If True and owner has permission, run intent-aware web search
       and inject top results as [Web Grounding Context] before the prompt.
     - grounding_docs: If True and owner has permission, query the knowledge base and
@@ -1581,6 +1583,97 @@ def chat_swarm(
 
             CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
+            
+            # THREE-TIER ACCESS CONTROL
+            is_admin = _is_admin_session(session_id, owner_id)
+            # dev_mode passed as parameter from API request
+            
+            # Determine capability tier
+            if is_admin:
+                # L3_ADMIN: Full system access + git operations
+                from tools.file_ops import read_file, write_file, list_dir
+                from tools.terminal import run_command
+                from tools.admin_file_ops import admin_read_file, admin_write_file, admin_list_dir
+                from tools.git_ops import git_status, git_checkout, git_commit, git_push, git_pull, git_branch_list
+                
+                agent_tools = [read_file, write_file, list_dir, run_command,
+                              admin_read_file, admin_write_file, admin_list_dir,
+                              git_status, git_checkout, git_commit, git_push, git_pull, git_branch_list]
+                
+                instructions = """You are Hive Mind, the AI assistant for the Agent Swarm infrastructure.
+                
+                ADMIN MODE ACTIVE - Full System Access:
+                
+                YOUR CAPABILITIES:
+                1. **Workspace Files**: read_file, write_file, list_dir (sandbox: /workspace/)
+                2. **Admin Files**: admin_read_file, admin_write_file, admin_list_dir (any path on any node)
+                3. **Terminal**: run_command (execute commands, Docker, SSH)
+                4. **Git Operations**: git_status, git_checkout, git_commit, git_push, git_pull, git_branch_list
+                   - Operates on Lovelace (192.168.2.101), Turing (192.168.2.103), Hopper (192.168.2.102)
+                   - Example: git_status("turing", "/home/misterobots/Home_AI_Lab")
+                5. **Task Routing**: Dispatch to CODE, DEVOPS, IMAGE, 3D, RESEARCH agents
+                
+                INFRASTRUCTURE:
+                - Docker (Turing gateway, services across all nodes)
+                - PostgreSQL, Redis (Hopper)
+                - Ollama LLMs (Turing qwen3:8b, Lovelace dual GPUs)
+                - Git repos on all nodes
+                
+                Keep responses concise. You have unrestricted system access."""
+                yield {"type": "log", "content": "[Conversationalist] Admin mode active - full system access"}
+                
+            elif dev_mode:
+                # L2_USER + dev_mode: Workspace-scoped only
+                from tools.file_ops import read_file, write_file, list_dir
+                from tools.terminal import run_command
+                
+                agent_tools = [read_file, write_file, list_dir, run_command]
+                
+                instructions = """You are Hive Mind, a friendly AI coding assistant.
+                
+                DEVELOPER MODE ACTIVE - Workspace Access:
+                
+                YOUR CAPABILITIES:
+                1. **Workspace Files**: read_file, write_file, list_dir (restricted to /workspace/ only)
+                2. **Terminal**: run_command (sandboxed shell, no SSH to other nodes)
+                3. **Task Routing**: Dispatch to CODE, DEVOPS, IMAGE, 3D, RESEARCH agents for specialized work
+                
+                RESTRICTIONS:
+                - File operations limited to /workspace/ directory (sandbox enforced)
+                - NO git operations (request admin access for this)
+                - NO SSH to Lovelace/Turing/Hopper (admin only)
+                - NO system-wide file access (admin only)
+                
+                Keep responses concise and focused on the coding task."""
+                yield {"type": "log", "content": "[Conversationalist] Developer mode - workspace sandbox active"}
+                
+            else:
+                # L1_PUBLIC / L2_USER: Conversation only
+                agent_tools = None
+                
+                instructions = """You are Hive Mind, a friendly AI assistant.
+                
+                YOUR CAPABILITIES:
+                - Answer questions and explain concepts clearly
+                - Provide research and analysis
+                - Have natural conversations
+                - Route complex tasks to specialized agents:
+                  * CODE: Software engineering, debugging, scripts
+                  * DEVOPS: Infrastructure, Docker, servers, deployment
+                  * IMAGE: 2D art generation
+                  * 3D: 3D modeling and action figures
+                  * RESEARCH: Deep analysis and investigation
+                  * DOCUMENTATION: Technical writing
+                
+                WHAT YOU CANNOT DO:
+                - Direct file system access (requires developer mode)
+                - Execute terminal commands (requires developer mode)
+                - Git operations (requires admin access)
+                - System administration (requires admin access)
+                
+                To unlock developer tools, ask your admin to enable developer mode for your session.
+                Keep responses concise and friendly."""
+                yield {"type": "log", "content": "[Conversationalist] Regular user mode - conversation only"}
 
             conversationalist = Agent(
                 name="Hive Mind",
@@ -1593,34 +1686,10 @@ def chat_swarm(
                 session_id=session_id,
                 add_history_to_messages=True,
                 num_history_responses=10,
-                instructions="""You are Hive Mind, a friendly and knowledgeable AI assistant in a self-hosted home lab.
-                You have a warm, direct personality. You can answer general questions, chat casually, explain concepts clearly,
-                and help the user understand their AI system. Keep responses concise unless depth is clearly needed.
-                
-                ACTUAL SYSTEM ARCHITECTURE:
-                - You run in a Docker container (agent_runtime) on Turing (192.168.2.103)
-                - You can SSH to other nodes: Lovelace (192.168.2.101), Hopper (192.168.2.102), BMO (192.168.2.106)
-                - All systems are self-hosted on local hardware with no cloud dependencies
-                
-                YOUR CORE CAPABILITIES:
-                1. File Operations: read_file, write_file, list_dir (via tools)
-                2. Terminal Commands: run_command (execute shell scripts, Docker commands, SSH operations)
-                3. Routing Complex Tasks: Dispatch to specialized agents for CODE, DEVOPS, IMAGE generation, 3D modeling, RESEARCH, etc.
-                4. Multi-Agent Coordination: Can orchestrate multiple experts for complex multi-step tasks
-                
-                INFRASTRUCTURE YOU CAN ACCESS:
-                - Docker containers (via docker CLI)
-                - PostgreSQL database (on Hopper for Authentik, Langfuse)
-                - Redis (on Hopper)
-                - Ollama LLMs (on Turing and Lovelace)
-                - Git repositories
-                
-                WHAT YOU CANNOT DO:
-                - You do NOT have direct access to Prometheus, Grafana, Netdata, Ansible, Terraform, Wireshark, John the Ripper, OpenVAS, or other tools unless they are explicitly installed
-                - You cannot make assumptions about installed software - be factual about what exists
-                
-                When asked about capabilities, list your ACTUAL routing options and core tools, not hypothetical software.""",
+                instructions=instructions,
+                tools=agent_tools,
                 show_tool_calls=False,
+                run_tool_calls=bool(agent_tools),
             )
 
             full_content = ""

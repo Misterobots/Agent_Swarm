@@ -883,6 +883,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     grounding_docs=request.grounding_docs,
                     grounding_file=request.grounding_file,
                     swarm_mode=request.swarm_mode,
+                    dev_mode=request.dev_mode,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -1151,6 +1152,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             grounding_docs=request.grounding_docs,
             grounding_file=request.grounding_file,
             swarm_mode=request.swarm_mode,
+            dev_mode=request.dev_mode,
         )
         full_resp = ""
         for update in gen:

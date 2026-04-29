@@ -138,6 +138,18 @@ INTENT_CAPABILITY_MAP = {
         "security_level": "L3_ADMIN",
         "expiry_hours": 4,
     },
+    "CONVERSATION": {
+        "agent_name": "Hive Mind",
+        "template_id": "conversationalist",
+        "capabilities": [
+            "model_generate",
+            # Baseline: conversation only for L1_PUBLIC/L2_USER
+            # Developer mode adds workspace-scoped file/terminal
+            # L3_ADMIN adds full system access + git operations
+        ],
+        "security_level": "L1_PUBLIC",
+        "expiry_hours": 1,
+    },
 }
 
 # Safe default for unknown or AMBIGUOUS intents
