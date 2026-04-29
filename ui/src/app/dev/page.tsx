@@ -2,15 +2,13 @@
 
 import { DevWorkspace } from "@/components/dev/dev-workspace";
 import { useDevStore } from "@/lib/stores/dev-store";
-import { FolderTree, Eye, Settings, Bot } from "lucide-react";
+import { FolderTree, Eye, Settings, Bot, Layers } from "lucide-react";
 
 export default function DevPage() {
   const {
     showFileTree,
-    showOutputPreview,
     agentEnabled,
     setShowFileTree,
-    setShowOutputPreview,
     setAgentEnabled,
   } = useDevStore();
 
@@ -35,19 +33,6 @@ export default function DevPage() {
           >
             <FolderTree size={14} />
             Files
-          </button>
-
-          <button
-            onClick={() => setShowOutputPreview(!showOutputPreview)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${
-              showOutputPreview
-                ? "bg-[var(--chat-accent)] text-white"
-                : "bg-[var(--chat-input-bg)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-            }`}
-            title="Toggle output preview"
-          >
-            <Eye size={14} />
-            Preview
           </button>
 
           {/* Agent mode toggle */}

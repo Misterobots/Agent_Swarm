@@ -389,6 +389,8 @@ class ChatRequest(BaseModel):
     grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
     swarm_mode: bool = False          # route through Lamport multi-agent coordinator
+    solving_max_iter: Optional[int] = None  # MarsRL max iterations (0 = unlimited, overrides config)
+    solving_max_time: Optional[int] = None  # MarsRL max time in seconds (0 = unlimited, overrides config)
 
 
 # ---------------------------------------------------------------------------
@@ -884,6 +886,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     grounding_file=request.grounding_file,
                     swarm_mode=request.swarm_mode,
                     dev_mode=request.dev_mode,
+                    solving_max_iter=request.solving_max_iter,
+                    solving_max_time=request.solving_max_time,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")

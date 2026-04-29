@@ -99,6 +99,8 @@ function SwarmResponseRenderer({
     return <MarkdownRenderer content={content} isStreaming={isStreaming} />;
   }
 
+  const [processExpanded, setProcessExpanded] = useState(false);
+
   return (
     <div>
       {/* Main synthesis plan — shown first and prominently */}
@@ -113,12 +115,24 @@ function SwarmResponseRenderer({
         </div>
       )}
 
-      {/* Collapsible process phases */}
+      {/* Collapsible process phases - parent collapse wrapper */}
       {parsed.processBlocks.length > 0 && (
-        <div className="mt-4 space-y-1">
-          {parsed.processBlocks.map((block) => (
-            <CollapsiblePhase key={block.title} title={block.title} content={block.content} />
-          ))}
+        <div className="mt-4 border border-[var(--chat-border)] rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setProcessExpanded((v) => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 bg-[var(--chat-panel)] hover:bg-[var(--chat-soft)] text-[var(--chat-text)] transition-colors text-[13px] font-medium"
+          >
+            <span>Planning & Coordination Details</span>
+            <ChevronDown size={14} className={cn("transition-transform duration-150", processExpanded && "rotate-180")} />
+          </button>
+          {processExpanded && (
+            <div className="p-2 bg-[var(--chat-soft)] border-t border-[var(--chat-border)] space-y-1">
+              {parsed.processBlocks.map((block) => (
+                <CollapsiblePhase key={block.title} title={block.title} content={block.content} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

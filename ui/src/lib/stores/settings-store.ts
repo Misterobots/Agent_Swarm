@@ -18,6 +18,9 @@ interface SettingsState {
   groundingWeb: boolean;
   groundingDocs: boolean;
   groundingFile: boolean;
+  // Quality/Effort settings
+  solvingMaxIter: number; // MarsRL max iterations (0 = unlimited)
+  solvingMaxTime: number; // MarsRL max time in seconds (0 = unlimited)
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
@@ -31,6 +34,8 @@ interface SettingsState {
   setGroundingWeb: (on: boolean) => void;
   setGroundingDocs: (on: boolean) => void;
   setGroundingFile: (on: boolean) => void;
+  setSolvingMaxIter: (iter: number) => void;
+  setSolvingMaxTime: (time: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -49,6 +54,8 @@ export const useSettingsStore = create<SettingsState>()(
       groundingWeb: false,
       groundingDocs: false,
       groundingFile: false,
+      solvingMaxIter: 2, // Default: 2 iterations
+      solvingMaxTime: 0, // Default: no time limit
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),
@@ -62,6 +69,8 @@ export const useSettingsStore = create<SettingsState>()(
       setGroundingWeb: (groundingWeb) => set({ groundingWeb }),
       setGroundingDocs: (groundingDocs) => set({ groundingDocs }),
       setGroundingFile: (groundingFile) => set({ groundingFile }),
+      setSolvingMaxIter: (solvingMaxIter) => set({ solvingMaxIter }),
+      setSolvingMaxTime: (solvingMaxTime) => set({ solvingMaxTime }),
     }),
     { name: "hive-settings" }
   )

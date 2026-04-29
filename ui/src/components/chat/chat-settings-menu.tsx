@@ -11,6 +11,7 @@ import { WebGroundingToggle } from "./web-grounding-toggle";
 import { DocGroundingToggle } from "./doc-grounding-toggle";
 import { FileGroundingToggle } from "./file-grounding-toggle";
 import { SwarmToggle } from "./swarm-toggle";
+import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
 
 export function ChatSettingsMenu() {
@@ -82,6 +83,12 @@ export function ChatSettingsMenu() {
               <DocGroundingToggle />
               <FileGroundingToggle />
             </div>
+          </div>
+
+          {/* Quality/Effort Settings */}
+          <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
+            <label className="text-xs text-[var(--chat-muted)]">Quality & Effort</label>
+            <QualitySettingsPanel />
           </div>
 
           {/* Memory toggle */}

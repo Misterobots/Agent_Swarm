@@ -723,6 +723,8 @@ def chat_swarm(
     grounding_file: bool = False,
     swarm_mode: bool = False,
     dev_mode: bool = False,
+    solving_max_iter: int | None = None,
+    solving_max_time: int | None = None,
 ):
     """
     Generator that yields status updates and final response for UI.
@@ -1770,11 +1772,12 @@ def chat_swarm(
                     solver=solver,
                     verifier=verifier,
                     corrector=corrector,
-                    max_iter=2,
+                    max_iter=solving_max_iter if solving_max_iter is not None else 2,
                     intent=intent,
                     session_id=session_id,
                     token=ace_token,
                     template_metadata=template_metadata,
+                    max_time=solving_max_time if solving_max_time is not None else None,
                 )
 
                 yield {"type": "log", "content": f"[DevOps] Routing to MarsRL with infra context."}
@@ -2472,11 +2475,12 @@ You run on local hardware in a self-hosted home lab.""",
                     mars = MarsRLLoop(
                         solver=solver,
                         verifier=verifier,
-                        corrector=corrector,
-                        max_iter=2,
+                        correctorsolving_max_iter if solving_max_iter is not None else 2,
                         intent=intent,
                         session_id=session_id,
                         token=ace_token,
+                        template_metadata=template_metadata,
+                        max_time=solving_max_time if solving_max_time is not None else None
                         template_metadata=template_metadata,
                     )
 
