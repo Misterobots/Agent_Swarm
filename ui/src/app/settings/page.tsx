@@ -66,8 +66,7 @@ export default function SettingsPage() {
               <p className="mt-2 text-xs text-[var(--chat-muted)]">
                 Store your own API keys for Anthropic (Claude) and Google (Gemini) to access premium models with your subscription.
               </p>
-            </divonnect your GitHub account to access GitHub Models (GPT-4o, Claude, Llama, and more) directly in the chat and editor.
-            </p>
+            </div>
           </section>
 
           {/* Tools */}

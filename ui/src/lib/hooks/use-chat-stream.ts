@@ -300,14 +300,14 @@ export function useChatStream(options?: {
           } else if (event.type === "clarification_card") {
             if (event.clarification) {
               setMessagePendingClarification(convId!, assistantId, event.clarification as ClarificationCard);
-            }media_attachment") {
+            }
+          } else if (event.type === "media_attachment") {
             // Handle generated media (images, videos, 3D models)
             if (event.media) {
               mediaAttachmentsRef.current = [...mediaAttachmentsRef.current, event.media];
               // Update message immediately so preview appears during streaming
               setMessageMediaAttachments(convId!, assistantId, mediaAttachmentsRef.current);
             }
-          } else if (event.type === "
           } else if (event.type === "stream_mode") {
             const mode = event.streamMode || "responding";
             setStreamMode(mode);
