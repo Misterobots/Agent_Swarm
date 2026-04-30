@@ -1541,40 +1541,40 @@ def chat_swarm(
             return
 
         # --- ART WORKSPACE OFFER (for creative intents) ---
-        # Creative intents redirect to the Art Studio workspace instead of
-        # running heavy generation pipelines inline in chat.
-        CREATIVE_INTENTS = {"IMAGE", "3D", "ACTION_FIGURE"}
-        if intent in CREATIVE_INTENTS:
-            mode_label = {"IMAGE": "Image", "3D": "3D Model", "ACTION_FIGURE": "Action Figure"}.get(intent, intent)
-            yield {
-                "type": "workspace_offer",
-                "content": json.dumps({
-                    "intent": intent,
-                    "prompt": user_input,
-                    "message": f"This looks like a creative request. Switch to the Art Studio for {mode_label} generation."
-                })
-            }
-            yield {
-                "type": "response",
-                "content": (
-                    f"🎨 **Creative Request Detected: {mode_label}**\n\n"
-                    f"Switch to the **Art Studio** workspace (sidebar) for:\n"
-                    f"- Advanced generation controls & model selection\n"
-                    f"- Real-time 3D preview\n"
-                    f"- Gallery management & batch export\n"
-                    f"- Image upload for direct 3D conversion\n\n"
-                    f"Your prompt has been saved and will auto-fill when you enter the Art Studio."
-                )
-            }
-            # Save prompt so Art Studio can pick it up
-            from brooks import save_pending_context
-            save_pending_context({
-                "type": "art_studio_redirect",
-                "intent": intent,
-                "prompt": user_input
-            }, session_id=session_id, owner_id=owner_id)
-            AGENT_STATE.labels(agent_name="Router").set(1)
-            return
+        # DISABLED: Allow inline media generation in chat instead of redirecting to Art Studio
+        # Creative intents will now proceed to actual generation code with media_attachment events
+        # CREATIVE_INTENTS = {"IMAGE", "3D", "ACTION_FIGURE"}
+        # if intent in CREATIVE_INTENTS:
+        #     mode_label = {"IMAGE": "Image", "3D": "3D Model", "ACTION_FIGURE": "Action Figure"}.get(intent, intent)
+        #     yield {
+        #         "type": "workspace_offer",
+        #         "content": json.dumps({
+        #             "intent": intent,
+        #             "prompt": user_input,
+        #             "message": f"This looks like a creative request. Switch to the Art Studio for {mode_label} generation."
+        #         })
+        #     }
+        #     yield {
+        #         "type": "response",
+        #         "content": (
+        #             f"🎨 **Creative Request Detected: {mode_label}**\n\n"
+        #             f"Switch to the **Art Studio** workspace (sidebar) for:\n"
+        #             f"- Advanced generation controls & model selection\n"
+        #             f"- Real-time 3D preview\n"
+        #             f"- Gallery management & batch export\n"
+        #             f"- Image upload for direct 3D conversion\n\n"
+        #             f"Your prompt has been saved and will auto-fill when you enter the Art Studio."
+        #         )
+        #     }
+        #     # Save prompt so Art Studio can pick it up
+        #     from brooks import save_pending_context
+        #     save_pending_context({
+        #         "type": "art_studio_redirect",
+        #         "intent": intent,
+        #         "prompt": user_input
+        #     }, session_id=session_id, owner_id=owner_id)
+        #     AGENT_STATE.labels(agent_name="Router").set(1)
+        #     return
 
         # --- ROUTE: CONVERSATION / CASUAL CHAT ---
         if intent == "CONVERSATION":
@@ -2173,7 +2173,6 @@ def chat_swarm(
             AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
             
             from specialized.image_gen import generate_image
-            from utils.media_metadata import parse_generated_media
             
             concept_prompt = f"Concept art for 3d modeling, neutral background: {user_input}"
             yield {"type": "log", "content": f"[CreativeStudio] Prompt Optimized: '{concept_prompt}'"}
@@ -2184,14 +2183,6 @@ def chat_swarm(
                 yield {"type": "status", "content": f"🖼️ {img_result}"}
                 yield {"type": "log", "content": f"[CreativeStudio] Output: {img_result}"}
                 AGENT_STATE.labels(agent_name="CreativeStudio").set(1)
-                
-                # Emit media attachment for concept art
-                media_metadata = parse_generated_media(img_result)
-                if media_metadata:
-                    yield {
-                        "type": "media_attachment",
-                        "media": media_metadata,
-                    }
                 
                 import re
                 match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
@@ -2211,13 +2202,15 @@ def chat_swarm(
                         forge_result = generate_3d_model(full_image_path)
                     AGENT_STATE.labels(agent_name="Forge").set(1)
                     
-                    # Parse and emit 3D model metadata
-                    model_metadata = parse_generated_media(forge_result)
-                    if model_metadata:
-                        yield {
-                            "type": "media_attachment",
-                            "media": model_metadata,
+                    # Yield 3D Artifact
+                    yield {
+                        "type": "artifact", 
+                        "content": {
+                            "type": "3d_model", 
+                            "path": f"{filename}.glb", 
+                            "name": f"Creature_{filename}"
                         }
+                    }
                     
                     yield {"type": "response", "content": forge_result}
                     WORKFLOW_STEPS.labels(status="success", agent_type="Forge").inc()
@@ -2300,19 +2293,44 @@ def chat_swarm(
             AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
             
             from specialized.image_gen import generate_image
-            from utils.media_metadata import parse_generated_media
-            
             yield {"type": "log", "content": f"[CreativeStudio] Generating with flux-schnell: '{user_input}'"}
             with request_lock(context="image"):
                 response = generate_image(user_input)
             
-            # Parse media metadata for chat preview
-            media_metadata = parse_generated_media(response)
-            if media_metadata:
-                yield {
-                    "type": "media_attachment",
-                    "media": media_metadata,
-                }
+            # Extraction logic for artifact delivery
+            import re
+            image_match = re.search(r"Generated Image: ([\w\.-]+)", response)
+            if image_match:
+                filename = image_match.group(1)
+                delivery_dir = os.path.join(os.getcwd(), "delivered_artifacts")
+                if not os.path.exists(delivery_dir):
+                    os.makedirs(delivery_dir, exist_ok=True)
+                    
+                delivery_path = os.path.join(delivery_dir, filename)
+                COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://host.docker.internal:8188")
+                
+                try:
+                    import requests
+                    url = f"{COMFYUI_HOST}/view"
+                    params = {"filename": filename, "subfolder": "", "type": "output"}
+                    for i in range(10):
+                        r = requests.get(url, params=params, timeout=10)
+                        if r.status_code == 200:
+                            with open(delivery_path, 'wb') as f:
+                                f.write(r.content)
+                            yield {
+                                "type": "artifact",
+                                "content": {
+                                    "type": "image",
+                                    "name": filename,
+                                    "path": delivery_path, 
+                                    "docker_path": f"/app/comfy_io/output/{filename}" 
+                                }
+                            }
+                            break
+                        time.sleep(1)
+                except Exception as e:
+                    logger.error(f"Download error: {e}")
             
             AGENT_STATE.labels(agent_name="CreativeStudio").set(1)
             WORKFLOW_STEPS.labels(status="success", agent_type="CreativeStudio").inc()
