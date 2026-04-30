@@ -400,18 +400,29 @@ def queue_prompt(prompt_text: str, **kwargs):
     
     try:
         url = f"{COMFYUI_HOST}/prompt"
-        req = requests.post(url, json=p) # requests handles json encoding
+        logger.info(f"[ComfyUI] Submitting prompt to {url}...")
+        req = requests.post(url, json=p, timeout=30) # 30s timeout for initial submission
         
         if req.status_code != 200:
+            logger.error(f"[ComfyUI] HTTP {req.status_code}: {req.text}")
             return f"Error connecting to ComfyUI (Status {req.status_code}): {req.text}"
             
         response = req.json()
         if 'prompt_id' not in response:
+             logger.error(f"[ComfyUI] Missing prompt_id in response: {response}")
              return f"Error: ComfyUI did not return a prompt_id. Response: {response}"
              
         prompt_id = response['prompt_id']
+        logger.info(f"[ComfyUI] Prompt queued: {prompt_id}")
         print(f"--- [ComfyUI] Prompt Queued: {prompt_id} ---")
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"[ComfyUI] Connection failed to {COMFYUI_HOST}: {e}")
+        return f"Error: Cannot connect to ComfyUI at {COMFYUI_HOST}. Is ComfyUI running? ({e})"
+    except requests.exceptions.Timeout as e:
+        logger.error(f"[ComfyUI] Connection timeout to {COMFYUI_HOST}: {e}")
+        return f"Error: ComfyUI connection timeout at {COMFYUI_HOST} ({e})"
     except Exception as e:
+        logger.error(f"[ComfyUI] Unexpected error: {e}")
         return f"Error connecting to ComfyUI: {e}"
 
     print("--- [ComfyUI] Waiting for generation... ---")
