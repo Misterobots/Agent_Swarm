@@ -1241,6 +1241,11 @@ def chat_swarm(
             intent = "TRAIN"
             confidence = 0.98
             reasoning = f"Keyword override: explicit training directive detected in '{user_input[:60]}'"
+        # IMAGE generation keywords
+        if any(kw in _lower for kw in ["generate image", "generate an image", "create image", "create an image", "make image", "make an image", "draw", "paint", "generate art", "create art"]) and intent not in ("IMAGE", "ACTION_FIGURE"):
+            intent = "IMAGE"
+            confidence = 0.95
+            reasoning = f"Keyword override: image generation keywords detected in '{user_input[:60]}'"
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
             intent = "ACTION_FIGURE"
             confidence = 0.95
