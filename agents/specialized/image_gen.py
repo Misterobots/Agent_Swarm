@@ -5,6 +5,7 @@ import os
 import time
 import base64
 from logger_setup import setup_logger
+from specialized.gpu_pool_manager import get_gpu_pool
 
 # Logging Setup
 logger = setup_logger("CreativeStudio")
@@ -149,17 +150,19 @@ def get_image_model_catalog(available_ckpts: list[str] | None = None) -> dict:
         "models": available_ckpts,
     }
 
-def list_available_models() -> list:
+def list_available_models(comfyui_host=None) -> list:
     """Queries ComfyUI for all available checkpoints."""
+    if comfyui_host is None:
+        comfyui_host = COMFYUI_HOST
     try:
-        url = f"{COMFYUI_HOST}/object_info/CheckpointLoaderSimple"
+        url = f"{comfyui_host}/object_info/CheckpointLoaderSimple"
         req = requests.get(url, timeout=5)
         if req.status_code == 200:
             models = _extract_checkpoint_names(req.json())
             if not models:
                 logger.warning(
                     "ComfyUI checkpoint discovery returned an empty list",
-                    extra={"comfyui_host": COMFYUI_HOST, "endpoint": url},
+                    extra={"comfyui_host": comfyui_host, "endpoint": url},
                 )
             return models
         logger.warning(
@@ -180,9 +183,12 @@ def resolve_generation_target(requested_model: str | None, available_ckpts: list
 
     if requested_model in IMAGE_MODEL_REGISTRY:
         if requested_model == "auto":
+            logger.info(f"[AUTO-FALLBACK] Testing priority order with available checkpoints: {available_ckpts}")
             for candidate_id in IMAGE_MODEL_REGISTRY["auto"].get("priority", []):
                 checkpoint = _match_profile_checkpoint(candidate_id, available_ckpts)
+                logger.info(f"[AUTO-FALLBACK] Testing profile '{candidate_id}' → matched: {checkpoint or 'NO MATCH'}")
                 if checkpoint:
+                    logger.info(f"[AUTO-FALLBACK] ✓ Selected profile '{candidate_id}' with checkpoint '{checkpoint}'")
                     return {
                         "requested_model": requested_model,
                         "profile_id": candidate_id,
@@ -284,196 +290,220 @@ def queue_prompt(prompt_text: str, **kwargs):
     """
     Sends a prompt to ComfyUI with optional manual overrides.
     Pass negative_prompt kwarg to override the negative conditioning text.
+    Supports multi-GPU load balancing via GPU pool manager.
     """
-    requested_ckpt = kwargs.get("model_name")
-    negative_prompt_override = kwargs.get("negative_prompt")
-    all_ckpts = list_available_models()
+    # Get GPU instance from pool
+    gpu_pool = get_gpu_pool()
+    prefer_gpu = kwargs.get("gpu_id", None)  # Allow caller to request specific GPU
+    
+    instance = gpu_pool.get_available_instance(prefer_gpu=prefer_gpu)
+    if instance is None:
+        logger.warning("All GPUs busy - using primary instance (may queue)")
+        comfyui_host = COMFYUI_HOST
+    else:
+        comfyui_host = instance["host"]
+        logger.info(f"Using {instance['name']} at {comfyui_host}")
     
     try:
-        target = resolve_generation_target(requested_ckpt, all_ckpts)
-        ckpt_name = target["checkpoint"]
-    except (RuntimeError, ValueError) as exc:
-        logger.error(
-            "Checkpoint selection failed for image generation",
-            extra={
-                "requested_ckpt": requested_ckpt,
-                "available_ckpts": all_ckpts,
-                "prompt_preview": prompt_text[:120],
-            },
-        )
-        return f"Error: {exc}"
+        # 1. Model Selection
+        requested_ckpt = kwargs.get("model_name")
+        negative_prompt_override = kwargs.get("negative_prompt")
+        all_ckpts = list_available_models(comfyui_host=comfyui_host)
+        
+        try:
+            target = resolve_generation_target(requested_ckpt, all_ckpts)
+            ckpt_name = target["checkpoint"]
+        except (RuntimeError, ValueError) as exc:
+            logger.error(
+                "Checkpoint selection failed for image generation",
+                extra={
+                    "requested_ckpt": requested_ckpt,
+                    "available_ckpts": all_ckpts,
+                    "prompt_preview": prompt_text[:120],
+                },
+            )
+            return f"Error: {exc}"
             
-    # 2. Determine Configuration
-    model_type = detect_model_type(ckpt_name)
-    raw_params = get_model_params(model_type)
-    profile_defaults = IMAGE_MODEL_REGISTRY.get(target["profile_id"], {}).get("defaults", {})
-    
-    # APPLY OVERRIDES
-    params = {
-        "cfg": float(kwargs.get("cfg", raw_params["cfg"])),
-        "steps": int(kwargs.get("steps", raw_params["steps"])),
-        "sampler": kwargs.get("sampler", raw_params["sampler"]),
-        "scheduler": kwargs.get("scheduler", raw_params["scheduler"]),
-        "width": int(kwargs.get("width", profile_defaults.get("width", raw_params["width"]))),
-        "height": int(kwargs.get("height", profile_defaults.get("height", raw_params["height"])))
-    }
-    
-    if kwargs.get("skip_refinement"):
-        final_prompt = prompt_text
-    else:
-        final_prompt = refine_prompt(prompt_text, model_type)
-    print(
-        f"--- [ComfyUI] Config: {model_type} | Profile: {target['profile_id']} | "
-        f"Ckpt: {ckpt_name} | Params: {params} ---"
-    )
+            # 2. Determine Configuration
+        model_type = detect_model_type(ckpt_name)
+        raw_params = get_model_params(model_type)
+        profile_defaults = IMAGE_MODEL_REGISTRY.get(target["profile_id"], {}).get("defaults", {})
+        
+        # APPLY OVERRIDES
+        params = {
+            "cfg": float(kwargs.get("cfg", raw_params["cfg"])),
+            "steps": int(kwargs.get("steps", raw_params["steps"])),
+            "sampler": kwargs.get("sampler", raw_params["sampler"]),
+            "scheduler": kwargs.get("scheduler", raw_params["scheduler"]),
+            "width": int(kwargs.get("width", profile_defaults.get("width", raw_params["width"]))),
+            "height": int(kwargs.get("height", profile_defaults.get("height", raw_params["height"])))
+        }
+        
+        if kwargs.get("skip_refinement"):
+            final_prompt = prompt_text
+        else:
+            final_prompt = refine_prompt(prompt_text, model_type)
+        print(
+            f"--- [ComfyUI] Config: {model_type} | Profile: {target['profile_id']} | "
+            f"Ckpt: {ckpt_name} | Params: {params} ---"
+        )
 
-    # 3. Payload
-    p = {
-        "prompt": {
-            "3": {
-                "class_type": "KSampler",
-                "inputs": {
-                    "cfg": params['cfg'],
-                    "denoise": 1,
-                    "latent_image": ["5", 0],
-                    "model": ["4", 0],
-                    "negative": ["7", 0],
-                    "positive": ["6", 0],
-                    "sampler_name": params['sampler'],
-                    "scheduler": params['scheduler'],
-                    "seed": 5, 
-                    "steps": params['steps']
-                }
-            },
-            "4": {
-                "class_type": "CheckpointLoaderSimple",
-                "inputs": {
-                    "ckpt_name": ckpt_name 
-                }
-            },
-            "5": {
-                "class_type": "EmptyLatentImage",
-                "inputs": {
-                    "batch_size": 1,
-                    "height": params['height'],
-                    "width": params['width']
-                }
-            },
-            "6": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {
-                    "clip": ["4", 1],
-                    "text": final_prompt
-                }
-            },
-            "7": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {
-                    "clip": ["4", 1],
-                    "text": negative_prompt_override if negative_prompt_override is not None else (
-                        "" if "FLUX" in model_type else
-                        "(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation"
-                    )
-                }
-            },
-            "8": {
-                "class_type": "VAEDecode",
-                "inputs": {
-                    "samples": ["3", 0],
-                    "vae": ["4", 2]
-                }
-            },
-            "9": {
-                "class_type": "SaveImage",
-                "inputs": {
-                    "filename_prefix": f"ComfyUI_{model_type}",
-                    "images": ["8", 0]
+            # 3. Payload
+        p = {
+            "prompt": {
+                "3": {
+                    "class_type": "KSampler",
+                    "inputs": {
+                        "cfg": params['cfg'],
+                        "denoise": 1,
+                        "latent_image": ["5", 0],
+                        "model": ["4", 0],
+                        "negative": ["7", 0],
+                        "positive": ["6", 0],
+                        "sampler_name": params['sampler'],
+                        "scheduler": params['scheduler'],
+                        "seed": 5, 
+                        "steps": params['steps']
+                    }
+                },
+                "4": {
+                    "class_type": "CheckpointLoaderSimple",
+                    "inputs": {
+                        "ckpt_name": ckpt_name 
+                    }
+                },
+                "5": {
+                    "class_type": "EmptyLatentImage",
+                    "inputs": {
+                        "batch_size": 1,
+                        "height": params['height'],
+                        "width": params['width']
+                    }
+                },
+                "6": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {
+                        "clip": ["4", 1],
+                        "text": final_prompt
+                    }
+                },
+                "7": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {
+                        "clip": ["4", 1],
+                        "text": negative_prompt_override if negative_prompt_override is not None else (
+                            "" if "FLUX" in model_type else
+                            "(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation"
+                        )
+                    }
+                },
+                "8": {
+                    "class_type": "VAEDecode",
+                    "inputs": {
+                        "samples": ["3", 0],
+                        "vae": ["4", 2]
+                    }
+                },
+                "9": {
+                    "class_type": "SaveImage",
+                    "inputs": {
+                        "filename_prefix": f"ComfyUI_{model_type}",
+                        "images": ["8", 0]
+                    }
                 }
             }
         }
-    }
-    
-    client_id = str(uuid.uuid4())
-    p["client_id"] = client_id
-    import random
-    p["prompt"]["3"]["inputs"]["seed"] = random.randint(1, 1000000000)
-    
-    try:
-        url = f"{COMFYUI_HOST}/prompt"
-        req = requests.post(url, json=p) # requests handles json encoding
+        
+        client_id = str(uuid.uuid4())
+        p["client_id"] = client_id
+        import random
+        p["prompt"]["3"]["inputs"]["seed"] = random.randint(1, 1000000000)
+        
+        # 4. Submit prompt to ComfyUI
+        url = f"{comfyui_host}/prompt"
+        req = requests.post(url, json=p)
+        # 4. Submit prompt to ComfyUI
+        url = f"{comfyui_host}/prompt"
+        req = requests.post(url, json=p)
         
         if req.status_code != 200:
             return f"Error connecting to ComfyUI (Status {req.status_code}): {req.text}"
             
         response = req.json()
         if 'prompt_id' not in response:
-             return f"Error: ComfyUI did not return a prompt_id. Response: {response}"
+            return f"Error: ComfyUI did not return a prompt_id. Response: {response}"
              
         prompt_id = response['prompt_id']
         print(f"--- [ComfyUI] Prompt Queued: {prompt_id} ---")
-    except Exception as e:
-        return f"Error connecting to ComfyUI: {e}"
-
-    print("--- [ComfyUI] Waiting for generation... ---")
-    time.sleep(2)
-
-    timeout_seconds = 900  # 15 minutes — covers model load + queue wait + steps=20+ generation
-    start_time = time.time()
-    lost_count = 0
-
-    while (time.time() - start_time) < timeout_seconds:
-        try:
-            history_url = f"{COMFYUI_HOST}/history/{prompt_id}"
-            res = requests.get(history_url, timeout=5)
-            history = res.json()
-
-            if prompt_id in history:
-                entry = history[prompt_id]
-                # Check for ComfyUI execution error
-                status_str = entry.get('status', {}).get('status_str', '')
-                if status_str == 'error':
-                    msgs = entry.get('status', {}).get('messages', [])
-                    err_detail = "Unknown ComfyUI error"
-                    for msg in msgs:
-                        if isinstance(msg, list) and msg[0] == 'execution_error':
-                            err_detail = msg[1].get('exception_message', err_detail)
-                            break
-                    return f"Error: ComfyUI execution failed: {err_detail.strip()}"
-                outputs = entry.get('outputs', {})
-                if '9' in outputs:
-                     images = outputs['9'].get('images', [])
-                     if images:
-                         filename = images[0]['filename']
-                         subfolder = images[0].get('subfolder', '')
-                         return (
-                             f"Generated Image: {filename} (in {subfolder} output) "
-                             f"| profile={target['profile_id']} | checkpoint={ckpt_name}"
-                         )
-                     return "Error: ComfyUI completed but produced no image output."
-                return "Error: ComfyUI completed but SaveImage node produced no output."
-
-            # Not in history yet — check queue to avoid premature timeout while waiting in line
-            try:
-                q_res = requests.get(f"{COMFYUI_HOST}/queue", timeout=5)
-                q_data = q_res.json()
-                is_pending = any(item[1] == prompt_id for item in q_data.get('queue_pending', []))
-                is_running = any(item[1] == prompt_id for item in q_data.get('queue_running', []))
-                if is_pending:
-                    # Reset timer while queued so we don't count wait time against generation budget
-                    start_time = time.time()
-                elif not is_running:
-                    lost_count += 1
-                    if lost_count > 5:
-                        return "Error: ComfyUI job disappeared from queue without producing output."
-            except Exception:
-                pass
-
-        except Exception as e:
-            logger.warning(f"Polling error: {e}")
+        
+        # 5. Wait for generation to complete
+        print("--- [ComfyUI] Waiting for generation... ---")
         time.sleep(2)
 
-    elapsed = int(time.time() - start_time)
-    return f"Error: Image generation timed out after {elapsed}s (limit {timeout_seconds}s)."
+        timeout_seconds = 900  # 15 minutes — covers model load + queue wait + steps=20+ generation
+        start_time = time.time()
+        lost_count = 0
+
+        while (time.time() - start_time) < timeout_seconds:
+            try:
+                history_url = f"{comfyui_host}/history/{prompt_id}"
+                res = requests.get(history_url, timeout=5)
+                history = res.json()
+
+                if prompt_id in history:
+                    entry = history[prompt_id]
+                    # Check for ComfyUI execution error
+                    status_str = entry.get('status', {}).get('status_str', '')
+                    if status_str == 'error':
+                        msgs = entry.get('status', {}).get('messages', [])
+                        err_detail = "Unknown ComfyUI error"
+                        for msg in msgs:
+                            if isinstance(msg, list) and msg[0] == 'execution_error':
+                                err_detail = msg[1].get('exception_message', err_detail)
+                                break
+                        return f"Error: ComfyUI execution failed: {err_detail.strip()}"
+                    
+                    outputs = entry.get('outputs', {})
+                    if '9' in outputs:
+                        images = outputs['9'].get('images', [])
+                        if images:
+                            filename = images[0]['filename']
+                            subfolder = images[0].get('subfolder', '')
+                            return (
+                                f"Generated Image: {filename} (in {subfolder} output) "
+                                f"| profile={target['profile_id']} | checkpoint={ckpt_name}"
+                            )
+                    return "Error: ComfyUI completed but produced no image output."
+                
+                # Not in history yet — check queue to avoid premature timeout while waiting in line
+                try:
+                    q_res = requests.get(f"{comfyui_host}/queue", timeout=5)
+                    q_data = q_res.json()
+                    is_pending = any(item[1] == prompt_id for item in q_data.get('queue_pending', []))
+                    is_running = any(item[1] == prompt_id for item in q_data.get('queue_running', []))
+                    if is_pending:
+                        # Reset timer while queued so we don't count wait time against generation budget
+                        start_time = time.time()
+                    elif not is_running:
+                        lost_count += 1
+                        if lost_count > 5:
+                            return "Error: ComfyUI job disappeared from queue without producing output."
+                except Exception:
+                    pass
+
+            except Exception as e:
+                logger.warning(f"Polling error: {e}")
+            
+            time.sleep(2)
+
+        # Timeout occurred
+        elapsed = int(time.time() - start_time)
+        return f"Error: Image generation timed out after {elapsed}s (limit {timeout_seconds}s)."
+    
+    finally:
+        # Always release the GPU instance
+        if instance:
+            gpu_pool.release_instance(instance)
 
 # --- LAYER 6: VERIFICATION ---
 import cv2
@@ -601,7 +631,7 @@ def generate_image(
     logger.info(f"DEBUG: generate_image called with prompt='{prompt}' device='{target_device}'")
 
     workspace_root = _resolve_workspace_root()
-    # PATH DISCOVEY LOGIC
+    # PATH DISCOVERY LOGIC
     # We need to find where ComfyUI is dumping images.
     candidate_paths = [
         os.getenv("COMFYUI_OUTPUT_DIR"),
@@ -617,20 +647,18 @@ def generate_image(
             logger.info(f"Targeting ComfyUI Output: {output_dir}")
             break
             
+    # If no local directory available, create a temp directory for HTTP-fetched images
     if not output_dir:
-        return "Error: Could not locate ComfyUI output directory. Check COMFYUI_OUTPUT_DIR env var."
+        output_dir = "/tmp/comfyui_images"
+        os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Using temp directory for ComfyUI images: {output_dir}")
 
     last_candidate: dict | None = None
 
-    try:
-        from utils.gpu_queue import request_lock as _request_lock
-        _gpu_ctx = _request_lock("image", timeout=600)
-    except Exception:
-        from contextlib import nullcontext
-        _gpu_ctx = nullcontext()
-
-    with _gpu_ctx:
-      for attempt in range(MAX_RETRIES + 1):
+    # NOTE: GPU lock is managed by the caller (church.py).
+    # Do NOT acquire lock here to avoid deadlock with nested lock acquisition.
+    
+    for attempt in range(MAX_RETRIES + 1):
         if attempt > 0:
             logger.info(f"--- [Creative Studio] Verification Failed. Retrying ({attempt}/{MAX_RETRIES})... ---")
             
@@ -644,11 +672,26 @@ def generate_image(
             resolved_target = resolve_generation_target(model_name, list_available_models())
             img_path = os.path.join(output_dir, filename)
             
+            # Try to find the image locally first
             if not os.path.exists(img_path):
-                if os.path.exists(filename): img_path = filename
-                else: 
-                     logger.warning(f"Could not find image at {img_path}.")
-                     return result_msg
+                if os.path.exists(filename): 
+                    img_path = filename
+                else:
+                    # Image not found locally - try fetching via ComfyUI HTTP API
+                    logger.info(f"Image not found locally at {img_path}, fetching via HTTP...")
+                    try:
+                        view_url = f"{COMFYUI_HOST}/view?filename={filename}"
+                        response = requests.get(view_url, timeout=30)
+                        if response.status_code == 200:
+                            with open(img_path, 'wb') as f:
+                                f.write(response.content)
+                            logger.info(f"Downloaded image from ComfyUI: {filename}")
+                        else:
+                            logger.warning(f"Could not fetch image from ComfyUI (status {response.status_code})")
+                            return result_msg
+                    except Exception as e:
+                        logger.warning(f"Could not fetch image via HTTP: {e}")
+                        return result_msg
             
             # 0. Save Metadata Sidecar
             try:
