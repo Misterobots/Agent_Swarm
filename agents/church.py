@@ -21,7 +21,12 @@ from dispatcher import Event, EventType
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock, get_best_host_for_model
 from phi.storage.agent.postgres import PgAgentStorage
-from config import AGNO_DB_URL, PLANNING_MAX_ITER, PLANNING_MAX_TIME
+from role_model_resolver import get_model_for_role
+from config import (
+    AGNO_DB_URL, PLANNING_MAX_ITER, PLANNING_MAX_TIME,
+    ARCHITECT_MODEL, COORDINATOR_MODEL, CODER_MODEL, DEVOPS_MODEL,
+    RESEARCHER_MODEL, ANALYST_MODEL, VERIFIER_MODEL
+)
 
 logger = setup_logger("Router")
 security_audit_logger = setup_logger("SecurityAudit")
@@ -213,6 +218,7 @@ def handle_task_event(event: Event):
                 user_input=user_input,
                 session_id=session_id,
                 owner_id=owner_id,
+                ultraplan_mode=False,  # Legacy dispatcher path doesn't have ultraplan_mode
             ):
                 if update.get("type") == "response":
                     logger.info(f"[Coordinator] Final: {update['content'][:200]}")
@@ -755,6 +761,10 @@ def chat_swarm(
     route_start_time = time.time()
     lf_trace = None  # Langfuse trace handle (populated below if Langfuse is active)
     turn_id = f"{session_id}-{int(time.time()*1000)}"
+    
+    # Extract user ID for team builder configuration
+    # (will be None for anonymous users, who get defaults)
+    uid = owner_id if owner_id else None
 
     # Collect thought/log events for Langfuse trace narrative
     _trace_thoughts = []  # {"type": "thought"|"log", "content": "..."}
@@ -814,22 +824,40 @@ def chat_swarm(
         yield _l(f"[Router] Intercepted RAG Context ({len(extracted_context)} chars).")
     
     # 1. Load Context (Memory Bridge)
-    from brooks import get_pending_context, clear_context, save_pending_image_clarification
+    from brooks import get_pending_context, clear_context, save_pending_image_clarification, save_pending_image_quality
     pending_ctx = get_pending_context(session_id=session_id, owner_id=owner_id)
     
     # Check if this is a reply to a clarification
     if pending_ctx:
         if pending_ctx.get("type") == "image_clarification":
             original_prompt = pending_ctx.get("prompt", "")
-            # Guard: discard stale/snowballing context (>500 chars means it's been re-merged)
-            if len(original_prompt) > 500:
-                logger.warning(f"--- [Router] Discarding stale context ({len(original_prompt)} chars) ---")
+            # Check if this is a quality preference answer
+            if any(kw in user_input.lower() for kw in ["high_quality", "balanced", "fast_preview", "quality", "high", "fast"]):
+                # Extract quality preference
+                if "high" in user_input.lower():
+                    quality = "high_quality"
+                elif "fast" in user_input.lower() or "preview" in user_input.lower():
+                    quality = "fast_preview"
+                else:
+                    quality = "balanced"
+                
+                logger.info(f"--- [Router] Quality preference detected: {quality} ---")
+                # DON'T clear context yet - save quality first, it will persist
+                save_pending_image_quality(quality, session_id=session_id, owner_id=owner_id)
+                yield {"type": "log", "content": f"[Art Director] Quality set to: {quality}"}
+                
+                # Continue with original prompt (context will be read by IMAGE intent)
+                user_input = original_prompt
+            # Guard: discard stale/snowballing context (>100 chars means it's been re-merged)
+            elif len(original_prompt) > 100:
+                logger.warning(f"--- [Router] Discarding stale image context ({len(original_prompt)} chars) ---")
                 yield {"type": "log", "content": "[Context Manager] Stale context discarded."}
                 clear_context(session_id=session_id, owner_id=owner_id)
             else:
-                logger.info(f"--- [Router] Merging Context. Original: '{original_prompt}' + New: '{user_input}' ---")
-                user_input = f"{original_prompt} {user_input}"
-                yield {"type": "log", "content": f"[Context Manager] Context Merged: '{user_input}'"}
+                # Don't merge - user is answering, so append answer to original
+                logger.info(f"--- [Router] Answering clarification. Original: '{original_prompt}' + Answer: '{user_input}' ---")
+                user_input = f"{original_prompt}, {user_input}"
+                yield {"type": "log", "content": f"[Context Manager] Clarification answered."}
                 clear_context(session_id=session_id, owner_id=owner_id)
             
         elif pending_ctx.get("type") == "art_studio_redirect":
@@ -947,20 +975,42 @@ def chat_swarm(
                     history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
                     extracted_context=extracted_context,
                     ace_token=ace_token,
+                    ultraplan_mode=ultraplan_mode,
+                    dev_mode=dev_mode,
                 ):
                     yield chunk
                 return
 
             elif user_input.startswith("new_project"):
-                logger.info("[Router] Dev project: launching onboarding flow.")
-                from lamport import coordinate_project_onboarding as _onboard
-                for chunk in _onboard(
-                    original_prompt,
-                    session_id=session_id,
-                    owner_id=owner_id,
-                ):
-                    yield chunk
-                return
+                # In dev_mode, skip onboarding and go straight to building
+                if dev_mode:
+                    logger.info("[Router] Dev project (dev_mode): routing to coordinator for direct implementation.")
+                    user_input = original_prompt
+                    yield {"type": "log", "content": "[Context Manager] Dev mode: building directly..."}
+                    from lamport import coordinate_task as _coord
+                    yield {"type": "status", "content": "🛠️ Launching coordinator..."}
+                    for chunk in _coord(
+                        user_input,
+                        session_id=session_id,
+                        owner_id=owner_id,
+                        history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
+                        extracted_context=extracted_context,
+                        ace_token=ace_token,
+                        ultraplan_mode=ultraplan_mode,
+                        dev_mode=dev_mode,
+                    ):
+                        yield chunk
+                    return
+                else:
+                    logger.info("[Router] Dev project: launching onboarding flow.")
+                    from lamport import coordinate_project_onboarding as _onboard
+                    for chunk in _onboard(
+                        original_prompt,
+                        session_id=session_id,
+                        owner_id=owner_id,
+                    ):
+                        yield chunk
+                    return
 
             else:
                 # plan_only or freetext — treat as external research
@@ -1509,6 +1559,7 @@ def chat_swarm(
 
         # --- ROUTE: COORDINATE (Multi-Worker Orchestration) ---
         if intent == "COORDINATE":
+            logger.info(f"[Coordinator] DEBUG: About to call coordinate_task with ultraplan_mode={ultraplan_mode}")
             yield _emit_turn_metadata(turn_id, "Coordinator", ["thinking", "tool-use", "responding"])
             yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "🧩 Coordinator Mode: Initializing multi-worker orchestration..."}
@@ -1529,6 +1580,8 @@ def chat_swarm(
                     extracted_context=extracted_context,
                     ace_token=ace_token,
                     template_metadata=template_metadata,
+                    ultraplan_mode=ultraplan_mode,
+                    dev_mode=dev_mode,
                 ):
                     yield update
 
@@ -1722,11 +1775,12 @@ def chat_swarm(
         # --- ROUTE: DEVOPS / INFRASTRUCTURE ---
         if intent == "DEVOPS":
             yield _emit_turn_metadata(turn_id, "DevOps Engineer", ["thinking", "tool-use", "responding"])
-            yield _emit_stream_mode("thinking")
+            # Use team builder to resolve model for devops role
+            DEVOPS_MODEL = get_model_for_role(uid, "devops", default=DEVOPS_MODEL)
+            DEVOPS_MODEL = _resolve_model_for_intent("DEVOPS", DEVOPS_MODEL)
             yield {"type": "status", "content": "🖥️ DevOps Engineer: Analyzing infrastructure task..."}
             AGENT_STATE.labels(agent_name="DevOps").set(2)
 
-            DEVOPS_MODEL = _resolve_model_for_intent("DEVOPS", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(DEVOPS_MODEL)
 
             devops_input = f"[DEVOPS TASK] {user_input}"
@@ -1812,9 +1866,9 @@ def chat_swarm(
             yield _emit_turn_metadata(turn_id, "Data Analyst", ["thinking", "responding"])
             yield _emit_stream_mode("thinking")
             yield {"type": "status", "content": "📊 Data Analyst: Processing your data request..."}
-            AGENT_STATE.labels(agent_name="DataAnalyst").set(2)
-
-            DATA_MODEL = _resolve_model_for_intent("DATA", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            # Use team builder to resolve model for analyst role
+            DATA_MODEL = get_model_for_role(uid, "analyst", default=ANALYST_MODEL)
+            DATA_MODEL = _resolve_model_for_intent("DATA", DATA_MODEL)
             OLLAMA_HOST = get_best_host_for_model(DATA_MODEL)
 
             data_agent = Agent(
@@ -1890,58 +1944,119 @@ def chat_swarm(
              yield {"type": "status", "content": "🎨 Art Director: Reviewing your vision..."}
              AGENT_STATE.labels(agent_name="ArtDirector").set(2)
              
-             # Config — template-driven model selection with health-aware routing
-             MODEL_NAME = _resolve_model_for_intent("IMAGE", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+             # Use team builder to resolve model for architect role (IMAGE uses architectural thinking)
+             MODEL_NAME = get_model_for_role(uid, "architect", default=ARCHITECT_MODEL)
+             MODEL_NAME = _resolve_model_for_intent("IMAGE", MODEL_NAME)
              OLLAMA_HOST = get_best_host_for_model(MODEL_NAME)
              
-             art_director = Agent(
-                 name="Art Director",
-                 model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}),
-                 instructions="""You are the AI Art Director. Your goal is to ensure image prompts are vividly detailed.
-                 
-                 CRITICAL RULES:
-                 1. **Check for Style**: Does the prompt specify "Photo", "Painting", "3D Render", or "Sketch"? If not, ask!
-                 2. **Check for Setting**: Does the prompt specify a location? If not, ask!
-                 3. **Check for Subject Detail**: "A dog" is bad. "A Golden Retriever" is okay. "A black labrador puppy" is good.
-                 
-                 RESPONSE FORMAT:
-                 - If ANY of the above are missing/vague, return: 'CLARIFY: [Direct question asking for the missing detail]'
-                 - If the prompt is fully detailed (Subject + Style + Setting), return: 'EXECUTE'
-                 """,
-                 show_tool_calls=False
-             )
+             # SIMPLE DETERMINISTIC CHECKS (no LLM needed)
+             prompt_lower = user_input.lower()
              
-             try:
-                 # 0. LEARNED MEMORY INJECTION
-                 from memory_system import memory
-                 learned_rules = memory.get_relevant_rules(user_input, "visual_rules")
-                 
-                 memory_context = ""
-                 if learned_rules:
-                     memory_context = f"\n\n[🧠 MEMORY]: The user has previously taught you:\n" + "\n".join([f"- {r}" for r in learned_rules])
-                 
-                 # Check specificity
-                 review_prompt = f"Review this prompt: '{user_input}'{memory_context}"
-                 review: RunResponse = art_director.run(review_prompt)
-                 
-                 if "CLARIFY:" in review.content:
-                     # HITL STOP: Return the clarifying question and EXIT the generator.
-                     # SAVE CONTEXT so we remember next time.
-                     save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
-                     
-                     question = review.content.replace("CLARIFY:", "").strip()
-                     yield {"type": "response", "content": f"🎨 **Art Director:** {question}"}
-                     _score_trace(lf_trace, langfuse, 0.7, output=question)
-                     AGENT_STATE.labels(agent_name="ArtDirector").set(1)
-                     return
-                 
-                 yield {"type": "log", "content": "[Art Director] Prompt approved for Execution."}
-                 
-             except Exception as e:
-                 # Fallback: If AD fails, just execute.
-                 logger.error(f"Art Director Failed: {e}")
-                 yield {"type": "log", "content": "[Art Director] Offline. Skipping review."}
-                 
+             # Check for style keywords
+             has_style = any(kw in prompt_lower for kw in [
+                 # Photography / realism
+                 "photo", "photograph", "realistic", "hyperrealistic", "photorealistic",
+                 # Painting
+                 "painting", "oil painting", "watercolor", "acrylic", "gouache",
+                 "impressionist", "expressionist", "abstract",
+                 # Digital / illustration
+                 "digital art", "digital painting", "illustration", "concept art",
+                 "vector", "flat design", "isometric", "low poly", "pixel art",
+                 # Drawing / traditional
+                 "sketch", "drawing", "pencil", "charcoal", "ink", "pastel", "crayon",
+                 # 3D / render
+                 "3d render", "3d", "render", "cgi", "blender", "octane", "unreal engine",
+                 # Stylized
+                 "anime", "manga", "cartoon", "comic", "disney", "pixar", "chibi",
+                 "vintage", "retro", "noir", "cinematic", "fantasy", "surreal",
+                 # Portrait / decorative
+                 "portrait", "landscape", "minimalist", "sticker",
+             ])
+
+             # Check for setting / composition keywords
+             has_setting = any(kw in prompt_lower for kw in [
+                 # Explicit location nouns
+                 "background", "setting", "location", "scene", "environment",
+                 "forest", "jungle", "woods", "park",
+                 "city", "urban", "street", "alley", "skyline",
+                 "ocean", "sea", "beach", "lake", "river", "waterfall",
+                 "mountain", "desert", "field", "meadow", "valley",
+                 "space", "galaxy", "cosmos", "planet",
+                 "studio", "indoors", "outdoors", "room", "kitchen", "bedroom",
+                 "castle", "temple", "library", "lab", "dungeon",
+                 "white background", "black background", "gradient",
+                 # Prepositions as strong location indicators
+                 " in a ", " in the ", " on a ", " on the ",
+                 " at the ", " at a ", " inside ", " outside ",
+                 " under a ", " under the ", " above the ",
+                 " beside ", " near the ", " near a ",
+                 " surrounded by", " against a ", " against the ",
+             ])
+             
+             # Emit structured clarification if missing critical info
+             if not has_style:
+                 save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
+                 yield {
+                     "type": "clarification_request",
+                     "question": "What visual style would you like?",
+                     "options": [
+                         {"id": "photo", "label": "📷 Photorealistic", "value": "A photorealistic image", "description": "Realistic photography style"},
+                         {"id": "painting", "label": "🎨 Artistic Painting", "value": "A painted artwork", "description": "Oil, watercolor, or acrylic style"},
+                         {"id": "3d", "label": "🔮 3D Rendered", "value": "A 3D rendered scene", "description": "CGI/Blender style rendering"},
+                         {"id": "sketch", "label": "✏️ Hand-drawn Sketch", "value": "A pencil sketch", "description": "Line art or pencil drawing"},
+                     ],
+                     "allow_custom": True,
+                     "allow_multiple": False,
+                     "card_type": "art_direction"
+                 }
+                 _score_trace(lf_trace, langfuse, 0.7, output="Style clarification requested")
+                 AGENT_STATE.labels(agent_name="ArtDirector").set(1)
+                 return
+             
+             if not has_setting:
+                 save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
+                 yield {
+                     "type": "clarification_request", 
+                     "question": "Where should this be located?",
+                     "options": [
+                         {"id": "white_bg", "label": "⬜ Plain white background", "value": "on a plain white background", "description": "Clean, minimal background"},
+                         {"id": "studio", "label": "🎬 Studio lighting", "value": "in a professional photography studio", "description": "Professional studio setup"},
+                         {"id": "nature", "label": "🌳 Outdoor/Nature", "value": "in a natural outdoor setting", "description": "Natural environment"},
+                         {"id": "indoor", "label": "🏠 Indoor scene", "value": "in an indoor room setting", "description": "Interior environment"},
+                     ],
+                     "allow_custom": True,
+                     "allow_multiple": False,
+                     "card_type": "art_direction"
+                 }
+                 _score_trace(lf_trace, langfuse, 0.7, output="Setting clarification requested")
+                 AGENT_STATE.labels(agent_name="ArtDirector").set(1)
+                 return
+             
+             # All checks passed - now ask for quality preference if not already set
+             from brooks import load_pending_image_quality
+             pending_quality = load_pending_image_quality(session_id=session_id, owner_id=owner_id)
+             if not pending_quality:
+                 save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
+                 yield {
+                     "type": "clarification_request",
+                     "question": "What quality level would you like?",
+                     "context": "Higher quality takes longer but produces more accurate and detailed images.",
+                     "options": [
+                         {"id": "high", "label": "🎯 High Quality", "value": "high_quality", "description": "FLUX Dev: 20 steps, best accuracy (30-60s)"},
+                         {"id": "balanced", "label": "⚖️ Balanced", "value": "balanced", "description": "FLUX Dev: 12 steps, good quality (15-30s)"},
+                         {"id": "fast", "label": "⚡ Fast Preview", "value": "fast_preview", "description": "FLUX Schnell: 4 steps, quick iterations (5-10s)"},
+                     ],
+                     "allow_custom": False,
+                     "allow_multiple": False,
+                     "card_type": "art_direction"
+                 }
+                 _score_trace(lf_trace, langfuse, 0.7, output="Quality clarification requested")
+                 AGENT_STATE.labels(agent_name="ArtDirector").set(1)
+                 return
+             
+             # All checks passed - proceed to generation
+             yield {"type": "log", "content": "[Art Director] Prompt approved for Execution."}
+             
              AGENT_STATE.labels(agent_name="ArtDirector").set(1)
 
         # --- ROUTE: DOC STANDARDS AGENT (admin-only /standardize-doc) ---
@@ -2297,45 +2412,106 @@ def chat_swarm(
             yield {"type": "status", "content": "🎨 Creative Studio: Spinning up..."}
             AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
             
+            # Check if quality preference was answered
+            from brooks import load_pending_image_quality
+            pending_quality = load_pending_image_quality(session_id=session_id, owner_id=owner_id)
+            
+            # Map quality to generation parameters
+            # Use "auto" mode to let image_gen.py pick the best available model
+            quality_params = {}
+            if pending_quality == "high_quality":
+                quality_params = {"model_name": "auto", "steps": 20, "cfg": 3.5}
+                yield {"type": "log", "content": "[CreativeStudio] Using HIGH QUALITY settings (auto model, 20 steps)"}
+            elif pending_quality == "balanced":
+                quality_params = {"model_name": "auto", "steps": 12, "cfg": 3.5}
+                yield {"type": "log", "content": "[CreativeStudio] Using BALANCED settings (auto model, 12 steps)"}
+            elif pending_quality == "fast_preview":
+                quality_params = {"model_name": "auto", "steps": 4, "cfg": 1.0}
+                yield {"type": "log", "content": "[CreativeStudio] Using FAST PREVIEW settings (auto model, 4 steps)"}
+            else:
+                # Default to balanced if no preference set
+                quality_params = {"model_name": "auto", "steps": 12, "cfg": 3.5}
+                yield {"type": "log", "content": "[CreativeStudio] Using DEFAULT (Balanced) settings"}
+            
             from specialized.image_gen import generate_image
-            yield {"type": "log", "content": f"[CreativeStudio] Generating with flux-schnell: '{user_input}'"}
+            yield {"type": "log", "content": f"[CreativeStudio] Generating: '{user_input}'"}
             with request_lock(context="image"):
-                response = generate_image(user_input)
+                response = generate_image(user_input, **quality_params)
             
             # Extraction logic for artifact delivery
             import re
             image_match = re.search(r"Generated Image: ([\w\.-]+)", response)
             if image_match:
                 filename = image_match.group(1)
-                delivery_dir = os.path.join(os.getcwd(), "delivered_artifacts")
+                
+                # Source: where image_gen.py saved it (in agent_runtime container)
+                source_path = os.path.join("/tmp/comfyui_images", filename)
+                
+                # === QUALITY CONTROL INSPECTION ===
+                yield {"type": "status", "content": "🔍 Quality Control: Inspecting image..."}
+                try:
+                    from specialized.quality_control_agent import inspect_generated_image
+                    qc_result = inspect_generated_image(source_path, user_input)
+                    
+                    overall_score = qc_result.get("overall_score", 0.0)
+                    passed = qc_result.get("passed", False)
+                    issues = qc_result.get("issues", [])
+                    
+                    logger.info(f"[QualityControl] Score: {overall_score:.1f}/10 | Passed: {passed}")
+                    
+                    if not passed:
+                        # Log issues but continue delivery (non-blocking QC for now)
+                        issue_text = ", ".join(issues) if issues and issues[0].lower() != "none" else "Minor quality concerns"
+                        yield {
+                            "type": "log",
+                            "content": f"⚠️ Quality Check: {overall_score:.1f}/10 - {issue_text}"
+                        }
+                        logger.warning(f"[QualityControl] Image quality below threshold but delivering anyway")
+                    else:
+                        yield {
+                            "type": "log",
+                            "content": f"✓ Quality Check: {overall_score:.1f}/10 - Excellent!"
+                        }
+                except Exception as qc_error:
+                    logger.warning(f"[QualityControl] Inspection failed, proceeding with delivery: {qc_error}")
+                    yield {"type": "log", "content": "⚠️ Quality inspection unavailable, proceeding..."}
+                
+                # Destination: delivered_artifacts for UI serving
+                delivery_dir = "/workspace/delivered_artifacts"
                 if not os.path.exists(delivery_dir):
                     os.makedirs(delivery_dir, exist_ok=True)
-                    
                 delivery_path = os.path.join(delivery_dir, filename)
-                COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://host.docker.internal:8188")
                 
                 try:
-                    import requests
-                    url = f"{COMFYUI_HOST}/view"
-                    params = {"filename": filename, "subfolder": "", "type": "output"}
-                    for i in range(10):
-                        r = requests.get(url, params=params, timeout=10)
-                        if r.status_code == 200:
-                            with open(delivery_path, 'wb') as f:
-                                f.write(r.content)
+                    # Copy from temp directory to delivered_artifacts
+                    if os.path.exists(source_path):
+                        import shutil
+                        shutil.copy2(source_path, delivery_path)
+                        logger.info(f"[CreativeStudio] Copied image to delivered_artifacts: {filename}")
+                        
+                        # Use media_metadata to create proper attachment structure
+                        from utils.media_metadata import extract_media_metadata
+                        media_meta = extract_media_metadata(
+                            filename,
+                            base_path=delivery_dir,
+                            url_prefix="/api/backend/delivered_artifacts"
+                        )
+                        
+                        if media_meta:
+                            # Emit media_attachment event for UI
                             yield {
-                                "type": "artifact",
-                                "content": {
-                                    "type": "image",
-                                    "name": filename,
-                                    "path": delivery_path, 
-                                    "docker_path": f"/app/comfy_io/output/{filename}" 
-                                }
+                                "type": "media_attachment",
+                                "content": media_meta  # content, not media
                             }
-                            break
-                        time.sleep(1)
+                            logger.info(f"[CreativeStudio] Media attachment emitted: {filename}")
+                    else:
+                        logger.warning(f"[CreativeStudio] Image not found at {source_path}")
                 except Exception as e:
-                    logger.error(f"Download error: {e}")
+                    logger.error(f"[CreativeStudio] Error delivering image: {e}", exc_info=True)
+            
+            # Clear quality preference after use so it doesn't persist to next image
+            from brooks import clear_context
+            clear_context(session_id=session_id, owner_id=owner_id)
             
             AGENT_STATE.labels(agent_name="CreativeStudio").set(1)
             WORKFLOW_STEPS.labels(status="success", agent_type="CreativeStudio").inc()
@@ -2410,10 +2586,10 @@ def chat_swarm(
         # --- ROUTE: STANDARD ARCHITECT / CODE (MarsRL Loop or Fast Pass) ---
         # Only fall through if no specialized route handled this intent
         if intent not in ("CONVERSATION", "DEVOPS", "DATA", "AMBIGUOUS", "IMAGE",
-                          "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE",
-                          "TRAIN", "IOT_CONTROL", "VISION", "COORDINATE"):
-
-            ARCH_MODEL = os.getenv('ARCHITECT_MODEL', os.getenv('PRIMARY_MODEL', 'qwen3:14b'))
+                          "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE"):
+            # Use team builder to resolve model for coder/architect role
+            ARCH_MODEL = get_model_for_role(uid, "coder", default=ARCHITECT_MODEL)
+            ARCH_MODEL = os.getenv('ARCHITECT_MODEL', ARCH_MODEL)
             OLLAMA_HOST = get_best_host_for_model(ARCH_MODEL)
 
             try:
