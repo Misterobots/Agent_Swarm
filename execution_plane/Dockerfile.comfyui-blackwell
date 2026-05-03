@@ -1,0 +1,77 @@
+# ComfyUI Dockerfile for Blackwell GPUs (sm_120)
+# Based on PyTorch 2.11.0 with CUDA 13.0
+# Stock ComfyUI - no Creature Forge modifications
+
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
+
+# Set non-interactive mode for apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python 3.11 and system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    git \
+    wget \
+    curl \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python (force overwrite if exists)
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python3
+
+# Upgrade pip
+RUN python3.11 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install PyTorch 2.11.0 with CUDA 13.0 support (Blackwell sm_120)
+RUN pip3 install --no-cache-dir \
+    torch==2.11.0+cu130 \
+    torchvision==0.26.0+cu130 \
+    --index-url https://download.pytorch.org/whl/cu130
+
+# Install ComfyUI core dependencies
+RUN pip3 install --no-cache-dir \
+    transformers>=4.28.0 \
+    tokenizers>=0.13.3 \
+    sentencepiece \
+    safetensors>=0.4.2 \
+    aiohttp \
+    accelerate \
+    pyyaml \
+    Pillow>=9.5.0 \
+    scipy \
+    tqdm \
+    psutil \
+    kornia>=0.6.7 \
+    spandrel \
+    soundfile \
+    einops
+
+# Clone stock ComfyUI from official repo
+WORKDIR /home/runner/ComfyUI
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git . && \
+    git config --global --add safe.directory /home/runner/ComfyUI
+
+# Install ComfyUI requirements
+RUN if [ -f requirements.txt ]; then pip3 install --no-cache-dir -r requirements.txt; fi
+
+# Create necessary directories
+RUN mkdir -p models/checkpoints models/vae models/loras models/embeddings \
+    models/clip models/clip_vision models/style_models models/upscale_models \
+    output input temp custom_nodes user
+
+# Set working directory
+WORKDIR /home/runner/ComfyUI
+
+# Expose ComfyUI port
+EXPOSE 8188
+
+# Default command (can be overridden in docker-compose.yml)
+CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188"]

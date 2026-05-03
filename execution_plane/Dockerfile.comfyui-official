@@ -1,0 +1,22 @@
+# ComfyUI Dockerfile using official image as base
+# Adds PyTorch 2.11.0 + CUDA 13.0 for Blackwell GPU support (sm_120)
+
+FROM yanwk/comfyui-boot:cu121
+
+# Upgrade to PyTorch 2.11.0 with CUDA 13.0 (adds sm_120 support)
+RUN pip3 install --no-cache-dir --upgrade \
+    torch==2.11.0+cu130 \
+    torchvision==0.26.0+cu130 \
+    --index-url https://download.pytorch.org/whl/cu130
+
+# Verify PyTorch installation and GPU architectures
+RUN python3 -c "import torch; print(f'PyTorch {torch.__version__}'); print(f'CUDA Available: {torch.cuda.is_available()}'); print(f'Supported Architectures: {torch.cuda.get_arch_list()}')"
+
+# ComfyUI is already installed in /home/runner/ComfyUI
+WORKDIR /home/runner/ComfyUI
+
+# Expose port
+EXPOSE 8188
+
+# Use the boot script from the base image
+CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188"]

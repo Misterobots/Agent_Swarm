@@ -413,6 +413,7 @@ def queue_prompt(prompt_text: str, **kwargs):
                 }
             }
         }
+<<<<<<< HEAD
         
         client_id = str(uuid.uuid4())
         p["client_id"] = client_id
@@ -425,19 +426,108 @@ def queue_prompt(prompt_text: str, **kwargs):
         # 4. Submit prompt to ComfyUI
         url = f"{comfyui_host}/prompt"
         req = requests.post(url, json=p)
+=======
+    }
+    
+    client_id = str(uuid.uuid4())
+    p["client_id"] = client_id
+    import random
+    p["prompt"]["3"]["inputs"]["seed"] = random.randint(1, 1000000000)
+    
+    try:
+        url = f"{COMFYUI_HOST}/prompt"
+        logger.info(f"[ComfyUI] Submitting prompt to {url}...")
+        req = requests.post(url, json=p, timeout=30) # 30s timeout for initial submission
+>>>>>>> d6fda849d7fb2b1b2895f270465a4100b3550efc
         
         if req.status_code != 200:
+            logger.error(f"[ComfyUI] HTTP {req.status_code}: {req.text}")
             return f"Error connecting to ComfyUI (Status {req.status_code}): {req.text}"
             
         response = req.json()
         if 'prompt_id' not in response:
+<<<<<<< HEAD
             return f"Error: ComfyUI did not return a prompt_id. Response: {response}"
+=======
+             logger.error(f"[ComfyUI] Missing prompt_id in response: {response}")
+             return f"Error: ComfyUI did not return a prompt_id. Response: {response}"
+>>>>>>> d6fda849d7fb2b1b2895f270465a4100b3550efc
              
         prompt_id = response['prompt_id']
+        logger.info(f"[ComfyUI] Prompt queued: {prompt_id}")
         print(f"--- [ComfyUI] Prompt Queued: {prompt_id} ---")
+<<<<<<< HEAD
         
         # 5. Wait for generation to complete
         print("--- [ComfyUI] Waiting for generation... ---")
+=======
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"[ComfyUI] Connection failed to {COMFYUI_HOST}: {e}")
+        return f"Error: Cannot connect to ComfyUI at {COMFYUI_HOST}. Is ComfyUI running? ({e})"
+    except requests.exceptions.Timeout as e:
+        logger.error(f"[ComfyUI] Connection timeout to {COMFYUI_HOST}: {e}")
+        return f"Error: ComfyUI connection timeout at {COMFYUI_HOST} ({e})"
+    except Exception as e:
+        logger.error(f"[ComfyUI] Unexpected error: {e}")
+        return f"Error connecting to ComfyUI: {e}"
+
+    print("--- [ComfyUI] Waiting for generation... ---")
+    time.sleep(2)
+
+    timeout_seconds = 900  # 15 minutes — covers model load + queue wait + steps=20+ generation
+    start_time = time.time()
+    lost_count = 0
+
+    while (time.time() - start_time) < timeout_seconds:
+        try:
+            history_url = f"{COMFYUI_HOST}/history/{prompt_id}"
+            res = requests.get(history_url, timeout=5)
+            history = res.json()
+
+            if prompt_id in history:
+                entry = history[prompt_id]
+                # Check for ComfyUI execution error
+                status_str = entry.get('status', {}).get('status_str', '')
+                if status_str == 'error':
+                    msgs = entry.get('status', {}).get('messages', [])
+                    err_detail = "Unknown ComfyUI error"
+                    for msg in msgs:
+                        if isinstance(msg, list) and msg[0] == 'execution_error':
+                            err_detail = msg[1].get('exception_message', err_detail)
+                            break
+                    return f"Error: ComfyUI execution failed: {err_detail.strip()}"
+                outputs = entry.get('outputs', {})
+                if '9' in outputs:
+                     images = outputs['9'].get('images', [])
+                     if images:
+                         filename = images[0]['filename']
+                         subfolder = images[0].get('subfolder', '')
+                         return (
+                             f"Generated Image: {filename} (in {subfolder} output) "
+                             f"| profile={target['profile_id']} | checkpoint={ckpt_name}"
+                         )
+                     return "Error: ComfyUI completed but produced no image output."
+                return "Error: ComfyUI completed but SaveImage node produced no output."
+
+            # Not in history yet — check queue to avoid premature timeout while waiting in line
+            try:
+                q_res = requests.get(f"{COMFYUI_HOST}/queue", timeout=5)
+                q_data = q_res.json()
+                is_pending = any(item[1] == prompt_id for item in q_data.get('queue_pending', []))
+                is_running = any(item[1] == prompt_id for item in q_data.get('queue_running', []))
+                if is_pending:
+                    # Reset timer while queued so we don't count wait time against generation budget
+                    start_time = time.time()
+                elif not is_running:
+                    lost_count += 1
+                    if lost_count > 5:
+                        return "Error: ComfyUI job disappeared from queue without producing output."
+            except Exception:
+                pass
+
+        except Exception as e:
+            logger.warning(f"Polling error: {e}")
+>>>>>>> d6fda849d7fb2b1b2895f270465a4100b3550efc
         time.sleep(2)
 
         timeout_seconds = 900  # 15 minutes — covers model load + queue wait + steps=20+ generation
