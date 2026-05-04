@@ -1140,7 +1140,7 @@ def chat_swarm(
             yield {"type": "status", "content": "📋 Planner: Decomposing task..."}
             yield _t("→ UltraPlan mode: generating plan only (no execution)")
 
-            PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
             OLLAMA_HOST = get_best_host_for_model(PLAN_MODEL)
 
             plan_system_prompt = (
@@ -1408,7 +1408,7 @@ def chat_swarm(
             yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
             AGENT_STATE.labels(agent_name="Conversationalist").set(2)
 
-            CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
             OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
 
             conversationalist = Agent(
@@ -1456,7 +1456,7 @@ def chat_swarm(
             yield {"type": "status", "content": "🖥️ DevOps Engineer: Analyzing infrastructure task..."}
             AGENT_STATE.labels(agent_name="DevOps").set(2)
 
-            DEVOPS_MODEL = _resolve_model_for_intent("DEVOPS", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            DEVOPS_MODEL = _resolve_model_for_intent("DEVOPS", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
             OLLAMA_HOST = get_best_host_for_model(DEVOPS_MODEL)
 
             devops_input = f"[DEVOPS TASK] {user_input}"
@@ -1543,7 +1543,7 @@ def chat_swarm(
             yield {"type": "status", "content": "📊 Data Analyst: Processing your data request..."}
             AGENT_STATE.labels(agent_name="DataAnalyst").set(2)
 
-            DATA_MODEL = _resolve_model_for_intent("DATA", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            DATA_MODEL = _resolve_model_for_intent("DATA", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
             OLLAMA_HOST = get_best_host_for_model(DATA_MODEL)
 
             data_agent = Agent(
@@ -1611,7 +1611,7 @@ def chat_swarm(
              AGENT_STATE.labels(agent_name="ArtDirector").set(2)
              
              # Config — template-driven model selection with health-aware routing
-             MODEL_NAME = _resolve_model_for_intent("IMAGE", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+             MODEL_NAME = _resolve_model_for_intent("IMAGE", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
              OLLAMA_HOST = get_best_host_for_model(MODEL_NAME)
              
              art_director = Agent(
@@ -1772,7 +1772,7 @@ def chat_swarm(
             AGENT_STATE.labels(agent_name="TechnicalWriter").set(2)
             
             # Template-driven model selection with health-aware routing
-            TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
             OLLAMA_HOST = get_best_host_for_model(TECH_MODEL)
             
             tech_writer = Agent(
@@ -2133,7 +2133,7 @@ def chat_swarm(
                           "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE",
                           "TRAIN", "IOT_CONTROL", "VISION", "COORDINATE"):
 
-            ARCH_MODEL = os.getenv('ARCHITECT_MODEL', os.getenv('PRIMARY_MODEL', 'qwen3:14b'))
+            ARCH_MODEL = os.getenv('ARCHITECT_MODEL', os.getenv('PRIMARY_MODEL', 'qwen3.6:27b'))
             OLLAMA_HOST = get_best_host_for_model(ARCH_MODEL)
 
             try:

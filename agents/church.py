@@ -1355,7 +1355,7 @@ def chat_swarm(
             yield {"type": "status", "content": "📋 Planner: Decomposing task..."}
             yield _t("→ UltraPlan mode: generating plan only (no execution)")
 
-            PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
             OLLAMA_HOST = get_best_host_for_model(PLAN_MODEL)
 
             plan_system_prompt = (
@@ -1637,7 +1637,7 @@ def chat_swarm(
             yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
             AGENT_STATE.labels(agent_name="Conversationalist").set(2)
 
-            CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
             OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
             
             # THREE-TIER ACCESS CONTROL
@@ -2239,7 +2239,7 @@ def chat_swarm(
             AGENT_STATE.labels(agent_name="TechnicalWriter").set(2)
             
             # Template-driven model selection with health-aware routing
-            TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
+            TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b")))
             OLLAMA_HOST = get_best_host_for_model(TECH_MODEL)
             
             tech_writer = Agent(

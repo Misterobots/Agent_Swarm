@@ -122,10 +122,10 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
 
 class SemanticRouter:
     def __init__(self):
-        # After TTFT optimization: router uses the primary model (qwen3:14b) on
+        # After TTFT optimization: router uses the primary model (qwen3.6:27b) on
         # Lovelace instead of nemotron-orchestrator on Turing. This eliminates
         # the cross-network hop and keeps the model already hot in VRAM.
-        self.model_name = os.getenv("ROUTER_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b"))
+        self.model_name = os.getenv("ROUTER_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b"))
         from utils.gpu_queue import get_best_host_for_model
         self.host = get_best_host_for_model(self.model_name)
         

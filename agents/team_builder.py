@@ -6,7 +6,7 @@ Stored in JSON files at: /workspace/user_projects/{uid}/team_config.json
 
 Each config maps role names to model names:
 {
-  "coordinator": "qwen3:14b",
+  "coordinator": "qwen3.6:27b",
   "coder": "qwen2.5-coder:14b",
   "devops": "nemotron:70b",
   ...

@@ -202,7 +202,7 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
     Use LLM to decompose a complex task into subtasks.
     Returns dict with research_tasks, implementation_tasks, verification_criteria.
     """
-    decompose_model = os.getenv("COORDINATOR_MODEL", "qwen3:14b")
+    decompose_model = os.getenv("COORDINATOR_MODEL", "qwen3.6:27b")
     host = get_best_host_for_model(decompose_model)
 
     system_prompt = (
@@ -287,7 +287,7 @@ def _synthesize_findings(findings: str, original_task: str) -> str:
     LLM synthesis step: Read all research findings and produce an implementation plan.
     This is the ONLY step where the coordinator delegates understanding to the LLM.
     """
-    synth_model = os.getenv("COORDINATOR_MODEL", "qwen3:14b")
+    synth_model = os.getenv("COORDINATOR_MODEL", "qwen3.6:27b")
     host = get_best_host_for_model(synth_model)
 
     system_prompt = (

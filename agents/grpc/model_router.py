@@ -8,7 +8,7 @@ executes inference via Ollama's HTTP API.
 Model assignments (from config.py):
     nemotron-orchestrator:8b → intent classification (router)
     qwen2.5-coder:14b      → code generation
-    qwen3:14b              → general reasoning
+    qwen3.6:27b            → general reasoning
     llama3.2:3b            → research / lightweight tasks
     moondream:latest       → vision (image analysis)
 """
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 ROUTER_MODEL = os.getenv("ROUTER_MODEL", "nemotron-orchestrator:8b")
 CODE_MODEL = os.getenv("ARCHITECT_MODEL", "qwen2.5-coder:14b-instruct-q4_k_m")
-GENERAL_MODEL = os.getenv("COORDINATOR_MODEL", "qwen3:14b")
+GENERAL_MODEL = os.getenv("COORDINATOR_MODEL", "qwen3.6:27b")
 RESEARCH_MODEL = os.getenv("LIBRARIAN_MODEL", "llama3.2:3b")
 VISION_MODEL = os.getenv("VISION_MODEL", "moondream:latest")
 
@@ -63,6 +63,7 @@ MODEL_ROLES: Dict[str, str] = {
 CONTEXT_WINDOWS: Dict[str, int] = {
     "qwen2.5-coder:14b": 32768,
     "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
+    "qwen3.6:27b": 262144,
     "qwen3:14b": 40960,
     "nemotron-orchestrator:8b": 32768,
     "nemotron-mini": 4096,

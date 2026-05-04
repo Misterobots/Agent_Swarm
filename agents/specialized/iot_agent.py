@@ -15,7 +15,7 @@ def get_iot_agent() -> Agent:
     Returns the configured IoT Controller Agent.
     Thinking mode disabled — IoT commands are direct tool calls, not reasoning tasks.
     """
-    MODEL_NAME = os.getenv("PRIMARY_MODEL", "qwen3:14b")
+    MODEL_NAME = os.getenv("PRIMARY_MODEL", "qwen3.6:27b")
     OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
     # System Instructions for the Expanded IoT Agent

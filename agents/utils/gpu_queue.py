@@ -37,7 +37,7 @@ def _get_preferred_host(model_name: str) -> str:
     - Lovelace (Local): 2x 16GB VRAM (5060 Ti). Primary inference for all task models.
     - Turing (Secondary): 8GB VRAM (3070 Ti). Dedicated to safety + embeddings only.
     
-    After model consolidation, qwen3:14b is the primary workhorse and always
+    After model consolidation, qwen3.6:27b is the primary workhorse and always
     runs on Lovelace. Only safety and embedding models route to Turing.
     """
     # Turing models — async safety + embeddings (not latency-critical)

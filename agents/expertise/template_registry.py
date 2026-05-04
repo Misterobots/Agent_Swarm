@@ -221,7 +221,7 @@ _SEED_TEMPLATES = [
         "capabilities": ["model_generate", "file_read", "file_write", "terminal_exec",
                           "terminal_read", "api_call", "resource_access"],
         "security_level": "L3_ADMIN",
-        "default_model": "qwen3:14b",
+        "default_model": "qwen3.6:27b",
     },
 ]
 
