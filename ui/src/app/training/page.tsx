@@ -37,14 +37,24 @@ export default function TrainingPage() {
       >
         <WorkspaceCardGrid>
           <WorkspaceLinkCard
+            title="Launch Run"
+            description="Start a new training run: full pipeline, curated, synthetic, or export."
+            href="/training/launch"
+          />
+          <WorkspaceLinkCard
+            title="Run History"
+            description="View all past training runs, adapter status, and metrics."
+            href="/training/runs"
+          />
+          <WorkspaceLinkCard
+            title="Model Catalog"
+            description="GRPO, QLoRA, GGUF conversion, and A/B promotion."
+            href="/training/models"
+          />
+          <WorkspaceLinkCard
             title="Voice Calibration"
             description="BMO voice tuning and playback validation."
             href="/training/voice"
-          />
-          <WorkspaceLinkCard
-            title="Model Training"
-            description="GRPO, QLoRA, GGUF conversion, and A/B promotion."
-            href="/training/models"
           />
         </WorkspaceCardGrid>
       </WorkspaceSection>
