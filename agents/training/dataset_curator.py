@@ -110,8 +110,7 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
         "hf_id": "glaiveai/glaive-function-calling-v2",
         "description": "113K multi-turn function/tool calling conversations",
         "category": "tool_calling",
-        "format": "sharegpt",
-        "content_field": "conversations",  # may vary per split
+        "format": "glaive_chat",  # glaiveai format: system + chat string fields
         "default_max": 10000,
         "recommended_for": ["code_developer", "iot_controller"],
     },
@@ -137,8 +136,7 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
         "hf_id": "glaiveai/glaive-code-assistant-v3",
         "description": "~120K code generation and debugging conversations",
         "category": "code",
-        "format": "sharegpt",
-        "content_field": "conversations",
+        "format": "instruct",  # question/answer fields
         "default_max": 10000,
         "recommended_for": ["code_developer"],
     },
@@ -162,11 +160,12 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
     },
     "the-stack-v2": {
         "hf_id": "bigcode/the-stack-v2-train-smol-ids",
-        "description": "Code files from The Stack v2 (small reproducible subset)",
+        "description": "Code files from The Stack v2 (small reproducible subset) — requires HF_TOKEN",
         "category": "code",
         "format": "code",
         "content_field": "content",
         "default_max": 5000,
+        "requires_auth": True,  # gated dataset — set HF_TOKEN env var
         "recommended_for": ["code_developer"],
     },
 }
@@ -391,15 +390,62 @@ def _sharegpt_to_grpo(sample: Dict) -> Optional[Dict]:
     return {"conversations": normalized}
 
 
+def _glaive_chat_to_grpo(sample: Dict) -> Optional[Dict]:
+    """
+    Convert glaiveai dataset format (system + chat string) to GRPO.
+
+    Input: {"system": "SYSTEM: You are a helpful assistant...",
+            "chat": "USER: ...\nASSISTANT: ...<|endoftext|>"}
+
+    The chat field uses "USER:", "ASSISTANT:", and "FUNCTION RESPONSE:" markers
+    separated by newlines.
+    """
+    chat = sample.get("chat", "")
+    system = sample.get("system", "")
+    if not chat:
+        return None
+
+    # Strip leading "SYSTEM: " prefix from system field
+    sys_text = re.sub(r'^SYSTEM:\s*', '', system.strip()) if system else ""
+
+    # Split on newlines that precede a role marker
+    turns = re.split(r'\n(?=USER:|ASSISTANT:|FUNCTION RESPONSE:)', chat)
+    convs = []
+    if sys_text:
+        convs.append({"role": "system", "content": sys_text})
+
+    for turn in turns:
+        # Strip glaive's end-of-text marker
+        turn = turn.strip().rstrip('<|endoftext|>').strip()
+        if turn.startswith('USER:'):
+            content = turn[5:].strip()
+            if content:
+                convs.append({"role": "user", "content": content})
+        elif turn.startswith('ASSISTANT:'):
+            content = turn[10:].strip()
+            if content:
+                convs.append({"role": "assistant", "content": content})
+        elif turn.startswith('FUNCTION RESPONSE:'):
+            content = turn[18:].strip()
+            if content:
+                convs.append({"role": "tool", "content": content})
+
+    roles = [t["role"] for t in convs]
+    if "user" not in roles or "assistant" not in roles:
+        return None
+
+    return {"conversations": convs}
+
+
 def _instruct_to_grpo(sample: Dict) -> Optional[Dict]:
     """
     Convert instruction-format samples to GRPO.
 
     Input: {"instruction": "...", "input": "...", "output": "..."}
     """
-    instruction = sample.get("instruction", "")
+    instruction = sample.get("instruction", "") or sample.get("question", "")
     inp = sample.get("input", "")
-    output = sample.get("output", "")
+    output = sample.get("output", "") or sample.get("answer", "")
 
     if not instruction or not output:
         return None
@@ -526,6 +572,16 @@ class DatasetCurator:
                     per_dataset_stats[key] = {"error": "source_not_whitelisted"}
                     continue
 
+                # ── Auth check for gated datasets ─────────────────────────
+                if meta.get("requires_auth") and not os.getenv("HF_TOKEN"):
+                    logger.warning(
+                        f"Dataset '{key}' ({meta['hf_id']}) is a gated dataset "
+                        f"and requires HF_TOKEN \u2014 skipping. Set the HF_TOKEN "
+                        f"environment variable to enable this dataset."
+                    )
+                    per_dataset_stats[key] = {"error": "requires_hf_token"}
+                    continue
+
                 logger.info(
                     f"Downloading {meta['hf_id']} (limit={limit})..."
                 )
@@ -549,7 +605,9 @@ class DatasetCurator:
                     # Convert format based on declared dataset format
                     fmt = meta.get("format", "sharegpt")
                     converted = None
-                    if fmt == "code":
+                    if fmt == "glaive_chat":
+                        converted = _glaive_chat_to_grpo(sample)
+                    elif fmt == "code":
                         converted = _code_to_grpo(sample, meta.get("content_field", "content"))
                     if converted is None:
                         converted = _sharegpt_to_grpo(sample)
