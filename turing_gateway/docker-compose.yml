@@ -752,10 +752,10 @@ networks:
 volumes:
   spire_agent_data:
     external: true
-    name: r730_gateway_spire_agent_data
+    name: turing_gateway_spire_agent_data
   spire_socket:
     external: true
-    name: r730_gateway_spire_socket
+    name: turing_gateway_spire_socket
   prometheus_data:
     external: true
     name: r730_gateway_prometheus_data
