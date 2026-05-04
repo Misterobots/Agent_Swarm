@@ -215,6 +215,9 @@ services:
     depends_on:
       langfuse-web:
         condition: service_started
+    env_file:
+      - ../network.env
+      - .env
     environment: *langfuse-env
     networks:
       - swarm_net
