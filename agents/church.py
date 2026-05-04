@@ -19,7 +19,7 @@ import requests
 from pathlib import Path
 from dispatcher import Event, EventType
 from logger_setup import setup_logger
-from utils.gpu_queue import request_lock, get_best_host_for_model
+from utils.gpu_queue import request_lock, get_best_host_for_model, get_queue_status
 from phi.storage.agent.postgres import PgAgentStorage
 from role_model_resolver import get_model_for_role
 from config import (
@@ -110,6 +110,22 @@ def _resolve_model_for_intent(intent: str, fallback_model: str) -> str:
     except Exception as e:
         logger.debug(f"[Router] Template model lookup failed for {intent}: {e}")
     return fallback_model
+
+
+def _maybe_emit_queue_status(model_name: str, uid: str = ""):
+    """
+    Check VRAM queue status for *model_name* and, if the estimated wait
+    exceeds the threshold AND alternatives are loaded, return a
+    ``model_queue_status`` SSE event dict.  Otherwise returns None.
+    Fast-path: returns None immediately for small (≤8 GB) models.
+    """
+    try:
+        qs = get_queue_status(model_name, uid=uid)
+        if qs.get("should_prompt"):
+            return {"type": "model_queue_status", "content": qs}
+    except Exception as e:
+        logger.debug(f"[Router] Queue status check failed (non-fatal): {e}")
+    return None
 
 
 # --- Langfuse Tracing ---
@@ -1392,6 +1408,9 @@ def chat_swarm(
             )
 
             try:
+                _qs_event = _maybe_emit_queue_status(PLAN_MODEL, uid=uid or "")
+                if _qs_event:
+                    yield _qs_event
                 with request_lock(context="text"):
                     yield _emit_stream_mode("responding")
                     response_stream = planner.run(user_input, stream=True)
@@ -1750,6 +1769,9 @@ def chat_swarm(
 
             full_content = ""
             try:
+                _qs_event = _maybe_emit_queue_status(CONV_MODEL, uid=uid or "")
+                if _qs_event:
+                    yield _qs_event
                 with _langfuse_span("conversation_generation", "Conversationalist", CONV_MODEL, user_input) as span_result:
                     with request_lock(context="text"):
                         response_stream = conversationalist.run(user_input, stream=True)
@@ -1804,6 +1826,9 @@ def chat_swarm(
                 )
                 full_content = ""
                 try:
+                    _qs_event = _maybe_emit_queue_status(DEVOPS_MODEL, uid=uid or "")
+                    if _qs_event:
+                        yield _qs_event
                     with _langfuse_span("devops_fast_generation", "DevOps", DEVOPS_MODEL, devops_input) as span_result:
                         with request_lock(context="text"):
                             yield _emit_stream_mode("responding")
@@ -1840,6 +1865,9 @@ def chat_swarm(
                 try:
                     tool_call_id = f"tool-devops-{int(time.time()*1000)}"
                     yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": "DEVOPS", "model": DEVOPS_MODEL})
+                    _qs_event = _maybe_emit_queue_status(DEVOPS_MODEL, uid=uid or "")
+                    if _qs_event:
+                        yield _qs_event
                     with request_lock(context="text"):
                         yield _emit_stream_mode("tool-use")
                         yield _emit_tool_progress(tool_call_id, "marsrl_loop", 25, "Initializing MarsRL loop")
@@ -1889,6 +1917,9 @@ def chat_swarm(
                     yield {"type": "log", "content": f"[DataAnalyst] Reading attached context ({len(extracted_context)} chars)..."}
                     final_input = f"{final_input}\n\n[Data Context]:\n{extracted_context}"
 
+                _qs_event = _maybe_emit_queue_status(DATA_MODEL, uid=uid or "")
+                if _qs_event:
+                    yield _qs_event
                 with _langfuse_span("data_analysis_generation", "DataAnalyst", DATA_MODEL, final_input) as span_result:
                     with request_lock(context="text"):
                         response_stream = data_agent.run(final_input, stream=True)

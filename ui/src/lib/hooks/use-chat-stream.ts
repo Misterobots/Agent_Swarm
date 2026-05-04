@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment } from "@/types/chat";
+import type { ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 
 const MODEL_WINDOWS: Record<string, number> = {
@@ -73,6 +73,7 @@ export function useChatStream(options?: {
     setMessagePendingApprovals,
     setMessageMediaAttachments,
     setMessagePendingClarification,
+    setMessageQueueStatus,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -307,6 +308,10 @@ export function useChatStream(options?: {
               mediaAttachmentsRef.current = [...mediaAttachmentsRef.current, event.media];
               // Update message immediately so preview appears during streaming
               setMessageMediaAttachments(convId!, assistantId, mediaAttachmentsRef.current);
+            }
+          } else if (event.type === "model_queue_status") {
+            if (event.queueStatus) {
+              setMessageQueueStatus(convId!, assistantId, event.queueStatus as QueueStatus);
             }
           } else if (event.type === "stream_mode") {
             const mode = event.streamMode || "responding";

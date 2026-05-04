@@ -285,3 +285,158 @@ def request_lock(context: str, timeout: int = 300):
                 logger.info(f"[GPU Queue] Lock released for context: '{context}'.")
 
 
+# ---------------------------------------------------------------------------
+# Tiered Queue System
+#
+# Design:
+#   SMALL models (≤ LARGE_MODEL_VRAM_THRESHOLD_GB): bypass the lock entirely.
+#     Ollama handles concurrent small-model requests natively. No Redis queue.
+#   LARGE models (> threshold): serialized via the existing Redis mutex PLUS
+#     a Redis list (swarm:queue:large) that tracks queue position for UX.
+#
+# The Redis queue list entries are JSON strings:
+#   {"request_id": str, "uid": str, "model": str, "queued_at": float}
+#
+# SSE feedback:
+#   Before acquiring request_lock for a large model, call get_queue_status()
+#   and yield a "model_queue_status" event to the client. If wait > 30s and
+#   alternatives exist, set should_prompt = True for the UI to offer options.
+# ---------------------------------------------------------------------------
+
+LARGE_QUEUE_KEY      = "swarm:queue:large"
+PROMPT_WAIT_THRESHOLD = 30   # seconds — show alternative suggestion above this
+
+def _get_loaded_model_names(host: str = OLLAMA_HOST) -> list[str]:
+    """Query Ollama /api/ps and return names of currently VRAM-resident models."""
+    try:
+        resp = requests.get(f"{host}/api/ps", timeout=5)
+        if resp.status_code == 200:
+            return [m.get("name", "") for m in resp.json().get("models", [])]
+    except Exception:
+        pass
+    return []
+
+
+def enqueue_large_request(request_id: str, uid: str, model: str) -> int:
+    """
+    Add a large-model request to the Redis position queue.
+    Returns the 1-based position (1 = next to run).
+    Fail-open: returns 0 if Redis is unavailable.
+    """
+    import json as _json
+    import time as _time
+    try:
+        client = get_redis_client()
+        entry = _json.dumps({
+            "request_id": request_id,
+            "uid": uid,
+            "model": model,
+            "queued_at": _time.time(),
+        })
+        client.rpush(LARGE_QUEUE_KEY, entry)
+        length = client.llen(LARGE_QUEUE_KEY)
+        logger.debug(f"[GPU Queue] Enqueued request {request_id} for {model}. Position: {length}")
+        return length
+    except Exception as e:
+        logger.debug(f"[GPU Queue] Could not enqueue request (fail-open): {e}")
+        return 0
+
+
+def dequeue_large_request(request_id: str) -> None:
+    """Remove a request from the position queue when it completes."""
+    import json as _json
+    try:
+        client = get_redis_client()
+        entries = client.lrange(LARGE_QUEUE_KEY, 0, -1)
+        for entry in entries:
+            try:
+                data = _json.loads(entry)
+                if data.get("request_id") == request_id:
+                    client.lrem(LARGE_QUEUE_KEY, 1, entry)
+                    logger.debug(f"[GPU Queue] Dequeued request {request_id}")
+                    return
+            except Exception:
+                continue
+    except Exception as e:
+        logger.debug(f"[GPU Queue] Could not dequeue request (non-fatal): {e}")
+
+
+def get_queue_status(model_name: str, uid: str = "") -> dict:
+    """
+    Return queue status for a model request — used to generate SSE feedback
+    BEFORE acquiring the GPU lock.
+
+    Returned dict shape (also the payload for "model_queue_status" SSE event):
+    {
+      "model":            str,
+      "tier":             "small" | "large",
+      "is_loaded":        bool,     # model currently in Ollama VRAM
+      "queue_position":   int,      # 0 = no wait, N = N requests ahead
+      "estimated_wait_s": int,      # seconds until this request can start
+      "alternatives":     [         # loaded alternatives that could answer faster
+          {"name": str, "description": str, "vram_gb": float}
+      ],
+      "should_prompt":    bool,     # True → UI should offer alternative suggestion
+    }
+    """
+    try:
+        from model_registry import is_large_model, get_alternatives, estimate_queue_wait, get_model
+    except ImportError:
+        # model_registry not available — return minimal safe status
+        return {
+            "model": model_name, "tier": "large", "is_loaded": False,
+            "queue_position": 0, "estimated_wait_s": 20,
+            "alternatives": [], "should_prompt": False,
+        }
+
+    tier = "large" if is_large_model(model_name) else "small"
+
+    # Small models: no queue, just check if loaded
+    if tier == "small":
+        loaded = _get_loaded_model_names()
+        return {
+            "model": model_name,
+            "tier": "small",
+            "is_loaded": model_name in loaded,
+            "queue_position": 0,
+            "estimated_wait_s": 0,
+            "alternatives": [],
+            "should_prompt": False,
+        }
+
+    # Large model: check VRAM residency and queue depth
+    loaded = _get_loaded_model_names()
+    is_loaded = model_name in loaded
+
+    # Queue depth: how many large requests are currently ahead of ours
+    queue_depth = 0
+    try:
+        client = get_redis_client()
+        queue_depth = client.llen(LARGE_QUEUE_KEY)
+    except Exception:
+        pass
+
+    estimated_wait = 0 if is_loaded else estimate_queue_wait(model_name, queue_depth)
+
+    # Find currently-loaded alternatives that could answer without a model swap
+    alt_specs = get_alternatives(model_name, only_available=True)
+    loaded_alts = [
+        {"name": s.name, "description": s.description, "vram_gb": s.vram_gb}
+        for s in alt_specs
+        if s.name in loaded
+    ]
+
+    should_prompt = (
+        estimated_wait > PROMPT_WAIT_THRESHOLD
+        and len(loaded_alts) > 0
+    )
+
+    return {
+        "model": model_name,
+        "tier": tier,
+        "is_loaded": is_loaded,
+        "queue_position": queue_depth,
+        "estimated_wait_s": estimated_wait,
+        "alternatives": loaded_alts,
+        "should_prompt": should_prompt,
+    }

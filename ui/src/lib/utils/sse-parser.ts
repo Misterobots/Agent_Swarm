@@ -171,6 +171,14 @@ export async function* streamSSE(
               media: (delta as any).content,
             };
           }
+          // Model queue status — emitted before GPU lock acquisition
+          else if (delta.type === "model_queue_status") {
+            yield {
+              type: "model_queue_status",
+              content: "",
+              queueStatus: (delta as any).content,
+            };
+          }
           // Swarm theater events
           else if (delta.type === "swarm_phase") {
             yield {
@@ -304,6 +312,12 @@ export async function* streamSSE(
               type: "media_attachment",
               content: "",
               media: (delta as any).content,
+            };
+          } else if (delta.type === "model_queue_status") {
+            yield {
+              type: "model_queue_status",
+              content: "",
+              queueStatus: (delta as any).content,
             };
           } else if (delta.type === "tool_call") {
             yield {

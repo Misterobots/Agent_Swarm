@@ -111,8 +111,18 @@ export interface ClarificationCard {
   card_type: "ambiguity" | "dev_project" | "onboarding";
 }
 
+export interface QueueStatus {
+  model: string;
+  tier: "small" | "large";
+  is_loaded: boolean;
+  queue_position: number;
+  estimated_wait_s: number;
+  alternatives: Array<{ name: string; description: string; vram_gb: number }>;
+  should_prompt: boolean;
+}
+
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -153,6 +163,9 @@ export interface StreamEvent {
 
   // Media attachment
   media?: MediaAttachment;
+
+  // Model queue status
+  queueStatus?: QueueStatus;
 }
 
 /**
@@ -185,6 +198,7 @@ export interface ChatMessage {
   pendingApprovals?: ToolApprovalEvent[];
   pendingClarification?: ClarificationCard;
   mediaAttachments?: MediaAttachment[];
+  pendingQueueStatus?: QueueStatus;
 }
 
 export interface Conversation {

@@ -344,9 +344,10 @@ async def voice_chat(request: VoiceRequest):
     """
     from specialized.voice_assistant import Message
     
+    import asyncio as _aio
     agent = get_voice_agent()
-    # Process message
-    response_msg = agent.process(Message(role="user", content=request.text))
+    # Process message (run in thread to avoid blocking the async event loop)
+    response_msg = await _aio.to_thread(agent.process, Message(role="user", content=request.text))
     metadata = response_msg.metadata or {}
 
     return {
@@ -1079,7 +1080,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                             yield f"data: {json.dumps(tool_chunk)}\n\n"
                             continue
 
-                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card"]:
+                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card", "model_queue_status"]:
                             continue
 
                         content = raw_content
@@ -1096,7 +1097,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "turn_boundary", "turn_metadata",
                                         "continuation", "stream_mode",
                                         "clarification_request", "clarification_card",
-                                        "media_attachment"):
+                                        "media_attachment", "model_queue_status"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",

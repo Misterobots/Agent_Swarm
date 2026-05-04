@@ -61,21 +61,29 @@ HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTAN
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{TURING_IP}:11434")
 OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
 # ---------------------------------------------------------------------------
-# Model Consolidation (TTFT Optimization)
-# Primary model: qwen3.6:27b — 27B dense hybrid-attention (Gated DeltaNet),
-# 256K context, integrated vision. ~17GB VRAM on Lovelace dual 5060 Ti.
-# BMO voice: qwen2.5:3b — lightweight, on-demand.
+# Model Configuration
+# Primary model: gemma4:31b — 31B dense, 20GB VRAM, best reasoning + coding,
+#   256K context, vision, native function calling. (Download: ~20GB)
+#   Coordinator/Architect/Verifier default once pulled.
+# Current workhorse: qwen3.6:27b — 27B hybrid-attention, 17GB VRAM, 256K ctx.
+# Fast MoE option: gemma4:26b — 26B MoE (3.8B active), 18GB VRAM, 256K ctx.
+# Coder specialist: qwen2.5-coder:14b — 9GB, code-optimized.
+# Lightweight tier (no queue): qwen3:8b, qwen2.5-coder:7b — ≤8GB VRAM.
+# BMO voice: llama3.2:3b — lightweight, on-demand.
 # Safety: llama-guard-3:8b — async on Turing.
+#
+# See agents/model_registry.py for the full model catalog and VRAM specs.
 # ---------------------------------------------------------------------------
-PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "qwen3.6:27b")
-ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         PRIMARY_MODEL)
+PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "gemma4:31b")
+FALLBACK_MODEL       = os.getenv("FALLBACK_MODEL",       "qwen3.6:27b")   # used when PRIMARY not yet downloaded
+ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "qwen3.6:27b")   # router stays fast
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      PRIMARY_MODEL)
 COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    PRIMARY_MODEL)
 LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
-CODER_MODEL          = os.getenv("CODER_MODEL",          PRIMARY_MODEL)
-DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         PRIMARY_MODEL)
-RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     PRIMARY_MODEL)
-ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        PRIMARY_MODEL)
+CODER_MODEL          = os.getenv("CODER_MODEL",          "qwen2.5-coder:14b")
+DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         "qwen2.5-coder:14b")
+RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     "qwen3.6:27b")
+ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        "qwen3.6:27b")
 VERIFIER_MODEL       = os.getenv("VERIFIER_MODEL",       PRIMARY_MODEL)
 
 # ---------------------------------------------------------------------------
