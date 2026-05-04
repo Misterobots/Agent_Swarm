@@ -589,15 +589,26 @@ DEV_TOOL_DEFINITIONS = [
 
 def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optional[str]:
     """Resolve a stable owner identifier from request payload or authenticated context."""
+    # DEBUG: Log all headers to understand what's being received
+    auth_headers = {
+        "X-authentik-uid": request.headers.get("X-authentik-uid", ""),
+        "X-authentik-username": request.headers.get("X-authentik-username", ""),
+        "X-authentik-email": request.headers.get("X-authentik-email", ""),
+    }
+    logger.debug(f"[owner_id] payload={payload_user_id}, headers={auth_headers}")
+    
     if payload_user_id:
+        logger.info(f"[owner_id] Resolved from payload: {payload_user_id}")
         return payload_user_id
 
     # Check Authentik forward-auth headers (injected by Traefik forwardAuth middleware)
     authentik_uid = request.headers.get("X-authentik-uid", "").strip()
     if authentik_uid:
+        logger.info(f"[owner_id] Resolved from X-authentik-uid: {authentik_uid}")
         return authentik_uid
     authentik_user = request.headers.get("X-authentik-username", "").strip()
     if authentik_user:
+        logger.info(f"[owner_id] Resolved from X-authentik-username: {authentik_user}")
         return authentik_user
 
     agent_card = getattr(request.state, "agent_card", None)
@@ -615,8 +626,11 @@ def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optio
 
     token_profile = getattr(request.state, "token_profile", None)
     if token_profile == "user" and getattr(agent_card, "session_id", None):
-        return f"session:{agent_card.session_id}"
+        session_owner = f"session:{agent_card.session_id}"
+        logger.info(f"[owner_id] Resolved from session: {session_owner}")
+        return session_owner
 
+    logger.warning("[owner_id] Could not resolve owner_id - returning None (memories will be stored as 'swarm')")
     return None
 
 
@@ -1065,7 +1079,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                             yield f"data: {json.dumps(tool_chunk)}\n\n"
                             continue
 
-                        if msg_type not in ["message", "response", "error"]:
+                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card"]:
                             continue
 
                         content = raw_content
@@ -1080,13 +1094,15 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         # content appender.
                         if msg_type in ("status", "thought", "log", "plan",
                                         "turn_boundary", "turn_metadata",
-                                        "continuation", "stream_mode"):
+                                        "continuation", "stream_mode",
+                                        "clarification_request", "clarification_card",
+                                        "media_attachment"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
                                 "created": 1234567890,
                                 "model": request.model,
-                                "choices": [{"index": 0, "delta": {"content": raw_content, "type": msg_type}, "finish_reason": None}]
+                                "choices": [{"index": 0, "delta": update, "finish_reason": None}]
                             }
                             yield f"data: {json.dumps(typed_chunk)}\n\n"
                             continue
@@ -1361,6 +1377,11 @@ async def health_nodes():
     from inference.node_health import get_node_monitor
     monitor = get_node_monitor()
     return {"nodes": monitor.get_all_statuses()}
+
+@app.get("/v1/health/nodes")
+async def health_nodes_alias():
+    """Alias for /api/v1/health/nodes without /api prefix."""
+    return await health_nodes()
 
 
 # ---------------------------------------------------------------------------
@@ -3688,11 +3709,15 @@ async def ops_health():
         "execution_plane": execution_plane, "control_plane": ctrl_plane,
     }
 
+@app.get("/v1/ops/health")
+async def ops_health_alias():
+    """Alias for /api/v1/ops/health without /api prefix."""
+    return await ops_health()
+
 
 # --- Ops Traces Endpoints (Langfuse proxy) ---
-@app.get("/api/v1/ops/traces")
-async def ops_traces(limit: int = 50):
-    """Recent Langfuse traces (proxied from Langfuse API)."""
+async def _ops_traces_impl(limit: int = 50):
+    """Shared implementation for ops traces endpoint."""
     import requests as _requests
     from config import LANGFUSE_HOST
     lf_host = LANGFUSE_HOST
@@ -3717,10 +3742,18 @@ async def ops_traces(limit: int = 50):
     except Exception as e:
         return {"data": [], "error": str(e)}
 
+@app.get("/api/v1/ops/traces")
+async def ops_traces(limit: int = 50):
+    """Recent Langfuse traces (proxied from Langfuse API)."""
+    return await _ops_traces_impl(limit)
 
-@app.get("/api/v1/ops/traces/{trace_id}")
-async def ops_trace_detail(trace_id: str):
-    """Langfuse trace detail + observations (spans)."""
+@app.get("/v1/ops/traces")
+async def ops_traces_alias(limit: int = 50):
+    """Alias for /api/v1/ops/traces without /api prefix."""
+    return await _ops_traces_impl(limit)
+
+async def _ops_trace_detail_impl(trace_id: str):
+    """Shared implementation for ops trace detail endpoint."""
     import requests as _requests
     from config import LANGFUSE_HOST
     lf_host = LANGFUSE_HOST
@@ -3745,6 +3778,16 @@ async def ops_trace_detail(trace_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/ops/traces/{trace_id}")
+async def ops_trace_detail(trace_id: str):
+    """Langfuse trace detail + observations (spans)."""
+    return await _ops_trace_detail_impl(trace_id)
+
+@app.get("/v1/ops/traces/{trace_id}")
+async def ops_trace_detail_alias(trace_id: str):
+    """Alias for /api/v1/ops/traces/{trace_id} without /api prefix."""
+    return await _ops_trace_detail_impl(trace_id)
 
 
 # --- Training Runs / Catalog Endpoints ---
@@ -4246,6 +4289,11 @@ async def ops_service_checks():
             "unhealthy": len(results) - healthy_count,
         },
     }
+
+@app.get("/v1/ops/services")
+async def ops_service_checks_alias():
+    """Alias for /api/v1/ops/services without /api prefix."""
+    return await ops_service_checks()
 
 
 @app.post("/api/v1/ops/services/{service_id}/restart")
