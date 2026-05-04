@@ -73,6 +73,11 @@ ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         PRIMARY_MODEL)
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      PRIMARY_MODEL)
 COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    PRIMARY_MODEL)
 LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
+CODER_MODEL          = os.getenv("CODER_MODEL",          PRIMARY_MODEL)
+DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         PRIMARY_MODEL)
+RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     PRIMARY_MODEL)
+ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        PRIMARY_MODEL)
+VERIFIER_MODEL       = os.getenv("VERIFIER_MODEL",       PRIMARY_MODEL)
 
 # ---------------------------------------------------------------------------
 # ExpertiseTemplate Database (swarm schema in langfuse DB)

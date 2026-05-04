@@ -155,6 +155,22 @@ export async function* streamSSE(
               continuationHint: delta.continuationHint,
             };
           }
+          // Clarification cards (new)
+          else if (delta.type === "clarification_card") {
+            yield {
+              type: "clarification_card",
+              content: "",
+              clarification: (delta as any).clarification,
+            };
+          }
+          // Media attachments (new)
+          else if (delta.type === "media_attachment") {
+            yield {
+              type: "media_attachment",
+              content: "",
+              media: (delta as any).content,
+            };
+          }
           // Swarm theater events
           else if (delta.type === "swarm_phase") {
             yield {
@@ -276,6 +292,18 @@ export async function* streamSSE(
               type: "continuation",
               content: delta.content || "Ready to continue",
               continuationHint: delta.continuationHint,
+            };
+          } else if (delta.type === "clarification_card") {
+            yield {
+              type: "clarification_card",
+              content: "",
+              clarification: (delta as any).clarification,
+            };
+          } else if (delta.type === "media_attachment") {
+            yield {
+              type: "media_attachment",
+              content: "",
+              media: (delta as any).content,
             };
           } else if (delta.type === "tool_call") {
             yield {

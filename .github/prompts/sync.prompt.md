@@ -22,7 +22,7 @@ You are executing a full repository sync across all Memex pioneer nodes.
 Before making any changes, tag the current HEAD as a rollback point so any sync can be cleanly undone.
 
 ```powershell
-cd C:\Users\panca\OneDrive\Documents\GitHub\Agent_Swarm
+cd C:\Users\panca\Documents\GitHub\Agent_Swarm
 $rollbackTag = "rollback/" + (Get-Date -Format "yyyy-MM-ddTHH-mm-ss")
 git tag $rollbackTag
 git push origin $rollbackTag
@@ -40,7 +40,7 @@ git reset --hard <tag-name>   # local only — then force-push if needed (ask us
 Run the following in the terminal. If `$COMMIT_MSG` was provided as the argument, use it as the commit message. Otherwise generate a one-line conventional-commit message that summarises the staged diff (e.g. `feat: add agent swarm UX panel`).
 
 ```powershell
-cd C:\Users\panca\OneDrive\Documents\GitHub\Agent_Swarm
+cd C:\Users\panca\Documents\GitHub\Agent_Swarm
 git add -A
 git diff --cached --stat
 ```

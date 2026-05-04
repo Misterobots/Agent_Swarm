@@ -92,7 +92,7 @@ async def extract_memories(conversation_text: str) -> list[dict]:
                     "stream": False,
                     "options": {"temperature": 0.1, "num_predict": 1024},
                 },
-                timeout=90.0,
+                timeout=120.0,
             )
             resp.raise_for_status()
             raw = resp.json().get("response", "").strip()

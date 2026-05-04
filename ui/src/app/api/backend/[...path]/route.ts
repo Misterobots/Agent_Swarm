@@ -19,6 +19,8 @@ function isMemPalacePath(path: string) {
 async function proxyRequest(req: NextRequest) {
   const url = new URL(req.url);
   const backendPath = url.pathname.replace(/^\/api\/backend/, "");
+  
+  // Forward the path as-is - agent runtime has routes at both /v1/... and /api/v1/...
   const baseUrl = isMemPalacePath(backendPath) ? getMemPalaceUrl() : getBackendUrl();
   const target = `${baseUrl}${backendPath}${url.search}`;
 

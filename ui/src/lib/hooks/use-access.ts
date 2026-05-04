@@ -9,6 +9,7 @@ interface CallerIdentity {
   username?: string;
   email?: string;
   name?: string;
+  uid?: string;
   groups?: string[];
   auth_source?: string;
   [key: string]: unknown;
@@ -27,6 +28,7 @@ function parseIdentity(payload: IdentityResponse) {
   return {
     securityLevel: level,
     username: caller.username || "",
+    uid: caller.uid || "",
     displayName: caller.name || caller.username || "",
     email: caller.email || "",
     authenticated: !!caller.auth_source,
@@ -37,6 +39,7 @@ export function useAccess() {
   const [loading, setLoading] = useState(true);
   const [securityLevel, setSecurityLevel] = useState("");
   const [username, setUsername] = useState("");
+  const [uid, setUid] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -54,6 +57,7 @@ export function useAccess() {
         const id = parseIdentity(data);
         setSecurityLevel(id.securityLevel);
         setUsername(id.username);
+        setUid(id.uid);
         setDisplayName(id.displayName);
         setEmail(id.email);
         setAuthenticated(id.authenticated);
@@ -78,6 +82,7 @@ export function useAccess() {
     securityLevel,
     isAdmin: securityLevel === "L3_ADMIN" || securityLevel === "L4_SYSTEM",
     username,
+    uid,
     displayName,
     email,
     authenticated,

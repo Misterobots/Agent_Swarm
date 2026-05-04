@@ -190,16 +190,6 @@ def handle_task_event(event: Event):
                 else:
                     logger.error(f"[Vision] VLM returned status {res.status_code}")
 
-        elif intent == "IMAGE":
-            # Direct Route to Creative Team / Image Gen
-            from specialized.image_gen import generate_image
-            logger.info(f"[Router] Routing to Image Gen (Device: {target_device})")
-            
-            # Execute
-            with request_lock(context="image"):
-                response = generate_image(user_input, target_device=target_device)
-            logger.info(f"[ImageGen] Result: {response}")
-            
         elif intent == "3D":
              # Direct Route to 3D Pipeline
              from specialized.image_gen import generate_image
@@ -824,40 +814,46 @@ def chat_swarm(
         yield _l(f"[Router] Intercepted RAG Context ({len(extracted_context)} chars).")
     
     # 1. Load Context (Memory Bridge)
-    from brooks import get_pending_context, clear_context, save_pending_image_clarification, save_pending_image_quality
+    from brooks import get_pending_context, clear_context, save_pending_image_clarification
     pending_ctx = get_pending_context(session_id=session_id, owner_id=owner_id)
     
     # Check if this is a reply to a clarification
     if pending_ctx:
         if pending_ctx.get("type") == "image_clarification":
             original_prompt = pending_ctx.get("prompt", "")
-            # Check if this is a quality preference answer
-            if any(kw in user_input.lower() for kw in ["high_quality", "balanced", "fast_preview", "quality", "high", "fast"]):
-                # Extract quality preference
-                if "high" in user_input.lower():
-                    quality = "high_quality"
-                elif "fast" in user_input.lower() or "preview" in user_input.lower():
-                    quality = "fast_preview"
-                else:
-                    quality = "balanced"
-                
-                logger.info(f"--- [Router] Quality preference detected: {quality} ---")
-                # DON'T clear context yet - save quality first, it will persist
-                save_pending_image_quality(quality, session_id=session_id, owner_id=owner_id)
-                yield {"type": "log", "content": f"[Art Director] Quality set to: {quality}"}
-                
-                # Continue with original prompt (context will be read by IMAGE intent)
-                user_input = original_prompt
-            # Guard: discard stale/snowballing context (>100 chars means it's been re-merged)
-            elif len(original_prompt) > 100:
-                logger.warning(f"--- [Router] Discarding stale image context ({len(original_prompt)} chars) ---")
-                yield {"type": "log", "content": "[Context Manager] Stale context discarded."}
+            
+            # Detect if user is starting a NEW image request (not answering clarification)
+            user_lower = user_input.lower().strip()
+            new_image_keywords = ["generate", "create", "make", "draw", "paint", "design", "produce"]
+            is_new_request = any(user_lower.startswith(kw) for kw in new_image_keywords)
+            
+            # Detect meta-comments about the original prompt (not actual clarification answers)
+            meta_comment_keywords = [
+                "initial prompt", "already said", "already specified", "already mentioned",
+                "i said", "i specified", "i mentioned", "i told you", "you asked",
+                "original prompt", "first prompt", "my prompt", "the prompt stated"
+            ]
+            is_meta_comment = any(kw in user_lower for kw in meta_comment_keywords)
+            
+            # Also check for snowballed prompts (multiple commas indicate repeated merges)
+            comma_count = original_prompt.count(",")
+            is_snowballed = comma_count >= 2 or len(original_prompt) > 150
+            
+            if is_new_request or is_snowballed or is_meta_comment:
+                # This is a NEW request or meta-comment, not an answer to clarification - clear context
+                logger.warning(f"--- [Router] Discarding image context (new_request={is_new_request}, snowballed={is_snowballed}, meta_comment={is_meta_comment}) ---")
+                yield {"type": "log", "content": "[Context Manager] Context cleared."}
                 clear_context(session_id=session_id, owner_id=owner_id)
+                
+                # If meta-comment, don't process it as a new image request
+                if is_meta_comment:
+                    yield {"type": "text", "content": "I apologize for the confusion. Let me process your original request correctly."}
+                    return
             else:
-                # Don't merge - user is answering, so append answer to original
+                # User is answering clarification - merge
                 logger.info(f"--- [Router] Answering clarification. Original: '{original_prompt}' + Answer: '{user_input}' ---")
                 user_input = f"{original_prompt}, {user_input}"
-                yield {"type": "log", "content": f"[Context Manager] Clarification answered."}
+                yield {"type": "log", "content": f"[Context Manager] Context merged."}
                 clear_context(session_id=session_id, owner_id=owner_id)
             
         elif pending_ctx.get("type") == "art_studio_redirect":
@@ -1985,6 +1981,9 @@ def chat_swarm(
                  "studio", "indoors", "outdoors", "room", "kitchen", "bedroom",
                  "castle", "temple", "library", "lab", "dungeon",
                  "white background", "black background", "gradient",
+                 # Fashion / events
+                 "runway", "catwalk", "fashion show", "paris", "milan", "new york",
+                 "stage", "theater", "concert", "venue", "event",
                  # Prepositions as strong location indicators
                  " in a ", " in the ", " on a ", " on the ",
                  " at the ", " at a ", " inside ", " outside ",
@@ -1993,21 +1992,25 @@ def chat_swarm(
                  " surrounded by", " against a ", " against the ",
              ])
              
+             logger.info(f"[Art Director] Prompt analysis: has_style={has_style}, has_setting={has_setting}, prompt_preview='{user_input[:100]}'")
+             
              # Emit structured clarification if missing critical info
              if not has_style:
                  save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
                  yield {
-                     "type": "clarification_request",
-                     "question": "What visual style would you like?",
-                     "options": [
-                         {"id": "photo", "label": "📷 Photorealistic", "value": "A photorealistic image", "description": "Realistic photography style"},
-                         {"id": "painting", "label": "🎨 Artistic Painting", "value": "A painted artwork", "description": "Oil, watercolor, or acrylic style"},
-                         {"id": "3d", "label": "🔮 3D Rendered", "value": "A 3D rendered scene", "description": "CGI/Blender style rendering"},
-                         {"id": "sketch", "label": "✏️ Hand-drawn Sketch", "value": "A pencil sketch", "description": "Line art or pencil drawing"},
-                     ],
-                     "allow_custom": True,
-                     "allow_multiple": False,
-                     "card_type": "art_direction"
+                     "type": "clarification_card",
+                     "clarification": {
+                         "question": "What visual style would you like?",
+                         "options": [
+                             {"id": "photo", "label": "📷 Photorealistic", "value": "A photorealistic image", "description": "Realistic photography style"},
+                             {"id": "painting", "label": "🎨 Artistic Painting", "value": "A painted artwork", "description": "Oil, watercolor, or acrylic style"},
+                             {"id": "3d", "label": "🔮 3D Rendered", "value": "A 3D rendered scene", "description": "CGI/Blender style rendering"},
+                             {"id": "sketch", "label": "✏️ Hand-drawn Sketch", "value": "A pencil sketch", "description": "Line art or pencil drawing"},
+                         ],
+                         "allow_custom": True,
+                         "allow_multiple": False,
+                         "card_type": "art_direction"
+                     }
                  }
                  _score_trace(lf_trace, langfuse, 0.7, output="Style clarification requested")
                  AGENT_STATE.labels(agent_name="ArtDirector").set(1)
@@ -2016,48 +2019,117 @@ def chat_swarm(
              if not has_setting:
                  save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
                  yield {
-                     "type": "clarification_request", 
-                     "question": "Where should this be located?",
-                     "options": [
-                         {"id": "white_bg", "label": "⬜ Plain white background", "value": "on a plain white background", "description": "Clean, minimal background"},
-                         {"id": "studio", "label": "🎬 Studio lighting", "value": "in a professional photography studio", "description": "Professional studio setup"},
-                         {"id": "nature", "label": "🌳 Outdoor/Nature", "value": "in a natural outdoor setting", "description": "Natural environment"},
-                         {"id": "indoor", "label": "🏠 Indoor scene", "value": "in an indoor room setting", "description": "Interior environment"},
-                     ],
-                     "allow_custom": True,
-                     "allow_multiple": False,
-                     "card_type": "art_direction"
+                     "type": "clarification_card",
+                     "clarification": {
+                         "question": "Where should this be located?",
+                         "options": [
+                             {"id": "white_bg", "label": "⬜ Plain white background", "value": "on a plain white background", "description": "Clean, minimal background"},
+                             {"id": "studio", "label": "🎬 Studio lighting", "value": "in a professional photography studio", "description": "Professional studio setup"},
+                             {"id": "nature", "label": "🌳 Outdoor/Nature", "value": "in a natural outdoor setting", "description": "Natural environment"},
+                             {"id": "indoor", "label": "🏠 Indoor scene", "value": "in an indoor room setting", "description": "Interior environment"},
+                         ],
+                         "allow_custom": True,
+                         "allow_multiple": False,
+                         "card_type": "art_direction"
+                     }
                  }
                  _score_trace(lf_trace, langfuse, 0.7, output="Setting clarification requested")
                  AGENT_STATE.labels(agent_name="ArtDirector").set(1)
                  return
              
-             # All checks passed - now ask for quality preference if not already set
-             from brooks import load_pending_image_quality
-             pending_quality = load_pending_image_quality(session_id=session_id, owner_id=owner_id)
-             if not pending_quality:
-                 save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
-                 yield {
-                     "type": "clarification_request",
-                     "question": "What quality level would you like?",
-                     "context": "Higher quality takes longer but produces more accurate and detailed images.",
-                     "options": [
-                         {"id": "high", "label": "🎯 High Quality", "value": "high_quality", "description": "FLUX Dev: 20 steps, best accuracy (30-60s)"},
-                         {"id": "balanced", "label": "⚖️ Balanced", "value": "balanced", "description": "FLUX Dev: 12 steps, good quality (15-30s)"},
-                         {"id": "fast", "label": "⚡ Fast Preview", "value": "fast_preview", "description": "FLUX Schnell: 4 steps, quick iterations (5-10s)"},
-                     ],
-                     "allow_custom": False,
-                     "allow_multiple": False,
-                     "card_type": "art_direction"
-                 }
-                 _score_trace(lf_trace, langfuse, 0.7, output="Quality clarification requested")
-                 AGENT_STATE.labels(agent_name="ArtDirector").set(1)
-                 return
-             
              # All checks passed - proceed to generation
              yield {"type": "log", "content": "[Art Director] Prompt approved for Execution."}
-             
              AGENT_STATE.labels(agent_name="ArtDirector").set(1)
+             
+             # Execute generation inline (don't fall through to elif)
+             yield {"type": "status", "content": "🎨 Creative Studio: Spinning up..."}
+             AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
+             
+             # Use auto mode to let image_gen.py select best available model (FLUX)
+             from agents.specialized.image_gen import generate_image
+             yield {"type": "log", "content": f"[CreativeStudio] Generating: '{user_input}'"}
+             with request_lock(context="image"):
+                 response = generate_image(user_input, model_name="auto")
+             
+             # Extraction logic for artifact delivery
+             import re
+             image_match = re.search(r"Generated Image: ([\w\.-]+)", response)
+             if image_match:
+                 filename = image_match.group(1)
+                 
+                 # Source: where image_gen.py saved it (in agent_runtime container)
+                 source_path = os.path.join("/tmp/comfyui_images", filename)
+                 
+                 # === QUALITY CONTROL INSPECTION ===
+                 yield {"type": "status", "content": "🔍 Quality Control: Inspecting image..."}
+                 try:
+                     from specialized.quality_control_agent import inspect_generated_image
+                     qc_result = inspect_generated_image(source_path, user_input)
+                     
+                     overall_score = qc_result.get("overall_score", 0.0)
+                     passed = qc_result.get("passed", False)
+                     issues = qc_result.get("issues", [])
+                     
+                     logger.info(f"[QualityControl] Score: {overall_score:.1f}/10 | Passed: {passed}")
+                     
+                     if not passed:
+                         # Log issues but continue delivery (non-blocking QC for now)
+                         issue_text = ", ".join(issues) if issues and issues[0].lower() != "none" else "Minor quality concerns"
+                         yield {
+                             "type": "log",
+                             "content": f"⚠️ Quality Check: {overall_score:.1f}/10 - {issue_text}"
+                         }
+                         logger.warning(f"[QualityControl] Image quality below threshold but delivering anyway")
+                     else:
+                         yield {
+                             "type": "log",
+                             "content": f"✓ Quality Check: {overall_score:.1f}/10 - Excellent!"
+                         }
+                 except Exception as qc_error:
+                     logger.warning(f"[QualityControl] Inspection failed, proceeding with delivery: {qc_error}")
+                     yield {"type": "log", "content": "⚠️ Quality inspection unavailable, proceeding..."}
+                 
+                 # Destination: delivered_artifacts for UI serving
+                 delivery_dir = "/workspace/delivered_artifacts"
+                 if not os.path.exists(delivery_dir):
+                     os.makedirs(delivery_dir, exist_ok=True)
+                 delivery_path = os.path.join(delivery_dir, filename)
+                 
+                 try:
+                     # Copy from temp directory to delivered_artifacts
+                     if os.path.exists(source_path):
+                         import shutil
+                         shutil.copy2(source_path, delivery_path)
+                         logger.info(f"[CreativeStudio] Copied image to delivered_artifacts: {filename}")
+                         
+                         # Use media_metadata to create proper attachment structure
+                         from utils.media_metadata import extract_media_metadata
+                         media_meta = extract_media_metadata(
+                             filename,
+                             base_path=delivery_dir,
+                             url_prefix="/api/backend/delivered_artifacts"
+                         )
+                         
+                         if media_meta:
+                             yield {
+                                 "type": "media_attachment",
+                                 "content": media_meta
+                             }
+                             yield {"type": "response", "content": f"✨ Image generated: {filename}"}
+                             WORKFLOW_STEPS.labels(status="success", agent_type="CreativeStudio").inc()
+                         else:
+                             yield {"type": "error", "content": "Failed to create media metadata"}
+                     else:
+                         logger.error(f"[CreativeStudio] Source image not found: {source_path}")
+                         yield {"type": "error", "content": f"Image file not found after generation"}
+                 except Exception as e:
+                     logger.error(f"[CreativeStudio] Failed to deliver image: {e}")
+                     yield {"type": "error", "content": f"Image delivery failed: {e}"}
+             else:
+                 yield {"type": "error", "content": f"Could not extract filename from: {response}"}
+             
+             AGENT_STATE.labels(agent_name="CreativeStudio").set(1)
+             return
 
         # --- ROUTE: DOC STANDARDS AGENT (admin-only /standardize-doc) ---
         if intent == "DOC_STANDARDS":
@@ -2412,31 +2484,10 @@ def chat_swarm(
             yield {"type": "status", "content": "🎨 Creative Studio: Spinning up..."}
             AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
             
-            # Check if quality preference was answered
-            from brooks import load_pending_image_quality
-            pending_quality = load_pending_image_quality(session_id=session_id, owner_id=owner_id)
-            
-            # Map quality to generation parameters
-            # Use "auto" mode to let image_gen.py pick the best available model
-            quality_params = {}
-            if pending_quality == "high_quality":
-                quality_params = {"model_name": "auto", "steps": 20, "cfg": 3.5}
-                yield {"type": "log", "content": "[CreativeStudio] Using HIGH QUALITY settings (auto model, 20 steps)"}
-            elif pending_quality == "balanced":
-                quality_params = {"model_name": "auto", "steps": 12, "cfg": 3.5}
-                yield {"type": "log", "content": "[CreativeStudio] Using BALANCED settings (auto model, 12 steps)"}
-            elif pending_quality == "fast_preview":
-                quality_params = {"model_name": "auto", "steps": 4, "cfg": 1.0}
-                yield {"type": "log", "content": "[CreativeStudio] Using FAST PREVIEW settings (auto model, 4 steps)"}
-            else:
-                # Default to balanced if no preference set
-                quality_params = {"model_name": "auto", "steps": 12, "cfg": 3.5}
-                yield {"type": "log", "content": "[CreativeStudio] Using DEFAULT (Balanced) settings"}
-            
-            from specialized.image_gen import generate_image
-            yield {"type": "log", "content": f"[CreativeStudio] Generating: '{user_input}'"}
+            # Use auto mode to let image_gen.py select best available model (FLUX)
+            from agents.specialized.image_gen import generate_image
             with request_lock(context="image"):
-                response = generate_image(user_input, **quality_params)
+                response = generate_image(user_input, model_name="auto")
             
             # Extraction logic for artifact delivery
             import re

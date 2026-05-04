@@ -130,6 +130,24 @@ class MemoryAuditLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class ExtractionLog(Base):
+    """Per-attempt log of conversation extraction calls, keyed by owner_id."""
+
+    __tablename__ = "extraction_log"
+    __table_args__ = (
+        Index("ix_extract_log_owner", "owner_id"),
+        Index("ix_extract_log_attempted_at", "attempted_at"),
+        {"schema": "mempalace"},
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    owner_id = Column(String(100), nullable=False)
+    agent_id = Column(String(100))
+    memories_stored = Column(Integer, default=0)          # 0 = nothing extracted
+    conversation_length = Column(Integer, default=0)      # chars, for debug
+    attempted_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 # ---------------------------------------------------------------------------
 # Bootstrap: create schema + extension + tables
 # ---------------------------------------------------------------------------

@@ -17,7 +17,8 @@ export function PalaceHud() {
   const adminViewingOwner = usePalaceStore((s) => s.adminViewingOwner);
   const setAdminOwner = usePalaceStore((s) => s.setAdminOwner);
   const loadLayout = usePalaceStore((s) => s.loadLayout);
-  const { isAdmin, username, displayName } = useAccess();
+  const { isAdmin, username, uid, displayName } = useAccess();
+  const selfOwnerId = uid || username;
   const colors = usePalaceColors();
 
   // Light-theme glass overrides
@@ -32,7 +33,7 @@ export function PalaceHud() {
   const [showOwnerInput, setShowOwnerInput] = useState(false);
   const [ownerInput, setOwnerInput] = useState("");
 
-  const isSelfScope = Boolean(username) && adminViewingOwner === username;
+  const isSelfScope = Boolean(username) && (adminViewingOwner === selfOwnerId);
   const isEveryoneScope = adminViewingOwner === null;
   const isCustomScope = Boolean(adminViewingOwner && adminViewingOwner !== username);
 
@@ -95,9 +96,9 @@ export function PalaceHud() {
   const handleScopeChange = useCallback(
     (scope: "self" | "everyone" | "custom") => {
       if (scope === "self" && username) {
-        setAdminOwner(username);
-        setOwnerInput(username);
-        loadLayout(username);
+        setAdminOwner(selfOwnerId);
+        setOwnerInput(selfOwnerId);
+        loadLayout(selfOwnerId);
         setShowOwnerInput(false);
         return;
       }

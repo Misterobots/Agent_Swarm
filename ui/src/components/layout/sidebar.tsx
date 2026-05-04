@@ -250,8 +250,9 @@ export function Sidebar() {
           </div>
         ) : (
           <a
-            href="https://auth.shivelymedia.com/"
+            href="/api/auth/login"
             className="flex items-center gap-2 text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)] transition-colors"
+            title="Sign in with Authentik"
           >
             <LogIn size={14} />
             <span>Sign in</span>

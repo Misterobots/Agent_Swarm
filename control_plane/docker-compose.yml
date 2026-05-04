@@ -122,7 +122,7 @@ services:
       - MEMPALACE_DB_NAME=${LANGFUSE_DB_NAME}
       - OLLAMA_HOST=http://192.168.2.101:11434
       - EMBED_MODEL=nomic-embed-text
-      - EXTRACT_MODEL=nemotron-mini
+      - EXTRACT_MODEL=qwen2.5-coder:14b
       - LOG_LEVEL=INFO
     ports:
       - "8200:8200"

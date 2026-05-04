@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, delete, func, update, text
 
-from .database import async_session, init_db, Memory, AgentSnapshot, TeamMemory, MemoryAuditLog
+from .database import async_session, init_db, Memory, AgentSnapshot, TeamMemory, MemoryAuditLog, ExtractionLog
 from .embeddings import embed_text, embed_texts, extract_memories, close_client
 
 logging.basicConfig(
@@ -208,6 +208,10 @@ async def health():
 @app.post("/v1/memories", response_model=MemoryOut)
 async def store_memory(req: MemoryCreate):
     """Store a memory with auto-generated embedding."""
+    owner_id = (req.owner_id or "").strip()
+    if not owner_id:
+        raise HTTPException(400, "owner_id is required for memory writes")
+
     embedding = await embed_text(req.content)
     mem = Memory(
         content=req.content,
@@ -215,7 +219,7 @@ async def store_memory(req: MemoryCreate):
         domain=req.domain,
         agent_id=req.agent_id,
         team_id=req.team_id,
-        owner_id=req.owner_id,
+        owner_id=owner_id,
         embedding=embedding,
         metadata_=req.metadata,
     )
@@ -304,6 +308,61 @@ async def memory_stats():
     }
 
 
+@app.get("/v1/palace/audit/extractions")
+async def extraction_audit():
+    """Per-owner extraction metrics: attempts, memories stored, success rate, last seen."""
+    async with async_session() as session:
+        # Aggregate extraction_log by owner_id
+        agg = (await session.execute(
+            select(
+                ExtractionLog.owner_id,
+                func.count(ExtractionLog.id).label("total_attempts"),
+                func.sum(ExtractionLog.memories_stored).label("total_stored"),
+                func.max(ExtractionLog.attempted_at).label("last_attempt_at"),
+            ).group_by(ExtractionLog.owner_id)
+            .order_by(func.max(ExtractionLog.attempted_at).desc())
+        )).all()
+
+        # Successful attempts per owner (memories_stored > 0)
+        success_attempt_rows = (await session.execute(
+            select(
+                ExtractionLog.owner_id,
+                func.count(ExtractionLog.id).label("success_count"),
+                func.max(ExtractionLog.attempted_at).label("last_success_at"),
+            )
+            .where(ExtractionLog.memories_stored > 0)
+            .group_by(ExtractionLog.owner_id)
+        )).all()
+        success_map = {r.owner_id: (r.success_count, r.last_success_at) for r in success_attempt_rows}
+
+        # Memory count per owner from memories table
+        mem_counts = (await session.execute(
+            select(Memory.owner_id, func.count(Memory.id).label("memory_count"))
+            .group_by(Memory.owner_id)
+        )).all()
+        mem_count_map = {r.owner_id: r.memory_count for r in mem_counts}
+
+    result = []
+    for row in agg:
+        attempts = row.total_attempts or 0
+        stored = int(row.total_stored or 0)
+        success_count, last_success_at = success_map.get(row.owner_id, (0, None))
+        success_rate = round(success_count / attempts, 4) if attempts > 0 else 0.0
+        result.append({
+            "owner_id": row.owner_id,
+            "owner_id_short": row.owner_id[:8] + "..." if row.owner_id else "",
+            "total_attempts": attempts,
+            "total_memories_stored": stored,
+            "current_memory_count": mem_count_map.get(row.owner_id, 0),
+            "success_rate": success_rate,
+            "last_attempt_at": row.last_attempt_at.isoformat() if row.last_attempt_at else None,
+            "last_success_at": last_success_at.isoformat() if last_success_at else None,
+        })
+
+    logger.info("Extraction audit served: %d unique owners", len(result))
+    return result
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Memory Extraction — auto-extract from conversations
 # ═══════════════════════════════════════════════════════════════════════════
@@ -311,34 +370,48 @@ async def memory_stats():
 @app.post("/v1/extract", response_model=list[MemoryOut])
 async def extract_and_store(req: ExtractionRequest):
     """Extract memories from conversation text and store them."""
-    extracted = await extract_memories(req.conversation)
-    if not extracted:
-        return []
+    owner_id = (req.owner_id or "").strip()
+    if not owner_id:
+        raise HTTPException(400, "owner_id is required for extraction")
 
-    # Generate embeddings in batch
-    contents = [m["content"] for m in extracted]
-    embeddings = await embed_texts(contents)
+    extracted = await extract_memories(req.conversation)
 
     stored = []
+    if extracted:
+        # Generate embeddings in batch
+        contents = [m["content"] for m in extracted]
+        embeddings = await embed_texts(contents)
+
+        async with async_session() as session:
+            for item, emb in zip(extracted, embeddings):
+                mem = Memory(
+                    content=item["content"],
+                    memory_type=item["type"],
+                    domain=item.get("domain", "general"),
+                    agent_id=req.agent_id,
+                    team_id=req.team_id,
+                    owner_id=owner_id,
+                    embedding=emb,
+                )
+                session.add(mem)
+                stored.append(mem)
+            await session.commit()
+            for mem in stored:
+                await session.refresh(mem)
+
+    # Always log the extraction attempt (even if 0 memories stored)
     async with async_session() as session:
-        for item, emb in zip(extracted, embeddings):
-            mem = Memory(
-                content=item["content"],
-                memory_type=item["type"],
-                domain=item.get("domain", "general"),
-                agent_id=req.agent_id,
-                team_id=req.team_id,
-                owner_id=req.owner_id,
-                embedding=emb,
-            )
-            session.add(mem)
-            stored.append(mem)
+        log_entry = ExtractionLog(
+            owner_id=owner_id,
+            agent_id=req.agent_id,
+            memories_stored=len(stored),
+            conversation_length=len(req.conversation),
+        )
+        session.add(log_entry)
         await session.commit()
-        for mem in stored:
-            await session.refresh(mem)
 
     logger.info("Extracted %d memories from conversation (owner=%s, agent=%s)",
-                len(stored), req.owner_id, req.agent_id)
+                len(stored), owner_id, req.agent_id)
     return [_memory_to_out(m) for m in stored]
 
 
@@ -537,7 +610,7 @@ def _derive_wing(agent_id: str | None, team_id: str | None) -> str:
         return f"wing_team_{team_id}"
     if agent_id:
         return f"wing_{agent_id}"
-    return "wing_agent_swarm"
+    return "wing_self"
 
 
 @app.get("/v1/palace/layout", response_model=PalaceLayoutOut)
@@ -701,7 +774,7 @@ async def palace_room_memories(
     if wing.startswith("wing_team_"):
         team_id = wing[len("wing_team_"):]
         stmt = stmt.where(Memory.team_id == team_id)
-    elif wing.startswith("wing_") and wing != "wing_agent_swarm":
+    elif wing.startswith("wing_") and wing not in ("wing_agent_swarm", "wing_self"):
         agent_id = wing[len("wing_"):]
         stmt = stmt.where(Memory.agent_id == agent_id)
 

@@ -5,6 +5,7 @@ import os
 import time
 import base64
 from logger_setup import setup_logger
+from agents.specialized.gpu_pool_manager import get_gpu_pool
 
 # Logging Setup
 logger = setup_logger("CreativeStudio")
@@ -284,7 +285,20 @@ def queue_prompt(prompt_text: str, **kwargs):
     """
     Sends a prompt to ComfyUI with optional manual overrides.
     Pass negative_prompt kwarg to override the negative conditioning text.
+    Supports multi-GPU load balancing via GPU pool manager.
     """
+    # Get GPU instance from pool
+    gpu_pool = get_gpu_pool()
+    prefer_gpu = kwargs.get("gpu_id", None)  # Allow caller to request specific GPU
+    
+    instance = gpu_pool.get_available_instance(prefer_gpu=prefer_gpu)
+    if instance is None:
+        logger.warning("All GPUs busy - using primary instance (may queue)")
+        comfyui_host = COMFYUI_HOST
+    else:
+        comfyui_host = instance["host"]
+        logger.info(f"Using {instance['name']} at {comfyui_host}")
+    
     requested_ckpt = kwargs.get("model_name")
     negative_prompt_override = kwargs.get("negative_prompt")
     all_ckpts = list_available_models()
@@ -301,6 +315,8 @@ def queue_prompt(prompt_text: str, **kwargs):
                 "prompt_preview": prompt_text[:120],
             },
         )
+        if instance:
+            gpu_pool.release_instance(instance)
         return f"Error: {exc}"
             
     # 2. Determine Configuration
@@ -456,6 +472,31 @@ def queue_prompt(prompt_text: str, **kwargs):
                      if images:
                          filename = images[0]['filename']
                          subfolder = images[0].get('subfolder', '')
+                         
+                         # Download image from ComfyUI (since it's on a different machine)
+                         try:
+                             import urllib.parse
+                             download_dir = "/tmp/comfyui_images"
+                             os.makedirs(download_dir, exist_ok=True)
+                             
+                             # Build view URL
+                             params = {"filename": filename, "type": "output"}
+                             if subfolder:
+                                 params["subfolder"] = subfolder
+                             view_url = f"{comfyui_host}/view?{urllib.parse.urlencode(params)}"
+                             
+                             # Download image
+                             img_response = requests.get(view_url, timeout=30)
+                             if img_response.status_code != 200:
+                                 logger.error(f"Failed to download image from {view_url}: {img_response.status_code}")
+                             else:
+                                 local_path = os.path.join(download_dir, filename)
+                                 with open(local_path, "wb") as f:
+                                     f.write(img_response.content)
+                                 logger.info(f"Downloaded image to {local_path}")
+                         except Exception as e:
+                             logger.error(f"Failed to download image from ComfyUI: {e}")
+                         
                          return (
                              f"Generated Image: {filename} (in {subfolder} output) "
                              f"| profile={target['profile_id']} | checkpoint={ckpt_name}"
@@ -483,6 +524,9 @@ def queue_prompt(prompt_text: str, **kwargs):
             logger.warning(f"Polling error: {e}")
         time.sleep(2)
 
+    # Timeout - release GPU before returning
+    if instance:
+        gpu_pool.release_instance(instance)
     elapsed = int(time.time() - start_time)
     return f"Error: Image generation timed out after {elapsed}s (limit {timeout_seconds}s)."
 
@@ -612,9 +656,10 @@ def generate_image(
     logger.info(f"DEBUG: generate_image called with prompt='{prompt}' device='{target_device}'")
 
     workspace_root = _resolve_workspace_root()
-    # PATH DISCOVEY LOGIC
+    # PATH DISCOVERY LOGIC
     # We need to find where ComfyUI is dumping images.
     candidate_paths = [
+        "/tmp/comfyui_images",  # Downloaded images from remote ComfyUI
         os.getenv("COMFYUI_OUTPUT_DIR"),
         "C:/Users/panca/Documents/ComfyUI/ComfyUI/output", # Host Default
         "/app/comfy_io/output", # Docker Map
@@ -627,9 +672,12 @@ def generate_image(
             output_dir = p
             logger.info(f"Targeting ComfyUI Output: {output_dir}")
             break
-            
+    
+    # If no existing output_dir found, create /tmp/comfyui_images
     if not output_dir:
-        return "Error: Could not locate ComfyUI output directory. Check COMFYUI_OUTPUT_DIR env var."
+        output_dir = "/tmp/comfyui_images"
+        os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Created ComfyUI output directory: {output_dir}")
 
     last_candidate: dict | None = None
 

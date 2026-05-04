@@ -358,6 +358,7 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - SECONDARY_OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
+      - COMFYUI_HOST=http://${LOVELACE_IP:-192.168.2.101}:8188
       - PYTHONPATH=/app
       - MEMPALACE_API_URL=http://mempalace:8200
       - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
@@ -373,6 +374,8 @@ services:
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
       - 'VALID_API_KEYS={"sk-coder-identity":"hive_ui","sk-devops-identity":"devops_agent"}'
+    extra_hosts:
+      - "mempalace:${HOPPER_IP:-192.168.2.102}"
     volumes:
       - ../agents:/app/agents
       - ../:/workspace

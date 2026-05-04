@@ -23,7 +23,7 @@ export function PalaceViewer() {
   const goBack = usePalaceStore((s) => s.goBack);
   const selectMemory = usePalaceStore((s) => s.selectMemory);
   const roomMemories = usePalaceStore((s) => s.roomMemories);
-  const { isAdmin, username, loading: accessLoading } = useAccess();
+  const { isAdmin, username, uid, loading: accessLoading } = useAccess();
   const scopeInitialized = useRef(false);
 
   const colors = usePalaceColors();
@@ -33,7 +33,7 @@ export function PalaceViewer() {
 
     if (isAdmin && username && !scopeInitialized.current && adminViewingOwner === null) {
       scopeInitialized.current = true;
-      setAdminOwner(username);
+      setAdminOwner(uid || username);
       return;
     }
 
