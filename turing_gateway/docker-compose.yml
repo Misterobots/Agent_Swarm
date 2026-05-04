@@ -455,6 +455,13 @@ services:
       - "traefik.http.routers.hive-ext-http.service=hive-ext-http"
       - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
       - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
+      # Static asset bypass — no auth for Next.js assets to prevent post-login redirect to /manifest.json
+      # Browser fetches these in the background; without bypass they hijack the Authentik redirect state
+      - "traefik.http.routers.hive-static.rule=Host(`hive.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.hive-static.entrypoints=websecure"
+      - "traefik.http.routers.hive-static.priority=30"
+      - "traefik.http.routers.hive-static.tls=true"
+      - "traefik.http.routers.hive-static.service=hive-ext"
       # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
       # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://hive.shivelymedia.com/ws/terminal
       - "traefik.http.routers.terminal-ws.rule=PathPrefix(`/ws/terminal`)"
@@ -513,6 +520,7 @@ services:
       # gRPC uses HTTP/2, Traefik routes via h2c for internal LAN
       - "traefik.http.routers.openclaude-grpc.rule=PathPrefix(`/grpc`)"
       - "traefik.http.routers.openclaude-grpc.entrypoints=web"
+      - "traefik.http.routers.openclaude-grpc.service=openclaude-grpc"
       - "traefik.http.services.openclaude-grpc.loadbalancer.server.port=50051"
       - "traefik.http.services.openclaude-grpc.loadbalancer.server.scheme=h2c"
       # External HTTPS route: grpc.shivelymedia.com (behind Authentik)
@@ -523,6 +531,7 @@ services:
       - "traefik.http.routers.openclaude-ext.tls.domains[0].main=shivelymedia.com"
       - "traefik.http.routers.openclaude-ext.tls.domains[0].sans=*.shivelymedia.com"
       - "traefik.http.routers.openclaude-ext.middlewares=globalHeaders@file,secureHeaders@file,authentik@docker"
+      - "traefik.http.routers.openclaude-ext.service=openclaude-ext"
       - "traefik.http.services.openclaude-ext.loadbalancer.server.port=50051"
       - "traefik.http.services.openclaude-ext.loadbalancer.server.scheme=h2c"
       - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/openclaude-grpc"
