@@ -192,7 +192,7 @@ _SEED_TEMPLATES = [
         ),
         "capabilities": ["model_generate", "file_read", "api_call"],
         "security_level": "L2_USER",
-        "default_model": "qwen3.5:9b",
+        "default_model": "qwen3.6:27b",
     },
     {
         "id": "memory_controller",

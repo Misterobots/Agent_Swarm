@@ -4,8 +4,7 @@ corrector_agent.py — MarsRL Corrector Agent
 The Corrector receives the original task, the Solver's failed response,
 and the Verifier's failure reason, then generates a corrected output.
 
-Model: qwen3.5:9b (same as Solver but with different system prompt)
-This follows MarsRL's agent-specific optimization — same model, different role.
+Model: qwen3.6:27b (same as PRIMARY_MODEL — same model, different role.)
 """
 
 import os
@@ -20,7 +19,7 @@ from logger_setup import setup_logger
 logger = setup_logger("Corrector")
 
 # Config
-DEFAULT_CORRECTOR_MODEL = os.getenv("CORRECTOR_MODEL", "qwen3.5:9b")
+DEFAULT_CORRECTOR_MODEL = os.getenv("CORRECTOR_MODEL", "qwen3.6:27b")
 
 CORRECTOR_SYSTEM_PROMPT = """You are the Corrector Agent in a multi-agent software engineering system.
 
