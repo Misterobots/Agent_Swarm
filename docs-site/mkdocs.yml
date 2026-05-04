@@ -114,7 +114,7 @@ extra:
     prometheus_url: "http://192.168.2.103:9091"
     ollama_port: "11434"
     agent_runtime_port: "8008"
-    solver_model: "qwen3.5:9b"
+    solver_model: "qwen3.6:27b"
     router_model: "nemotron-orchestrator:8b"
     verifier_model: "llama-guard-3:8b"
     coordinator_model: "qwen3:14b"
@@ -222,6 +222,7 @@ nav:
       - Coordinator: modules/coordinator.md
       - MarsRL Loop: modules/mars-loop.md
       - Dispatcher: modules/dispatcher.md
+      - Training Dispatcher: modules/training-dispatcher.md
       - GPU Allocator: modules/gpu-allocator.md
       - Memory: modules/memory.md
       - Governance: modules/governance.md

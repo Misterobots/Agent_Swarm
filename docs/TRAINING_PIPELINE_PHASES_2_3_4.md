@@ -1,8 +1,8 @@
 # Phase 2–4 Training Pipeline Upgrade — Implementation Report
 
-> **Date:** 2026-05-XX  
+> **Date:** 2026-05-04  
 > **Preceding phase:** Phase 1 (qwen3.6:27b model upgrade, commit 549ab9e)  
-> **Commit:** _see git log_
+> **Commit:** 4771ed5 — `feat(training): Phase 2-4 training pipeline upgrade`
 
 ---
 
@@ -181,3 +181,41 @@ ARCHETYPE_TRAINING_CONFIGS: dict = {
 - llama-guard pre-scan is fire-and-forget (fail-open on network errors). Consider adding a strict mode flag.
 - `the-stack-v2` `_code_to_grpo()` converter produces low-quality single-turn samples; a future improvement could use surrounding context for multi-turn instruction building.
 - `DISPATCHER_SECRET` must be added to `execution_plane/.env` and `network.env` on both Lovelace and Turing before the dispatcher is useful in production.
+
+---
+
+## Activation (2026-05-04)
+
+Post-commit activation steps completed on the same day:
+
+### Secrets added
+| File | Variable | Value |
+|------|----------|-------|
+| `execution_plane/.env` | `DISPATCHER_SECRET` | 64-char hex (generated via `secrets.token_hex(32)`) |
+| `network.env` | `DISPATCHER_SECRET` | Same value (shared secret) |
+| `network.env` | `DISPATCHER_URL` | `http://192.168.2.101:8001` |
+
+### Containers started
+```
+docker compose -f execution_plane/docker-compose.yml up -d training-dispatcher
+# → training_dispatcher Started
+
+# Turing: agent_runtime force-recreated to pick up DISPATCHER_SECRET + DISPATCHER_URL
+ssh misterobots@192.168.2.103 'cd Home_AI_Lab/turing_gateway && docker compose up -d --force-recreate agent-runtime'
+# → agent_runtime Recreated, Started
+```
+
+### Health check
+```json
+GET http://192.168.2.101:8001/health
+{
+  "status": "online",
+  "node": "lovelace",
+  "ip": "192.168.2.101",
+  "active_jobs": 0,
+  "total_jobs": 0,
+  "available_archetypes": ["coder", "coordinator", "researcher", "creative"]
+}
+```
+
+The training pipeline is **fully active** as of 2026-05-04T07:00 CDT.

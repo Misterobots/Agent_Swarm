@@ -1378,11 +1378,6 @@ async def health_nodes():
     monitor = get_node_monitor()
     return {"nodes": monitor.get_all_statuses()}
 
-@app.get("/v1/health/nodes")
-async def health_nodes_alias():
-    """Alias for /api/v1/health/nodes without /api prefix."""
-    return await health_nodes()
-
 
 # ---------------------------------------------------------------------------
 #  Grounding Permissions Endpoints
@@ -3709,15 +3704,11 @@ async def ops_health():
         "execution_plane": execution_plane, "control_plane": ctrl_plane,
     }
 
-@app.get("/v1/ops/health")
-async def ops_health_alias():
-    """Alias for /api/v1/ops/health without /api prefix."""
-    return await ops_health()
-
 
 # --- Ops Traces Endpoints (Langfuse proxy) ---
-async def _ops_traces_impl(limit: int = 50):
-    """Shared implementation for ops traces endpoint."""
+@app.get("/api/v1/ops/traces")
+async def ops_traces(limit: int = 50):
+    """Recent Langfuse traces (proxied from Langfuse API)."""
     import requests as _requests
     from config import LANGFUSE_HOST
     lf_host = LANGFUSE_HOST
@@ -3742,18 +3733,10 @@ async def _ops_traces_impl(limit: int = 50):
     except Exception as e:
         return {"data": [], "error": str(e)}
 
-@app.get("/api/v1/ops/traces")
-async def ops_traces(limit: int = 50):
-    """Recent Langfuse traces (proxied from Langfuse API)."""
-    return await _ops_traces_impl(limit)
 
-@app.get("/v1/ops/traces")
-async def ops_traces_alias(limit: int = 50):
-    """Alias for /api/v1/ops/traces without /api prefix."""
-    return await _ops_traces_impl(limit)
-
-async def _ops_trace_detail_impl(trace_id: str):
-    """Shared implementation for ops trace detail endpoint."""
+@app.get("/api/v1/ops/traces/{trace_id}")
+async def ops_trace_detail(trace_id: str):
+    """Langfuse trace detail + observations (spans)."""
     import requests as _requests
     from config import LANGFUSE_HOST
     lf_host = LANGFUSE_HOST
@@ -3778,16 +3761,6 @@ async def _ops_trace_detail_impl(trace_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/v1/ops/traces/{trace_id}")
-async def ops_trace_detail(trace_id: str):
-    """Langfuse trace detail + observations (spans)."""
-    return await _ops_trace_detail_impl(trace_id)
-
-@app.get("/v1/ops/traces/{trace_id}")
-async def ops_trace_detail_alias(trace_id: str):
-    """Alias for /api/v1/ops/traces/{trace_id} without /api prefix."""
-    return await _ops_trace_detail_impl(trace_id)
 
 
 # --- Training Runs / Catalog Endpoints ---
@@ -4289,11 +4262,6 @@ async def ops_service_checks():
             "unhealthy": len(results) - healthy_count,
         },
     }
-
-@app.get("/v1/ops/services")
-async def ops_service_checks_alias():
-    """Alias for /api/v1/ops/services without /api prefix."""
-    return await ops_service_checks()
 
 
 @app.post("/api/v1/ops/services/{service_id}/restart")

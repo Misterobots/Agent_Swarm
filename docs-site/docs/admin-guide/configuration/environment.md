@@ -74,6 +74,51 @@ Reference for all variables in `network.env`.
 | `MINIO_ROOT_PASSWORD` | *(secret)* | MinIO admin password |
 | `MINIO_ENDPOINT` | `{{ hopper_ip }}:9000` | MinIO API endpoint |
 
+## Training Dispatcher
+
+Variables that activate and configure the Training Dispatcher on Lovelace.
+
+| Variable | File | Description |
+|----------|------|-------------|
+| `DISPATCHER_SECRET` | `execution_plane/.env` **and** `network.env` | Shared secret — must match on **both** Lovelace and Turing. Set in `.env` so the dispatcher container reads it; set in `network.env` so `agent_runtime` reads it to populate the `X-Dispatcher-Key` header. |
+| `DISPATCHER_URL` | `network.env` | Full URL of the dispatcher, e.g. `http://192.168.2.101:8001`. Read by `agent_runtime` to know where to send jobs. |
+| `EXPORT_MIN_SCORE` | `network.env` (optional) | Minimum MarsRL reward score for trace export. Default: `0.85`. |
+| `HF_TOKEN` | `network.env` (optional) | HuggingFace token for gated dataset access. |
+
+!!! warning "Both files required"
+    `DISPATCHER_SECRET` must be present in **both** `execution_plane/.env` (for the dispatcher container on Lovelace) and `network.env` (for `agent_runtime` on Turing). If either is missing, jobs will fail with a 401 or 503 error.
+
+### Generating the secret
+
+```powershell
+# Windows (PowerShell)
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+```bash
+# Linux
+openssl rand -hex 32
+```
+
+Use the same output in both files.
+
+### Activating after setting the secret
+
+```bash
+# Lovelace — start dispatcher
+cd execution_plane && docker compose up -d training-dispatcher
+
+# Turing — restart agent_runtime to pick up new env vars
+docker compose up -d --force-recreate agent-runtime
+```
+
+Verify:
+
+```bash
+curl http://192.168.2.101:8001/health
+# {"status":"online","available_archetypes":["coder","coordinator","researcher","creative"],...}
+```
+
 ## Usage
 
 All Docker Compose files load `network.env` via the `--env-file` flag:

@@ -46,8 +46,61 @@ config.dev_mode         # False
 | `LOG_LEVEL` | `log_level` | `INFO` |
 | `DEV_MODE` | `dev_mode` | `false` |
 
+## Archetype Training Configs
+
+`ARCHETYPE_TRAINING_CONFIGS` maps agent archetypes to their training parameters. Used by the Training Dispatcher to validate submitted jobs and resolve dataset/epoch defaults.
+
+```python
+ARCHETYPE_TRAINING_CONFIGS: dict = {
+    "coder": {
+        "datasets": ["glaive-code-assistant", "code-feedback"],
+        "epochs": 3,
+        "base_model": TRAINING_BASE_SOLVER,
+        "description": "Code generation and review"
+    },
+    "coordinator": {
+        "datasets": ["hermes-function-calling", "slim-orca"],
+        "epochs": 2,
+        "base_model": TRAINING_BASE_SOLVER,
+        "description": "Tool use and task delegation"
+    },
+    "researcher": {
+        "datasets": ["openhermes", "slim-orca"],
+        "epochs": 2,
+        "base_model": TRAINING_BASE_SOLVER,
+        "description": "Multi-step reasoning"
+    },
+    "creative": {
+        "datasets": ["openhermes"],
+        "epochs": 2,
+        "base_model": TRAINING_BASE_SOLVER,
+        "description": "Creative writing and ideation"
+    },
+}
+```
+
+| Key | `datasets` | `epochs` |
+|-----|-----------|---------|
+| `coder` | `glaive-code-assistant`, `code-feedback` | 3 |
+| `coordinator` | `hermes-function-calling`, `slim-orca` | 2 |
+| `researcher` | `openhermes`, `slim-orca` | 2 |
+| `creative` | `openhermes` | 2 |
+
+The dispatcher exposes the available keys via `GET /health` as `available_archetypes`.
+
+## Training Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TRAINING_BASE_SOLVER` | `Qwen/Qwen3-27B` | Base model for all GRPO fine-tunes |
+| `TRAINING_NUM_EPOCHS` | `2` | Default epochs (per-archetype overrides this) |
+| `DISPATCHER_SECRET` | *(set in `.env`)* | Shared secret for Training Dispatcher auth |
+| `DISPATCHER_URL` | `http://{{ lovelace_ip }}:8001` | Dispatcher endpoint (read by `agent_runtime`) |
+| `EXPORT_MIN_SCORE` | `0.85` | Minimum MarsRL score for trace export |
+
 ## Related
 
 - [Admin: Environment Variables](../admin-guide/configuration/environment.md) — full reference
-
+- [Module: Training Dispatcher](training-dispatcher.md)
+- [Training API Reference](../developer-guide/api/training.md)
 
