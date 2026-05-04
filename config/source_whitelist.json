@@ -1,0 +1,23 @@
+{
+  "_comment": "Approved HuggingFace organisation slugs for training dataset ingestion. Only datasets whose HF owner org appears in approved_orgs will be allowed through the whitelist check in dataset_curator.py. Add new orgs only after manual review.",
+  "approved_orgs": [
+    "glaiveai",
+    "NousResearch",
+    "teknium",
+    "Open-Orca",
+    "m-a-p",
+    "bigcode",
+    "mistralai",
+    "Qwen",
+    "meta-llama",
+    "EleutherAI",
+    "allenai",
+    "HuggingFaceH4",
+    "HuggingFaceFW",
+    "openai",
+    "databricks",
+    "WizardLMTeam",
+    "TIGER-Lab",
+    "cognitivecomputations"
+  ]
+}

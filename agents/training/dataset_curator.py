@@ -6,11 +6,17 @@ ShareGPT/conversation format to GRPO-compatible JSONL, and scans every
 sample for training data poisoning before it enters the pipeline.
 
 Supported datasets:
-    - glaiveai/glaive-function-calling-v2    (113K, tool calling)
-    - NousResearch/hermes-function-calling-v1 (11.6K, IoT/home automation)
-    - teknium/OpenHermes-2.5                 (1M, general/code/reasoning)
-    - glaiveai/glaive-code-assistant-v3      (~120K, code generation)
-    - Open-Orca/SlimOrca                     (518K, reasoning chains)
+    - glaiveai/glaive-function-calling-v2         (113K, tool calling)
+    - NousResearch/hermes-function-calling-v1      (11.6K, IoT/home automation)
+    - teknium/OpenHermes-2.5                       (1M, general/code/reasoning)
+    - glaiveai/glaive-code-assistant-v3            (~120K, code generation)
+    - Open-Orca/SlimOrca                           (518K, reasoning chains)
+    - m-a-p/CodeFeedback-Filtered-Instruction      (~66K, filtered code instruction)
+    - bigcode/the-stack-v2-train-smol-ids          (code files, small subset)
+
+Security:
+    - Source whitelist enforced via config/source_whitelist.json
+    - llama-guard-3:8b pre-scan of each sample (first 20 tokens via Turing inference)
 
 Usage:
     python -m training.dataset_curator \\
@@ -31,7 +37,69 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from config import TRAINING_DATASET_DIR
+from config import TRAINING_DATASET_DIR, TURING_IP
+
+# Turing inference endpoint for llama-guard pre-scan
+_TURING_INFERENCE = os.getenv("TURING_OLLAMA_HOST", f"http://{TURING_IP}:8008")
+_GUARD_MODEL = os.getenv("GUARD_MODEL", "llama-guard-3:8b")
+
+# Resolve source whitelist (approved HuggingFace orgs)
+_WHITELIST_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "source_whitelist.json"
+
+
+def _load_source_whitelist() -> set:
+    """Load approved HuggingFace organisation slugs from config/source_whitelist.json."""
+    if not _WHITELIST_PATH.exists():
+        logger.warning(f"Source whitelist not found at {_WHITELIST_PATH} — whitelist check disabled")
+        return set()
+    try:
+        with open(_WHITELIST_PATH) as f:
+            data = json.load(f)
+        return set(data.get("approved_orgs", []))
+    except Exception as e:
+        logger.error(f"Failed to load source whitelist: {e}")
+        return set()
+
+
+def _is_whitelisted(hf_id: str, whitelist: set) -> bool:
+    """Return True if the HuggingFace dataset org is in the whitelist (or whitelist is empty)."""
+    if not whitelist:
+        return True  # Whitelist not configured — allow all (logged at load time)
+    org = hf_id.split("/")[0] if "/" in hf_id else hf_id
+    return org in whitelist
+
+
+def _llamaguard_scan(text: str) -> bool:
+    """
+    Send the first 20 whitespace-separated tokens of `text` to Turing's
+    llama-guard-3:8b.  Returns True if the content passes (safe), False if
+    the model flags it as unsafe.
+
+    Falls through to True (pass) on any network or parsing error so that a
+    down Turing node doesn’t block local-only curation runs.
+    """
+    import urllib.request
+    tokens_preview = " ".join(text.split()[:20])
+    payload = json.dumps({
+        "model": _GUARD_MODEL,
+        "messages": [{"role": "user", "content": tokens_preview}],
+        "stream": False,
+    }).encode()
+    try:
+        req = urllib.request.Request(
+            f"{_TURING_INFERENCE}/v1/chat/completions",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            body = json.loads(resp.read())
+        content = body["choices"][0]["message"]["content"].strip().lower()
+        # llama-guard replies with "safe" or "unsafe <category>"
+        return content.startswith("safe")
+    except Exception as e:
+        logger.debug(f"llama-guard pre-scan failed (pass-through): {e}")
+        return True  # fail-open: don’t block curation on network errors
 
 logger = logging.getLogger("DatasetCurator")
 
@@ -82,6 +150,24 @@ CURATED_DATASETS: Dict[str, Dict[str, Any]] = {
         "content_field": "conversations",
         "default_max": 10000,
         "recommended_for": ["librarian", "code_developer", "technical_writer"],
+    },
+    "code-feedback": {
+        "hf_id": "m-a-p/CodeFeedback-Filtered-Instruction",
+        "description": "~66K filtered code instruction samples with quality scoring",
+        "category": "code",
+        "format": "sharegpt",
+        "content_field": "conversations",
+        "default_max": 10000,
+        "recommended_for": ["code_developer"],
+    },
+    "the-stack-v2": {
+        "hf_id": "bigcode/the-stack-v2-train-smol-ids",
+        "description": "Code files from The Stack v2 (small reproducible subset)",
+        "category": "code",
+        "format": "code",
+        "content_field": "content",
+        "default_max": 5000,
+        "recommended_for": ["code_developer"],
     },
 }
 
@@ -334,16 +420,44 @@ def _instruct_to_grpo(sample: Dict) -> Optional[Dict]:
 
 # ── Main Curator ─────────────────────────────────────────────────────────────
 
+def _code_to_grpo(sample: Dict, content_field: str = "content") -> Optional[Dict]:
+    """
+    Convert a raw code file sample (The Stack v2 style) to a single-turn GRPO entry.
+
+    Input: {"content": "<code text>", "lang": "Python", ...}
+    """
+    code = sample.get(content_field, "")
+    if not code or not code.strip():
+        return None
+    lang = sample.get("lang", sample.get("language", ""))
+    instruction = f"Complete or continue the following {lang} code:" if lang else "Complete or continue the following code:"
+    return {
+        "conversations": [
+            {"role": "user", "content": instruction},
+            {"role": "assistant", "content": code},
+        ]
+    }
+
+
 class DatasetCurator:
     """
     Downloads curated HuggingFace datasets, converts to GRPO format,
     and applies security scanning to every sample.
+
+    Enforces source whitelist (config/source_whitelist.json) and
+    runs llama-guard-3:8b pre-scan on each sample's first 20 tokens.
     """
 
-    def __init__(self, output_dir: str = TRAINING_DATASET_DIR):
+    def __init__(
+        self,
+        output_dir: str = TRAINING_DATASET_DIR,
+        use_llamaguard: bool = True,
+    ):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.scanner = TrainingDataScanner()
+        self.use_llamaguard = use_llamaguard
+        self._whitelist = _load_source_whitelist()
 
     def list_available(self) -> List[Dict[str, Any]]:
         """Return catalog of available curated datasets."""
@@ -400,6 +514,17 @@ class DatasetCurator:
                 ds_written = 0
                 ds_rejected = 0
                 ds_skipped = 0
+                ds_guard_blocked = 0
+
+                # ── Whitelist check ───────────────────────────────────────
+                if not _is_whitelisted(meta["hf_id"], self._whitelist):
+                    logger.warning(
+                        f"Dataset '{key}' ({meta['hf_id']}) is not in source "
+                        f"whitelist \u2014 skipping. Add the org to "
+                        f"config/source_whitelist.json to allow it."
+                    )
+                    per_dataset_stats[key] = {"error": "source_not_whitelisted"}
+                    continue
 
                 logger.info(
                     f"Downloading {meta['hf_id']} (limit={limit})..."
@@ -421,15 +546,39 @@ class DatasetCurator:
                 )
 
                 for i, sample in enumerate(ds):
-                    # Convert format
-                    converted = _sharegpt_to_grpo(sample)
+                    # Convert format based on declared dataset format
+                    fmt = meta.get("format", "sharegpt")
+                    converted = None
+                    if fmt == "code":
+                        converted = _code_to_grpo(sample, meta.get("content_field", "content"))
+                    if converted is None:
+                        converted = _sharegpt_to_grpo(sample)
                     if converted is None:
                         converted = _instruct_to_grpo(sample)
                     if converted is None:
                         ds_skipped += 1
                         continue
 
-                    # Security scan
+                    # ── llama-guard pre-scan (first assistant turn) ───────
+                    if self.use_llamaguard:
+                        first_text = next(
+                            (t["content"] for t in converted["conversations"]
+                             if t["role"] in ("user", "assistant")),
+                            "",
+                        )
+                        if first_text and not _llamaguard_scan(first_text):
+                            rejected_record = {
+                                **converted,
+                                "source": "curated",
+                                "dataset": key,
+                                "rejection_flags": ["llama-guard: unsafe content"],
+                            }
+                            frej.write(json.dumps(rejected_record) + "\n")
+                            ds_guard_blocked += 1
+                            ds_rejected += 1
+                            continue
+
+                    # ── Security scan ─────────────────────────────────────
                     if scan_security:
                         scan_result = self.scanner.scan_conversation(
                             converted["conversations"]
@@ -466,6 +615,7 @@ class DatasetCurator:
                 per_dataset_stats[key] = {
                     "written": ds_written,
                     "rejected": ds_rejected,
+                    "guard_blocked": ds_guard_blocked,
                     "skipped": ds_skipped,
                 }
                 total_written += ds_written

@@ -1,9 +1,14 @@
 """
 Export high-reward Langfuse traces to GRPO-compatible JSONL.
 
-Queries traces tagged with training_candidate score > 0.8,
-fetches full trace + observations, and converts to multi-turn
-conversation format suitable for GRPO training.
+Queries traces tagged with training_candidate score > EXPORT_MIN_SCORE
+(default 0.85), fetches full trace + observations, and converts to
+multi-turn conversation format suitable for GRPO training.
+
+Phase 3 improvements:
+  - Threshold configurable via EXPORT_MIN_SCORE env var (default 0.85)
+  - Content-based dedup: skips traces with identical first 100 chars of output
+  - Topic diversity scoring: caps over-represented topics at total_limit // 4
 
 Usage:
     python -m training.export_traces --output training_data/exported.jsonl
@@ -29,6 +34,33 @@ logger = logging.getLogger("TraceExporter")
 
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "pk-lf-dev")
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "sk-lf-dev")
+
+# Configurable quality threshold — raise to 0.85 from previous 0.8
+EXPORT_MIN_SCORE = float(os.getenv("EXPORT_MIN_SCORE", "0.85"))
+
+# Topic buckets for diversity balancing
+_TOPIC_KEYWORDS: Dict[str, List[str]] = {
+    "code": ["python", "javascript", "function", "class", "import", "def ", "var ", "const ", "async"],
+    "math": ["equation", "formula", "calculate", "integral", "derivative", "theorem", "proof"],
+    "tool_use": ["tool_call", "function_call", "tool_response", "invoke", "execute"],
+    "creative": ["story", "poem", "write", "creative", "fiction", "narrative", "describe"],
+    "general": [],  # Catch-all — anything not matching the above
+}
+
+
+def _classify_topic(conversations: List[dict]) -> str:
+    """Bucket a conversation into a topic category based on simple keyword matching."""
+    text = " ".join(
+        t.get("content", "").lower()
+        for t in conversations
+        if t.get("role") in ("user", "assistant")
+    )
+    for topic, keywords in _TOPIC_KEYWORDS.items():
+        if topic == "general":
+            continue
+        if any(kw in text for kw in keywords):
+            return topic
+    return "general"
 
 
 class TraceExporter:
@@ -68,10 +100,10 @@ class TraceExporter:
         ids_file.write_text(json.dumps(sorted(self._exported_ids)))
 
     def fetch_training_candidates(
-        self, since_hours: int = 168, limit: int = 500
+        self, since_hours: int = 168, limit: int = 500, min_score: float = EXPORT_MIN_SCORE
     ) -> List[dict]:
         """
-        Fetch traces that have a training_candidate score.
+        Fetch traces that have a training_candidate score >= min_score.
         Returns list of trace detail dicts with their observations.
         """
         # Step 1: Get scores named "training_candidate"
@@ -93,6 +125,12 @@ class TraceExporter:
             if not trace_id or trace_id in self._exported_ids:
                 continue
 
+            # Apply quality threshold
+            score_value = score.get("value", 0.0)
+            if score_value < min_score:
+                logger.debug(f"Skipping trace {trace_id}: score {score_value:.3f} < threshold {min_score}")
+                continue
+
             try:
                 # Step 2: Fetch full trace
                 trace = self._api_get(f"/traces/{trace_id}")
@@ -107,13 +145,13 @@ class TraceExporter:
                 candidates.append({
                     "trace": trace,
                     "observations": observations,
-                    "score_value": score.get("value", 1.0),
+                    "score_value": score_value,
                 })
             except Exception as e:
                 logger.warning(f"Failed to fetch trace {trace_id}: {e}")
                 continue
 
-        logger.info(f"Fetched {len(candidates)} new candidate traces")
+        logger.info(f"Fetched {len(candidates)} new candidate traces (min_score={min_score})")
         return candidates
 
     def trace_to_grpo_trajectory(
@@ -228,7 +266,7 @@ class TraceExporter:
 
         # Use the training_candidate score as a proxy for quality
         reward = self.reward_fn.compute_reward(
-            final_score=max(final_score, 0.8),  # training candidates are > 0.8 by definition
+            final_score=max(final_score, EXPORT_MIN_SCORE),  # training candidates are >= threshold by definition
             iterations=iterations,
             safety_passed=safety_passed,
         )
@@ -282,16 +320,23 @@ class TraceExporter:
     def export_dataset(
         self,
         output_path: Optional[str] = None,
-        min_score: float = 0.8,
+        min_score: float = EXPORT_MIN_SCORE,
         since_hours: int = 168,
         template_id: Optional[str] = None,
+        total_limit: Optional[int] = None,
     ) -> int:
         """
         Main entry point: fetch training candidates, convert, write JSONL.
 
+        Phase 3 features:
+          - min_score: defaults to EXPORT_MIN_SCORE env var (0.85)
+          - Content-based dedup: skips traces with identical first 100 chars of output
+          - Topic diversity cap: each topic capped at total_limit // 4 samples
+
         Args:
             template_id: If provided, only export traces from this agent template
                          (e.g. 'code_developer', 'creative_writer').
+            total_limit: Hard cap on total exported samples. Also controls per-topic cap.
         Returns count of exported trajectories.
         """
         if output_path is None:
@@ -300,26 +345,62 @@ class TraceExporter:
 
         candidates = self.fetch_training_candidates(
             since_hours=since_hours,
+            min_score=min_score,
         )
+
+        # Content-based dedup: track fingerprints of first 100 chars of assistant output
+        output_fingerprints: set = set()
+
+        # Topic diversity tracking
+        topic_counts: Dict[str, int] = {topic: 0 for topic in _TOPIC_KEYWORDS}
+        max_per_topic = (total_limit // len(_TOPIC_KEYWORDS)) if total_limit else None
 
         exported = 0
         skipped_template = 0
+        skipped_content_dup = 0
+        skipped_topic_cap = 0
         with open(output_path, "w", encoding="utf-8") as f:
             for candidate in candidates:
+                if total_limit and exported >= total_limit:
+                    break
+
                 trajectory = self.trace_to_grpo_trajectory(
                     candidate["trace"],
                     candidate["observations"],
                 )
-                if trajectory:
-                    # Filter by template_id if specified
-                    if template_id:
-                        trace_template = trajectory.get("metadata", {}).get("template_id")
-                        if trace_template != template_id:
-                            skipped_template += 1
-                            continue
-                    f.write(json.dumps(trajectory) + "\n")
-                    self._exported_ids.add(trajectory["id"])
-                    exported += 1
+                if not trajectory:
+                    continue
+
+                # Filter by template_id if specified
+                if template_id:
+                    trace_template = trajectory.get("metadata", {}).get("template_id")
+                    if trace_template != template_id:
+                        skipped_template += 1
+                        continue
+
+                # Content-based dedup: skip if first 100 chars of output seen before
+                conversations = trajectory.get("conversations", [])
+                assistant_turns = [t for t in conversations if t.get("role") == "assistant"]
+                if assistant_turns:
+                    output_fingerprint = assistant_turns[-1].get("content", "")[:100]
+                    if output_fingerprint and output_fingerprint in output_fingerprints:
+                        logger.debug(f"Skipping trace {trajectory['id']}: duplicate output fingerprint")
+                        skipped_content_dup += 1
+                        continue
+                    if output_fingerprint:
+                        output_fingerprints.add(output_fingerprint)
+
+                # Topic diversity cap
+                topic = _classify_topic(conversations)
+                if max_per_topic and topic_counts.get(topic, 0) >= max_per_topic:
+                    logger.debug(f"Skipping trace {trajectory['id']}: topic '{topic}' at cap ({max_per_topic})")
+                    skipped_topic_cap += 1
+                    continue
+                topic_counts[topic] = topic_counts.get(topic, 0) + 1
+
+                f.write(json.dumps(trajectory) + "\n")
+                self._exported_ids.add(trajectory["id"])
+                exported += 1
 
         if template_id:
             logger.info(
@@ -327,6 +408,13 @@ class TraceExporter:
                 f"skipped {skipped_template} from other templates"
             )
 
+        if skipped_content_dup:
+            logger.info(f"Content dedup: skipped {skipped_content_dup} duplicate-output traces")
+
+        if skipped_topic_cap:
+            logger.info(f"Topic diversity: skipped {skipped_topic_cap} over-represented traces")
+
+        logger.info(f"Topic distribution: {dict(topic_counts)}")
         self._save_exported_ids()
         logger.info(f"Exported {exported} trajectories to {output_path}")
         return exported

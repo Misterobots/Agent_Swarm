@@ -200,3 +200,36 @@ TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "2e-5")
 TRAINING_NUM_EPOCHS          = int(os.getenv("TRAINING_NUM_EPOCHS",      "3"))
 TRAINING_WINDOW_START        = int(os.getenv("TRAINING_WINDOW_START",    "2"))   # hour
 TRAINING_WINDOW_END          = int(os.getenv("TRAINING_WINDOW_END",      "6"))   # hour
+
+# ---------------------------------------------------------------------------
+# Archetype Training Configurations (Phase 4)
+# Maps archetype slug → dataset keys + per-archetype training overrides.
+# Used by the training dispatcher to determine which curated datasets to
+# combine and how many epochs to run for each agent specialisation.
+# ---------------------------------------------------------------------------
+ARCHETYPE_TRAINING_CONFIGS: dict = {
+    "coder": {
+        "datasets": ["glaive-code-assistant", "code-feedback"],
+        "epochs": 3,
+        "base_model": TRAINING_BASE_SOLVER,
+        "description": "Code generation, debugging, and technical problem solving",
+    },
+    "coordinator": {
+        "datasets": ["hermes-function-calling", "slim-orca"],
+        "epochs": 2,
+        "base_model": TRAINING_BASE_SOLVER,
+        "description": "Tool orchestration, multi-step task planning, and IoT control",
+    },
+    "researcher": {
+        "datasets": ["openhermes", "slim-orca"],
+        "epochs": 2,
+        "base_model": TRAINING_BASE_SOLVER,
+        "description": "Deep research, reasoning chains, and information synthesis",
+    },
+    "creative": {
+        "datasets": ["openhermes"],
+        "epochs": 2,
+        "base_model": TRAINING_BASE_SOLVER,
+        "description": "Creative writing, storytelling, and content generation",
+    },
+}

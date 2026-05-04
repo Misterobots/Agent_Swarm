@@ -430,7 +430,6 @@ services:
     command: [ "streamlit", "run", "agents/ui.py", "--server.port=8501", "--server.address=0.0.0.0" ]
     ports:
       - "8501:8501"
-      - "8001:8001"
     networks:
       - execution_net
     labels:
@@ -660,6 +659,47 @@ services:
     networks:
       - execution_net
     restart: unless-stopped
+
+  # TRAINING DISPATCHER — Accepts job requests from Turing, runs GRPO training on Lovelace GPUs
+  # Auth: X-Dispatcher-Key header (DISPATCHER_SECRET env var)
+  # Endpoint: http://192.168.2.101:8001
+  training-dispatcher:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile
+    image: home-ai-lab/agent-runtime:latest
+    container_name: training_dispatcher
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    env_file:
+      - ../network.env
+    environment:
+      - PYTHONPATH=/app
+      - DISPATCHER_SECRET=${DISPATCHER_SECRET}
+      - TRAINING_OUTPUT_DIR=/workspace/training_output
+      - TRAINING_DATASET_DIR=/workspace/training_data
+      - TRAINING_BASE_SOLVER=${TRAINING_BASE_SOLVER:-Qwen/Qwen3.6-27B}
+      - SECONDARY_OLLAMA_HOST=http://ollama:11434
+      - HF_TOKEN=${HF_TOKEN:-}
+      - FORCE_TRAIN=${FORCE_TRAIN:-0}
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: ["uvicorn", "agents.training.dispatcher:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "info"]
+    ports:
+      - "8001:8001"
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=false"
 
 networks:
   execution_net:
