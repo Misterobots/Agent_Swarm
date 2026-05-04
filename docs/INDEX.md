@@ -1,8 +1,8 @@
 # Home AI Lab — Documentation Index
 
-**System**: Agentic Hive v3.4 — Distributed Multi-Agent Swarm
-**Last Updated**: 2026-04-16
-**Architecture Status**: Production (Phase 6 complete, Phase 7 in progress)
+**System**: Agentic Hive v4.0 — Distributed Multi-Agent Swarm
+**Last Updated**: 2026-05-04
+**Architecture Status**: Production (Phase 7 complete — gemma4:31b integration, model registry, tiered VRAM queue)
 
 > This index is the canonical entry point for all documentation. Every canonical document must link back here.
 > Third-party auditors: start with [Compliance Status](compliance/maestro_compliance_status.md), [Security](admin/security.md), and [System Catalog](catalog/system_component_service_catalog.md).

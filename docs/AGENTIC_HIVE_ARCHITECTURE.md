@@ -4,8 +4,8 @@
 
 The **Agentic Hive** is a decentralized, multi-agent orchestration system designed for autonomy, creativity, and real-world interaction. Unlike monolithic LLM applications, the Hive employs a **Swarm Intelligence** architecture where specialized agents — bound by strict identity, security, and reinforcement-learning optimization protocols — collaborate to solve complex tasks.
 
-**Current Version:** 3.1 (Qwen 3.5 Standarization)
-**Core Innovation:** The Hive now uses an inference-time **MarsRL loop** (Solver → Verifier → Corrector) for all coding tasks, with Langfuse process-reward scoring at each step. This implements the methodology published in MarsRL (Nov 2025) and MiniMax Forge (Feb 2026) using `qwen3.5:9b`.
+**Current Version:** 4.0 (gemma4:31b + MarsRL)
+**Core Innovation:** The Hive now uses an inference-time **MarsRL loop** (Solver → Verifier → Corrector) for all coding tasks, with Langfuse process-reward scoring at each step. This implements the methodology published in MarsRL (Nov 2025) and MiniMax Forge (Feb 2026) using `gemma4:31b` as the primary model.
 
 ---
 
@@ -18,11 +18,11 @@ The **Agentic Hive** is a decentralized, multi-agent orchestration system design
 
 ### 2.1 Node Specifications
 
-| Node                                    | Role                          | Hardware                   | Key Services                                          |
-| --------------------------------------- | ----------------------------- | -------------------------- | ----------------------------------------------------- |
-| **Dell Hopper** (192.168.2.102)      | Control Plane                 | x86 low-power              | SPIRE, PostgreSQL, Langfuse, ClickHouse, Redis, MinIO |
-| **Lovelace** (192.168.2.101)           | Heavy Inference + App Runtime | RTX 5060 Ti 16GB, 32GB RAM | Docker Execution Plane, ComfyUI, qwen3.5:9b           |
-| **Dell PowerEdge Turing** (192.168.2.103) | Routing + Offload Inference   | RTX 3070 Ti 8GB            | qwen3.5:9b, nemotron-orchestrator, llama-guard-3:8b   |
+| Node                                    | Role                          | Hardware                              | Key Services                                                            |
+| --------------------------------------- | ----------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
+| **Hopper** (192.168.2.102)              | Control Plane                 | x86 low-power                         | SPIRE, PostgreSQL, Langfuse, ClickHouse, Redis, MinIO                   |
+| **Lovelace** (192.168.2.101)            | Heavy Inference + Generation  | Dual RTX 5060 Ti (32 GB VRAM), 32 GB RAM | Ollama (`gemma4:31b`, `qwen3.6:27b`, etc.), ComfyUI, Voice Services |
+| **Turing** (192.168.2.103)              | Gateway + Agent Runtime       | **No GPU** (3070 Ti removed — CPU only) | Traefik, agent_runtime, hive_ui, Prometheus, Grafana, Loki, Redis      |
 
 ---
 
@@ -32,10 +32,11 @@ The **Agentic Hive** is a decentralized, multi-agent orchestration system design
 
 The Hive rejects the "One Model Fits All" approach. It uses **role-specialized inference**:
 
-- **Nemotron-Orchestrator**: Fast multi-agent routing and coordination.
-- **Qwen 3.5 9B**: Primary coding generation and autonomous engineering (256K context).
-- **llama-guard-3:8b**: Safety screening and content moderation.
-- **LogicVerifier**: AST-level code correctness + coherence heuristics.
+- **gemma4:31b**: Primary model — reasoning, coding, planning, conversation (20 GB VRAM).
+- **qwen3.6:27b**: Fallback / alternative large model (17.4 GB VRAM).
+- **qwen2.5-coder:14b**: Specialist coding model.
+- **llama-guard-3:8b**: Safety screening and content moderation (CPU on Turing).
+- **church.py intent classifier**: Fast multi-agent routing and coordination (no separate LLM needed — deterministic keyword rules).
 
 ### 3.2 MarsRL Loop Flow
 
@@ -57,16 +58,18 @@ Pass threshold: score ≥ 0.60
 
 ### 4.1 Specialized Agent Breakdown
 
-#### A. The Solver / Corrector (Qwen 3.5 9B)
+#### A. The Solver / Corrector (gemma4:31b)
 
-- **Model**: `qwen3.5:9b`
-- **Role**: Primary MarsRL Solver for first-pass code generation; Corrector for fixing failed outputs.
-- **Context**: 256K tokens.
+- **Model**: `gemma4:31b`
+- **Role**: Primary MarsRL Solver for first-pass generation; Corrector for fixing failed outputs.
+- **Context**: 128K tokens.
+- **Fallback**: `qwen3.6:27b`
 
-#### B. The Router / Orchestrator (Nemotron-Orchestrator-8B)
+#### B. The Router / Orchestrator (church.py intent classifier)
 
-- **Model**: `nemotron-orchestrator:8b`
-- **Role**: Intent classification, multi-agent coordination.
+- **Implementation**: Deterministic keyword rules in `agents/church.py`
+- **Role**: Intent classification, multi-agent coordination (IMAGE / CODE / CHAT / etc.).
+- **No separate LLM needed** — replaced nemotron-orchestrator with fast rule-based classifier.
 
 #### C. The Safety Verifier (llama-guard-3:8b)
 
@@ -85,9 +88,9 @@ Pass threshold: score ≥ 0.60
 
 ---
 
-**Version**: 3.1.0
+**Version**: 4.0.0
 **Status**: Production
-**Date**: 2026-03-12
+**Date**: 2026-05-04
 
 ---
 
@@ -113,6 +116,7 @@ Pass threshold: score ≥ 0.60
 
 | Date | Author | Changes |
 |------|--------|--------|
+| 2026-05-04 | AI-Copilot | v4.0 — gemma4:31b as primary, dual RTX 5060 Ti (32 GB), Turing GPU removal, model registry, tiered VRAM queue, Hopper node name |
 | 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
 | 2026-03-12 | AI-Copilot | v3.1 — Qwen 3.5 9B standardization, Dell Turing topology |
 

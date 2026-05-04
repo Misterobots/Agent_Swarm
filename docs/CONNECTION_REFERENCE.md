@@ -13,10 +13,13 @@ This document serves as the living reference for all User Interfaces and backend
 | Node           | IP Address      | Role                                    |
 | :------------- | :-------------- | :-------------------------------------- |
 | Home Assistant | `192.168.2.100` | Smart Home Hub                          |
-| Lovelace      | `192.168.2.101` | Compute Node (Inference + ComfyUI)      |
-| Control-Node   | `192.168.2.102` | Control Plane (SPIRE, Langfuse, DB)     |
-| **Turing**       | `192.168.2.103` | **Gateway/Ops Hub** (Traefik, Monitoring) |
-| iDRAC          | `192.168.2.104` | Turing Remote Management                  |
+| Lovelace       | `192.168.2.101` | Compute Node (Inference + ComfyUI)      |
+| Hopper         | `192.168.2.102` | Control Plane (SPIRE, Langfuse, DB)     |
+| **Turing**     | `192.168.2.103` | **Gateway/Ops Hub** (Traefik, agent_runtime, hive_ui) |
+| iDRAC          | `192.168.2.104` | Turing Remote Management                |
+| BMO            | `192.168.2.106` | Raspberry Pi (Voice/IoT, wakeword)      |
+
+> **Note**: Turing has **no dedicated GPU** (RTX 3070 Ti removed — CPU inference only for safety/embed models). All large model inference runs on Lovelace (dual RTX 5060 Ti, 32 GB VRAM total).
 
 ---
 
@@ -24,15 +27,15 @@ This document serves as the living reference for all User Interfaces and backend
 
 **Primary Entry Point**: All UIs accessible via **Turing Traefik Gateway** @ `http://192.168.2.103`
 
-| Interface                | URL                         | Hosted On    | Purpose                                                           |
-| :----------------------- | :-------------------------- | :----------- | :---------------------------------------------------------------- |
-| **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Dell Turing    | Central reverse proxy (primary entry point for all services)       |
-| **Open-WebUI Gateway**   | `http://192.168.2.103:3000` | Dell Turing    | Primary chat interface to interact with the Swarm.                |
-| **Grafana / Ops Portal** | `http://192.168.2.103:3001` | Dell Turing    | Real-time Docker logs, GPU metrics, agent performance.            |
-| **Prometheus Metrics**   | `http://192.168.2.103:9090` | Dell Turing    | Time-series metrics database + query interface.                   |
-| **Loki Logs API**        | `http://192.168.2.103:3100` | Dell Turing    | Log aggregation backend (data source for Grafana).                |
-| **Traefik Dashboard**    | `http://192.168.2.103:8080` | Dell Turing    | Live routing and load balancer metrics.                           |
-| **Langfuse Dashboard**   | `http://192.168.2.102:3000` | Control-Node | Live tracking of LLM traces, MarsRL Process Rewards, token usage. |
+| Interface                | URL                         | Hosted On       | Purpose                                                           |
+| :----------------------- | :-------------------------- | :-------------- | :---------------------------------------------------------------- |
+| **Traefik Gateway** ⭐   | `http://192.168.2.103:80`   | Turing          | Central reverse proxy (primary entry point for all services)      |
+| **Hive UI** ⭐           | `http://192.168.2.103:3200` | Turing          | **Primary chat interface** — Next.js Hive Mind UI.                |
+| **Grafana / Ops Portal** | `http://192.168.2.103:3001` | Turing          | Real-time Docker logs, metrics, agent performance.                |
+| **Prometheus Metrics**   | `http://192.168.2.103:9091` | Turing          | Time-series metrics database + query interface.                   |
+| **Loki Logs API**        | `http://192.168.2.103:3100` | Turing          | Log aggregation backend (data source for Grafana).                |
+| **Traefik Dashboard**    | `http://192.168.2.103:8080` | Turing          | Live routing and load balancer metrics.                           |
+| **Langfuse Dashboard**   | `http://192.168.2.102:3000` | Hopper          | Live tracking of LLM traces, MarsRL Process Rewards, token usage. |
 | **OpenHands Sandbox**    | `http://192.168.2.103/hands` | Turing→Lovelace | Secure Docker-in-Docker (routed via Traefik).                    |
 | **ComfyUI**              | `http://192.168.2.103/comfy` | Turing→Lovelace | Node-based GUI for 3D/Image Generation (routed via Traefik).     |
 
@@ -58,8 +61,8 @@ This document serves as the living reference for all User Interfaces and backend
 
 | Service                      | Endpoint                                  | Hosted On | Purpose                                            |
 | :--------------------------- | :---------------------------------------- | :-------- | :------------------------------------------------- |
-| **Ollama (Primary)**         | `http://192.168.2.101:11434/api/generate` | Lovelace | `qwen3.5:9b` (Heavy-Local) — Large-scale coding expertise. |
-| **Ollama (Secondary/Gateway)** | `http://192.168.2.103:11434/api/generate` | Dell Turing | `qwen3.5:9b`, `nemotron-orchestrator`, `llama-guard3:8b`. |
+| **Ollama (Primary)**    | `http://192.168.2.101:11434/api/generate` | Lovelace | `gemma4:31b` (20 GB), `qwen3.6:27b` (17.4 GB), `qwen2.5-coder:14b` (9 GB), `qwen3:8b` (5.2 GB), `llama3.2:3b` (2 GB), `nomic-embed-text` (274 MB). |
+| **Ollama (Turing — CPU only)** | `http://192.168.2.103:11434/api/generate` | Turing | `nomic-embed-text`, `llama-guard-3:8b` — safety screening and embeddings only. No large models. |
 | **RVC Voice Generation**     | `http://192.168.2.101:8100/infer`         | Lovelace | Physical BMO robot voice reconstruction.          |
 | **Qwen3-TTS Module**         | `http://192.168.2.101:8020/tts`           | Lovelace | Base Text-to-Speech generation.                   |
 
@@ -77,18 +80,18 @@ To connect **Open-WebUI** or **external agents** to the Swarm:
 - **API Key:** `sk-swarm` (or leave blank for local-only)
 
 ### Direct Connection (bypass gateway)
-- **Lovelace Inference:** `http://192.168.2.101:8008/v1`
-- **Turing Inference:** `http://192.168.2.103:11434/api` (Ollama only)
+- **Agent Runtime (Turing):** `http://192.168.2.103:8008/v1`
+- **Lovelace Ollama:** `http://192.168.2.101:11434/api` (Ollama direct)
 
 To connect directly to the **Local Expert** (High Performance):
 - **OLLAMA_BASE_URL:** `http://192.168.2.101:11434`
-- **Target Model:** `qwen3.5:9b`
+- **Primary Model:** `gemma4:31b`
+- **Fallback Model:** `qwen3.6:27b`
 
-To connect directly to the **Offload Solver** (Efficient):
-- **OLLAMA_BASE_URL:** `http://192.168.2.103:11434`
-- **Target Model:** `qwen3.5:9b`
-- **Context Window:** `256,000`
-- **Orchestrator Model:** `nemotron-orchestrator:8b` (Context: 4,096)
+To connect directly to the **Coder** (Efficient):
+- **OLLAMA_BASE_URL:** `http://192.168.2.101:11434`
+- **Target Model:** `qwen2.5-coder:14b`
+- **Context Window:** `128,000`
 
 ---
 
@@ -98,11 +101,11 @@ For off-site access, use your Tailscale IP addresses or MagicDNS names instead o
 
 **Primary Gateway Entry Point**: All services routed through Turing Traefik
 
-| Node           | Tailscale Address (Example) | Common Ports          | Purpose |
-| :------------- | :-------------------------- | :-------------------- | :------ |
-| **Dell Turing**  | `dell-turing.tail-xxxx.ts.net` | 80, 3000, 3001, 9090, 8080 | Gateway/Ops Hub (Traefik + all monitoring) |
-| **Lovelace**  | `lovelace.tail-xxxx.ts.net` | 8008, 8188, 11434 (direct access only) | Compute Node (direct access if needed) |
-| **Control-Node**| `control-node.tail-xxxx.ts.net`| 3000 | SPIRE, Langfuse, DB |
+| Node        | Tailscale Address (Example)    | Common Ports               | Purpose |
+| :---------- | :----------------------------- | :------------------------- | :------ |
+| **Turing**  | `turing.tail-xxxx.ts.net`      | 80, 3200, 3001, 9091, 8080 | Gateway/Ops Hub (Traefik + monitoring + agent_runtime + hive_ui) |
+| **Lovelace** | `lovelace.tail-xxxx.ts.net`   | 8188, 11434 (direct only)  | Compute Node (Ollama GPU inference, ComfyUI) |
+| **Hopper**  | `hopper.tail-xxxx.ts.net`      | 3000                       | SPIRE, Langfuse, DB |
 
 > [!TIP]
 > Use `tailscale status` on any node to find the specific IP or hostname. Ensure **MagicDNS** is enabled in your Tailscale admin console for the shortest URLs.
@@ -129,6 +132,7 @@ For off-site access, use your Tailscale IP addresses or MagicDNS names instead o
 
 | Date | Author | Changes |
 |------|--------|--------|
+| 2026-05-04 | AI-Copilot | Updated: gemma4:31b primary models, dual RTX 5060 Ti (32 GB), Turing GPU removal, Hive UI as primary (:3200), Prometheus port :9091, agent_runtime on Turing, Hopper node name, BMO node added |
 | 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
 | 2026-03-01 | AI-Copilot | Initial connection reference |
 

@@ -9,7 +9,7 @@
 - [Documentation Governance Standard](../governance/documentation_governance_standard.md)
 - [Documentation Gap Register](../governance/documentation_gap_register.md)
 
-**Last Updated**: 2026-03-23 · **Architecture Version**: 3.3
+**Last Updated**: 2026-05-04 · **Architecture Version**: 4.0
 
 ---
 
@@ -20,10 +20,11 @@ All IP addresses are managed in [`network.env`](../../network.env) — edit that
 | Node | IP | Role | Hardware |
 |------|----|------|----------|
 | Home Assistant | `<home-assistant-ip>` | Smart Home Hub | Dedicated HA device |
-| **Execution Node** | `<execution-node-ip>` | GPU Compute / Agent Runtime | RTX 5060 Ti 16GB, 32GB RAM, 500GB SSD |
-| **Control Node** | `<control-node-ip>` | Control Plane | x86 low-power, 16GB RAM, 512GB SSD |
-| **Gateway Node** | `<gateway-node-ip>` | Gateway / Ops | 384GB RAM, 24 CPU, 450GB SSD |
-| iDRAC | `<idrac-ip>` | Gateway Remote Management | — |
+| **Execution Node** (Lovelace) | `192.168.2.101` | GPU Compute | Dual RTX 5060 Ti (32 GB VRAM), 32 GB RAM, 500 GB SSD |
+| **Control Node** (Hopper) | `192.168.2.102` | Control Plane | x86 low-power, 16 GB RAM, 512 GB SSD |
+| **Gateway Node** (Turing) | `192.168.2.103` | Gateway / Ops / Agent Runtime | **No GPU** (3070 Ti removed), 384 GB RAM, 40 CPU, 450 GB SSD |
+| iDRAC | `192.168.2.104` | Gateway Remote Management | — |
+| BMO | `192.168.2.106` | Voice/IoT Satellite | Raspberry Pi |
 
 **Tailscale Remote Access**: Connect to `gateway-node.tail-xxxx.ts.net:80` for all services. Run `tailscale status` on any node for the current MagicDNS hostname.
 
@@ -83,8 +84,8 @@ For Turing gateway deployment, `turing_gateway/docker-compose.yml` must set **bo
 
 | Service | Endpoint | Node | Models |
 |---------|----------|------|--------|
-| Ollama (Primary) | `http://<execution-node-ip>:11434` | Execution Node | `qwen3.5:9b` |
-| Ollama (Gateway) | `http://<gateway-node-ip>:11434` | Gateway Node | `qwen3.5:9b`, `nemotron-orchestrator:8b`, `llama-guard-3:8b` |
+| Ollama (Primary) | `http://192.168.2.101:11434` | Execution Node (Lovelace) | `gemma4:31b` (20 GB), `qwen3.6:27b` (17.4 GB), `qwen2.5-coder:14b` (9 GB), `qwen3:8b` (5.2 GB), `llama3.2:3b` (2 GB), `nomic-embed-text` (274 MB) |
+| Ollama (Gateway — CPU only) | `http://192.168.2.103:11434` | Gateway Node (Turing) | `nomic-embed-text`, `llama-guard-3:8b` — safety and embeddings only. No large models. |
 | RVC Voice | `http://<execution-node-ip>:8100/infer` | Execution Node | BMO voice model |
 | Qwen-TTS | `http://<execution-node-ip>:8020/tts` | Execution Node | Text-to-speech |
 | ComfyUI API | `http://<execution-node-ip>:8188` | Execution Node | Image/3D generation (internal) |
@@ -93,18 +94,19 @@ For Turing gateway deployment, `turing_gateway/docker-compose.yml` must set **bo
 
 ```
 Primary (via Gateway):
-  API Base URL:   http://<gateway-node-ip>/swarm/v1
+  API Base URL:   http://192.168.2.103/swarm/v1
   Model:          Home-AI-Swarm
   API Key:        sk-swarm
   Context Window: 128,000
   Max Tokens:     4,096
 
 Direct (Execution Node bypass):
-  API Base URL:   http://<execution-node-ip>:8008/v1
+  API Base URL:   http://192.168.2.103:8008/v1
 
 Raw Ollama (Execution Node):
-  OLLAMA_BASE_URL: http://<execution-node-ip>:11434
-  Model:           qwen3.5:9b
+  OLLAMA_BASE_URL: http://192.168.2.101:11434
+  Primary Model:   gemma4:31b
+  Fallback Model:  qwen3.6:27b
 ```
 
 ---

@@ -1,6 +1,6 @@
 ﻿# Home AI Lab Infrastructure Reference
-**Last Updated**: March 15, 2026  
-**Current Architecture Version**: 3.1 (Post-Phase 4 Distributed)  
+**Last Updated**: May 4, 2026  
+**Current Architecture Version**: 4.0 (Post-Phase 7 — gemma4:31b + MarsRL)  
 **Maintenance Owner**: Engineering Team
 
 ---
@@ -12,8 +12,8 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 | Tier | Host | Role | Hardware | Services |
 |------|------|------|----------|----------|
 | **Control** | Hopper (192.168.2.102) | Orchestration & Observability Backend | 16GB RAM, 512GB SSD | SPIRE, Langfuse, PostgreSQL, ClickHouse, MinIO |
-| **Ops/Gateway** | Dell Turing (192.168.2.103) | Reverse Proxy & Monitoring | 384GB RAM, 24 CPU, 450GB SSD | Traefik, Prometheus, Grafana, Loki, cAdvisor, Redis |
-| **Compute** | Lovelace (192.168.2.101) | GPU Inference & Agent Runtime | 32GB RAM, RTX 5060 Ti (16GB), 500GB SSD | Ollama, ComfyUI, Agent Runtime, Voice Services |
+| **Ops/Gateway** | Turing (192.168.2.103) | Reverse Proxy, Agent Runtime & Monitoring | 384GB RAM, 40 CPU (dual Xeon E5-2630 v4), 450GB SSD, **No GPU** | Traefik, agent_runtime, hive_ui, Prometheus, Grafana, Loki, Redis |
+| **Compute** | Lovelace (192.168.2.101) | GPU Inference & Generation | 32GB RAM, **Dual RTX 5060 Ti (32 GB VRAM total)**, 500GB SSD | Ollama, ComfyUI, Voice Services |
 
 ---
 
@@ -99,32 +99,25 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 
 ---
 
-### TIER 3: COMPUTE (192.168.2.101 - JUSTIN-PC)
+### TIER 3: COMPUTE (192.168.2.101 — Lovelace)
 
 #### 15 Compute Services
 
 | Service | Port | GPU | Purpose |
 |---------|------|-----|---------|
 | SPIRE Agent | socket | - | Workload identity |
-| Ollama | 11434 | ✓ | LLM inference (7B, 3B models) |
+| Ollama | 11434 | ✓ | LLM inference — `gemma4:31b` (20 GB), `qwen3.6:27b` (17.4 GB), `qwen2.5-coder:14b` (9 GB), `qwen3:8b` (5.2 GB), `llama3.2:3b` (2 GB), `nomic-embed-text` (274 MB) |
 | ComfyUI | 8188 | ✓ | Image generation (shared GPU) |
 | BMO Voice | 8100 | ✓ | Voice conversion (RVC) |
 | Voice Engine | 8020 | ✓ | Text-to-speech (Qwen3-TTS 1.7B) |
 | OpenHands | 3000 | - | Code execution sandbox |
-| Agent Runtime | 8008 | - | FastAPI backend (orchestrator) |
-| Agent UI | 8501 | - | Streamlit web interface |
-| Ops Portal | 8502 | - | Admin dashboard |
 | VS Code (DevOps) | 8443 | - | Full workspace IDE |
 | VS Code (Coding) | 8444 | - | Restricted sandbox IDE |
-| Authentik Server | 9000 | - | SSO & identity |
-| Authentik Worker | - | - | Background tasks |
-| Authentik DB | - | - | User storage (PostgreSQL) |
-| Authentik Redis | - | - | Session cache |
 
 **GPU Memory Sharing**:
-- RTX 5060 Ti: 16GB total
-- Ollama: 512MB overhead + model (5-10GB typical)
-- ComfyUI: 4-8GB typical
+- Dual RTX 5060 Ti: 32 GB total (16 GB each)
+- Ollama: 512 MB overhead + model (`gemma4:31b` ≈ 20 GB, `qwen3.6:27b` ≈ 17.4 GB)
+- ComfyUI: 4–8 GB typical
 - Management: OLLAMA_KEEP_ALIVE=5m (auto-unload after idle)
 
 ---
