@@ -259,13 +259,37 @@ async def speech_to_text(
             temp_path = tmp.name
             
         print(f"--- [STT] Processing: {temp_path} ---")
-        
+
+        # Pre-process: apply sox noise reduction + bandpass to improve SNR for speech
+        denoised_path = temp_path + "_denoised.wav"
+        try:
+            subprocess.run(
+                ["sox", temp_path, "-r", "16000", denoised_path,
+                 "highpass", "80", "lowpass", "8000", "noisered", "/app/noise.prof", "0.21"],
+                check=True, capture_output=True
+            )
+            stt_input_path = denoised_path
+            print("--- [STT] Noise reduction applied ---")
+        except Exception as _sox_err:
+            # Fallback: just resample to 16kHz (SenseVoice expects 16kHz)
+            try:
+                subprocess.run(
+                    ["sox", temp_path, "-r", "16000", denoised_path,
+                     "highpass", "80", "lowpass", "8000"],
+                    check=True, capture_output=True
+                )
+                stt_input_path = denoised_path
+                print(f"--- [STT] Bandpass applied (no noise profile: {_sox_err}) ---")
+            except Exception:
+                stt_input_path = temp_path
+                print("--- [STT] Using raw audio (sox unavailable) ---")
+
         # Inference
         # SenseVoiceSmall returns a list of results
         res = stt_model.generate(
-            input=temp_path,
+            input=stt_input_path,
             cache={},
-            language="auto",  # or "zn", "en", "yue", "ja", "ko"
+            language="en",  # Lock to English — "auto" misdetects noisy audio as CJK
             use_itn=True,
             batch_size_s=60,
             merge_vad=True,
@@ -287,6 +311,12 @@ async def speech_to_text(
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
+            except:
+                pass
+        denoised = temp_path + "_denoised.wav" if temp_path else ""
+        if denoised and os.path.exists(denoised):
+            try:
+                os.remove(denoised)
             except:
                 pass
 

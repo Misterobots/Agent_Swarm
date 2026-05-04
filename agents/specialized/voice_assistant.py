@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import re
 import threading
 from datetime import datetime
@@ -20,14 +21,54 @@ logger = logging.getLogger("VoiceAssistant")
 logger.setLevel(logging.INFO)
 
 # --- Config ---
-BMO_MODEL = os.getenv("BMO_LLM_MODEL", "qwen3:8b")
+BMO_MODEL = os.getenv("BMO_LLM_MODEL", "qwen3:14b")
 BMO_OLLAMA_HOST = os.getenv("BMO_OLLAMA_HOST", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
 MAX_MEMORY = 10  # Keep last 10 exchanges
 MEMPALACE_API_URL = os.getenv("MEMPALACE_API_URL", "http://mempalace:8200")
 
+# Pre-baked acknowledgement phrases — spoken immediately while LLM processes
+_ACK_PHRASES = [
+    "Beemo is on it.",
+    "Checking now.",
+    "Give Beemo a moment.",
+    "Computations starting.",
+    "Beemo is thinking.",
+]
+
+# Status update phrases — spoken if LLM takes more than ~10 seconds
+_STATUS_PHRASES = [
+    "Beemo is still working on that.",
+    "Almost there, maybe.",
+    "Beemo is still computing.",
+    "Still on it. Give Beemo a second.",
+]
+
+
+def _clean_response(text: str) -> str:
+    """Remove LLM artifacts before TTS: think tags, markdown, AI disclaimers."""
+    # Strip qwen3 thinking blocks
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    # Strip markdown formatting
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)   # code blocks
+    text = re.sub(r"`([^`]+)`", r"\1", text)                  # inline code
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)              # bold
+    text = re.sub(r"\*(.+?)\*", r"\1", text)                  # italic
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)  # headers
+    text = re.sub(r"^[-*•]\s+", "", text, flags=re.MULTILINE)   # bullets
+    text = re.sub(r"^\d+\.\s+", "", text, flags=re.MULTILINE)   # numbered lists
+    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)    # markdown links
+    # Collapse newlines/extra whitespace to single space
+    text = re.sub(r"\n+", " ", text)
+    text = re.sub(r" {2,}", " ", text)
+    # Log and strip AI-disclaimer phrases (character break detection)
+    if re.search(r"(?i)(as an ai|i'm an ai|i am an ai|as a language model|as an ai assistant)", text):
+        logger.warning("⚠️ BMO character break detected — AI disclaimer in response. Stripping.")
+        text = re.sub(r"(?i)(as an ai|i'm an ai|i am an ai|as a language model|as an ai assistant)[^.!?]*[.!?]?", "", text)
+    return text.strip()
+
 
 def _strip_think_tags(text: str) -> str:
-    """Remove <think>...</think> blocks emitted by qwen3 before TTS."""
+    """Legacy alias — use _clean_response() for new code."""
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
@@ -88,6 +129,35 @@ class SmartHomeTool(Toolkit):
         return "Could not list devices"
 
 
+class WebSearchTool(Toolkit):
+    """Web search via DuckDuckGo Lite. No API key required."""
+
+    def __init__(self):
+        super().__init__(name="web_search")
+        self.register(self.search)
+
+    def search(self, query: str) -> str:
+        """Search the web for real-time information: store hours, news, prices, facts, events.
+        Use this whenever the user asks about something you don't know or that may have changed.
+        Returns a short summary of the top results."""
+        try:
+            from tools.web_browser import web_search
+            results = web_search(query, num_results=4)
+            if not results:
+                return "No results found."
+            # Summarise into a compact string for the LLM
+            lines = []
+            for r in results:
+                title = r.get("title", "").strip()
+                snippet = r.get("snippet", r.get("body", "")).strip()
+                if title or snippet:
+                    lines.append(f"{title}: {snippet}" if title else snippet)
+            return "\n".join(lines[:4]) if lines else "No useful results."
+        except Exception as e:
+            logger.warning(f"WebSearch failed: {e}")
+            return f"Search unavailable: {e}"
+
+
 class Message(BaseModel):
     role: str
     content: str
@@ -99,21 +169,67 @@ class VoiceAssistantAgent:
         self.name = "BMO"
         self.description = "BMO handles voice interactions and Home Assistant control with personality."
         self.conversation_history: deque = deque(maxlen=MAX_MEMORY * 2)  # user + assistant pairs
+
+        # Ack audio cache — pre-baked on startup so first ack is instant
+        self._ack_cache: list = []       # list of (text, audio_path)
+        self._status_cache: list = []    # list of (text, audio_path)
+        self._ack_lock = threading.Lock()
         
         # Tools
         self.smart_home = SmartHomeTool()
         self.weather = WeatherTool()
         self.time_tool = TimeTool()
         self.news = NewsTool()
+        self.web_search = WebSearchTool()
         
         # LLM Agent with all tools
         self.llm_agent = Agent(
             model=Ollama(id=BMO_MODEL, host=BMO_OLLAMA_HOST),
             description=BMO_SYSTEM_PROMPT,
-            tools=[self.smart_home, self.weather, self.time_tool, self.news],
+            tools=[self.smart_home, self.weather, self.time_tool, self.news, self.web_search],
             show_tool_calls=False,
             markdown=False,
+            add_history_to_messages=True,
+            num_history_responses=8,  # keep last 8 exchanges in context window
         )
+
+        # Pre-bake ack/status audio in the background — ready before first real request
+        threading.Thread(target=self._prebake_audio, daemon=True).start()
+
+    def _prebake_audio(self):
+        """Generate ack and status audio files at startup and cache their paths."""
+        for phrase in _ACK_PHRASES:
+            try:
+                path = clone_voice(phrase, effect="BMO")
+                if path:
+                    with self._ack_lock:
+                        self._ack_cache.append((phrase, path))
+                    logger.info(f"🔊 Prebaked ack: {phrase!r}")
+            except Exception as e:
+                logger.warning(f"Prebake failed for {phrase!r}: {e}")
+        for phrase in _STATUS_PHRASES:
+            try:
+                path = clone_voice(phrase, effect="BMO")
+                if path:
+                    with self._ack_lock:
+                        self._status_cache.append((phrase, path))
+                    logger.info(f"🔊 Prebaked status: {phrase!r}")
+            except Exception as e:
+                logger.warning(f"Prebake failed for {phrase!r}: {e}")
+
+    def get_ack(self) -> tuple:
+        """Return (text, audio_path) for an immediate ack. Falls back to text-only if not ready."""
+        with self._ack_lock:
+            if self._ack_cache:
+                return random.choice(self._ack_cache)
+        return (random.choice(_ACK_PHRASES), None)
+
+    def get_status_update(self) -> tuple:
+        """Return (text, audio_path) for a 'still working' status update."""
+        with self._ack_lock:
+            if self._status_cache:
+                return random.choice(self._status_cache)
+        return (random.choice(_STATUS_PHRASES), None)
 
     def _recall_memories(self, user_text: str) -> str:
         """Query MemPalace for facts relevant to this turn. Non-fatal, 3s timeout."""
@@ -219,7 +335,7 @@ class VoiceAssistantAgent:
         memories = self._recall_memories(user_text)
         context = self._build_context(user_text, memories)
         response = self.llm_agent.run(context)
-        response_text = _strip_think_tags(response.content)
+        response_text = _clean_response(response.content)
 
         # Update in-session memory and kick off persistent MemPalace store
         self.conversation_history.append({"role": "user", "content": user_text})

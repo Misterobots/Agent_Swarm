@@ -326,8 +326,12 @@ async def submit_task(request: TaskRequest):
 class VoiceRequest(BaseModel):
     text: str
 
-# Persist agent to avoid re-initializing Ollama/Phidata every request (reduces latency)
+# Persist agent to avoid re-initializing Ollama/Phidata every request
 _voice_agent = None
+
+# Async job store: job_id → {"status": "processing|done", "result": dict|None, "started": float}
+_voice_jobs: dict = {}
+_VOICE_JOB_TTL = 300  # seconds before old jobs are purged
 
 def get_voice_agent():
     global _voice_agent
@@ -336,34 +340,106 @@ def get_voice_agent():
         _voice_agent = VoiceAssistantAgent()
     return _voice_agent
 
+def _purge_old_voice_jobs():
+    import time as _t
+    cutoff = _t.time() - _VOICE_JOB_TTL
+    stale = [k for k, v in _voice_jobs.items() if v["started"] < cutoff]
+    for k in stale:
+        del _voice_jobs[k]
+
 @app.post("/v1/voice/chat")
 async def voice_chat(request: VoiceRequest):
     """
-    Dedicated endpoint for Voice Satellite.
-    Returns text response AND audio path.
+    Voice Satellite endpoint — returns an immediate ack + job_id.
+    The Pi plays the ack audio instantly, then polls /v1/voice/result/{job_id}.
     """
-    from specialized.voice_assistant import Message
-    
     import asyncio as _aio
+    import time as _t
+    import uuid as _uuid
+    from specialized.voice_assistant import Message
+
     agent = get_voice_agent()
-    # Process message (run in thread to avoid blocking the async event loop)
-    response_msg = await _aio.to_thread(agent.process, Message(role="user", content=request.text))
-    metadata = response_msg.metadata or {}
+    job_id = _uuid.uuid4().hex[:8]
+    ack_text, ack_audio = agent.get_ack()
+
+    _voice_jobs[job_id] = {"status": "processing", "result": None, "started": _t.time()}
+    _purge_old_voice_jobs()
+
+    async def _run():
+        try:
+            msg = await _aio.to_thread(agent.process, Message(role="user", content=request.text))
+            meta = msg.metadata or {}
+            _voice_jobs[job_id]["result"] = {
+                "text": msg.content,
+                "audio_path": meta.get("audio_path"),
+                "sandbox": {
+                    "emotion": meta.get("emotion"),
+                    "pitch": meta.get("pitch"),
+                    "speed": meta.get("speed"),
+                    "sample_match": meta.get("sample_match"),
+                    "response_sample": meta.get("response_sample"),
+                    "sample_file": meta.get("sample_file"),
+                    "sample_url": meta.get("sample_url"),
+                    "audio_kind": meta.get("audio_kind"),
+                },
+            }
+        except Exception as _e:
+            logger.error(f"Voice job {job_id} failed: {_e}")
+            _voice_jobs[job_id]["result"] = {
+                "text": "Beemo hit an error on that one.",
+                "audio_path": None,
+                "sandbox": {},
+            }
+        finally:
+            _voice_jobs[job_id]["status"] = "done"
+
+    _aio.create_task(_run())
 
     return {
-        "text": response_msg.content,
-        "audio_path": metadata.get("audio_path"),
-        "sandbox": {
-            "emotion": metadata.get("emotion"),
-            "pitch": metadata.get("pitch"),
-            "speed": metadata.get("speed"),
-            "sample_match": metadata.get("sample_match"),
-            "response_sample": metadata.get("response_sample"),
-            "sample_file": metadata.get("sample_file"),
-            "sample_url": metadata.get("sample_url"),
-            "audio_kind": metadata.get("audio_kind"),
-        },
+        "job_id": job_id,
+        "status": "processing",
+        "ack_text": ack_text,
+        "ack_audio": ack_audio,
     }
+
+@app.get("/v1/voice/result/{job_id}")
+async def voice_result(job_id: str):
+    """Poll this after receiving a job_id from /v1/voice/chat."""
+    import time as _t
+    from fastapi import HTTPException
+    job = _voice_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or expired")
+    if job["status"] != "done":
+        elapsed = round(_t.time() - job["started"], 1)
+        agent = get_voice_agent()
+        status_text, status_audio = agent.get_status_update()
+        return {
+            "status": "processing",
+            "elapsed": elapsed,
+            "status_text": status_text,
+            "status_audio": status_audio,
+        }
+    return {"status": "done", **job["result"]}
+
+
+@app.post("/v1/voice/say")
+async def voice_say(request: VoiceRequest):
+    """Synthesize a short phrase with BMO's voice and return the audio path.
+    Used by the Pi for local confirmations (volume changes, etc.) without
+    going through the full LLM pipeline."""
+    from specialized.voice_cloning import clone_voice
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+    try:
+        import asyncio as _say_asyncio
+        audio_path = await _say_asyncio.to_thread(clone_voice, text, effect="BMO")
+        return {"audio_path": audio_path}
+    except Exception as e:
+        logger.error(f"[voice/say] TTS failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e)[:200])
+
 
 # --- OpenAI-Compatible Chat Endpoint (For VS Code Extensions) ---
 class ChatMessage(BaseModel):

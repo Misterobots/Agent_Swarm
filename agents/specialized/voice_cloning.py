@@ -129,16 +129,16 @@ def clone_voice(
                 FISH_AUDIO_URL,
                 headers=headers,
                 data=json.dumps(payload),
-                timeout=60,
+                timeout=10,
             )
             # Fall back to local RVC if Fish Audio fails (bad key, no credits, etc.)
             if response.status_code != 200:
                 logger.warning(f"Fish Audio failed ({response.status_code}): {response.text[:100]}. Falling back to local RVC.")
-                response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=60)
+                response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=5)
         elif effect == "BMO":
             # --- Local RVC Engine (no Fish Audio key) ---
             logger.info("Using local RVC engine (no FISH_AUDIO_API_KEY set)")
-            response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=60)
+            response = requests.post(BMO_ENGINE_URL, params={"text": text}, timeout=5)
         else:
             # Generic TTS Engine (/tts) expects form data + file uploads
             data = {"text": text}
@@ -215,7 +215,7 @@ def clone_voice(
             
     except Exception as e:
         logger.error(f"Connection Failed: {e}")
-        return f"Error connecting to Voice Engine: {e}. Is the service running?"
+        return None  # TTS service unreachable — Pi will skip audio playback
 
 def get_voice_cloning_agent():
     return Agent(

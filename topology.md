@@ -20,7 +20,7 @@ graph TD
         AgentUI[🖥️ Agent UI]:::logic
         Router{🧠 Router}:::logic
         ArtDirector[🎨 Art Director]:::logic
-        Studio[🖌️ Creative Studio]:::logic
+        Studio[�️ Creative Studio]:::logic
         
         %% Internal Flow
         User --> AgentUI --> Router
@@ -32,8 +32,8 @@ graph TD
     subgraph Creative_Plane ["🏭 CREATIVE PLANE (Local Host)"]
         direction TB
         ComfyUI[⚙️ ComfyUI Engine]:::factory
-        Validator[👁️ Validation Server]:::factory
-        GPU((🚀 RTX 5060 Ti)):::factory
+        Validator[�️ Validation Server]:::factory
+        GPU((� RTX 5060 Ti)):::factory
 
         %% Factory Flow
         Studio -->|1. Generate| ComfyUI

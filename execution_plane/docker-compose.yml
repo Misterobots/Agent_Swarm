@@ -148,8 +148,8 @@ services:
     environment:
       # Lovelace local Ollama — 2x 5060 Ti (32GB VRAM) handles all heavy models
       - OLLAMA_HOST=http://ollama:11434
-      # Turing Ollama — 3070 Ti (8GB VRAM) handles BMO voice only (llama3.2:3b = 2GB)
-      - BMO_OLLAMA_HOST=http://192.168.2.103:11434
+      # Local Ollama — BMO voice uses qwen3:14b (9.2GB VRAM, fits alongside other services)
+      - BMO_OLLAMA_HOST=http://ollama:11434
       # Fish Audio cloud TTS for BMO voice (overrides local RVC)
       - FISH_AUDIO_API_KEY=9c84d88f61174cdba215e69e65daff4d
       - FISH_AUDIO_MODEL_ID=323847d4c5394c678e5909c2206725f6
@@ -171,9 +171,8 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       # Home Assistant Integration
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
-      # BMO Voice LLM — small 3B model that fits alongside comfyui
-      # Heavy models may OOM when ComfyUI is loaded
-      - BMO_LLM_MODEL=qwen3:8b
+      # BMO Voice LLM — qwen3:14b fits in VRAM (9.2GB < 15.93GB); latency masked by async ack
+      - BMO_LLM_MODEL=qwen3:14b
       # BMO Weather location (Open-Meteo, no API key needed)
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}
