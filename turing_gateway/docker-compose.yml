@@ -68,10 +68,12 @@ services:
       - prometheus_data:/prometheus
     ports:
       - "9091:9090"
+    mem_limit: 2g
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=90d'  # Keep 3 months of metrics
+      - '--storage.tsdb.retention.time=15d'   # 15 days is plenty for a home lab
+      - '--storage.tsdb.retention.size=3GB'   # Hard cap — evicts oldest blocks first
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
