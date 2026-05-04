@@ -46,11 +46,11 @@ const RUN_TYPES = [
 ];
 
 const TIME_PRESETS = [
-  { label: "15 min", value: 15, estimate: "~25-85 min total" },
-  { label: "30 min", value: 30, estimate: "~40-100 min total" },
-  { label: "1 hour", value: 60, estimate: "~70-130 min total" },
-  { label: "2 hours", value: 120, estimate: "~130-190 min total" },
-  { label: "4 hours", value: 240, estimate: "~250-310 min total" },
+  { label: "15 min", value: 15, estimate: "~30-50 min total" },
+  { label: "30 min", value: 30, estimate: "~45-65 min total" },
+  { label: "1 hour", value: 60, estimate: "~80-110 min total" },
+  { label: "2 hours", value: 120, estimate: "~140-170 min total" },
+  { label: "4 hours", value: 240, estimate: "~260-290 min total" },
   { label: "No limit", value: null, estimate: "Runs until all epochs complete" },
 ];
 
@@ -257,7 +257,7 @@ export function TrainingLauncher() {
                         {t.id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                       </p>
                       <p className="text-xs text-[var(--chat-muted)] mt-0.5">
-                        {t.intent} &middot; {t.default_model}
+                        {t.intent}
                       </p>
                     </div>
                   </button>
@@ -388,9 +388,9 @@ export function TrainingLauncher() {
             </div>
             <p className="text-xs text-[var(--chat-muted)]">
               Time budget controls active training only. Total wall-clock time
-              also includes model loading (~10-70 min depending on cache) and
-              dataset preparation. Estimates shown assume a 7B model on the
-              Execution Node GPU.
+              also includes model loading (~10-30 min cached, up to 60 min cold)
+              and dataset preparation. Estimates assume Qwen3.6-27B QLoRA on
+              Lovelace’s RTX 5060 Ti (32 GB VRAM).
             </p>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
               {TIME_PRESETS.map((preset) => {
@@ -438,9 +438,9 @@ export function TrainingLauncher() {
                 Training stops after {timeBudget} min of active training.
                 Checkpoints saved every 50 steps. Estimated total time:{" "}
                 <span className="text-[var(--chat-muted)]">
-                  {timeBudget + 10}&ndash;{timeBudget + 70} min
+                  {timeBudget + 15}&ndash;{timeBudget + 40} min
                 </span>{" "}
-                (including model load + dataset prep).
+                (including model load + dataset prep on Lovelace).
               </p>
             )}
           </div>

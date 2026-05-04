@@ -1,45 +1,20 @@
 "use client";
 
-import { BookOpen, CheckCircle2, ChevronRight, FlaskConical, RefreshCw, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { FlaskConical, History, RefreshCw, Sparkles } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
-import { fetchModelCatalog, fetchOpsTrainingRuns } from "@/lib/api/training";
+import { fetchModelCatalog } from "@/lib/api/training";
 import { useCallback, useEffect, useState } from "react";
-import type { ModelCatalog, TrainingRun } from "@/types/ops";
+import type { ModelCatalog } from "@/types/ops";
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-function RunStatusBadge({ status }: { status: TrainingRun["status"] }) {
-  const map = {
-    in_progress: "text-yellow-400 border-yellow-900/60 bg-yellow-950/30",
-    complete: "text-emerald-400 border-emerald-900/60 bg-emerald-950/20",
-    converted: "text-[var(--chat-accent)] border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/8",
-  } as const;
-  const label = {
-    in_progress: "In Progress",
-    complete: "Adapter Ready",
-    converted: "GGUF Converted",
-  } as const;
-  return (
-    <span className={`inline-block rounded border px-1.5 py-0.5 text-xs ${map[status]}`}>
-      {label[status]}
-    </span>
-  );
-}
-
-function NodeBadge({ node }: { node: string }) {
-  return node === "execution-plane" ? (
-    <span className="rounded bg-[var(--chat-panel)] px-1.5 py-0.5 text-xs text-[var(--chat-muted)]">Exec</span>
-  ) : (
-    <span className="rounded bg-[var(--chat-panel)] px-1.5 py-0.5 text-xs text-[var(--chat-accent)]">Ctrl</span>
-  );
-}
+// ── helpers ──────────────────────────────────────────────────
 
 function fmtSize(mb: number) {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ page Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── page ─────────────────────────────────────────────────────
 export default function TrainingModelsPage() {
-  const [runs, setRuns] = useState<TrainingRun[]>([]);
   const [catalog, setCatalog] = useState<ModelCatalog>({
     ollama_models: [],
     local_gguf: [],
@@ -49,8 +24,7 @@ export default function TrainingModelsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [r, c] = await Promise.all([fetchOpsTrainingRuns(), fetchModelCatalog()]);
-    setRuns(r);
+    const c = await fetchModelCatalog();
     setCatalog(c);
     setLoading(false);
   }, []);
@@ -64,12 +38,12 @@ export default function TrainingModelsPage() {
 
   return (
     <WorkspaceShell
-      title="Model Training"
-      description="Training runs, adapter management, GGUF conversion, and deployed model catalog."
+      title="Model Catalog"
+      description="Deployed Ollama models, local GGUF files, and training pipeline reference."
       icon={FlaskConical}
     >
       {/* Refresh */}
-      <div className="mb-6 flex items-center justify-end">
+      <div className="mb-2 flex items-center justify-end">
         <button
           onClick={load}
           disabled={loading}
@@ -80,82 +54,25 @@ export default function TrainingModelsPage() {
         </button>
       </div>
 
-      {/* Training Runs */}
-      <WorkspaceSection
-        title="Training Runs"
-        description="QLoRA/GRPO runs from agents/training/grpo_trainer.py stored in the training output directory."
-      >
-        <div className="overflow-x-auto rounded-lg border border-[var(--chat-border)]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)]">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Run ID</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">
-                  Base Model
-                </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] hidden sm:table-cell">
-                  Started
-                </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)]">Status</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--chat-muted)] hidden md:table-cell">
-                  GGUF Files
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && runs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-[var(--chat-muted)]">
-                    Loading training runsÃ¢â‚¬Â¦
-                  </td>
-                </tr>
-              ) : runs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-[var(--chat-muted)]">
-                    No training runs found in{" "}
-                    <code className="text-xs">TRAINING_OUTPUT_DIR</code>. Run{" "}
-                    <code className="text-xs">
-                      python -m training.grpo_trainer --dataset Ã¢â‚¬Â¦
-                    </code>{" "}
-                    to start one.
-                  </td>
-                </tr>
-              ) : (
-                runs.map((run) => (
-                  <tr key={run.id} className="border-b border-[var(--chat-border)] hover:bg-[var(--chat-surface)]">
-                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--chat-text)]">{run.id}</td>
-                    <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)]">{run.base_model}</td>
-                    <td className="px-4 py-2.5 text-xs text-[var(--chat-muted)] hidden sm:table-cell">
-                      {run.started_at ?? "Ã¢â‚¬â€"}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <RunStatusBadge status={run.status} />
-                    </td>
-                    <td className="px-4 py-2.5 hidden md:table-cell">
-                      {run.gguf_files.length > 0 ? (
-                        <ul className="space-y-0.5">
-                          {run.gguf_files.map((f) => (
-                            <li key={f} className="font-mono text-xs text-[var(--chat-accent)]">
-                              {f}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span className="text-xs text-[var(--chat-muted)]">Ã¢â‚¬â€</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* Run History quick-link */}
+      <WorkspaceSection title="Training Runs">
+        <Link
+          href="/training/runs"
+          className="flex items-center gap-3 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-4 py-3 hover:border-[var(--chat-accent)] hover:bg-[var(--chat-surface)] transition-colors group"
+        >
+          <History size={16} className="text-[var(--chat-muted)] group-hover:text-[var(--chat-accent)] transition-colors shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-[var(--chat-text)]">View Run History</p>
+            <p className="text-xs text-[var(--chat-muted)]">All training runs with live metrics, convert-to-Ollama, and A/B deploy actions</p>
+          </div>
+          <span className="text-xs text-[var(--chat-muted)] group-hover:text-[var(--chat-accent)] transition-colors">&rarr;</span>
+        </Link>
       </WorkspaceSection>
 
       {/* Training pipeline quick-ref */}
       <WorkspaceSection
         title="Training Pipeline"
-        description="CLI commands to advance a run through the full GRPO Ã¢â€ â€™ GGUF Ã¢â€ â€™ Ollama pipeline."
+        description="CLI commands to advance a run through the full GRPO → GGUF → Ollama pipeline."
       >
         <div className="grid gap-3 sm:grid-cols-3">
           {[
@@ -187,7 +104,7 @@ export default function TrainingModelsPage() {
       {catalog.local_gguf.length > 0 && (
         <WorkspaceSection
           title="Local GGUF Files"
-          description="Converted models in the training output directory Ã¢â‚¬â€ ready for Ollama import."
+          description="Converted models in the training output directory — ready for Ollama import."
         >
           <div className="overflow-x-auto rounded-lg border border-[var(--chat-border)]">
             <table className="w-full text-sm">
@@ -220,18 +137,18 @@ export default function TrainingModelsPage() {
         </WorkspaceSection>
       )}
 
-      {/* Model Catalog Ã¢â‚¬â€ Ollama */}
+      {/* Model Catalog — Ollama */}
       <WorkspaceSection
-        title="Model Catalog Ã¢â‚¬â€ Deployed (Ollama)"
-        description="Live models available across both inference nodes. Future: promote a GGUF here via ollama create."
+        title="Model Catalog — Deployed (Ollama)"
+        description="Live models available across both inference nodes."
       >
         {catalog.errors.length > 0 && (
           <div className="mb-3 rounded-lg border border-yellow-900/60 bg-yellow-950/30 px-4 py-2 text-xs text-yellow-400">
-            {catalog.errors.join(" Ã‚Â· ")}
+            {catalog.errors.join(" · ")}
           </div>
         )}
         {loading && catalog.ollama_models.length === 0 ? (
-          <p className="py-6 text-center text-sm text-[var(--chat-muted)]">Querying Ollama nodesÃ¢â‚¬Â¦</p>
+          <p className="py-6 text-center text-sm text-[var(--chat-muted)]">Querying Ollama nodes…</p>
         ) : catalog.ollama_models.length === 0 ? (
           <p className="py-6 text-center text-sm text-[var(--chat-muted)]">
             No Ollama models found (nodes may be offline or OLLAMA_HOST unconfigured).
@@ -284,7 +201,7 @@ export default function TrainingModelsPage() {
                             <td className="px-4 py-2 text-xs text-[var(--chat-muted)] hidden sm:table-cell">
                               {m.modified_at
                                 ? new Date(m.modified_at).toLocaleDateString()
-                                : "Ã¢â‚¬â€"}
+                                : "—"}
                             </td>
                           </tr>
                         ))}
