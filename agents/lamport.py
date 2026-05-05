@@ -1001,8 +1001,8 @@ def coordinate_task(
         yield {"type": "swarm_phase", "phase_num": 4, "phase_name": "Implement", "total_phases": 5}
 
         # Execution mode: use Leibniz with real tools for codebase tasks unless
-        # plan_mode is explicitly requested.
-        execute_code = (not plan_mode) and (scope == "codebase")
+        # plan_mode or ultraplan_mode is explicitly requested.
+        execute_code = (not plan_mode) and (not ultraplan_mode) and (scope == "codebase")
 
         yield {
             "type": "status",
