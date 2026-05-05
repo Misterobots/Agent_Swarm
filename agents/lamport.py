@@ -449,8 +449,10 @@ def _run_worker(
             worker.state = WorkerState.CANCELLED
             return ""
 
-        with request_lock(context="text"):
-            response: RunResponse = agent.run(prompt)
+        # Note: no GPU lock here — workers run in parallel across multiple Ollama hosts
+        # (distributed by get_swarm_worker_host round-robin). The GPU lock would serialize
+        # all workers onto a single slot and cause timeouts with 4+ concurrent workers.
+        response: RunResponse = agent.run(prompt)
 
         result = response.content if response and response.content else "No output"
         worker.result = result
