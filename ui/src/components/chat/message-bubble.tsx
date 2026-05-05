@@ -95,13 +95,13 @@ function SwarmResponseRenderer({
   isStreaming?: boolean;
 }) {
   const parsed = useMemo(() => (!isStreaming ? parseSwarmContent(content) : null), [content, isStreaming]);
+  // Must be declared before any early returns — Rules of Hooks require unconditional hook calls
+  const [processExpanded, setProcessExpanded] = useState(false);
 
   if (!parsed) {
     // Streaming or not yet fully parsed — render flat
     return <MarkdownRenderer content={content} isStreaming={isStreaming} />;
   }
-
-  const [processExpanded, setProcessExpanded] = useState(false);
 
   return (
     <div>
