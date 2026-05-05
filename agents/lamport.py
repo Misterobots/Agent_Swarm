@@ -58,6 +58,47 @@ def _team_clear(team_id: str):
     except Exception as e:
         logger.debug(f"[Coordinator] Team memory clear failed (non-fatal): {e}")
 
+
+# --- MemPalace user palace: per-user project registry ---
+def _palace_project_lookup(owner_id: str, query: str, limit: int = 3) -> list[dict]:
+    """Search the user's 'projects' room in their palace wing for matching projects."""
+    if not owner_id:
+        return []
+    try:
+        from mempalace_client import mempalace
+        results = mempalace.search(query, agent_id=owner_id, domain="projects", limit=limit)
+        return results or []
+    except Exception as e:
+        logger.debug(f"[Coordinator] Palace project lookup failed (non-fatal): {e}")
+        return []
+
+
+def _palace_project_save(owner_id: str, slug: str, url: str, description: str, path: str = None) -> None:
+    """Record a completed project in the user's palace wing under room 'projects'."""
+    if not owner_id:
+        return
+    try:
+        from datetime import datetime as _dt
+        from mempalace_client import mempalace
+        content = (
+            f"PROJECT: {slug}\n"
+            f"URL: {url}\n"
+            f"PATH: {path or f'user_projects/{slug}/index.html'}\n"
+            f"DESCRIPTION: {description}\n"
+            f"STATUS: active\n"
+            f"BUILT: {_dt.now().strftime('%Y-%m-%d')}\n"
+        )
+        mempalace.store(
+            content,
+            memory_type="episodic",
+            domain="projects",
+            agent_id=owner_id,
+        )
+        logger.info(f"[Coordinator] Saved project '{slug}' to palace wing for '{owner_id}'")
+    except Exception as e:
+        logger.debug(f"[Coordinator] Palace project save failed (non-fatal): {e}")
+
+
 # --- Scratchpad Root ---
 SCRATCHPAD_ROOT = Path(__file__).parent / "scratchpad"
 
@@ -1068,6 +1109,33 @@ def coordinate_task(
         # plan_mode or ultraplan_mode is explicitly requested.
         execute_code = (not plan_mode) and (not ultraplan_mode) and (scope == "codebase")
 
+        # --- Palace Project Lookup: check if user already has a matching project ---
+        _existing_project_context = ""
+        if execute_code and owner_id:
+            _palace_hits = _palace_project_lookup(owner_id, user_input, limit=3)
+            if _palace_hits:
+                _best = _palace_hits[0]
+                _hit_content = _best.get("content", "") or _best.get("document", "")
+                if _hit_content and "PROJECT:" in _hit_content:
+                    _existing_project_context = (
+                        f"\n\n[MEMORY PALACE — EXISTING PROJECT FOUND FOR THIS USER]:\n"
+                        f"{_hit_content}\n"
+                        f"CRITICAL: Read the existing file first using read_file(), then update "
+                        f"it in place using write_file(). Do NOT call build_web_app() — that "
+                        f"creates a new project at a new path and discards the user's work.\n"
+                    )
+                    yield {
+                        "type": "log",
+                        "content": (
+                            f"[Coordinator] Palace: existing project found for '{owner_id}' — "
+                            f"injecting context into coder prompt"
+                        ),
+                    }
+                    yield {
+                        "type": "thought",
+                        "content": "→ Memory Palace: Existing project detected — coder will read-then-update",
+                    }
+
         yield {
             "type": "status",
             "content": (
@@ -1149,6 +1217,7 @@ def coordinate_task(
                     f"exact project. Never leave 'Starting Point', 'Central Hub', 'GAME TEMPLATE', "
                     f"'replace this section', or any other template placeholder in the final HTML.\n\n"
                     f"[Implementation Plan from Synthesis]:\n{synthesis}\n\n"
+                    f"{_existing_project_context}"
                 )
             else:
                 # Plan-only: document the approach but do not execute
@@ -1253,6 +1322,21 @@ def coordinate_task(
                         f"The project is now running — check the Preview pane.\n\n"
                     ),
                 }
+
+                # Save project to the user's palace wing so future swarm runs can iterate
+                if owner_id:
+                    import re as _re
+                    _slug_match = _re.search(r"/projects/([^/?\s]+)", _preview_url)
+                    if _slug_match:
+                        _project_slug = _slug_match.group(1).rstrip("/")
+                        _project_desc = user_input[:400]
+                        _palace_project_save(
+                            owner_id=owner_id,
+                            slug=_project_slug,
+                            url=_preview_url,
+                            description=_project_desc,
+                            path=f"user_projects/{_project_slug}/index.html",
+                        )
 
         # === PHASE 5: VERIFICATION ===
         yield {"type": "swarm_phase", "phase_num": 5, "phase_name": "Verify", "total_phases": 5}
