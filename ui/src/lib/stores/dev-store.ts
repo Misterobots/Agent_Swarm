@@ -85,7 +85,7 @@ export const useDevStore = create<DevState>()(
       activeTerminalId: "",
       selectedNode: "workspace",
       gitBranch: {},
-      previewUrl: "http://localhost:3000",
+      previewUrl: "",
       showFileTree: true,
       showOutputPreview: true,
       showEditorPanel: false,
