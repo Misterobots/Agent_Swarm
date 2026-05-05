@@ -183,8 +183,8 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
-    devices:
-      - /dev/kmsg
+    # /dev/kmsg removed: Ubuntu 22.04+ AppArmor blocks it even when passed through;
+    # causes startup warning "operation not permitted" — OOM events disabled regardless
     networks:
       - ai_lab_net
     labels:
