@@ -104,30 +104,204 @@ export default function PioneersPage() {
         </div>
       </div>
 
-      {/* Main Content - Team Builder */}
+      {/* Main Content - Pioneer Roster */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-7xl mx-auto">
-          {/* Info Cards */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="p-4 bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-lg hover:border-[var(--chat-accent)] transition-colors">
-              <div className="text-2xl font-bold text-[var(--chat-accent)] mb-1">∞</div>
-              <div className="text-xs text-[var(--chat-muted)]">Model Variants</div>
-              <div className="text-sm text-[var(--chat-text)] mt-2">Deploy specialized models for each role</div>
+          {/* Pioneer Roster Grid */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-8 bg-[var(--chat-accent)]" />
+              <h2 className="text-2xl font-bold text-[var(--chat-text)]">Active Pioneers</h2>
+              <span className="text-sm text-[var(--chat-muted)]">• 7 agents deployed</span>
             </div>
-            <div className="p-4 bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-lg hover:border-cyan-500 transition-colors">
-              <div className="text-2xl font-bold text-cyan-400 mb-1">↕</div>
-              <div className="text-xs text-[var(--chat-muted)]">Dynamic Scaling</div>
-              <div className="text-sm text-[var(--chat-text)] mt-2">Swarm adapts to task complexity</div>
-            </div>
-            <div className="p-4 bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-lg hover:border-purple-500 transition-colors">
-              <div className="text-2xl font-bold text-purple-400 mb-1">⚡</div>
-              <div className="text-xs text-[var(--chat-muted)]">Live Collaboration</div>
-              <div className="text-sm text-[var(--chat-text)] mt-2">Real-time inter-agent communication</div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Ada - Coordinator */}
+              <div className="group relative bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-5 transition-all hover:border-[var(--chat-accent)] hover:shadow-lg">
+                <div className="absolute top-3 right-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+                    A
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-[var(--chat-text)] mb-1">Ada</h3>
+                    <div className="inline-block px-2 py-0.5 bg-purple-500 bg-opacity-20 border border-purple-500 border-opacity-30 rounded text-xs text-purple-400 mb-2">
+                      COORDINATOR
+                    </div>
+                    <p className="text-xs text-[var(--chat-muted)] leading-relaxed mb-3">
+                      Mission planner and orchestrator. Decomposes complex tasks, assigns work to specialists, and ensures coordination across the swarm.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--chat-muted)]">Neural Core:</span>
+                      <span className="text-[var(--chat-text)] font-mono">qwen3:14b</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Turing - Architect */}
+              <div className="group relative bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-5 transition-all hover:border-[var(--chat-accent)] hover:shadow-lg">
+                <div className="absolute top-3 right-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">
+                    T
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-[var(--chat-text)] mb-1">Turing</h3>
+                    <div className="inline-block px-2 py-0.5 bg-blue-500 bg-opacity-20 border border-blue-500 border-opacity-30 rounded text-xs text-blue-400 mb-2">
+                      ARCHITECT
+                    </div>
+                    <p className="text-xs text-[var(--chat-muted)] leading-relaxed mb-3">
+                      System designer and technical lead. Plans architectures, designs data flows, and defines technical specifications for the team.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--chat-muted)]">Neural Core:</span>
+                      <span className="text-[var(--chat-text)] font-mono">qwen2.5-coder:14b</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grace - Coder */}
+              <div className="group relative bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-5 transition-all hover:border-[var(--chat-accent)] hover:shadow-lg">
+                <div className="absolute top-3 right-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white font-bold text-lg">
+                    G
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-[var(--chat-text)] mb-1">Grace</h3>
+                    <div className="inline-block px-2 py-0.5 bg-green-500 bg-opacity-20 border border-green-500 border-opacity-30 rounded text-xs text-green-400 mb-2">
+                      CODER
+                    </div>
+                    <p className="text-xs text-[var(--chat-muted)] leading-relaxed mb-3">
+                      Primary implementation specialist. Writes production code, implements features, handles file operations, and debugs complex issues.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--chat-muted)]">Neural Core:</span>
+                      <span className="text-[var(--chat-text)] font-mono">qwen2.5-coder:14b</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dennis - DevOps */}
+              <div className="group relative bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-5 transition-all hover:border-[var(--chat-accent)] hover:shadow-lg">
+                <div className="absolute top-3 right-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-lg">
+                    D
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-[var(--chat-text)] mb-1">Dennis</h3>
+                    <div className="inline-block px-2 py-0.5 bg-orange-500 bg-opacity-20 border border-orange-500 border-opacity-30 rounded text-xs text-orange-400 mb-2">
+                      DEVOPS
+                    </div>
+                    <p className="text-xs text-[var(--chat-muted)] leading-relaxed mb-3">
+                      Infrastructure guardian. Manages containers, orchestrates deployments, writes bash scripts, and maintains system reliability.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--chat-muted)]">Neural Core:</span>
+                      <span className="text-[var(--chat-text)] font-mono">qwen3:8b</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Margaret - Researcher */}
+              <div className="group relative bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-5 transition-all hover:border-[var(--chat-accent)] hover:shadow-lg">
+                <div className="absolute top-3 right-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-amber-500 flex items-center justify-center text-white font-bold text-lg">
+                    M
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-[var(--chat-text)] mb-1">Margaret</h3>
+                    <div className="inline-block px-2 py-0.5 bg-yellow-500 bg-opacity-20 border border-yellow-500 border-opacity-30 rounded text-xs text-yellow-400 mb-2">
+                      RESEARCHER
+                    </div>
+                    <p className="text-xs text-[var(--chat-muted)] leading-relaxed mb-3">
+                      Knowledge seeker and context gatherer. Explores codebases, investigates patterns, searches documentation, and builds understanding.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--chat-muted)]">Neural Core:</span>
+                      <span className="text-[var(--chat-text)] font-mono">llama3.2:3b</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Claude - Analyst */}
+              <div className="group relative bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-5 transition-all hover:border-[var(--chat-accent)] hover:shadow-lg">
+                <div className="absolute top-3 right-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                    C
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-[var(--chat-text)] mb-1">Claude</h3>
+                    <div className="inline-block px-2 py-0.5 bg-indigo-500 bg-opacity-20 border border-indigo-500 border-opacity-30 rounded text-xs text-indigo-400 mb-2">
+                      ANALYST
+                    </div>
+                    <p className="text-xs text-[var(--chat-muted)] leading-relaxed mb-3">
+                      Data interpreter and insights provider. Analyzes patterns, extracts meaning from data, and provides strategic recommendations.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--chat-muted)]">Neural Core:</span>
+                      <span className="text-[var(--chat-text)] font-mono">qwen3:8b</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dijkstra - Verifier */}
+              <div className="group relative bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-5 transition-all hover:border-[var(--chat-accent)] hover:shadow-lg">
+                <div className="absolute top-3 right-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+                    D
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-[var(--chat-text)] mb-1">Dijkstra</h3>
+                    <div className="inline-block px-2 py-0.5 bg-red-500 bg-opacity-20 border border-red-500 border-opacity-30 rounded text-xs text-red-400 mb-2">
+                      VERIFIER
+                    </div>
+                    <p className="text-xs text-[var(--chat-muted)] leading-relaxed mb-3">
+                      Quality guardian and code reviewer. Validates implementations, checks for errors, ensures standards, and maintains excellence.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--chat-muted)]">Neural Core:</span>
+                      <span className="text-[var(--chat-text)] font-mono">qwen3:8b</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Team Builder Component */}
+          {/* Team Configuration Section */}
           <div className="bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-1 h-6 bg-cyan-500" />
+              <h2 className="text-xl font-bold text-[var(--chat-text)]">Team Configuration</h2>
+            </div>
+            <p className="text-sm text-[var(--chat-muted)] mb-6">
+              Customize which AI models power each Pioneer. Choose from local Ollama models or cloud providers.
+            </p>
             <TeamBuilderSettings />
           </div>
         </div>
