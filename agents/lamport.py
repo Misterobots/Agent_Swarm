@@ -353,11 +353,16 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                 try:
                     decoder = json.JSONDecoder()
                     candidate = clean_text[last_brace:].strip()
-                    parsed, _ = decoder.raw_decode(candidate)
+                    parsed, end_pos = decoder.raw_decode(candidate)
                     if "confidence" in parsed:
                         scores = parsed
-                        # Remove the JSON block from the plan text
-                        plan_text = raw_text[:raw_text.rfind("{")].rstrip()
+                        # Remove the JSON block from plan_text regardless of position
+                        # (model sometimes puts the JSON block at the start, not the end)
+                        json_start = raw_text.rfind("{")
+                        json_end = json_start + end_pos
+                        text_before = raw_text[:json_start].rstrip()
+                        text_after = raw_text[json_end:].strip()
+                        plan_text = text_before if text_before else text_after
                 except (json.JSONDecodeError, ValueError):
                     pass
             # Strategy 2 (fallback): scan reversed lines for single-line JSON
@@ -368,7 +373,9 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                     if stripped.startswith("{") and "confidence" in stripped:
                         try:
                             scores = json.loads(stripped)
-                            plan_text = raw_text[: raw_text.rfind(stripped)].rstrip()
+                            text_before = raw_text[: raw_text.rfind(stripped)].rstrip()
+                            text_after = raw_text[raw_text.rfind(stripped) + len(stripped):].strip()
+                            plan_text = text_before if text_before else text_after
                         except (json.JSONDecodeError, ValueError):
                             pass
                         break
