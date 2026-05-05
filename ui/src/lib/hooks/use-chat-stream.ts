@@ -314,7 +314,12 @@ export function useChatStream(options?: {
             // Agent pushes a URL into the dev workspace preview pane
             if ((event as any).url) {
               useDevStore.getState().setPreviewUrl((event as any).url);
+              // setPreviewUrl already sets showChatPreview=true via the store action
             }
+          } else if (event.type === "preview_unavailable") {
+            // Build completed but produces no web interface — show placeholder
+            useDevStore.getState().setPreviewUnavailable(true);
+            useDevStore.getState().setShowChatPreview(true);
           } else if (event.type === "model_queue_status") {
             if (event.queueStatus) {
               setMessageQueueStatus(convId!, assistantId, event.queueStatus as QueueStatus);

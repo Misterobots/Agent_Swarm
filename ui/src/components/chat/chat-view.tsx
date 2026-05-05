@@ -17,6 +17,7 @@ import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
 import { Bot } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
+import { ChatPreviewPane } from "./chat-preview-pane";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import { useBuddyStore } from "@/lib/stores/buddy-store";
@@ -39,6 +40,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const setEditorContent = useDevStore((s) => s.setEditorContent);
   const setActiveFile = useDevStore((s) => s.setActiveFile);
   const clearSelectedText = useDevStore((s) => s.setSelectedText);
+  const showChatPreview = useDevStore((s) => s.showChatPreview);
 
   // Editor sync: called when AI writes a file
   const handleToolResult = useCallback(
@@ -314,6 +316,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         </button>
       )}
       </div>{/* end chat column */}
+      {/* Preview pane — slides in as a sibling column when a build deploys a web app */}
+      {showChatPreview && <ChatPreviewPane />}
       {/* Swarm theater drawer — sibling column, squeezes chat */}
       <SwarmDrawer />
     </div>

@@ -1163,7 +1163,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                             yield f"data: {json.dumps(tool_chunk)}\n\n"
                             continue
 
-                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card", "set_preview_url"]:
+                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card", "set_preview_url", "preview_unavailable"]:
                             continue
 
                         content = raw_content
@@ -1180,7 +1180,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "turn_boundary", "turn_metadata",
                                         "continuation", "stream_mode",
                                         "clarification_request", "clarification_card",
-                                        "media_attachment", "set_preview_url"):
+                                        "media_attachment", "set_preview_url",
+                                        "preview_unavailable"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",

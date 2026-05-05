@@ -32,6 +32,10 @@ interface DevState {
   previewUrl: string;
   showFileTree: boolean;
   showOutputPreview: boolean;
+
+  // Chat preview pane (slides in on /chat when a build completes)
+  showChatPreview: boolean;
+  previewUnavailable: boolean;
   
   // Flyout panels (Gemini-style)
   showEditorPanel: boolean;
@@ -62,6 +66,8 @@ interface DevState {
   setPreviewUrl: (url: string) => void;
   setShowFileTree: (show: boolean) => void;
   setShowOutputPreview: (show: boolean) => void;
+  setShowChatPreview: (show: boolean) => void;
+  setPreviewUnavailable: (unavailable: boolean) => void;
   
   // Flyout panel actions
   setShowEditorPanel: (show: boolean) => void;
@@ -88,6 +94,8 @@ export const useDevStore = create<DevState>()(
       previewUrl: "",
       showFileTree: true,
       showOutputPreview: true,
+      showChatPreview: false,
+      previewUnavailable: false,
       showEditorPanel: false,
       showTerminalPanel: false,
       viewMode: "code",
@@ -115,9 +123,11 @@ export const useDevStore = create<DevState>()(
       setGitBranch: (node, branch) =>
         set((s) => ({ gitBranch: { ...s.gitBranch, [node]: branch } })),
       
-      setPreviewUrl: (url) => set({ previewUrl: url }),
+      setPreviewUrl: (url) => set({ previewUrl: url, ...(url ? { showChatPreview: true, previewUnavailable: false } : {}) }),
       setShowFileTree: (show) => set({ showFileTree: show }),
       setShowOutputPreview: (show) => set({ showOutputPreview: show }),
+      setShowChatPreview: (show) => set({ showChatPreview: show }),
+      setPreviewUnavailable: (unavailable) => set({ previewUnavailable: unavailable }),
       
       setShowEditorPanel: (show) => set({ showEditorPanel: show }),
       setShowTerminalPanel: (show) => set({ showTerminalPanel: show }),
