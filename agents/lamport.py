@@ -584,6 +584,8 @@ def coordinate_task(
     extracted_context: str = "",
     ace_token: str = None,
     template_metadata: dict = None,
+    ultraplan_mode: bool = False,
+    dev_mode: bool = False,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
