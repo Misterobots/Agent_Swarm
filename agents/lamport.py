@@ -203,7 +203,7 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
     Returns dict with research_tasks, implementation_tasks, verification_criteria.
     """
     decompose_model = os.getenv("COORDINATOR_MODEL", "qwen3.6:27b")
-    host = get_best_host_for_model(decompose_model)
+    host = get_swarm_worker_host(decompose_model)
 
     system_prompt = (
         "You are a task decomposition engine. Given a complex task, break it into phases.\n"
@@ -291,7 +291,7 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
     ambiguity   — 0.0–1.0, how much unclear information remains (lower is better)
     """
     synth_model = os.getenv("COORDINATOR_MODEL", "qwen3.6:27b")
-    host = get_best_host_for_model(synth_model)
+    host = get_swarm_worker_host(synth_model)
 
     system_prompt = (
         "You are a technical lead synthesizing research findings into an implementation plan.\n"
