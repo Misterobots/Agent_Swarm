@@ -329,27 +329,49 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
 
         if resp.status_code == 200:
             raw_text = resp.json().get("response", "")
-            # Parse the trailing confidence/ambiguity JSON block
+            # Strip markdown code fences that models sometimes wrap JSON in
+            import re as _re
+            clean_text = _re.sub(r"```(?:json)?", "", raw_text, flags=_re.IGNORECASE).replace("```", "")
+            # Parse the trailing confidence/ambiguity JSON block — handles multiline and single-line
             confidence = 0.80
             ambiguity = 0.15
             ambiguous_points = []
             plan_text = raw_text
-            lines = raw_text.strip().splitlines()
-            for line in reversed(lines):
-                stripped = line.strip()
-                if stripped.startswith("{") and "confidence" in stripped:
-                    try:
-                        scores = json.loads(stripped)
-                        confidence = float(scores.get("confidence", 0.80))
-                        ambiguity = float(scores.get("ambiguity", 0.15))
-                        ambiguous_points = scores.get("ambiguous_points", [])
-                        if not isinstance(ambiguous_points, list):
-                            ambiguous_points = []
-                        # Remove the scores line from the plan text
-                        plan_text = raw_text[: raw_text.rfind(stripped)].rstrip()
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-                    break
+            scores = None
+            # Strategy 1: find last '{' and parse forward (handles multiline JSON)
+            last_brace = clean_text.rfind("{")
+            if last_brace != -1:
+                try:
+                    decoder = json.JSONDecoder()
+                    candidate = clean_text[last_brace:].strip()
+                    parsed, _ = decoder.raw_decode(candidate)
+                    if "confidence" in parsed:
+                        scores = parsed
+                        # Remove the JSON block from the plan text
+                        plan_text = raw_text[:raw_text.rfind("{")].rstrip()
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            # Strategy 2 (fallback): scan reversed lines for single-line JSON
+            if scores is None:
+                lines = raw_text.strip().splitlines()
+                for line in reversed(lines):
+                    stripped = line.strip()
+                    if stripped.startswith("{") and "confidence" in stripped:
+                        try:
+                            scores = json.loads(stripped)
+                            plan_text = raw_text[: raw_text.rfind(stripped)].rstrip()
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                        break
+            if scores:
+                confidence = float(scores.get("confidence", 0.80))
+                ambiguity = float(scores.get("ambiguity", 0.15))
+                ambiguous_points = scores.get("ambiguous_points", [])
+                if not isinstance(ambiguous_points, list):
+                    ambiguous_points = []
+                logger.info(f"[Coordinator] Synthesis JSON parsed: confidence={confidence:.0%} ambiguity={ambiguity:.0%} points={ambiguous_points}")
+            else:
+                logger.warning(f"[Coordinator] Could not parse synthesis JSON block from response tail: {raw_text[-200:]!r}")
             if not plan_text:
                 plan_text = "Synthesis failed — no response from model."
             return {"plan": plan_text, "confidence": confidence, "ambiguity": ambiguity, "ambiguous_points": ambiguous_points}
