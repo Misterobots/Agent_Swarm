@@ -302,9 +302,10 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
         "- Note any conflicts or gaps in the research\n"
         "- Be specific about file paths, function names, and technical details\n\n"
         "IMPORTANT: At the very end of your response, on its own line, output a JSON block:\n"
-        '{"confidence": 0.92, "ambiguity": 0.03}\n'
+        '{"confidence": 0.92, "ambiguity": 0.03, "ambiguous_points": ["brief point 1", "brief point 2"]}\n'
         "confidence: 0.0–1.0 — how confident you are this plan is complete and correct\n"
-        "ambiguity:  0.0–1.0 — how much unclear information remains (0 = none, 1 = all unclear)"
+        "ambiguity:  0.0–1.0 — how much unclear information remains (0 = none, 1 = all unclear)\n"
+        "ambiguous_points: list of short strings describing EXACTLY what is unclear or under-specified (empty list if nothing is ambiguous)"
     )
 
     prompt = (
@@ -331,6 +332,7 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
             # Parse the trailing confidence/ambiguity JSON block
             confidence = 0.80
             ambiguity = 0.15
+            ambiguous_points = []
             plan_text = raw_text
             lines = raw_text.strip().splitlines()
             for line in reversed(lines):
@@ -340,6 +342,9 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                         scores = json.loads(stripped)
                         confidence = float(scores.get("confidence", 0.80))
                         ambiguity = float(scores.get("ambiguity", 0.15))
+                        ambiguous_points = scores.get("ambiguous_points", [])
+                        if not isinstance(ambiguous_points, list):
+                            ambiguous_points = []
                         # Remove the scores line from the plan text
                         plan_text = raw_text[: raw_text.rfind(stripped)].rstrip()
                     except (json.JSONDecodeError, ValueError):
@@ -347,7 +352,7 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                     break
             if not plan_text:
                 plan_text = "Synthesis failed — no response from model."
-            return {"plan": plan_text, "confidence": confidence, "ambiguity": ambiguity}
+            return {"plan": plan_text, "confidence": confidence, "ambiguity": ambiguity, "ambiguous_points": ambiguous_points}
     except Exception as e:
         logger.error(f"[Coordinator] Synthesis failed: {e}")
 
@@ -355,6 +360,7 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
         "plan": f"Synthesis failed. Raw findings:\n{findings}",
         "confidence": 0.50,
         "ambiguity": 0.50,
+        "ambiguous_points": [],
     }
 
 
@@ -931,6 +937,7 @@ def coordinate_task(
         synthesis = ""
         synth_confidence = 0.80
         synth_ambiguity = 0.20
+        synth_ambiguous_points = []
 
         for synth_pass in range(1, max_synth_passes + 1):
             with request_lock(context="text"):
@@ -938,6 +945,7 @@ def coordinate_task(
             synthesis = synth_result["plan"]
             synth_confidence = synth_result["confidence"]
             synth_ambiguity = synth_result["ambiguity"]
+            synth_ambiguous_points = synth_result.get("ambiguous_points", [])
 
             # Threshold: 90% first pass, 95% on subsequent passes
             required_confidence = 0.90 if synth_pass == 1 else 0.95
@@ -972,15 +980,31 @@ def coordinate_task(
                     )
                 except Exception as _e:
                     logger.warning(f"[Coordinator] Could not save clarification context: {_e}")
+
+                # Build a specific question from the ambiguous points the LLM identified
+                if synth_ambiguous_points:
+                    _points_text = "\n".join(f"• {p}" for p in synth_ambiguous_points[:4])
+                    _clarif_question = (
+                        f"The swarm completed research but hit {synth_ambiguity:.0%} ambiguity "
+                        f"(confidence {synth_confidence:.0%}, need ≥95%). These points need clarification:\n\n"
+                        f"{_points_text}\n\nPlease clarify any of the above to proceed."
+                    )
+                    _clarif_context = f"Ambiguity remaining: {synth_ambiguity:.0%}"
+                    _clarif_options = [p[:60] for p in synth_ambiguous_points[:4]]
+                else:
+                    _clarif_question = (
+                        f"Research complete but confidence is {synth_confidence:.0%} (need ≥95%). "
+                        "Please provide additional detail or constraints to help proceed."
+                    )
+                    _clarif_context = f"Ambiguity remaining: {synth_ambiguity:.0%}"
+                    _clarif_options = []
+
                 yield {
                     "type": "clarification_card",
                     "clarification": {
-                        "question": (
-                            f"I've studied the problem but my solution confidence is "
-                            f"{synth_confidence:.0%} (need ≥95%). What detail would help me proceed?"
-                        ),
-                        "context": f"Ambiguity remaining: {synth_ambiguity:.0%}",
-                        "options": [],
+                        "question": _clarif_question,
+                        "context": _clarif_context,
+                        "options": _clarif_options,
                         "allow_freetext": True,
                         "card_type": "ambiguity",
                     },
