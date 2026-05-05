@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHANTOM RUNNER // Shadowrun 2057</title>
+<style>
+  :root {
+    --neon-cyan: #00fff7;
+    --neon-magenta: #ff00cc;
+    --neon-yellow: #ffe000;
+    --neon-green: #00ff41;
+    --dark-bg: #050a0f;
+    --panel-bg: #0a1520;
+    --panel-border: #1a3050;
+    --text: #c8dfe8;
+    --muted: #4a6a80;
+    --success: #00ff41;
+    --danger: #ff3040;
+    --font-mono: 'Courier New', Courier, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--dark-bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* Scanlines overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* --- HEADER --- */
+  header {
+    background: linear-gradient(90deg, #000, #0a1520 30%, #0a1520 70%, #000);
+    border-bottom: 2px solid var(--neon-cyan);
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 0 30px rgba(0,255,247,0.2);
+  }
+  .logo {
+    font-size: 1.5rem; font-weight: bold; letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,255,247,0.4);
+  }
+  .logo span { color: var(--neon-magenta); text-shadow: 0 0 20px var(--neon-magenta); }
+  .header-info { font-size: 0.7rem; color: var(--muted); text-align: right; line-height: 1.8; }
+  .header-info b { color: var(--neon-yellow); }
+
+  /* --- LAYOUT --- */
+  .game-container {
+    display: grid;
+    grid-template-columns: 300px 1fr 280px;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+    height: calc(100vh - 65px);
+  }
+
+  /* --- PANELS --- */
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .panel-title {
+    font-size: 0.65rem; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--neon-cyan); margin-bottom: 12px;
+    border-bottom: 1px solid var(--panel-border); padding-bottom: 8px;
+    text-shadow: 0 0 10px var(--neon-cyan);
+  }
+
+  /* --- MAP PANEL --- */
+  .map-panel {
+    grid-row: span 2;
+    border-right: 2px solid var(--panel-border);
+  }
+  .district {
+    padding: 10px 12px; margin-bottom: 6px;
+    border: 1px solid var(--panel-border);
+    cursor: pointer; transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .district:hover { border-color: var(--neon-cyan); background: rgba(0,255,247,0.05); }
+  .district.active {
+    border-color: var(--neon-magenta);
+    background: rgba(255,0,204,0.08);
+    box-shadow: inset 0 0 15px rgba(255,0,204,0.1);
+  }
+  .district.visited { border-color: var(--neon-green); opacity: 0.7; }
+  .district.locked { opacity: 0.4; cursor: not-allowed; }
+  .district-name { font-size: 0.85rem; font-weight: bold; color: var(--neon-yellow); }
+  .district-sub { font-size: 0.65rem; color: var(--muted); margin-top: 3px; }
+  .district-badge {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    font-size: 0.6rem; padding: 2px 6px;
+    background: rgba(255,0,204,0.2); border: 1px solid var(--neon-magenta);
+    color: var(--neon-magenta);
+  }
+
+  /* --- MAIN AREA --- */
+  .main-panel {
+    border-right: 1px solid var(--panel-border);
+    display: flex; flex-direction: column; padding: 0;
+  }
+  .scene-box {
+    flex: 1; padding: 24px; overflow-y: auto;
+    background: linear-gradient(180deg, rgba(0,10,20,0.8) 0%, var(--panel-bg) 100%);
+  }
+  .scene-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+  }
+  .scene-location {
+    font-size: 1.1rem; color: var(--neon-cyan);
+    text-shadow: 0 0 15px var(--neon-cyan);
+  }
+  .scene-icon { font-size: 1.4rem; }
+  .scene-desc {
+    font-size: 0.8rem; line-height: 1.7; color: var(--text);
+    margin-bottom: 20px; padding: 14px;
+    border-left: 3px solid var(--neon-cyan);
+    background: rgba(0,255,247,0.03);
+  }
+  .clue-box {
+    margin-bottom: 16px; padding: 14px;
+    border: 1px solid var(--neon-yellow);
+    background: rgba(255,224,0,0.04);
+  }
+  .clue-label {
+    font-size: 0.6rem; letter-spacing: 3px; color: var(--neon-yellow);
+    margin-bottom: 8px;
+  }
+  .clue-text { font-size: 0.82rem; line-height: 1.7; }
+
+  /* Choice buttons */
+  .choices { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .choice-btn {
+    background: transparent; border: 1px solid var(--panel-border);
+    color: var(--text); font-family: var(--font-mono); font-size: 0.8rem;
+    padding: 10px 14px; cursor: pointer; text-align: left;
+    transition: all 0.15s; position: relative;
+  }
+  .choice-btn:hover {
+    border-color: var(--neon-cyan); color: var(--neon-cyan);
+    background: rgba(0,255,247,0.05);
+    padding-left: 20px;
+  }
+  .choice-btn:hover::before { content: '> '; color: var(--neon-cyan); }
+  .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .choice-btn.danger:hover { border-color: var(--danger); color: var(--danger); background: rgba(255,48,64,0.05); }
+
+  /* --- MATRIX HACK MINI-GAME --- */
+  .hack-panel {
+    padding: 20px;
+    border-top: 2px solid var(--neon-magenta);
+    background: rgba(255,0,204,0.04);
+    display: none;
+  }
+  .hack-panel.active { display: block; }
+  .hack-title {
+    font-size: 0.7rem; letter-spacing: 3px; color: var(--neon-magenta);
+    margin-bottom: 14px; text-shadow: 0 0 10px var(--neon-magenta);
+  }
+  .hack-grid {
+    display: grid; grid-template-columns: repeat(6,1fr); gap: 4px;
+    margin-bottom: 14px;
+  }
+  .hack-cell {
+    padding: 8px 4px; text-align: center;
+    font-size: 0.75rem; font-weight: bold;
+    border: 1px solid var(--panel-border);
+    cursor: pointer; transition: all 0.1s; user-select: none;
+    color: var(--neon-green);
+  }
+  .hack-cell:hover { border-color: var(--neon-green); background: rgba(0,255,65,0.1); }
+  .hack-cell.selected { background: rgba(0,255,65,0.25); border-color: var(--neon-green); color: #fff; }
+  .hack-cell.locked { background: rgba(255,48,64,0.2); border-color: var(--danger); color: var(--danger); cursor: not-allowed; }
+  .hack-cell.match { background: rgba(0,255,65,0.4); border-color: var(--neon-green); animation: pulse 0.4s; }
+  .hack-sequence {
+    display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .hack-seq-cell {
+    padding: 6px 10px; border: 1px solid var(--muted);
+    font-size: 0.75rem; color: var(--muted); min-width: 38px; text-align: center;
+  }
+  .hack-seq-cell.filled { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+  .hack-seq-cell.correct { border-color: var(--neon-green); color: var(--neon-green); background: rgba(0,255,65,0.1); }
+  .hack-status { font-size: 0.75rem; margin-top: 8px; }
+  .hack-timer {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .timer-bar { flex: 1; height: 6px; background: var(--panel-border); position: relative; }
+  .timer-fill { height: 100%; background: var(--neon-cyan); transition: width 0.1s linear; }
+  .timer-fill.danger { background: var(--danger); }
+
+  /* --- RIGHT PANEL — INTEL --- */
+  .intel-panel { overflow-y: auto; }
+  .intel-card {
+    padding: 10px 12px; margin-bottom: 10px;
+    border: 1px solid var(--panel-border);
+    font-size: 0.75rem;
+  }
+  .intel-card-title { color: var(--neon-yellow); font-size: 0.65rem; letter-spacing: 2px; margin-bottom: 6px; }
+  .intel-card p { color: var(--text); line-height: 1.6; }
+  .clue-collected {
+    padding: 7px 10px; margin-bottom: 5px;
+    border-left: 3px solid var(--neon-cyan);
+    background: rgba(0,255,247,0.04);
+    font-size: 0.72rem; color: var(--text);
+  }
+  .clue-collected .clue-num { color: var(--neon-cyan); font-size: 0.6rem; margin-bottom: 3px; }
+
+  /* --- STATUS BAR --- */
+  .status-bar {
+    grid-column: span 3;
+    padding: 8px 20px;
+    background: #000;
+    border-top: 1px solid var(--panel-border);
+    display: flex; gap: 24px; align-items: center;
+    font-size: 0.65rem; color: var(--muted);
+  }
+  .status-item b { color: var(--neon-cyan); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .status-dot.online { background: var(--neon-green); box-shadow: 0 0 6px var(--neon-green); }
+  .status-dot.alert { background: var(--danger); box-shadow: 0 0 6px var(--danger); animation: blink 1s infinite; }
+
+  /* --- PROGRESS BAR --- */
+  .progress-wrapper { margin-bottom: 16px; }
+  .progress-label { font-size: 0.65rem; color: var(--muted); margin-bottom: 4px; letter-spacing: 2px; }
+  .progress-bar { height: 6px; background: var(--panel-border); }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta)); transition: width 0.5s ease; }
+
+  /* --- ALERTS & MODALS --- */
+  .alert-banner {
+    padding: 10px 16px; margin-bottom: 16px;
+    font-size: 0.78rem; border-left: 4px solid;
+  }
+  .alert-banner.success { border-color: var(--neon-green); background: rgba(0,255,65,0.06); color: var(--neon-green); }
+  .alert-banner.danger { border-color: var(--danger); background: rgba(255,48,64,0.06); color: var(--danger); }
+  .alert-banner.info { border-color: var(--neon-cyan); background: rgba(0,255,247,0.04); color: var(--neon-cyan); }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--panel-bg); border: 2px solid var(--neon-cyan);
+    padding: 32px; max-width: 500px; width: 90%;
+    box-shadow: 0 0 60px rgba(0,255,247,0.3);
+  }
+  .modal h2 { color: var(--neon-cyan); font-size: 1.1rem; letter-spacing: 3px; margin-bottom: 16px; }
+  .modal p { font-size: 0.82rem; line-height: 1.8; margin-bottom: 12px; }
+  .modal-btn {
+    background: var(--neon-cyan); color: #000;
+    border: none; padding: 10px 24px;
+    font-family: var(--font-mono); font-size: 0.8rem; font-weight: bold;
+    cursor: pointer; letter-spacing: 2px; margin-top: 8px;
+    transition: all 0.2s;
+  }
+  .modal-btn:hover { background: #fff; box-shadow: 0 0 20px var(--neon-cyan); }
+  .modal-btn.secondary {
+    background: transparent; color: var(--neon-magenta);
+    border: 1px solid var(--neon-magenta); margin-left: 10px;
+  }
+  .modal-btn.secondary:hover { background: rgba(255,0,204,0.1); }
+
+  /* Glitch animation for title */
+  @keyframes glitch {
+    0%,100% { clip-path: none; transform: none; }
+    20% { clip-path: polygon(0 10%, 100% 10%, 100% 30%, 0 30%); transform: translateX(-3px); }
+    40% { clip-path: polygon(0 50%, 100% 50%, 100% 70%, 0 70%); transform: translateX(3px); }
+    60% { clip-path: none; transform: none; }
+  }
+  .glitch { animation: glitch 4s infinite; }
+
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .fadein { animation: fadeIn 0.4s ease; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: var(--dark-bg); }
+  ::-webkit-scrollbar-thumb { background: var(--panel-border); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">PHANTOM<span>RUNNER</span></div>
+  <div class="header-info">
+    SEATTLE GRID // 2057.05.04 // <b>SECURE CHANNEL</b><br>
+    TARGET: THE CIPHER // STATUS: <b style="color:var(--neon-magenta)">EVADING</b>
+  </div>
+</header>
+
+<div class="game-container">
+
+  <!-- LEFT: MAP / DISTRICT SELECTOR -->
+  <div class="panel map-panel">
+    <div class="panel-title">// SEATTLE GRID</div>
+    <div class="progress-wrapper">
+      <div class="progress-label">TRAIL INTEGRITY</div>
+      <div class="progress-bar"><div class="progress-fill" id="trailProgress" style="width:0%"></div></div>
+    </div>
+    <div id="districtList">
+      <!-- Districts injected by JS -->
+    </div>
+  </div>
+
+  <!-- CENTER: MAIN SCENE + HACK PANEL -->
+  <div class="main-panel">
+    <div class="scene-box" id="sceneBox">
+      <!-- Scene content injected by JS -->
+    </div>
+    <div class="hack-panel" id="hackPanel">
+      <div class="hack-title">// MATRIX INTRUSION PROTOCOL</div>
+      <div class="hack-timer">
+        <span style="font-size:0.65rem;color:var(--muted)">ICE TIMER</span>
+        <div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
+        <span id="timerVal" style="font-size:0.65rem;color:var(--neon-cyan)">30s</span>
+      </div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px">
+        MATCH THE SEQUENCE — SELECT CODES IN ORDER:
+      </div>
+      <div class="hack-sequence" id="hackTarget"></div>
+      <div class="hack-sequence" id="hackCurrent"></div>
+      <div class="hack-grid" id="hackGrid"></div>
+      <div class="hack-status" id="hackStatus"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: INTEL DOSSIER -->
+  <div class="panel intel-panel">
+    <div class="panel-title">// INTEL DOSSIER</div>
+    <div class="intel-card">
+      <div class="intel-card-title">TARGET PROFILE</div>
+      <p><b style="color:var(--neon-magenta)">THE CIPHER</b><br>
+      Rogue decker. Stole the Novatech Blacklist from MCT's Seattle data vault. 
+      Armed with a custom deck, one step ahead of every runner team sent after her.
+      Leaves deliberate clues — she wants to be caught... or does she?</p>
+    </div>
+    <div class="intel-card">
+      <div class="intel-card-title">YOUR HANDLE</div>
+      <p>Ghost_0x | Rating: 3 Runner<br>
+      Rep: Neutral | Fixer: Shiv<br>
+      Pay: 50,000¥ + 10% on capture</p>
+    </div>
+    <div id="cluesList">
+      <div class="panel-title" style="margin-top:12px">// COLLECTED CLUES</div>
+      <div id="cluesContainer" style="color:var(--muted);font-size:0.72rem;">No clues yet.</div>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <span><span class="status-dot online"></span><b id="locationStatus">THE BARRENS</b></span>
+    <span>HEAT: <b id="heatStatus" style="color:var(--neon-green)">COLD</b></span>
+    <span>CLUES: <b id="clueCount">0</b>/6</span>
+    <span>MOVES: <b id="moveCount">0</b></span>
+    <span style="margin-left:auto;color:var(--neon-cyan)">NUYEN: <b id="nuyen">50,000¥</b></span>
+  </div>
+
+</div>
+
+<!-- INTRO MODAL -->
+<div class="modal-overlay active" id="introModal">
+  <div class="modal">
+    <h2 class="glitch">// MISSION BRIEF</h2>
+    <p>Chummer, the Cipher hit MCT's Seattle vault three hours ago and jacked the 
+    <b style="color:var(--neon-yellow)">Novatech Blacklist</b> — 
+    a kill-file worth a million nuyen to the wrong fixer.</p>
+    <p>Your job: track her across the Seattle sprawl before she vanishes into the 
+    deep Resonance. She leaves clues — breadcrumbs for someone smart enough to follow them.</p>
+    <p style="color:var(--neon-cyan)">FIND 6 CLUES across Seattle's districts, decode the trail, 
+    and corner The Cipher before her window closes.</p>
+    <p style="color:var(--muted);font-size:0.72rem">Tip: some locations require a Matrix hack to access intel.</p>
+    <button class="modal-btn" onclick="startGame()">JACK IN</button>
+  </div>
+</div>
+
+<!-- VICTORY MODAL -->
+<div class="modal-overlay" id="victoryModal">
+  <div class="modal">
+    <h2 style="color:var(--neon-green)">// TARGET CORNERED</h2>
+    <p id="victoryText"></p>
+    <button class="modal-btn" onclick="resetGame()">NEW RUN</button>
+  </div>
+</div>
+
+<!-- GAME OVER MODAL -->
+<div class="modal-overlay" id="gameoverModal">
+  <div class="modal">
+    <h2 style="color:var(--danger)">// SIGNAL LOST</h2>
+    <p id="gameoverText"></p>
+    <button class="modal-btn" onclick="resetGame()">REBOOT</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// GAME DATA
+// ══════════════════════════════════════════════════════════════════
+
+const DISTRICTS = [
+  {
+    id: "barrens",
+    name: "The Barrens",
+    sub: "Puyallup District",
+    icon: "🏚️",
+    locked: false,
+    desc: "A wasteland of crumbling arcologies and squatter camps. The air smells of chemical rain and desperation. Gangers eye you from behind rusted fences.",
+    clue: {
+      id: 1,
+      text: "A burned SIN chip in the mud. The serial number is MCT-issue. She was here — posing as a corporate auditor. One witness saw her board a maglev toward the Waterfront.",
+      needsHack: false
+    }
+  },
+  {
+    id: "waterfront",
+    name: "The Waterfront",
+    sub: "Elliot Bay Docks",
+    icon: "⚓",
+    locked: false,
+    desc: "Cold gray fog rolls off Puget Sound. Automated cargo drones hum overhead. A Yakuza-controlled pier sits dark at the far end of the dock.",
+    clue: {
+      id: 2,
+      text: "Dock manifest shows a ghost-shipment — a crate registered to 'Yomi Industries' picked up at 03:15. The crate contained a portable Faraday cage. She's shielding her deck from trace-lock.",
+      needsHack: false
+    }
+  },
+  {
+    id: "redmond",
+    name: "Redmond Matrix Hub",
+    sub: "Old Tech Corridor",
+    icon: "📡",
+    locked: false,
+    desc: "A maze of illegal node-stacks and pirate data havens. Neon glyphs flicker from jury-rigged AR overlays. This is where forgotten tech goes to die — and be resurrected.",
+    clue: {
+      id: 3,
+      text: "Deep in the Hub's archives, a ghost-tagged packet traces back to a node in the Ork Underground. She used this Hub to re-route her Matrix signal. Her next stop: somewhere off-grid.",
+      needsHack: true
+    }
+  },
+  {
+    id: "underground",
+    name: "Ork Underground",
+    sub: "Tunnel Network",
+    icon: "🪖",
+    locked: false,
+    desc: "Kilometers of tunnels beneath Seattle, carved out by the Ork nation after the Awakening. Firelight, market stalls, and the low rumble of generators. Outsiders are tolerated — barely.",
+    clue: {
+      id: 4,
+      text: "A fixer named Brass Tusk reluctantly confirms: she traded a credstick for passage to Touristville, carrying a drive encrypted with a Black Ice key she called 'Leviathan'. She seemed... afraid.",
+      needsHack: false
+    }
+  },
+  {
+    id: "bellevue",
+    name: "Bellevue Corporate",
+    sub: "AAA Corporate Zone",
+    icon: "🏢",
+    locked: false,
+    desc: "Glass towers, manicured AR gardens, and Knight Errant patrols every 200 meters. The air is clean here. Too clean. Everyone is being watched.",
+    clue: {
+      id: 5,
+      text: "Security logs show an unauthorized deck connected to Ares sub-node 7 for exactly 4 seconds — just long enough to pull one file. The file was named 'EXTRACTION_POINT_ECHO'. She has an exit plan.",
+      needsHack: true
+    }
+  },
+  {
+    id: "renraku",
+    name: "Renraku Arcology",
+    sub: "Deep Grid Access",
+    icon: "🔮",
+    locked: false,
+    desc: "The re-opened Arcology: part corporate city, part digital fortress. The Renraku Grid here runs on architecture no street decker has ever cracked... until now.",
+    clue: {
+      id: 6,
+      text: "She's not running. She never was. The Blacklist was bait — she wanted MCT to activate the file so she could trace their shadow assets. The Cipher IS the extraction. Her rendezvous: Platform Zeta, midnight.",
+      needsHack: true
+    }
+  }
+];
+
+const HACK_CODES = ["1C","3E","7A","BD","FF","55","A0","C2","4D","8F","2B","6E"];
+
+// ══════════════════════════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════════════════════════
+
+let state = {
+  cluesFound: [],
+  visitedDistricts: [],
+  currentDistrict: null,
+  moves: 0,
+  heat: 0, // 0=cold 1=warm 2=hot 3=burned
+  hackInProgress: false,
+  hackTimer: null,
+  hackSeq: [],
+  hackCurrent: [],
+  hackTimeLeft: 30
+};
+
+// ══════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════
+
+function startGame() {
+  document.getElementById('introModal').classList.remove('active');
+  renderDistricts();
+  showDistrict('barrens');
+}
+
+function resetGame() {
+  state = { cluesFound:[], visitedDistricts:[], currentDistrict:null, moves:0, heat:0, hackInProgress:false, hackTimer:null, hackSeq:[], hackCurrent:[], hackTimeLeft:30 };
+  document.getElementById('victoryModal').classList.remove('active');
+  document.getElementById('gameoverModal').classList.remove('active');
+  document.getElementById('introModal').classList.add('active');
+  document.getElementById('cluesContainer').innerHTML = 'No clues yet.';
+  document.getElementById('clueCount').textContent = '0';
+  document.getElementById('moveCount').textContent = '0';
+  document.getElementById('trailProgress').style.width = '0%';
+  document.getElementById('heatStatus').textContent = 'COLD';
+  document.getElementById('heatStatus').style.color = 'var(--neon-green)';
+  document.getElementById('nuyen').textContent = '50,000¥';
+  stopHack();
+  renderDistricts();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER DISTRICTS
+// ══════════════════════════════════════════════════════════════════
+
+function renderDistricts() {
+  const container = document.getElementById('districtList');
+  container.innerHTML = '';
+  DISTRICTS.forEach(d => {
+    const visited = state.visitedDistricts.includes(d.id);
+    const active = state.currentDistrict === d.id;
+    const clueGot = state.cluesFound.some(c => c.id === d.clue.id);
+    const div = document.createElement('div');
+    div.className = 'district' + (active?' active':'') + (visited&&!active?' visited':'');
+    div.onclick = () => showDistrict(d.id);
+    div.innerHTML = `
+      <div class="district-name">${d.icon} ${d.name}</div>
+      <div class="district-sub">${d.sub}</div>
+      ${clueGot ? '<div class="district-badge">CLUE FOUND</div>' : ''}
+      ${d.clue.needsHack && !clueGot ? '<div class="district-badge" style="border-color:var(--neon-magenta);color:var(--neon-magenta)">HACK REQ</div>' : ''}
+    `;
+    container.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SHOW DISTRICT SCENE
+// ══════════════════════════════════════════════════════════════════
+
+function showDistrict(id) {
+  const d = DISTRICTS.find(x => x.id === id);
+  if (!d) return;
+  stopHack();
+  state.currentDistrict = id;
+  state.moves++;
+  if (!state.visitedDistricts.includes(id)) state.visitedDistricts.push(id);
+
+  document.getElementById('locationStatus').textContent = d.name.toUpperCase();
+  document.getElementById('moveCount').textContent = state.moves;
+  renderDistricts();
+
+  const alreadyHasClue = state.cluesFound.some(c => c.id === d.clue.id);
+  const sceneBox = document.getElementById('sceneBox');
+
+  let html = `<div class="fadein">
+    <div class="scene-header">
+      <span class="scene-icon">${d.icon}</span>
+      <span class="scene-location">${d.name} // ${d.sub}</span>
+    </div>
+    <div class="scene-desc">${d.desc}</div>`;
+
+  if (alreadyHasClue) {
+    html += `<div class="alert-banner success">✓ CLUE ALREADY SECURED FROM THIS LOCATION</div>`;
+    html += `<div class="clue-box"><div class="clue-label">// CLUE #${d.clue.id}</div><div class="clue-text">${d.clue.text}</div></div>`;
+    html += `<div class="choices"><button class="choice-btn" onclick="showSummary()">▶ REVIEW DOSSIER</button></div>`;
+  } else if (d.clue.needsHack) {
+    html += `<div class="alert-banner info">⚡ MATRIX NODE DETECTED — INTRUSION REQUIRED TO ACCESS INTEL</div>`;
+    html += `<div class="choices">
+      <button class="choice-btn" onclick="startHack('${d.id}')">▶ INITIATE MATRIX BREACH</button>
+      <button class="choice-btn" onclick="showDistrict(getNextUnvisited())">▷ WITHDRAW — SEARCH ELSEWHERE</button>
+    </div>`;
+  } else {
+    html += `<div class="choices">
+      <button class="choice-btn" onclick="collectClue('${d.id}')">▶ INVESTIGATE — SEARCH FOR INTEL</button>
+      <button class="choice-btn" onclick="showDistrict(getNextUnvisited())">▷ MOVE ON</button>
+    </div>`;
+  }
+
+  html += '</div>';
+  sceneBox.innerHTML = html;
+  document.getElementById('hackPanel').classList.remove('active');
+}
+
+function getNextUnvisited() {
+  const unvisited = DISTRICTS.filter(d => !state.visitedDistricts.includes(d.id));
+  return unvisited.length ? unvisited[0].id : DISTRICTS[0].id;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// COLLECT CLUE
+// ══════════════════════════════════════════════════════════════════
+
+function collectClue(districtId) {
+  const d = DISTRICTS.find(x => x.id === districtId);
+  if (!d) return;
+  if (state.cluesFound.some(c => c.id === d.clue.id)) return;
+
+  state.cluesFound.push(d.clue);
+  addHeat(1);
+  updateClueUI();
+
+  const sceneBox = document.getElementById('sceneBox');
+  sceneBox.innerHTML = `<div class="fadein">
+    <div class="scene-header">
+      <span class="scene-icon">${d.icon}</span>
+      <span class="scene-location">${d.name}</span>
+    </div>
+    <div class="alert-banner success">✓ INTEL SECURED — CLUE #${d.clue.id} LOGGED</div>
+    <div class="clue-box">
+      <div class="clue-label">// INTERCEPTED INTEL</div>
+      <div class="clue-text">${d.clue.text}</div>
+    </div>
+    <div class="choices">
+      <button class="choice-btn" onclick="checkVictory()">▶ FOLLOW THE TRAIL</button>
+      <button class="choice-btn" onclick="showDistrict(getNextUnvisited())">▷ SEARCH ANOTHER DISTRICT</button>
+    </div>
+  </div>`;
+  renderDistricts();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MATRIX HACK MINI-GAME
+// ══════════════════════════════════════════════════════════════════
+
+function startHack(districtId) {
+  if (state.hackInProgress) return;
+  state.hackInProgress = true;
+  state.hackDistrict = districtId;
+
+  // Generate sequence of 4 codes to match
+  const codes = [...HACK_CODES].sort(() => Math.random() - 0.5).slice(0, 8);
+  state.hackSeq = codes.slice(0, 4);
+  state.hackCurrent = [];
+  state.hackCodes = codes;
+  state.hackTimeLeft = 30;
+
+  // Show panel
+  document.getElementById('hackPanel').classList.add('active');
+
+  // Render target sequence
+  const targetEl = document.getElementById('hackTarget');
+  targetEl.innerHTML = state.hackSeq.map(c => `<div class="hack-seq-cell">${c}</div>`).join('');
+
+  // Render current (empty)
+  renderHackCurrent();
+
+  // Render grid
+  const gridEl = document.getElementById('hackGrid');
+  gridEl.innerHTML = codes.map(c =>
+    `<div class="hack-cell" onclick="selectHackCode('${c}', this)">${c}</div>`
+  ).join('');
+
+  document.getElementById('hackStatus').innerHTML = `<span style="color:var(--neon-cyan)">SELECT ${state.hackSeq.length} CODES IN THE CORRECT ORDER</span>`;
+
+  // Timer
+  startHackTimer();
+
+  // Scroll to hack panel
+  document.getElementById('hackPanel').scrollIntoView({behavior:'smooth'});
+}
+
+function renderHackCurrent() {
+  const el = document.getElementById('hackCurrent');
+  const cells = [];
+  for (let i = 0; i < state.hackSeq.length; i++) {
+    const val = state.hackCurrent[i];
+    const correct = val === state.hackSeq[i];
+    const cls = val ? (correct ? 'correct' : 'filled') : '';
+    cells.push(`<div class="hack-seq-cell ${cls}">${val || '?'}</div>`);
+  }
+  el.innerHTML = cells.join('');
+}
+
+function selectHackCode(code, el) {
+  if (!state.hackInProgress) return;
+  if (el.classList.contains('locked')) return;
+  if (state.hackCurrent.length >= state.hackSeq.length) return;
+
+  state.hackCurrent.push(code);
+  el.classList.add('selected');
+  renderHackCurrent();
+
+  if (state.hackCurrent.length === state.hackSeq.length) {
+    checkHackResult();
+  }
+}
+
+function checkHackResult() {
+  stopHack();
+  const success = state.hackCurrent.every((c, i) => c === state.hackSeq[i]);
+
+  if (success) {
+    document.getElementById('hackStatus').innerHTML = `<span style="color:var(--neon-green)">✓ ICE BYPASSED — INTEL ACCESS GRANTED</span>`;
+    document.getElementById('hackGrid').querySelectorAll('.hack-cell').forEach(c => c.classList.add('match'));
+    setTimeout(() => {
+      document.getElementById('hackPanel').classList.remove('active');
+      collectClue(state.hackDistrict);
+    }, 1200);
+  } else {
+    addHeat(2);
+    document.getElementById('hackStatus').innerHTML = `<span style="color:var(--danger)">✗ SEQUENCE MISMATCH — ICE COUNTER-ATTACK</span>`;
+    setTimeout(() => {
+      document.getElementById('hackPanel').classList.remove('active');
+      showHackFailure();
+    }, 1200);
+  }
+  state.hackInProgress = false;
+}
+
+function showHackFailure() {
+  const sceneBox = document.getElementById('sceneBox');
+  sceneBox.innerHTML += `<div class="fadein alert-banner danger">
+    ✗ MATRIX BREACH FAILED — ICE TRACED YOUR SIGNAL. HEAT INCREASED.
+    <div class="choices" style="margin-top:10px">
+      <button class="choice-btn danger" onclick="startHack('${state.hackDistrict}')">▶ RETRY BREACH (RISK: HIGH)</button>
+      <button class="choice-btn" onclick="showDistrict(getNextUnvisited())">▷ WITHDRAW</button>
+    </div>
+  </div>`;
+}
+
+function startHackTimer() {
+  state.hackTimeLeft = 30;
+  state.hackTimer = setInterval(() => {
+    state.hackTimeLeft--;
+    const pct = (state.hackTimeLeft / 30) * 100;
+    const fill = document.getElementById('timerFill');
+    fill.style.width = pct + '%';
+    fill.className = 'timer-fill' + (pct < 30 ? ' danger' : '');
+    document.getElementById('timerVal').textContent = state.hackTimeLeft + 's';
+    if (state.hackTimeLeft <= 0) {
+      stopHack();
+      state.hackInProgress = false;
+      addHeat(1);
+      document.getElementById('hackPanel').classList.remove('active');
+      showHackFailure();
+    }
+  }, 1000);
+}
+
+function stopHack() {
+  if (state.hackTimer) { clearInterval(state.hackTimer); state.hackTimer = null; }
+  state.hackInProgress = false;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HEAT & STATUS
+// ══════════════════════════════════════════════════════════════════
+
+const HEAT_LABELS = ['COLD','WARM','HOT','BURNED'];
+const HEAT_COLORS = ['var(--neon-green)','var(--neon-yellow)','#ff8800','var(--danger)'];
+
+function addHeat(amount) {
+  state.heat = Math.min(3, state.heat + amount);
+  const el = document.getElementById('heatStatus');
+  el.textContent = HEAT_LABELS[state.heat];
+  el.style.color = HEAT_COLORS[state.heat];
+  if (state.heat >= 3) {
+    setTimeout(triggerGameOver, 800);
+  }
+}
+
+function updateClueUI() {
+  const count = state.cluesFound.length;
+  document.getElementById('clueCount').textContent = count;
+  document.getElementById('trailProgress').style.width = (count / 6 * 100) + '%';
+
+  const nuyen = Math.max(0, 50000 - (state.moves * 500) - (state.heat * 5000));
+  document.getElementById('nuyen').textContent = nuyen.toLocaleString() + '¥';
+
+  const container = document.getElementById('cluesContainer');
+  if (count === 0) { container.innerHTML = 'No clues yet.'; return; }
+  container.innerHTML = state.cluesFound.map(c =>
+    `<div class="clue-collected"><div class="clue-num">CLUE #${c.id}</div>${c.text.substring(0,80)}...</div>`
+  ).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// VICTORY / DEFEAT
+// ══════════════════════════════════════════════════════════════════
+
+function checkVictory() {
+  if (state.cluesFound.length >= 6) {
+    triggerVictory();
+  } else {
+    const unvisited = DISTRICTS.filter(d => !state.cluesFound.some(c => c.id === d.clue.id));
+    if (unvisited.length > 0) showDistrict(unvisited[0].id);
+  }
+}
+
+function showSummary() {
+  if (state.cluesFound.length >= 6) {
+    triggerVictory();
+    return;
+  }
+  const sceneBox = document.getElementById('sceneBox');
+  const remaining = 6 - state.cluesFound.length;
+  sceneBox.innerHTML = `<div class="fadein">
+    <div class="scene-header"><span class="scene-icon">📋</span><span class="scene-location">DOSSIER REVIEW</span></div>
+    <div class="scene-desc">You have ${state.cluesFound.length} of 6 clues. ${remaining} more to find before you can corner The Cipher.</div>
+    <div class="choices">
+      ${DISTRICTS.filter(d => !state.cluesFound.some(c => c.id === d.clue.id)).map(d =>
+        `<button class="choice-btn" onclick="showDistrict('${d.id}')">▶ HEAD TO ${d.name.toUpperCase()}</button>`
+      ).join('')}
+    </div>
+  </div>`;
+}
+
+function triggerVictory() {
+  stopHack();
+  const nuyen = Math.max(10000, 50000 - (state.moves * 500) - (state.heat * 5000));
+  const bonus = state.moves <= 8 ? 10000 : 0;
+  document.getElementById('victoryText').innerHTML = `
+    <b style="color:var(--neon-green)">Platform Zeta. Midnight.</b><br><br>
+    You find The Cipher at the rendezvous — not escaping, but waiting. She had planned every step: 
+    the Blacklist, the breadcrumbs, even you. But you played her game better than she expected.<br><br>
+    The Novatech Blacklist is recovered. MCT's shadow assets are exposed. 
+    Shiv transfers <b style="color:var(--neon-yellow)">${(nuyen + bonus).toLocaleString()}¥</b> to your credstick.
+    ${bonus ? '<br><br><span style="color:var(--neon-cyan)">EFFICIENCY BONUS: +10,000¥</span>' : ''}
+    <br><br><span style="color:var(--muted)">Moves: ${state.moves} | Heat: ${HEAT_LABELS[state.heat]}</span>
+  `;
+  document.getElementById('victoryModal').classList.add('active');
+}
+
+function triggerGameOver() {
+  stopHack();
+  document.getElementById('gameoverText').innerHTML = `
+    Your heat signature was too strong. Knight Errant black-ops closed in while you were on the trail.<br><br>
+    The Cipher vanished into the Deep Grid. The Blacklist is gone. 
+    Shiv sends one message: <i>"Lie low. Try again when the heat dies."</i><br><br>
+    <span style="color:var(--muted)">Moves: ${state.moves} | Status: BURNED</span>
+  `;
+  document.getElementById('gameoverModal').classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════════════════
+
+renderDistricts();
+</script>
+</body>
+</html>

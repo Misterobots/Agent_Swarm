@@ -6,6 +6,7 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import type { ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
+import { useDevStore } from "@/lib/stores/dev-store";
 
 const MODEL_WINDOWS: Record<string, number> = {
   "qwen2.5-coder:14b": 32768,
@@ -308,6 +309,11 @@ export function useChatStream(options?: {
               mediaAttachmentsRef.current = [...mediaAttachmentsRef.current, event.media];
               // Update message immediately so preview appears during streaming
               setMessageMediaAttachments(convId!, assistantId, mediaAttachmentsRef.current);
+            }
+          } else if (event.type === "set_preview_url") {
+            // Agent pushes a URL into the dev workspace preview pane
+            if ((event as any).url) {
+              useDevStore.getState().setPreviewUrl((event as any).url);
             }
           } else if (event.type === "model_queue_status") {
             if (event.queueStatus) {

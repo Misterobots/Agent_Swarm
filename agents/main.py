@@ -200,6 +200,10 @@ app.mount("/metrics", metrics_app)
 if os.path.exists("/workspace/delivered_artifacts"):
     app.mount("/delivered_artifacts", StaticFiles(directory="/workspace/delivered_artifacts"), name="artifacts")
 
+# Mount User Projects — agents write web apps here; served at /projects/<name>/
+os.makedirs("/workspace/user_projects", exist_ok=True)
+app.mount("/projects", StaticFiles(directory="/workspace/user_projects", html=True), name="projects")
+
 # --- Direct File Serving for Voice Samples (StaticFiles mount was unreliable) ---
 from fastapi.responses import FileResponse
 from fastapi import HTTPException
@@ -1159,7 +1163,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                             yield f"data: {json.dumps(tool_chunk)}\n\n"
                             continue
 
-                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card"]:
+                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card", "set_preview_url"]:
                             continue
 
                         content = raw_content
@@ -1176,7 +1180,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "turn_boundary", "turn_metadata",
                                         "continuation", "stream_mode",
                                         "clarification_request", "clarification_card",
-                                        "media_attachment"):
+                                        "media_attachment", "set_preview_url"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",

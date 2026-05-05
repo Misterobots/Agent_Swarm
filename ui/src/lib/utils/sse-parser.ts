@@ -171,6 +171,14 @@ export async function* streamSSE(
               media: (delta as any).content,
             };
           }
+          // Agent pushes a URL into the preview pane
+          else if (delta.type === "set_preview_url") {
+            yield {
+              type: "set_preview_url",
+              content: "",
+              url: (delta as any).url || (delta as any).content || "",
+            };
+          }
           // Model queue status — emitted before GPU lock acquisition
           else if (delta.type === "model_queue_status") {
             yield {
@@ -312,6 +320,12 @@ export async function* streamSSE(
               type: "media_attachment",
               content: "",
               media: (delta as any).content,
+            };
+          } else if (delta.type === "set_preview_url") {
+            yield {
+              type: "set_preview_url",
+              content: "",
+              url: (delta as any).url || (delta as any).content || "",
             };
           } else if (delta.type === "model_queue_status") {
             yield {

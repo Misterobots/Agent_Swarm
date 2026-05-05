@@ -132,7 +132,8 @@ export const useDevStore = create<DevState>()(
         agentEnabled: state.agentEnabled,
         editorSyncEnabled: state.editorSyncEnabled,
         selectedNode: state.selectedNode,
-        previewUrl: state.previewUrl,
+        // previewUrl is intentionally NOT persisted — it defaults to empty so
+        // the pane shows a friendly empty state rather than loading a stale URL.
         showFileTree: state.showFileTree,
         showOutputPreview: state.showOutputPreview,
         showEditorPanel: state.showEditorPanel,
