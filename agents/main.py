@@ -326,12 +326,8 @@ async def submit_task(request: TaskRequest):
 class VoiceRequest(BaseModel):
     text: str
 
-# Persist agent to avoid re-initializing Ollama/Phidata every request
+# Persist agent to avoid re-initializing Ollama/Phidata every request (reduces latency)
 _voice_agent = None
-
-# Async job store: job_id → {"status": "processing|done", "result": dict|None, "started": float}
-_voice_jobs: dict = {}
-_VOICE_JOB_TTL = 300  # seconds before old jobs are purged
 
 def get_voice_agent():
     global _voice_agent
@@ -340,106 +336,33 @@ def get_voice_agent():
         _voice_agent = VoiceAssistantAgent()
     return _voice_agent
 
-def _purge_old_voice_jobs():
-    import time as _t
-    cutoff = _t.time() - _VOICE_JOB_TTL
-    stale = [k for k, v in _voice_jobs.items() if v["started"] < cutoff]
-    for k in stale:
-        del _voice_jobs[k]
-
 @app.post("/v1/voice/chat")
 async def voice_chat(request: VoiceRequest):
     """
-    Voice Satellite endpoint — returns an immediate ack + job_id.
-    The Pi plays the ack audio instantly, then polls /v1/voice/result/{job_id}.
+    Dedicated endpoint for Voice Satellite.
+    Returns text response AND audio path.
     """
-    import asyncio as _aio
-    import time as _t
-    import uuid as _uuid
     from specialized.voice_assistant import Message
-
+    
     agent = get_voice_agent()
-    job_id = _uuid.uuid4().hex[:8]
-    ack_text, ack_audio = agent.get_ack()
-
-    _voice_jobs[job_id] = {"status": "processing", "result": None, "started": _t.time()}
-    _purge_old_voice_jobs()
-
-    async def _run():
-        try:
-            msg = await _aio.to_thread(agent.process, Message(role="user", content=request.text))
-            meta = msg.metadata or {}
-            _voice_jobs[job_id]["result"] = {
-                "text": msg.content,
-                "audio_path": meta.get("audio_path"),
-                "sandbox": {
-                    "emotion": meta.get("emotion"),
-                    "pitch": meta.get("pitch"),
-                    "speed": meta.get("speed"),
-                    "sample_match": meta.get("sample_match"),
-                    "response_sample": meta.get("response_sample"),
-                    "sample_file": meta.get("sample_file"),
-                    "sample_url": meta.get("sample_url"),
-                    "audio_kind": meta.get("audio_kind"),
-                },
-            }
-        except Exception as _e:
-            logger.error(f"Voice job {job_id} failed: {_e}")
-            _voice_jobs[job_id]["result"] = {
-                "text": "Beemo hit an error on that one.",
-                "audio_path": None,
-                "sandbox": {},
-            }
-        finally:
-            _voice_jobs[job_id]["status"] = "done"
-
-    _aio.create_task(_run())
+    # Process message
+    response_msg = agent.process(Message(role="user", content=request.text))
+    metadata = response_msg.metadata or {}
 
     return {
-        "job_id": job_id,
-        "status": "processing",
-        "ack_text": ack_text,
-        "ack_audio": ack_audio,
+        "text": response_msg.content,
+        "audio_path": metadata.get("audio_path"),
+        "sandbox": {
+            "emotion": metadata.get("emotion"),
+            "pitch": metadata.get("pitch"),
+            "speed": metadata.get("speed"),
+            "sample_match": metadata.get("sample_match"),
+            "response_sample": metadata.get("response_sample"),
+            "sample_file": metadata.get("sample_file"),
+            "sample_url": metadata.get("sample_url"),
+            "audio_kind": metadata.get("audio_kind"),
+        },
     }
-
-@app.get("/v1/voice/result/{job_id}")
-async def voice_result(job_id: str):
-    """Poll this after receiving a job_id from /v1/voice/chat."""
-    import time as _t
-    from fastapi import HTTPException
-    job = _voice_jobs.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found or expired")
-    if job["status"] != "done":
-        elapsed = round(_t.time() - job["started"], 1)
-        agent = get_voice_agent()
-        status_text, status_audio = agent.get_status_update()
-        return {
-            "status": "processing",
-            "elapsed": elapsed,
-            "status_text": status_text,
-            "status_audio": status_audio,
-        }
-    return {"status": "done", **job["result"]}
-
-
-@app.post("/v1/voice/say")
-async def voice_say(request: VoiceRequest):
-    """Synthesize a short phrase with BMO's voice and return the audio path.
-    Used by the Pi for local confirmations (volume changes, etc.) without
-    going through the full LLM pipeline."""
-    from specialized.voice_cloning import clone_voice
-    text = request.text.strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="text is required")
-    try:
-        import asyncio as _say_asyncio
-        audio_path = await _say_asyncio.to_thread(clone_voice, text, effect="BMO")
-        return {"audio_path": audio_path}
-    except Exception as e:
-        logger.error(f"[voice/say] TTS failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)[:200])
-
 
 # --- OpenAI-Compatible Chat Endpoint (For VS Code Extensions) ---
 class ChatMessage(BaseModel):
@@ -808,6 +731,86 @@ async def list_models(request: Request):
         logger.error(f"Error in list_models: {e}")
         raise
 
+
+@app.get("/v1/models/ollama")
+async def list_ollama_models():
+    """
+    List Ollama models available across all nodes for the Team Builder UI.
+    Queries both OLLAMA_HOST (Turing) and SECONDARY_OLLAMA_HOST (Lovelace) so that
+    large models stored on Lovelace's 32 GB VRAM appear as available.
+    """
+    import requests as _requests
+    from config import OLLAMA_HOST, SECONDARY_OLLAMA_HOST
+    from model_registry import MODELS, get_user_selectable_models
+
+    # Gather pulled model names from all Ollama nodes
+    pulled: set[str] = set()
+    errors: list[str] = []
+    for label, host in [("execution-plane", OLLAMA_HOST), ("control-plane", SECONDARY_OLLAMA_HOST)]:
+        try:
+            r = _requests.get(f"{host}/api/tags", timeout=3)
+            if r.status_code == 200:
+                for m in r.json().get("models", []):
+                    pulled.add(m.get("name", ""))
+        except Exception as e:
+            errors.append(f"{label}: {str(e)[:80]}")
+            logger.warning(f"[models/ollama] Could not reach {label} ({host}): {e}")
+
+    # Update availability flags — mark available if present on ANY node
+    for name, spec in MODELS.items():
+        if name in pulled:
+            spec.available = True
+
+    selectable = get_user_selectable_models()
+    return {
+        "models": [m.to_dict() for m in selectable],
+        "errors": errors,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Team Builder API  (role → model configuration per user)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/v1/team-builder/config")
+async def team_builder_get_config(request: Request):
+    """Load the authenticated user's team builder configuration."""
+    uid = request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    from team_builder import get_team_config
+    return get_team_config(uid)
+
+
+@app.post("/v1/team-builder/config")
+async def team_builder_save_config(request: Request):
+    """Save the authenticated user's team builder configuration."""
+    uid = request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        config = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    from team_builder import save_team_config
+    try:
+        save_team_config(uid, config)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"status": "saved", "roles": list(config.keys())}
+
+
+@app.delete("/v1/team-builder/config")
+async def team_builder_delete_config(request: Request):
+    """Reset the authenticated user's team builder configuration to defaults."""
+    uid = request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    from team_builder import clear_team_config
+    deleted = clear_team_config(uid)
+    return {"status": "reset", "was_configured": deleted}
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest, http_request: Request):
     """
@@ -1156,7 +1159,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                             yield f"data: {json.dumps(tool_chunk)}\n\n"
                             continue
 
-                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card", "model_queue_status"]:
+                        if msg_type not in ["message", "response", "error", "clarification_request", "media_attachment", "clarification_card"]:
                             continue
 
                         content = raw_content
@@ -1173,7 +1176,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "turn_boundary", "turn_metadata",
                                         "continuation", "stream_mode",
                                         "clarification_request", "clarification_card",
-                                        "media_attachment", "model_queue_status"):
+                                        "media_attachment"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
