@@ -457,11 +457,20 @@ services:
       - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
       # Static asset bypass — no auth for Next.js assets to prevent post-login redirect to /manifest.json
       # Browser fetches these in the background; without bypass they hijack the Authentik redirect state
+      # HTTPS bypass (websecure): static assets served directly, no ForwardAuth
       - "traefik.http.routers.hive-static.rule=Host(`hive.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
       - "traefik.http.routers.hive-static.entrypoints=websecure"
       - "traefik.http.routers.hive-static.priority=30"
       - "traefik.http.routers.hive-static.tls=true"
       - "traefik.http.routers.hive-static.service=hive-ext"
+      # HTTP bypass (web): same paths on port 80 — redirect to HTTPS only, no authentik
+      # Root cause: authentik@docker fires before redirect-to-https in hive-ext-http middleware chain,
+      # so HTTP manifest.json requests get hijacked by OAuth before the HTTPS redirect runs
+      - "traefik.http.routers.hive-static-http.rule=Host(`hive.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.hive-static-http.entrypoints=web"
+      - "traefik.http.routers.hive-static-http.priority=30"
+      - "traefik.http.routers.hive-static-http.middlewares=redirect-to-https@docker"
+      - "traefik.http.routers.hive-static-http.service=hive-ext-http"
       # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
       # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://hive.shivelymedia.com/ws/terminal
       - "traefik.http.routers.terminal-ws.rule=PathPrefix(`/ws/terminal`)"
