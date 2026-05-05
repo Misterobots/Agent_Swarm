@@ -647,7 +647,10 @@ def coordinate_task(
             return
 
         # --- DEV PROJECT GATE: detect new codebase tasks and route to onboarding ---
-        if scope == "codebase" and project_type in ("new", "unknown"):
+        # Skip in dev_mode — church.py already asked the routing question and re-invoked
+        # coordinate_task with dev_mode=True after the user answered, so firing again
+        # would create an infinite clarification loop.
+        if scope == "codebase" and project_type in ("new", "unknown") and not dev_mode:
             logger.info(f"[Coordinator] Codebase task detected (project_type={project_type}), asking for project routing.")
             try:
                 from brooks import save_pending_context as _save_ctx
