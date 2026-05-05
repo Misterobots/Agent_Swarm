@@ -19,6 +19,7 @@ class RequestType(str, Enum):
     GROUNDING_WEB = "GROUNDING_WEB"    # Grant internet/web grounding access
     GROUNDING_DOCS = "GROUNDING_DOCS"  # Grant document/library grounding access
     GROUNDING_FILE = "GROUNDING_FILE"  # Grant local workspace/filespace grounding access
+    TOOL_USE = "TOOL_USE"        # Agent requesting to use a specific tool/capability
     OTHER = "OTHER"
 
 class RequestStatus(str, Enum):
@@ -78,19 +79,26 @@ class GovernanceManager:
         from leibniz_agent import assess_compatibility
         comp_assessment = assess_compatibility(type, description)
         
-        status = RequestStatus.PENDING
         notes = [
             f"Security Assessment: {sec_assessment.content}",
             f"Technical Check: {comp_assessment}"
         ]
-        
-        # Auto-Approve if SAFE (for now, or maybe just mark as ASSESSED)
-        # Let's keep it PENDING for Admin review unless it's very trivial, 
-        # but the requirement says "Build Admin Approval Dashboard", so we usually want *some* approval.
-        # However, to be helpful, let's say "SAFE" requests are PENDING (Green light), "UNSAFE" are REJECTED (Red light).
-        
-        if "UNSAFE" in sec_assessment.content:
+
+        # Auto-approve logic:
+        # - SAFE → auto-approve (≥95% safety threshold met)
+        # - MANUAL_REVIEW → PENDING (human review required)
+        # - UNSAFE → REJECTED immediately
+        sec_content = sec_assessment.content
+        if "UNSAFE" in sec_content:
             status = RequestStatus.REJECTED
+            notes.append("Auto-rejected: security policy violation detected.")
+        elif "SAFE" in sec_content and "UNSAFE" not in sec_content:
+            status = RequestStatus.APPROVED
+            notes.append("Auto-approved: security assessment SAFE (≥95% threshold).")
+        else:
+            # MANUAL_REVIEW or unknown — stay PENDING
+            status = RequestStatus.PENDING
+            notes.append("Queued for manual review: automated assessment inconclusive.")
         
         new_req = RequestItem(
             id=req_id,

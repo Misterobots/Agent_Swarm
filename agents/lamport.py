@@ -282,10 +282,13 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
     }
 
 
-def _synthesize_findings(findings: str, original_task: str) -> str:
+def _synthesize_findings(findings: str, original_task: str) -> dict:
     """
     LLM synthesis step: Read all research findings and produce an implementation plan.
-    This is the ONLY step where the coordinator delegates understanding to the LLM.
+    Returns a dict: {"plan": str, "confidence": float, "ambiguity": float}
+
+    confidence  — 0.0–1.0, how complete and correct the plan is
+    ambiguity   — 0.0–1.0, how much unclear information remains (lower is better)
     """
     synth_model = os.getenv("COORDINATOR_MODEL", "qwen3.6:27b")
     host = get_best_host_for_model(synth_model)
@@ -297,7 +300,11 @@ def _synthesize_findings(findings: str, original_task: str) -> str:
         "- Identify key insights, constraints, and dependencies\n"
         "- Produce a clear, actionable implementation plan\n"
         "- Note any conflicts or gaps in the research\n"
-        "- Be specific about file paths, function names, and technical details"
+        "- Be specific about file paths, function names, and technical details\n\n"
+        "IMPORTANT: At the very end of your response, on its own line, output a JSON block:\n"
+        '{"confidence": 0.92, "ambiguity": 0.03}\n'
+        "confidence: 0.0–1.0 — how confident you are this plan is complete and correct\n"
+        "ambiguity:  0.0–1.0 — how much unclear information remains (0 = none, 1 = all unclear)"
     )
 
     prompt = (
@@ -320,11 +327,35 @@ def _synthesize_findings(findings: str, original_task: str) -> str:
         )
 
         if resp.status_code == 200:
-            return resp.json().get("response", "Synthesis failed — no response from model.")
+            raw_text = resp.json().get("response", "")
+            # Parse the trailing confidence/ambiguity JSON block
+            confidence = 0.80
+            ambiguity = 0.15
+            plan_text = raw_text
+            lines = raw_text.strip().splitlines()
+            for line in reversed(lines):
+                stripped = line.strip()
+                if stripped.startswith("{") and "confidence" in stripped:
+                    try:
+                        scores = json.loads(stripped)
+                        confidence = float(scores.get("confidence", 0.80))
+                        ambiguity = float(scores.get("ambiguity", 0.15))
+                        # Remove the scores line from the plan text
+                        plan_text = raw_text[: raw_text.rfind(stripped)].rstrip()
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                    break
+            if not plan_text:
+                plan_text = "Synthesis failed — no response from model."
+            return {"plan": plan_text, "confidence": confidence, "ambiguity": ambiguity}
     except Exception as e:
         logger.error(f"[Coordinator] Synthesis failed: {e}")
 
-    return f"Synthesis failed. Raw findings:\n{findings}"
+    return {
+        "plan": f"Synthesis failed. Raw findings:\n{findings}",
+        "confidence": 0.50,
+        "ambiguity": 0.50,
+    }
 
 
 def _generate_followups(synthesis: str, impl_tasks: list) -> str:
@@ -586,6 +617,7 @@ def coordinate_task(
     template_metadata: dict = None,
     ultraplan_mode: bool = False,
     dev_mode: bool = False,
+    plan_mode: bool = False,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
@@ -594,9 +626,13 @@ def coordinate_task(
     Phases:
         1. Decompose (LLM) — break task into subtasks
         2. Research (parallel workers) — investigate unknowns
-        3. Synthesize (LLM) — merge findings into plan
+        3. Synthesize (LLM) — merge findings into plan, score confidence
         4. Implement (workers) — execute the plan
+           • plan_mode=False + scope='codebase': Leibniz runs with real tools
+           • plan_mode=True or scope!='codebase': written plan only
         5. Verify (fresh worker) — check results
+
+    plan_mode: when True, skip actual execution even for codebase tasks.
     """
     session = CoordinatorSession(session_id, owner_id)
     logger.info(
@@ -891,26 +927,102 @@ def coordinate_task(
         yield {"type": "thought", "content": "→ Phase 3/5: Synthesis (LLM — reading all findings)"}
 
         all_findings = session.get_all_scratchpad_content()
-        with request_lock(context="text"):
-            synthesis = _synthesize_findings(all_findings, user_input)
+        max_synth_passes = 3
+        synthesis = ""
+        synth_confidence = 0.80
+        synth_ambiguity = 0.20
+
+        for synth_pass in range(1, max_synth_passes + 1):
+            with request_lock(context="text"):
+                synth_result = _synthesize_findings(all_findings, user_input)
+            synthesis = synth_result["plan"]
+            synth_confidence = synth_result["confidence"]
+            synth_ambiguity = synth_result["ambiguity"]
+
+            # Threshold: 90% first pass, 95% on subsequent passes
+            required_confidence = 0.90 if synth_pass == 1 else 0.95
+            yield {
+                "type": "log",
+                "content": (
+                    f"[Coordinator] Synthesis pass {synth_pass}/{max_synth_passes}: "
+                    f"confidence={synth_confidence:.0%}, ambiguity={synth_ambiguity:.0%} "
+                    f"(need ≥{required_confidence:.0%} confidence, ≤5% ambiguity)"
+                ),
+            }
+
+            if synth_confidence >= required_confidence and synth_ambiguity <= 0.05:
+                break
+
+            if synth_pass >= max_synth_passes:
+                # Hit iteration limit without meeting thresholds — ask for guidance
+                logger.warning(
+                    f"[Coordinator] Synthesis thresholds not met after {max_synth_passes} passes "
+                    f"(confidence={synth_confidence:.0%}, ambiguity={synth_ambiguity:.0%}). "
+                    "Requesting clarification."
+                )
+                try:
+                    from brooks import save_pending_context as _save_ctx
+                    _save_ctx(
+                        {"type": "swarm_clarification", "prompt": user_input, "question":
+                         f"I've analysed the task but my confidence is only {synth_confidence:.0%} "
+                         f"with {synth_ambiguity:.0%} ambiguity remaining. What additional detail "
+                         "or constraint would help me proceed with confidence?"},
+                        session_id=session_id,
+                        owner_id=owner_id,
+                    )
+                except Exception as _e:
+                    logger.warning(f"[Coordinator] Could not save clarification context: {_e}")
+                yield {
+                    "type": "clarification_card",
+                    "clarification": {
+                        "question": (
+                            f"I've studied the problem but my solution confidence is "
+                            f"{synth_confidence:.0%} (need ≥95%). What detail would help me proceed?"
+                        ),
+                        "context": f"Ambiguity remaining: {synth_ambiguity:.0%}",
+                        "options": [],
+                        "allow_freetext": True,
+                        "card_type": "ambiguity",
+                    },
+                }
+                return
+            # else: loop and try synthesis again (findings unchanged but model temperature
+            # varies slightly, sometimes yielding higher-confidence output)
+
         session.write_to_scratchpad("01_synthesis.md", f"# Synthesis\n\n{synthesis}")
 
         # Persist synthesis to team memory for cross-coordination recall
         _team_store(session.coordination_id, "synthesis", synthesis)
 
         yield {"type": "message", "content": "**🧠 Synthesis Complete** ✓\n\n"}
-        yield {"type": "log", "content": f"[Coordinator] Synthesis: {len(synthesis)} chars"}
+        yield {"type": "log", "content": f"[Coordinator] Synthesis: {len(synthesis)} chars, confidence={synth_confidence:.0%}"}
 
         # === PHASE 4: IMPLEMENTATION (serial) ===
         yield {"type": "swarm_phase", "phase_num": 4, "phase_name": "Implement", "total_phases": 5}
+
+        # Execution mode: use Leibniz with real tools for codebase tasks unless
+        # plan_mode is explicitly requested.
+        execute_code = (not plan_mode) and (scope == "codebase")
+
         yield {
             "type": "status",
-            "content": f"🔨 Coordinator: Executing {len(impl_tasks)} implementation tasks...",
+            "content": (
+                f"{'⚡ Executing' if execute_code else '📝 Planning'}: "
+                f"{len(impl_tasks)} implementation task(s)..."
+            ),
         }
         yield {
             "type": "thought",
-            "content": f"→ Phase 4/5: Implementation ({len(impl_tasks)} tasks, serial)",
+            "content": (
+                f"→ Phase 4/5: Implementation ({len(impl_tasks)} tasks, serial) — "
+                f"{'EXECUTION MODE' if execute_code else 'PLAN MODE'}"
+            ),
         }
+        if execute_code:
+            yield {
+                "type": "log",
+                "content": "[Coordinator] Execution mode active — Leibniz will write files and run tools.",
+            }
 
         impl_results = {}
         for i, task_def in enumerate(impl_tasks):
@@ -919,7 +1031,12 @@ def coordinate_task(
 
             worker_id = session.register_worker(role, task_text, "implementation")
             try:
-                agent = _get_agent_for_role(role, session_id=session_id, scope=scope)
+                if execute_code and role in ("architect", "coder", "devops"):
+                    # Use Leibniz — it has write_file, run_command, build_web_app etc.
+                    from leibniz_agent import get_architect_agent
+                    agent = get_architect_agent(session_id=session_id)
+                else:
+                    agent = _get_agent_for_role(role, session_id=session_id, scope=scope)
             except Exception as _agent_err:
                 logger.warning(
                     f"[Coordinator] Agent init failed for role '{role}' (falling back to simple agent): {_agent_err}"
@@ -950,16 +1067,28 @@ def coordinate_task(
                 "content": f"Spawned {_impl_pioneer['name']} ({role})",
             }
 
-            # Implementation workers get the synthesis as context.
-            # IMPORTANT: produce written plans/designs/docs only — do NOT execute
-            # commands, connect to live services, or modify infrastructure.
-            impl_prompt = (
-                f"[Implementation Task {i+1}/{len(impl_tasks)}]\n"
-                f"{task_text}\n\n"
-                f"IMPORTANT: Produce a detailed written plan, design, or documentation for this "
-                f"task. Do NOT execute commands, SSH to servers, or make live connections.\n\n"
-                f"[Synthesis / Implementation Plan]:\n{synthesis}\n\n"
-            )
+            if execute_code and role in ("architect", "coder", "devops"):
+                # Execution prompt: agent has tools, tell it to use them
+                impl_prompt = (
+                    f"[Implementation Task {i+1}/{len(impl_tasks)}]\n"
+                    f"{task_text}\n\n"
+                    f"You have access to tools: build_web_app, get_project_template, write_file, "
+                    f"read_file, list_dir, run_command.\n"
+                    f"EXECUTE this task — write actual code and files. "
+                    f"For web apps, use build_web_app(project_name, html_content) to create the "
+                    f"project and get a live URL. Use get_project_template(type) to start from a "
+                    f"scaffold (available types: game, dashboard, landing).\n\n"
+                    f"[Implementation Plan from Synthesis]:\n{synthesis}\n\n"
+                )
+            else:
+                # Plan-only: document the approach but do not execute
+                impl_prompt = (
+                    f"[Implementation Task {i+1}/{len(impl_tasks)}]\n"
+                    f"{task_text}\n\n"
+                    f"IMPORTANT: Produce a detailed written plan, design, or documentation for this "
+                    f"task. Do NOT execute commands, SSH to servers, or make live connections.\n\n"
+                    f"[Synthesis / Implementation Plan]:\n{synthesis}\n\n"
+                )
             if extracted_context:
                 impl_prompt += f"[Original Context]:\n{extracted_context}"
 
@@ -1012,6 +1141,30 @@ def coordinate_task(
                 ],
                 "content": f"Implementation step {i+1} done",
             }
+
+        # After all implementation tasks: scan for web app URLs and push to preview pane
+        if execute_code:
+            import re as _re
+            _url_pattern = _re.compile(
+                r"PROJECT_URL:\s*(https?://[^\s\n\"'<>]+)"
+            )
+            for _worker_result in impl_results.values():
+                _match = _url_pattern.search(_worker_result or "")
+                if _match:
+                    _preview_url = _match.group(1).rstrip("/") + "/"
+                    yield {
+                        "type": "set_preview_url",
+                        "url": _preview_url,
+                        "content": "",
+                    }
+                    yield {
+                        "type": "message",
+                        "content": (
+                            f"**🌐 Live Preview:** [{_preview_url}]({_preview_url})\n\n"
+                            f"The project is now running — check the Preview pane.\n\n"
+                        ),
+                    }
+                    break  # Only emit once even if multiple workers built apps
 
         # === PHASE 5: VERIFICATION ===
         yield {"type": "swarm_phase", "phase_num": 5, "phase_name": "Verify", "total_phases": 5}

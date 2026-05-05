@@ -5,6 +5,7 @@ import os
 
 from tools.file_ops import read_file, write_file, list_dir
 from tools.terminal import run_command
+from tools.web_builder import build_web_app, get_project_template, list_project_templates
 
 from phi.knowledge.combined import CombinedKnowledgeBase
 from phi.vectordb.pgvector import PgVector
@@ -57,7 +58,8 @@ def get_architect_agent(session_id: Optional[str] = None, model_name: Optional[s
         num_history_responses=5,
         description="I am the Architect. I plan, write, and execute code using tools.",
         instructions=ARCHITECT_INSTRUCTIONS,
-        tools=[read_file, write_file, list_dir, run_command],
+        tools=[read_file, write_file, list_dir, run_command,
+               build_web_app, get_project_template, list_project_templates],
         knowledge=knowledge_base,
         show_tool_calls=False,
         run_tool_calls=True, # Enable NATIVE execution

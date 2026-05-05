@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PAGE_TITLE}}</title>
+<style>
+  :root {
+    --bg: #050510;
+    --card-bg: #0d0d20;
+    --border: #1e1e3f;
+    --accent: #7c3aed;
+    --accent-glow: rgba(124,58,237,0.3);
+    --accent2: #06b6d4;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --success: #10b981;
+    --font-sans: system-ui, -apple-system, sans-serif;
+    --font-mono: 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-sans); min-height: 100vh; }
+  /* Hero */
+  .hero {
+    min-height: 80vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 40px 20px; position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, var(--accent-glow), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-block; padding: 4px 14px; border-radius: 20px;
+    background: rgba(124,58,237,0.15); border: 1px solid var(--accent);
+    font-size: 0.72rem; letter-spacing: 2px; color: var(--accent); margin-bottom: 20px;
+  }
+  .hero-title { font-size: clamp(2rem, 6vw, 4rem); font-weight: 800; line-height: 1.1; margin-bottom: 20px; }
+  .hero-title .gradient { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero-sub { font-size: 1.1rem; color: var(--muted); max-width: 540px; line-height: 1.7; margin-bottom: 32px; }
+  .btn-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .btn-primary {
+    padding: 13px 28px; background: var(--accent); color: #fff; border: none;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer; border-radius: 4px;
+    transition: all 0.2s; text-decoration: none;
+  }
+  .btn-primary:hover { background: #6d28d9; box-shadow: 0 0 30px var(--accent-glow); transform: translateY(-1px); }
+  .btn-secondary {
+    padding: 13px 28px; background: transparent; color: var(--text); border: 1px solid var(--border);
+    font-size: 0.9rem; font-weight: 600; cursor: pointer; border-radius: 4px;
+    transition: all 0.2s; text-decoration: none;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  /* Features */
+  .section { padding: 60px 24px; max-width: 1100px; margin: 0 auto; }
+  .section-title { font-size: 1.6rem; font-weight: 700; text-align: center; margin-bottom: 8px; }
+  .section-sub { color: var(--muted); text-align: center; margin-bottom: 40px; }
+  .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .feature-card {
+    background: var(--card-bg); border: 1px solid var(--border); padding: 24px; border-radius: 8px;
+    transition: border-color 0.2s;
+  }
+  .feature-card:hover { border-color: var(--accent); }
+  .feature-icon { font-size: 1.8rem; margin-bottom: 12px; }
+  .feature-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; }
+  .feature-desc { font-size: 0.83rem; color: var(--muted); line-height: 1.7; }
+  /* Stats banner */
+  .stats-banner {
+    background: var(--card-bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    padding: 40px 24px;
+  }
+  .stats-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 32px; text-align: center; }
+  .stat-number { font-size: 2.4rem; font-weight: 800; color: var(--accent); }
+  .stat-desc { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  /* Testimonials */
+  .testimonials-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+  .testimonial {
+    background: var(--card-bg); border: 1px solid var(--border); padding: 20px; border-radius: 8px;
+  }
+  .testimonial-text { font-size: 0.85rem; color: var(--text); line-height: 1.7; margin-bottom: 16px; font-style: italic; }
+  .testimonial-author { font-size: 0.75rem; color: var(--accent); font-weight: 600; }
+  /* CTA */
+  .cta-section {
+    background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(6,182,212,0.1));
+    border: 1px solid var(--border); border-radius: 12px; padding: 60px 24px; text-align: center; margin: 40px 24px;
+    max-width: 800px; margin-left: auto; margin-right: auto;
+  }
+  .cta-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 12px; }
+  .cta-sub { color: var(--muted); margin-bottom: 28px; }
+  /* Footer */
+  footer { background: var(--card-bg); border-top: 1px solid var(--border); padding: 24px; text-align: center; font-size: 0.75rem; color: var(--muted); }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">{{BADGE_TEXT}}</div>
+  <h1 class="hero-title">{{HEADLINE_LINE1}}<br><span class="gradient">{{HEADLINE_LINE2}}</span></h1>
+  <p class="hero-sub">{{SUBHEADLINE}}</p>
+  <div class="btn-group">
+    <a href="#cta" class="btn-primary">{{CTA_PRIMARY}}</a>
+    <a href="#features" class="btn-secondary">{{CTA_SECONDARY}}</a>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-banner">
+  <div class="stats-inner">
+    <div><div class="stat-number">{{STAT1_NUM}}</div><div class="stat-desc">{{STAT1_LABEL}}</div></div>
+    <div><div class="stat-number">{{STAT2_NUM}}</div><div class="stat-desc">{{STAT2_LABEL}}</div></div>
+    <div><div class="stat-number">{{STAT3_NUM}}</div><div class="stat-desc">{{STAT3_LABEL}}</div></div>
+    <div><div class="stat-number">{{STAT4_NUM}}</div><div class="stat-desc">{{STAT4_LABEL}}</div></div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <h2 class="section-title">{{FEATURES_TITLE}}</h2>
+  <p class="section-sub">{{FEATURES_SUB}}</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">{{FEATURE1_ICON}}</div>
+      <div class="feature-title">{{FEATURE1_TITLE}}</div>
+      <div class="feature-desc">{{FEATURE1_DESC}}</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">{{FEATURE2_ICON}}</div>
+      <div class="feature-title">{{FEATURE2_TITLE}}</div>
+      <div class="feature-desc">{{FEATURE2_DESC}}</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">{{FEATURE3_ICON}}</div>
+      <div class="feature-title">{{FEATURE3_TITLE}}</div>
+      <div class="feature-desc">{{FEATURE3_DESC}}</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">{{FEATURE4_ICON}}</div>
+      <div class="feature-title">{{FEATURE4_TITLE}}</div>
+      <div class="feature-desc">{{FEATURE4_DESC}}</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">{{FEATURE5_ICON}}</div>
+      <div class="feature-title">{{FEATURE5_TITLE}}</div>
+      <div class="feature-desc">{{FEATURE5_DESC}}</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">{{FEATURE6_ICON}}</div>
+      <div class="feature-title">{{FEATURE6_TITLE}}</div>
+      <div class="feature-desc">{{FEATURE6_DESC}}</div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section">
+  <h2 class="section-title">{{TESTIMONIALS_TITLE}}</h2>
+  <div class="testimonials-grid">
+    <div class="testimonial">
+      <div class="testimonial-text">"{{TESTIMONIAL1_TEXT}}"</div>
+      <div class="testimonial-author">— {{TESTIMONIAL1_AUTHOR}}</div>
+    </div>
+    <div class="testimonial">
+      <div class="testimonial-text">"{{TESTIMONIAL2_TEXT}}"</div>
+      <div class="testimonial-author">— {{TESTIMONIAL2_AUTHOR}}</div>
+    </div>
+    <div class="testimonial">
+      <div class="testimonial-text">"{{TESTIMONIAL3_TEXT}}"</div>
+      <div class="testimonial-author">— {{TESTIMONIAL3_AUTHOR}}</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section" id="cta">
+  <h2 class="cta-title">{{CTA_TITLE}}</h2>
+  <p class="cta-sub">{{CTA_SUBTITLE}}</p>
+  <div class="btn-group">
+    <a href="#" class="btn-primary">{{CTA_BTN_TEXT}}</a>
+  </div>
+</div>
+
+<footer>
+  <p>© 2057 {{COMPANY_NAME}} — Built by Memex Agent Swarm</p>
+</footer>
+
+</body>
+</html>

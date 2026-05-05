@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{DASHBOARD_TITLE}}</title>
+<style>
+  :root {
+    --bg: #070d14;
+    --panel: #0d1620;
+    --border: #1e3040;
+    --accent: #00b4d8;
+    --accent2: #48cae4;
+    --text: #caf0f8;
+    --muted: #4a6a7a;
+    --success: #52b788;
+    --warning: #e9c46a;
+    --danger: #e76f51;
+    --font: 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; display: flex; flex-direction: column; }
+  header {
+    padding: 14px 24px; border-bottom: 2px solid var(--accent);
+    background: var(--panel);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { font-size: 1.1rem; letter-spacing: 3px; color: var(--accent); }
+  .logo small { font-size: 0.65rem; color: var(--muted); display: block; letter-spacing: 1px; }
+  .header-right { display: flex; gap: 16px; align-items: center; font-size: 0.7rem; color: var(--muted); }
+  .badge { padding: 3px 8px; border-radius: 2px; font-size: 0.62rem; letter-spacing: 1px; }
+  .badge.green { background: rgba(82,183,136,0.15); color: var(--success); border: 1px solid var(--success); }
+  .badge.yellow { background: rgba(233,196,106,0.15); color: var(--warning); border: 1px solid var(--warning); }
+  main { flex: 1; padding: 20px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: auto 1fr 1fr; gap: 14px; }
+  /* Stat cards */
+  .stat-card { background: var(--panel); border: 1px solid var(--border); padding: 16px; }
+  .stat-label { font-size: 0.62rem; letter-spacing: 2px; color: var(--muted); margin-bottom: 8px; }
+  .stat-value { font-size: 1.6rem; color: var(--accent); font-weight: bold; }
+  .stat-delta { font-size: 0.68rem; margin-top: 6px; color: var(--success); }
+  .stat-delta.neg { color: var(--danger); }
+  /* Chart panel */
+  .chart-panel { grid-column: span 2; background: var(--panel); border: 1px solid var(--border); padding: 16px; }
+  .panel-title { font-size: 0.62rem; letter-spacing: 2px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+  /* Simple bar chart */
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 120px; }
+  .bar { flex: 1; background: var(--accent); opacity: 0.7; transition: opacity 0.2s; position: relative; min-width: 20px; }
+  .bar:hover { opacity: 1; }
+  .bar-label { font-size: 0.55rem; color: var(--muted); text-align: center; margin-top: 4px; }
+  /* Table */
+  .table-panel { grid-column: span 2; background: var(--panel); border: 1px solid var(--border); padding: 16px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  th { text-align: left; font-size: 0.6rem; letter-spacing: 2px; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  tr:hover td { background: rgba(0,180,216,0.04); }
+  /* List panel */
+  .list-panel { grid-column: span 2; background: var(--panel); border: 1px solid var(--border); padding: 16px; }
+  .list-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; }
+  .list-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .dot-green { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .dot-yellow { background: var(--warning); }
+  .dot-red { background: var(--danger); }
+  /* Gauge */
+  .gauge-panel { background: var(--panel); border: 1px solid var(--border); padding: 16px; }
+  .gauge-ring { position: relative; width: 80px; height: 80px; margin: 0 auto 8px; }
+  .gauge-ring svg { width: 80px; height: 80px; transform: rotate(-90deg); }
+  .gauge-ring circle { fill: none; stroke-width: 8; }
+  .gauge-bg { stroke: var(--border); }
+  .gauge-fill { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+  .gauge-val { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 0.9rem; color: var(--accent); }
+  footer { background: var(--panel); border-top: 1px solid var(--border); padding: 8px 24px; display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">{{DASHBOARD_TITLE}}<small>MONITORING DASHBOARD</small></div>
+  <div class="header-right">
+    <span id="lastUpdated">Updated: just now</span>
+    <span class="badge green">ONLINE</span>
+  </div>
+</header>
+<main>
+  <!-- Stat cards row -->
+  <div class="stat-card">
+    <div class="stat-label">{{METRIC_1_LABEL}}</div>
+    <div class="stat-value" id="m1">—</div>
+    <div class="stat-delta" id="m1d">Loading...</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">{{METRIC_2_LABEL}}</div>
+    <div class="stat-value" id="m2">—</div>
+    <div class="stat-delta" id="m2d">Loading...</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">{{METRIC_3_LABEL}}</div>
+    <div class="stat-value" id="m3">—</div>
+    <div class="stat-delta" id="m3d">Loading...</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">{{METRIC_4_LABEL}}</div>
+    <div class="stat-value" id="m4">—</div>
+    <div class="stat-delta" id="m4d">Loading...</div>
+  </div>
+
+  <!-- Bar chart -->
+  <div class="chart-panel">
+    <div class="panel-title">// {{CHART_TITLE}}</div>
+    <div class="bar-chart" id="barChart"></div>
+    <div style="display:flex;gap:6px;margin-top:4px" id="barLabels"></div>
+  </div>
+
+  <!-- Gauge -->
+  <div class="gauge-panel">
+    <div class="panel-title">// {{GAUGE_TITLE}}</div>
+    <div class="gauge-ring">
+      <svg viewBox="0 0 80 80">
+        <circle class="gauge-bg" cx="40" cy="40" r="32" />
+        <circle class="gauge-fill" id="gaugeFill" cx="40" cy="40" r="32"
+          stroke-dasharray="201" stroke-dashoffset="100" />
+      </svg>
+      <div class="gauge-val" id="gaugeVal">—</div>
+    </div>
+    <div style="text-align:center;font-size:0.65rem;color:var(--muted)" id="gaugeLabel">Loading</div>
+  </div>
+
+  <!-- Another gauge -->
+  <div class="gauge-panel">
+    <div class="panel-title">// {{GAUGE2_TITLE}}</div>
+    <div class="gauge-ring">
+      <svg viewBox="0 0 80 80">
+        <circle class="gauge-bg" cx="40" cy="40" r="32" />
+        <circle class="gauge-fill" id="gauge2Fill" cx="40" cy="40" r="32"
+          stroke-dasharray="201" stroke-dashoffset="150" style="stroke:var(--accent2)" />
+      </svg>
+      <div class="gauge-val" id="gauge2Val" style="color:var(--accent2)">—</div>
+    </div>
+    <div style="text-align:center;font-size:0.65rem;color:var(--muted)" id="gauge2Label">Loading</div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-panel">
+    <div class="panel-title">// {{TABLE_TITLE}}</div>
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>NAME</th><th>STATUS</th><th>VALUE</th><th>UPDATED</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="4" style="color:var(--muted)">Loading data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- List -->
+  <div class="list-panel">
+    <div class="panel-title">// {{LIST_TITLE}}</div>
+    <div id="eventList">Loading...</div>
+  </div>
+</main>
+<footer>
+  <span>DASHBOARD TEMPLATE v1.0</span>
+  <span id="footerTime">—</span>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════
+// DATA — replace with real API calls or static data
+// ═══════════════════════════════════════════════════
+
+const MOCK_DATA = {
+  metrics: [
+    { label: "{{METRIC_1_LABEL}}", value: "1,247", delta: "+12.4% vs last week", pos: true },
+    { label: "{{METRIC_2_LABEL}}", value: "98.7%", delta: "+0.2% vs last week", pos: true },
+    { label: "{{METRIC_3_LABEL}}", value: "342ms", delta: "-18ms vs last week", pos: true },
+    { label: "{{METRIC_4_LABEL}}", value: "4.8/5", delta: "+0.3 vs last month", pos: true },
+  ],
+  chart: [
+    { label: "Mon", value: 65 }, { label: "Tue", value: 82 }, { label: "Wed", value: 74 },
+    { label: "Thu", value: 91 }, { label: "Fri", value: 88 }, { label: "Sat", value: 56 },
+    { label: "Sun", value: 43 },
+  ],
+  gauge: { value: 78, label: "{{GAUGE_TITLE}}" },
+  gauge2: { value: 62, label: "{{GAUGE2_TITLE}}" },
+  table: [
+    { name: "Item A", status: "ACTIVE",   value: "1,204", updated: "2m ago" },
+    { name: "Item B", status: "ACTIVE",   value: "987",   updated: "5m ago" },
+    { name: "Item C", status: "WARNING",  value: "423",   updated: "8m ago" },
+    { name: "Item D", status: "INACTIVE", value: "0",     updated: "1h ago" },
+    { name: "Item E", status: "ACTIVE",   value: "3,891", updated: "just now" },
+  ],
+  events: [
+    { color: "dot-green",  text: "System check passed — all services nominal" },
+    { color: "dot-yellow", text: "Item C threshold warning — monitor closely" },
+    { color: "dot-green",  text: "Backup completed successfully" },
+    { color: "dot-green",  text: "Scheduled maintenance window closed" },
+    { color: "dot-red",    text: "Alert: Item D offline — investigating" },
+  ],
+};
+
+function setGauge(id, pct) {
+  const circumference = 201;
+  const offset = circumference - (circumference * pct / 100);
+  document.getElementById(id).style.strokeDashoffset = offset;
+}
+
+function statusColor(s) {
+  return s === "ACTIVE" ? "var(--success)" : s === "WARNING" ? "var(--warning)" : "var(--muted)";
+}
+
+function render() {
+  // Metrics
+  MOCK_DATA.metrics.forEach((m, i) => {
+    const n = i + 1;
+    document.getElementById(`m${n}`).textContent = m.value;
+    const d = document.getElementById(`m${n}d`);
+    d.textContent = m.delta;
+    d.className = "stat-delta" + (m.pos ? "" : " neg");
+  });
+
+  // Bar chart
+  const max = Math.max(...MOCK_DATA.chart.map(d => d.value));
+  document.getElementById("barChart").innerHTML = MOCK_DATA.chart.map(d =>
+    `<div class="bar" style="height:${(d.value/max*100)}%" title="${d.value}"></div>`
+  ).join("");
+  document.getElementById("barLabels").innerHTML = MOCK_DATA.chart.map(d =>
+    `<div style="flex:1;text-align:center" class="bar-label">${d.label}</div>`
+  ).join("");
+
+  // Gauges
+  setGauge("gaugeFill", MOCK_DATA.gauge.value);
+  document.getElementById("gaugeVal").textContent = MOCK_DATA.gauge.value + "%";
+  document.getElementById("gaugeLabel").textContent = MOCK_DATA.gauge.label;
+  setGauge("gauge2Fill", MOCK_DATA.gauge2.value);
+  document.getElementById("gauge2Val").textContent = MOCK_DATA.gauge2.value + "%";
+  document.getElementById("gauge2Label").textContent = MOCK_DATA.gauge2.label;
+
+  // Table
+  document.getElementById("tableBody").innerHTML = MOCK_DATA.table.map(r =>
+    `<tr><td>${r.name}</td><td style="color:${statusColor(r.status)}">${r.status}</td><td>${r.value}</td><td style="color:var(--muted)">${r.updated}</td></tr>`
+  ).join("");
+
+  // Events
+  document.getElementById("eventList").innerHTML = MOCK_DATA.events.map(e =>
+    `<div class="list-item"><div class="list-dot ${e.color}"></div><span>${e.text}</span></div>`
+  ).join("");
+
+  // Footer
+  const now = new Date();
+  document.getElementById("footerTime").textContent = now.toLocaleTimeString();
+  document.getElementById("lastUpdated").textContent = "Updated: " + now.toLocaleTimeString();
+}
+
+render();
+setInterval(render, 30000); // Refresh every 30s
+</script>
+</body>
+</html>

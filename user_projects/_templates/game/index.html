@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{GAME_TITLE}}</title>
+<style>
+  :root {
+    --bg: #0a0a12;
+    --panel: #11111e;
+    --border: #2a2a45;
+    --accent: #00fff7;
+    --accent2: #ff00cc;
+    --text: #d0dde8;
+    --muted: #4a5568;
+    --success: #00ff88;
+    --danger: #ff3855;
+    --font: 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+  /* Scanline effect */
+  body::after {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  }
+  header {
+    padding: 16px 24px; border-bottom: 2px solid var(--accent);
+    background: linear-gradient(90deg, #000 0%, var(--panel) 20%, var(--panel) 80%, #000 100%);
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 0 30px rgba(0,255,247,0.15);
+  }
+  .title { font-size: 1.4rem; letter-spacing: 4px; color: var(--accent); text-shadow: 0 0 20px var(--accent); }
+  .title span { color: var(--accent2); }
+  .status-row { display: flex; gap: 20px; font-size: 0.65rem; color: var(--muted); }
+  .status-row b { color: var(--accent); }
+  main { display: grid; grid-template-columns: 260px 1fr 240px; height: calc(100vh - 58px); }
+  /* Left sidebar */
+  .sidebar { padding: 16px; border-right: 1px solid var(--border); overflow-y: auto; }
+  /* Center */
+  .game-area { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+  /* Right panel */
+  .info-panel { padding: 16px; border-left: 1px solid var(--border); overflow-y: auto; }
+  .panel-label { font-size: 0.6rem; letter-spacing: 3px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+  /* Cards */
+  .card { border: 1px solid var(--border); padding: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }
+  .card:hover { border-color: var(--accent); background: rgba(0,255,247,0.04); }
+  .card.active { border-color: var(--accent2); background: rgba(255,0,204,0.06); }
+  .card-title { font-size: 0.8rem; color: var(--accent2); margin-bottom: 4px; }
+  .card-sub { font-size: 0.65rem; color: var(--muted); }
+  /* Scene */
+  .scene-title { font-size: 1rem; color: var(--accent); margin-bottom: 12px; }
+  .scene-body { font-size: 0.82rem; line-height: 1.8; border-left: 3px solid var(--accent); padding: 12px; background: rgba(0,255,247,0.03); margin-bottom: 16px; }
+  /* Actions */
+  .actions { display: flex; flex-direction: column; gap: 8px; }
+  .btn { background: transparent; border: 1px solid var(--border); color: var(--text); font-family: var(--font); font-size: 0.8rem; padding: 10px 14px; cursor: pointer; text-align: left; transition: all 0.15s; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); padding-left: 20px; }
+  .btn.primary { border-color: var(--accent2); color: var(--accent2); }
+  .btn.primary:hover { background: rgba(255,0,204,0.1); }
+  /* Alert */
+  .alert { padding: 10px 14px; border-left: 3px solid; font-size: 0.78rem; margin-bottom: 12px; }
+  .alert.success { border-color: var(--success); color: var(--success); background: rgba(0,255,136,0.05); }
+  .alert.danger { border-color: var(--danger); color: var(--danger); background: rgba(255,56,85,0.05); }
+  .alert.info { border-color: var(--accent); color: var(--accent); background: rgba(0,255,247,0.04); }
+  /* Progress */
+  .progress-bar { height: 4px; background: var(--border); margin-bottom: 12px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.4s; }
+  /* Stat */
+  .stat { display: flex; justify-content: space-between; font-size: 0.72rem; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .stat-val { color: var(--accent); }
+  /* Footer */
+  footer { grid-column: span 3; background: #000; border-top: 1px solid var(--border); padding: 6px 20px; display: flex; gap: 20px; font-size: 0.62rem; color: var(--muted); }
+  footer b { color: var(--accent); }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .fadein { animation: fadeIn 0.35s ease; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">{{GAME_TITLE_SHORT}}<span>{{GAME_SUBTITLE}}</span></div>
+  <div class="status-row">
+    <span>SCORE: <b id="score">0</b></span>
+    <span>LIVES: <b id="lives">3</b></span>
+    <span>LEVEL: <b id="level">1</b></span>
+  </div>
+</header>
+<main>
+  <div class="sidebar">
+    <div class="panel-label">// MAP</div>
+    <div id="locationList"><!-- Locations rendered by JS --></div>
+  </div>
+  <div class="game-area">
+    <div id="sceneArea"><!-- Scene rendered by JS --></div>
+    <div class="actions" id="actionArea"><!-- Actions rendered by JS --></div>
+  </div>
+  <div class="info-panel">
+    <div class="panel-label">// STATUS</div>
+    <div class="stat"><span>Progress</span><span class="stat-val" id="progressPct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+    <div id="statsArea"><!-- Stats rendered by JS --></div>
+    <div class="panel-label" style="margin-top:16px">// LOG</div>
+    <div id="logArea" style="font-size:0.7rem;color:var(--muted)">Game starting...</div>
+  </div>
+  <footer>
+    <span>LOCATION: <b id="footerLoc">—</b></span>
+    <span>MOVES: <b id="footerMoves">0</b></span>
+    <span style="margin-left:auto">GAME TEMPLATE v1.0</span>
+  </footer>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════
+// GAME DATA — replace this section with your content
+// ═══════════════════════════════════════════════════
+
+const GAME_CONFIG = {
+  title: "{{GAME_TITLE}}",
+  winCondition: 5, // number of objectives to complete
+};
+
+const LOCATIONS = [
+  { id: "start",    name: "Starting Point",  icon: "🚀", desc: "You begin your journey here. Look around for clues." },
+  { id: "hub",      name: "Central Hub",     icon: "🏙️", desc: "A busy crossroads. Many paths lead from here." },
+  { id: "forest",   name: "Deep Woods",      icon: "🌲", desc: "Dense trees obscure your vision. Something rustles nearby." },
+  { id: "lab",      name: "Research Lab",    icon: "🔬", desc: "Abandoned equipment lines the walls. Data terminals flicker." },
+  { id: "vault",    name: "The Vault",       icon: "🔒", desc: "Heavy doors. This is where the target must be." },
+];
+
+const OBJECTIVES = [
+  { id: "obj1", location: "hub",    desc: "Find the contact",         clue: "They were last seen near the lab." },
+  { id: "obj2", location: "forest", desc: "Retrieve the keycard",     clue: "Hidden under the old oak." },
+  { id: "obj3", location: "lab",    desc: "Access the terminal",      clue: "Password hint: 4 digits, year of founding." },
+  { id: "obj4", location: "lab",    desc: "Download the files",       clue: "Transfer complete — heading to the vault." },
+  { id: "obj5", location: "vault",  desc: "Complete the mission",     clue: "All evidence gathered. Target confirmed." },
+];
+
+// ═══════════════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════════════
+
+let state = {
+  location: "start",
+  completed: [],
+  moves: 0,
+  log: [],
+};
+
+// ═══════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════
+
+function addLog(msg) {
+  state.log.unshift(msg);
+  if (state.log.length > 10) state.log.pop();
+  document.getElementById("logArea").innerHTML = state.log.map(l => `<div>${l}</div>`).join("");
+}
+
+function updateFooter() {
+  const loc = LOCATIONS.find(l => l.id === state.location);
+  document.getElementById("footerLoc").textContent = loc ? loc.name.toUpperCase() : "—";
+  document.getElementById("footerMoves").textContent = state.moves;
+}
+
+function updateStats() {
+  const pct = Math.round((state.completed.length / GAME_CONFIG.winCondition) * 100);
+  document.getElementById("progressPct").textContent = pct + "%";
+  document.getElementById("progressBar").style.width = pct + "%";
+  document.getElementById("score").textContent = state.completed.length * 100;
+}
+
+function renderLocations() {
+  document.getElementById("locationList").innerHTML = LOCATIONS.map(loc => `
+    <div class="card ${state.location === loc.id ? 'active' : ''}" onclick="goTo('${loc.id}')">
+      <div class="card-title">${loc.icon} ${loc.name}</div>
+      <div class="card-sub">${state.completed.some(id => {
+        const obj = OBJECTIVES.find(o => o.id === id);
+        return obj && obj.location === loc.id;
+      }) ? '✓ Objective found' : 'Unexplored'}</div>
+    </div>
+  `).join("");
+}
+
+function renderScene() {
+  const loc = LOCATIONS.find(l => l.id === state.location);
+  const localObjs = OBJECTIVES.filter(o => o.location === state.location && !state.completed.includes(o.id));
+  const doneObjs = OBJECTIVES.filter(o => o.location === state.location && state.completed.includes(o.id));
+
+  let html = `<div class="fadein">
+    <div class="scene-title">${loc.icon} ${loc.name}</div>
+    <div class="scene-body">${loc.desc}</div>`;
+
+  if (doneObjs.length) {
+    html += doneObjs.map(o => `<div class="alert success">✓ ${o.desc}</div>`).join("");
+  }
+
+  if (localObjs.length) {
+    html += localObjs.map(o => `
+      <div class="alert info">📋 Objective: ${o.desc}</div>
+      <div style="font-size:0.78rem;color:var(--text);margin-bottom:10px">Clue: <i>${o.clue}</i></div>
+    `).join("");
+    html += `<button class="btn primary" onclick="completeObjective('${localObjs[0].id}')">▶ Complete: ${localObjs[0].desc}</button>`;
+  } else {
+    html += `<div class="alert info">Nothing more to do here. Move to another location.</div>`;
+  }
+
+  html += "</div>";
+  document.getElementById("sceneArea").innerHTML = html;
+  document.getElementById("actionArea").innerHTML = LOCATIONS
+    .filter(l => l.id !== state.location)
+    .map(l => `<button class="btn" onclick="goTo('${l.id}')">▷ Go to ${l.name}</button>`)
+    .join("");
+}
+
+// ═══════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════
+
+function goTo(id) {
+  state.location = id;
+  state.moves++;
+  const loc = LOCATIONS.find(l => l.id === id);
+  addLog(`Moved to ${loc.name}`);
+  updateFooter();
+  renderLocations();
+  renderScene();
+}
+
+function completeObjective(id) {
+  if (state.completed.includes(id)) return;
+  state.completed.push(id);
+  const obj = OBJECTIVES.find(o => o.id === id);
+  addLog(`Completed: ${obj.desc}`);
+  updateStats();
+  renderLocations();
+  renderScene();
+  if (state.completed.length >= GAME_CONFIG.winCondition) {
+    setTimeout(() => alert(`🎉 Victory! All objectives complete in ${state.moves} moves.`), 400);
+  }
+}
+
+// Init
+updateStats();
+updateFooter();
+renderLocations();
+renderScene();
+addLog("Game started. Find all objectives.");
+</script>
+</body>
+</html>
