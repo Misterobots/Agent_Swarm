@@ -1288,6 +1288,20 @@ def chat_swarm(
             intent = "DOC_STANDARDS"
             confidence = 1.0
             reasoning = "Slash command: /standardize-doc"
+        # BUILD/GAME/APP creation should route to COORDINATE (Lamport)
+        import re as _re
+        _build_patterns = [
+            r"\bbuild\s+(me\s+)?(a|an|the)?\s*(simple|basic|full|complete|working)?\s*(web\s*)?(app|application|game|dashboard|site|website|tool|page)\b",
+            r"\bcreate\s+(me\s+)?(a|an|the)?\s*(simple|basic|full|complete|working)?\s*(web\s*)?(app|application|game|dashboard|site|website|tool|page)\b",
+            r"\bmake\s+(me\s+)?(a|an|the)?\s*(simple|basic|full|complete|working)?\s*(web\s*)?(app|application|game|dashboard|site|website|tool|page)\b",
+        ]
+        if intent not in ("COORDINATE", "IMAGE", "3D", "ACTION_FIGURE", "DEVOPS"):
+            for _bp in _build_patterns:
+                if _re.search(_bp, _lower):
+                    intent = "COORDINATE"
+                    confidence = 0.92
+                    reasoning = f"Keyword override: build/create/make + artifact type detected in '{user_input[:60]}'"
+                    break
         
         yield _l(f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}")
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
