@@ -32,6 +32,13 @@ interface DevState {
   previewUrl: string;
   showFileTree: boolean;
   showOutputPreview: boolean;
+  
+  // Flyout panels (Gemini-style)
+  showEditorPanel: boolean;
+  showTerminalPanel: boolean;
+  
+  // View mode: 'preview' (live output) or 'code' (editor + file tree)
+  viewMode: "preview" | "code";
 
   setEditorContent: (content: string) => void;
   setEditorLanguage: (language: string) => void;
@@ -55,6 +62,13 @@ interface DevState {
   setPreviewUrl: (url: string) => void;
   setShowFileTree: (show: boolean) => void;
   setShowOutputPreview: (show: boolean) => void;
+  
+  // Flyout panel actions
+  setShowEditorPanel: (show: boolean) => void;
+  setShowTerminalPanel: (show: boolean) => void;
+  toggleEditorPanel: () => void;
+  toggleTerminalPanel: () => void;
+  setViewMode: (mode: "preview" | "code") => void;
 }
 
 export const useDevStore = create<DevState>()(
@@ -74,6 +88,9 @@ export const useDevStore = create<DevState>()(
       previewUrl: "http://localhost:3000",
       showFileTree: true,
       showOutputPreview: true,
+      showEditorPanel: false,
+      showTerminalPanel: false,
+      viewMode: "code",
       
       setEditorContent: (content) => set({ editorContent: content }),
       setEditorLanguage: (language) => set({ editorLanguage: language }),
@@ -101,6 +118,12 @@ export const useDevStore = create<DevState>()(
       setPreviewUrl: (url) => set({ previewUrl: url }),
       setShowFileTree: (show) => set({ showFileTree: show }),
       setShowOutputPreview: (show) => set({ showOutputPreview: show }),
+      
+      setShowEditorPanel: (show) => set({ showEditorPanel: show }),
+      setShowTerminalPanel: (show) => set({ showTerminalPanel: show }),
+      toggleEditorPanel: () => set((s) => ({ showEditorPanel: !s.showEditorPanel })),
+      toggleTerminalPanel: () => set((s) => ({ showTerminalPanel: !s.showTerminalPanel })),
+      setViewMode: (mode) => set({ viewMode: mode }),
     }),
     {
       name: "hive-dev-store",
@@ -112,6 +135,9 @@ export const useDevStore = create<DevState>()(
         previewUrl: state.previewUrl,
         showFileTree: state.showFileTree,
         showOutputPreview: state.showOutputPreview,
+        showEditorPanel: state.showEditorPanel,
+        viewMode: state.viewMode,
+        // Note: showTerminalPanel is NOT persisted - always starts closed
       }),
     }
   )

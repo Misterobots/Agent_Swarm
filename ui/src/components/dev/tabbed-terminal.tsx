@@ -207,11 +207,9 @@ export function TabbedTerminal() {
     });
   }
 
-  // Create initial terminal if none exist
+  // Don't auto-create terminal tabs - let user create them explicitly
   useEffect(() => {
-    if (tabs.length === 0) {
-      createTab();
-    }
+    // Intentionally empty - no auto-creation
   }, []);
 
   const activeTab = tabs.find((t) => t.id === activeTerminalId) || tabs[0];
@@ -280,20 +278,34 @@ export function TabbedTerminal() {
 
       {/* Terminal containers */}
       <div className="flex-1 relative">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            ref={(el) => {
-              if (el) {
-                containerRefs.current.set(tab.id, el);
-                if (!tab.term) {
-                  initTerminal(tab.id, el);
+        {tabs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)]">
+            <TerminalIcon size={48} className="mb-4 opacity-50" />
+            <p className="text-sm mb-4">No terminal sessions</p>
+            <button
+              onClick={createTab}
+              className="px-4 py-2 bg-[var(--chat-accent)] text-white rounded hover:opacity-90 transition-opacity flex items-center gap-2"
+            >
+              <Plus size={16} />
+              New Terminal
+            </button>
+          </div>
+        ) : (
+          tabs.map((tab) => (
+            <div
+              key={tab.id}
+              ref={(el) => {
+                if (el) {
+                  containerRefs.current.set(tab.id, el);
+                  if (!tab.term) {
+                    initTerminal(tab.id, el);
+                  }
                 }
-              }
-            }}
-            className={`absolute inset-0 ${tab.id === activeTerminalId ? "block" : "hidden"}`}
-          />
-        ))}
+              }}
+              className={`absolute inset-0 ${tab.id === activeTerminalId ? "block" : "hidden"}`}
+            />
+          ))
+        )}
       </div>
     </div>
   );
