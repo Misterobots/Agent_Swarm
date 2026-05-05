@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { TeamBuilder } from "@/components/settings/team-builder";
+import { TeamBuilderSettings } from "@/components/settings/team-builder";
 import { ArrowLeft, Sparkles, Users, Cpu } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
@@ -128,7 +128,7 @@ export default function PioneersPage() {
 
           {/* Team Builder Component */}
           <div className="bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-xl p-6 shadow-2xl">
-            <TeamBuilder />
+            <TeamBuilderSettings />
           </div>
         </div>
       </div>
