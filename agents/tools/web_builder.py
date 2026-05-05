@@ -70,6 +70,13 @@ def build_web_app(project_name: str, html_content: str) -> str:
         index_file.write_text(html_content, encoding="utf-8")
         url = f"{PROJECT_BASE_URL}/{project_name}/"
         logger.info(f"[WebBuilder] Built project '{project_name}' → {url}")
+        # Write the URL to a temp file so Lamport can reliably pick it up
+        # even when the LLM paraphrases the tool result in its response text.
+        try:
+            import pathlib as _pl
+            _pl.Path("/tmp/web_builder_last_url.txt").write_text(url, encoding="utf-8")
+        except Exception:
+            pass
         return f"PROJECT_URL: {url}\nSuccessfully wrote {len(html_content)} bytes to {index_file}"
     except (ValueError, PermissionError) as e:
         logger.error(f"[WebBuilder] Security error building '{project_name}': {e}")

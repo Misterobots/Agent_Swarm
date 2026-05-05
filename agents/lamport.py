@@ -1078,6 +1078,12 @@ def coordinate_task(
                     f"For web apps, use build_web_app(project_name, html_content) to create the "
                     f"project and get a live URL. Use get_project_template(type) to start from a "
                     f"scaffold (available types: game, dashboard, landing).\n\n"
+                    f"CRITICAL — TEMPLATE CUSTOMIZATION: If you use get_project_template(), you MUST "
+                    f"replace ALL placeholder content before calling build_web_app(). The template is "
+                    f"a structural scaffold only. Replace every generic name, location, description, "
+                    f"game objective, and placeholder comment with rich, specific content for THIS "
+                    f"exact project. Never leave 'Starting Point', 'Central Hub', 'GAME TEMPLATE', "
+                    f"'replace this section', or any other template placeholder in the final HTML.\n\n"
                     f"[Implementation Plan from Synthesis]:\n{synthesis}\n\n"
                 )
             else:
@@ -1148,23 +1154,41 @@ def coordinate_task(
             _url_pattern = _re.compile(
                 r"PROJECT_URL:\s*(https?://[^\s\n\"'<>]+)"
             )
+            _preview_url = None
             for _worker_result in impl_results.values():
                 _match = _url_pattern.search(_worker_result or "")
                 if _match:
                     _preview_url = _match.group(1).rstrip("/") + "/"
-                    yield {
-                        "type": "set_preview_url",
-                        "url": _preview_url,
-                        "content": "",
-                    }
-                    yield {
-                        "type": "message",
-                        "content": (
-                            f"**🌐 Live Preview:** [{_preview_url}]({_preview_url})\n\n"
-                            f"The project is now running — check the Preview pane.\n\n"
-                        ),
-                    }
                     break  # Only emit once even if multiple workers built apps
+
+            # Fallback: web_builder writes the last deployed URL to a temp file
+            # so we can reliably pick it up even when the LLM paraphrases the
+            # tool result in its response text (response.content is LLM text only).
+            if not _preview_url:
+                try:
+                    import pathlib as _pl
+                    _tmp = _pl.Path("/tmp/web_builder_last_url.txt")
+                    if _tmp.exists():
+                        _candidate = _tmp.read_text(encoding="utf-8").strip()
+                        if _candidate.startswith("http"):
+                            _preview_url = _candidate.rstrip("/") + "/"
+                            _tmp.unlink(missing_ok=True)  # consume so it doesn't leak to next request
+                except Exception:
+                    pass
+
+            if _preview_url:
+                yield {
+                    "type": "set_preview_url",
+                    "url": _preview_url,
+                    "content": "",
+                }
+                yield {
+                    "type": "message",
+                    "content": (
+                        f"**🌐 Live Preview:** [{_preview_url}]({_preview_url})\n\n"
+                        f"The project is now running — check the Preview pane.\n\n"
+                    ),
+                }
 
         # === PHASE 5: VERIFICATION ===
         yield {"type": "swarm_phase", "phase_num": 5, "phase_name": "Verify", "total_phases": 5}
