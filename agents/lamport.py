@@ -308,13 +308,18 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
         "ambiguous_points: list of short strings describing EXACTLY what is unclear or under-specified (empty list if nothing is ambiguous)"
     )
 
-    prompt = (
-        f"Original Task: {original_task}\n\n"
-        f"Research Findings:\n{findings}\n\n"
-        "Synthesize these findings into a concrete implementation plan."
-    )
-
     try:
+        # Truncate findings to ~24k chars to stay within 32k context window
+        MAX_FINDINGS_CHARS = 24000
+        if len(findings) > MAX_FINDINGS_CHARS:
+            findings = findings[:MAX_FINDINGS_CHARS] + "\n\n[...truncated for context window...]"
+
+        prompt = (
+            f"Original Task: {original_task}\n\n"
+            f"Research Findings:\n{findings}\n\n"
+            "Synthesize these findings into a concrete implementation plan."
+        )
+
         resp = requests.post(
             f"{host}/api/generate",
             json={
@@ -322,13 +327,17 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                 "prompt": prompt,
                 "system": system_prompt,
                 "stream": False,
-                "options": {"temperature": 0.4, "num_predict": 2048},
+                "options": {"temperature": 0.4, "num_predict": 4096, "num_ctx": 32768},
             },
-            timeout=120,
+            timeout=240,
         )
+        logger.info(f"[Coordinator] Synthesis HTTP {resp.status_code}, response_len={len(resp.text)}")
 
         if resp.status_code == 200:
-            raw_text = resp.json().get("response", "")
+            resp_json = resp.json()
+            raw_text = resp_json.get("response", "")
+            if not raw_text:
+                logger.warning(f"[Coordinator] Synthesis empty response. done_reason={resp_json.get('done_reason')} eval_count={resp_json.get('eval_count')}")
             # Strip markdown code fences that models sometimes wrap JSON in
             import re as _re
             clean_text = _re.sub(r"```(?:json)?", "", raw_text, flags=_re.IGNORECASE).replace("```", "")

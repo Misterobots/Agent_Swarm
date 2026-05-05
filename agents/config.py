@@ -61,29 +61,22 @@ HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTAN
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{TURING_IP}:11434")
 OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
 # ---------------------------------------------------------------------------
-# Model Configuration
-# Primary model: gemma4:31b — 31B dense, 20GB VRAM, best reasoning + coding,
-#   256K context, vision, native function calling. (Download: ~20GB)
-#   Coordinator/Architect/Verifier default once pulled.
-# Current workhorse: qwen3.6:27b — 27B hybrid-attention, 17GB VRAM, 256K ctx.
-# Fast MoE option: gemma4:26b — 26B MoE (3.8B active), 18GB VRAM, 256K ctx.
-# Coder specialist: qwen2.5-coder:14b — 9GB, code-optimized.
-# Lightweight tier (no queue): qwen3:8b, qwen2.5-coder:7b — ≤8GB VRAM.
-# BMO voice: llama3.2:3b — lightweight, on-demand.
+# Model Consolidation (TTFT Optimization)
+# Primary model: qwen3:14b — handles code, conversation, coordination,
+# research, documentation. Pinned in VRAM (keep_alive=-1) on GPU 0.
+# BMO voice: qwen2.5:3b — lightweight, on-demand.
 # Safety: llama-guard-3:8b — async on Turing.
-#
-# See agents/model_registry.py for the full model catalog and VRAM specs.
+# Vision: moondream — on-demand.
 # ---------------------------------------------------------------------------
-PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "gemma4:31b")
-FALLBACK_MODEL       = os.getenv("FALLBACK_MODEL",       "qwen3.6:27b")   # used when PRIMARY not yet downloaded
-ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "qwen3.6:27b")   # router stays fast
+PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "qwen3:14b")
+ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         PRIMARY_MODEL)
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      PRIMARY_MODEL)
 COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    PRIMARY_MODEL)
 LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
-CODER_MODEL          = os.getenv("CODER_MODEL",          "qwen2.5-coder:14b")
-DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         "qwen2.5-coder:14b")
-RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     "qwen3.6:27b")
-ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        "qwen3.6:27b")
+CODER_MODEL          = os.getenv("CODER_MODEL",          PRIMARY_MODEL)
+DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         PRIMARY_MODEL)
+RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     PRIMARY_MODEL)
+ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        PRIMARY_MODEL)
 VERIFIER_MODEL       = os.getenv("VERIFIER_MODEL",       PRIMARY_MODEL)
 
 # ---------------------------------------------------------------------------
@@ -107,23 +100,22 @@ SOLVING_MAX_TIME = int(os.getenv("SOLVING_MAX_TIME", "0"))    # seconds, 0 = unl
 # ---------------------------------------------------------------------------
 TRAINING_OUTPUT_DIR          = os.getenv("TRAINING_OUTPUT_DIR",          "/workspace/training_output")
 TRAINING_DATASET_DIR         = os.getenv("TRAINING_DATASET_DIR",         "/workspace/training_data")
-TRAINING_BASE_SOLVER         = os.getenv("TRAINING_BASE_SOLVER",         "Qwen/Qwen3.6-27B")
+TRAINING_BASE_SOLVER         = os.getenv("TRAINING_BASE_SOLVER",         "Qwen/Qwen2.5-Coder-7B-Instruct")
 TRAINING_BASE_ROUTER         = os.getenv("TRAINING_BASE_ROUTER",         "nvidia/Nemotron-Mini-4B-Instruct")
-TRAINING_LORA_RANK           = int(os.getenv("TRAINING_LORA_RANK",       "16"))   # smaller footprint for 27B
-TRAINING_LORA_ALPHA          = int(os.getenv("TRAINING_LORA_ALPHA",      "32"))   # 2× rank
-TRAINING_BATCH_SIZE          = int(os.getenv("TRAINING_BATCH_SIZE",      "1"))    # 27B requires micro-batch=1
-TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION", "8"))  # effective batch = 8
-TRAINING_MAX_SEQ_LEN         = int(os.getenv("TRAINING_MAX_SEQ_LEN",     "2048")) # VRAM budget for 27B QLoRA
+TRAINING_LORA_RANK           = int(os.getenv("TRAINING_LORA_RANK",       "64"))
+TRAINING_LORA_ALPHA          = int(os.getenv("TRAINING_LORA_ALPHA",      "128"))
+TRAINING_BATCH_SIZE          = int(os.getenv("TRAINING_BATCH_SIZE",      "2"))
+TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION", "4"))
 
 # ---------------------------------------------------------------------------
 # Context Window Management
 # ---------------------------------------------------------------------------
 CONTEXT_WINDOWS: dict[str, int] = {
-    "qwen3.6:27b": 262144,
     "qwen3:14b": 40960,
     "qwen3:8b": 32768,
-    "qwen2.5-coder:14b": 32768,
-    "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
+    "qwen2.5-coder:14b": 16384,
+    "qwen2.5-coder:14b-instruct-q4_k_m": 16384,
+    "qwen3.5:9b": 32768,
     "nemotron-orchestrator:8b": 32768,
     "nemotron-mini": 4096,
     "qwen2.5:3b": 8192,
@@ -206,38 +198,6 @@ SUBSCRIPTION_MODELS: dict[str, str] = {
 
 TRAINING_LEARNING_RATE       = float(os.getenv("TRAINING_LEARNING_RATE", "2e-5"))
 TRAINING_NUM_EPOCHS          = int(os.getenv("TRAINING_NUM_EPOCHS",      "3"))
+TRAINING_MAX_SEQ_LEN         = int(os.getenv("TRAINING_MAX_SEQ_LEN",    "8192"))
 TRAINING_WINDOW_START        = int(os.getenv("TRAINING_WINDOW_START",    "2"))   # hour
 TRAINING_WINDOW_END          = int(os.getenv("TRAINING_WINDOW_END",      "6"))   # hour
-
-# ---------------------------------------------------------------------------
-# Archetype Training Configurations (Phase 4)
-# Maps archetype slug → dataset keys + per-archetype training overrides.
-# Used by the training dispatcher to determine which curated datasets to
-# combine and how many epochs to run for each agent specialisation.
-# ---------------------------------------------------------------------------
-ARCHETYPE_TRAINING_CONFIGS: dict = {
-    "coder": {
-        "datasets": ["glaive-code-assistant", "code-feedback"],
-        "epochs": 3,
-        "base_model": TRAINING_BASE_SOLVER,
-        "description": "Code generation, debugging, and technical problem solving",
-    },
-    "coordinator": {
-        "datasets": ["hermes-function-calling", "slim-orca"],
-        "epochs": 2,
-        "base_model": TRAINING_BASE_SOLVER,
-        "description": "Tool orchestration, multi-step task planning, and IoT control",
-    },
-    "researcher": {
-        "datasets": ["openhermes", "slim-orca"],
-        "epochs": 2,
-        "base_model": TRAINING_BASE_SOLVER,
-        "description": "Deep research, reasoning chains, and information synthesis",
-    },
-    "creative": {
-        "datasets": ["openhermes"],
-        "epochs": 2,
-        "base_model": TRAINING_BASE_SOLVER,
-        "description": "Creative writing, storytelling, and content generation",
-    },
-}

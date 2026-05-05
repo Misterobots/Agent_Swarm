@@ -61,8 +61,8 @@ MODEL_ROLES: Dict[str, str] = {
 
 # Context windows (duplicated here for standalone operation on Turing)
 CONTEXT_WINDOWS: Dict[str, int] = {
-    "qwen2.5-coder:14b": 32768,
-    "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
+    "qwen2.5-coder:14b": 16384,
+    "qwen2.5-coder:14b-instruct-q4_k_m": 16384,
     "qwen3.6:27b": 262144,
     "qwen3:14b": 40960,
     "nemotron-orchestrator:8b": 32768,
