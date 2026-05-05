@@ -172,9 +172,10 @@ class LogicVerifier:
                 return False, f"Repetition detected (line repeated {most_common_count}x)"
 
         # 4. Truncation detection — response ends mid-sentence or mid-code-block
+        # Count triple-backtick fences only (ignore single/double backticks in prose)
         stripped = response.strip()
-        open_blocks = stripped.count("```") % 2
-        if open_blocks != 0:
+        fence_matches = re.findall(r"```", stripped)
+        if len(fence_matches) % 2 != 0 and not stripped.endswith("```"):
             return False, "Response appears truncated (unclosed code block)"
 
         return True, "Coherence OK"
