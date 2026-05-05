@@ -57,10 +57,11 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 ### TIER 2: OPS & GATEWAY (192.168.2.103 - Turing)
 
 #### Traefik v3.6 (Reverse Proxy)
-- **Ports**: 80 (HTTP), 443 (HTTPS), 8082 (API)
+- **Ports**: 80 (HTTP), 443 (HTTPS), 8082 (API — internal only, not host-exposed)
 - **Routing**: Routes /ai, /comfy, /ops, /code, /devops, etc.
-- **Authentication**: Authentik middleware (forward auth)
-- **TLS**: Auto-generated or externally provided
+- **Authentication**: Authentik ForwardAuth middleware (`authentik@docker`) applied to all hive_ui routes
+- **TLS**: Wildcard cert `*.shivelymedia.com` via cfdns resolver (Cloudflare DNS-01)
+- **Static asset bypass**: `hive-static` (websecure, priority 30) and `hive-static-http` (web, priority 30) routers exempt `/_next/`, `/manifest.json`, `/favicon.ico`, `/robots.txt`, `/sitemap.xml` from ForwardAuth. HTTP bypass uses only `redirect-to-https@docker` — no content is served over cleartext. Required because Authentik ForwardAuth fires before `redirect-to-https` in the HTTP middleware chain, intercepting PWA manifest requests before they can be redirected to HTTPS.
 
 #### Prometheus (Metrics Collection)
 - **Port**: 9091 (mapped from 9090)
@@ -91,6 +92,7 @@ The Home AI Lab operates a **three-tier distributed architecture** optimized for
 - **Port**: 8889
 - **Metrics**: CPU, memory, network, disk I/O per container
 - **Scrape**: 1s interval (aggregated by Prometheus)
+- **Note**: `/dev/kmsg` device is NOT passed through (removed 2026-05-04) — AppArmor on Ubuntu 22.04 blocks `/dev/kmsg` reads even when passed as a Docker device, generating continuous kernel log warnings. Stale overlay2 errors after container recreation are resolved by `docker restart cadvisor-turing`.
 
 #### Redis (Cache & Queue)
 - **Port**: 6379

@@ -132,6 +132,7 @@ For off-site access, use your Tailscale IP addresses or MagicDNS names instead o
 
 | Date | Author | Changes |
 |------|--------|--------|
+| 2026-05-04 | AI-Copilot | Fixed: Traefik `hive-static-http` bypass router — HTTP (port 80) static asset requests to `/manifest.json`, `/_next/`, `/favicon.ico` etc. were intercepted by `authentik@docker` ForwardAuth before `redirect-to-https` could run, causing CORS-blocked OAuth redirects. Added priority-30 `web` entrypoint router with `redirect-to-https` only (no auth). Also fixed: `coordinate_task()` `ultraplan_mode`/`dev_mode` signature mismatch in `agents/lamport.py`; cAdvisor `/dev/kmsg` device removed from compose (AppArmor block on Ubuntu 22.04). |
 | 2026-05-04 | AI-Copilot | Updated: gemma4:31b primary models, dual RTX 5060 Ti (32 GB), Turing GPU removal, Hive UI as primary (:3200), Prometheus port :9091, agent_runtime on Turing, Hopper node name, BMO node added |
 | 2026-04-16 | AI-Copilot | Added source references, changelog, maintenance guide, testing section |
 | 2026-03-01 | AI-Copilot | Initial connection reference |
