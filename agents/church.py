@@ -1289,19 +1289,16 @@ def chat_swarm(
             confidence = 1.0
             reasoning = "Slash command: /standardize-doc"
         # BUILD/GAME/APP creation should route to COORDINATE (Lamport)
+        # Two-part check: build/create/make verb + artifact type anywhere in sentence
+        # (avoids strict adjacency failures like "build me a simple space explorer game")
         import re as _re
-        _build_patterns = [
-            r"\bbuild\s+(me\s+)?(a|an|the)?\s*(simple|basic|full|complete|working)?\s*(web\s*)?(app|application|game|dashboard|site|website|tool|page)\b",
-            r"\bcreate\s+(me\s+)?(a|an|the)?\s*(simple|basic|full|complete|working)?\s*(web\s*)?(app|application|game|dashboard|site|website|tool|page)\b",
-            r"\bmake\s+(me\s+)?(a|an|the)?\s*(simple|basic|full|complete|working)?\s*(web\s*)?(app|application|game|dashboard|site|website|tool|page)\b",
-        ]
         if intent not in ("COORDINATE", "IMAGE", "3D", "ACTION_FIGURE", "DEVOPS"):
-            for _bp in _build_patterns:
-                if _re.search(_bp, _lower):
-                    intent = "COORDINATE"
-                    confidence = 0.92
-                    reasoning = f"Keyword override: build/create/make + artifact type detected in '{user_input[:60]}'"
-                    break
+            _build_verb_re = r'\b(build|create|make)\b'
+            _artifact_re = r'\b(app|application|game|dashboard|site|website|tool|page|program|calculator)\b'
+            if _re.search(_build_verb_re, _lower) and _re.search(_artifact_re, _lower):
+                intent = "COORDINATE"
+                confidence = 0.92
+                reasoning = f"Keyword override: build/create/make + artifact type detected in '{user_input[:60]}'"
         
         yield _l(f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}")
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
@@ -2768,6 +2765,21 @@ You run on local hardware in a self-hosted home lab.""",
             # show it in the expandable Agent Trace, not in the response body.
             if USE_LANGFUSE and lf_trace:
                 yield {"type": "turn_metadata", "turnMetadata": {"traceId": lf_trace}}
+            # Fallback: if web_builder wrote a URL during this turn (any routing path),
+            # emit set_preview_url so the chat preview pane opens automatically.
+            try:
+                _url_file = "/tmp/web_builder_last_url.txt"
+                if os.path.exists(_url_file):
+                    _url_mtime = os.path.getmtime(_url_file)
+                    _turn_start = route_start_time if 'route_start_time' in locals() else 0
+                    if _url_mtime >= _turn_start:
+                        with open(_url_file) as _f:
+                            _fallback_url = _f.read().strip()
+                        if _fallback_url:
+                            yield {"type": "set_preview_url", "content": _fallback_url}
+                            logger.info(f"[church] Fallback set_preview_url emitted: {_fallback_url}")
+            except Exception as _fe:
+                logger.debug(f"[church] Fallback preview URL check failed: {_fe}")
             yield _emit_stream_mode("requesting")
             yield _emit_continuation_hint("await_user", "Turn complete")
             yield _emit_turn_boundary(turn_id, "completed")
