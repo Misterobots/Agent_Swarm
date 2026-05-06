@@ -31,12 +31,14 @@ logger = logging.getLogger("mempalace")
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("MemPalace starting — initializing database …")
-    await init_db()
-    logger.info("MemPalace ready")
-    yield
-    await close_client()
-    logger.info("MemPalace shutdown")
+    # StreamableHTTP session manager must be started before handling MCP requests
+    async with _mcp.session_manager.run():
+        logger.info("MemPalace starting — initializing database …")
+        await init_db()
+        logger.info("MemPalace ready")
+        yield
+        await close_client()
+        logger.info("MemPalace shutdown")
 
 
 app = FastAPI(
