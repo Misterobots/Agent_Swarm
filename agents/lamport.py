@@ -276,12 +276,20 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "- project_type='existing': working with/inside an existing codebase\n"
         "- project_type='new': creating a brand new project/app from scratch\n"
         "- project_type='unknown': cannot determine (use only when scope='codebase')\n\n"
-        "AMBIGUITY CHECK: Before decomposing, evaluate whether the task has enough context to\n"
-        "produce a correct and useful plan. If a single critical piece of information is missing\n"
-        "that would fundamentally change the research approach (e.g. target platform, language,\n"
-        "intended audience, desired outcome), set clarification_needed=true and provide a single,\n"
-        "specific clarification_question. Only set this when truly necessary — most tasks should\n"
-        "proceed. Default: clarification_needed=false, clarification_question=null."
+        "AMBIGUITY CHECK: Be extremely conservative — the default MUST be clarification_needed=false.\n"
+        "Only set clarification_needed=true if ALL of the following are true:\n"
+        "  1. A single CRITICAL piece of information is genuinely absent (not just nice-to-have)\n"
+        "  2. Without it, research would go in the completely WRONG direction\n"
+        "  3. The question cannot be reasonably inferred from context\n"
+        "NEVER ask for clarification when:\n"
+        "  - The request describes a creative project (game, app, website) with any style/mechanic/theme guidance\n"
+        "  - The task is a build/make/create request with a clear subject\n"
+        "  - The user has provided visual style, tone, audience, or feature descriptions\n"
+        "  - You could make reasonable assumptions and proceed\n"
+        "  - The question would be generic (e.g. 'provide more detail', 'what do you mean', 'more context')\n"
+        "If you set clarification_needed=true, the clarification_question MUST be specific and actionable\n"
+        "(e.g. 'Should this target mobile browsers or desktop only?'), NOT vague (e.g. 'Can you provide more detail?').\n"
+        "Default: clarification_needed=false, clarification_question=null."
     )
 
     prompt = f"{history_context}\n\nTask to decompose:\n{user_input}" if history_context else user_input
@@ -310,6 +318,22 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
                 parsed["implementation_tasks"] = [{"role": "architect", "task": user_input}]
             if "verification_criteria" not in parsed or not parsed["verification_criteria"]:
                 parsed["verification_criteria"] = ["Task completed correctly"]
+
+            # --- Clarification quality gate: reject vague/generic questions ---
+            _GENERIC_PHRASES = (
+                "more detail", "more context", "more information", "provide more",
+                "can you clarify", "could you clarify", "what do you mean",
+                "please clarify", "please provide", "help me proceed",
+                "additional detail", "additional context", "additional information",
+            )
+            if parsed.get("clarification_needed"):
+                q = (parsed.get("clarification_question") or "").lower()
+                if not q or any(p in q for p in _GENERIC_PHRASES):
+                    logger.info(
+                        f"[Coordinator] Rejecting vague clarification question {q!r} — proceeding without clarification"
+                    )
+                    parsed["clarification_needed"] = False
+                    parsed["clarification_question"] = None
 
             # --- Scope override: creation/build requests must always be codebase ---
             _BUILD_KEYWORDS = (
