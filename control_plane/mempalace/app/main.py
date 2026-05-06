@@ -791,7 +791,7 @@ async def extract_from_conversation_mcp(
     return "\n".join(lines)
 
 
-app.mount("/mcp", _mcp.sse_app())
+app.mount("/mcp", _mcp.streamable_http_app())
 
 
 @app.get("/v1/palace/room", response_model=list[MemoryOut])
