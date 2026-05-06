@@ -310,6 +310,23 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
                 parsed["implementation_tasks"] = [{"role": "architect", "task": user_input}]
             if "verification_criteria" not in parsed or not parsed["verification_criteria"]:
                 parsed["verification_criteria"] = ["Task completed correctly"]
+
+            # --- Scope override: creation/build requests must always be codebase ---
+            _BUILD_KEYWORDS = (
+                "build", "make", "create", "develop", "implement", "write", "code",
+                "generate a game", "generate a web", "generate an app",
+                "a game", "a web app", "a website", "an app", "a tool",
+            )
+            _input_lower = user_input.lower()
+            if parsed.get("scope") != "codebase" and any(kw in _input_lower for kw in _BUILD_KEYWORDS):
+                logger.info(
+                    f"[Coordinator] Scope override: '{parsed.get('scope')}' → 'codebase' "
+                    f"(detected build intent in user request)"
+                )
+                parsed["scope"] = "codebase"
+                if parsed.get("project_type") not in ("existing", "new"):
+                    parsed["project_type"] = "new"
+
             return parsed
     except Exception as e:
         logger.error(f"[Coordinator] Task decomposition failed: {e}")
@@ -1398,6 +1415,74 @@ def coordinate_task(
         }
 
         yield {"type": "message", "content": f"**🔍 Verification**\n\n{verify_result}\n\n"}
+
+        # --- Auto-retry: if verification failed because execution was skipped (plan-only),
+        # re-run Phase 4 in execution mode so the code actually gets written. ---
+        _verify_lower = verify_result.lower()
+        _is_fail = any(kw in _verify_lower for kw in ("fail", "not complete", "no code", "no implementation", "planning document", "no actual"))
+        if _is_fail and not execute_code and scope == "codebase":
+            logger.warning("[Coordinator] Verification FAIL on plan-only run — auto-retrying in execution mode")
+            yield {
+                "type": "thought",
+                "content": "→ Auto-retry: verification caught plan-only result, re-running with code execution enabled",
+            }
+            yield {"type": "status", "content": "⚡ Auto-correcting: running implementation in execution mode..."}
+            execute_code = True  # Force execution mode for retry
+            for i, task_def in enumerate(impl_tasks):
+                task_text = task_def.get("task", "")
+                role = task_def.get("role", "architect")
+                retry_prompt = (
+                    f"[Implementation Task {i+1}/{len(impl_tasks)} — EXECUTION REQUIRED]\n"
+                    f"{task_text}\n\n"
+                    f"You MUST write actual code and create files. Use build_web_app(project_name, html_content) "
+                    f"to create a live web project. Do NOT just plan or describe — WRITE THE CODE NOW.\n\n"
+                    f"[Implementation Plan from Synthesis]:\n{synthesis}\n\n"
+                    f"{_existing_project_context}"
+                )
+                retry_worker_id = session.register_worker(role, task_text, "implementation")
+                retry_agent = _get_agent_for_role(role, session_id=session_id, scope="codebase")
+                retry_result = _run_worker(
+                    session, retry_worker_id, retry_agent, retry_prompt,
+                    child_token=_derive_worker_token(ace_token, role, task_text),
+                )
+                yield {
+                    "type": "message",
+                    "content": f"✅ Retry: {role} completed — {retry_result[:200]}...\n\n" if len(retry_result) > 200 else f"✅ Retry: {role} completed\n\n",
+                }
+                impl_results[f"retry_w-{retry_worker_id}"] = retry_result
+
+            # Check for new preview URL after retry
+            _retry_url_pattern = re.compile(r"PROJECT_URL:\s*(https?://[^\s\n\"'<>]+)")
+            for _res in impl_results.values():
+                _m = _retry_url_pattern.search(_res or "")
+                if _m:
+                    _preview_url = _m.group(1).rstrip("/") + "/"
+                    yield {"type": "set_preview_url", "url": _preview_url, "content": ""}
+                    yield {"type": "message", "content": f"**🌐 Live Preview:** [{_preview_url}]({_preview_url})\n\n"}
+                    if owner_id:
+                        import re as _re2
+                        _sm = _re2.search(r"/projects/([^/?\s]+)", _preview_url)
+                        if _sm:
+                            _palace_project_save(owner_id, _sm.group(1).rstrip("/"), _preview_url, user_input[:400])
+                    break
+            if not _preview_url:
+                try:
+                    import pathlib as _pl2
+                    _tmp2 = _pl2.Path("/tmp/web_builder_last_url.txt")
+                    if _tmp2.exists():
+                        _c2 = _tmp2.read_text(encoding="utf-8").strip()
+                        if _c2.startswith("http"):
+                            _preview_url = _c2.rstrip("/") + "/"
+                            _tmp2.unlink(missing_ok=True)
+                            yield {"type": "set_preview_url", "url": _preview_url, "content": ""}
+                            yield {"type": "message", "content": f"**🌐 Live Preview:** [{_preview_url}]({_preview_url})\n\n"}
+                            if owner_id:
+                                import re as _re3
+                                _sm3 = _re3.search(r"/projects/([^/?\s]+)", _preview_url)
+                                if _sm3:
+                                    _palace_project_save(owner_id, _sm3.group(1).rstrip("/"), _preview_url, user_input[:400])
+                except Exception:
+                    pass
 
         # Store verification in team memory
         _team_store(session.coordination_id, "verification", verify_result, author="verifier")

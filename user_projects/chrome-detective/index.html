@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHROME DETECTIVE — Cyberpunk Carmen San Diego</title>
+<style>
+  :root {
+    --bg: #050810;
+    --surface: #0d1220;
+    --card: #111827;
+    --border: #1e2d4a;
+    --neon-cyan: #00f5ff;
+    --neon-pink: #ff00a0;
+    --neon-green: #00ff41;
+    --neon-yellow: #ffee00;
+    --neon-orange: #ff6b00;
+    --text: #c8d4e8;
+    --muted: #4a5568;
+    --accent: #7c3aed;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── LAYOUT ── */
+  .shell { display: flex; flex-direction: column; min-height: 100vh; max-width: 1200px; margin: 0 auto; padding: 16px; gap: 12px; }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .logo {
+    font-size: 1.4rem; font-weight: 900; letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,245,255,0.3);
+  }
+  .logo span { color: var(--neon-pink); text-shadow: 0 0 20px var(--neon-pink); }
+  .hud-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    font-size: 0.65rem; padding: 3px 8px; border-radius: 2px;
+    border: 1px solid; letter-spacing: 0.08em; font-weight: 700;
+  }
+  .badge-moves { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+  .badge-score { border-color: var(--neon-green); color: var(--neon-green); }
+  .badge-time  { border-color: var(--neon-orange); color: var(--neon-orange); }
+  .badge-case  { border-color: var(--neon-pink);   color: var(--neon-pink); }
+
+  /* ── MAIN GRID ── */
+  .grid { display: grid; grid-template-columns: 1fr 340px; gap: 12px; flex: 1; }
+  @media (max-width: 780px) { .grid { grid-template-columns: 1fr; } }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    position: relative;
+  }
+  .panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink), transparent);
+  }
+  .panel-title {
+    font-size: 0.65rem; letter-spacing: 0.2em; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 12px;
+  }
+  .panel-title span { color: var(--neon-cyan); }
+
+  /* ── CITY MAP ── */
+  .city-map { position: relative; }
+  #map-canvas { width: 100%; height: 340px; border-radius: 2px; display: block; }
+
+  /* ── LOCATION INFO ── */
+  .location-name {
+    font-size: 1.3rem; font-weight: 900; letter-spacing: 0.1em;
+    text-transform: uppercase; margin-bottom: 4px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px rgba(0,245,255,0.5);
+  }
+  .location-sub { font-size: 0.7rem; color: var(--muted); margin-bottom: 12px; letter-spacing: 0.1em; }
+
+  /* ── CLUES ── */
+  .clue-grid { display: flex; flex-direction: column; gap: 6px; }
+  .clue-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: rgba(0,245,255,0.03);
+    border: 1px solid rgba(0,245,255,0.1);
+    border-radius: 3px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    cursor: default;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .clue-item:hover { border-color: rgba(0,245,255,0.3); background: rgba(0,245,255,0.06); }
+  .clue-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+  .clue-text { color: var(--text); }
+  .clue-tag {
+    display: inline-block; font-size: 0.58rem; padding: 1px 5px;
+    background: rgba(124,58,237,0.3); border: 1px solid var(--accent);
+    color: #a78bfa; border-radius: 2px; margin-left: 4px; vertical-align: middle;
+  }
+
+  /* ── DESTINATION BUTTONS ── */
+  .dest-grid { display: flex; flex-direction: column; gap: 6px; }
+  .dest-btn {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    font-family: 'Courier New', monospace;
+    color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 0.8rem;
+  }
+  .dest-btn:hover {
+    border-color: var(--neon-cyan);
+    background: rgba(0,245,255,0.04);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 12px rgba(0,245,255,0.1) inset;
+  }
+  .dest-btn:active { transform: scale(0.98); }
+  .dest-btn .dest-name { font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; }
+  .dest-btn .dest-zone { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; }
+  .dest-btn .dest-arrow { margin-left: auto; color: var(--neon-pink); font-size: 0.9rem; }
+
+  /* ── SUSPECT DOSSIER ── */
+  .dossier { display: flex; flex-direction: column; gap: 10px; }
+  .suspect-portrait {
+    width: 100%; aspect-ratio: 1;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface);
+    font-size: 5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .suspect-portrait::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.5));
+  }
+  .suspect-portrait.revealed { border-color: var(--neon-pink); box-shadow: 0 0 20px rgba(255,0,160,0.2); }
+
+  .attr-list { display: flex; flex-direction: column; gap: 5px; }
+  .attr-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; }
+  .attr-key { color: var(--muted); letter-spacing: 0.08em; }
+  .attr-val { color: var(--neon-cyan); font-weight: 700; }
+  .attr-val.unknown { color: var(--muted); font-style: italic; }
+  .attr-val.known { color: var(--neon-green); }
+
+  /* ── WARRANT ── */
+  .warrant-area { margin-top: 8px; }
+  .suspect-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
+    max-height: 200px; overflow-y: auto;
+  }
+  .suspect-chip {
+    background: rgba(0,0,0,0.4); border: 1px solid var(--border);
+    border-radius: 3px; padding: 7px 8px; cursor: pointer;
+    font-size: 0.68rem; font-family: 'Courier New', monospace;
+    color: var(--text);
+    transition: all 0.15s; text-align: left;
+  }
+  .suspect-chip:hover { border-color: var(--neon-pink); color: var(--neon-pink); }
+  .suspect-chip .chip-name { font-weight: 700; font-size: 0.72rem; display: block; }
+  .suspect-chip .chip-alias { color: var(--muted); font-size: 0.6rem; }
+  .suspect-chip.eliminated { opacity: 0.3; text-decoration: line-through; pointer-events: none; }
+
+  /* ── MESSAGE LOG ── */
+  .log-area {
+    background: rgba(0,0,0,0.4); border: 1px solid var(--border);
+    border-radius: 3px; padding: 10px;
+    font-size: 0.72rem; min-height: 60px; max-height: 90px;
+    overflow-y: auto; line-height: 1.6;
+    color: var(--neon-green);
+  }
+  .log-area .log-entry { display: block; }
+  .log-area .log-entry::before { content: '> '; color: var(--muted); }
+
+  /* ── ARREST BTN ── */
+  .arrest-btn {
+    width: 100%; padding: 12px;
+    background: linear-gradient(135deg, rgba(255,0,160,0.15), rgba(255,0,160,0.05));
+    border: 1px solid var(--neon-pink);
+    border-radius: 3px;
+    color: var(--neon-pink);
+    font-family: 'Courier New', monospace;
+    font-weight: 900; font-size: 0.85rem;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .arrest-btn:hover {
+    background: rgba(255,0,160,0.2);
+    box-shadow: 0 0 20px rgba(255,0,160,0.25);
+  }
+  .arrest-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ── OVERLAY SCREENS ── */
+  .overlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(5,8,16,0.92);
+    backdrop-filter: blur(6px);
+  }
+  .overlay.hidden { display: none; }
+  .overlay-box {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 40px 32px;
+    max-width: 480px; width: 92%; text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .overlay-box::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+  }
+  .overlay-title { font-size: 2rem; font-weight: 900; letter-spacing: 0.15em; margin-bottom: 8px; }
+  .overlay-sub   { font-size: 0.85rem; color: var(--muted); margin-bottom: 24px; line-height: 1.7; }
+  .overlay-btn {
+    padding: 12px 28px; font-family: 'Courier New', monospace;
+    font-weight: 900; font-size: 0.85rem; letter-spacing: 0.15em;
+    text-transform: uppercase; border-radius: 3px; cursor: pointer;
+    border: 1px solid var(--neon-cyan); color: var(--neon-cyan);
+    background: rgba(0,245,255,0.05);
+    transition: all 0.15s;
+  }
+  .overlay-btn:hover { background: rgba(0,245,255,0.12); box-shadow: 0 0 20px rgba(0,245,255,0.2); }
+
+  /* ── GLITCH EFFECT ── */
+  @keyframes glitch {
+    0%   { text-shadow: 2px 0 var(--neon-pink), -2px 0 var(--neon-cyan); }
+    25%  { text-shadow: -2px 0 var(--neon-pink),  2px 0 var(--neon-cyan); }
+    50%  { text-shadow: 2px 2px var(--neon-pink), -2px -2px var(--neon-cyan); }
+    75%  { text-shadow: 0 0 0 transparent; }
+    100% { text-shadow: 2px 0 var(--neon-pink), -2px 0 var(--neon-cyan); }
+  }
+  .glitch { animation: glitch 1.5s infinite; }
+
+  @keyframes flicker {
+    0%,100% { opacity: 1; } 92% { opacity: 0.95; } 94% { opacity: 0.7; } 96% { opacity: 1; }
+  }
+  .flicker { animation: flicker 4s infinite; }
+
+  @keyframes pulse-border {
+    0%,100% { box-shadow: 0 0 6px rgba(0,245,255,0.2); }
+    50% { box-shadow: 0 0 18px rgba(0,245,255,0.5); }
+  }
+
+  .neon-pulse { animation: pulse-border 2s infinite; }
+
+  /* ── TIMER BAR ── */
+  .timer-bar-wrap { height: 3px; background: var(--surface); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+  .timer-bar { height: 100%; background: var(--neon-orange); transition: width 1s linear, background 0.5s; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo flicker">CHROME<span>&nbsp;DETECTIVE</span></div>
+    <div class="hud-badges">
+      <span class="badge badge-case">CASE <span id="case-num">01</span></span>
+      <span class="badge badge-moves">MOVES: <span id="move-count">6</span></span>
+      <span class="badge badge-score">SCORE: <span id="score-val">0</span></span>
+      <span class="badge badge-time">TIME: <span id="timer-val">120</span>s</span>
+    </div>
+  </header>
+
+  <!-- TIMER BAR -->
+  <div class="timer-bar-wrap"><div class="timer-bar" id="timer-bar" style="width:100%"></div></div>
+
+  <!-- MAIN GRID -->
+  <main class="grid">
+    <!-- LEFT COLUMN: MAP + CLUES + DESTINATIONS -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Current City Map Canvas -->
+      <div class="panel city-map">
+        <div class="panel-title">[ <span>CURRENT NODE</span> ]</div>
+        <canvas id="map-canvas" width="800" height="340"></canvas>
+        <div style="margin-top:12px;">
+          <div class="location-name" id="city-name">NEO-TOKYO</div>
+          <div class="location-sub" id="city-sub">SECTOR 7 // PACIFIC DIGITAL SOVEREIGNTY ZONE</div>
+        </div>
+      </div>
+
+      <!-- Clue Intel -->
+      <div class="panel">
+        <div class="panel-title">[ <span>WITNESS INTEL</span> // LOCAL INFORMANTS ]</div>
+        <div class="clue-grid" id="clue-grid"></div>
+      </div>
+
+      <!-- Travel Destinations -->
+      <div class="panel">
+        <div class="panel-title">[ <span>JUMP DESTINATIONS</span> // TRANSIT HUB ]</div>
+        <div class="dest-grid" id="dest-grid"></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: DOSSIER + SUSPECTS + LOG -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Suspect Dossier -->
+      <div class="panel">
+        <div class="panel-title">[ <span>SUSPECT DOSSIER</span> ]</div>
+        <div class="dossier">
+          <div class="suspect-portrait" id="suspect-portrait">❓</div>
+          <div class="attr-list" id="attr-list"></div>
+        </div>
+      </div>
+
+      <!-- Warrant — Issue Arrest -->
+      <div class="panel">
+        <div class="panel-title">[ <span>WARRANT</span> // SUSPECTS AT LARGE ]</div>
+        <div class="warrant-area">
+          <div class="suspect-grid" id="suspect-grid"></div>
+          <div style="height:8px;"></div>
+          <button class="arrest-btn" id="arrest-btn" disabled onclick="game.issueArrest()">
+            ⚡ ISSUE ARREST WARRANT
+          </button>
+        </div>
+      </div>
+
+      <!-- Message Log -->
+      <div class="panel">
+        <div class="panel-title">[ <span>FIELD LOG</span> ]</div>
+        <div class="log-area" id="log-area"></div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- INTRO OVERLAY -->
+<div class="overlay" id="intro-overlay">
+  <div class="overlay-box">
+    <div class="overlay-title glitch" style="color:var(--neon-cyan);">CHROME DETECTIVE</div>
+    <div class="overlay-sub">
+      Year 2077. A ghost in the net — the infamous cyberterrorist <strong style="color:var(--neon-pink);">WIRE.CARMEN</strong> has stolen encrypted corporate data and vanished into the megacity grid.<br><br>
+      Trace her through the city-states. Gather clues. Issue a warrant before time expires.
+    </div>
+    <button class="overlay-btn" onclick="game.start()">JACK IN →</button>
+  </div>
+</div>
+
+<!-- WIN OVERLAY -->
+<div class="overlay hidden" id="win-overlay">
+  <div class="overlay-box">
+    <div class="overlay-title" style="color:var(--neon-green);">CASE CLOSED</div>
+    <div class="overlay-sub" id="win-msg">WIRE.CARMEN apprehended.</div>
+    <button class="overlay-btn" onclick="game.restart()">NEW CASE →</button>
+  </div>
+</div>
+
+<!-- LOSE OVERLAY -->
+<div class="overlay hidden" id="lose-overlay">
+  <div class="overlay-box">
+    <div class="overlay-title" style="color:var(--neon-pink);">SIGNAL LOST</div>
+    <div class="overlay-sub" id="lose-msg">The trail has gone cold.</div>
+    <button class="overlay-btn" onclick="game.restart()">RETRY →</button>
+  </div>
+</div>
+
+<script>
+// ── GAME DATA ──────────────────────────────────────────────────────────────
+
+const CITIES = [
+  { id: 'neo-tokyo',    name: 'NEO-TOKYO',      sub: 'SECTOR 7 // PACIFIC DIGITAL SOVEREIGNTY ZONE', color: '#00f5ff', bg: '#00101a', x:0.82, y:0.28 },
+  { id: 'night-city',  name: 'NIGHT CITY',      sub: 'CALIFORNIA NEXUS // FREE CORP TERRITORY',       color: '#ff00a0', bg: '#1a000d', x:0.08, y:0.35 },
+  { id: 'neo-shanghai',name: 'NEO-SHANGHAI',     sub: 'PACIFIC RIM DATA HUB // TRIAX CONTROLLED',      color: '#ffee00', bg: '#1a1600', x:0.70, y:0.42 },
+  { id: 'mega-london',  name: 'MEGA-LONDON',     sub: 'EU GRID NODE 01 // ARASAKA PROTECTORATE',       color: '#00ff41', bg: '#001a08', x:0.45, y:0.18 },
+  { id: 'neo-delhi',    name: 'NEO-DELHI',       sub: 'SOUTH ASIA NODE // INDEPENDENT SOVEREIGNTY',    color: '#ff6b00', bg: '#1a0900', x:0.60, y:0.48 },
+  { id: 'new-lagos',    name: 'NEW LAGOS',       sub: 'AFRICAN DATA EXCHANGE // NOMAD NEUTRAL ZONE',   color: '#a855f7', bg: '#0d0017', x:0.42, y:0.60 },
+  { id: 'rust-moscow',  name: 'RUST MOSCOW',     sub: 'EASTERN SECTOR // OLD MILITECH TERRITORY',      color: '#60a5fa', bg: '#00080f', x:0.60, y:0.15 },
+  { id: 'nueva-lima',   name: 'NUEVA LIMA',      sub: 'SOUTH AMERICAN GRID // OPEN CITY',              color: '#34d399', bg: '#001a10', x:0.18, y:0.68 },
+];
+
+const SUSPECTS = [
+  { id:'s1', name:'CHROME CARMEN',  alias:'WIRE.CARMEN',  emoji:'🦾', faction:'Ghost Cell',     aug:'Neon Spine Mod',      vehicle:'Stealth Hoverbike', hair:'White Braids',    eyes:'Glowing Violet' },
+  { id:'s2', name:'ZERO NAKAMURA',  alias:'ZER0',         emoji:'🤖', faction:'Arasaka',        aug:'Titanium Arm',        vehicle:'Corp Skycar',       hair:'Black Shaved',    eyes:'Silver Chrome' },
+  { id:'s3', name:'FLUX REYES',     alias:'PHANTOM',      emoji:'💀', faction:'Maelstrom',      aug:'Facial Dermal Armor', vehicle:'Armored Groundbike',hair:'Red Mohawk',      eyes:'Red Optical' },
+  { id:'s4', name:'ECHO VANCE',     alias:'GHOST',        emoji:'🧬', faction:'Nomads',         aug:'Neural Bridge X12',   vehicle:'Nomad Crawler',     hair:'Long Silver',     eyes:'Mirrored Blue' },
+  { id:'s5', name:'STATIC QUINN',   alias:'SPLICE',       emoji:'⚡', faction:'Militech',       aug:'Subdermal HUD',       vehicle:'EMP Moped',         hair:'Neon Blue Pixie', eyes:'Yellow LED' },
+  { id:'s6', name:'GLITCH OSEI',    alias:'DAEMON',       emoji:'🔥', faction:'Bartmoss Cult',  aug:'Mantis Blades',       vehicle:'Stolen Megrotaxi',  hair:'Natural Dreads',  eyes:'Burning Orange' },
+];
+
+const CLUE_TEMPLATES = [
+  t => `Informant says the runner had ${t.hair} hair`,
+  t => `Surveillance feed caught ${t.eyes} optical implants`,
+  t => `Gang tags near exit match ${t.faction} iconography`,
+  t => `Tool marks left by ${t.aug}`,
+  t => `Traffic cams logged a ${t.vehicle} leaving the zone`,
+  t => `Street doc sold neural stims — customer had ${t.hair} hair`,
+  t => `Bouncer noticed someone with ${t.aug} at the black market`,
+  t => `Graffiti left: "${t.faction}" gang symbol spray-painted in neon`,
+  t => `Drone scan of escape route found ${t.vehicle} exhaust signature`,
+  t => `Netrunner trace matches ${t.faction} cellular encryption`,
+];
+
+const CLUE_ICONS = ['🔬','📡','🕵','👁','🔊','📷','💬','🧩','🚀','🌐'];
+
+// ── MAP RENDERER ───────────────────────────────────────────────────────────
+
+function drawCityMap(canvas, cityId) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const city = CITIES.find(c => c.id === cityId) || CITIES[0];
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background gradient
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, city.bg);
+  grad.addColorStop(1, '#050810');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = city.color + '15';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Buildings (deterministic from city seed)
+  const seed = city.id.charCodeAt(0) + city.id.charCodeAt(1);
+  const rng = (n) => Math.abs(Math.sin(n * 127.1 + seed * 311.7)) % 1;
+
+  const numBuildings = 18;
+  for (let i = 0; i < numBuildings; i++) {
+    const bw = 28 + rng(i * 5) * 50;
+    const bh = 40 + rng(i * 7) * 160;
+    const bx = (i / numBuildings) * (W + 20) - 10 + rng(i * 3) * 20;
+    const by = H - bh;
+
+    // Building body
+    const bgrad = ctx.createLinearGradient(bx, by, bx, H);
+    bgrad.addColorStop(0, city.color + '22');
+    bgrad.addColorStop(1, city.color + '08');
+    ctx.fillStyle = bgrad;
+    ctx.fillRect(bx, by, bw, bh);
+
+    // Outline
+    ctx.strokeStyle = city.color + '40';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, bw, bh);
+
+    // Windows
+    ctx.fillStyle = city.color;
+    for (let wy = by + 8; wy < H - 8; wy += 12) {
+      for (let wx = bx + 5; wx < bx + bw - 8; wx += 10) {
+        if (rng(wx * 3.7 + wy * 2.3 + i) > 0.45) {
+          const alpha = 0.3 + rng(wx + wy) * 0.5;
+          ctx.globalAlpha = alpha;
+          ctx.fillRect(wx, wy, 5, 4);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+  }
+
+  // All city nodes on map
+  CITIES.forEach(c => {
+    const nx = c.x * W, ny = c.y * H;
+    const isCurrent = c.id === cityId;
+
+    // Node glow
+    const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, isCurrent ? 30 : 16);
+    ng.addColorStop(0, c.color + (isCurrent ? '60' : '30'));
+    ng.addColorStop(1, 'transparent');
+    ctx.fillStyle = ng;
+    ctx.beginPath(); ctx.arc(nx, ny, isCurrent ? 30 : 16, 0, Math.PI * 2); ctx.fill();
+
+    // Node dot
+    ctx.beginPath(); ctx.arc(nx, ny, isCurrent ? 7 : 4, 0, Math.PI * 2);
+    ctx.fillStyle = c.color;
+    ctx.fill();
+
+    if (isCurrent) {
+      // Outer ring
+      ctx.strokeStyle = c.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(nx, ny, 14, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // City label
+    ctx.fillStyle = c.color;
+    ctx.font = `${isCurrent ? '700' : '500'} ${isCurrent ? 9 : 7}px Courier New`;
+    ctx.textAlign = 'center';
+    ctx.fillText(c.name, nx, ny + (isCurrent ? 26 : 20));
+  });
+
+  // Scan line across map
+  const now = Date.now();
+  const scanY = ((now / 3000) % 1) * H;
+  const scanGrad = ctx.createLinearGradient(0, scanY - 4, 0, scanY + 4);
+  scanGrad.addColorStop(0, 'transparent');
+  scanGrad.addColorStop(0.5, city.color + '30');
+  scanGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = scanGrad;
+  ctx.fillRect(0, scanY - 4, W, 8);
+}
+
+// ── GAME ENGINE ────────────────────────────────────────────────────────────
+
+const game = (() => {
+  let state = {};
+  let timerInterval = null;
+  let mapInterval = null;
+
+  function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function shuffle(arr) { return arr.slice().sort(() => Math.random() - 0.5); }
+  function pick(arr, n) { return shuffle(arr).slice(0, n); }
+
+  function log(msg) {
+    const area = document.getElementById('log-area');
+    const span = document.createElement('span');
+    span.className = 'log-entry';
+    span.textContent = msg;
+    area.prepend(span);
+    if (area.children.length > 10) area.removeChild(area.lastChild);
+  }
+
+  function start() {
+    document.getElementById('intro-overlay').classList.add('hidden');
+    newCase();
+  }
+
+  function restart() {
+    document.getElementById('win-overlay').classList.add('hidden');
+    document.getElementById('lose-overlay').classList.add('hidden');
+    newCase();
+  }
+
+  function newCase() {
+    if (timerInterval) clearInterval(timerInterval);
+    if (mapInterval) clearInterval(mapInterval);
+
+    // Choose criminal and starting city
+    const criminal = rand(SUSPECTS);
+    const cityRoute = shuffle(CITIES.map(c => c.id));
+    const startCity = cityRoute[0];
+    const criminalCity = cityRoute[1]; // Where they actually are
+
+    state = {
+      criminal,
+      caseNum: (state.caseNum || 0) + 1,
+      currentCity: startCity,
+      criminalCity,
+      movesLeft: 6,
+      timeLeft: 120,
+      score: (state.score || 0),
+      cluesGathered: [],
+      eliminatedSuspects: [],
+      knownAttrs: {},
+      selectedSuspect: null,
+      over: false,
+    };
+
+    updateHUD();
+    renderCityInfo();
+    renderClues();
+    renderDestinations();
+    renderDossier();
+    renderSuspects();
+    renderArrestBtn();
+    document.getElementById('log-area').innerHTML = '';
+    log(`Case #${state.caseNum} opened. Criminal traced to megacity grid.`);
+    log(`You're at ${CITIES.find(c=>c.id===state.currentCity).name}. Start investigating.`);
+
+    // Map animation loop
+    const canvas = document.getElementById('map-canvas');
+    mapInterval = setInterval(() => drawCityMap(canvas, state.currentCity), 100);
+    drawCityMap(canvas, state.currentCity);
+
+    // Timer countdown
+    timerInterval = setInterval(() => {
+      if (state.over) { clearInterval(timerInterval); return; }
+      state.timeLeft--;
+      updateHUD();
+      const pct = (state.timeLeft / 120) * 100;
+      const bar = document.getElementById('timer-bar');
+      bar.style.width = pct + '%';
+      bar.style.background = pct > 50 ? 'var(--neon-orange)' : pct > 25 ? '#ffcc00' : 'var(--neon-pink)';
+      if (state.timeLeft <= 0) {
+        clearInterval(timerInterval);
+        endGame(false, 'Time expired. Criminal escaped into the dark web.');
+      }
+    }, 1000);
+  }
+
+  function updateHUD() {
+    document.getElementById('case-num').textContent = String(state.caseNum).padStart(2,'0');
+    document.getElementById('move-count').textContent = state.movesLeft;
+    document.getElementById('score-val').textContent = state.score;
+    document.getElementById('timer-val').textContent = state.timeLeft;
+  }
+
+  function renderCityInfo() {
+    const city = CITIES.find(c => c.id === state.currentCity);
+    document.getElementById('city-name').textContent = city.name;
+    document.getElementById('city-sub').textContent = city.sub;
+    document.getElementById('city-name').style.color = city.color;
+    drawCityMap(document.getElementById('map-canvas'), state.currentCity);
+  }
+
+  function renderClues() {
+    const grid = document.getElementById('clue-grid');
+    grid.innerHTML = '';
+
+    // Generate 3 clues about the criminal — some real, some noise
+    const criminal = state.criminal;
+    const allClues = CLUE_TEMPLATES.map((fn, i) => ({ text: fn(criminal), icon: CLUE_ICONS[i] }));
+    const chosen = pick(allClues, 3);
+
+    chosen.forEach(clue => {
+      // Is this clue near the criminal's trail?
+      const isTrailClue = state.currentCity === state.criminalCity || Math.random() > 0.4;
+      const div = document.createElement('div');
+      div.className = 'clue-item';
+      div.innerHTML = `
+        <span class="clue-icon">${clue.icon}</span>
+        <span class="clue-text">${clue.text} <span class="clue-tag">${isTrailClue ? 'VERIFIED' : 'UNVERIFIED'}</span></span>
+      `;
+      if (isTrailClue) {
+        // Actually reveal an attribute
+        revealAttrFromClue(clue.text);
+      }
+      grid.appendChild(div);
+    });
+  }
+
+  function revealAttrFromClue(text) {
+    const c = state.criminal;
+    if (text.includes(c.hair))    state.knownAttrs.hair = c.hair;
+    if (text.includes(c.eyes))    state.knownAttrs.eyes = c.eyes;
+    if (text.includes(c.faction)) state.knownAttrs.faction = c.faction;
+    if (text.includes(c.aug))     state.knownAttrs.aug = c.aug;
+    if (text.includes(c.vehicle)) state.knownAttrs.vehicle = c.vehicle;
+    renderDossier();
+    renderSuspects();
+    renderArrestBtn();
+  }
+
+  function renderDossier() {
+    const ka = state.knownAttrs;
+    const attrList = document.getElementById('attr-list');
+    const portrait = document.getElementById('suspect-portrait');
+
+    const revealed = Object.keys(ka).length;
+    if (revealed >= 3 && state.selectedSuspect === state.criminal.id) {
+      portrait.textContent = state.criminal.emoji;
+      portrait.classList.add('revealed');
+    } else if (revealed >= 2) {
+      portrait.textContent = '⚠';
+      portrait.classList.remove('revealed');
+    } else {
+      portrait.textContent = '❓';
+      portrait.classList.remove('revealed');
+    }
+
+    attrList.innerHTML = '';
+    const attrs = [
+      { key: 'HAIR', val: ka.hair },
+      { key: 'EYES', val: ka.eyes },
+      { key: 'FACTION', val: ka.faction },
+      { key: 'AUGMENT', val: ka.aug },
+      { key: 'VEHICLE', val: ka.vehicle },
+    ];
+    attrs.forEach(a => {
+      const div = document.createElement('div');
+      div.className = 'attr-row';
+      div.innerHTML = `
+        <span class="attr-key">${a.key}</span>
+        <span class="attr-val ${a.val ? 'known' : 'unknown'}">${a.val || '[ UNKNOWN ]'}</span>
+      `;
+      attrList.appendChild(div);
+    });
+  }
+
+  function renderSuspects() {
+    const grid = document.getElementById('suspect-grid');
+    grid.innerHTML = '';
+    SUSPECTS.forEach(s => {
+      const eliminated = state.eliminatedSuspects.includes(s.id);
+      const chip = document.createElement('button');
+      chip.className = 'suspect-chip' + (eliminated ? ' eliminated' : '');
+      chip.innerHTML = `<span class="chip-name">${s.emoji} ${s.name}</span><span class="chip-alias">"${s.alias}"</span>`;
+      chip.onclick = () => selectSuspect(s.id);
+      chip.disabled = eliminated;
+      if (state.selectedSuspect === s.id) {
+        chip.style.borderColor = 'var(--neon-pink)';
+        chip.style.color = 'var(--neon-pink)';
+      }
+      grid.appendChild(chip);
+    });
+  }
+
+  function selectSuspect(id) {
+    state.selectedSuspect = id;
+    renderSuspects();
+    renderDossier();
+    renderArrestBtn();
+    const s = SUSPECTS.find(x => x.id === id);
+    log(`Suspect ${s.name} flagged in dossier.`);
+  }
+
+  function renderArrestBtn() {
+    const btn = document.getElementById('arrest-btn');
+    // Enable if selected a suspect and gathered enough clues
+    const canArrest = state.selectedSuspect && Object.keys(state.knownAttrs).length >= 2;
+    btn.disabled = !canArrest;
+  }
+
+  function renderDestinations() {
+    const grid = document.getElementById('dest-grid');
+    grid.innerHTML = '';
+    const others = CITIES.filter(c => c.id !== state.currentCity);
+    // Show 3 destinations
+    pick(others, 3).forEach(city => {
+      const btn = document.createElement('button');
+      btn.className = 'dest-btn';
+      const isCriminalCity = city.id === state.criminalCity;
+      btn.innerHTML = `
+        <span style="font-size:1.2rem">${isCriminalCity ? '🎯' : '🌐'}</span>
+        <div>
+          <div class="dest-name" style="color:${city.color}">${city.name}</div>
+          <div class="dest-zone">${city.sub}</div>
+        </div>
+        <span class="dest-arrow">→</span>
+      `;
+      // Hide the trail indicator — player can't see it; just cosmetic
+      btn.querySelector('.dest-name').style.color = city.color;
+      btn.onclick = () => travelTo(city.id);
+      grid.appendChild(btn);
+    });
+  }
+
+  function travelTo(cityId) {
+    if (state.over) return;
+    if (state.movesLeft <= 0) {
+      endGame(false, 'No moves remaining. Criminal slipped through the net.');
+      return;
+    }
+
+    state.movesLeft--;
+    state.currentCity = cityId;
+    const city = CITIES.find(c => c.id === cityId);
+    log(`Jumped to ${city.name}.`);
+
+    if (cityId === state.criminalCity) {
+      log('TRAIL HOT — Criminal signature detected in this node!');
+      // Bonus clues when at criminal's city
+      Object.assign(state.knownAttrs, {
+        faction: state.criminal.faction,
+        aug: state.criminal.aug,
+      });
+    }
+
+    updateHUD();
+    renderCityInfo();
+    renderClues();
+    renderDestinations();
+    renderDossier();
+    renderSuspects();
+    renderArrestBtn();
+  }
+
+  function issueArrest() {
+    if (state.over || !state.selectedSuspect) return;
+    const suspect = SUSPECTS.find(s => s.id === state.selectedSuspect);
+    if (suspect.id === state.criminal.id) {
+      // Correct!
+      const bonus = state.movesLeft * 50 + state.timeLeft * 5;
+      state.score += 500 + bonus;
+      endGame(true,
+        `${state.criminal.name} ("${state.criminal.alias}") apprehended in ${CITIES.find(c=>c.id===state.currentCity).name}.\n` +
+        `Evidence: ${Object.values(state.knownAttrs).join(', ')}.\n` +
+        `Score: +${500 + bonus} (${state.movesLeft} moves left, ${state.timeLeft}s remaining)`
+      );
+    } else {
+      // Wrong!
+      log(`WRONG SUSPECT: ${suspect.name} released. Credibility damaged.`);
+      state.score = Math.max(0, state.score - 100);
+      state.eliminatedSuspects.push(suspect.id);
+      state.selectedSuspect = null;
+      updateHUD();
+      renderSuspects();
+      renderDossier();
+      renderArrestBtn();
+    }
+  }
+
+  function endGame(won, msg) {
+    state.over = true;
+    clearInterval(timerInterval);
+    if (won) {
+      document.getElementById('win-msg').textContent = msg;
+      document.getElementById('win-overlay').classList.remove('hidden');
+    } else {
+      document.getElementById('lose-msg').textContent =
+        msg + `\n\nThe criminal was ${state.criminal.name} ("${state.criminal.alias}").`;
+      document.getElementById('lose-overlay').classList.remove('hidden');
+    }
+  }
+
+  return { start, restart, issueArrest };
+})();
+</script>
+</body>
+</html>
