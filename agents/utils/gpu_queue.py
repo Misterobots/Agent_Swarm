@@ -34,19 +34,18 @@ TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (2
 def _get_preferred_host(model_name: str) -> str:
     """
     Static hardware-aware routing (no health checks).
-    - Lovelace (Local): 2x 16GB VRAM (5060 Ti). Primary inference for all task models.
-    - Turing (Secondary): 8GB VRAM (3070 Ti). Dedicated to safety + embeddings only.
-    
-    After model consolidation, qwen3.6:27b is the primary workhorse and always
-    runs on Lovelace. Only safety and embedding models route to Turing.
-    """
-    # Turing models — async safety + embeddings (not latency-critical)
-    turing_models = ["llama-guard", "nomic-embed"]
+    - Lovelace (SECONDARY): 2x 16GB VRAM (5060 Ti, 32GB total). Primary for all large models.
+    - Turing (OLLAMA_HOST): 8GB VRAM (3070 Ti). Small models, safety, and embeddings only.
 
-    if any(m in model_name for m in turing_models):
-        return SECONDARY_OLLAMA_HOST
-    # Everything else goes to Lovelace (fast CPU, dual 5060 Ti)
-    return OLLAMA_HOST
+    Default: Lovelace. Only models that fit within Turing's 8GB VRAM route there.
+    """
+    # Models confirmed to fit on Turing (≤8B params / safety / embeddings)
+    turing_safe = ["llama-guard", "nomic-embed", "qwen3:0", "qwen3:1", "qwen3:4", "qwen3:8b"]
+
+    if any(m in model_name for m in turing_safe):
+        return OLLAMA_HOST
+    # Everything else goes to Lovelace (dual 5060 Ti, 32GB VRAM)
+    return SECONDARY_OLLAMA_HOST
 
 
 def _get_fallback_host(preferred: str) -> str:
@@ -130,18 +129,24 @@ def get_swarm_worker_host(model_name: str) -> str:
     """
     Round-robin host selector for swarm coordinator workers.
 
-    Instead of routing every worker to the single "best" host (which causes
-    them to queue internally on one GPU), this distributes successive worker
-    requests across all *healthy* Ollama endpoints — OLLAMA_HOST (Turing) and
-    SECONDARY_OLLAMA_HOST (Lovelace) — so multiple workers can run in true
-    GPU-level parallel.
+    Distributes workers across GPU hosts for parallel execution, BUT only
+    includes a host in the pool if the model can actually run there.
+    - Small models (<=8B, safety, embeds): Turing + Lovelace pool (round-robin)
+    - Large models (>8B): Lovelace only (Turing has 8GB VRAM, not enough)
     """
-    candidates = [OLLAMA_HOST]
-    if SECONDARY_OLLAMA_HOST and SECONDARY_OLLAMA_HOST != OLLAMA_HOST:
-        candidates.append(SECONDARY_OLLAMA_HOST)
+    preferred = _get_preferred_host(model_name)
+
+    if preferred == OLLAMA_HOST:
+        # Small model — can run on either host; round-robin for parallelism
+        candidates = [OLLAMA_HOST]
+        if SECONDARY_OLLAMA_HOST and SECONDARY_OLLAMA_HOST != OLLAMA_HOST:
+            candidates.append(SECONDARY_OLLAMA_HOST)
+    else:
+        # Large model — Lovelace only; no round-robin to Turing (OOM risk)
+        candidates = [SECONDARY_OLLAMA_HOST]
 
     if len(candidates) == 1:
-        logger.debug(f"[GPU Round-Robin] Only one host available; using {candidates[0]}.")
+        logger.debug(f"[GPU Round-Robin] Single eligible host for '{model_name}': {candidates[0]}.")
         return candidates[0]
 
     # Filter to healthy hosts; fall back to all candidates if health check fails
