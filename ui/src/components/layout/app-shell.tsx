@@ -57,7 +57,7 @@ export function AppShell({ children }: AppShellProps) {
       )}
 
       {/* Main content */}
-      <div className={cn("flex-1 flex flex-col min-w-0 overflow-x-hidden", isMobile && "pb-14")}>
+      <div className={cn("flex-1 flex flex-col min-w-0 overflow-hidden", isMobile && "pb-14")}>
         {/* Toggle button — desktop/tablet only */}
         {!isMobile && (
           <button

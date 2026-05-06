@@ -13,7 +13,7 @@ export default function DevPage() {
   } = useDevStore();
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--chat-bg)] border-b border-[var(--chat-border)]">
         <div className="flex items-center gap-2">
@@ -59,7 +59,7 @@ export default function DevPage() {
       </div>
 
       {/* Workspace */}
-      <div className="flex-1">
+      <div className="flex-1 overflow-hidden">
         <DevWorkspace />
       </div>
     </div>
