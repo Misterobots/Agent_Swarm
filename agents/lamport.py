@@ -1114,7 +1114,7 @@ def coordinate_task(
                         f"{_points_text}\n\nPlease clarify any of the above to proceed."
                     )
                     _clarif_context = f"Ambiguity remaining: {synth_ambiguity:.0%}"
-                    _clarif_options = [p[:60] for p in synth_ambiguous_points[:4]]
+                    _clarif_options = [{"label": p[:60], "value": p[:60]} for p in synth_ambiguous_points[:4]]
                 else:
                     _clarif_question = (
                         f"Research complete but confidence is {synth_confidence:.0%} (need ≥95%). "
