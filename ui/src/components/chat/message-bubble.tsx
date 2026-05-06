@@ -385,16 +385,17 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
                 ))}
               </div>
             )}
-            {message.pendingClarification && onSelectClarification && (
-              <ClarificationCard
-                card={message.pendingClarification}
-                onSelect={onSelectClarification}
-                disabled={isStreaming}
-              />
-            )}
           </>
         ) : (
           <span className="inline-block w-2 h-4 bg-[var(--chat-accent)] animate-pulse rounded-sm streaming-caret" />
+        )}
+        {/* ClarificationCard — rendered outside content conditional so it shows even when content is empty */}
+        {message.pendingClarification && onSelectClarification && (
+          <ClarificationCard
+            card={message.pendingClarification}
+            onSelect={onSelectClarification}
+            disabled={isStreaming}
+          />
         )}
         {/* Model queue status — rendered outside content conditional so it shows even when content is empty */}
         {message.pendingQueueStatus && (

@@ -965,35 +965,25 @@ def chat_swarm(
                 return
 
             elif user_input.startswith("new_project"):
-                # In dev_mode, skip onboarding and go straight to building
-                if dev_mode:
-                    logger.info("[Router] Dev project (dev_mode): routing to coordinator for direct implementation.")
-                    user_input = original_prompt
-                    yield {"type": "log", "content": "[Context Manager] Dev mode: building directly..."}
-                    from lamport import coordinate_task as _coord
-                    yield {"type": "status", "content": "🛠️ Launching coordinator..."}
-                    for chunk in _coord(
-                        user_input,
-                        session_id=session_id,
-                        owner_id=owner_id,
-                        history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                        extracted_context=extracted_context,
-                        ace_token=ace_token,
-                        ultraplan_mode=ultraplan_mode,
-                        dev_mode=dev_mode,
-                    ):
-                        yield chunk
-                    return
-                else:
-                    logger.info("[Router] Dev project: launching onboarding flow.")
-                    from lamport import coordinate_project_onboarding as _onboard
-                    for chunk in _onboard(
-                        original_prompt,
-                        session_id=session_id,
-                        owner_id=owner_id,
-                    ):
-                        yield chunk
-                    return
+                # Always route directly to coordinator — skip multi-step onboarding for new projects.
+                # dev_mode=True unlocks workspace-scoped tools so pioneers can write files.
+                logger.info("[Router] Dev project (new): routing directly to coordinator for implementation.")
+                user_input = original_prompt
+                yield {"type": "log", "content": "[Context Manager] New project: launching coordinator..."}
+                from lamport import coordinate_task as _coord
+                yield {"type": "status", "content": "🛠️ Launching coordinator..."}
+                for chunk in _coord(
+                    user_input,
+                    session_id=session_id,
+                    owner_id=owner_id,
+                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
+                    extracted_context=extracted_context,
+                    ace_token=ace_token,
+                    ultraplan_mode=ultraplan_mode,
+                    dev_mode=True,
+                ):
+                    yield chunk
+                return
 
             else:
                 # plan_only or freetext — treat as external research
