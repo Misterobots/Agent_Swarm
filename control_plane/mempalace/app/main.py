@@ -746,6 +746,51 @@ async def get_memory_stats_mcp() -> str:
     return "\n".join(lines)
 
 
+@_mcp.tool()
+async def extract_from_conversation_mcp(
+    conversation: str,
+    owner_id: str = "",
+    agent_id: str = "",
+    domain: str = "general",
+) -> str:
+    """Extract and store multiple memories from a conversation or session summary.
+
+    Pass a ~500-word summary of the session (decisions made, bugs fixed, patterns
+    discovered, configurations confirmed).  The LLM extraction pipeline will
+    identify discrete facts and store each one with an embedding.
+
+    Returns a summary of how many memories were stored.
+    """
+    extracted = await extract_memories(conversation)
+    if not extracted:
+        return "No memories extracted from conversation."
+
+    contents = [m["content"] for m in extracted]
+    embeddings = await embed_texts(contents)
+
+    stored_ids = []
+    async with async_session() as session:
+        for item, emb in zip(extracted, embeddings):
+            mem = Memory(
+                content=item["content"],
+                memory_type=item.get("memory_type", "semantic"),
+                domain=item.get("domain", domain),
+                agent_id=agent_id or None,
+                owner_id=owner_id or None,
+                embedding=emb,
+                metadata_={},
+            )
+            session.add(mem)
+            stored_ids.append(item["content"][:80])
+        await session.commit()
+
+    logger.info("[MCP] extract_from_conversation stored %d memories (owner=%s)", len(stored_ids), owner_id)
+    lines = [f"Stored {len(stored_ids)} memories:"]
+    for s in stored_ids:
+        lines.append(f"  - {s}…")
+    return "\n".join(lines)
+
+
 app.mount("/mcp", _mcp.sse_app())
 
 
