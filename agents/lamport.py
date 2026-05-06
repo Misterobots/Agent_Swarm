@@ -1149,7 +1149,7 @@ def coordinate_task(
                 ),
             }
 
-            if synth_confidence >= required_confidence and synth_ambiguity <= 0.05:
+            if synth_confidence >= required_confidence and synth_ambiguity <= 0.25:
                 break
 
             if synth_pass >= max_synth_passes:
@@ -1175,10 +1175,29 @@ def coordinate_task(
                 # Build the clarification card using the LLM-generated question and suggestions.
                 # Priority: use the LLM's clarification_question if it generated one,
                 # otherwise fall back to constructing one from the ambiguous points.
-                if synth_clarification_question:
+                # QUALITY GATE: reject generic/vague questions — if none survive, proceed without asking.
+                _GENERIC_SYNTH_PHRASES = (
+                    "more detail", "more context", "more information", "provide more",
+                    "can you clarify", "could you clarify", "what do you mean",
+                    "please clarify", "please provide", "help me proceed",
+                    "additional detail", "additional context",
+                )
+                _q_lower = (synth_clarification_question or "").lower()
+                _question_is_valid = bool(synth_clarification_question) and not any(
+                    p in _q_lower for p in _GENERIC_SYNTH_PHRASES
+                )
+                if not _question_is_valid and not synth_ambiguous_points:
+                    # No useful question and no ambiguous points — just proceed with the plan.
+                    logger.info(
+                        "[Coordinator] Synthesis thresholds not met but no specific clarification "
+                        "question available — proceeding without clarification card."
+                    )
+                    break
+
+                if _question_is_valid:
                     _clarif_question = synth_clarification_question
                 elif synth_ambiguous_points:
-                    _clarif_question = f"Which of the following would you like to clarify first?"
+                    _clarif_question = "Which of the following would you like to clarify first?"
                 else:
                     _clarif_question = "Could you provide more detail to help me proceed?"
 
