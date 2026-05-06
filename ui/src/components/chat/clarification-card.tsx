@@ -20,9 +20,11 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
   const handleOption = (value: string, redirect?: string) => {
     if (disabled || selected) return;
     setSelected(value);
-    onSelect(value);
     if (redirect) {
-      setTimeout(() => router.push(redirect), 200);
+      // Pure navigation — no backend round-trip, just go there directly
+      router.push(redirect);
+    } else {
+      onSelect(value);
     }
   };
 
