@@ -672,8 +672,15 @@ async def palace_layout(
 # ═══════════════════════════════════════════════════════════════════════════
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
-_mcp = FastMCP("MemPalace")
+_mcp = FastMCP(
+    "MemPalace",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["192.168.2.102:*", "localhost:*", "127.0.0.1:*", "hopper:*"],
+    ),
+)
 
 
 @_mcp.tool()
