@@ -303,13 +303,25 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
                 "system": system_prompt,
                 "stream": False,
                 "format": "json",
+                "think": False,
                 "options": {"temperature": 0.3, "num_predict": 1024},
             },
             timeout=60,
         )
 
         if resp.status_code == 200:
-            raw = resp.json().get("response", "{}")
+            raw = resp.json().get("response", "{}") or "{}"
+            # Thinking models (qwen3.x) may return empty response with content only in thinking tokens
+            # Strip <think>...</think> blocks if present, then extract first JSON object
+            import re as _re_decomp
+            raw = _re_decomp.sub(r"<think>.*?</think>", "", raw, flags=_re_decomp.DOTALL).strip() or "{}"
+            # Strip markdown code fences
+            raw = _re_decomp.sub(r"```(?:json)?", "", raw, flags=_re_decomp.IGNORECASE).replace("```", "").strip()
+            if not raw or raw == "{}":
+                # Last resort: try the thinking field directly
+                thinking = resp.json().get("thinking", "") or ""
+                m = _re_decomp.search(r"\{.*\}", thinking, _re_decomp.DOTALL)
+                raw = m.group(0) if m else "{}"
             parsed = json.loads(raw)
             # Validate structure — ensure required keys exist
             if "research_tasks" not in parsed or not parsed["research_tasks"]:
