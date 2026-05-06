@@ -385,7 +385,7 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                 "prompt": prompt,
                 "system": system_prompt,
                 "stream": False,
-                "options": {"temperature": 0.4, "num_predict": 4096, "num_ctx": 32768},
+                "options": {"temperature": 0.4, "num_predict": 8192, "num_ctx": 32768},
             },
             timeout=240,
         )
@@ -447,7 +447,19 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
             else:
                 logger.warning(f"[Coordinator] Could not parse synthesis JSON block from response tail: {raw_text[-200:]!r}")
             if not plan_text:
+                # Model returned a response but plan text was empty after JSON extraction.
+                # (Commonly: thinking model used full num_predict budget on <think> tokens,
+                # or placed the JSON first leaving nothing before it.)
                 plan_text = "Synthesis failed — no response from model."
+                # Override confidence so the outer retry loop triggers instead of
+                # proceeding with an empty/failed plan.
+                confidence = 0.0
+                ambiguity = 1.0
+                logger.warning(
+                    "[Coordinator] Synthesis plan_text empty after JSON extraction — "
+                    f"forcing confidence=0.0 to trigger retry. raw_text len={len(raw_text)}, "
+                    f"scores={scores}"
+                )
             return {"plan": plan_text, "confidence": confidence, "ambiguity": ambiguity, "ambiguous_points": ambiguous_points}
     except Exception as e:
         logger.error(f"[Coordinator] Synthesis failed: {e}")
@@ -1044,6 +1056,20 @@ def coordinate_task(
             synth_confidence = synth_result["confidence"]
             synth_ambiguity = synth_result["ambiguity"]
             synth_ambiguous_points = synth_result.get("ambiguous_points", [])
+
+            # Safety-net: if plan is the error fallback string or suspiciously short,
+            # force failure regardless of reported confidence so we always retry.
+            _MIN_SYNTHESIS_LEN = 300
+            if len(synthesis) < _MIN_SYNTHESIS_LEN or synthesis.startswith("Synthesis failed"):
+                yield {
+                    "type": "log",
+                    "content": (
+                        f"[Coordinator] Synthesis pass {synth_pass} produced only "
+                        f"{len(synthesis)} chars — treating as failure and retrying."
+                    ),
+                }
+                synth_confidence = 0.0
+                synth_ambiguity = 1.0
 
             # Threshold: 90% first pass, 95% on subsequent passes
             required_confidence = 0.90 if synth_pass == 1 else 0.95
