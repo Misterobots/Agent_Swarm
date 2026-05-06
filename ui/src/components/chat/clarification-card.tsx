@@ -34,35 +34,45 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
   };
 
   const headerColor =
-    card.card_type === "dev_project"
+    card.card_type === "dev_mode_gate"
+      ? "bg-cyan-950/30 border-cyan-700/40"
+      : card.card_type === "dev_project"
       ? "bg-blue-950/30 border-blue-700/40"
       : card.card_type === "onboarding"
       ? "bg-emerald-950/30 border-emerald-700/40"
       : "bg-amber-950/30 border-amber-700/40";
 
   const headerText =
-    card.card_type === "dev_project"
+    card.card_type === "dev_mode_gate"
+      ? "text-cyan-200"
+      : card.card_type === "dev_project"
       ? "text-blue-200"
       : card.card_type === "onboarding"
       ? "text-emerald-200"
       : "text-amber-200";
 
   const headerBorder =
-    card.card_type === "dev_project"
+    card.card_type === "dev_mode_gate"
+      ? "border-cyan-700/50"
+      : card.card_type === "dev_project"
       ? "border-blue-700/50"
       : card.card_type === "onboarding"
       ? "border-emerald-700/50"
       : "border-amber-700/50";
 
   const optionHover =
-    card.card_type === "dev_project"
+    card.card_type === "dev_mode_gate"
+      ? "hover:border-cyan-600 hover:text-cyan-300"
+      : card.card_type === "dev_project"
       ? "hover:border-blue-600 hover:text-blue-300"
       : card.card_type === "onboarding"
       ? "hover:border-emerald-600 hover:text-emerald-300"
       : "hover:border-amber-600 hover:text-amber-300";
 
   const selectedStyle =
-    card.card_type === "dev_project"
+    card.card_type === "dev_mode_gate"
+      ? "border-cyan-600 text-cyan-300 bg-cyan-900/20"
+      : card.card_type === "dev_project"
       ? "border-blue-600 text-blue-300 bg-blue-900/20"
       : card.card_type === "onboarding"
       ? "border-emerald-600 text-emerald-300 bg-emerald-900/20"
@@ -73,7 +83,9 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
       {/* Header */}
       <div className={cn("px-3 py-2 border-b", headerColor, headerBorder)}>
         <span className={cn("text-xs font-semibold", headerText)}>
-          {card.card_type === "dev_project"
+          {card.card_type === "dev_mode_gate"
+            ? "⚡ Dev Mode Required"
+            : card.card_type === "dev_project"
             ? "🛠️ Project Setup"
             : card.card_type === "onboarding"
             ? "🚀 New Project"

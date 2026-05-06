@@ -992,6 +992,86 @@ def chat_swarm(
                 yield {"type": "log", "content": "[Context Manager] Plan-only mode — research and plan without code changes."}
                 # Fall through to normal routing below
 
+        elif pending_ctx.get("type") == "dev_mode_gate":
+            original_prompt = pending_ctx.get("prompt", "")
+            clear_context(session_id=session_id, owner_id=owner_id)
+
+            if user_input.startswith("switch_to_dev_mode"):
+                logger.info("[Router] Dev mode gate: user chose to switch to Dev Mode.")
+                yield {
+                    "type": "delta",
+                    "content": (
+                        "Opening the **Developer** workspace...\n\n"
+                        "Your request has been saved. In the **Developer** tab:\n"
+                        "1. Enable the **🤖 Agent** toggle\n"
+                        "2. Re-send your request for full implementation (file creation, code execution, live preview)\n\n"
+                        f"Your original request was:\n> *{original_prompt[:200]}{'...' if len(original_prompt) > 200 else ''}*"
+                    ),
+                }
+                return
+
+            elif user_input.startswith("request_dev_access"):
+                logger.info("[Router] Dev mode gate: user requested dev access via governance.")
+                try:
+                    from liskov import governance_manager, RequestType
+                    item = governance_manager.submit_request(
+                        type=RequestType.DEV_MODE,
+                        description=(
+                            f"User {owner_id!r} requests Dev Mode access. "
+                            f"Task: {original_prompt[:300]}"
+                        ),
+                        user=owner_id or "anonymous",
+                    )
+                    yield {
+                        "type": "delta",
+                        "content": (
+                            f"✅ Dev Mode access request submitted (ID: `{item.id}`). "
+                            f"An admin will review your request.\n\n"
+                            "In the meantime, running a **research & planning pass**:\n"
+                        ),
+                    }
+                except Exception as _gov_e:
+                    logger.warning(f"[DevModeGate] Governance request failed: {_gov_e}")
+                    yield {
+                        "type": "delta",
+                        "content": "⚠️ Could not submit governance request. Running research & planning pass:\n",
+                    }
+                # Fall through: run in plan_mode after yielding the message
+                user_input = original_prompt
+                from lamport import coordinate_task as _coord
+                for chunk in _coord(
+                    user_input,
+                    session_id=session_id,
+                    owner_id=owner_id,
+                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
+                    extracted_context=extracted_context,
+                    ace_token=ace_token,
+                    ultraplan_mode=ultraplan_mode,
+                    dev_mode=True,   # skip lamport's inner gate
+                    plan_mode=True,  # research & plan only — no file writes
+                ):
+                    yield chunk
+                return
+
+            else:
+                # "plan_only" or freetext
+                logger.info("[Router] Dev mode gate: user chose plan-only.")
+                user_input = original_prompt
+                from lamport import coordinate_task as _coord
+                for chunk in _coord(
+                    user_input,
+                    session_id=session_id,
+                    owner_id=owner_id,
+                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
+                    extracted_context=extracted_context,
+                    ace_token=ace_token,
+                    ultraplan_mode=ultraplan_mode,
+                    dev_mode=True,   # skip lamport's inner gate
+                    plan_mode=True,  # research & plan only — no file writes
+                ):
+                    yield chunk
+                return
+
     try:
         yield _emit_turn_metadata(turn_id, "Router", ["thinking"])
         yield _emit_stream_mode("thinking")
@@ -1543,6 +1623,54 @@ def chat_swarm(
 
         # --- ROUTE: COORDINATE (Multi-Worker Orchestration) ---
         if intent == "COORDINATE":
+            # --- DEV MODE GATE: intercept build/project requests when not in dev mode ---
+            _build_keywords = (
+                "build", "create", "make", "develop", "implement", "write a ",
+                "code ", "design a", "design an", "generate a", "generate an",
+                "program ", "app", "game", "website", "web app", "tool",
+            )
+            _is_build_request = any(kw in user_input.lower() for kw in _build_keywords)
+            if not dev_mode and _is_build_request:
+                logger.info("[Router] Coding/project request detected in standard mode — showing dev mode gate.")
+                try:
+                    from brooks import save_pending_context as _save_ctx
+                    _save_ctx(
+                        {"type": "dev_mode_gate", "prompt": user_input},
+                        session_id=session_id,
+                        owner_id=owner_id,
+                    )
+                except Exception as _e:
+                    logger.warning(f"[DevModeGate] Could not save context: {_e}")
+                yield {
+                    "type": "clarification_card",
+                    "clarification": {
+                        "question": "This looks like a project build request. Dev Mode unlocks file creation, code execution, and a live workspace. How would you like to proceed?",
+                        "context": "You're in standard chat mode. Switching to **Dev Mode** gives the swarm full implementation tools.",
+                        "options": [
+                            {
+                                "label": "Switch to Dev Mode",
+                                "value": "switch_to_dev_mode",
+                                "description": "Open the Developer workspace",
+                                "redirect": "/dev",
+                            },
+                            {
+                                "label": "Request Dev Access",
+                                "value": "request_dev_access",
+                                "description": "Submit a governance request",
+                            },
+                            {
+                                "label": "Research & Plan Only",
+                                "value": "plan_only",
+                                "description": "Run the swarm, no files written",
+                            },
+                        ],
+                        "allow_freetext": False,
+                        "card_type": "dev_mode_gate",
+                    },
+                }
+                return
+            # --- END DEV MODE GATE ---
+
             logger.info(f"[Coordinator] DEBUG: About to call coordinate_task with ultraplan_mode={ultraplan_mode}")
             yield _emit_turn_metadata(turn_id, "Coordinator", ["thinking", "tool-use", "responding"])
             yield _emit_stream_mode("thinking")

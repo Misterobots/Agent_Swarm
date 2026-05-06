@@ -12,6 +12,7 @@ GOVERNANCE_DB_PATH = "/workspace/governance.json"
 
 # --- Models ---
 class RequestType(str, Enum):
+    DEV_MODE = "DEV_MODE"              # Grant developer workspace / agentic coding access
     PACKAGE = "PACKAGE"          # pip install, apt install
     MODEL = "MODEL"              # Pull new model
     PERMISSION = "PERMISSION"    # Change file access
