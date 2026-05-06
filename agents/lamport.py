@@ -401,8 +401,14 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
         if resp.status_code == 200:
             resp_json = resp.json()
             raw_text = resp_json.get("response", "")
+            # Ollama 0.7+ thinking models (e.g. qwen3) put the visible output in
+            # "response" and the reasoning chain in "thinking". The model often writes
+            # its entire synthesis plan inside <think> tags, leaving "response" as
+            # just the JSON metadata block. Grab the thinking content so we can use
+            # it as plan_text if response contains only the JSON footer.
+            thinking_text = resp_json.get("thinking", "") or ""
             if not raw_text:
-                logger.warning(f"[Coordinator] Synthesis empty response. done_reason={resp_json.get('done_reason')} eval_count={resp_json.get('eval_count')}")
+                logger.warning(f"[Coordinator] Synthesis empty response. done_reason={resp_json.get('done_reason')} eval_count={resp_json.get('eval_count')} thinking_len={len(thinking_text)}")
             # Strip markdown code fences that models sometimes wrap JSON in
             import re as _re
             clean_text = _re.sub(r"```(?:json)?", "", raw_text, flags=_re.IGNORECASE).replace("```", "")
@@ -465,18 +471,25 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                 logger.warning(f"[Coordinator] Could not parse synthesis JSON block from response tail: {raw_text[-200:]!r}")
             if not plan_text:
                 # Model returned a response but plan text was empty after JSON extraction.
-                # (Commonly: thinking model used full num_predict budget on <think> tokens,
-                # or placed the JSON first leaving nothing before it.)
-                plan_text = "Synthesis failed — no response from model."
-                # Override confidence so the outer retry loop triggers instead of
-                # proceeding with an empty/failed plan.
-                confidence = 0.0
-                ambiguity = 1.0
-                logger.warning(
-                    "[Coordinator] Synthesis plan_text empty after JSON extraction — "
-                    f"forcing confidence=0.0 to trigger retry. raw_text len={len(raw_text)}, "
-                    f"scores={scores}"
-                )
+                # This is the normal behavior for Ollama thinking models (qwen3, etc.):
+                # the model writes the plan inside <think> tags → Ollama exposes it in the
+                # "thinking" field, not "response". Try to recover from thinking content.
+                if thinking_text:
+                    plan_text = thinking_text
+                    logger.info(
+                        f"[Coordinator] Using 'thinking' field as synthesis plan "
+                        f"({len(thinking_text)} chars, model put plan in <think> block)"
+                    )
+                else:
+                    # No thinking content either — genuine failure
+                    plan_text = "Synthesis failed — no response from model."
+                    confidence = 0.0
+                    ambiguity = 1.0
+                    logger.warning(
+                        "[Coordinator] Synthesis plan_text empty after JSON extraction — "
+                        f"forcing confidence=0.0 to trigger retry. raw_text len={len(raw_text)}, "
+                        f"scores={scores}"
+                    )
             return {
                 "plan": plan_text,
                 "confidence": confidence,
