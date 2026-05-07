@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User } from "lucide-react";
 import { BuddyWidget } from "@/components/buddy/buddy-widget";
 import { useAccess } from "@/lib/hooks/use-access";
+import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
 
 function HiveLogo() {
   return (
@@ -62,7 +63,7 @@ export function Sidebar() {
   const activeId = useChatStore((s) => s.activeConversationId);
   const setActive = useChatStore((s) => s.setActiveConversation);
   const createConversation = useChatStore((s) => s.createConversation);
-  const deleteConversation = useChatStore((s) => s.deleteConversation);
+  const { deleteConversation } = useConversationSync();
   const model = useSettingsStore((s) => s.model);
   const { isAdmin, authenticated, displayName } = useAccess();
   const showConversations = isConversationRoute(pathname);

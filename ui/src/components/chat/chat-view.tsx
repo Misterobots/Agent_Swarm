@@ -21,6 +21,7 @@ import { ChatPreviewPane } from "./chat-preview-pane";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import { useBuddyStore } from "@/lib/stores/buddy-store";
+import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import type { FileAttachment } from "@/types/chat";
 
@@ -56,6 +57,9 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
     },
     [editorSyncEnabled, activeFile, setEditorContent, setActiveFile]
   );
+
+  // Load conversations from server on mount for cross-device sync
+  useConversationSync();
 
   const devMode = showDevContext && agentEnabled;
 

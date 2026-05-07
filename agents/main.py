@@ -131,7 +131,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Trigger scheduler init failed (non-fatal): {e}")
 
-        # 7. Clean up orphaned training runs (status='running' but server restarted)
+        # 7. Initialize Conversation Store (cross-device sync)
+        try:
+            from conversation_store import init_table as _init_conv_table
+            _init_conv_table()
+        except Exception as e:
+            logger.warning(f"Conversation store init failed (non-fatal): {e}")
+
+        # 8. Clean up orphaned training runs (status='running' but server restarted)
         try:
             from config import TEMPLATE_DB_URL
             import psycopg2
@@ -1767,6 +1774,51 @@ async def buddy_get_achievements():
     except Exception as exc:
         logger.warning(f"[Buddy] get_achievements failed: {exc}")
         return {"achievements": [], "error": str(exc)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Conversation sync endpoints (cross-device persistence)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/v1/conversations")
+async def conv_list(request: Request):
+    """Return all conversations for the authenticated user."""
+    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    try:
+        from conversation_store import list_conversations
+        return {"conversations": list_conversations(owner_id)}
+    except Exception as exc:
+        logger.error(f"[ConvSync] list failed for {owner_id}: {exc}")
+        return {"conversations": [], "error": str(exc)}
+
+
+@app.put("/v1/conversations/{conv_id}")
+async def conv_upsert(conv_id: str, request: Request):
+    """Save (create or update) a conversation for the authenticated user."""
+    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    try:
+        body = await request.json()
+        if body.get("id") != conv_id:
+            return {"ok": False, "error": "id mismatch"}
+        from conversation_store import save_conversation
+        save_conversation(owner_id, body)
+        return {"ok": True}
+    except Exception as exc:
+        logger.error(f"[ConvSync] upsert failed for {owner_id}/{conv_id}: {exc}")
+        return {"ok": False, "error": str(exc)}
+
+
+@app.delete("/v1/conversations/{conv_id}")
+async def conv_delete(conv_id: str, request: Request):
+    """Delete a conversation for the authenticated user."""
+    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    try:
+        from conversation_store import delete_conversation
+        delete_conversation(owner_id, conv_id)
+        return {"ok": True}
+    except Exception as exc:
+        logger.error(f"[ConvSync] delete failed for {owner_id}/{conv_id}: {exc}")
+        return {"ok": False, "error": str(exc)}
 
 
 @app.get("/v1/training/status")

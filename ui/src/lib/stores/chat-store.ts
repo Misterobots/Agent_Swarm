@@ -29,6 +29,7 @@ interface ChatState {
   createConversation: (model?: string) => string;
   setActiveConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
+  replaceConversations: (conversations: Conversation[]) => void;
   updateConversation: (id: string, patch: Partial<Conversation>) => void;
   addMessage: (conversationId: string, message: Omit<ChatMessage, "id" | "timestamp">) => string;
   updateMessage: (conversationId: string, messageId: string, content: string) => void;
@@ -74,6 +75,9 @@ export const useChatStore = create<ChatState>()(
       },
 
       setActiveConversation: (id) => set({ activeConversationId: id }),
+
+      replaceConversations: (conversations) =>
+        set({ conversations }),
 
       deleteConversation: (id) =>
         set((state) => {

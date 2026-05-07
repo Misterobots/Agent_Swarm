@@ -426,6 +426,18 @@ export function useChatStream(options?: {
         if (swarmState.active && swarmState.theaterPhase !== "idle") {
           swarmState.setTheaterPhase("complete");
         }
+        // Persist completed conversation to server for cross-device sync
+        if (convId) {
+          const conv = useChatStore.getState().conversations.find((c) => c.id === convId);
+          if (conv) {
+            fetch(`/api/backend/v1/conversations/${convId}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(conv),
+            }).catch(() => {});
+          }
+        }
+
         thoughtTraceRef.current = [];
         toolCallTraceRef.current = [];
         toolLifecycleRef.current = [];
