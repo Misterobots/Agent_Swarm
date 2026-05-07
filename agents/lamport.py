@@ -137,6 +137,57 @@ WORKER_PIONEERS: dict[str, list[dict]] = {
         {"name": "Turing", "full_name": "Alan Turing",       "motto": "We can only see a short distance ahead, but we can see plenty there that needs to be done."},
         {"name": "Liskov", "full_name": "Barbara Liskov",    "motto": "Abstraction is the key to simplicity."},
     ],
+    # --- Perspective-diversity roles (used in research_mode / multi-faceted topics) ---
+    "technical": [
+        {"name": "Knuth",    "full_name": "Donald Knuth",      "motto": "Programs are meant to be read by humans."},
+        {"name": "Dijkstra", "full_name": "Edsger Dijkstra",   "motto": "Simplicity is a prerequisite for reliability."},
+        {"name": "Thompson", "full_name": "Ken Thompson",      "motto": "One of my most productive days was throwing away 1000 lines of code."},
+    ],
+    "ethical": [
+        {"name": "Weil",     "full_name": "Simone Weil",       "motto": "Attention is the rarest and purest form of generosity."},
+        {"name": "Rawls",    "full_name": "John Rawls",        "motto": "Justice is the first virtue of social institutions."},
+        {"name": "Floridi",  "full_name": "Luciano Floridi",   "motto": "We are becoming informational organisms."},
+    ],
+    "economic": [
+        {"name": "Keynes",   "full_name": "John M. Keynes",    "motto": "The difficulty lies not in the new ideas, but in escaping from the old ones."},
+        {"name": "Ostrom",   "full_name": "Elinor Ostrom",     "motto": "A resource is not just physical — it is also institutional."},
+        {"name": "Hayek",    "full_name": "Friedrich Hayek",   "motto": "The curious task of economics is to demonstrate how little men actually know."},
+    ],
+    "scientific": [
+        {"name": "Curie",    "full_name": "Marie Curie",       "motto": "Nothing in life is to be feared, it is only to be understood."},
+        {"name": "Feynman",  "full_name": "Richard Feynman",   "motto": "If you can't explain something simply, you don't understand it well enough."},
+        {"name": "Sagan",    "full_name": "Carl Sagan",        "motto": "Extraordinary claims require extraordinary evidence."},
+    ],
+    "regulatory": [
+        {"name": "Brandeis", "full_name": "Louis Brandeis",    "motto": "Sunlight is said to be the best of disinfectants."},
+        {"name": "Nader",    "full_name": "Ralph Nader",       "motto": "The function of leadership is to produce more leaders, not more followers."},
+        {"name": "Warren",   "full_name": "Elizabeth Warren",  "motto": "The system is rigged, but it doesn't have to stay that way."},
+    ],
+    "end_user": [
+        {"name": "Norman",   "full_name": "Don Norman",        "motto": "Design is really an act of communication."},
+        {"name": "Nielsen",  "full_name": "Jakob Nielsen",     "motto": "Usability is not a luxury, it is a basic condition for survival."},
+        {"name": "Cooper",   "full_name": "Alan Cooper",       "motto": "No matter how cool your interface is, it would be better if there were less of it."},
+    ],
+    "historical": [
+        {"name": "Braudel",  "full_name": "Fernand Braudel",   "motto": "History is the long memory of time."},
+        {"name": "Kuhn",     "full_name": "Thomas Kuhn",       "motto": "Normal science does not aim at novelties of fact or theory."},
+        {"name": "Durant",   "full_name": "Will Durant",       "motto": "The health of nations is more important than the wealth of nations."},
+    ],
+    "policy": [
+        {"name": "Sen",      "full_name": "Amartya Sen",       "motto": "Development is freedom."},
+        {"name": "Ostrom",   "full_name": "Elinor Ostrom",     "motto": "A resource is not just physical — it is also institutional."},
+        {"name": "Sachs",    "full_name": "Jeffrey Sachs",     "motto": "The world has the knowledge and the resources to end extreme poverty."},
+    ],
+    "environmental": [
+        {"name": "Carson",   "full_name": "Rachel Carson",     "motto": "The more clearly we can focus our attention on the wonders and realities of the universe, the less taste we shall have for destruction."},
+        {"name": "Attenborough", "full_name": "David Attenborough", "motto": "It's surely our responsibility to do everything within our power to create a planet that provides a home not just for us, but for all life on Earth."},
+        {"name": "Lovins",   "full_name": "Amory Lovins",      "motto": "Efficiency is doing things right; effectiveness is doing the right things."},
+    ],
+    "social": [
+        {"name": "Du Bois",  "full_name": "W.E.B. Du Bois",   "motto": "The cost of liberty is less than the price of repression."},
+        {"name": "Wollstonecraft", "full_name": "Mary Wollstonecraft", "motto": "I do not wish women to have power over men; but over themselves."},
+        {"name": "Bourdieu", "full_name": "Pierre Bourdieu",   "motto": "The function of sociology is to unsettle the obvious."},
+    ],
 }
 
 def _pioneer_for_role(role: str) -> dict:
@@ -795,6 +846,225 @@ def coordinate_project_onboarding(
 
 
 # ---------------------------------------------------------------------------
+# Perspective-diversity research helpers
+# ---------------------------------------------------------------------------
+
+# Taxonomy of lens perspectives the swarm can apply to a topic.
+PERSPECTIVE_TAXONOMY: list[str] = [
+    "technical", "ethical", "economic", "scientific",
+    "regulatory", "end_user", "historical", "policy",
+    "environmental", "social",
+]
+
+
+def _decompose_task_perspectives(
+    user_input: str,
+    history_context: str = "",
+) -> dict:
+    """
+    Ask the LLM whether a topic is multi-faceted and, if so, which perspectives
+    from PERSPECTIVE_TAXONOMY apply.
+
+    Returns::
+        {
+          "is_multifaceted": bool,
+          "perspectives": [
+              {"role": str, "perspective_label": str, "task": str, "lens_description": str},
+              ...
+          ],
+          "summary": str,
+        }
+    """
+    _host = get_swarm_worker_host(COORDINATOR_MODEL)
+    client = Client(host=_host)
+
+    schema = {
+        "type": "object",
+        "required": ["is_multifaceted", "perspectives", "summary"],
+        "properties": {
+            "is_multifaceted": {"type": "boolean"},
+            "summary": {"type": "string"},
+            "perspectives": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["role", "perspective_label", "task", "lens_description"],
+                    "properties": {
+                        "role":               {"type": "string"},
+                        "perspective_label":  {"type": "string"},
+                        "task":               {"type": "string"},
+                        "lens_description":   {"type": "string"},
+                    },
+                },
+            },
+        },
+    }
+
+    taxonomy_list = ", ".join(PERSPECTIVE_TAXONOMY)
+    prompt = (
+        f"You are a research planning coordinator. Analyse the following topic:\n\n"
+        f"TOPIC: {user_input}\n\n"
+        f"HISTORY CONTEXT:\n{history_context[:800]}\n\n"
+        f"Decide whether this topic is multi-faceted — i.e. it has meaningfully different "
+        f"implications depending on the viewpoint (e.g. technical, ethical, economic, regulatory). "
+        f"A topic is multi-faceted when at least 3 distinct perspectives from the taxonomy below "
+        f"would each produce substantially different findings or reach different conclusions.\n\n"
+        f"Available perspective roles: {taxonomy_list}\n\n"
+        f"If multi-faceted, choose 3–5 perspectives that are MOST relevant to this topic. "
+        f"For each perspective:\n"
+        f"  - role: one of the taxonomy values above\n"
+        f"  - perspective_label: short human-readable label (e.g. 'Technical Analysis')\n"
+        f"  - task: the SAME topic reframed as a research task through that lens\n"
+        f"  - lens_description: 1-sentence description of what this lens focuses on\n\n"
+        f"Return valid JSON only."
+    )
+
+    try:
+        resp = client.chat(
+            model=COORDINATOR_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            format=schema,
+            options={"temperature": 0.2, "num_predict": 1200},
+        )
+        raw = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
+        return json.loads(raw)
+    except Exception as e:
+        logger.warning(f"[Coordinator] _decompose_task_perspectives failed: {e}")
+        return {"is_multifaceted": False, "perspectives": [], "summary": user_input[:200]}
+
+
+def _synthesize_perspective_matrix(
+    findings_by_perspective: dict[str, str],
+    original_task: str,
+) -> dict:
+    """
+    Merge per-perspective findings into a Perspective Matrix with explicit
+    convergent and divergent highlights.
+
+    Args:
+        findings_by_perspective: {perspective_label: finding_text}
+        original_task: the original user question/task
+
+    Returns::
+        {
+          "matrix_md": str,          # full markdown including table + sections
+          "convergent_points": list[str],
+          "divergent_points": list[str],
+          "controversy_level": "low"|"medium"|"high",
+          "synthesis_narrative": str,
+        }
+    """
+    _host = get_swarm_worker_host(COORDINATOR_MODEL)
+    client = Client(host=_host)
+
+    schema = {
+        "type": "object",
+        "required": ["convergent_points", "divergent_points", "controversy_level", "synthesis_narrative"],
+        "properties": {
+            "convergent_points":   {"type": "array", "items": {"type": "string"}},
+            "divergent_points":    {"type": "array", "items": {"type": "string"}},
+            "controversy_level":   {"type": "string", "enum": ["low", "medium", "high"]},
+            "synthesis_narrative": {"type": "string"},
+        },
+    }
+
+    findings_text = "\n\n".join(
+        f"=== {label} ===\n{text}" for label, text in findings_by_perspective.items()
+    )
+
+    prompt = (
+        f"You are a research synthesis coordinator. Below are findings about the following "
+        f"topic gathered from multiple distinct expert perspectives:\n\n"
+        f"TOPIC: {original_task}\n\n"
+        f"FINDINGS BY PERSPECTIVE:\n{findings_text}\n\n"
+        f"Your tasks:\n"
+        f"1. Identify CONVERGENT POINTS — facts, conclusions, or recommendations where ALL or "
+        f"MOST perspectives agree. These are the most reliable takeaways.\n"
+        f"2. Identify DIVERGENT POINTS — areas where perspectives CONFLICT, reach opposite "
+        f"conclusions, or where the topic is genuinely controversial or contested. Be specific "
+        f"about WHICH perspectives disagree and WHY.\n"
+        f"3. Rate the overall CONTROVERSY LEVEL: 'low' (broad consensus), 'medium' (some tensions), "
+        f"'high' (strong disagreements or value conflicts).\n"
+        f"4. Write a synthesis_narrative (3-5 paragraphs) that integrates all perspectives, "
+        f"names the tensions explicitly, and gives the user a balanced view.\n\n"
+        f"Return valid JSON only."
+    )
+
+    result = {
+        "convergent_points": [],
+        "divergent_points": [],
+        "controversy_level": "medium",
+        "synthesis_narrative": "",
+    }
+
+    try:
+        with request_lock(context="text"):
+            resp = client.chat(
+                model=COORDINATOR_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                format=schema,
+                options={"temperature": 0.3, "num_predict": 2000},
+            )
+        raw = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
+        parsed = json.loads(raw)
+        result.update(parsed)
+    except Exception as e:
+        logger.warning(f"[Coordinator] _synthesize_perspective_matrix failed: {e}")
+
+    # Build the full markdown output
+    perspective_labels = list(findings_by_perspective.keys())
+    controversy_emoji = {"low": "🟢", "medium": "🟡", "high": "🔴"}.get(
+        result["controversy_level"], "🟡"
+    )
+
+    # Table header
+    table_rows = []
+    for label, text in findings_by_perspective.items():
+        snippet = text.replace("\n", " ").strip()[:200]
+        if len(text) > 200:
+            snippet += "…"
+        table_rows.append(f"| {label} | {snippet} |")
+
+    table_md = (
+        f"| Perspective | Summary |\n"
+        f"|-------------|----------|\n"
+        + "\n".join(table_rows)
+    )
+
+    convergent_md = (
+        "\n".join(f"- {p}" for p in result["convergent_points"])
+        or "_No strong convergent points identified._"
+    )
+    divergent_md = (
+        "\n".join(f"- {p}" for p in result["divergent_points"])
+        or "_No strong divergent points identified._"
+    )
+
+    controversy_alert = ""
+    if result["controversy_level"] == "high":
+        controversy_alert = (
+            f"> **⚠️ Controversy Alert** — Perspectives significantly disagree on this topic. "
+            f"Consider which lens is most relevant to your context before acting on any single viewpoint.\n\n"
+        )
+
+    matrix_md = (
+        f"## 🔬 Perspective Research Matrix\n\n"
+        f"{table_md}\n\n"
+        f"### ✅ Convergent Points _(broad agreement across perspectives)_\n\n"
+        f"{convergent_md}\n\n"
+        f"### ⚠️ Divergent Points _(conflicting views or contested territory)_\n\n"
+        f"{controversy_alert}"
+        f"{divergent_md}\n\n"
+        f"**Controversy Level:** {controversy_emoji} {result['controversy_level'].capitalize()}\n\n"
+        f"### 📊 Synthesis\n\n"
+        f"{result['synthesis_narrative']}\n"
+    )
+
+    result["matrix_md"] = matrix_md
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Main orchestration generator
 # ---------------------------------------------------------------------------
 
@@ -809,6 +1079,7 @@ def coordinate_task(
     ultraplan_mode: bool = False,
     dev_mode: bool = False,
     plan_mode: bool = False,
+    research_mode: bool = False,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
@@ -824,6 +1095,9 @@ def coordinate_task(
         5. Verify (fresh worker) — check results
 
     plan_mode: when True, skip actual execution even for codebase tasks.
+    research_mode: when True, trigger multi-perspective swarm research flow instead
+        of the default task-decomposition flow. Also auto-triggered when the topic
+        is detected as multi-faceted.
     """
     session = CoordinatorSession(session_id, owner_id)
     logger.info(
@@ -954,6 +1228,180 @@ def coordinate_task(
 
         # Save plan to scratchpad
         session.write_to_scratchpad("00_plan.json", json.dumps(plan, indent=2))
+
+        # -----------------------------------------------------------------------
+        # PERSPECTIVE RESEARCH FLOW
+        # Trigger when: research_mode=True (user toggled Swarm+Research), OR
+        # when auto-detection finds the topic is multi-faceted.
+        # This replaces Phases 2-3 with a perspectives-diverse research swarm.
+        # -----------------------------------------------------------------------
+        _use_perspective_mode = research_mode
+        _perspective_probe: dict = {}
+
+        if not _use_perspective_mode:
+            # Auto-detect: ask LLM if topic warrants perspective diversity
+            yield {"type": "thought", "content": "→ Checking if topic is multi-faceted for perspective mode..."}
+            _perspective_probe = _decompose_task_perspectives(user_input, history_context)
+            _use_perspective_mode = _perspective_probe.get("is_multifaceted", False)
+            if _use_perspective_mode:
+                yield {"type": "thought", "content": "→ Multi-faceted topic detected — activating Perspective Research Mode"}
+                yield {"type": "log", "content": "[Coordinator] Auto-activated perspective research mode"}
+
+        if _use_perspective_mode:
+            # Use probe result if available, otherwise run perspective decomposition now
+            if not _perspective_probe:
+                _perspective_probe = _decompose_task_perspectives(user_input, history_context)
+
+            perspectives = _perspective_probe.get("perspectives", [])
+            if not perspectives:
+                # Fallback: build a minimal set of perspectives from taxonomy
+                perspectives = [
+                    {"role": "technical",   "perspective_label": "Technical Analysis",   "task": user_input, "lens_description": "Engineering and implementation perspective"},
+                    {"role": "ethical",     "perspective_label": "Ethical Analysis",     "task": user_input, "lens_description": "Moral and societal impact perspective"},
+                    {"role": "economic",    "perspective_label": "Economic Analysis",    "task": user_input, "lens_description": "Financial and market perspective"},
+                ]
+
+            yield {
+                "type": "message",
+                "content": (
+                    f"**🔬 Perspective Research Mode** — {len(perspectives)} lenses activated\n\n"
+                    + "\n".join(f"- **{p['perspective_label']}**: {p['lens_description']}" for p in perspectives)
+                    + "\n\n"
+                ),
+            }
+
+            # Phase 2P: Parallel perspective researchers
+            yield {"type": "swarm_phase", "phase_num": 2, "phase_name": "Research", "total_phases": 4}
+            yield {
+                "type": "status",
+                "content": f"🔬 Launching {len(perspectives)} perspective research workers...",
+            }
+
+            findings_by_perspective: dict[str, str] = {}
+            max_workers_p = min(len(perspectives), 3)
+
+            with ThreadPoolExecutor(max_workers=max_workers_p) as pool:
+                futures_p = {}
+                for i, persp in enumerate(perspectives):
+                    role = persp.get("role", "researcher")
+                    label = persp.get("perspective_label", role.capitalize())
+                    task_text = persp.get("task", user_input)
+                    lens_desc = persp.get("lens_description", "")
+
+                    # Build perspective-specific prompt injecting the lens instruction
+                    persp_prompt = (
+                        f"[Perspective Research Task: {label}]\n\n"
+                        f"TOPIC: {task_text}\n\n"
+                        f"YOUR LENS: {lens_desc}\n"
+                        f"You are analyzing this topic EXCLUSIVELY through the lens of a {label} expert. "
+                        f"Actively look for where this perspective DISAGREES with or COMPLICATES mainstream "
+                        f"consensus or other viewpoints. Highlight any tensions, trade-offs, or controversial "
+                        f"aspects that are most visible from this lens. Do not simply agree with the default "
+                        f"view — probe for what YOUR perspective uniquely reveals.\n\n"
+                        f"Produce a detailed, structured analysis. Use headings. End with a summary "
+                        f"'Key Takeaways from the {label} Perspective'."
+                    )
+                    if extracted_context:
+                        persp_prompt += f"\n\n[Context]:\n{extracted_context}"
+
+                    worker_id = session.register_worker(role, task_text, "research")
+                    # Use a researcher agent with standard tools but perspective-specific prompt
+                    agent = _get_agent_for_role("researcher", session_id=session_id, scope="research")
+                    child_token = _derive_worker_token(ace_token, role, task_text)
+
+                    future = pool.submit(
+                        _run_worker, session, worker_id, agent, persp_prompt,
+                        child_token=child_token,
+                    )
+                    futures_p[future] = (worker_id, role, label)
+                    pioneer = session.workers[worker_id].pioneer
+                    yield {
+                        "type": "swarm_worker_created",
+                        "worker_id": worker_id,
+                        "role": role,
+                        "pioneer_name": pioneer["name"],
+                        "pioneer_full_name": pioneer["full_name"],
+                        "pioneer_motto": pioneer["motto"],
+                        "task": f"[{label}] {task_text[:80]}",
+                        "phase": "research",
+                        "content": f"Spawned {pioneer['name']} ({label})",
+                    }
+
+                # Collect results
+                for future in as_completed(futures_p):
+                    worker_id, role, label = futures_p[future]
+                    try:
+                        result = future.result(timeout=180)
+                        findings_by_perspective[label] = result or ""
+                        worker = session.workers[worker_id]
+                        elapsed = (
+                            (worker.completed_at or time.time())
+                            - (worker.started_at or time.time())
+                        )
+                        pioneer = worker.pioneer
+                        yield {
+                            "type": "message",
+                            "content": f"✅ **{pioneer['name']}** ({label}) completed in {elapsed:.1f}s\n\n",
+                        }
+                        _team_store(
+                            session.coordination_id,
+                            f"perspective_{label}_{worker_id}",
+                            result[:2000] if result else "",
+                            author=role,
+                        )
+                    except Exception as e:
+                        yield {
+                            "type": "log",
+                            "content": f"[Coordinator] Perspective worker {label} failed: {e}",
+                        }
+                        yield {
+                            "type": "message",
+                            "content": f"⚠️ **{label}** worker failed: {e}\n\n",
+                        }
+
+            # Phase 3P: Perspective Matrix Synthesis
+            yield {"type": "swarm_phase", "phase_num": 3, "phase_name": "Synthesize", "total_phases": 4}
+            yield {"type": "status", "content": "🧠 Building Perspective Matrix..."}
+            yield {"type": "thought", "content": "→ Phase 3/4: Perspective Matrix synthesis"}
+
+            persp_matrix = _synthesize_perspective_matrix(findings_by_perspective, user_input)
+            matrix_md = persp_matrix.get("matrix_md", "")
+
+            session.write_to_scratchpad("01_perspective_matrix.md", matrix_md)
+            _team_store(session.coordination_id, "perspective_matrix", matrix_md)
+
+            yield {"type": "message", "content": "**🧠 Perspective Matrix Complete** ✓\n\n"}
+
+            # Phase 4P: Summary (skip implementation for research-only mode)
+            yield {"type": "swarm_phase", "phase_num": 4, "phase_name": "Verify", "total_phases": 4}
+
+            total_time = time.time() - session.created_at
+            total_workers = len(session.workers)
+            completed = sum(1 for w in session.workers.values() if w.state == WorkerState.COMPLETED)
+            failed = sum(1 for w in session.workers.values() if w.state == WorkerState.FAILED)
+
+            yield {
+                "type": "message",
+                "content": (
+                    f"---\n"
+                    f"**📊 Perspective Research Summary**\n"
+                    f"- Perspectives researched: {len(findings_by_perspective)}\n"
+                    f"- Convergent points: {len(persp_matrix.get('convergent_points', []))}\n"
+                    f"- Divergent points: {len(persp_matrix.get('divergent_points', []))}\n"
+                    f"- Controversy level: {persp_matrix.get('controversy_level', 'unknown')}\n"
+                    f"- Completed workers: {completed} | Failed: {failed}\n"
+                    f"- Total time: {total_time:.1f}s\n"
+                ),
+            }
+
+            followup_section = _generate_followups(persp_matrix.get("synthesis_narrative", ""), [])
+            yield {"type": "response", "content": f"{matrix_md}{followup_section}"}
+            logger.info(
+                f"[Coordinator] Perspective research {session.coordination_id} complete: "
+                f"{completed}/{total_workers} workers, {total_time:.1f}s, "
+                f"controversy={persp_matrix.get('controversy_level')}"
+            )
+            return  # Perspective flow is complete; skip standard Phases 2-5 below
 
         # === PHASE 2: RESEARCH (parallel) ===
         yield {"type": "swarm_phase", "phase_num": 2, "phase_name": "Research", "total_phases": 5}

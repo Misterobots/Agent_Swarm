@@ -1695,6 +1695,7 @@ def chat_swarm(
                     ultraplan_mode=ultraplan_mode,
                     dev_mode=dev_mode,
                     plan_mode=ultraplan_mode,  # ultraplan_mode = plan-only in execution layer
+                    research_mode=research_mode,  # enable perspective research swarm
                 ):
                     yield update
 
