@@ -1258,26 +1258,45 @@ def chat_swarm(
         yield _t("→ Security: PASS")
         WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
 
-        # --- ANTHROPIC FAST-PATH (admin-only Claude models) ---
+        # --- ANTHROPIC FAST-PATH (per-user key, or admin env var as fallback) ---
         if model and _is_anthropic_model(model):
-            if not _is_admin_session(session_id, owner_id):
-                yield {"type": "error", "content": "🔒 Claude models require admin privileges. Falling back to local model."}
-                logger.warning(f"[Router] Non-admin tried Anthropic model: {model}")
-                _audit_security_event(
-                    "claude_access_denied",
-                    {
-                        "requested_model": model,
-                        "session_id": session_id,
-                        "owner_id": owner_id,
-                        "reason": "insufficient_security_level",
-                    },
+            # 1. Try the user's own stored key first
+            _user_anthropic_key: str | None = None
+            if owner_id:
+                try:
+                    from provider_keys import get_key as _get_provider_key
+                    _key_record = _get_provider_key(owner_id, "anthropic")
+                    if _key_record:
+                        _user_anthropic_key = _key_record.get_api_key()
+                except Exception as _pk_err:
+                    logger.warning(f"[Router] Could not fetch user Anthropic key for {owner_id!r}: {_pk_err}")
+
+            # 2. Fall back to admin env-var key only for admin sessions
+            _use_admin_key = (
+                not _user_anthropic_key
+                and _is_admin_session(session_id, owner_id)
+                and ANTHROPIC_ENABLED
+            )
+            _resolved_key = _user_anthropic_key or (ANTHROPIC_API_KEY if _use_admin_key else None)
+            _key_source = "user-stored" if _user_anthropic_key else "admin-env"
+
+            if not _resolved_key:
+                yield {
+                    "type": "error",
+                    "content": (
+                        "🔑 No Anthropic API key found. "
+                        "Add your key in **Settings → Provider API Keys** to use Claude models."
+                    ),
+                }
+                logger.warning(
+                    f"[Router] Anthropic key missing for user {owner_id!r}, model {model!r}"
                 )
                 model = None  # Fall through to normal Ollama routing
-            elif ANTHROPIC_ENABLED:
+            else:
                 yield {"type": "status", "content": f"☁️ Claude ({model}): Generating..."}
-                yield _t(f"→ Provider: Anthropic ({model})")
+                yield _t(f"→ Provider: Anthropic ({model}) [{_key_source}]")
                 try:
-                    provider = AnthropicProvider(model=model)
+                    provider = AnthropicProvider(api_key=_resolved_key, model=model)
                     api_messages = [{"role": "user", "content": user_input}]
                     if history:
                         api_messages = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in history]
@@ -1293,30 +1312,12 @@ def chat_swarm(
                     _score_trace(lf_trace, langfuse, 0.9, output="[anthropic stream]")
                     WORKFLOW_STEPS.labels(status="success", agent_type="Anthropic").inc()
                 except Exception as e:
-                    logger.error(f"[Router] Anthropic provider error: {e}")
+                    logger.error(f"[Router] Anthropic provider error ({_key_source}): {e}")
                     yield {"type": "error", "content": f"Claude API error: {e}"}
                     _score_trace(lf_trace, langfuse, 0.0)
                 finally:
                     AGENT_STATE.labels(agent_name="Router").set(1)
                 return
-            else:
-                logger.warning(
-                    f"[Router] Claude model requested but provider unavailable: {model}"
-                )
-                _audit_security_event(
-                    "claude_provider_unavailable",
-                    {
-                        "requested_model": model,
-                        "session_id": session_id,
-                        "owner_id": owner_id,
-                        "reason": "provider_not_configured",
-                    },
-                )
-                yield {
-                    "type": "error",
-                    "content": "Claude provider is not configured. Falling back to local model.",
-                }
-                model = None
 
         # 3. Intent Routing (Neural Upgrade)
         # Short-circuit: swarm_mode has a fixed intent, skip the LLM neural router
