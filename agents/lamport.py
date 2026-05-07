@@ -430,7 +430,7 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                 "stream": False,
                 "options": {"temperature": 0.4, "num_predict": 8192, "num_ctx": 32768},
             },
-            timeout=240,
+            timeout=90,
         )
         logger.info(f"[Coordinator] Synthesis HTTP {resp.status_code}, response_len={len(resp.text)}")
 
@@ -1127,6 +1127,10 @@ def coordinate_task(
         synth_suggested_answers: list = []
 
         for synth_pass in range(1, max_synth_passes + 1):
+            yield {
+                "type": "status",
+                "content": f"🧠 Synthesis pass {synth_pass}/{max_synth_passes}: reading all findings...",
+            }
             with request_lock(context="text"):
                 synth_result = _synthesize_findings(all_findings, user_input)
             synthesis = synth_result["plan"]
