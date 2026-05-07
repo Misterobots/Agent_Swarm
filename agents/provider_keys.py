@@ -45,10 +45,14 @@ PROVIDERS: dict[str, dict] = {
     "google": {
         "label": "Google (Gemini)",
         "models": [
-            {"id": "gemini-2.5-pro",    "label": "Gemini 2.5 Pro",    "context": 1_048_576},
-            {"id": "gemini-2.5-flash",  "label": "Gemini 2.5 Flash",  "context": 1_048_576},
-            {"id": "gemini-2.0-flash",  "label": "Gemini 2.0 Flash",  "context": 1_048_576},
-            {"id": "gemini-1.5-pro",    "label": "Gemini 1.5 Pro",    "context": 2_097_152},
+            {"id": "gemini-3.1-pro-preview",    "label": "Gemini 3.1 Pro Preview",    "context": 1_048_576},
+            {"id": "gemini-3-pro-preview",       "label": "Gemini 3 Pro Preview",       "context": 1_048_576},
+            {"id": "gemini-3-flash-preview",     "label": "Gemini 3 Flash Preview",     "context": 1_048_576},
+            {"id": "gemini-3.1-flash-lite",      "label": "Gemini 3.1 Flash Lite",      "context": 1_048_576},
+            {"id": "gemini-2.5-pro",             "label": "Gemini 2.5 Pro",             "context": 1_048_576},
+            {"id": "gemini-2.5-flash",           "label": "Gemini 2.5 Flash",           "context": 1_048_576},
+            {"id": "gemini-2.5-flash-lite",      "label": "Gemini 2.5 Flash-Lite",      "context": 1_048_576},
+            {"id": "gemini-2.0-flash",           "label": "Gemini 2.0 Flash",           "context": 1_048_576},
         ],
         "validate_url": "https://generativelanguage.googleapis.com/v1beta/models",
         "key_prefix": "AI",
