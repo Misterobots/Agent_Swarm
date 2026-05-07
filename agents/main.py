@@ -993,6 +993,80 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 "choices": [{"index": 0, "message": {"role": "assistant", "content": chunk.content}, "finish_reason": "stop"}],
             }
 
+    # Route NVIDIA NIM requests directly to the NvidiaProvider
+    if request.model.startswith("nvidia/"):
+        uid = http_request.headers.get("X-authentik-uid", "").strip()
+        if not uid:
+            raise HTTPException(status_code=401, detail="NVIDIA NIM requires an authenticated session")
+        try:
+            from providers.nvidia_provider import NvidiaProvider
+        except ImportError as e:
+            raise HTTPException(status_code=503, detail=f"NVIDIA provider unavailable: {e}")
+
+        msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+        provider = NvidiaProvider(user_id=uid, model=request.model)
+
+        if request.stream:
+            async def nvidia_stream():
+                import time
+                for chunk in provider.generate_stream(msgs):
+                    sse = {
+                        "id": "chatcmpl-nvidia",
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": request.model,
+                        "choices": [{"index": 0, "delta": {"content": chunk.content, "type": chunk.type}, "finish_reason": None}],
+                    }
+                    yield f"data: {json.dumps(sse)}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(nvidia_stream(), media_type="text/event-stream")
+        else:
+            chunk = provider.generate(msgs)
+            return {
+                "id": "chatcmpl-nvidia",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": chunk.content}, "finish_reason": "stop"}],
+            }
+
+    # Route Google Gemini requests directly to the GoogleProvider
+    if request.model.startswith("gemini-"):
+        uid = http_request.headers.get("X-authentik-uid", "").strip()
+        if not uid:
+            raise HTTPException(status_code=401, detail="Google Gemini requires an authenticated session")
+        try:
+            from providers.google_provider import GoogleProvider
+        except ImportError as e:
+            raise HTTPException(status_code=503, detail=f"Google provider unavailable: {e}")
+
+        msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+        provider = GoogleProvider(user_id=uid, model=request.model)
+
+        if request.stream:
+            async def google_stream():
+                import time
+                for chunk in provider.generate_stream(msgs):
+                    sse = {
+                        "id": "chatcmpl-google",
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": request.model,
+                        "choices": [{"index": 0, "delta": {"content": chunk.content, "type": chunk.type}, "finish_reason": None}],
+                    }
+                    yield f"data: {json.dumps(sse)}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(google_stream(), media_type="text/event-stream")
+        else:
+            chunk = provider.generate(msgs)
+            return {
+                "id": "chatcmpl-google",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": chunk.content}, "finish_reason": "stop"}],
+            }
+
     # Extract history (all but the last message), convert Pydantic models to dicts
     history = [{"role": m.role, "content": m.content} for m in request.messages[:-1]]
     # Extract latest prompt
