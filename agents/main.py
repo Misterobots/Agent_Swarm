@@ -711,17 +711,22 @@ async def clear_auto_approve_rules(http_request: Request):
 async def list_models(request: Request):
     """
     OpenAI-compatible /v1/models.
-    Returns local swarm models + GitHub Models if the user has a connected account.
+    Returns local swarm models + any provider models for which the user has
+    a connected account (GitHub OAuth token or API key via provider_keys).
+
+    Durability note: adding a new provider to provider_keys.PROVIDERS
+    automatically surfaces it here — no edit to this function needed.
     """
     try:
+        _ts = int(time.time())
         base_models = [
-            {"id": "swarm-standard",  "object": "model", "created": int(time.time()), "owned_by": "MarsRL"},
-            {"id": "Home-AI-Swarm",   "object": "model", "created": int(time.time()), "owned_by": "MarsRL"},
+            {"id": "Home-AI-Swarm",  "object": "model", "created": _ts, "owned_by": "MarsRL", "label": "Memex"},
+            {"id": "swarm-standard", "object": "model", "created": _ts, "owned_by": "MarsRL", "label": "Swarm Standard"},
         ]
 
-        # Append GitHub Models if this user has a connected token
         uid = request.headers.get("X-authentik-uid", "").strip()
         if uid:
+            # ── GitHub Models (OAuth device flow) ────────────────────────────
             try:
                 from github_oauth import get_token
                 from providers.github_models_provider import GITHUB_MODELS
@@ -730,16 +735,47 @@ async def list_models(request: Request):
                         base_models.append({
                             "id": m["id"],
                             "object": "model",
-                            "created": int(time.time()),
+                            "created": _ts,
                             "owned_by": "github",
+                            "label": m.get("label", m["id"]),
                             "context_window": m.get("context"),
                         })
+                    logger.info(f"list_models: added {len(GITHUB_MODELS)} GitHub models for uid={uid}")
             except Exception as e:
-                logger.warning(f"list_models: could not fetch GitHub models: {e}")
+                logger.warning(f"list_models: GitHub models error: {e}", exc_info=True)
+
+            # ── API-key providers (Anthropic, Google, etc.) ──────────────────
+            # Data-driven loop: iterates provider_keys.PROVIDERS so new
+            # providers added there appear automatically without touching this code.
+            try:
+                from provider_keys import get_key, PROVIDERS as _PROVIDERS
+                for provider_id, provider_info in _PROVIDERS.items():
+                    try:
+                        if get_key(uid, provider_id):
+                            added = 0
+                            for m in provider_info.get("models", []):
+                                base_models.append({
+                                    "id": m["id"],
+                                    "object": "model",
+                                    "created": _ts,
+                                    "owned_by": provider_id,
+                                    "label": m.get("label", m["id"]),
+                                    "context_window": m.get("context"),
+                                })
+                                added += 1
+                            logger.info(
+                                f"list_models: added {added} {provider_id} models for uid={uid}"
+                            )
+                    except Exception as _e:
+                        logger.warning(
+                            f"list_models: error checking {provider_id} key for uid={uid}: {_e}"
+                        )
+            except Exception as e:
+                logger.warning(f"list_models: provider_keys error: {e}", exc_info=True)
 
         return {"object": "list", "data": base_models}
     except Exception as e:
-        logger.error(f"Error in list_models: {e}")
+        logger.error(f"Error in list_models: {e}", exc_info=True)
         raise
 
 
