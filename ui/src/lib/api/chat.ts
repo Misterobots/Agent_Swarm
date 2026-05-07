@@ -121,7 +121,7 @@ export async function saveSessionSummary(dateKey: string, topic: string, summary
 }
 
 export async function fetchModels(): Promise<Model[]> {
-  const response = await fetch(`${API_BASE}/v1/models`);
+  const response = await fetch(`${API_BASE}/v1/models`, { cache: "no-store" });
   if (!response.ok) return [];
   const data = await response.json();
   return data.data || [];

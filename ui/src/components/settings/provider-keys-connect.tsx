@@ -48,8 +48,8 @@ export function ProviderKeysConnect() {
     setLoading(true);
     try {
       const [catalogRes, connectedRes] = await Promise.all([
-        fetch(`${API_BASE}/api/v1/provider-keys/providers`),
-        fetch(`${API_BASE}/api/v1/provider-keys/list`),
+        fetch(`${API_BASE}/api/v1/provider-keys/providers`, { cache: "no-store" }),
+        fetch(`${API_BASE}/api/v1/provider-keys/list`, { cache: "no-store" }),
       ]);
       
       if (catalogRes.ok) {
