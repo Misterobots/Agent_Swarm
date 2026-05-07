@@ -97,16 +97,23 @@ def _decrypt(ciphertext: bytes) -> str:
 # DB
 # ---------------------------------------------------------------------------
 
-_DDL = """
+_DDL_TABLE = """
 CREATE TABLE IF NOT EXISTS swarm.provider_api_keys (
     user_id     TEXT NOT NULL,
     provider    TEXT NOT NULL,
     api_key     BYTEA NOT NULL,
     label       TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (user_id, provider)
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+"""
+
+# Separate migration: adds the unique constraint needed for ON CONFLICT upserts.
+# Uses CREATE UNIQUE INDEX IF NOT EXISTS so it is safe to run against tables that
+# were created before the PRIMARY KEY clause was added to _DDL_TABLE.
+_DDL_UNIQUE = """
+CREATE UNIQUE INDEX IF NOT EXISTS provider_api_keys_user_provider_idx
+    ON swarm.provider_api_keys(user_id, provider);
 """
 
 
@@ -115,7 +122,8 @@ def _get_conn():
     from config import TEMPLATE_DB_URL
     conn = psycopg2.connect(TEMPLATE_DB_URL)
     cur = conn.cursor()
-    cur.execute(_DDL)
+    cur.execute(_DDL_TABLE)
+    cur.execute(_DDL_UNIQUE)
     conn.commit()
     cur.close()
     return conn
