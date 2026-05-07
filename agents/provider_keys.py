@@ -118,6 +118,18 @@ WHERE a.ctid < b.ctid
   AND a.provider = b.provider;
 """
 
+# Migration: give key_id a default so INSERTs that omit it don't fail.
+# gen_random_uuid() is available in pgvector/pg15 via the pgcrypto / uuid-ossp extension.
+_DDL_KEY_ID_DEFAULT = """
+DO $$
+BEGIN
+    ALTER TABLE swarm.provider_api_keys
+        ALTER COLUMN key_id SET DEFAULT gen_random_uuid()::text;
+EXCEPTION WHEN others THEN
+    NULL;  -- column may already have a default; ignore
+END $$;
+"""
+
 # Idempotent unique index — safe to run on tables created before the PRIMARY KEY
 # clause was added and on freshly-created tables alike.
 _DDL_UNIQUE = """
@@ -133,6 +145,7 @@ def _get_conn():
     cur = conn.cursor()
     cur.execute(_DDL_TABLE)
     cur.execute(_DDL_DEDUP)
+    cur.execute(_DDL_KEY_ID_DEFAULT)
     cur.execute(_DDL_UNIQUE)
     conn.commit()
     cur.close()
