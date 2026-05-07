@@ -999,16 +999,31 @@ def _synthesize_perspective_matrix(
     }
 
     try:
+        # Truncate each perspective's findings to avoid context overflow
+        # while keeping enough detail for meaningful synthesis
+        MAX_FINDING_CHARS = 6000
+        truncated_findings = {
+            label: (text[:MAX_FINDING_CHARS] + "\n[... truncated for synthesis ...]" if len(text) > MAX_FINDING_CHARS else text)
+            for label, text in findings_by_perspective.items()
+        }
+        findings_text_trunc = "\n\n".join(
+            f"=== {label} ===\n{text}" for label, text in truncated_findings.items()
+        )
+        # Replace findings_text in prompt with truncated version
+        trunc_prompt = prompt.replace(findings_text, findings_text_trunc)
+
         with request_lock(context="text"):
             resp = client.chat(
                 model=COORDINATOR_MODEL,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": trunc_prompt}],
                 format=schema,
-                options={"temperature": 0.3, "num_predict": 2000},
+                options={"temperature": 0.3, "num_predict": 8192},
             )
         raw = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
         parsed = json.loads(raw)
         result.update(parsed)
+        if not result.get("synthesis_narrative"):
+            logger.warning("[Coordinator] _synthesize_perspective_matrix returned empty synthesis_narrative")
     except Exception as e:
         logger.warning(f"[Coordinator] _synthesize_perspective_matrix failed: {e}")
 
