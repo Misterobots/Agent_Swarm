@@ -25,6 +25,7 @@ from enum import Enum
 import requests
 from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
+from ollama import Client
 
 from logger_setup import setup_logger
 from config import AGNO_DB_URL, ARCHITECT_MODEL, COORDINATOR_MODEL
