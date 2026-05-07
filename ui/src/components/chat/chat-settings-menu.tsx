@@ -13,6 +13,7 @@ import { FileGroundingToggle } from "./file-grounding-toggle";
 import { SwarmToggle } from "./swarm-toggle";
 import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,6 +21,15 @@ export function ChatSettingsMenu() {
   const activeConversationId = useChatStore((s) => s.activeConversationId);
   const updateConversation = useChatStore((s) => s.updateConversation);
   const activeConv = useChatStore((s) => s.activeConversation());
+
+  const ultraplanMode = useSettingsStore((s) => s.ultraplanMode);
+  const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
+  const researchMode = useSettingsStore((s) => s.researchMode);
+  const swarmMode = useSettingsStore((s) => s.swarmMode);
+  const groundingWeb = useSettingsStore((s) => s.groundingWeb);
+  const groundingDocs = useSettingsStore((s) => s.groundingDocs);
+  const groundingFile = useSettingsStore((s) => s.groundingFile);
+  const anyModeActive = ultraplanMode || ultrathinkMode || researchMode || swarmMode || groundingWeb || groundingDocs || groundingFile;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -41,14 +51,19 @@ export function ChatSettingsMenu() {
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md flex items-center justify-center transition-colors",
+          "flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md flex items-center justify-center transition-colors relative",
           isOpen
             ? "bg-[var(--chat-accent)] text-white"
-            : "bg-[var(--chat-panel)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] border border-[var(--chat-border)]"
+            : anyModeActive
+              ? "bg-[color:color-mix(in_srgb,var(--chat-accent-2)_15%,var(--chat-panel))] text-[var(--chat-accent-2)] border border-[color:color-mix(in_srgb,var(--chat-accent-2)_50%,var(--chat-border))]"
+              : "bg-[var(--chat-panel)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] border border-[var(--chat-border)]"
         )}
-        title="Chat settings"
+        title={anyModeActive ? "Chat settings (modes active)" : "Chat settings"}
       >
         <Settings2 size={16} />
+        {anyModeActive && !isOpen && (
+          <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--chat-accent-2)]" />
+        )}
       </button>
 
       {/* Settings menu dropdown */}

@@ -18,8 +18,6 @@ const API = "/api/backend/v1/conversations";
 export function useConversationSync() {
   const replaceConversations = useChatStore((s) => s.replaceConversations);
   const deleteConversationLocal = useChatStore((s) => s.deleteConversation);
-  const setActiveConversation = useChatStore((s) => s.setActiveConversation);
-  const activeConversationId = useChatStore((s) => s.activeConversationId);
 
   // Load from server once on mount — server is source of truth
   useEffect(() => {
