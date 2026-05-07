@@ -1410,13 +1410,50 @@ def coordinate_task(
                 ),
             }
 
-            followup_section = _generate_followups(persp_matrix.get("synthesis_narrative", ""), [])
+            followup_section = _generate_followups(persp_matrix.get("synthesis_narrative", ""), impl_tasks)
             yield {"type": "response", "content": f"{matrix_md}{followup_section}"}
             logger.info(
                 f"[Coordinator] Perspective research {session.coordination_id} complete: "
                 f"{completed}/{total_workers} workers, {total_time:.1f}s, "
                 f"controversy={persp_matrix.get('controversy_level')}"
             )
+
+            # If there are implementation tasks (e.g. an architect synthesis), run them now
+            # using the perspective matrix as the research context.
+            if impl_tasks:
+                yield {"type": "swarm_phase", "phase_num": 5, "phase_name": "Implement", "total_phases": 5}
+                yield {
+                    "type": "status",
+                    "content": f"🔨 Running {len(impl_tasks)} implementation task(s) using perspective matrix...",
+                }
+                impl_context = (
+                    f"You have access to the following multi-perspective research matrix:\n\n"
+                    f"{matrix_md}\n\n"
+                    f"Use these findings to complete your task."
+                )
+                for impl_task in impl_tasks:
+                    role = impl_task.get("role", "architect")
+                    task_text = impl_task.get("task", "")
+                    worker_id = session.register_worker(role, task_text, "implementation")
+                    agent = _get_agent_for_role(role, session_id=session_id, scope=scope)
+                    child_token = _derive_worker_token(ace_token, role, task_text)
+                    worker_prompt = f"{task_text}\n\n{impl_context}"
+                    yield {
+                        "type": "swarm_worker_created",
+                        "worker_id": worker_id,
+                        "role": role,
+                        "phase": "implementation",
+                        "task": task_text,
+                        "pioneer": session.workers[worker_id].pioneer,
+                    }
+                    result = _run_worker(session, worker_id, agent, worker_prompt, child_token=child_token)
+                    if result:
+                        session.write_to_scratchpad(f"impl_{role}.md", result)
+                        yield {"type": "message", "content": f"✅ **{role.capitalize()}** completed\n\n"}
+                        yield {"type": "response", "content": result}
+                    else:
+                        yield {"type": "message", "content": f"⚠️ **{role.capitalize()}** returned no output\n\n"}
+
             return  # Perspective flow is complete; skip standard Phases 2-5 below
 
         # === PHASE 2: RESEARCH (parallel) ===
