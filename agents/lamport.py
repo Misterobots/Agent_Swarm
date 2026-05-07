@@ -27,7 +27,7 @@ from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 
 from logger_setup import setup_logger
-from config import AGNO_DB_URL, ARCHITECT_MODEL
+from config import AGNO_DB_URL, ARCHITECT_MODEL, COORDINATOR_MODEL
 from utils.gpu_queue import request_lock, get_best_host_for_model, get_swarm_worker_host
 
 logger = setup_logger("Lamport")
