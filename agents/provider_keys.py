@@ -108,9 +108,18 @@ CREATE TABLE IF NOT EXISTS swarm.provider_api_keys (
 );
 """
 
-# Separate migration: adds the unique constraint needed for ON CONFLICT upserts.
-# Uses CREATE UNIQUE INDEX IF NOT EXISTS so it is safe to run against tables that
-# were created before the PRIMARY KEY clause was added to _DDL_TABLE.
+# Remove duplicate (user_id, provider) rows, keeping the one with the highest
+# ctid (most recently inserted). Must run before the unique index is created.
+_DDL_DEDUP = """
+DELETE FROM swarm.provider_api_keys a
+USING swarm.provider_api_keys b
+WHERE a.ctid < b.ctid
+  AND a.user_id  = b.user_id
+  AND a.provider = b.provider;
+"""
+
+# Idempotent unique index — safe to run on tables created before the PRIMARY KEY
+# clause was added and on freshly-created tables alike.
 _DDL_UNIQUE = """
 CREATE UNIQUE INDEX IF NOT EXISTS provider_api_keys_user_provider_idx
     ON swarm.provider_api_keys(user_id, provider);
@@ -123,6 +132,7 @@ def _get_conn():
     conn = psycopg2.connect(TEMPLATE_DB_URL)
     cur = conn.cursor()
     cur.execute(_DDL_TABLE)
+    cur.execute(_DDL_DEDUP)
     cur.execute(_DDL_UNIQUE)
     conn.commit()
     cur.close()
