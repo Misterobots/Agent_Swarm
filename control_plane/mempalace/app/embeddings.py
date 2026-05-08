@@ -1,5 +1,8 @@
 """Ollama-backed embedding generation and LLM memory extraction."""
 
+from __future__ import annotations
+
+import asyncio
 import os
 import re
 import json
@@ -10,10 +13,11 @@ import httpx
 
 logger = logging.getLogger("mempalace.embeddings")
 
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://192.168.2.101:11434")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 EXTRACT_MODEL = os.getenv("EXTRACT_MODEL", "qwen2.5-coder:14b-instruct-q4_k_m")
 HTTPX_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "60"))
+EMBED_RETRIES = int(os.getenv("OLLAMA_EMBED_RETRIES", "2"))
 
 _client: Optional[httpx.AsyncClient] = None
 
@@ -25,31 +29,50 @@ def _get_client() -> httpx.AsyncClient:
     return _client
 
 
+async def _embed_post(payload: dict) -> list[list[float]]:
+    """POST to Ollama /api/embed with bounded retries on transient failures.
+
+    Retries on connection errors, timeouts, and 5xx responses. Does NOT retry
+    on 4xx (caller error), and surfaces the original exception after the
+    final attempt so the FastAPI handler can return a meaningful 5xx.
+    """
+    client = _get_client()
+    last_exc: Exception | None = None
+    for attempt in range(EMBED_RETRIES + 1):
+        try:
+            resp = await client.post(f"{OLLAMA_HOST}/api/embed", json=payload)
+            if 500 <= resp.status_code < 600:
+                resp.raise_for_status()  # raises HTTPStatusError → retry
+            resp.raise_for_status()
+            return resp.json()["embeddings"]
+        except (httpx.TransportError, httpx.TimeoutException, httpx.HTTPStatusError) as exc:
+            # Don't retry 4xx
+            if isinstance(exc, httpx.HTTPStatusError) and 400 <= exc.response.status_code < 500:
+                raise
+            last_exc = exc
+            if attempt < EMBED_RETRIES:
+                backoff = 0.5 * (2 ** attempt)
+                logger.warning(
+                    "Ollama embed attempt %d/%d failed (%s); retrying in %.1fs",
+                    attempt + 1, EMBED_RETRIES + 1, exc, backoff,
+                )
+                await asyncio.sleep(backoff)
+    assert last_exc is not None
+    raise last_exc
+
+
 # ---------------------------------------------------------------------------
 # Embedding
 # ---------------------------------------------------------------------------
 async def embed_text(text: str) -> list[float]:
     """Generate a 768-dim embedding via Ollama nomic-embed-text."""
-    client = _get_client()
-    resp = await client.post(
-        f"{OLLAMA_HOST}/api/embed",
-        json={"model": EMBED_MODEL, "input": text},
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    # Ollama /api/embed returns {"embeddings": [[...], ...]}
-    return data["embeddings"][0]
+    embeddings = await _embed_post({"model": EMBED_MODEL, "input": text})
+    return embeddings[0]
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
     """Batch embed multiple texts."""
-    client = _get_client()
-    resp = await client.post(
-        f"{OLLAMA_HOST}/api/embed",
-        json={"model": EMBED_MODEL, "input": texts},
-    )
-    resp.raise_for_status()
-    return resp.json()["embeddings"]
+    return await _embed_post({"model": EMBED_MODEL, "input": texts})
 
 
 # ---------------------------------------------------------------------------

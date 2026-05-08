@@ -1,5 +1,7 @@
 """MemPalace database layer — async SQLAlchemy + pgvector models."""
 
+from __future__ import annotations
+
 import asyncio
 import os
 import logging
@@ -35,7 +37,14 @@ VECTOR_DIM = 768  # nomic-embed-text dimension
 # ---------------------------------------------------------------------------
 # Engine + session factory
 # ---------------------------------------------------------------------------
-engine = create_async_engine(DATABASE_URL, echo=False, pool_size=5, max_overflow=10)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_size=20,
+    max_overflow=20,
+    pool_pre_ping=True,    # detect dropped connections (e.g. after pg restart)
+    pool_recycle=1800,     # recycle every 30 min to avoid stale connections
+)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -54,6 +63,11 @@ class Memory(Base):
 
     __tablename__ = "memories"
     __table_args__ = (
+        # NOTE: IVFFlat is only well-tuned after the table has data — the
+        # initial index built at bootstrap on an empty table is degenerate.
+        # When data volume justifies it, REINDEX or migrate to HNSW
+        # (pgvector >= 0.5: postgresql_using="hnsw", with m/ef_construction
+        # parameters). Tracked as a follow-up; not blocking current scale.
         Index("ix_mem_embedding", "embedding", postgresql_using="ivfflat",
               postgresql_with={"lists": 100},
               postgresql_ops={"embedding": "vector_cosine_ops"}),
@@ -125,6 +139,10 @@ class MemoryAuditLog(Base):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    # memory_id is intentionally NOT a foreign key. Delete audits must
+    # survive the deletion of the memory they describe — that is the entire
+    # point of the audit trail. CASCADE would erase the trail; SET NULL
+    # would erase the historical id. UUIDs make collision risk negligible.
     memory_id = Column(UUID(as_uuid=True), nullable=False)
     action = Column(String(20), nullable=False)          # created | edited | deleted
     actor_id = Column(String(100), nullable=False)

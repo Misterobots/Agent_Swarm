@@ -6,6 +6,8 @@ Provides three memory subsystems:
   3. Team memories    — shared state for coordinator task teams
 """
 
+from __future__ import annotations
+
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -13,8 +15,10 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
+from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel, Field
-from sqlalchemy import select, delete, func, update, text
+from sqlalchemy import select, delete, func, update, text, case
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
@@ -26,6 +30,20 @@ logging.basicConfig(
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
 logger = logging.getLogger("mempalace")
+
+
+# ---------------------------------------------------------------------------
+# MCP server — defined before lifespan because lifespan references _mcp.
+# Tool implementations are registered further down once the ORM models and
+# helpers are in scope. Mounted onto the FastAPI app at the bottom of the file.
+# ---------------------------------------------------------------------------
+_mcp = FastMCP(
+    "MemPalace",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["192.168.2.102:*", "localhost:*", "127.0.0.1:*", "hopper:*"],
+    ),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +192,16 @@ class AuditLogOut(BaseModel):
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _score(dist: float | None) -> float:
+    """Convert pgvector cosine distance to a similarity score.
+
+    pgvector's cosine_distance returns 0.0 (identical) … 2.0 (opposite).
+    Similarity = 1 - distance, so the result is in [-1.0, 1.0]. Round
+    to 4 decimals for compact JSON.
+    """
+    return round(1.0 - (dist or 0.0), 4)
+
+
 def _memory_to_out(m: Memory, score: float | None = None) -> MemoryOut:
     meta = m.metadata_ or {}
     return MemoryOut(
@@ -282,11 +310,7 @@ async def search_memories(req: SearchQuery):
             )
             await session.commit()
 
-    results = []
-    for mem, dist in rows:
-        similarity = 1.0 - (dist or 0.0)
-        results.append(_memory_to_out(mem, score=round(similarity, 4)))
-    return results
+    return [_memory_to_out(mem, score=_score(dist)) for mem, dist in rows]
 
 
 @app.delete("/v1/memories/{memory_id}")
@@ -336,53 +360,55 @@ async def memory_stats():
 
 @app.get("/v1/palace/audit/extractions")
 async def extraction_audit():
-    """Per-owner extraction metrics: attempts, memories stored, success rate, last seen."""
+    """Per-owner extraction metrics: attempts, memories stored, success rate, last seen.
+
+    Single aggregate query — uses conditional aggregation for the success-only
+    metrics (memories_stored > 0) and a correlated subquery for the live memory
+    count, instead of fanning out to three separate round-trips.
+    """
+    success_count = func.sum(
+        case((ExtractionLog.memories_stored > 0, 1), else_=0)
+    ).label("success_count")
+    last_success_at = func.max(
+        case((ExtractionLog.memories_stored > 0, ExtractionLog.attempted_at))
+    ).label("last_success_at")
+    current_memory_count = (
+        select(func.count(Memory.id))
+        .where(Memory.owner_id == ExtractionLog.owner_id)
+        .correlate(ExtractionLog)
+        .scalar_subquery()
+        .label("current_memory_count")
+    )
+
+    stmt = (
+        select(
+            ExtractionLog.owner_id,
+            func.count(ExtractionLog.id).label("total_attempts"),
+            func.sum(ExtractionLog.memories_stored).label("total_stored"),
+            func.max(ExtractionLog.attempted_at).label("last_attempt_at"),
+            success_count,
+            last_success_at,
+            current_memory_count,
+        )
+        .group_by(ExtractionLog.owner_id)
+        .order_by(func.max(ExtractionLog.attempted_at).desc())
+    )
+
     async with async_session() as session:
-        # Aggregate extraction_log by owner_id
-        agg = (await session.execute(
-            select(
-                ExtractionLog.owner_id,
-                func.count(ExtractionLog.id).label("total_attempts"),
-                func.sum(ExtractionLog.memories_stored).label("total_stored"),
-                func.max(ExtractionLog.attempted_at).label("last_attempt_at"),
-            ).group_by(ExtractionLog.owner_id)
-            .order_by(func.max(ExtractionLog.attempted_at).desc())
-        )).all()
-
-        # Successful attempts per owner (memories_stored > 0)
-        success_attempt_rows = (await session.execute(
-            select(
-                ExtractionLog.owner_id,
-                func.count(ExtractionLog.id).label("success_count"),
-                func.max(ExtractionLog.attempted_at).label("last_success_at"),
-            )
-            .where(ExtractionLog.memories_stored > 0)
-            .group_by(ExtractionLog.owner_id)
-        )).all()
-        success_map = {r.owner_id: (r.success_count, r.last_success_at) for r in success_attempt_rows}
-
-        # Memory count per owner from memories table
-        mem_counts = (await session.execute(
-            select(Memory.owner_id, func.count(Memory.id).label("memory_count"))
-            .group_by(Memory.owner_id)
-        )).all()
-        mem_count_map = {r.owner_id: r.memory_count for r in mem_counts}
+        rows = (await session.execute(stmt)).all()
 
     result = []
-    for row in agg:
+    for row in rows:
         attempts = row.total_attempts or 0
-        stored = int(row.total_stored or 0)
-        success_count, last_success_at = success_map.get(row.owner_id, (0, None))
-        success_rate = round(success_count / attempts, 4) if attempts > 0 else 0.0
         result.append({
             "owner_id": row.owner_id,
-            "owner_id_short": row.owner_id[:8] + "..." if row.owner_id else "",
+            "owner_id_short": (row.owner_id[:8] + "...") if row.owner_id else "",
             "total_attempts": attempts,
-            "total_memories_stored": stored,
-            "current_memory_count": mem_count_map.get(row.owner_id, 0),
-            "success_rate": success_rate,
+            "total_memories_stored": int(row.total_stored or 0),
+            "current_memory_count": row.current_memory_count or 0,
+            "success_rate": round((row.success_count or 0) / attempts, 4) if attempts else 0.0,
             "last_attempt_at": row.last_attempt_at.isoformat() if row.last_attempt_at else None,
-            "last_success_at": last_success_at.isoformat() if last_success_at else None,
+            "last_success_at": row.last_success_at.isoformat() if row.last_success_at else None,
         })
 
     logger.info("Extraction audit served: %d unique owners", len(result))
@@ -402,39 +428,36 @@ async def extract_and_store(req: ExtractionRequest):
 
     extracted = await extract_memories(req.conversation)
 
-    stored = []
+    embeddings: list[list[float]] = []
     if extracted:
-        # Generate embeddings in batch
-        contents = [m["content"] for m in extracted]
-        embeddings = await embed_texts(contents)
+        embeddings = await embed_texts([m["content"] for m in extracted])
 
-        async with async_session() as session:
-            for item, emb in zip(extracted, embeddings):
-                mem = Memory(
-                    content=item["content"],
-                    memory_type=item["type"],
-                    domain=item.get("domain", "general"),
-                    agent_id=req.agent_id,
-                    team_id=req.team_id,
-                    owner_id=owner_id,
-                    embedding=emb,
-                )
-                session.add(mem)
-                stored.append(mem)
-            await session.commit()
-            for mem in stored:
-                await session.refresh(mem)
-
-    # Always log the extraction attempt (even if 0 memories stored)
+    stored: list[Memory] = []
+    # Single transaction: store memories + the extraction-attempt audit row
+    # commit together, so the log can never disagree with what was stored.
     async with async_session() as session:
-        log_entry = ExtractionLog(
+        for item, emb in zip(extracted, embeddings):
+            mem = Memory(
+                content=item["content"],
+                memory_type=item["type"],
+                domain=item.get("domain", "general"),
+                agent_id=req.agent_id,
+                team_id=req.team_id,
+                owner_id=owner_id,
+                embedding=emb,
+            )
+            session.add(mem)
+            stored.append(mem)
+
+        session.add(ExtractionLog(
             owner_id=owner_id,
             agent_id=req.agent_id,
             memories_stored=len(stored),
             conversation_length=len(req.conversation),
-        )
-        session.add(log_entry)
+        ))
         await session.commit()
+        for mem in stored:
+            await session.refresh(mem)
 
     logger.info("Extracted %d memories from conversation (owner=%s, agent=%s)",
                 len(stored), owner_id, req.agent_id)
@@ -640,6 +663,7 @@ _HALL_MAP = {
     "preference": "hall_preferences",
     "discovery": "hall_discoveries",
 }
+_HALL_MAP_REVERSE = {v: k for k, v in _HALL_MAP.items()}
 
 
 def _derive_wing(
@@ -709,21 +733,9 @@ async def palace_layout(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MCP / SSE — Model Context Protocol endpoint for VS Code + agents
+# MCP / SSE — Model Context Protocol tools (server defined at module top)
 # Mounted at /mcp; SSE endpoint accessible at /mcp/sse
 # ═══════════════════════════════════════════════════════════════════════════
-
-from mcp.server.fastmcp import FastMCP
-from mcp.server.transport_security import TransportSecuritySettings
-
-_mcp = FastMCP(
-    "MemPalace",
-    transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=True,
-        allowed_hosts=["192.168.2.102:*", "localhost:*", "127.0.0.1:*", "hopper:*"],
-    ),
-)
-
 
 @_mcp.tool()
 async def search_memories_mcp(
@@ -750,11 +762,10 @@ async def search_memories_mcp(
         rows = (await session.execute(stmt)).all()
     if not rows:
         return "No memories found."
-    lines = []
-    for mem, dist in rows:
-        score = round(1.0 - (dist or 0.0), 4)
-        lines.append(f"[{score}] ({mem.memory_type}/{mem.domain}) {mem.content}")
-    return "\n".join(lines)
+    return "\n".join(
+        f"[{_score(dist)}] ({mem.memory_type}/{mem.domain}) {mem.content}"
+        for mem, dist in rows
+    )
 
 
 @_mcp.tool()
@@ -866,10 +877,7 @@ async def palace_room_memories(
     offset: int = 0,
 ):
     """Fetch memories for a specific palace room (used by the 3D drawer view)."""
-    # Reverse-derive filters from palace coordinates
-    # hall → memory_type
-    reverse_hall = {v: k for k, v in _HALL_MAP.items()}
-    memory_type = reverse_hall.get(hall)
+    memory_type = _HALL_MAP_REVERSE.get(hall)
 
     stmt = select(Memory).where(Memory.domain == room)
     if memory_type:
