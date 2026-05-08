@@ -24,6 +24,7 @@ Guides for developers extending, customizing, and integrating with Memex.
 | [Tasks](api/tasks.md) | Async task management |
 | [Governance](api/governance.md) | Governance request API |
 | [Training](api/training.md) | GRPO training endpoints |
+| [MemPalace](api/mempalace.md) | Semantic memory service — HTTP + MCP tools |
 | [Internal](api/internal.md) | Health, metrics, debugging |
 
 

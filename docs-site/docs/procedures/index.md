@@ -16,6 +16,7 @@ Step-by-step operational runbooks for common administrative tasks.
 | [Disaster Recovery](disaster-recovery.md) | Full system recovery from backup |
 | [GPU Troubleshooting](gpu-troubleshooting.md) | Diagnose and fix GPU issues |
 | [Database Maintenance](database-maintenance.md) | PostgreSQL vacuum, backup, restore |
+| [MemPalace Migrations](mempalace-migration.md) | Add an Alembic migration, baseline-stamp a live DB, deploy schema changes |
 | [Log Analysis](log-analysis.md) | Query and analyze logs in knuth |
 | [Performance Tuning](performance-tuning.md) | Optimize inference speed and throughput |
 

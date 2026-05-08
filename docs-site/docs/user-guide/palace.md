@@ -110,4 +110,11 @@ Post-processing pipeline: Bloom → N8AO ambient occlusion → Vignette → ACES
 
 Adaptive device pixel ratio: `[1, 1.5]` for performance on lower-end GPUs.
 
+## Related
+
+- [Memory System (architecture)](../architecture/memory-system.md) — what's stored where, and why
+- [MemPalace Architecture Deep Dive](../architecture/mempalace-deep-dive.md) — the database schema, palace metaphor, and extraction pipeline that drives this UI
+- [Service: MemPalace](../modules/services/mempalace.md) — operator reference for the backend service
+- [User Guide: Settings](settings.md) — teach memex new preferences (TRAIN intent)
+
 
