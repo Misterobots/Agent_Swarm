@@ -247,82 +247,16 @@ services:
 
   # --- COMFYUI (Creature Minsky) ---
   comfyui:
-    image: yanwk/comfyui-boot:cu121
+    image: comfyui:blackwell-sm120
     container_name: comfyui_gpu
     hostname: comfyui
     restart: always
     ports:
       - "8188:8188"
     volumes:
-      # Mount the User's ComfyUI Install (Core & Custom Nodes)
-
-      - /c/Users/panca/Documents/ComfyUI/ComfyUI:/home/runner/ComfyUI
-      # Mount Output/Input to Workspace for easier agent access if needed (Optional)
-      - /c/Users/panca/Documents/ComfyUI/ComfyUI/output:/home/runner/ComfyUI/output
-    environment:
-      # Yanwk Boot Args
-      - CLI_ARGS=--listen 0.0.0.0 --port 8188 --preview-method auto --cuda-device 1
-      - NVIDIA_VISIBLE_DEVICES=1        # GPU 1 dedicated to image generation
-
-
-    command:
-      - "bash"
-      - "-c"
-      - |
-        echo "[DEBUG] Listing /home/runner/ComfyUI:"
-        ls -la /home/runner/ComfyUI
-        echo "[DEBUG] Checking main.py:"
-        ls -la /home/runner/ComfyUI/main.py
-        
-        echo "--- DIRECT STARTUP: 5060 Ti Patching Mode (v10) ---"
-        git config --global --add safe.directory /home/runner/ComfyUI
-        cd /home/runner/ComfyUI
-        
-        # PRE-LAUNCH: Prepend User Nvidia Libraries to LD_LIBRARY_PATH to avoid system conflicts
-        NVIDIA_BASE="/home/runner/.local/lib/python3.11/site-packages/nvidia"
-        export LD_LIBRARY_PATH="$$NVIDIA_BASE/cudnn/lib:$$NVIDIA_BASE/cublas/lib:$$NVIDIA_BASE/cuda_runtime/lib:$$NVIDIA_BASE/cuda_cupti/lib:$$NVIDIA_BASE/cufft/lib:$$NVIDIA_BASE/curand/lib:$$NVIDIA_BASE/cusolver/lib:$$NVIDIA_BASE/cusparse/lib:$$NVIDIA_BASE/nccl/lib:$$NVIDIA_BASE/nvtx/lib:$$LD_LIBRARY_PATH"
-        echo "[ENV] Updated LD_LIBRARY_PATH: $$LD_LIBRARY_PATH"
-        
-        NEED_5060_PATCH=0
-        if [ ! -f .5060_patch_v11_applied ]; then
-          NEED_5060_PATCH=1
-        else
-          if ! python3 -c "import sys; import torch; arch_list = set(torch.cuda.get_arch_list()); sys.exit(0 if 'sm_120' in arch_list else 1)"
-          then
-            echo "[SETUP] Existing torch build does not advertise sm_120 support; forcing patch refresh."
-            NEED_5060_PATCH=1
-          fi
-        fi
-
-        if [ "$$NEED_5060_PATCH" = "1" ]; then
-          echo "[SETUP] Applying 5060 Ti Patches (v11)..."
-
-          echo "[SETUP] Installing PyTorch Nightly (CUDA 12.8 compatible)..."
-          pip install "numpy<2.0" "pillow>=12.1.0" rembg --pre torch torchvision torchaudio --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu128 --extra-index-url https://pypi.org/simple
-
-          echo "[SETUP] Installing Critical Dependencies..."
-          pip install xatlas accelerate utils3d pymeshlab watchdog kiui onnxruntime-gpu transformers diffusers sentencepiece protobuf scipy einops opencv-python jaxtyping typeguard lxml pyfqmr plyfile pyhocon omegaconf matplotlib tripo3d easydict simpleeval huggingface_hub[hf_xet] pyvista
-
-          echo "[SETUP] Cleaning up stale xformers artifacts..."
-          pip uninstall -y xformers || true
-          rm -rf /home/runner/.local/lib/python3.11/site-packages/xformers
-          rm -rf /home/runner/.local/lib/python3.11/site-packages/xformers-*.dist-info
-          rm -rf /usr/local/lib64/python3.11/site-packages/xformers
-          rm -rf /usr/local/lib64/python3.11/site-packages/xformers-*.dist-info
-          rm -rf /usr/local/lib/python3.11/site-packages/xformers
-          rm -rf /usr/local/lib/python3.11/site-packages/xformers-*.dist-info
-
-          # Note: xformers masking is now handled by custom_nodes/AAA_Antigravity_Patch/
-
-          rm .5060_patch_* 2>/dev/null || true
-          touch .5060_patch_v11_applied
-          echo "[SETUP] Patching Complete. Marker v11 created."
-        else
-          echo "[SETUP] Patches already applied. Skipping install."
-        fi
-        
-        echo "Launching ComfyUI..."
-        exec python3 main.py --listen 0.0.0.0 --port 8188 --preview-method auto
+      - C:/Users/panca/Documents/ComfyUI_app/models:/home/runner/ComfyUI/models:ro
+      - C:/Users/panca/Documents/ComfyUI_app/output:/home/runner/ComfyUI/output:rw
+      - C:/Users/panca/Documents/ComfyUI_app/input:/home/runner/ComfyUI/input:rw
     deploy:
       resources:
         reservations:
@@ -337,7 +271,7 @@ services:
           - comfyui_gpu
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.comfyui.rule=PathPrefix(`/comfy`)"
+      - "traefik.http.routers.comfyui.rule=PathPrefix(\\/comfy\\)"
       - "traefik.http.routers.comfyui.entrypoints=web"
       - "traefik.http.routers.comfyui.middlewares=strip-comfy,authentik@docker"
       - "traefik.http.middlewares.strip-comfy.stripprefix.prefixes=/comfy"
