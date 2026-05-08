@@ -211,4 +211,4 @@ docker compose stop training-dispatcher
 - [Training API Reference](../developer-guide/api/training.md)
 - [Module: Config — Archetype Configs](config.md#archetype-training-configs)
 - [Admin: Environment Variables](../admin-guide/configuration/environment.md#training-dispatcher)
-- [Phase 2–4 Implementation Report](../../docs/TRAINING_PIPELINE_PHASES_2_3_4.md)
+- [Phase 2–4 Implementation Report](https://github.com/Misterobots/Agent_Swarm/blob/main/docs/TRAINING_PIPELINE_PHASES_2_3_4.md) (in repo `docs/` outside the doc site)

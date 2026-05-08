@@ -2824,17 +2824,24 @@ def chat_swarm(
                 
             result = memory.add_rule(domain, keyword, rule)
 
-            # Also store in MemPalace as a procedural memory
+            # Also mirror into MemPalace as a procedural memory via the HTTP
+            # service. Failure is non-critical — the rule is already in
+            # Skills Memory; this only adds semantic recall.
             try:
-                from mempalace_client import mempalace as _mp
-                _mp.store(
-                    content=f"{keyword}: {rule}",
-                    memory_type="procedural",
-                    domain=domain.replace("_rules", ""),
-                    owner_id=owner_id,
-                )
-            except Exception:
-                pass
+                import httpx as _httpx_mp
+                _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
+                async with _httpx_mp.AsyncClient(timeout=5.0) as _mp_client:
+                    await _mp_client.post(
+                        f"{_mp_url}/v1/memories",
+                        json={
+                            "content": f"{keyword}: {rule}",
+                            "memory_type": "procedural",
+                            "domain": domain.replace("_rules", ""),
+                            "owner_id": owner_id,
+                        },
+                    )
+            except Exception as _mp_exc:
+                logger.debug("[MemPalace] TRAIN mirror failed: %s", _mp_exc)
 
             yield {"type": "response", "content": f"🧠 **Learned**: {result}"}
             _score_trace(lf_trace, langfuse, 1.0, output=result)

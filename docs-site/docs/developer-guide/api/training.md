@@ -160,45 +160,6 @@ Sends `SIGTERM` to the training subprocess. Returns `404` if the job does not ex
 
 ## Related
 
-- [Module: Training Dispatcher](../modules/training-dispatcher.md)
+- [Module: Training Dispatcher](../../modules/training-dispatcher.md)
 - [Admin: Secrets](../../admin-guide/operations/secrets.md)
-- [Config: ARCHETYPE_TRAINING_CONFIGS](../modules/config.md#archetype-training-configs)
-}
-```
-
-## Submit Comparison
-
-```
-POST /v1/training/compare
-```
-
-Human feedback for preference learning:
-
-```json
-{
-    "prompt": "Write a sorting function",
-    "response_a": "def sort(lst): return sorted(lst)",
-    "response_b": "def sort(lst):\n    return sorted(lst, key=lambda x: x)",
-    "preferred": "a",
-    "session_id": "session-abc"
-}
-```
-
-## List Training Runs
-
-```
-GET /v1/training/runs
-```
-
-## Training Data
-
-Training data is stored in `training_data/`:
-
-```
-training_data/
-├── comparisons/      # Human preference pairs
-├── sessions/         # Session-based training data
-└── rewards/          # Process-reward scores from MarsRL
-```
-
-
+- [Config: ARCHETYPE_TRAINING_CONFIGS](../../modules/config.md#archetype-training-configs)
