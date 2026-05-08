@@ -43,5 +43,11 @@ receivers:
     webhook_configs:
       - url: 'https://notify.shivelymedia.com/home-ai-alerts'
         send_resolved: true
+        # Bearer token written to tmpfs by the alertmanager container's entrypoint
+        # (see turing_gateway/docker-compose.yml). Sourced from $NTFY_ALERT_TOKEN.
+        http_config:
+          authorization:
+            type: Bearer
+            credentials_file: /tmp/secrets/ntfy_token
 
 inhibit_rules: []

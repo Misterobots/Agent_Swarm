@@ -113,6 +113,11 @@ services:
         fi
         printf '%s' "$$ALERT_SMTP_PASSWORD" > /tmp/secrets/smtp_password
         chmod 0400 /tmp/secrets/smtp_password
+        if [ -z "$$NTFY_ALERT_TOKEN" ]; then
+          echo "WARN: NTFY_ALERT_TOKEN is not set; ntfy webhook will return 403." >&2
+        fi
+        printf '%s' "$$NTFY_ALERT_TOKEN" > /tmp/secrets/ntfy_token
+        chmod 0400 /tmp/secrets/ntfy_token
         exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
     tmpfs:
       - /tmp/secrets:size=64k,mode=1777
@@ -124,7 +129,7 @@ services:
       - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM:-Admin@Graceful-Tech.com}
       - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-Justin@shivelymail.com}
       - NTFY_ALERT_TOPIC=${NTFY_ALERT_TOPIC:-home-ai-alerts}
-      - NTFY_ALERT_TOKEN=${NTFY_ALERT_TOKEN:-tk_12345678901234567890123456789}
+      - NTFY_ALERT_TOKEN=${NTFY_ALERT_TOKEN:?set NTFY_ALERT_TOKEN - see turing_gateway/.env}
     networks:
       - ai_lab_net
     labels:
