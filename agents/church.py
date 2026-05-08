@@ -2827,19 +2827,19 @@ def chat_swarm(
             # Also mirror into MemPalace as a procedural memory via the HTTP
             # service. Failure is non-critical — the rule is already in
             # Skills Memory; this only adds semantic recall.
+            # chat_swarm is a sync generator, so use sync requests here.
             try:
-                import httpx as _httpx_mp
                 _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
-                async with _httpx_mp.AsyncClient(timeout=5.0) as _mp_client:
-                    await _mp_client.post(
-                        f"{_mp_url}/v1/memories",
-                        json={
-                            "content": f"{keyword}: {rule}",
-                            "memory_type": "procedural",
-                            "domain": domain.replace("_rules", ""),
-                            "owner_id": owner_id,
-                        },
-                    )
+                requests.post(
+                    f"{_mp_url}/v1/memories",
+                    json={
+                        "content": f"{keyword}: {rule}",
+                        "memory_type": "procedural",
+                        "domain": domain.replace("_rules", ""),
+                        "owner_id": owner_id,
+                    },
+                    timeout=5.0,
+                )
             except Exception as _mp_exc:
                 logger.debug("[MemPalace] TRAIN mirror failed: %s", _mp_exc)
 
