@@ -37,7 +37,7 @@ receivers:
         # entrypoint (see turing_gateway/docker-compose.yml alertmanager service).
         # The file is written to an in-container tmpfs and never persisted to
         # the repo or to disk.
-        auth_password_file: /run/secrets/smtp_password
+        auth_password_file: /tmp/secrets/smtp_password
         require_tls: true
         send_resolved: true
     webhook_configs:

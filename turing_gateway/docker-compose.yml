@@ -98,22 +98,24 @@ services:
       - alertmanager_data:/alertmanager
     ports:
       - "9093:9093"
-    # Materialize $ALERT_SMTP_PASSWORD to /run/secrets/smtp_password (tmpfs)
+    # Materialize $ALERT_SMTP_PASSWORD to /tmp/secrets/smtp_password (tmpfs)
     # before alertmanager starts, so alertmanager.yml can use auth_password_file
     # and the secret never appears on the filesystem outside the container.
+    # /tmp is used because the alertmanager image runs as `nobody` and cannot
+    # write to /run/secrets when mounted as tmpfs.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -e
-        mkdir -p /run/secrets
+        mkdir -p /tmp/secrets
         if [ -z "$$ALERT_SMTP_PASSWORD" ] || [ "$$ALERT_SMTP_PASSWORD" = "CHANGE_ME_APP_PASSWORD" ]; then
           echo "WARN: ALERT_SMTP_PASSWORD is not set; email alerts will fail to authenticate." >&2
         fi
-        printf '%s' "$$ALERT_SMTP_PASSWORD" > /run/secrets/smtp_password
-        chmod 0400 /run/secrets/smtp_password
+        printf '%s' "$$ALERT_SMTP_PASSWORD" > /tmp/secrets/smtp_password
+        chmod 0400 /tmp/secrets/smtp_password
         exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
     tmpfs:
-      - /run/secrets:size=64k,mode=0700
+      - /tmp/secrets:size=64k,mode=0700
     environment:
       - ALERT_SMTP_HOST=${ALERT_SMTP_HOST:-smtp.zoho.com}
       - ALERT_SMTP_PORT=${ALERT_SMTP_PORT:-587}
