@@ -115,7 +115,7 @@ services:
         chmod 0400 /tmp/secrets/smtp_password
         exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
     tmpfs:
-      - /tmp/secrets:size=64k,mode=0700
+      - /tmp/secrets:size=64k,mode=1777
     environment:
       - ALERT_SMTP_HOST=${ALERT_SMTP_HOST:-smtp.zoho.com}
       - ALERT_SMTP_PORT=${ALERT_SMTP_PORT:-587}
