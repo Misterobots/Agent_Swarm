@@ -321,6 +321,15 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "- Keep tasks focused and actionable\n"
         "- Use role names: researcher, architect, coder, devops, analyst\n"
         "- 2-5 research tasks, 1-4 implementation tasks, 1-3 verification criteria\n\n"
+        "RESEARCH TASK DIVERSITY (critical for scope='external'):\n"
+        "When the task is research or analysis (scope='external'), you MUST generate 3-4 DISTINCT research tasks.\n"
+        "Each task must investigate a DIFFERENT angle or sub-question. NEVER copy the user input verbatim into multiple tasks.\n"
+        "Good research decomposition example for 'Explain NERC CIP standards':\n"
+        "  1. researcher: What are the core NERC CIP reliability standards and their mandatory requirements?\n"
+        "  2. researcher: What are the current compliance challenges and enforcement gaps in NERC CIP?\n"
+        "  3. analyst: How do NERC CIP standards compare to other critical infrastructure frameworks (NIST, IEC 62443)?\n"
+        "  4. researcher: What are real-world case studies of NERC CIP violations and their consequences?\n"
+        "Each researcher should look at a UNIQUE aspect: requirements, implementation, history, comparisons, risks, or current state.\n\n"
         "SCOPE RULES:\n"
         "- scope='codebase': task involves writing, reading, or modifying code in an existing or new project\n"
         "- scope='external': task involves research, explanation, analysis, or web lookups with no code changes\n"
@@ -356,7 +365,7 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
                 "stream": False,
                 "format": "json",
                 "think": False,
-                "options": {"temperature": 0.3, "num_predict": 1024},
+                "options": {"temperature": 0.3, "num_predict": 2048},
             },
             timeout=60,
         )
@@ -380,6 +389,20 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
                 parsed["research_tasks"] = [{"role": "researcher", "task": user_input}]
             if "implementation_tasks" not in parsed or not parsed["implementation_tasks"]:
                 parsed["implementation_tasks"] = [{"role": "architect", "task": user_input}]
+
+            # Quality gate: for external/research tasks, if only 1 researcher produced the
+            # verbatim input as its task, the decomposition was lazy — log a warning.
+            # The perspective mode will compensate, but surface it for debugging.
+            r_tasks = parsed.get("research_tasks", [])
+            if (
+                parsed.get("scope") == "external"
+                and len(r_tasks) == 1
+                and r_tasks[0].get("task", "").strip() == user_input.strip()
+            ):
+                logger.warning(
+                    "[Coordinator] Decomposition returned single verbatim research task for external "
+                    "scope — perspective mode will compensate."
+                )
             if "verification_criteria" not in parsed or not parsed["verification_criteria"]:
                 parsed["verification_criteria"] = ["Task completed correctly"]
 
@@ -1410,50 +1433,13 @@ def coordinate_task(
                 ),
             }
 
-            followup_section = _generate_followups(persp_matrix.get("synthesis_narrative", ""), impl_tasks)
+            followup_section = _generate_followups(persp_matrix.get("synthesis_narrative", ""), [])
             yield {"type": "response", "content": f"{matrix_md}{followup_section}"}
             logger.info(
                 f"[Coordinator] Perspective research {session.coordination_id} complete: "
                 f"{completed}/{total_workers} workers, {total_time:.1f}s, "
                 f"controversy={persp_matrix.get('controversy_level')}"
             )
-
-            # If there are implementation tasks (e.g. an architect synthesis), run them now
-            # using the perspective matrix as the research context.
-            if impl_tasks:
-                yield {"type": "swarm_phase", "phase_num": 5, "phase_name": "Implement", "total_phases": 5}
-                yield {
-                    "type": "status",
-                    "content": f"🔨 Running {len(impl_tasks)} implementation task(s) using perspective matrix...",
-                }
-                impl_context = (
-                    f"You have access to the following multi-perspective research matrix:\n\n"
-                    f"{matrix_md}\n\n"
-                    f"Use these findings to complete your task."
-                )
-                for impl_task in impl_tasks:
-                    role = impl_task.get("role", "architect")
-                    task_text = impl_task.get("task", "")
-                    worker_id = session.register_worker(role, task_text, "implementation")
-                    agent = _get_agent_for_role(role, session_id=session_id, scope=scope)
-                    child_token = _derive_worker_token(ace_token, role, task_text)
-                    worker_prompt = f"{task_text}\n\n{impl_context}"
-                    yield {
-                        "type": "swarm_worker_created",
-                        "worker_id": worker_id,
-                        "role": role,
-                        "phase": "implementation",
-                        "task": task_text,
-                        "pioneer": session.workers[worker_id].pioneer,
-                    }
-                    result = _run_worker(session, worker_id, agent, worker_prompt, child_token=child_token)
-                    if result:
-                        session.write_to_scratchpad(f"impl_{role}.md", result)
-                        yield {"type": "message", "content": f"✅ **{role.capitalize()}** completed\n\n"}
-                        yield {"type": "response", "content": result}
-                    else:
-                        yield {"type": "message", "content": f"⚠️ **{role.capitalize()}** returned no output\n\n"}
-
             return  # Perspective flow is complete; skip standard Phases 2-5 below
 
         # === PHASE 2: RESEARCH (parallel) ===
