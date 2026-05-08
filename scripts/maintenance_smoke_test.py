@@ -76,13 +76,15 @@ def post_alert(router: str, payload: dict[str, Any]) -> dict[str, Any]:
 def fetch_audit(router: str, limit: int = 20) -> list[dict[str, Any]]:
     r = requests.get(f"{router}/api/maintenance/audit", params={"limit": limit}, timeout=5)
     r.raise_for_status()
-    return r.json().get("rows", [])
+    body = r.json()
+    return body if isinstance(body, list) else body.get("rows", [])
 
 
 def fetch_queue(router: str) -> list[dict[str, Any]]:
     r = requests.get(f"{router}/api/maintenance/queue", params={"status": "pending"}, timeout=5)
     r.raise_for_status()
-    return r.json().get("items", [])
+    body = r.json()
+    return body if isinstance(body, list) else body.get("items", [])
 
 
 def healthz(router: str) -> bool:
@@ -123,23 +125,29 @@ def main() -> int:
 
     all_pass = True
 
+    def latest_decision(alertname: str) -> dict[str, Any] | None:
+        for row in fetch_audit(args.router, limit=20):
+            if row.get("alert_name") == alertname:
+                return row
+        return None
+
     # Test 1 — agent_safe path
     print("\n[1] ServiceDown(job=postgres) — expect route=agent")
-    resp = post_alert(args.router, make_payload("ServiceDown", job="postgres", instance="hopper:5432", severity="critical"))
-    decisions = resp.get("decisions", [])
-    all_pass &= expect("router accepted webhook", bool(decisions))
-    if decisions:
-        d = decisions[0]
+    post_alert(args.router, make_payload("ServiceDown", job="postgres", instance="hopper:5432", severity="critical"))
+    time.sleep(0.3)
+    d = latest_decision("ServiceDown")
+    all_pass &= expect("audit row recorded", d is not None)
+    if d:
         all_pass &= expect("route is agent", d.get("route") == "agent", f"got {d.get('route')}")
         all_pass &= expect("action is restart_container", d.get("action") == "restart_container")
 
     # Test 2 — human path
     print("\n[2] ContainerHighMemory — expect route=human + queue item")
     pre_queue = fetch_queue(args.router)
-    resp = post_alert(args.router, make_payload("ContainerHighMemory", name="agent_runtime", severity="warning"))
-    decisions = resp.get("decisions", [])
-    if decisions:
-        d = decisions[0]
+    post_alert(args.router, make_payload("ContainerHighMemory", name="agent_runtime", severity="warning"))
+    time.sleep(0.3)
+    d = latest_decision("ContainerHighMemory")
+    if d:
         all_pass &= expect("route is human", d.get("route") == "human", f"got {d.get('route')}")
     post_queue = fetch_queue(args.router)
     all_pass &= expect(
@@ -150,10 +158,10 @@ def main() -> int:
 
     # Test 3 — cooldown suppression
     print("\n[3] Repeat ServiceDown(job=postgres) — expect route=suppressed_cooldown")
-    resp = post_alert(args.router, make_payload("ServiceDown", job="postgres", instance="hopper:5432", severity="critical"))
-    decisions = resp.get("decisions", [])
-    if decisions:
-        d = decisions[0]
+    post_alert(args.router, make_payload("ServiceDown", job="postgres", instance="hopper:5432", severity="critical"))
+    time.sleep(0.3)
+    d = latest_decision("ServiceDown")
+    if d:
         all_pass &= expect(
             "route is suppressed_cooldown",
             d.get("route") == "suppressed_cooldown",

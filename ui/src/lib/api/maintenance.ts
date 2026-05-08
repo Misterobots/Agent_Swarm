@@ -17,8 +17,7 @@ export async function fetchMaintenanceQueue(
       cache: "no-store",
     });
     if (!res.ok) return [];
-    const data = (await res.json()) as { items?: MaintenanceQueueItem[] };
-    return data.items ?? [];
+    return (await res.json()) as MaintenanceQueueItem[];
   } catch {
     return [];
   }
@@ -50,8 +49,7 @@ export async function fetchMaintenanceAudit(
       { cache: "no-store" }
     );
     if (!res.ok) return [];
-    const data = (await res.json()) as { rows?: MaintenanceAuditRow[] };
-    return data.rows ?? [];
+    return (await res.json()) as MaintenanceAuditRow[];
   } catch {
     return [];
   }
