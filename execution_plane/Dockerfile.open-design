@@ -48,5 +48,5 @@ VOLUME /data
 # Daemon API port (default 7456)
 EXPOSE 7456
 
-# Start the daemon CLI
-CMD ["node", "apps/daemon/dist/cli.js"]
+# Start the daemon CLI (--no-open: suppress xdg-open in headless containers)
+CMD ["node", "apps/daemon/dist/cli.js", "--no-open"]
