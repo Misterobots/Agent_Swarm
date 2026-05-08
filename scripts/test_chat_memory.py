@@ -3,7 +3,7 @@
 import json, urllib.request, time
 
 AGENT_URL = "http://localhost:8008"
-MEMPALACE_URL = "http://192.168.2.103:8200"
+MEMPALACE_URL = "http://192.168.2.102:8200"
 
 # 1. Get current memory count
 req = urllib.request.Request(f"{MEMPALACE_URL}/v1/palace/layout")
