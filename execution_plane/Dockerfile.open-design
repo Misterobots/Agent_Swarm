@@ -8,8 +8,9 @@ FROM node:24-slim
 # Build tools needed for native add-ons (better-sqlite3, etc.)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       git python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
+       ca-certificates git python3 make g++ \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
 
 # Enable corepack / pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
