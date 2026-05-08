@@ -607,11 +607,17 @@ _HALL_MAP = {
 }
 
 
-def _derive_wing(agent_id: str | None, team_id: str | None) -> str:
+def _derive_wing(
+    agent_id: str | None,
+    team_id: str | None,
+    owner_id: str | None = None,
+) -> str:
     if team_id:
         return f"wing_team_{team_id}"
     if agent_id:
         return f"wing_{agent_id}"
+    if owner_id:
+        return f"wing_{owner_id}"
     return "wing_self"
 
 
@@ -625,10 +631,11 @@ async def palace_layout(
         stmt = select(
             Memory.agent_id,
             Memory.team_id,
+            Memory.owner_id,
             Memory.memory_type,
             Memory.domain,
             func.count(Memory.id).label("cnt"),
-        ).group_by(Memory.agent_id, Memory.team_id, Memory.memory_type, Memory.domain)
+        ).group_by(Memory.agent_id, Memory.team_id, Memory.owner_id, Memory.memory_type, Memory.domain)
 
         if owner_id:
             stmt = stmt.where(Memory.owner_id == owner_id)
@@ -640,8 +647,8 @@ async def palace_layout(
     # Build the hierarchy in-memory
     wings_map: dict[str, dict[str, dict[str, int]]] = {}
     total = 0
-    for (aid, tid, mtype, domain, cnt) in rows:
-        wing_name = _derive_wing(aid, tid)
+    for (aid, tid, oid, mtype, domain, cnt) in rows:
+        wing_name = _derive_wing(aid, tid, oid)
         hall_name = _HALL_MAP.get(mtype, f"hall_{mtype}")
         room_name = domain or "general"
         total += cnt
