@@ -151,9 +151,13 @@ export function PalaceViewer() {
 
       {/* ── Layer 2: CSS 3D spatial content ───────────────────── */}
       <div
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ zIndex: 1, perspective: "1200px", perspectiveOrigin: "50% 45%" }}
+        className="absolute inset-0 overflow-y-auto"
+        style={{ zIndex: 1 }}
       >
+        <div
+          className="flex min-h-full items-center justify-center py-8"
+          style={{ perspective: "1200px", perspectiveOrigin: "50% 45%" }}
+        >
         <div
           key={sceneKey}
           style={{
@@ -170,6 +174,7 @@ export function PalaceViewer() {
             />
           )}
           {(location.level === "hall" || location.level === "room") && <RoomView />}
+        </div>
         </div>
       </div>
 
