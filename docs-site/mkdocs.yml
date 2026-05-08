@@ -214,6 +214,7 @@ nav:
       - Governance: developer-guide/api/governance.md
       - Grounding: developer-guide/api/grounding.md
       - Training: developer-guide/api/training.md
+      - MemPalace: developer-guide/api/mempalace.md
       - Internal: developer-guide/api/internal.md
   - Modules:
     - modules/index.md
@@ -262,6 +263,7 @@ nav:
     - Disaster Recovery: procedures/disaster-recovery.md
     - GPU Troubleshooting: procedures/gpu-troubleshooting.md
     - Database Maintenance: procedures/database-maintenance.md
+    - MemPalace Migrations: procedures/mempalace-migration.md
     - Log Analysis: procedures/log-analysis.md
     - Performance Tuning: procedures/performance-tuning.md
   - Tutorials:

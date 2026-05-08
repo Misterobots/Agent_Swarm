@@ -2,471 +2,327 @@
 title: "MemPalace Integration Deep Dive"
 ---
 
-# MemPalace Integration — Architecture Deep Dive
+# MemPalace — Architecture Deep Dive
 
 ```
 Document ID: ARCH-MEM-001
 Domain: Architecture
 Owner: Core Platform
 Status: Approved
-Version: 2.0
-Last Updated: 2026-04-16
+Version: 3.0
+Last Updated: 2026-05-08
+Source of Truth: control_plane/mempalace/app/{main.py,database.py,embeddings.py}
 ```
-
 
 ---
 
 ## Purpose
 
-Documents the integration of the official [MemPalace](https://github.com/mempalace/mempalace) library (v3.3.0+) as the agent memory subsystem. Replaces the previous custom pgvector HTTP service with an embedded ChromaDB-backed palace architecture.
+MemPalace is Memex's hierarchical semantic memory service. It provides three
+memory subsystems behind a FastAPI + PostgreSQL/pgvector backend, exposed both
+as a REST API and as MCP (Model Context Protocol) tools so VS Code, agent
+runtimes, and the 3D Palace UI can all read and write through one source of
+truth.
 
 ---
 
-## Source References
+## Service Topology
 
-| Source | Type | Relevance |
-|--------|------|-----------|
-| [MemPalace Library](https://github.com/mempalace/mempalace) | Open source (pip) | Core dependency — palace hierarchy, ChromaDB backend, KnowledgeGraph |
-| [ChromaDB](https://github.com/chroma-core/chroma) | Open source | Underlying vector store used by MemPalace for drawer persistence |
-| [Method of Loci](https://en.wikipedia.org/wiki/Method_of_loci) | Cognitive science | Memory palace spatial metaphor that MemPalace implements |
-| [Semantic Memory in AI Agents (Park et al., 2023)](https://arxiv.org/abs/2304.03442) | Research paper | Generative agent memory architecture with retrieval |
-| [pgvector](https://github.com/pgvector/pgvector) | Open source | Previous vector store (replaced by ChromaDB in v2) |
+| Property | Value |
+|----------|-------|
+| **Node** | Control Plane ({{ hopper_ip }}) |
+| **Container** | `mempalace` |
+| **Image** | `control_plane-mempalace` |
+| **Port** | 8200 (HTTP + MCP) |
+| **URL** | `http://{{ hopper_ip }}:8200` |
+| **MCP endpoint** | `http://{{ hopper_ip }}:8200/mcp` |
+| **Backend** | PostgreSQL (`mempalace` schema) with pgvector |
+| **Embeddings** | Ollama `nomic-embed-text` (768-dim) on Lovelace |
+| **Extraction LLM** | Ollama `qwen2.5-coder:14b` |
+| **Compose** | `control_plane/docker-compose.yml` |
+| **Build** | `control_plane/mempalace/Dockerfile` |
 
----
+```mermaid
+graph TB
+    subgraph Clients
+        AGENT["Agent Runtime<br/>main.py"]
+        UI["Hive UI<br/>Palace 3D viewer"]
+        VSC["VS Code / MCP clients"]
+    end
 
-## Changelog: Source → Hive Implementation
+    subgraph Hopper["Control Plane (Hopper)"]
+        MP["MemPalace<br/>FastAPI :8200"]
+        PG[("PostgreSQL<br/>mempalace schema")]
+    end
 
-This table documents what was adopted from the official MemPalace library and what was customized for the Hive.
+    subgraph Lovelace["Execution Plane (Lovelace)"]
+        OL["Ollama :11434<br/>nomic-embed-text<br/>qwen2.5-coder:14b"]
+    end
 
-??? info "View full changelog table"
+    AGENT -->|"POST /v1/extract<br/>POST /v1/memories/search"| MP
+    UI -->|"GET /v1/palace/layout<br/>GET /v1/palace/room"| MP
+    VSC -->|"MCP /mcp"| MP
+    MP -->|"async SQLAlchemy + asyncpg"| PG
+    MP -->|"embed + extract"| OL
 
-    | Feature | MemPalace Library (v3.3.0) | Hive Implementation | Delta |
-    |---------|---------------------------|---------------------|-------|
-    | Palace hierarchy | Wing → Hall → Room → Drawer | Wing → Hall → Drawer (skip Room) | Simplified — Room layer auto-created but not exposed |
-    | Wing derivation | Manual wing names | Auto-derived from agent name (`"Code Developer"` → `"Code_Developer"`) | Automatic mapping, no manual config |
-    | Hall mapping | Free-form hall names | Fixed set of 6 halls mapped from `memory_type` | Constrained to known categories |
-    | ChromaBackend | Default persistent client | Configured with `MEMPALACE_DATA_DIR` env var | Environment-driven path |
-    | KnowledgeGraph | SQLite-backed, full API | Wrapped as `team_store/team_get/team_search/team_clear` | Simplified team-scoped API |
-    | Diary / snapshots | CLI commands | Wrapped `save_snapshot()` / `get_snapshot()` with fallback | Graceful degradation if CLI unavailable |
-    | Error handling | Raises exceptions | All methods catch exceptions, return safe defaults | Never propagates errors to callers |
-    | Initialization | Explicit `Palace()` constructor | Singleton `MemPalaceClient` with lazy init | One instance per process |
-    | Search | `search_memories(query, n)` | `search(query, agent_name, memory_type, limit)` with wing/hall scoping | Scoped search per agent + type |
-    | `extract()` | Not in base library | Custom fact extraction using LLM (optional) | Added intelligence layer |
-
-
----
-
-## Architecture Overview
-
-??? info "Architecture Diagram"
-
-    ```mermaid
-    graph TD
-        subgraph Agent["Agent Layer"]
-            R["router.py"] --> MC["mempalace_client.py"]
-            C["coordinator.py"] --> MC
-            M["main.py"] --> MC
-        end
-
-        MC --> LIB
-
-        subgraph LIB["MemPalace Library<br/><i>pip install</i>"]
-            CB["ChromaBackend"] -.->|Drawer storage| LIB_NOTE[ ]
-            SM["search_memories()"] -.->|Semantic search| LIB_NOTE
-            KG["KnowledgeGraph"] -.->|Team memory| LIB_NOTE
-            DI["Diary / CLI"] -.->|Snapshots| LIB_NOTE
-        end
-
-        LIB --> STORE
-
-        subgraph STORE["Storage Layer"]
-            CHROMA["ChromaDB<br/><i>embedded</i>"]
-            SQLITE["SQLite<br/><i>KnowledgeGraph</i>"]
-        end
-
-        style Agent fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
-        style LIB fill:#0f3460,stroke:#16213e,color:#e0e0e0
-        style STORE fill:#162447,stroke:#16213e,color:#e0e0e0
-        style LIB_NOTE fill:none,stroke:none
-    ```
-
-
-No separate memory server is required. MemPalace runs embedded in the agent process.
-
----
-
-## Palace Hierarchy
-
-MemPalace organizes memory in a spatial metaphor:
-
-| Level | Concept | Mapped to |
-|-------|---------|-----------|
-| **Palace** | Top-level container | One per Hive instance |
-| **Wing** | Agent or team grouping | Agent name (e.g., `Code_Developer`) or team ID |
-| **Hall** | Memory category | `conversations`, `decisions`, `code_patterns`, `errors`, `tasks`, `general` |
-| **Room** | Not used (library creates auto) | — |
-| **Drawer** | Individual memory unit | One ChromaDB document per memory |
-
-### Memory Type → Hall Mapping
-
-| `memory_type` | Hall |
-|----------------|------|
-| `conversation` | `conversations` |
-| `decision` | `decisions` |
-| `code` | `code_patterns` |
-| `error` | `errors` |
-| `task` | `tasks` |
-| *(default)* | `general` |
-
-### Wing Derivation
-
-Wings are derived from agent names:
-
-```python
-"Code Developer"  → "Code_Developer"
-"Art Director"    → "Art_Director"
-"team:research-1" → "team_research_1"
+    style Hopper fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
+    style Lovelace fill:#162447,stroke:#16213e,color:#e0e0e0
+    style Clients fill:#0f3460,stroke:#16213e,color:#e0e0e0
 ```
 
 ---
 
-## Client API
+## Three Memory Subsystems
 
-The `MemPalaceClient` singleton (`agents/mempalace_client.py`) exposes this interface:
+MemPalace stores three distinct kinds of memory in three separate tables.
+They share the same vector embedding pipeline but have different semantics.
 
-??? info "Full Client API — Individual Memory"
+### 1. Semantic Memories (`mempalace.memories`)
 
-    | Method | Signature | Description |
-    |--------|-----------|-------------|
-    | `store()` | `(content, agent_name, memory_type, metadata)` | Store a memory in the appropriate wing/hall/drawer |
-    | `search()` | `(query, agent_name, memory_type, limit) → list[dict]` | Semantic search across an agent's memories |
-    | `delete()` | `(memory_id) → bool` | Delete a specific memory by ID |
-    | `stats()` | `() → dict` | Collection statistics (count, palace name) |
-    | `extract()` | `(text, agent_name) → list[dict]` | Extract structured facts from raw text |
+Vector-searchable facts extracted from conversations. The dominant table —
+all primary read/write traffic touches it.
 
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | UUID | Primary key |
+| `content` | TEXT | The memory itself (one clear sentence) |
+| `memory_type` | VARCHAR(50) | `semantic` / `episodic` / `procedural` / `preference` / `discovery` |
+| `domain` | VARCHAR(100) | `coding` / `visual` / `general` / `architecture` / `cooking` / … |
+| `agent_id` | VARCHAR(100) | Creating agent (nullable) |
+| `team_id` | VARCHAR(100) | Coordinator team scope (nullable) |
+| `owner_id` | VARCHAR(100) | User identity (required for writes) |
+| `embedding` | `Vector(768)` | nomic-embed-text |
+| `metadata_` | JSONB | Free-form key/value (column name `metadata`) |
+| `created_at` / `updated_at` | TIMESTAMP | Server defaults |
+| `access_count` | INT | Bumped on every search hit; used for UI heat indicator + planned ranking score (ADR-005) |
+| `relevance_decay` | FLOAT | Reserved for future decay scoring |
 
-??? info "Full Client API — Snapshots"
+### 2. Agent Snapshots (`mempalace.agent_snapshots`)
 
-    | Method | Signature | Description |
-    |--------|-----------|-------------|
-    | `save_snapshot()` | `(tag) → dict` | Save current palace state (CLI-based) |
-    | `get_snapshot()` | `(tag) → dict` | Retrieve a saved snapshot |
+Versioned per-agent learned state. The TRAIN intent and per-agent learning
+loops persist here. Uniqueness constraint `(agent_id, owner_id, version)`
+ensures no two snapshots share a version, and the writer retries on race.
 
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | UUID | Primary key |
+| `agent_id` | VARCHAR(100) | Required |
+| `owner_id` | VARCHAR(100) | Nullable |
+| `snapshot_data` | JSONB | Arbitrary state |
+| `version` | INT | Monotonic per `(agent_id, owner_id)` |
+| `created_at` | TIMESTAMP | |
 
-??? info "Full Client API — Team Memory (KnowledgeGraph)"
+### 3. Team Memories (`mempalace.team_memories`)
 
-    | Method | Signature | Description |
-    |--------|-----------|-------------|
-    | `team_store()` | `(team_id, key, value, author_agent)` | Store a team-scoped fact |
-    | `team_get()` | `(team_id, key) → str or None` | Retrieve a team fact by key |
-    | `team_search()` | `(team_id, query) → list[dict]` | Search team facts |
-    | `team_clear()` | `(team_id)` | Clear all facts for a team |
+Shared key-value scratchpad for Coordinator task teams. Atomic upserts via
+`INSERT … ON CONFLICT (team_id, key) DO UPDATE`.
 
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | UUID | Primary key |
+| `team_id` | VARCHAR(100) | Required |
+| `key` | VARCHAR(255) | Unique within team |
+| `value` | TEXT | |
+| `embedding` | `Vector(768)` | Indexed (`{key}: {value}` is embedded) |
+| `author_agent` | VARCHAR(100) | |
+| `created_at` | TIMESTAMP | |
 
-### Health
+### Supporting Tables
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `healthy()` | `() → bool` | Check if MemPalace library is importable and configured |
+`mempalace.memory_audit_log` — append-only audit trail. Records `created` /
+`edited` / `deleted` actions on individual memories with actor identity and
+the previous content. `memory_id` is intentionally **not** a foreign key so
+the audit row survives deletion of the underlying memory.
+
+`mempalace.extraction_log` — per-attempt log of `/v1/extract` calls,
+keyed by `owner_id`. Used by the `/v1/palace/audit/extractions` endpoint to
+report extraction success rate and recency.
+
+`mempalace.alembic_version` — single-row table managed by Alembic. Records
+which migration the schema is at.
 
 ---
 
-## Configuration
+## The Palace Metaphor
 
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `MEMPALACE_PALACE_NAME` | `"agent_swarm"` | Palace instance name |
-| `MEMPALACE_DATA_DIR` | `"~/.mempalace"` | ChromaDB + SQLite storage directory |
+The Palace UI presents memories as a navigable 3D space. The metaphor maps
+onto the database columns as follows:
 
-No API keys, URLs, or external services required.
+| UI Level | Encoded as | Source column |
+|---|---|---|
+| **Wing** | `wing_team_<team_id>` / `wing_agent_<agent_id>` / `wing_owner_<owner_id>` / `wing_self` | derived from `team_id`, `agent_id`, `owner_id` |
+| **Hall** | `hall_facts` / `hall_events` / `hall_advice` / `hall_preferences` / `hall_discoveries` | mapped from `memory_type` |
+| **Room** | The `domain` value itself | `domain` |
+| **Drawer** | A single memory record | one row |
+
+### `memory_type` → Hall mapping
+
+| `memory_type` | Hall name | Meaning |
+|---|---|---|
+| `semantic` | `hall_facts` | Factual knowledge |
+| `episodic` | `hall_events` | Events / experiences |
+| `procedural` | `hall_advice` | Rules / how-to |
+| `preference` | `hall_preferences` | User preferences |
+| `discovery` | `hall_discoveries` | Findings / insights |
+
+Unknown `memory_type` values fall back to `hall_<type>` (no fixed mapping).
+
+### Wing prefix encoding (post-2026-05-08)
+
+Every wing name carries an explicit prefix so the Palace 3D viewer can
+unambiguously reverse-decode any wing back to a database filter. Earlier
+versions used bare `wing_<id>` and could not distinguish agent-scope from
+owner-scope; that ambiguity was fixed in the v3 service rewrite.
 
 ---
 
-## Usage in Agent System
+## API Surface
 
-### Router (Contextual Memory)
+The service exposes 15 HTTP endpoints (under `/v1/...`) and 4 MCP tools
+(under `/mcp`). The HTTP and MCP surfaces are intentionally aligned: the same
+operations are available through both, with MCP tailored for tool-using
+agent contexts.
 
-```python
-# agents/router.py — After response generation
-from mempalace_client import mempalace
+### REST endpoints (selected)
 
-mempalace.store(
-    content=f"User asked: {user_input}\nResponse: {response_text}",
-    agent_name="Code Developer",
-    memory_type="conversation",
-    metadata={"session_id": session_id, "intent": intent},
-)
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | Liveness — used by Docker `HEALTHCHECK` |
+| `POST` | `/v1/memories` | Store a memory (writes audit `created`) |
+| `POST` | `/v1/memories/search` | Semantic search with cosine similarity |
+| `PATCH` | `/v1/memories/{id}` | Update content/type/domain/metadata (writes audit `edited`) |
+| `DELETE` | `/v1/memories/{id}` | Delete (writes audit `deleted`) |
+| `GET` | `/v1/memories/stats` | Counts by `(memory_type, domain)` |
+| `GET` | `/v1/memories/{id}/audit` | Audit history for a memory |
+| `POST` | `/v1/extract` | Run conversation through LLM extractor + store + log |
+| `POST` | `/v1/snapshots` | Save agent snapshot (next version, race-safe) |
+| `GET` | `/v1/snapshots/{agent_id}` | Get latest snapshot |
+| `POST` | `/v1/team/{team_id}` | Atomic upsert team key/value |
+| `GET` | `/v1/team/{team_id}` | List team memories |
+| `POST` | `/v1/team/{team_id}/search` | Semantic search within a team |
+| `DELETE` | `/v1/team/{team_id}` | Clear all team memories |
+| `GET` | `/v1/palace/layout` | Wings → halls → rooms → drawer counts |
+| `GET` | `/v1/palace/room` | Memories in a specific palace coordinate |
+| `GET` | `/v1/palace/audit/extractions` | Per-owner extraction audit (single query) |
+
+Full request/response schemas live in the
+[Developer Guide → MemPalace API](../developer-guide/api/mempalace.md).
+
+### MCP tools (mounted at `/mcp`)
+
+| Tool | Purpose |
+|---|---|
+| `search_memories_mcp` | Semantic search (requires `owner_id`) |
+| `store_memory_mcp` | Store a memory (requires `owner_id`) |
+| `get_memory_stats_mcp` | Total + per-type/domain breakdown |
+| `extract_from_conversation_mcp` | Run LLM extraction from a conversation summary |
+
+The MCP server is `FastMCP` from the `mcp` Python SDK, mounted as a
+sub-application at `/mcp`. Transport security restricts allowed hosts to
+`hopper:*`, `localhost:*`, `127.0.0.1:*`, and `192.168.2.102:*`.
+
+---
+
+## Data Flow: Extraction Pipeline
+
+The most operationally significant pathway. The agent runtime calls
+`POST /v1/extract` after each turn with a short conversation summary;
+MemPalace calls Ollama to identify discrete facts, embeds them in batch, and
+persists everything in a single transaction.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as Agent Runtime<br/>(main.py)
+    participant MP as MemPalace<br/>:8200
+    participant Ollama as Ollama<br/>:11434
+    participant PG as PostgreSQL
+
+    Agent->>+MP: POST /v1/extract<br/>{conversation, owner_id, agent_id}
+    MP->>+Ollama: POST /api/generate<br/>(qwen2.5-coder:14b)
+    Note over Ollama: Identify discrete facts<br/>and emit JSON array
+    Ollama-->>-MP: [{content, type, domain}, ...]
+    MP->>+Ollama: POST /api/embed (batch)<br/>(nomic-embed-text)
+    Ollama-->>-MP: [[0.12, ...], [0.34, ...], ...]
+    MP->>+PG: BEGIN
+    MP->>PG: INSERT memories × N
+    MP->>PG: INSERT extraction_log × 1
+    MP->>-PG: COMMIT
+    MP-->>-Agent: 200 [{stored memories}, ...]
 ```
 
-### Coordinator (Team Memory)
-
-```python
-# agents/coordinator.py — Research phase
-mempalace.team_store(
-    team_id=coordination_id,
-    key=f"research_{role}_{worker_id}",
-    value=result[:2000],
-    author_agent=role,
-)
-
-# Synthesis phase — read all team findings
-findings = mempalace.team_search(coordination_id, user_input)
-```
-
-### Search (Context Injection)
-
-```python
-# Enrich agent prompt with relevant past memories
-relevant = mempalace.search(
-    query=user_input,
-    agent_name="Code Developer",
-    memory_type="conversation",
-    limit=5,
-)
-context = "\n".join(m["content"] for m in relevant)
-```
+Both inserts share one transaction — the audit row can never disagree with
+what was actually stored, even on partial failure. Embedding calls retry up
+to 2× on 5xx / transport errors with exponential backoff.
 
 ---
 
-## Fallback Behavior
+## Schema Migrations
 
-The client gracefully degrades:
+Schema is owned by **Alembic** under `control_plane/mempalace/alembic/`. The
+runtime app calls `alembic upgrade head` on boot (in
+`init_db()`) instead of `Base.metadata.create_all` — so schema drift is
+impossible: the deployed code refuses to start unless migrations are applied.
 
-1. **Library not installed** → `healthy()` returns `False`, all operations return empty/safe defaults.
-2. **ChromaDB error** → Falls back to raw `chromadb.Client()` for drawer operations.
-3. **KnowledgeGraph error** → Team operations log warnings and return `None`/`[]`.
-4. **CLI unavailable** → Snapshot operations return `{"status": "unavailable"}`.
+Current migrations:
 
-No operation raises an exception to callers.
+| Revision | Title | Adds |
+|---|---|---|
+| `0001_baseline` | baseline schema | 5 tables, 8 indexes (incl. ivfflat on embeddings) |
+| `0002_add_unique_constraints` | snapshot + team uniqueness | `uq_snap_agent_owner_version`, `uq_team_mem_team_key`, dedupe |
 
----
-
-## Migration from v1 (HTTP Client)
-
-??? info "Migration Comparison Table"
-
-    | Aspect | v1 (Old) | v2 (Current) |
-    |--------|----------||--------------|
-    | Backend | pgvector HTTP service on port 9200 | Embedded ChromaDB |
-    | Protocol | HTTP REST via httpx | Python library calls |
-    | Persistence | PostgreSQL with pgvector | ChromaDB files + SQLite |
-    | Team memory | Not supported | KnowledgeGraph (SQLite) |
-    | External dependency | Separate Docker container | `pip install mempalace` |
-    | Failure mode | Connection errors | Graceful ImportError fallback |
-
-
-### Deployment
-
-The `mempalace` package is included in the execution plane Dockerfile:
-
-```dockerfile
-RUN pip install mempalace  # Added to agents dependency block
-```
+For the procedure to introduce a new migration, see
+[Procedures → MemPalace Migrations](../procedures/mempalace-migration.md).
 
 ---
 
-## Maintenance & Update Guide
+## Operational Hardening (May 2026 review)
 
-### Updating the MemPalace Library
+The service was audited and hardened in early May 2026. Headline changes:
 
-```bash
-# Check current version
-pip show mempalace
+| Concern | Before | After |
+|---|---|---|
+| MCP `extract_from_conversation` mis-typed memories | Always defaulted to `semantic` | Reads correct `type` key |
+| Palace viewer for owner-scoped memories | Decoder couldn't reach them | Explicit `wing_owner_*` prefix + decoder symmetric |
+| Audit trail | Only edits recorded | `created` / `edited` / `deleted` all recorded with actor_id |
+| Snapshot race | `SELECT max(version) → INSERT` could collide | UNIQUE constraint + IntegrityError retry (5×) |
+| Team memory race | Read-then-write upsert | `INSERT … ON CONFLICT … DO UPDATE` |
+| Schema management | `create_all` (no migration support) | Alembic with baseline + migration |
+| Connection pool | 5 + 10 overflow, no pre-ping | 20 + 20 overflow, pre-ping, 30-min recycle |
+| Ollama transient errors | First 5xx → 500 to caller | Bounded retry with exponential backoff |
+| Container security | Ran as root | Non-root UID 1000 + Docker `HEALTHCHECK` |
 
-# Update to latest
-pip install --upgrade mempalace
-
-# Verify compatibility
-python -c "from mempalace import Palace, ChromaBackend, KnowledgeGraph; print('OK')"
-```
-
-After updating, run the test suite (see Functionality Testing below) to verify no API breaking changes.
-
-### Adding New Hall Types
-
-To add a new memory category (e.g., `"feedback"` hall):
-
-1. Add the mapping in `agents/mempalace_client.py` in the `_HALL_MAP` dictionary:
-   ```python
-   _HALL_MAP = {
-       "conversation": "conversations",
-       "feedback": "feedback",  # new
-       ...
-   }
-   ```
-2. Callers can now use `mempalace.store(content, agent, memory_type="feedback")`.
-
-### Adding New Agent Wings
-
-Wings are auto-derived from agent names. No configuration needed — new agents automatically get their own wing.
-
-### Managing ChromaDB Storage
-
-```bash
-# Check storage size
-du -sh ~/.mempalace/
-
-# Back up
-tar czf mempalace_backup_$(date +%Y%m%d).tar.gz ~/.mempalace/
-
-# Clear all data (destructive)
-rm -rf ~/.mempalace/chroma/  # Removes all vector data
-rm -f ~/.mempalace/*.db        # Removes KnowledgeGraph
-```
-
-### Modifying Fallback Behavior
-
-All methods use try/except with safe defaults. To change fallback behavior (e.g., raise instead of suppress), edit the error handling in `agents/mempalace_client.py`.
+See [ADR-005](decisions/index.md) for the planned Phase 2 sparse-attention
+ranking work that builds on this baseline.
 
 ---
 
-## Functionality Testing
+## Known Follow-Ups
 
-### Running Existing Tests
-
-```bash
-pytest tests/test_mempalace_client.py -v
-```
-
-The test suite uses mocks for the MemPalace library internals and verifies:
-- Singleton initialization
-- `store()` routes to correct wing/hall
-- `search()` returns properly formatted results
-- `team_store()` / `team_get()` delegation to KnowledgeGraph
-- Fallback behavior when library is unavailable
-- `healthy()` status reporting
-
-### Manual Verification
-
-| Test Case | Command / Steps | Expected Result |
-|-----------|----------------|----------------|
-| Store memory | `curl -X POST http://localhost:8008/v1/memory -d '{"content": "test", "agent_name": "tester", "memory_type": "conversation"}'` | 200 OK, memory stored |
-| Search memory | `curl http://localhost:8008/v1/memory/search?query=test&agent=tester` | Returns matching memories |
-| Health check | `curl http://localhost:8008/v1/memory/health` | `{"healthy": true}` |
-| Stats | `curl http://localhost:8008/v1/memory/stats` | Collection count and palace name |
-| Team store | Use coordinator with COORDINATE intent | Team facts stored in KnowledgeGraph |
-
-### Integration Test (ChromaDB Persistence)
-
-```bash
-# Store a memory, restart the process, verify it persists
-python -c "
-from agents.mempalace_client import mempalace
-mempalace.store('integration test', 'test_agent', 'conversation')
-results = mempalace.search('integration', 'test_agent')
-assert len(results) > 0, 'Memory not found'
-print(f'Found {len(results)} result(s) - PASS')
-"
-```
+| Item | Trigger |
+|---|---|
+| IVFFlat → HNSW index migration | When memory count justifies the rebuild cost (pgvector ≥ 0.5 supports HNSW directly) |
+| Authenticated identity for `actor_id` on PATCH/DELETE | Currently caller-supplied; trusted boundary |
+| Phase 2 sparse-attention scoring | ADR-005 — composite cosine + recency + access |
+| Deprecate `agents/mempalace_client.py` | Single residual caller in `church.py` (TRAIN intent fallback) — replace with HTTP call |
 
 ---
 
----
+## Source of Truth
 
-## Planned Enhancement: Sparse Attention Retrieval Upgrade (ADR-005)
+| Component | File |
+|-----------|------|
+| FastAPI app + endpoints + MCP tools | `control_plane/mempalace/app/main.py` |
+| ORM models + engine + migrations runner | `control_plane/mempalace/app/database.py` |
+| Embedding + extraction pipeline | `control_plane/mempalace/app/embeddings.py` |
+| Schema migrations | `control_plane/mempalace/alembic/versions/*.py` |
+| Container image | `control_plane/mempalace/Dockerfile` |
+| Service definition | `control_plane/docker-compose.yml` |
+| HTTP caller (extraction) | `agents/main.py:_mempalace_extract_http` |
 
-!!! warning "Status: Proposed — not yet implemented"
-    This section documents the planned retrieval and context assembly upgrade.
-    See [`docs/decisions/ADR-005_sparse_attention_retrieval.md`](../../../docs/decisions/ADR-005_sparse_attention_retrieval.md)
-    and the baseline evidence record at `docs/evidence/sparse_attention_proposal_2026_05_06.md`.
+## Related
 
-### Background
-
-As memory stores grow and conversations deepen, the current flat cosine-similarity retrieval
-introduces cross-domain noise and ignores recency and reinforcement signals already present in
-the `Memory` table (`created_at`, `access_count`). Additionally, `church.py` injects all context
-layers unconditionally without respect to the per-model token budgets defined in `config.py`.
-
-Four improvements are planned in independently-deployable phases.
-
----
-
-### Phase 1 — Intent-Gated Domain Filtering
-
-`church.py` will pass a `domain=` filter to `/v1/memories/search` based on the resolved intent.
-The `SearchQuery.domain` field and its SQL `WHERE` clause are already implemented — only the
-caller needs updating.
-
-| Intent | Domain Filter Applied |
-|--------|-----------------------|
-| `IMAGE`, `ACTION_FIGURE` | `comfyui` |
-| `DEVOPS`, `IOT_CONTROL` | `infrastructure` |
-| `CODE`, `IOT_DEV` | `coding` |
-| `DATA` | `data` |
-| `TRAIN` | `agents` |
-| `CONVERSATION`, `COORDINATE`, `RESEARCH`, `DOCUMENTATION` | *(none — broad recall)* |
-
----
-
-### Phase 2 — Composite Retrieval Scoring
-
-The score returned by `search_memories()` and `search_memories_mcp()` will be replaced with a
-weighted composite that incorporates recency and access frequency:
-
-$$\text{score} = 0.6 \cdot s_{\cos} + 0.25 \cdot e^{-d/30} + 0.15 \cdot \frac{\log(1 + n_a)}{\log(101)}$$
-
-| Term | Meaning |
-|------|---------|
-| $s_{\cos}$ | Cosine similarity (`1.0 − cosine_distance`) |
-| $d$ | Days since `created_at` (half-life = 30 days) |
-| $n_a$ | `access_count` (log-normalized, saturates at ~100) |
-
-`SearchQuery` will gain a `min_score: Optional[float]` field for server-side threshold filtering,
-replacing the hardcoded `score > 0.5` check in `church.py`.
-
----
-
-### Phase 3 — Cross-Encoder Re-Ranking
-
-A new `reranker.py` module will lazy-load `CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")`
-(22M params, CPU-resident). When `SearchQuery.rerank=True`:
-
-1. Fetch `limit × 3` candidates via Phase 2 composite scoring
-2. Cross-encoder scores each `(query, memory_content)` pair (~20–80ms on CPU)
-3. Blend scores: $\text{final} = 0.5 \cdot \text{composite} + 0.5 \cdot \sigma(\text{reranker\_logit})$
-4. Re-sort by `final` score and truncate to `limit`
-
-**Enabled for:** `RESEARCH`, `DEVOPS`, `CODE`, `COORDINATE`
-**Disabled for:** `CONVERSATION`, `IOT_CONTROL` (latency-sensitive)
-
-**Dependency:** `sentence-transformers` added to Hopper MemPalace Docker image (~90 MB model download).
-
----
-
-### Phase 4 — Context Budget Manager
-
-A new `agents/context_budget.py` module will provide token-aware context trimming, activating
-the `CONTEXT_WINDOWS` config that has been defined in `agents/config.py` but never applied.
-
-| Component | Description |
-|-----------|-------------|
-| `estimate_tokens(text)` | Lightweight `len // 4` heuristic — no external tokenizer dependency |
-| `trim_history(history, budget)` | Walks history newest-first; always preserves `role=system` messages |
-| `ContextBudget(model_name)` | Reads `CONTEXT_WINDOWS`, allocates budget across layers |
-
-**Budget allocation (of available window after 30% generation headroom):**
-
-| Layer | Allocation |
-|-------|-----------|
-| Conversation history | 50% |
-| Memories + grounding | 25% |
-| System instructions | 25% |
-
-`church.py` will call `trim_history()` before serializing `history_context`, making
-`CONTEXT_WINDOWS` load-bearing for the first time since it was defined.
-
----
-
-??? info "Source of Truth"
-
-    | Component | File |
-    |-----------|------|
-    | MemPalace client singleton | `agents/mempalace_client.py` |
-    | Unit tests | `tests/test_mempalace_client.py` |
-    | Dockerfile dependency | `execution_plane/Dockerfile` |
-    | Router usage | `agents/router.py` (L672, L1635) |
-    | Coordinator usage | `agents/coordinator.py` (L38, L46) |
-    | API endpoints | `agents/main.py` (L999, L1060) |
-
-
-
+- [Memory System (architecture overview)](memory-system.md)
+- [Memory Module (agent-side memory)](../modules/memory.md)
+- [Service: MemPalace (operator reference)](../modules/services/mempalace.md)
+- [Memory Palace (3D UI guide)](../user-guide/palace.md)
