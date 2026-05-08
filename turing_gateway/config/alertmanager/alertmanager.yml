@@ -10,10 +10,22 @@ route:
   group_interval: 10s
   repeat_interval: 12h
   routes:
+    # Mirror every alert to the maintenance_router. It classifies the alert
+    # and either dispatches it to auto_repair_daemon (agent_safe path) or
+    # parks it in the Mission Control human queue. The original email/ntfy
+    # receivers still fire — this route is additive (continue: true).
+    - receiver: "maintenance-router"
+      continue: true
     - receiver: "default-receiver"
       group_by: ['env', 'instance']
 
 receivers:
+  - name: "maintenance-router"
+    webhook_configs:
+      - url: 'http://maintenance-router:9095/webhook/alertmanager'
+        send_resolved: true
+        max_alerts: 0   # forward every alert in the group, no batching cap
+
   - name: "default-receiver"
     email_configs:
       - to: 'Justin@shivelymail.com'
@@ -21,7 +33,11 @@ receivers:
         smarthost: 'smtp.zoho.com:587'
         auth_username: 'Admin@Graceful-Tech.com'
         auth_identity: 'Admin@Graceful-Tech.com'
-        auth_password: 'Lindsey520!'
+        # Password is materialized from $ALERT_SMTP_PASSWORD by the container
+        # entrypoint (see turing_gateway/docker-compose.yml alertmanager service).
+        # The file is written to an in-container tmpfs and never persisted to
+        # the repo or to disk.
+        auth_password_file: /run/secrets/smtp_password
         require_tls: true
         send_resolved: true
     webhook_configs:

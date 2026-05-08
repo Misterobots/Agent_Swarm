@@ -91,14 +91,29 @@ services:
     container_name: alertmanager-turing
     hostname: alertmanager-turing
     restart: unless-stopped
+    depends_on:
+      - maintenance-router    # webhook receiver must be reachable before alerts fire
     volumes:
       - ./config/alertmanager:/etc/alertmanager
       - alertmanager_data:/alertmanager
     ports:
       - "9093:9093"
+    # Materialize $ALERT_SMTP_PASSWORD to /run/secrets/smtp_password (tmpfs)
+    # before alertmanager starts, so alertmanager.yml can use auth_password_file
+    # and the secret never appears on the filesystem outside the container.
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
+      - |
+        set -e
+        mkdir -p /run/secrets
+        if [ -z "$$ALERT_SMTP_PASSWORD" ] || [ "$$ALERT_SMTP_PASSWORD" = "CHANGE_ME_APP_PASSWORD" ]; then
+          echo "WARN: ALERT_SMTP_PASSWORD is not set; email alerts will fail to authenticate." >&2
+        fi
+        printf '%s' "$$ALERT_SMTP_PASSWORD" > /run/secrets/smtp_password
+        chmod 0400 /run/secrets/smtp_password
+        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
+    tmpfs:
+      - /run/secrets:size=64k,mode=0700
     environment:
       - ALERT_SMTP_HOST=${ALERT_SMTP_HOST:-smtp.zoho.com}
       - ALERT_SMTP_PORT=${ALERT_SMTP_PORT:-587}
@@ -115,6 +130,54 @@ services:
       - "traefik.http.routers.alertmanager.rule=PathPrefix(`/alertmanager`)"
       - "traefik.http.routers.alertmanager.entrypoints=web"
       - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # MAINTENANCE ROUTER — Alertmanager → (auto_repair_daemon | Mission Control queue)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Classifies incoming alerts using config/maintenance/manifest.yaml and
+  # dispatches to either Redis (agent path → auto_repair_daemon) or the
+  # Postgres-backed human queue surfaced in Mission Control.
+  # Audit log: maintenance_dispatch table on Hopper Postgres.
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  maintenance-router:
+    build:
+      context: ../services/maintenance_router
+      dockerfile: Dockerfile
+    image: home-ai-lab/maintenance-router:latest
+    container_name: maintenance-router
+    hostname: maintenance-router
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../config/maintenance:/etc/maintenance:ro
+    environment:
+      - MAINTENANCE_MANIFEST=/etc/maintenance/manifest.yaml
+      - REDIS_HOST=redis-turing
+      - REDIS_PORT=6379
+      - MAINTENANCE_DB_HOST=${HOPPER_IP:-192.168.2.102}
+      - MAINTENANCE_DB_PORT=5432
+      - MAINTENANCE_DB_NAME=${MAINTENANCE_DB_NAME:-maintenance}
+      - MAINTENANCE_DB_USER=${MAINTENANCE_DB_USER:-maintenance}
+      - MAINTENANCE_DB_PASSWORD=${MAINTENANCE_DB_PASSWORD}
+      - LOG_LEVEL=${MAINTENANCE_LOG_LEVEL:-INFO}
+    ports:
+      - "9095:9095"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9095/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.maintenance-router.rule=PathPrefix(`/maintenance`)"
+      - "traefik.http.routers.maintenance-router.entrypoints=web"
+      - "traefik.http.services.maintenance-router.loadbalancer.server.port=9095"
 
   blackbox-exporter:
     image: prom/blackbox-exporter:latest
@@ -696,8 +759,8 @@ services:
       - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
       - NTFY_AUTH_DEFAULT_ACCESS=deny-all
-      - NTFY_AUTH_USERS=${NTFY_ADMIN_USER:-ntfyadmin}:${NTFY_ADMIN_PASSWORD_HASH:-$$2a$$10$$YLiO8U21sX1uhZamTLJXHuxgVC0Z/GKISibrKCLohPgtG7yIxSk4C}:admin
-      - NTFY_AUTH_TOKENS=${NTFY_ADMIN_USER:-ntfyadmin}:${NTFY_ALERT_TOKEN:-tk_12345678901234567890123456789}:alertmanager
+      - NTFY_AUTH_USERS=${NTFY_ADMIN_USER:?set NTFY_ADMIN_USER}:${NTFY_ADMIN_PASSWORD_HASH:?set NTFY_ADMIN_PASSWORD_HASH (bcrypt) — see turing_gateway/.env}:admin
+      - NTFY_AUTH_TOKENS=${NTFY_ADMIN_USER}:${NTFY_ALERT_TOKEN:?set NTFY_ALERT_TOKEN — see turing_gateway/.env}:alertmanager
       - NTFY_BEHIND_PROXY=true
       - NTFY_ENABLE_LOGIN=true
       - NTFY_ENABLE_METRICS=true

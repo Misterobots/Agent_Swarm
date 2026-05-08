@@ -143,10 +143,10 @@ export const primaryNavigation: NavigationItem[] = [
 
 export const secondaryNavigation: NavigationItem[] = [
   {
-    label: "Operations",
-    href: "/operations",
+    label: "Mission Control",
+    href: "/mission-control",
     icon: LayoutDashboard,
-    matchPrefixes: ["/operations"],
+    matchPrefixes: ["/mission-control", "/operations", "/ops"],
     adminOnly: true,
   },
   {

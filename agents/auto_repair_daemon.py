@@ -7,15 +7,29 @@ This daemon monitors critical services and automatically repairs common issues:
 - Database connection pool exhaustion
 - Network connectivity issues
 
+It runs two parallel paths:
+
+  1. Self-polling loop (the original behavior) — checks each service on
+     CHECK_INTERVAL and triggers repairs.
+  2. Redis subscriber (added 2026-05-08) — consumes routed alerts from the
+     `maintenance:system_alert` queue (populated by services/maintenance_router).
+     This lets agent-safe Prometheus alerts trigger immediate repairs without
+     waiting for the next poll cycle.
+
+The subscriber is OPTIONAL — if Redis is unreachable or the router isn't
+running, the poll loop alone preserves the historical behavior.
+
 Run as a background service or scheduled task.
 """
 
 import os
 import sys
 import time
+import json
 import logging
 import socket
 import subprocess
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import requests
@@ -53,6 +67,19 @@ AUTHENTIK_DB_PASSWORD = os.getenv("AUTHENTIK_DB_PASSWORD", "")
 CHECK_INTERVAL = int(os.getenv("AUTO_REPAIR_CHECK_INTERVAL", "300"))  # 5 minutes
 REPAIR_COOLDOWN = int(os.getenv("AUTO_REPAIR_COOLDOWN", "600"))  # 10 minutes between repairs
 
+# Redis subscriber (consumes routed alerts from maintenance_router)
+REDIS_HOST = os.getenv("REDIS_HOST", "redis-turing")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+SYSTEM_ALERT_QUEUE = "maintenance:system_alert"
+ENABLE_REDIS_SUBSCRIBER = os.getenv("AUTO_REPAIR_REDIS_SUBSCRIBER", "true").lower() == "true"
+
+# Map manifest 'node' values → SSH IPs.
+NODE_IPS = {
+    "turing": TURING_IP,
+    "hopper": HOPPER_IP,
+    "lovelace": LOVELACE_IP,
+}
+
 
 @dataclass
 class RepairAction:
@@ -78,11 +105,13 @@ class ServiceHealth:
 
 class AutoRepairDaemon:
     """Main auto-repair daemon class."""
-    
+
     def __init__(self):
         self.repair_history: List[RepairAction] = []
         self.last_repair_time: Dict[str, datetime] = {}
         self.consecutive_failures: Dict[str, int] = {}
+        self._stop_event = threading.Event()
+        self._subscriber_thread: Optional[threading.Thread] = None
         
     def run_ssh_command(self, node_ip: str, command: str) -> Tuple[bool, str]:
         """Execute a command on a remote node via SSH."""
@@ -369,20 +398,118 @@ class AutoRepairDaemon:
         if not self.repair_history:
             logger.info("No repairs performed yet")
             return
-        
+
         recent = [a for a in self.repair_history if (datetime.now() - a.timestamp) < timedelta(hours=24)]
-        
+
         if recent:
             logger.info(f"\n{'='*60}")
             logger.info(f"Repair Summary (Last 24 hours): {len(recent)} actions")
             logger.info(f"{'='*60}")
-            
+
             for action in recent[-10:]:  # Show last 10
                 status = "[OK]" if action.success else "[FAIL]"
                 logger.info(
                     f"{status} {action.timestamp.strftime('%H:%M:%S')} | "
                     f"{action.service} | {action.action} | {action.details[:50]}"
                 )
+
+    # ── Redis subscriber: consumes alerts from maintenance_router ─────────
+    def _execute_routed_action(self, payload: Dict) -> Optional[RepairAction]:
+        """Dispatch a routed alert (from maintenance_router) to a repair method.
+
+        Payload shape (set by services/maintenance_router/redis_bus.py):
+            {
+              "type": "system_alert",
+              "source": "maintenance_router",
+              "payload": {
+                "alertname": ..., "labels": {...}, "annotations": {...},
+                "action": "restart_container" | "repair_authentik_database",
+                "action_args": {"node": "hopper", "container": "postgres"},
+                ...
+              }
+            }
+        """
+        body = payload.get("payload") or {}
+        action = body.get("action")
+        args = body.get("action_args") or {}
+
+        if action == "repair_authentik_database":
+            return self.repair_authentik_database()
+
+        if action == "restart_container":
+            node = args.get("node")
+            container = args.get("container")
+            node_ip = NODE_IPS.get(node) if node else None
+            if not node_ip or not container:
+                logger.error(
+                    "routed restart_container missing/invalid args: node=%r container=%r",
+                    node, container,
+                )
+                return None
+            return self.restart_container(node_ip, container)
+
+        logger.warning("routed alert specifies unknown action %r — ignoring", action)
+        return None
+
+    def _redis_subscriber_loop(self):
+        """Block on the SYSTEM_ALERT queue and execute routed repairs.
+
+        Failures are logged and the loop continues; the poll loop is the
+        backstop if Redis or the router go down.
+        """
+        try:
+            import redis  # local import — daemon must work without redis lib
+        except ImportError:
+            logger.warning("redis library not installed; subscriber disabled")
+            return
+
+        try:
+            client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+            client.ping()
+        except Exception as e:
+            logger.warning("Redis unreachable (%s); subscriber disabled", e)
+            return
+
+        logger.info(
+            "Redis subscriber active on %s:%s queue=%s",
+            REDIS_HOST, REDIS_PORT, SYSTEM_ALERT_QUEUE,
+        )
+
+        while not self._stop_event.is_set():
+            try:
+                # Block up to 5s so we can check the stop flag periodically.
+                msg = client.blpop(SYSTEM_ALERT_QUEUE, timeout=5)
+                if msg is None:
+                    continue
+                _, raw = msg
+                try:
+                    payload = json.loads(raw)
+                except json.JSONDecodeError:
+                    logger.error("malformed payload on %s: %r", SYSTEM_ALERT_QUEUE, raw)
+                    continue
+
+                body = payload.get("payload") or {}
+                logger.info(
+                    "routed alert received: alertname=%s action=%s args=%s",
+                    body.get("alertname"), body.get("action"), body.get("action_args"),
+                )
+
+                action = self._execute_routed_action(payload)
+                if action is not None:
+                    self.repair_history.append(action)
+                    self.last_repair_time[action.service] = action.timestamp
+                    log_fn = logger.info if action.success else logger.error
+                    log_fn(
+                        "routed repair %s: service=%s action=%s details=%s",
+                        "succeeded" if action.success else "failed",
+                        action.service, action.action, action.details,
+                    )
+
+            except Exception as e:
+                # Don't let subscriber crashes kill the daemon.
+                logger.error("subscriber loop error: %s", e, exc_info=True)
+                time.sleep(2)
+
     
     def run(self):
         """Main daemon loop."""
@@ -390,23 +517,34 @@ class AutoRepairDaemon:
         logger.info(f"Check interval: {CHECK_INTERVAL}s")
         logger.info(f"Repair cooldown: {REPAIR_COOLDOWN}s")
         logger.info(f"Monitoring nodes: Turing={TURING_IP}, Hopper={HOPPER_IP}, Lovelace={LOVELACE_IP}")
-        
+
+        if ENABLE_REDIS_SUBSCRIBER:
+            self._subscriber_thread = threading.Thread(
+                target=self._redis_subscriber_loop,
+                name="AutoRepairRedisSubscriber",
+                daemon=True,
+            )
+            self._subscriber_thread.start()
+        else:
+            logger.info("Redis subscriber disabled (AUTO_REPAIR_REDIS_SUBSCRIBER=false)")
+
         try:
             while True:
                 try:
                     self.perform_health_check_and_repair()
                 except Exception as e:
                     logger.error(f"Error in health check cycle: {e}", exc_info=True)
-                
+
                 # Print summary every 6 hours
                 if len(self.repair_history) > 0 and len(self.repair_history) % 72 == 0:
                     self.print_repair_summary()
-                
+
                 logger.info(f"Sleeping for {CHECK_INTERVAL}s until next check...")
                 time.sleep(CHECK_INTERVAL)
-                
+
         except KeyboardInterrupt:
             logger.info("Auto-Repair Daemon shutting down...")
+            self._stop_event.set()
             self.print_repair_summary()
 
 
