@@ -73,6 +73,7 @@ export function useChatStream(options?: {
     setMessageTurnMetadata,
     setMessagePendingApprovals,
     setMessageMediaAttachments,
+    setMessageDesignArtifact,
     setMessagePendingClarification,
     setMessageQueueStatus,
   } = useChatStore();
@@ -84,6 +85,7 @@ export function useChatStream(options?: {
   const ultraplanMode = useSettingsStore((s) => s.ultraplanMode);
   const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
   const swarmMode = useSettingsStore((s) => s.swarmMode);
+  const designMode = useSettingsStore((s) => s.designMode);
   const groundingWeb = useSettingsStore((s) => s.groundingWeb);
   const groundingDocs = useSettingsStore((s) => s.groundingDocs);
   const groundingFile = useSettingsStore((s) => s.groundingFile);
@@ -221,7 +223,7 @@ export function useChatStream(options?: {
       abortRef.current = controller;
 
       try {
-        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime)) {
+        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
@@ -309,6 +311,11 @@ export function useChatStream(options?: {
               mediaAttachmentsRef.current = [...mediaAttachmentsRef.current, event.media];
               // Update message immediately so preview appears during streaming
               setMessageMediaAttachments(convId!, assistantId, mediaAttachmentsRef.current);
+            }
+          } else if (event.type === "design_artifact") {
+            // Handle generated design artifacts from Open Design Studio
+            if (event.design) {
+              setMessageDesignArtifact(convId!, assistantId, event.design);
             }
           } else if (event.type === "set_preview_url") {
             // Agent pushes a URL into the dev workspace preview pane
@@ -461,6 +468,7 @@ export function useChatStream(options?: {
       ultraplanMode,
       ultrathinkMode,
       swarmMode,
+      designMode,
       isStreaming,
       setMessageThoughtTrace,
       setMessageToolCalls,

@@ -1,0 +1,51 @@
+# Open Design (nexu-io/open-design) — Containerised daemon
+# Builds the Node.js daemon from source at image-build time.
+# The Next.js web app is skipped here (daemon API only).
+# Data directory is a named volume — SQLite + project files persist across restarts.
+
+FROM node:24-slim
+
+# Build tools needed for native add-ons (better-sqlite3, etc.)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       git python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Enable corepack / pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Clone open-design at build time (use --branch to pin a release tag if needed)
+ARG OD_REF=main
+RUN git clone --depth 1 --branch ${OD_REF} https://github.com/nexu-io/open-design.git .
+
+# Install all workspace dependencies (pnpm workspace root)
+RUN pnpm install --frozen-lockfile
+
+# Build the daemon package only
+RUN pnpm --filter @open-design/daemon build
+
+# Build the web package (generates apps/web/out/ served by daemon)
+# Skip with --build-arg SKIP_WEB_BUILD=1 to save ~4 min on the first build
+ARG SKIP_WEB_BUILD=0
+RUN if [ "$SKIP_WEB_BUILD" != "1" ]; then \
+      pnpm --filter @open-design/web build || echo "[od] Web build failed — daemon will run without UI"; \
+    fi
+
+# Persistent data directory (SQLite db + project files)
+ENV OD_DATA_DIR=/data
+
+# Bind on all interfaces so the container is reachable from Turing (192.168.2.103)
+# and from other containers on the execution_net Docker network.
+ENV OD_BIND_HOST=0.0.0.0
+
+ENV NODE_ENV=production
+
+VOLUME /data
+
+# Daemon API port (default 7456)
+EXPOSE 7456
+
+# Start the daemon CLI
+CMD ["node", "apps/daemon/dist/cli.js"]

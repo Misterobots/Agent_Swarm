@@ -15,6 +15,7 @@ export interface ChatStreamOptions {
   ultraplanMode?: boolean;
   ultrathinkMode?: boolean;
   swarmMode?: boolean;
+  designMode?: boolean;
   attachments?: FileAttachment[];
   groundingWeb?: boolean;
   groundingDocs?: boolean;
@@ -42,6 +43,7 @@ export async function* sendChatStream(
   swarmMode?: boolean,
   solvingMaxIter?: number,
   solvingMaxTime?: number,
+  designMode?: boolean,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -61,6 +63,7 @@ export async function* sendChatStream(
   if (groundingDocs) body.grounding_docs = true;
   if (groundingFile) body.grounding_file = true;
   if (swarmMode) body.swarm_mode = true;
+  if (designMode) body.design_mode = true;
   if (solvingMaxIter !== undefined) body.solving_max_iter = solvingMaxIter;
   if (solvingMaxTime !== undefined) body.solving_max_time = solvingMaxTime;
 

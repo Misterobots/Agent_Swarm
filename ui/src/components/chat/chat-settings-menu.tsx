@@ -11,6 +11,7 @@ import { WebGroundingToggle } from "./web-grounding-toggle";
 import { DocGroundingToggle } from "./doc-grounding-toggle";
 import { FileGroundingToggle } from "./file-grounding-toggle";
 import { SwarmToggle } from "./swarm-toggle";
+import { DesignModeToggle } from "./design-mode-toggle";
 import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
@@ -87,6 +88,7 @@ export function ChatSettingsMenu() {
               <UltraplanToggle />
               <UltrathinkToggle />
               <SwarmToggle />
+              <DesignModeToggle />
             </div>
           </div>
 

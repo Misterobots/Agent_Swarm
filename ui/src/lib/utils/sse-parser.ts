@@ -171,6 +171,14 @@ export async function* streamSSE(
               media: (delta as any).content,
             };
           }
+          // Design artifacts (Open Design)
+          else if (delta.type === "design_artifact") {
+            yield {
+              type: "design_artifact",
+              content: "",
+              design: (delta as any).content,
+            };
+          }
           // Agent pushes a URL into the preview pane
           else if (delta.type === "set_preview_url") {
             yield {
@@ -320,6 +328,12 @@ export async function* streamSSE(
               type: "media_attachment",
               content: "",
               media: (delta as any).content,
+            };
+          } else if (delta.type === "design_artifact") {
+            yield {
+              type: "design_artifact",
+              content: "",
+              design: (delta as any).content,
             };
           } else if (delta.type === "set_preview_url") {
             yield {

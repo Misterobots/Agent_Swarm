@@ -9,6 +9,7 @@ import Link from "next/link";
 import { ToolCallBlock } from "./tool-call-block";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { ClarificationCard } from "./clarification-card";
+import { DesignArtifactCard } from "./design-artifact-card";
 import { ModelQueueCard } from "./model-queue-card";
 import { MessageActions } from "./message-actions";
 import { MediaPreview } from "./media-preview";
@@ -403,6 +404,10 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
             status={message.pendingQueueStatus}
             onUseAlternative={onUseAlternativeModel}
           />
+        )}
+        {/* Design artifact — rendered outside content conditional so it shows even when content is empty */}
+        {message.designArtifact && (
+          <DesignArtifactCard artifact={message.designArtifact} />
         )}
       </div>
     </div>

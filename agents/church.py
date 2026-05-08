@@ -719,6 +719,7 @@ def chat_swarm(
     grounding_file: bool = False,
     swarm_mode: bool = False,
     dev_mode: bool = False,
+    design_mode: bool = False,
     solving_max_iter: int | None = None,
     solving_max_time: int | None = None,
 ):
@@ -1326,6 +1327,11 @@ def chat_swarm(
             confidence = 1.0
             reasoning = "swarm_mode=True bypasses neural router"
             yield {"type": "status", "content": "🧩 Swarm Mode: Routing directly to multi-agent coordinator..."}
+        elif design_mode:
+            intent = "DESIGN"
+            confidence = 1.0
+            reasoning = "design_mode=True bypasses neural router"
+            yield {"type": "status", "content": "🎨 Design Studio: Activating..."}
         else:
             from semantic_router import get_semantic_router
             
@@ -1354,6 +1360,19 @@ def chat_swarm(
             intent = "ACTION_FIGURE"
             confidence = 0.95
             reasoning = f"Keyword override: action figure keywords detected in '{user_input[:60]}'"
+        # DESIGN generation keywords (UI, landing pages, dashboards, decks, prototypes)
+        _design_keywords = [
+            "landing page", "saas landing", "mockup", "wireframe", "prototype",
+            "design a", "design me a", "design the", "ui design", "ux design",
+            "pitch deck", "slide deck", "presentation deck", "html slideshow",
+            "dashboard design", "design dashboard", "design a dashboard",
+            "mobile app design", "mobile ui", "app screen design",
+            "web prototype", "html prototype",
+        ]
+        if any(kw in _lower for kw in _design_keywords) and intent not in ("IMAGE", "ACTION_FIGURE"):
+            intent = "DESIGN"
+            confidence = 0.95
+            reasoning = f"Keyword override: design/UI keywords detected in '{user_input[:60]}'"
         # --- /standardize-doc command (admin-only) ---
         if _lower.strip().startswith("/standardize-doc"):
             intent = "DOC_STANDARDS"
@@ -1363,7 +1382,7 @@ def chat_swarm(
         # Two-part check: build/create/make verb + artifact type anywhere in sentence
         # (avoids strict adjacency failures like "build me a simple space explorer game")
         import re as _re
-        if intent not in ("COORDINATE", "IMAGE", "3D", "ACTION_FIGURE", "DEVOPS"):
+        if intent not in ("COORDINATE", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "DEVOPS"):
             _build_verb_re = r'\b(build|create|make)\b'
             _artifact_re = r'\b(app|application|game|dashboard|site|website|tool|page|program|calculator)\b'
             if _re.search(_build_verb_re, _lower) and _re.search(_artifact_re, _lower):
@@ -1408,12 +1427,12 @@ def chat_swarm(
             yield _t(f"→ Skill override: {old_intent} → {intent} (skill={skill})")
 
         # --- RESEARCH MODE OVERRIDE ---
-        if research_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "TRAIN"):
+        if research_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN"):
             intent = "RESEARCH"
             yield _t("→ Research mode activated: forcing RESEARCH intent")
 
         # --- SWARM MODE OVERRIDE ---
-        if swarm_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "TRAIN"):
+        if swarm_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN"):
             intent = "COORDINATE"
             yield _t("→ Swarm Mode: routing to multi-agent coordinator")
 
@@ -2683,6 +2702,102 @@ def chat_swarm(
             yield {"type": "response", "content": response}
             _score_trace(lf_trace, langfuse, 0.9, output=response)
             return
+
+        # --- ROUTE: DESIGN STUDIO (Open Design) ---
+        if intent == "DESIGN":
+            yield _emit_turn_metadata(turn_id, "Design Studio", ["thinking", "responding"])
+            yield _emit_stream_mode("thinking")
+            yield {"type": "status", "content": "🎨 Design Studio: Preparing..."}
+            AGENT_STATE.labels(agent_name="DesignStudio").set(2)
+
+            try:
+                from specialized.open_design_client import OpenDesignClient
+                import os as _os
+
+                od = OpenDesignClient()
+
+                # Skill mapping based on request content
+                _dl = user_input.lower()
+                if any(kw in _dl for kw in ["deck", "slide", "ppt", "presentation"]):
+                    skill_id = "guizang-ppt"
+                elif any(kw in _dl for kw in ["dashboard", "analytics", "metrics"]):
+                    skill_id = "dashboard"
+                elif any(kw in _dl for kw in ["landing", "saas", "marketing page"]):
+                    skill_id = "saas-landing"
+                elif any(kw in _dl for kw in ["mobile", "ios", "android", "app screen"]):
+                    skill_id = "mobile-app"
+                else:
+                    skill_id = "web-prototype"
+
+                yield {"type": "log", "content": f"[DesignStudio] Skill: {skill_id}"}
+
+                # Create project
+                yield {"type": "status", "content": "🎨 Design Studio: Creating project..."}
+                project = od.create_project(
+                    name=f"design-{int(__import__('time').time())}",
+                    skill_id=skill_id,
+                )
+                project_id = project["project"]["id"]
+                yield {"type": "log", "content": f"[DesignStudio] Project: {project_id}"}
+
+                # Create and start a run
+                yield {"type": "status", "content": "🎨 Design Studio: Running design agent..."}
+                run_resp = od.start_run(
+                    project_id=project_id,
+                    message=user_input,
+                    skill_id=skill_id,
+                )
+                run_id = run_resp["runId"]
+                yield {"type": "log", "content": f"[DesignStudio] Run: {run_id}"}
+
+                # Stream and collect the artifact HTML
+                html_content = None
+                artifact_id = None
+                for art_event in od.stream_run(run_id):
+                    if art_event["type"] == "artifact:end":
+                        html_content = art_event["fullContent"]
+                        artifact_id = art_event["identifier"]
+                    elif art_event["type"] == "text":
+                        pass  # agent commentary — ignore
+
+                if not html_content:
+                    yield {"type": "error", "content": "Design Studio: No artifact generated."}
+                    logger.error("[DesignStudio] No artifact generated for run %s", run_id)
+                    return
+
+                # Save to delivered_artifacts for serving
+                delivery_dir = "/workspace/delivered_artifacts"
+                _os.makedirs(delivery_dir, exist_ok=True)
+                filename = f"design_{project_id}.html"
+                delivery_path = _os.path.join(delivery_dir, filename)
+                with open(delivery_path, "w", encoding="utf-8") as _fh:
+                    _fh.write(html_content)
+                yield {"type": "log", "content": f"[DesignStudio] Saved: {filename}"}
+
+                AGENT_STATE.labels(agent_name="DesignStudio").set(1)
+                WORKFLOW_STEPS.labels(status="success", agent_type="DesignStudio").inc()
+
+                yield {
+                    "type": "design_artifact",
+                    "content": {
+                        "html": html_content,
+                        "project_id": project_id,
+                        "project_url": "http://192.168.2.101:17573",
+                        "filename": filename,
+                        "skill": skill_id,
+                    }
+                }
+                yield {"type": "response", "content": f"✨ Design created! [Open in Design Studio](http://192.168.2.101:17573)"}
+                _score_trace(lf_trace, langfuse, 0.9, output=f"design_artifact:{filename}")
+                return
+
+            except Exception as e:
+                AGENT_STATE.labels(agent_name="DesignStudio").set(1)
+                WORKFLOW_STEPS.labels(status="error", agent_type="DesignStudio").inc()
+                logger.error("[DesignStudio] Exception: %s", str(e), exc_info=True)
+                yield {"type": "error", "content": f"Design Studio failed: {e}"}
+                yield {"type": "log", "content": f"[DesignStudio] Exception: {str(e)}"}
+                return
 
         # --- ROUTE: TRAINER (FEEDBACK LOOP) ---
         if intent == "TRAIN":

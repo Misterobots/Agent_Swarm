@@ -157,6 +157,8 @@ services:
       - OPENHANDS_API_KEY=sk-sandbox-local
       - COMFYUI_HOST=http://comfyui_gpu:8188
       - "VALID_API_KEYS={\"sk-coder-identity\": \"coding_user\", \"sk-devops-identity\": \"devops_user\"}"
+      # Open Design daemon (LAN-accessible from agent_runtime on same execution_net)
+      - OPEN_DESIGN_URL=http://open_design:7456
       # SPIFFE Workload API socket path
       - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
       - PYTHONPATH=/app
@@ -634,6 +636,47 @@ services:
     labels:
       - "traefik.enable=false"
 
+  # ─────────────────────────────────────────────────────────────────
+  # OPEN DESIGN — nexu-io/open-design daemon
+  # Purpose : Design-intent UI generation (landing pages, dashboards,
+  #           decks, prototypes) via 31 skills + 72 design systems.
+  # Daemon API : http://192.168.2.101:7456  (LAN-accessible)
+  # First build : ~10 min (clone + pnpm install + tsc build)
+  #              Set SKIP_WEB_BUILD=1 to skip the Next.js static export
+  #              and save ~4 min (no /design-studio UI, API still works).
+  # Subsequent : Only Docker layer cache misses rebuilt (~1 min).
+  # Start      : docker compose up -d open-design
+  # ─────────────────────────────────────────────────────────────────
+  open-design:
+    build:
+      context: .
+      dockerfile: Dockerfile.open-design
+      args:
+        SKIP_WEB_BUILD: "${OD_SKIP_WEB_BUILD:-0}"
+    image: home-ai-lab/open-design:latest
+    container_name: open_design
+    restart: unless-stopped
+    ports:
+      - "7456:7456"   # daemon REST + SSE API
+    volumes:
+      - open_design_data:/data
+    environment:
+      - OD_BIND_HOST=0.0.0.0
+      - OD_DATA_DIR=/data
+      - NODE_ENV=production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7456/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=false"
+
 networks:
   execution_net:
     driver: bridge
@@ -648,5 +691,6 @@ volumes:
   spire_agent_data:
   spire_socket:
   tgw_models:
+  open_design_data:
   tgw_loras:
   tgw_presets:

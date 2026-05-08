@@ -42,6 +42,7 @@ interface ChatState {
   setMessagePendingApprovals: (conversationId: string, messageId: string, approvals: import("@/types/chat").ToolApprovalEvent[]) => void;
   setMessagePendingClarification: (conversationId: string, messageId: string, card: ClarificationCard | undefined) => void;
   setMessageMediaAttachments: (conversationId: string, messageId: string, attachments: MediaAttachment[]) => void;
+  setMessageDesignArtifact: (conversationId: string, messageId: string, artifact: import("@/types/chat").DesignArtifact) => void;
   setMessageQueueStatus: (conversationId: string, messageId: string, status: import("@/types/chat").QueueStatus | undefined) => void;
 }
 
@@ -249,6 +250,20 @@ export const useChatStore = create<ChatState>()(
               ...c,
               messages: c.messages.map((m) =>
                 m.id === messageId ? { ...m, mediaAttachments: attachments } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageDesignArtifact: (conversationId, messageId, artifact) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, designArtifact: artifact } : m
               ),
               updatedAt: Date.now(),
             };
