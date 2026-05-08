@@ -15,6 +15,8 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, delete, func, update, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 
 from .database import async_session, init_db, Memory, AgentSnapshot, TeamMemory, MemoryAuditLog, ExtractionLog
 from .embeddings import embed_text, embed_texts, extract_memories, close_client
@@ -208,7 +210,7 @@ async def health():
 # ═══════════════════════════════════════════════════════════════════════════
 
 @app.post("/v1/memories", response_model=MemoryOut)
-async def store_memory(req: MemoryCreate):
+async def store_memory(req: MemoryCreate, actor_id: str = ""):
     """Store a memory with auto-generated embedding."""
     owner_id = (req.owner_id or "").strip()
     if not owner_id:
@@ -227,6 +229,16 @@ async def store_memory(req: MemoryCreate):
     )
     async with async_session() as session:
         session.add(mem)
+        await session.flush()
+        session.add(MemoryAuditLog(
+            memory_id=mem.id,
+            action="created",
+            actor_id=actor_id or req.agent_id or owner_id,
+            actor_role="user",
+            previous_content=None,
+            new_content=mem.content,
+            changed_fields={},
+        ))
         await session.commit()
         await session.refresh(mem)
     logger.info("Stored memory %s [%s/%s] for owner=%s",
@@ -278,15 +290,27 @@ async def search_memories(req: SearchQuery):
 
 
 @app.delete("/v1/memories/{memory_id}")
-async def delete_memory(memory_id: UUID):
-    """Delete a specific memory."""
+async def delete_memory(memory_id: UUID, actor_id: str = "anonymous"):
+    """Delete a specific memory and audit the action."""
     async with async_session() as session:
-        result = await session.execute(
-            delete(Memory).where(Memory.id == memory_id)
-        )
+        existing = (await session.execute(
+            select(Memory).where(Memory.id == memory_id)
+        )).scalar_one_or_none()
+        if not existing:
+            raise HTTPException(404, "Memory not found")
+
+        prev_content = existing.content
+        await session.execute(delete(Memory).where(Memory.id == memory_id))
+        session.add(MemoryAuditLog(
+            memory_id=memory_id,
+            action="deleted",
+            actor_id=actor_id,
+            actor_role="user",
+            previous_content=prev_content,
+            new_content=None,
+            changed_fields={},
+        ))
         await session.commit()
-    if result.rowcount == 0:
-        raise HTTPException(404, "Memory not found")
     return {"status": "deleted", "id": str(memory_id)}
 
 
@@ -423,25 +447,39 @@ async def extract_and_store(req: ExtractionRequest):
 
 @app.post("/v1/snapshots", response_model=SnapshotOut)
 async def save_snapshot(req: SnapshotCreate):
-    """Save a versioned agent state snapshot."""
-    async with async_session() as session:
-        # Get current max version
-        result = await session.execute(
-            select(func.coalesce(func.max(AgentSnapshot.version), 0))
-            .where(AgentSnapshot.agent_id == req.agent_id)
-            .where(AgentSnapshot.owner_id == req.owner_id)
-        )
-        max_ver = result.scalar() or 0
+    """Save a versioned agent state snapshot.
 
-        snap = AgentSnapshot(
-            agent_id=req.agent_id,
-            owner_id=req.owner_id,
-            snapshot_data=req.snapshot_data,
-            version=max_ver + 1,
-        )
-        session.add(snap)
-        await session.commit()
-        await session.refresh(snap)
+    Race-safe: retries on the unique (agent_id, owner_id, version) constraint
+    if a concurrent writer claimed the same version.
+    """
+    last_err: Exception | None = None
+    for _ in range(5):
+        async with async_session() as session:
+            result = await session.execute(
+                select(func.coalesce(func.max(AgentSnapshot.version), 0))
+                .where(AgentSnapshot.agent_id == req.agent_id)
+                .where(AgentSnapshot.owner_id == req.owner_id)
+            )
+            max_ver = result.scalar() or 0
+
+            snap = AgentSnapshot(
+                agent_id=req.agent_id,
+                owner_id=req.owner_id,
+                snapshot_data=req.snapshot_data,
+                version=max_ver + 1,
+            )
+            session.add(snap)
+            try:
+                await session.commit()
+                await session.refresh(snap)
+                break
+            except IntegrityError as exc:
+                last_err = exc
+                await session.rollback()
+                continue
+    else:
+        logger.error("Snapshot save failed after retries: %s", last_err)
+        raise HTTPException(503, "Snapshot save contention — retry later")
 
     logger.info("Snapshot saved: agent=%s owner=%s v%d",
                 req.agent_id, req.owner_id, snap.version)
@@ -490,35 +528,32 @@ async def get_snapshot(agent_id: str, owner_id: Optional[str] = None):
 
 @app.post("/v1/team/{team_id}", response_model=TeamMemoryOut)
 async def store_team_memory(team_id: str, req: TeamMemoryCreate):
-    """Store or update a key-value pair in team memory."""
+    """Store or update a key-value pair in team memory.
+
+    Atomic upsert via INSERT ... ON CONFLICT (team_id, key) DO UPDATE — safe
+    against concurrent writers thanks to uq_team_mem_team_key.
+    """
     embedding = await embed_text(f"{req.key}: {req.value}")
 
+    stmt = pg_insert(TeamMemory).values(
+        team_id=team_id,
+        key=req.key,
+        value=req.value,
+        embedding=embedding,
+        author_agent=req.author_agent,
+    ).on_conflict_do_update(
+        constraint="uq_team_mem_team_key",
+        set_={
+            "value": req.value,
+            "embedding": embedding,
+            "author_agent": req.author_agent,
+        },
+    ).returning(TeamMemory)
+
     async with async_session() as session:
-        # Upsert: check if key exists
-        existing = await session.execute(
-            select(TeamMemory)
-            .where(TeamMemory.team_id == team_id)
-            .where(TeamMemory.key == req.key)
-        )
-        existing_mem = existing.scalar_one_or_none()
-
-        if existing_mem:
-            existing_mem.value = req.value
-            existing_mem.embedding = embedding
-            existing_mem.author_agent = req.author_agent
-            mem = existing_mem
-        else:
-            mem = TeamMemory(
-                team_id=team_id,
-                key=req.key,
-                value=req.value,
-                embedding=embedding,
-                author_agent=req.author_agent,
-            )
-            session.add(mem)
-
+        result = await session.execute(stmt)
+        mem = result.scalar_one()
         await session.commit()
-        await session.refresh(mem)
 
     return TeamMemoryOut(
         id=str(mem.id),
@@ -615,9 +650,9 @@ def _derive_wing(
     if team_id:
         return f"wing_team_{team_id}"
     if agent_id:
-        return f"wing_{agent_id}"
+        return f"wing_agent_{agent_id}"
     if owner_id:
-        return f"wing_{owner_id}"
+        return f"wing_owner_{owner_id}"
     return "wing_self"
 
 
@@ -697,12 +732,17 @@ async def search_memories_mcp(
     agent_id: str = "",
     limit: int = 10,
 ) -> str:
-    """Semantic search over memories in MemPalace. Returns top matches with scores."""
+    """Semantic search over memories in MemPalace. Returns top matches with scores.
+
+    owner_id is required to scope the search — without it, agents would
+    see memories across all users.
+    """
+    if not owner_id.strip():
+        return "Error: owner_id is required to scope the search"
     query_embedding = await embed_text(query)
     distance = Memory.embedding.cosine_distance(query_embedding).label("distance")
     stmt = select(Memory, distance).order_by(distance)
-    if owner_id:
-        stmt = stmt.where(Memory.owner_id == owner_id)
+    stmt = stmt.where(Memory.owner_id == owner_id)
     if agent_id:
         stmt = stmt.where(Memory.agent_id == agent_id)
     stmt = stmt.limit(limit)
@@ -725,14 +765,20 @@ async def store_memory_mcp(
     agent_id: str = "",
     owner_id: str = "",
 ) -> str:
-    """Store a new memory in MemPalace with an auto-generated embedding."""
+    """Store a new memory in MemPalace with an auto-generated embedding.
+
+    owner_id is required — memories without an owner cannot be retrieved
+    via the palace viewer or filtered by user.
+    """
+    if not owner_id.strip():
+        return "Error: owner_id is required for memory writes"
     embedding = await embed_text(content)
     mem = Memory(
         content=content,
         memory_type=memory_type,
         domain=domain,
         agent_id=agent_id or None,
-        owner_id=owner_id or None,
+        owner_id=owner_id,
         embedding=embedding,
         metadata_={},
     )
@@ -789,7 +835,7 @@ async def extract_from_conversation_mcp(
         for item, emb in zip(extracted, embeddings):
             mem = Memory(
                 content=item["content"],
-                memory_type=item.get("memory_type", "semantic"),
+                memory_type=item.get("type", "semantic"),
                 domain=item.get("domain", domain),
                 agent_id=agent_id or None,
                 owner_id=owner_id or None,
@@ -831,13 +877,16 @@ async def palace_room_memories(
     if owner_id:
         stmt = stmt.where(Memory.owner_id == owner_id)
 
-    # Filter by wing (agent or team)
+    # Filter by wing — prefix encodes scope (team/agent/owner/self)
     if wing.startswith("wing_team_"):
         team_id = wing[len("wing_team_"):]
         stmt = stmt.where(Memory.team_id == team_id)
-    elif wing.startswith("wing_") and wing not in ("wing_agent_swarm", "wing_self"):
-        agent_id = wing[len("wing_"):]
+    elif wing.startswith("wing_agent_"):
+        agent_id = wing[len("wing_agent_"):]
         stmt = stmt.where(Memory.agent_id == agent_id)
+    elif wing.startswith("wing_owner_"):
+        wing_owner = wing[len("wing_owner_"):]
+        stmt = stmt.where(Memory.owner_id == wing_owner)
 
     stmt = stmt.order_by(Memory.created_at.desc()).limit(limit).offset(offset)
 
@@ -855,10 +904,15 @@ async def palace_room_memories(
 async def update_memory(
     memory_id: UUID,
     req: MemoryUpdate,
-    actor_id: str = "anonymous",
-    actor_role: str = "user",
+    actor_id: str,
 ):
-    """Update a memory's content/fields and log the change."""
+    """Update a memory's content/fields and log the change.
+
+    actor_id is required and recorded in the audit log. actor_role is fixed
+    to "user" until authenticated identity is wired in — clients cannot
+    self-promote to admin via query string.
+    """
+    actor_role = "user"
     async with async_session() as session:
         result = await session.execute(
             select(Memory).where(Memory.id == memory_id)

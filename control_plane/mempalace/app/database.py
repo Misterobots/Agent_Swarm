@@ -1,12 +1,14 @@
 """MemPalace database layer — async SQLAlchemy + pgvector models."""
 
+import asyncio
 import os
 import logging
+from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import (
     Column, String, Text, Integer, Float, DateTime, Index,
-    ForeignKey, text, func,
+    ForeignKey, UniqueConstraint, text, func,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -81,6 +83,8 @@ class AgentSnapshot(Base):
     __tablename__ = "agent_snapshots"
     __table_args__ = (
         Index("ix_snap_agent_owner", "agent_id", "owner_id"),
+        UniqueConstraint("agent_id", "owner_id", "version",
+                         name="uq_snap_agent_owner_version"),
         {"schema": "mempalace"},
     )
 
@@ -98,6 +102,7 @@ class TeamMemory(Base):
     __tablename__ = "team_memories"
     __table_args__ = (
         Index("ix_team_mem_team", "team_id"),
+        UniqueConstraint("team_id", "key", name="uq_team_mem_team_key"),
         {"schema": "mempalace"},
     )
 
@@ -149,12 +154,28 @@ class ExtractionLog(Base):
 
 
 # ---------------------------------------------------------------------------
-# Bootstrap: create schema + extension + tables
+# Bootstrap: ensure extension/schema exist, then run pending migrations
 # ---------------------------------------------------------------------------
 async def init_db():
-    """Create mempalace schema, enable pgvector, and create all tables."""
+    """Bootstrap database: pgvector + mempalace schema + alembic upgrade head.
+
+    Schema changes are owned by Alembic migrations under alembic/versions/.
+    This function only handles the infrastructure pieces Alembic doesn't:
+    creating the pgvector extension and the mempalace schema namespace.
+    """
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.execute(text("CREATE SCHEMA IF NOT EXISTS mempalace"))
-        await conn.run_sync(Base.metadata.create_all)
+
+    # Defer alembic imports so the database module remains importable in
+    # contexts where alembic isn't installed (e.g. tooling, tests).
+    from alembic import command
+    from alembic.config import Config
+
+    cfg_path = Path(__file__).resolve().parents[1] / "alembic.ini"
+    cfg = Config(str(cfg_path))
+    # alembic.command.upgrade is sync; env.py uses asyncio.run internally,
+    # so we offload to a worker thread to avoid nested event-loop issues.
+    await asyncio.to_thread(command.upgrade, cfg, "head")
+
     logger.info("MemPalace database initialized")
