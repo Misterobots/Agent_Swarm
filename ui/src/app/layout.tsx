@@ -1,18 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { ClientShell } from "@/components/layout/client-shell";
 import "./globals.css";
 import "@xterm/xterm/css/xterm.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Use system fonts to avoid next/font/google Turbopack issues
+const geistSans = { variable: "--font-geist-sans", className: "" };
+const geistMono = { variable: "--font-geist-mono", className: "" };
 
 export const viewport: Viewport = {
   width: "device-width",

@@ -109,6 +109,14 @@ Write an ADR when:
 - **Impact**: Architecture (inference time), Observability (trace completeness), Learning (template scoring)
 - **Link**: [Full Decision](ADR-004_marsrl_inference_verification.md)
 
+### ADR-005: Sparse Attention Patterns for MemPalace Retrieval and Context Assembly
+- **Status**: Proposed
+- **Date**: 2026-05-06
+- **Owner**: Core Platform
+- **Summary**: Four-phase upgrade to MemPalace retrieval and church.py context assembly: (1) intent-gated domain filtering to eliminate cross-domain noise, (2) composite scoring incorporating cosine similarity, recency, and access frequency, (3) cross-encoder re-ranking for knowledge-intensive intents, (4) context budget manager that activates the dormant CONTEXT_WINDOWS config with a token-aware history sliding window.
+- **Impact**: Architecture (memory retrieval quality), Agents (context assembly), Operations (Hopper image rebuild for Phase 3)
+- **Link**: [Full Decision](ADR-005_sparse_attention_retrieval.md)
+
 ---
 
 ## Deprecated / Superseded ADRs

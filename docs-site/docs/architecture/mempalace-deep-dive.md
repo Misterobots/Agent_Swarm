@@ -361,6 +361,102 @@ print(f'Found {len(results)} result(s) - PASS')
 
 ---
 
+---
+
+## Planned Enhancement: Sparse Attention Retrieval Upgrade (ADR-005)
+
+!!! warning "Status: Proposed — not yet implemented"
+    This section documents the planned retrieval and context assembly upgrade.
+    See [`docs/decisions/ADR-005_sparse_attention_retrieval.md`](../../../docs/decisions/ADR-005_sparse_attention_retrieval.md)
+    and the baseline evidence record at `docs/evidence/sparse_attention_proposal_2026_05_06.md`.
+
+### Background
+
+As memory stores grow and conversations deepen, the current flat cosine-similarity retrieval
+introduces cross-domain noise and ignores recency and reinforcement signals already present in
+the `Memory` table (`created_at`, `access_count`). Additionally, `church.py` injects all context
+layers unconditionally without respect to the per-model token budgets defined in `config.py`.
+
+Four improvements are planned in independently-deployable phases.
+
+---
+
+### Phase 1 — Intent-Gated Domain Filtering
+
+`church.py` will pass a `domain=` filter to `/v1/memories/search` based on the resolved intent.
+The `SearchQuery.domain` field and its SQL `WHERE` clause are already implemented — only the
+caller needs updating.
+
+| Intent | Domain Filter Applied |
+|--------|-----------------------|
+| `IMAGE`, `ACTION_FIGURE` | `comfyui` |
+| `DEVOPS`, `IOT_CONTROL` | `infrastructure` |
+| `CODE`, `IOT_DEV` | `coding` |
+| `DATA` | `data` |
+| `TRAIN` | `agents` |
+| `CONVERSATION`, `COORDINATE`, `RESEARCH`, `DOCUMENTATION` | *(none — broad recall)* |
+
+---
+
+### Phase 2 — Composite Retrieval Scoring
+
+The score returned by `search_memories()` and `search_memories_mcp()` will be replaced with a
+weighted composite that incorporates recency and access frequency:
+
+$$\text{score} = 0.6 \cdot s_{\cos} + 0.25 \cdot e^{-d/30} + 0.15 \cdot \frac{\log(1 + n_a)}{\log(101)}$$
+
+| Term | Meaning |
+|------|---------|
+| $s_{\cos}$ | Cosine similarity (`1.0 − cosine_distance`) |
+| $d$ | Days since `created_at` (half-life = 30 days) |
+| $n_a$ | `access_count` (log-normalized, saturates at ~100) |
+
+`SearchQuery` will gain a `min_score: Optional[float]` field for server-side threshold filtering,
+replacing the hardcoded `score > 0.5` check in `church.py`.
+
+---
+
+### Phase 3 — Cross-Encoder Re-Ranking
+
+A new `reranker.py` module will lazy-load `CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")`
+(22M params, CPU-resident). When `SearchQuery.rerank=True`:
+
+1. Fetch `limit × 3` candidates via Phase 2 composite scoring
+2. Cross-encoder scores each `(query, memory_content)` pair (~20–80ms on CPU)
+3. Blend scores: $\text{final} = 0.5 \cdot \text{composite} + 0.5 \cdot \sigma(\text{reranker\_logit})$
+4. Re-sort by `final` score and truncate to `limit`
+
+**Enabled for:** `RESEARCH`, `DEVOPS`, `CODE`, `COORDINATE`
+**Disabled for:** `CONVERSATION`, `IOT_CONTROL` (latency-sensitive)
+
+**Dependency:** `sentence-transformers` added to Hopper MemPalace Docker image (~90 MB model download).
+
+---
+
+### Phase 4 — Context Budget Manager
+
+A new `agents/context_budget.py` module will provide token-aware context trimming, activating
+the `CONTEXT_WINDOWS` config that has been defined in `agents/config.py` but never applied.
+
+| Component | Description |
+|-----------|-------------|
+| `estimate_tokens(text)` | Lightweight `len // 4` heuristic — no external tokenizer dependency |
+| `trim_history(history, budget)` | Walks history newest-first; always preserves `role=system` messages |
+| `ContextBudget(model_name)` | Reads `CONTEXT_WINDOWS`, allocates budget across layers |
+
+**Budget allocation (of available window after 30% generation headroom):**
+
+| Layer | Allocation |
+|-------|-----------|
+| Conversation history | 50% |
+| Memories + grounding | 25% |
+| System instructions | 25% |
+
+`church.py` will call `trim_history()` before serializing `history_context`, making
+`CONTEXT_WINDOWS` load-bearing for the first time since it was defined.
+
+---
+
 ??? info "Source of Truth"
 
     | Component | File |
