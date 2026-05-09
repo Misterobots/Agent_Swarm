@@ -15,9 +15,7 @@ import {
   Mic2,
   Paintbrush,
   Radar,
-  Scale,
   Settings,
-  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
@@ -67,12 +65,6 @@ export const primaryNavigation: NavigationItem[] = [
         href: "/monitoring/traces",
         icon: Activity,
         matchPrefixes: ["/monitoring/traces"],
-      },
-      {
-        label: "Control Room",
-        href: "/monitoring/control-room",
-        icon: ShieldCheck,
-        matchPrefixes: ["/monitoring/control-room"],
       },
       {
         label: "Evidence Locker",
@@ -146,14 +138,14 @@ export const secondaryNavigation: NavigationItem[] = [
     label: "Mission Control",
     href: "/mission-control",
     icon: LayoutDashboard,
-    matchPrefixes: ["/mission-control", "/operations", "/ops"],
-    adminOnly: true,
-  },
-  {
-    label: "Governance",
-    href: "/governance",
-    icon: Scale,
-    matchPrefixes: ["/governance"],
+    matchPrefixes: [
+      "/mission-control",
+      "/operations",
+      "/ops",
+      "/control",
+      "/monitoring/control-room",
+      "/governance",
+    ],
     adminOnly: true,
   },
 ];

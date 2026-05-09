@@ -6,26 +6,52 @@ import {
   Activity,
   ClipboardCheck,
   Gauge,
-  Gavel,
+  HeartPulse,
   RefreshCw,
   Shield,
+  Wrench,
 } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { OpsDashboard } from "@/components/ops/ops-dashboard";
 import { MaintenanceQueue } from "@/components/mission-control/maintenance-queue";
+import { ServiceHealthBody } from "@/components/monitoring/service-health-body";
+import { GovernanceWorkflow } from "@/components/governance/governance-workflow";
 import { fetchOpsHealth } from "@/lib/api/ops";
 import { fetchGovernanceRequests } from "@/lib/api/workspaces";
 import { fetchMaintenanceQueue } from "@/lib/api/maintenance";
 import type { OpsHealth } from "@/types/ops";
 import type { GovernanceRequest } from "@/types/workspaces";
 
-type TabId = "status" | "maintenance" | "service-health" | "governance";
+type TabId = "status" | "action-queue" | "service-health" | "diagnostics";
 
 const TABS: { id: TabId; label: string; icon: typeof Activity }[] = [
   { id: "status", label: "Status", icon: Gauge },
-  { id: "maintenance", label: "Maintenance Queue", icon: ClipboardCheck },
-  { id: "service-health", label: "Service Checks", icon: Activity },
-  { id: "governance", label: "Governance", icon: Gavel },
+  { id: "action-queue", label: "Action Queue", icon: ClipboardCheck },
+  { id: "service-health", label: "Service Health", icon: HeartPulse },
+  { id: "diagnostics", label: "Diagnostics", icon: Wrench },
+];
+
+const DIAGNOSTIC_RUNBOOKS: { title: string; body: string; cmd: string }[] = [
+  {
+    title: "Cluster Health Check",
+    body: "Validate all three nodes and control-plane service checks.",
+    cmd: "GET /api/v1/ops/health",
+  },
+  {
+    title: "Logs Diagnostic",
+    body: "Inspect agent-runtime and gateway logs after incidents.",
+    cmd: "docker compose logs --tail=200",
+  },
+  {
+    title: "Reliability Suite",
+    body: "Run endpoint and host reliability scripts from execution plane.",
+    cmd: "bash test_endpoints.sh && bash test_host.sh",
+  },
+  {
+    title: "Node Health Check",
+    body: "Validate all inference nodes and loaded model state.",
+    cmd: "GET /api/v1/health/nodes",
+  },
 ];
 
 export default function MissionControlPage() {
@@ -62,11 +88,12 @@ export default function MissionControlPage() {
     [requests]
   );
   const unhealthy = health?.control_plane.filter((s) => !s.healthy) ?? [];
+  const actionQueueCount = pendingMaint + pendingGov.length;
 
   return (
     <WorkspaceShell
       title="Mission Control"
-      description="Unified surface for status, maintenance queue, service checks, and governance approvals."
+      description="Unified operator surface for status, action queue, service health, and diagnostics."
       icon={Shield}
     >
       <WorkspaceSection title="At a glance">
@@ -113,10 +140,10 @@ export default function MissionControlPage() {
             const Icon = t.icon;
             const active = tab === t.id;
             const badge =
-              t.id === "maintenance"
-                ? pendingMaint
-                : t.id === "governance"
-                  ? pendingGov.length
+              t.id === "action-queue"
+                ? actionQueueCount
+                : t.id === "service-health"
+                  ? unhealthy.length
                   : null;
             return (
               <button
@@ -131,7 +158,13 @@ export default function MissionControlPage() {
                 <Icon size={14} />
                 {t.label}
                 {badge !== null && badge > 0 && (
-                  <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-400">
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                      t.id === "service-health"
+                        ? "bg-red-500/20 text-red-400"
+                        : "bg-amber-500/20 text-amber-400"
+                    }`}
+                  >
                     {badge}
                   </span>
                 )}
@@ -192,63 +225,96 @@ export default function MissionControlPage() {
           </div>
         )}
 
-        {tab === "maintenance" && <MaintenanceQueue />}
-
-        {tab === "service-health" && (
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4 text-sm text-[var(--chat-muted)]">
-            <p>
-              The full service-checks surface lives at{" "}
-              <Link
-                href="/monitoring/service-health"
-                className="text-[var(--chat-accent)] underline-offset-2 hover:underline"
-              >
-                /monitoring/service-health
-              </Link>
-              . Open it for the canonical view; this tab is the entry point
-              from Mission Control.
-            </p>
+        {tab === "action-queue" && (
+          <div className="space-y-8">
+            <section>
+              <div className="mb-3 flex items-baseline justify-between">
+                <h3 className="text-sm font-medium uppercase tracking-wide text-[var(--chat-muted)]">
+                  Maintenance ({pendingMaint})
+                </h3>
+                <p className="text-xs text-[var(--chat-muted)]">
+                  Alerts routed by manifest. Agent-safe items dispatch automatically.
+                </p>
+              </div>
+              <MaintenanceQueue />
+            </section>
+            <section>
+              <div className="mb-3 flex items-baseline justify-between">
+                <h3 className="text-sm font-medium uppercase tracking-wide text-[var(--chat-muted)]">
+                  Governance ({pendingGov.length})
+                </h3>
+                <Link
+                  href="/governance"
+                  className="text-xs text-[var(--chat-accent)] underline-offset-2 hover:underline"
+                >
+                  Open in dedicated view →
+                </Link>
+              </div>
+              <GovernanceWorkflow />
+            </section>
           </div>
         )}
 
-        {tab === "governance" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-[var(--chat-muted)]">
-                {pendingGov.length} pending request
-                {pendingGov.length === 1 ? "" : "s"}.
-              </p>
-              <Link
-                href="/governance"
-                className="text-xs text-[var(--chat-accent)] underline-offset-2 hover:underline"
-              >
-                Open full governance workflow →
-              </Link>
+        {tab === "service-health" && <ServiceHealthBody />}
+
+        {tab === "diagnostics" && (
+          <div className="space-y-6">
+            <p className="text-sm text-[var(--chat-muted)]">
+              Common reliability and incident-response references. Copy and run
+              from the execution plane.
+            </p>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {DIAGNOSTIC_RUNBOOKS.map((card) => (
+                <div
+                  key={card.title}
+                  className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3"
+                >
+                  <p className="text-sm font-medium text-[var(--chat-text)]">
+                    {card.title}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--chat-muted)]">
+                    {card.body}
+                  </p>
+                  <code className="mt-2 block rounded bg-[var(--chat-bg)] px-2 py-1 text-xs text-[var(--chat-muted)]">
+                    {card.cmd}
+                  </code>
+                </div>
+              ))}
             </div>
             <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
-              {pendingGov.length === 0 ? (
-                <p className="text-sm text-[var(--chat-muted)]">
-                  No pending requests.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {pendingGov.slice(0, 8).map((req) => (
-                    <li
-                      key={req.id}
-                      className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2.5"
-                    >
-                      <p className="text-xs text-[var(--chat-text)]">
-                        <span className="font-mono text-[var(--chat-muted)]">
-                          {req.id}
-                        </span>{" "}
-                        · {req.type} · {req.status}
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--chat-muted)]">
-                        {req.description}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--chat-muted)]">
+                Related surfaces
+              </p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <Link
+                  href="/monitoring/dashboard"
+                  className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 text-xs hover:border-[var(--chat-accent)]"
+                >
+                  <p className="text-[var(--chat-text)]">Health Dashboard</p>
+                  <p className="mt-0.5 text-[var(--chat-muted)]">Cluster-wide containers</p>
+                </Link>
+                <Link
+                  href="/monitoring/grafana"
+                  className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 text-xs hover:border-[var(--chat-accent)]"
+                >
+                  <p className="text-[var(--chat-text)]">Grafana</p>
+                  <p className="mt-0.5 text-[var(--chat-muted)]">Metrics + logs</p>
+                </Link>
+                <Link
+                  href="/monitoring/traces"
+                  className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 text-xs hover:border-[var(--chat-accent)]"
+                >
+                  <p className="text-[var(--chat-text)]">Traces</p>
+                  <p className="mt-0.5 text-[var(--chat-muted)]">Request flow</p>
+                </Link>
+                <Link
+                  href="/monitoring/evidence-locker"
+                  className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 text-xs hover:border-[var(--chat-accent)]"
+                >
+                  <p className="text-[var(--chat-text)]">Evidence Locker</p>
+                  <p className="mt-0.5 text-[var(--chat-muted)]">Runbook archive</p>
+                </Link>
+              </div>
             </div>
           </div>
         )}
