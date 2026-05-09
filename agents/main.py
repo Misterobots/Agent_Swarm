@@ -158,10 +158,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Training run cleanup failed (non-fatal): {e}")
 
+        # 9. Start training-run watchdog (reconciles silent asyncio task crashes)
+        import asyncio as _asyncio
+        training_watchdog = _asyncio.create_task(_training_watchdog_loop())
+
         print("DEBUG: Startup Complete. Yielding...")
         logger.info("Swarm Engine Online. Waiting for events...")
         yield
         # Shutdown
+        training_watchdog.cancel()
         logger.info("Shutting down Swarm Engine...")
         if trigger_sched:
             trigger_sched.stop()
@@ -1797,6 +1802,44 @@ class TrainingStartRequest(BaseModel):
 _active_training: dict = {"run_id": None, "status": "idle", "started_at": None, "task": None}
 
 
+async def _training_watchdog_loop():
+    """Reconcile silent training-task crashes against the DB.
+
+    Why: training runs as an asyncio task in this process; a crash on a
+    code path that escapes `_run_training`'s except block (e.g. CancelledError
+    or import-time failures) can leave the DB row stuck on 'running' forever.
+    This loop catches that case while the container is up — the lifespan
+    startup reconciler only runs on boot.
+    """
+    import asyncio as _asyncio
+
+    while True:
+        try:
+            await _asyncio.sleep(60)
+            task = _active_training.get("task")
+            run_id = _active_training.get("run_id")
+            if task is None or not task.done():
+                continue
+            # Task finished. If status didn't get reset to idle, the finally
+            # block didn't run — treat as a hard crash.
+            if _active_training.get("status") == "running" and run_id:
+                exc = task.exception() if not task.cancelled() else _asyncio.CancelledError()
+                err = f"{type(exc).__name__}: {exc}" if exc else "Task exited without resetting status"
+                logger.error(f"[TrainingWatchdog] Reconciling orphaned run {run_id}: {err}")
+                try:
+                    from training.grpo_trainer import _update_training_run
+                    _update_training_run(run_id, "failed", error=f"watchdog: {err}")
+                except Exception as db_err:
+                    logger.warning(f"[TrainingWatchdog] DB update failed for run {run_id}: {db_err}")
+            _active_training["status"] = "idle"
+            _active_training["run_id"] = None
+            _active_training["task"] = None
+        except _asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"[TrainingWatchdog] loop error: {e}")
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Buddy companion endpoints
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2370,19 +2413,24 @@ async def training_start(req: TrainingStartRequest, background_tasks: Background
                 _active_training["run_id"] = result.get("run_id")
                 _active_training["status"] = "idle"
 
-        except Exception as e:
-            logger.error(f"Background training failed: {e}", exc_info=True)
-            # Mark the early DB row as failed so it doesn't stay 'running' forever
+        except BaseException as e:
+            logger.error(f"Background training failed: {e!r}", exc_info=True)
             if _early_run_id:
                 try:
                     from training.grpo_trainer import _update_training_run
-                    _update_training_run(_early_run_id, "failed", error=str(e))
+                    _update_training_run(_early_run_id, "failed", error=f"{type(e).__name__}: {e}")
                 except Exception as db_err:
                     logger.warning(f"[Training] Failed to mark DB row {_early_run_id} as failed: {db_err}")
+            raise
+        finally:
+            # Guarantee the in-memory lock is released, regardless of how we exited.
             _active_training["status"] = "idle"
             _active_training["run_id"] = None
+            _active_training["task"] = None
 
-    background_tasks.add_task(_run_training)
+    import asyncio as _asyncio
+    task = _asyncio.create_task(_run_training())
+    _active_training["task"] = task
     return {"status": "started", "run_type": req.run_type, "time_budget_minutes": req.time_budget_minutes}
 
 
