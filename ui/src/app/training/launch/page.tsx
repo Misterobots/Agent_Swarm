@@ -5,12 +5,16 @@ import { TrainingLauncher } from "@/components/training/training-launcher";
 export default function TrainingLaunchPage() {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-1 border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-6 py-2 text-xs text-[var(--chat-muted)]">
-        <Link href="/training" className="hover:text-[var(--chat-text)] transition-colors">
+      <div
+        className="relative flex items-center gap-1.5 bg-[var(--chat-surface)] py-2.5 text-[12px]"
+        style={{ paddingLeft: "calc(var(--sidebar-rail-pad, 0px) + 1.5rem)", paddingRight: "1.5rem" }}
+      >
+        <Link href="/training" className="text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors">
           Training
         </Link>
-        <ChevronRight size={12} />
-        <span className="text-[var(--chat-text)]">Launch Run</span>
+        <ChevronRight size={12} className="text-[var(--chat-subtle)]" />
+        <span className="text-[var(--chat-text)] font-medium">Launch Run</span>
+        <div className="absolute bottom-0 left-0 right-0 divider" />
       </div>
       <TrainingLauncher />
     </div>

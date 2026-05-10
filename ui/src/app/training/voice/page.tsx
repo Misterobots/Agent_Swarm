@@ -1,7 +1,8 @@
 "use client";
 
-import { AudioWaveform } from "lucide-react";
+import { AudioWaveform, Download, Loader2, Play } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { Button, Card } from "@/components/ui";
 import { useMemo, useState } from "react";
 import { synthesizeVoice } from "@/lib/api/workspaces";
 
@@ -32,64 +33,105 @@ export default function TrainingVoicePage() {
     >
       <WorkspaceSection title="Calibration Workspace">
         <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Pitch Shift (Semitones)</p>
-            <input
-              type="range"
-              min={-12}
-              max={24}
-              value={pitch}
-              onChange={(e) => setPitch(Number(e.target.value))}
-              className="mt-2 w-full"
-            />
-            <p className="mt-1 text-sm font-medium text-[var(--chat-text)]">{pitch}</p>
+          {/* Controls */}
+          <Card padding="md">
+            <FieldLabel>Pitch Shift</FieldLabel>
+            <div className="mt-2 flex items-center gap-3">
+              <input
+                type="range"
+                min={-12}
+                max={24}
+                value={pitch}
+                onChange={(e) => setPitch(Number(e.target.value))}
+                className="flex-1 accent-[var(--chat-accent)]"
+              />
+              <span className="text-[15px] font-semibold tabular-nums text-[var(--chat-text)] w-10 text-right">
+                {pitch > 0 ? `+${pitch}` : pitch}
+              </span>
+            </div>
+            <p className="mt-1 text-[10px] text-[var(--chat-subtle)]">semitones</p>
 
-            <p className="mt-4 text-xs text-[var(--chat-muted)]">Inference Method</p>
-            <select
-              value={method}
-              onChange={(e) => setMethod(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
-            >
-              <option value="rmvpe">rmvpe</option>
-              <option value="pm">pm</option>
-              <option value="crepe">crepe</option>
-            </select>
+            <div className="mt-5">
+              <FieldLabel>Inference Method</FieldLabel>
+              <select
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
+                className="input-field mt-2 w-full text-sm"
+              >
+                <option value="rmvpe">rmvpe</option>
+                <option value="pm">pm</option>
+                <option value="crepe">crepe</option>
+              </select>
+            </div>
 
-            <button
+            <Button
               onClick={onGenerate}
               disabled={!canGenerate}
-              className="mt-4 w-full rounded-lg border border-[var(--chat-accent)]/30 bg-[var(--chat-accent)]/10 px-3 py-2 text-sm text-[var(--chat-accent)] disabled:opacity-50"
+              variant="primary"
+              size="md"
+              fullWidth
+              loading={loading}
+              iconLeft={!loading ? <Play size={14} /> : undefined}
+              className="mt-5"
             >
-              {loading ? "Synthesizing..." : "Generate Audio"}
-            </button>
-          </div>
+              {loading ? "Synthesizing…" : "Generate Audio"}
+            </Button>
+          </Card>
 
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)]/40 p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Test Phrase</p>
+          {/* Test phrase + output */}
+          <Card padding="md">
+            <FieldLabel>Test Phrase</FieldLabel>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={6}
-              className="mt-1 w-full rounded-lg border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
+              className="input-field mt-2 w-full text-sm leading-relaxed resize-none"
             />
-            {audioUrl ? (
-              <div className="mt-4 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-bg)] p-3">
-                <p className="mb-2 text-xs text-[var(--chat-muted)]">Generated Audio</p>
-                <audio src={audioUrl} controls className="w-full" />
-                <a
-                  href={audioUrl}
-                  download={`bmo_pitch_${pitch}.wav`}
-                  className="mt-2 inline-block text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)]"
+            <div className="mt-4">
+              {audioUrl ? (
+                <div
+                  className="rounded-md p-3"
+                  style={{
+                    background: "var(--chat-panel)",
+                    border: "1px solid var(--chat-border)",
+                    boxShadow: "var(--inset-highlight)",
+                  }}
                 >
-                  Download WAV
-                </a>
-              </div>
-            ) : (
-              <p className="mt-4 text-xs text-[var(--chat-muted)]">Generate audio to preview calibration output.</p>
-            )}
-          </div>
+                  <FieldLabel>Generated Audio</FieldLabel>
+                  <audio src={audioUrl} controls className="mt-2 w-full" />
+                  <a
+                    href={audioUrl}
+                    download={`bmo_pitch_${pitch}.wav`}
+                    className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)] transition-colors"
+                  >
+                    <Download size={12} /> Download WAV
+                  </a>
+                </div>
+              ) : (
+                <div
+                  className="rounded-md border border-dashed border-[var(--chat-border)] px-4 py-6 text-center"
+                >
+                  <Loader2
+                    size={16}
+                    className={`mx-auto mb-2 text-[var(--chat-subtle)] ${loading ? "animate-spin" : "opacity-30"}`}
+                  />
+                  <p className="text-[12px] text-[var(--chat-muted)]">
+                    Generate audio to preview calibration output.
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
       </WorkspaceSection>
     </WorkspaceShell>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">
+      {children}
+    </p>
   );
 }

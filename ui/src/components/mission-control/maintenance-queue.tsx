@@ -11,6 +11,8 @@ import type {
   MaintenanceAuditRow,
   MaintenanceQueueItem,
 } from "@/types/maintenance";
+import { Button, Card } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 
 function relativeTime(iso: string) {
   const ms = Date.now() - Date.parse(iso);
@@ -24,27 +26,20 @@ function relativeTime(iso: string) {
   return `${day}d ago`;
 }
 
-function severityColor(sev?: string | null) {
+function severityClass(sev?: string | null) {
   switch ((sev || "").toLowerCase()) {
-    case "critical":
-      return "text-red-400 border-red-900/80 bg-red-950/30";
-    case "warning":
-      return "text-amber-400 border-amber-900/80 bg-amber-950/30";
-    default:
-      return "text-[var(--chat-muted)] border-[var(--chat-border)] bg-[var(--chat-panel)]";
+    case "critical": return "bg-red-500/15 text-red-400";
+    case "warning":  return "bg-amber-500/15 text-amber-400";
+    default:         return "bg-[var(--chat-panel)] text-[var(--chat-muted)]";
   }
 }
 
-function routeColor(route: string) {
+function routeClass(route: string) {
   switch (route) {
-    case "agent":
-      return "text-emerald-400";
-    case "human":
-      return "text-amber-400";
-    case "suppressed_cooldown":
-      return "text-sky-400";
-    default:
-      return "text-[var(--chat-muted)]";
+    case "agent": return "text-emerald-400";
+    case "human": return "text-amber-400";
+    case "suppressed_cooldown": return "text-sky-400";
+    default: return "text-[var(--chat-muted)]";
   }
 }
 
@@ -95,76 +90,78 @@ export function MaintenanceQueue() {
 
   return (
     <div className="space-y-6">
+      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         <input
           value={actor}
           onChange={(e) => setActor(e.target.value)}
           placeholder="Your handle"
-          className="rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-2.5 py-1.5 text-xs text-[var(--chat-text)]"
+          className="input-field !py-1.5 text-[12px] w-40"
         />
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={load}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+          iconLeft={<RefreshCw size={13} className={loading ? "animate-spin" : ""} />}
         >
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           Refresh
-        </button>
-        <div className="ml-auto flex flex-wrap items-center gap-3 text-xs text-[var(--chat-muted)]">
-          <span>
-            Recent dispatches —{" "}
-            <span className="text-emerald-400">agent {counts.agent}</span> ·{" "}
-            <span className="text-amber-400">human {counts.human}</span> ·{" "}
-            <span className="text-sky-400">cooldown {counts.suppressed}</span> ·{" "}
-            unmatched {counts.unmatched}
+        </Button>
+        <div className="ml-auto flex flex-wrap items-center gap-3 text-[11px] text-[var(--chat-muted)]">
+          <span className="text-[var(--chat-subtle)] uppercase tracking-wider font-semibold text-[10px]">
+            Recent dispatches
           </span>
+          <DispatchPill label="agent" count={counts.agent} tone="emerald" />
+          <DispatchPill label="human" count={counts.human} tone="amber" />
+          <DispatchPill label="cooldown" count={counts.suppressed} tone="sky" />
+          {counts.unmatched > 0 && (
+            <DispatchPill label="unmatched" count={counts.unmatched} tone="muted" />
+          )}
         </div>
       </div>
 
-      <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
-        {items.length === 0 ? (
-          <div className="flex items-center gap-2 px-2 py-6 text-sm text-[var(--chat-muted)]">
-            <CheckCircle2 size={16} className="text-emerald-400" />
-            Queue is clear. Agent-safe alerts handled automatically; nothing
-            awaiting human action.
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] p-3"
-              >
+      {/* Pending queue */}
+      {items.length === 0 ? (
+        <Card padding="lg" className="text-center">
+          <CheckCircle2 size={18} className="mx-auto mb-2 text-emerald-400" />
+          <p className="text-sm font-medium text-[var(--chat-text)]">Queue is clear</p>
+          <p className="mt-1 text-[12px] text-[var(--chat-muted)]">
+            Agent-safe alerts handled automatically; nothing awaiting human action.
+          </p>
+        </Card>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <li key={item.id}>
+              <Card padding="md">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <AlertTriangle
-                        size={14}
-                        className="text-amber-400 shrink-0"
-                      />
-                      <span className="font-mono text-sm text-[var(--chat-text)]">
+                      <AlertTriangle size={14} className="text-amber-400 flex-shrink-0" />
+                      <span className="font-mono text-[13px] font-medium text-[var(--chat-text)]">
                         {item.alert_name}
                       </span>
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${severityColor(item.severity)}`}
+                        className={cn(
+                          "rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                          severityClass(item.severity),
+                        )}
                       >
                         {item.severity || "info"}
                       </span>
                       {item.blast_radius && (
-                        <span className="rounded-full border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--chat-muted)]">
+                        <span className="rounded-sm bg-[var(--chat-panel)] border border-[var(--chat-border)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--chat-muted)]">
                           blast: {item.blast_radius}
                         </span>
                       )}
-                      <span className="text-[11px] text-[var(--chat-muted)]">
+                      <span className="text-[11px] tabular-nums text-[var(--chat-subtle)]">
                         {relativeTime(item.created_at)}
                       </span>
                     </div>
                     {item.summary && (
-                      <p className="mt-1.5 text-xs text-[var(--chat-text)]">
-                        {item.summary}
-                      </p>
+                      <p className="mt-1.5 text-[13px] text-[var(--chat-text)]">{item.summary}</p>
                     )}
                     {item.description && (
-                      <p className="mt-1 text-xs text-[var(--chat-muted)]">
+                      <p className="mt-1 text-[12px] text-[var(--chat-muted)] leading-relaxed">
                         {item.description}
                       </p>
                     )}
@@ -175,103 +172,128 @@ export function MaintenanceQueue() {
                         .map(([k, v]) => (
                           <span
                             key={k}
-                            className="rounded bg-[var(--chat-bg)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--chat-muted)]"
+                            className="rounded-sm font-mono px-1.5 py-0.5 text-[10px] text-[var(--chat-muted)]"
+                            style={{
+                              background: "var(--chat-bg)",
+                              border: "1px solid var(--chat-border)",
+                            }}
                           >
                             {k}={v}
                           </span>
                         ))}
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-1.5">
+                  <div className="flex flex-shrink-0 flex-wrap gap-1.5">
                     {item.runbook && (
                       <a
                         href={item.runbook}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded border border-[var(--chat-accent)]/40 bg-[var(--chat-accent)]/10 px-2 py-1 text-xs text-[var(--chat-accent)]"
+                        className="inline-flex items-center rounded-sm border border-[var(--chat-accent)]/40 bg-[var(--chat-accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--chat-accent)] hover:bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] transition-colors"
                       >
                         Runbook
                       </a>
                     )}
                     <button
                       onClick={() => ack(item.id, "acked")}
-                      className="rounded border border-emerald-800/80 bg-emerald-950/30 px-2 py-1 text-xs text-emerald-400"
+                      className="inline-flex items-center rounded-sm border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/15 transition-colors"
                     >
                       Ack
                     </button>
                     <button
                       onClick={() => ack(item.id, "resolved", "manually resolved")}
-                      className="rounded border border-[var(--chat-accent)]/40 bg-[var(--chat-accent)]/10 px-2 py-1 text-xs text-[var(--chat-accent)]"
+                      className="inline-flex items-center rounded-sm border border-[var(--chat-accent)]/40 bg-[var(--chat-accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--chat-accent)] hover:bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] transition-colors"
                     >
                       Resolved
                     </button>
                     <button
                       onClick={() => ack(item.id, "escalated")}
-                      className="rounded border border-red-900/80 bg-red-950/30 px-2 py-1 text-xs text-red-400"
+                      className="inline-flex items-center rounded-sm border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-400 hover:bg-red-500/15 transition-colors"
                     >
                       Escalate
                     </button>
                   </div>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
 
+      {/* Recent dispatches */}
       <div>
-        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--chat-muted)]">
+        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-subtle)]">
           Recent dispatches
         </h3>
-        <div className="overflow-x-auto rounded-lg border border-[var(--chat-border)]">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)] text-left text-[var(--chat-muted)]">
-                <th className="px-3 py-2 font-medium">When</th>
-                <th className="px-3 py-2 font-medium">Alert</th>
-                <th className="px-3 py-2 font-medium">Route</th>
-                <th className="px-3 py-2 font-medium">Action</th>
-                <th className="px-3 py-2 font-medium">Queue ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {audit.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-3 py-6 text-center text-[var(--chat-muted)]"
-                  >
-                    No dispatches yet.
-                  </td>
+        <div className="surface overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr
+                  className="border-b border-[var(--chat-border)] text-left"
+                  style={{ background: "color-mix(in srgb, var(--chat-panel) 60%, transparent)" }}
+                >
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">When</th>
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">Alert</th>
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">Route</th>
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">Action</th>
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">Queue ID</th>
                 </tr>
-              ) : (
-                audit.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-[var(--chat-border)] hover:bg-[var(--chat-surface)]"
-                  >
-                    <td className="px-3 py-2 text-[var(--chat-muted)]">
-                      {relativeTime(row.ts)}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-[var(--chat-text)]">
-                      {row.alert_name}
-                    </td>
-                    <td className={`px-3 py-2 ${routeColor(row.route)}`}>
-                      {row.route}
-                    </td>
-                    <td className="px-3 py-2 text-[var(--chat-muted)]">
-                      {row.action || "—"}
-                    </td>
-                    <td className="px-3 py-2 text-[var(--chat-muted)]">
-                      {row.queue_item_id ?? "—"}
+              </thead>
+              <tbody>
+                {audit.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-[var(--chat-muted)]">
+                      No dispatches yet.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  audit.map((row, i) => (
+                    <tr
+                      key={row.id}
+                      className={cn(
+                        "transition-colors hover:bg-[var(--hover-tint)]",
+                        i !== audit.length - 1 && "border-b border-[var(--divider)]",
+                      )}
+                    >
+                      <td className="px-3 py-2 tabular-nums text-[var(--chat-muted)]">
+                        {relativeTime(row.ts)}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[var(--chat-text)]">
+                        {row.alert_name}
+                      </td>
+                      <td className={cn("px-3 py-2 font-medium", routeClass(row.route))}>
+                        {row.route}
+                      </td>
+                      <td className="px-3 py-2 text-[var(--chat-muted)]">
+                        {row.action || "—"}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums text-[var(--chat-muted)]">
+                        {row.queue_item_id ?? "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function DispatchPill({ label, count, tone }: { label: string; count: number; tone: "emerald" | "amber" | "sky" | "muted" }) {
+  const toneClass = {
+    emerald: "text-emerald-400 bg-emerald-500/10",
+    amber:   "text-amber-400 bg-amber-500/10",
+    sky:     "text-sky-400 bg-sky-500/10",
+    muted:   "text-[var(--chat-muted)] bg-[var(--chat-panel)]",
+  }[tone];
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-medium", toneClass)}>
+      <span>{label}</span>
+      <span className="tabular-nums opacity-80">{count}</span>
+    </span>
   );
 }
