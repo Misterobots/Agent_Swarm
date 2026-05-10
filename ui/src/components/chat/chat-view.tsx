@@ -14,7 +14,7 @@ import { SwarmDrawer } from "@/components/swarm/swarm-drawer";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useSwarmBroadcast } from "@/lib/hooks/use-swarm-broadcast";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
-import { Bot } from "lucide-react";
+import { Bot, Sparkles, Code2, Search, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { ChatPreviewPane } from "./chat-preview-pane";
@@ -162,28 +162,37 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
     <div className="chat-shell flex h-full overflow-hidden" data-route="chat">
       <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-3 md:px-4 py-2 min-w-0">
+      <div className="relative flex items-center justify-between bg-[var(--chat-surface)] px-3 md:px-5 py-3 min-w-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <ModelSelector />
         </div>
-        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
           <button
             type="button"
             onClick={() => {
               void compactConversation();
             }}
-            className="w-16 md:w-44 h-2 rounded-full bg-[var(--chat-panel)] overflow-hidden border border-[var(--chat-border)]"
-            title={`Context usage: ${(tokenUsage.pct * 100).toFixed(1)}% (${tokenUsage.used}/${tokenUsage.total}) - Click to compact`}
+            className="group flex items-center gap-2 rounded-full px-2.5 py-1 transition-colors hover:bg-[var(--hover-tint)]"
+            title={`Context: ${(tokenUsage.pct * 100).toFixed(1)}% (${tokenUsage.used.toLocaleString()}/${tokenUsage.total.toLocaleString()}) — click to compact`}
           >
             <div
-              className={cn("h-full transition-all", usageBarClass(tokenUsage.pct))}
-              style={{ width: `${Math.min(100, tokenUsage.pct * 100)}%` }}
-            />
+              className="w-16 md:w-32 h-1.5 rounded-full overflow-hidden bg-[var(--chat-panel)] border border-[var(--chat-border)]"
+              style={{ boxShadow: "inset 0 1px 2px rgba(0,0,0,0.15)" }}
+            >
+              <div
+                className={cn("h-full transition-all duration-500 ease-out", usageBarClass(tokenUsage.pct))}
+                style={{
+                  width: `${Math.min(100, tokenUsage.pct * 100)}%`,
+                  boxShadow: tokenUsage.pct > 0.7 ? "0 0 8px currentColor" : "none",
+                }}
+              />
+            </div>
+            <span className="text-[11px] font-medium text-[var(--chat-muted)] group-hover:text-[var(--chat-text)] transition-colors hidden md:inline tabular-nums min-w-[2.5rem] text-right">
+              {(tokenUsage.pct * 100).toFixed(0)}%
+            </span>
           </button>
-          <span className="text-xs text-[var(--chat-muted)] hidden md:inline min-w-[3rem]">
-            {(tokenUsage.pct * 100).toFixed(0)}%
-          </span>
         </div>
+        <div className="absolute bottom-0 left-0 right-0 divider" />
       </div>
 
       {/* Messages */}
@@ -197,15 +206,13 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         )}
         <AwaySummaryBanner events={awayEvents} onDismiss={dismissAway} />
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)] gap-4 px-4">
-            <div className="w-16 h-16 rounded-2xl bg-[color:color-mix(in_srgb,var(--chat-accent)_14%,transparent)] flex items-center justify-center border border-[var(--chat-border)]">
-              <Bot size={32} className="text-[var(--chat-accent-strong)]" />
-            </div>
-            <div className="text-center">
-              <h2 className="text-lg font-medium text-[var(--chat-text)] mb-1">{personality.greeting}</h2>
-              <p className="text-sm text-[var(--chat-muted)]">{personality.subtitle}</p>
-            </div>
-          </div>
+          <EmptyChatState
+            greeting={personality.greeting}
+            subtitle={personality.subtitle}
+            onPrompt={(prompt) => {
+              window.dispatchEvent(new CustomEvent("chat:prefill", { detail: prompt }));
+            }}
+          />
         ) : (
           <div className="max-w-3xl mx-auto px-3 md:px-0">
             {messages.map((msg, idx) => {
@@ -325,6 +332,71 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       {showChatPreview && <ChatPreviewPane />}
       {/* Swarm theater drawer — sibling column, squeezes chat */}
       <SwarmDrawer />
+    </div>
+  );
+}
+
+const STARTER_PROMPTS: Array<{ icon: React.ComponentType<{ size?: number; className?: string }>; label: string; prompt: string }> = [
+  { icon: Code2,     label: "Write code",       prompt: "Help me write a small Python script that " },
+  { icon: Search,    label: "Look something up", prompt: "Search the web for " },
+  { icon: Lightbulb, label: "Brainstorm",       prompt: "Brainstorm ideas for " },
+  { icon: Sparkles,  label: "Summarize",        prompt: "Summarize this for me: " },
+];
+
+function EmptyChatState({
+  greeting,
+  subtitle,
+  onPrompt,
+}: {
+  greeting: string;
+  subtitle: string;
+  onPrompt: (prompt: string) => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full px-6 py-12">
+      <div className="w-full max-w-xl flex flex-col items-center text-center">
+        <div className="relative mb-6">
+          <div
+            className="w-20 h-20 rounded-2xl flex items-center justify-center"
+            style={{
+              background: "linear-gradient(135deg, var(--chat-accent-soft), color-mix(in srgb, var(--chat-accent) 6%, transparent))",
+              border: "1px solid color-mix(in srgb, var(--chat-accent) 30%, var(--chat-border))",
+              boxShadow: "var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.06)",
+            }}
+          >
+            <Bot size={36} className="text-[var(--chat-accent)]" />
+          </div>
+          <div
+            className="absolute -inset-4 -z-10 rounded-3xl opacity-60 blur-2xl"
+            style={{ background: "radial-gradient(circle, var(--chat-accent-soft), transparent 70%)" }}
+          />
+        </div>
+        <h1 className="text-2xl font-semibold text-[var(--chat-text)] tracking-tight mb-2">
+          {greeting}
+        </h1>
+        <p className="text-[15px] text-[var(--chat-muted)] mb-8">{subtitle}</p>
+
+        <div className="w-full grid grid-cols-2 gap-2.5">
+          {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onPrompt(prompt)}
+              className="lift group flex items-center gap-3 px-4 py-3 rounded-md text-left transition-colors"
+              style={{
+                background: "var(--chat-surface)",
+                border: "1px solid var(--chat-border)",
+                boxShadow: "var(--elev-1), var(--inset-highlight)",
+              }}
+            >
+              <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 bg-[var(--chat-panel)] border border-[var(--chat-border)] group-hover:border-[var(--chat-accent)] group-hover:text-[var(--chat-accent)] transition-colors text-[var(--chat-muted)]">
+                <Icon size={15} />
+              </div>
+              <span className="text-sm font-medium text-[var(--chat-text)]">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

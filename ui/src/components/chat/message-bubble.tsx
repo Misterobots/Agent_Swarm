@@ -241,7 +241,14 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
   }, [message.thoughtTrace]);
 
   return (
-    <div className={cn("group relative flex gap-3 py-4 px-4 msg-enter", isUser ? "bg-transparent" : "bg-[var(--chat-surface)]")}>
+    <div
+      className={cn(
+        "group relative flex gap-4 py-5 md:py-6 px-4 md:px-6 msg-enter",
+        isUser
+          ? "bg-transparent"
+          : "bg-[color:color-mix(in_srgb,var(--chat-surface)_60%,transparent)]"
+      )}
+    >
       <MessageActions
         content={message.content}
         isUser={isUser}
@@ -251,11 +258,20 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
       />
       <div
         className={cn(
-          "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
+          "flex-shrink-0 w-9 h-9 rounded-md flex items-center justify-center",
           isUser
-            ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_16%,transparent)] text-[var(--chat-accent-strong)] border border-[var(--chat-border)]"
-            : "bg-[color:color-mix(in_srgb,var(--chat-accent-2)_14%,transparent)] text-[var(--chat-accent-2)] border border-[var(--chat-border)]"
+            ? "text-[var(--chat-text)]"
+            : "text-[var(--chat-accent)]"
         )}
+        style={{
+          background: isUser
+            ? "var(--chat-panel)"
+            : "linear-gradient(135deg, var(--chat-accent-soft), color-mix(in srgb, var(--chat-accent) 4%, transparent))",
+          border: isUser
+            ? "1px solid var(--chat-border)"
+            : "1px solid color-mix(in srgb, var(--chat-accent) 25%, var(--chat-border))",
+          boxShadow: "var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.04)",
+        }}
       >
         {isUser ? <User size={16} /> : <Bot size={16} />}
       </div>
@@ -282,7 +298,7 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
           </div>
         )}
         {isUser ? (
-          <p className="whitespace-pre-wrap text-[13px] leading-[1.65]">{message.content}</p>
+          <p className="whitespace-pre-wrap text-[14px] leading-[1.65] text-[var(--chat-text)]">{message.content}</p>
         ) : message.content ? (
           <>
             {/* Collapsible response body */}
@@ -295,7 +311,10 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
                 )}
               </div>
               {isCollapsed && (
-                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[var(--chat-surface)] to-transparent pointer-events-none" />
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-12 pointer-events-none"
+                  style={{ background: "linear-gradient(to top, color-mix(in srgb, var(--chat-surface) 90%, transparent), transparent)" }}
+                />
               )}
             </div>
             {canCollapse && !isStreaming && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Send, Square } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useChatStore } from "@/lib/stores/chat-store";
@@ -97,6 +97,25 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   };
+
+  // Listen for prefill events (e.g. from EmptyChatState starter chips)
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (typeof detail !== "string") return;
+      setInput(detail);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(detail.length, detail.length);
+        el.style.height = "auto";
+        el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      });
+    };
+    window.addEventListener("chat:prefill", onPrefill);
+    return () => window.removeEventListener("chat:prefill", onPrefill);
+  }, []);
 
   return (
     <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-3 md:p-5">
