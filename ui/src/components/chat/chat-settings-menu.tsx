@@ -69,7 +69,10 @@ export function ChatSettingsMenu() {
 
       {/* Settings menu dropdown */}
       {isOpen && (
-        <div className="absolute bottom-full right-0 mb-2 w-56 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-lg p-2.5 space-y-2 z-30 max-h-[55vh] overflow-y-auto scrollbar-thin">
+        <div
+          className="absolute bottom-full right-0 mb-2 w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2.5 space-y-2 z-30 max-h-[55vh] overflow-y-auto scrollbar-thin theme-picker-enter"
+          style={{ boxShadow: "var(--elev-3)" }}
+        >
           <div className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wide mb-1">
             Chat Settings
           </div>

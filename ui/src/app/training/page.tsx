@@ -7,8 +7,10 @@ import {
   WorkspaceSection,
   WorkspaceShell,
 } from "@/components/workspace/workspace-shell";
+import { Card } from "@/components/ui";
 import { fetchModelCatalog, fetchOpsTrainingRuns } from "@/lib/api/training";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils/cn";
 
 export default function TrainingPage() {
   const [runsCount, setRunsCount] = useState(0);
@@ -61,20 +63,27 @@ export default function TrainingPage() {
 
       <WorkspaceSection title="Live Training Snapshot">
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Training Runs</p>
-            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">{runsCount}</p>
-          </div>
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Local GGUF Models</p>
-            <p className="mt-1 text-xl font-semibold text-[var(--chat-accent)]">{ggufCount}</p>
-          </div>
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Ollama Catalog Entries</p>
-            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">{catalogCount}</p>
-          </div>
+          <SnapshotTile label="Training Runs" value={runsCount} />
+          <SnapshotTile label="Local GGUF Models" value={ggufCount} accent />
+          <SnapshotTile label="Ollama Catalog Entries" value={catalogCount} />
         </div>
       </WorkspaceSection>
     </WorkspaceShell>
+  );
+}
+
+function SnapshotTile({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <Card padding="md">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--chat-subtle)]">{label}</p>
+      <p
+        className={cn(
+          "mt-2 text-[28px] font-semibold tabular-nums leading-none",
+          accent ? "text-[var(--chat-accent)]" : "text-[var(--chat-text)]"
+        )}
+      >
+        {value}
+      </p>
+    </Card>
   );
 }

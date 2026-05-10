@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
-import { Activity, RefreshCw } from "lucide-react";
+import { Activity, Boxes, RefreshCw, ShieldAlert, ClipboardCheck } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { NodeStatus } from "@/components/shared/node-status";
 import {
   WorkspaceCardGrid,
@@ -8,10 +9,12 @@ import {
   WorkspaceSection,
   WorkspaceShell,
 } from "@/components/workspace/workspace-shell";
+import { Button, Card } from "@/components/ui";
 import { fetchOpsHealth } from "@/lib/api/ops";
 import { fetchGovernanceRequests } from "@/lib/api/workspaces";
 import type { ClusterNode, OpsHealth } from "@/types/ops";
 import { useCallback, useEffect, useState } from "react";
+import { cn } from "@/lib/utils/cn";
 
 const CLUSTER_ORDER: Array<{ name: string; role: ClusterNode["role"]; ip: string }> = [
   { name: "Lovelace", role: "execution", ip: "192.168.2.101" },
@@ -48,41 +51,38 @@ export default function MonitoringPage() {
       title="Monitoring"
       description="Operations and observability surfaces for the full three-node Hive cluster."
       icon={Activity}
+      actions={
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={load}
+          iconLeft={<RefreshCw size={13} className={loading ? "animate-spin" : ""} />}
+        >
+          Refresh
+        </Button>
+      }
     >
       <WorkspaceSection
         title="Cluster Status Overview"
         description="Lovelace execution plane, Turing gateway, and control-plane health in one surface."
       >
-        <div className="mb-4 flex justify-end">
-          <button
-            onClick={load}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)] disabled:opacity-50"
-          >
-            <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
-          </button>
-        </div>
-
         <div className="grid gap-3 md:grid-cols-3">
           {CLUSTER_ORDER.map((cluster) => {
             const node = health?.nodes?.find((n) => n.role === cluster.role || n.name === cluster.name);
+            const status = node ? (node.healthy ? "online" : "degraded") : "unknown";
             return (
-              <div key={cluster.name} className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+              <Card key={cluster.name} padding="md">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-[var(--chat-text)]">{cluster.name}</p>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      node?.healthy ? "bg-emerald-950/50 text-emerald-300" : "bg-red-950/50 text-red-300"
-                    }`}
-                  >
-                    {node ? (node.healthy ? "ONLINE" : "DEGRADED") : "UNKNOWN"}
-                  </span>
+                  <p className="text-sm font-semibold text-[var(--chat-text)]">{cluster.name}</p>
+                  <StatusPill status={status} />
                 </div>
-                <p className="mt-1 font-mono text-xs text-[var(--chat-muted)]">{cluster.ip}</p>
-                <p className="mt-3 text-xs text-[var(--chat-muted)]">Running Containers</p>
-                <p className="text-xl font-semibold text-[var(--chat-text)]">{node?.running_count ?? 0}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-[var(--chat-subtle)]">{cluster.ip}</p>
+                <p className="mt-3 text-[10px] uppercase tracking-wide font-medium text-[var(--chat-subtle)]">Running Containers</p>
+                <p className="mt-1 text-[28px] font-semibold tabular-nums text-[var(--chat-text)] leading-none">
+                  {node?.running_count ?? 0}
+                </p>
                 {node?.error && <p className="mt-2 text-xs text-red-400">{node.error}</p>}
-              </div>
+              </Card>
             );
           })}
         </div>
@@ -118,26 +118,65 @@ export default function MonitoringPage() {
 
       <WorkspaceSection title="Operational Snapshot">
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Cluster Containers</p>
-            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">{health?.running_count ?? 0}</p>
-          </div>
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Unhealthy Services</p>
-            <p className="mt-1 text-xl font-semibold text-red-400">{unhealthyServices}</p>
-          </div>
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Pending Governance</p>
-            <p className="mt-1 text-xl font-semibold text-amber-400">{pending}</p>
-          </div>
+          <Snap label="Cluster Containers" value={health?.running_count ?? 0} icon={Boxes} />
+          <Snap label="Unhealthy Services" value={unhealthyServices} icon={ShieldAlert} tone={unhealthyServices > 0 ? "danger" : "neutral"} />
+          <Snap label="Pending Governance" value={pending} icon={ClipboardCheck} tone={pending > 0 ? "warning" : "neutral"} />
         </div>
       </WorkspaceSection>
 
-      <WorkspaceSection title="Inference Nodes - Ollama Status">
-        <div className="rounded-2xl border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
+      <WorkspaceSection title="Inference Nodes — Ollama Status">
+        <Card padding="md">
           <NodeStatus />
-        </div>
+        </Card>
       </WorkspaceSection>
     </WorkspaceShell>
+  );
+}
+
+function StatusPill({ status }: { status: "online" | "degraded" | "unknown" }) {
+  const config = {
+    online:   { bg: "bg-emerald-500/15", text: "text-emerald-400", label: "Online" },
+    degraded: { bg: "bg-red-500/15",     text: "text-red-400",     label: "Degraded" },
+    unknown:  { bg: "bg-[var(--chat-panel)]", text: "text-[var(--chat-muted)]", label: "Unknown" },
+  }[status];
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", config.bg, config.text)}>
+      <span className={cn("w-1 h-1 rounded-full", status === "online" ? "bg-emerald-400" : status === "degraded" ? "bg-red-400 animate-pulse" : "bg-[var(--chat-muted)]")} />
+      {config.label}
+    </span>
+  );
+}
+
+function Snap({
+  label,
+  value,
+  icon: Icon,
+  tone = "neutral",
+}: {
+  label: string;
+  value: number;
+  icon: LucideIcon;
+  tone?: "neutral" | "warning" | "danger";
+}) {
+  const valueClass = {
+    neutral: "text-[var(--chat-text)]",
+    warning: "text-amber-400",
+    danger:  "text-red-400",
+  }[tone];
+  const iconClass = {
+    neutral: "text-[var(--chat-muted)]",
+    warning: "text-amber-400",
+    danger:  "text-red-400",
+  }[tone];
+  return (
+    <Card padding="md">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--chat-subtle)]">{label}</p>
+        <Icon size={15} className={iconClass} />
+      </div>
+      <p className={cn("mt-2 text-[28px] font-semibold tabular-nums leading-none", valueClass)}>
+        {value}
+      </p>
+    </Card>
   );
 }

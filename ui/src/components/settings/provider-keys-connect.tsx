@@ -201,15 +201,15 @@ export function ProviderKeysConnect() {
 
       {/* Connection Form */}
       {showForm && (
-        <div className="bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg p-4 space-y-3">
+        <div className="surface p-4 space-y-3">
           <div>
-            <label className="text-xs text-[var(--chat-muted)] mb-1 block">Provider</label>
+            <label className="text-xs text-[var(--chat-muted)] mb-1.5 block">Provider</label>
             <select
               value={formData.provider}
               onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
-              className="w-full bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-md px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
+              className="input-field w-full text-sm"
             >
-              <option value="">Select a provider...</option>
+              <option value="">Select a provider…</option>
               {Object.entries(catalog).map(([id, info]) => (
                 <option key={id} value={id} disabled={isConnected(id)}>
                   {info.label} {isConnected(id) ? "(connected)" : ""}
@@ -219,18 +219,18 @@ export function ProviderKeysConnect() {
           </div>
 
           <div>
-            <label className="text-xs text-[var(--chat-muted)] mb-1 block">API Key</label>
+            <label className="text-xs text-[var(--chat-muted)] mb-1.5 block">API Key</label>
             <input
               type="password"
               value={formData.api_key}
               onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
-              placeholder="sk-ant-... or AI..."
-              className="w-full bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-md px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
+              placeholder="sk-ant-… or AI…"
+              className="input-field w-full text-sm"
             />
           </div>
 
           <div>
-            <label className="text-xs text-[var(--chat-muted)] mb-1 block">
+            <label className="text-xs text-[var(--chat-muted)] mb-1.5 block">
               Label (optional)
             </label>
             <input
@@ -238,25 +238,25 @@ export function ProviderKeysConnect() {
               value={formData.label}
               onChange={(e) => setFormData({ ...formData, label: e.target.value })}
               placeholder="My key, Work account, etc."
-              className="w-full bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-md px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
+              className="input-field w-full text-sm"
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button
               onClick={handleConnect}
               disabled={submitting || !formData.provider || !formData.api_key}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[var(--chat-accent)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="btn-primary flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-md"
             >
               {submitting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  Connecting...
+                  <span>Connecting…</span>
                 </>
               ) : (
                 <>
                   <Key size={14} />
-                  Connect
+                  <span>Connect</span>
                 </>
               )}
             </button>
@@ -267,7 +267,7 @@ export function ProviderKeysConnect() {
                 setErrorMsg("");
               }}
               disabled={submitting}
-              className="px-3 py-2 border border-[var(--chat-border)] rounded-md text-sm text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:border-[var(--chat-accent)]/60 transition-colors disabled:opacity-50"
+              className="btn-secondary px-4 py-2 text-sm rounded-md"
             >
               Cancel
             </button>
@@ -275,8 +275,10 @@ export function ProviderKeysConnect() {
 
           {/* Provider Info */}
           {formData.provider && catalog[formData.provider] && (
-            <div className="pt-2 border-t border-[var(--chat-border)]">
-              <p className="text-xs text-[var(--chat-muted)] mb-2">Available models:</p>
+            <div className="pt-3 border-t border-[var(--chat-border)]">
+              <p className="text-xs text-[var(--chat-subtle)] uppercase tracking-wide font-medium mb-2">
+                Available models
+              </p>
               <div className="space-y-1">
                 {catalog[formData.provider].models.map((model) => (
                   <div
@@ -284,7 +286,7 @@ export function ProviderKeysConnect() {
                     className="text-xs text-[var(--chat-text)] flex items-center justify-between"
                   >
                     <span>{model.label}</span>
-                    <span className="text-[var(--chat-muted)]">
+                    <span className="text-[var(--chat-muted)] tabular-nums">
                       {(model.context / 1000).toFixed(0)}k context
                     </span>
                   </div>

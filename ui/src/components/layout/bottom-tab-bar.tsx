@@ -34,7 +34,13 @@ export function BottomTabBar({ onMenuPress }: BottomTabBarProps) {
   );
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--chat-border)] bg-[var(--chat-surface)] pb-[env(safe-area-inset-bottom)]">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--chat-surface)] pb-[env(safe-area-inset-bottom)]"
+      style={{
+        borderTop: "1px solid var(--chat-border)",
+        boxShadow: "var(--elev-2)",
+      }}
+    >
       <div className="flex items-center justify-around h-14">
         {TAB_ITEMS.map((item) => {
           const active = isNavigationItemActive(
@@ -45,29 +51,57 @@ export function BottomTabBar({ onMenuPress }: BottomTabBarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
-                "flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors touch-target",
-                active
-                  ? "text-[var(--chat-accent)]"
-                  : "text-[var(--chat-muted)]"
-              )}
+              className="flex flex-col items-center justify-center w-full h-full touch-target relative"
             >
-              <item.icon size={20} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              {active && (
+                <span
+                  className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-b-full bg-[var(--chat-accent)]"
+                  style={{ boxShadow: "0 0 8px rgba(var(--chat-accent-rgb), 0.6)" }}
+                />
+              )}
+              <item.icon
+                size={20}
+                className={cn(
+                  "transition-all",
+                  active ? "text-[var(--chat-accent)] scale-110" : "text-[var(--chat-muted)]"
+                )}
+              />
+              <span
+                className={cn(
+                  "text-[10px] font-medium mt-0.5 transition-colors",
+                  active ? "text-[var(--chat-accent)]" : "text-[var(--chat-muted)]"
+                )}
+              >
+                {item.label}
+              </span>
             </Link>
           );
         })}
         <button
           onClick={onMenuPress}
-          className={cn(
-            "flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors touch-target",
-            !anyTabActive
-              ? "text-[var(--chat-accent)]"
-              : "text-[var(--chat-muted)] active:text-[var(--chat-accent)]"
-          )}
+          className="flex flex-col items-center justify-center w-full h-full touch-target relative"
         >
-          <Menu size={20} />
-          <span className="text-[10px] font-medium">More</span>
+          {!anyTabActive && (
+            <span
+              className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-b-full bg-[var(--chat-accent)]"
+              style={{ boxShadow: "0 0 8px rgba(var(--chat-accent-rgb), 0.6)" }}
+            />
+          )}
+          <Menu
+            size={20}
+            className={cn(
+              "transition-all",
+              !anyTabActive ? "text-[var(--chat-accent)] scale-110" : "text-[var(--chat-muted)]"
+            )}
+          />
+          <span
+            className={cn(
+              "text-[10px] font-medium mt-0.5 transition-colors",
+              !anyTabActive ? "text-[var(--chat-accent)]" : "text-[var(--chat-muted)]"
+            )}
+          >
+            More
+          </span>
         </button>
       </div>
     </nav>

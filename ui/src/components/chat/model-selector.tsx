@@ -87,7 +87,7 @@ export function ModelSelector() {
         value={model}
         onChange={(e) => setModel(e.target.value)}
         title={displayLabel}
-        className="appearance-none bg-[var(--chat-panel)] text-[var(--chat-text)] text-sm border border-[var(--chat-border)] rounded-lg pl-3 pr-10 py-1.5 focus:border-[var(--chat-accent)] focus:outline-none cursor-pointer max-w-[140px] md:max-w-none"
+        className="appearance-none bg-[var(--chat-panel)] text-[var(--chat-text)] text-[13px] font-medium border border-[var(--chat-border)] rounded-md pl-3 pr-9 py-1.5 hover:border-[color:color-mix(in_srgb,var(--chat-border)_50%,var(--chat-text))] focus:outline-none cursor-pointer max-w-[160px] md:max-w-none transition-colors"
       >
         {groups.map(({ owner, groupLabel, models }) =>
           useOptGroups ? (

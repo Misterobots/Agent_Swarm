@@ -237,36 +237,48 @@ export function Sidebar() {
       <div className="px-4 py-3 relative space-y-2">
         <div className="absolute top-0 left-3 right-3 divider" />
         {authenticated ? (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <User size={14} className="flex-shrink-0 text-[var(--chat-accent)]" />
-              <span className="text-xs text-[var(--chat-text)] truncate">{displayName}</span>
-              {isAdmin && (
-                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-[color:color-mix(in_srgb,var(--chat-accent)_15%,transparent)] text-[var(--chat-accent)]">
-                  Admin
-                </span>
-              )}
+              <div
+                className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 text-[var(--chat-accent)]"
+                style={{
+                  background: "linear-gradient(135deg, var(--chat-accent-soft), color-mix(in srgb, var(--chat-accent) 4%, transparent))",
+                  border: "1px solid color-mix(in srgb, var(--chat-accent) 25%, var(--chat-border))",
+                  boxShadow: "var(--inset-highlight)",
+                }}
+              >
+                <User size={13} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-medium text-[var(--chat-text)] truncate leading-none">{displayName}</p>
+                {isAdmin && (
+                  <span className="mt-1 inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded-sm bg-[var(--chat-accent-soft)] text-[var(--chat-accent-strong)] uppercase tracking-wider">
+                    Admin
+                  </span>
+                )}
+              </div>
             </div>
             <a
               href="https://auth.shivelymedia.com/flows/-/default/invalidation/"
-              className="flex items-center gap-1 text-[10px] text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
+              className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--chat-subtle)] hover:text-[var(--chat-text)] hover:bg-[var(--hover-tint)] transition-colors"
               title="Sign out"
+              aria-label="Sign out"
             >
-              <LogOut size={12} />
+              <LogOut size={13} />
             </a>
           </div>
         ) : (
           <a
             href="/api/auth/login"
-            className="flex items-center gap-2 text-xs text-[var(--chat-accent)] hover:text-[var(--chat-accent-strong)] transition-colors"
+            className="btn-secondary inline-flex items-center gap-2 text-[13px] px-3 py-1.5 rounded-md w-full justify-center"
             title="Sign in with Authentik"
           >
             <LogIn size={14} />
             <span>Sign in</span>
           </a>
         )}
-        <div className="flex items-center gap-2 text-[10px] text-[var(--chat-muted)]">
-          <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-[var(--chat-accent)]" />
+        <div className="flex items-center gap-1.5 text-[10px] text-[var(--chat-muted)]">
+          <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
           <span>Swarm Online</span>
         </div>
       </div>
