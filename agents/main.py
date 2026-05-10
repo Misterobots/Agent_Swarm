@@ -757,21 +757,37 @@ async def list_models(request: Request):
                 from provider_keys import get_key, PROVIDERS as _PROVIDERS
                 for provider_id, provider_info in _PROVIDERS.items():
                     try:
-                        if get_key(uid, provider_id):
-                            added = 0
-                            for m in provider_info.get("models", []):
-                                base_models.append({
-                                    "id": m["id"],
-                                    "object": "model",
-                                    "created": _ts,
-                                    "owned_by": provider_id,
-                                    "label": m.get("label", m["id"]),
-                                    "context_window": m.get("context"),
-                                })
-                                added += 1
-                            logger.info(
-                                f"list_models: added {added} {provider_id} models for uid={uid}"
-                            )
+                        rec = get_key(uid, provider_id)
+                        if not rec:
+                            continue
+                        catalog = provider_info.get("models", [])
+
+                        # NVIDIA: filter to models the user's key is entitled
+                        # to call (NVIDIA returns 404 for un-entitled models,
+                        # so we ping each one). Cached per user.
+                        if provider_id == "nvidia" and catalog:
+                            try:
+                                from providers.nvidia_entitlement import accessible_models
+                                ids = [m["id"] for m in catalog]
+                                allowed = accessible_models(uid, ids, rec.get_api_key())
+                                catalog = [m for m in catalog if m["id"] in allowed]
+                            except Exception as _e:
+                                logger.warning(f"list_models: nvidia entitlement check failed: {_e}")
+
+                        added = 0
+                        for m in catalog:
+                            base_models.append({
+                                "id": m["id"],
+                                "object": "model",
+                                "created": _ts,
+                                "owned_by": provider_id,
+                                "label": m.get("label", m["id"]),
+                                "context_window": m.get("context"),
+                            })
+                            added += 1
+                        logger.info(
+                            f"list_models: added {added} {provider_id} models for uid={uid}"
+                        )
                     except Exception as _e:
                         logger.warning(
                             f"list_models: error checking {provider_id} key for uid={uid}: {_e}"
@@ -4667,6 +4683,12 @@ async def provider_keys_connect(body: _ProviderKeyRequest, http_request: Request
                 detail=f"Unknown provider: {body.provider}. Supported: {list(PROVIDERS.keys())}"
             )
         upsert_key(uid, body.provider, body.api_key, body.label)
+        if body.provider == "nvidia":
+            try:
+                from providers.nvidia_entitlement import invalidate as _nv_invalidate
+                _nv_invalidate(uid)
+            except Exception:
+                pass
         return {"status": "connected", "provider": body.provider}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -4684,6 +4706,12 @@ async def provider_keys_disconnect(provider: str, http_request: Request):
     try:
         from provider_keys import delete_key
         deleted = delete_key(uid, provider)
+        if provider == "nvidia":
+            try:
+                from providers.nvidia_entitlement import invalidate as _nv_invalidate
+                _nv_invalidate(uid)
+            except Exception:
+                pass
         return {"disconnected": deleted, "provider": provider}
     except Exception as e:
         logger.error(f"provider_keys_disconnect error: {e}", exc_info=True)
