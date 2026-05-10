@@ -33,6 +33,9 @@ interface SettingsState {
   // Quality/Effort settings
   solvingMaxIter: number; // MarsRL max iterations (0 = unlimited)
   solvingMaxTime: number; // MarsRL max time in seconds (0 = unlimited)
+  // Layout
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
@@ -72,6 +75,8 @@ export const useSettingsStore = create<SettingsState>()(
       groundingFile: false,
       solvingMaxIter: 2, // Default: 2 iterations
       solvingMaxTime: 0, // Default: no time limit
+      sidebarOpen: true,
+      setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),

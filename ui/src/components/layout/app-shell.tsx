@@ -15,22 +15,21 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { isMobile, isTablet } = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const theme = useSettingsStore((s) => s.theme);
   const themeMode = useSettingsStore((s) => s.themeMode);
   const setTheme = useSettingsStore((s) => s.setTheme);
+  const persistedSidebarOpen = useSettingsStore((s) => s.sidebarOpen);
+  const setPersistedSidebarOpen = useSettingsStore((s) => s.setSidebarOpen);
 
-  // Close sidebar on mobile/tablet by default
-  useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    } else if (isTablet) {
-      setSidebarOpen(false);
-    } else {
-      setSidebarOpen(true);
-    }
-  }, [isMobile, isTablet]);
+  // Effective sidebar state: persisted preference on desktop, forced closed on
+  // mobile/tablet (those use the drawer). Toggling on desktop writes through
+  // to the store so the choice survives reloads.
+  const sidebarOpen = isMobile || isTablet ? false : persistedSidebarOpen;
+  const setSidebarOpen = (open: boolean) => {
+    if (isMobile || isTablet) return; // desktop-only preference
+    setPersistedSidebarOpen(open);
+  };
 
   // Apply theme + mode to <html>. Mode is resolved (system -> dark|light)
   // and re-resolves live if the user changes their OS preference.
