@@ -57,59 +57,100 @@
 /* ── DARK mode (default) — neutral zinc + sky accent ─────────── */
 [data-theme="memex"][data-mode="dark"],
 [data-theme="memex"]:not([data-mode]) {
-  --chat-bg:           #09090b;   /* zinc-950 */
-  --chat-surface:      #0f0f12;
-  --chat-surface-rgb:  15, 15, 18;
-  --chat-panel:        #18181b;   /* zinc-900 */
+  --chat-bg:           #0a0a0d;
+  --chat-surface:      #111114;
+  --chat-surface-rgb:  17, 17, 20;
+  --chat-panel:        #16161a;
   --chat-soft:         #131316;
-  --chat-border:       #27272a;   /* zinc-800 */
-  --chat-border-rgb:   39, 39, 42;
-  --chat-text:         #fafafa;   /* zinc-50 */
-  --chat-muted:        #a1a1aa;   /* zinc-400 */
+  --chat-elevated:     #1c1c21;   /* one tier above panel — for active rows, popovers */
+  --chat-border:       #26262b;
+  --chat-border-rgb:   38, 38, 43;
+  --chat-text:         #ededf0;
+  --chat-muted:        #8b8b94;
+  --chat-subtle:       #5b5b66;   /* tertiary text — timestamps, hints */
 
-  --chat-accent:       #38bdf8;   /* sky-400 */
-  --chat-accent-strong: #7dd3fc;  /* sky-300 */
-  --chat-accent-rgb:   56, 189, 248;
+  --chat-accent:       #60a5fa;       /* blue-400 — clean, recognizable */
+  --chat-accent-strong: #93c5fd;      /* blue-300 */
+  --chat-accent-soft:  rgba(96, 165, 250, 0.12);   /* tinted bg for active states */
+  --chat-accent-rgb:   96, 165, 250;
 
-  /* Elevation (theme-aware shadows) */
-  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --elev-2: 0 4px 12px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
-  --elev-3: 0 12px 32px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.4);
+  /* Layered elevation — tighter, more believable than single big shadow */
+  --elev-1:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
+  --elev-2:
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
+  --elev-3:
+    0 4px 8px rgba(0, 0, 0, 0.4),
+    0 12px 32px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
 
-  /* Focus ring — accent at low opacity */
-  --ring: 0 0 0 3px rgba(56, 189, 248, 0.35);
+  /* Inset highlight — gives panels a soft top-edge gleam */
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
-  /* Subtle hover surface tint */
+  /* Focus ring — multi-layer for legibility on busy surfaces */
+  --ring:
+    0 0 0 2px var(--chat-bg),
+    0 0 0 4px rgba(96, 165, 250, 0.55);
+
+  /* Body backdrop gradient — very subtle radial glow for depth */
+  --backdrop-glow:
+    radial-gradient(ellipse 1200px 800px at 20% -10%, rgba(96, 165, 250, 0.04), transparent 60%),
+    radial-gradient(ellipse 800px 600px at 90% 110%, rgba(96, 165, 250, 0.025), transparent 60%);
+
   --hover-tint: rgba(255, 255, 255, 0.04);
-  --press-tint: rgba(0, 0, 0, 0.2);
+  --press-tint: rgba(0, 0, 0, 0.25);
+  --divider:    rgba(255, 255, 255, 0.06);
 
   color-scheme: dark;
 }
 
 /* ── LIGHT mode — clean neutral whites ──────────────────────── */
 [data-theme="memex"][data-mode="light"] {
-  --chat-bg:           #fafafa;   /* zinc-50 */
+  --chat-bg:           #f8f8fa;
   --chat-surface:      #ffffff;
   --chat-surface-rgb:  255, 255, 255;
-  --chat-panel:        #f4f4f5;   /* zinc-100 */
-  --chat-soft:         #fafafa;
-  --chat-border:       #e4e4e7;   /* zinc-200 */
-  --chat-border-rgb:   228, 228, 231;
-  --chat-text:         #18181b;   /* zinc-900 */
-  --chat-muted:        #71717a;   /* zinc-500 */
+  --chat-panel:        #f1f1f4;
+  --chat-soft:         #f5f5f7;
+  --chat-elevated:     #ffffff;
+  --chat-border:       #e4e4e9;
+  --chat-border-rgb:   228, 228, 233;
+  --chat-text:         #1a1a1f;
+  --chat-muted:        #6b6b78;
+  --chat-subtle:       #9696a3;
 
-  --chat-accent:       #0284c7;   /* sky-600 — AA on white */
-  --chat-accent-strong: #0369a1;  /* sky-700 */
-  --chat-accent-rgb:   2, 132, 199;
+  --chat-accent:       #2563eb;       /* blue-600 — AA on white */
+  --chat-accent-strong: #1d4ed8;      /* blue-700 */
+  --chat-accent-soft:  rgba(37, 99, 235, 0.10);
+  --chat-accent-rgb:   37, 99, 235;
 
-  --elev-1: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
-  --elev-2: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.05);
-  --elev-3: 0 12px 32px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.06);
+  --elev-1:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  --elev-2:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 4px 12px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
+  --elev-3:
+    0 4px 8px rgba(15, 23, 42, 0.06),
+    0 12px 32px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
 
-  --ring: 0 0 0 3px rgba(2, 132, 199, 0.3);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 
-  --hover-tint: rgba(15, 23, 42, 0.04);
+  --ring:
+    0 0 0 2px var(--chat-bg),
+    0 0 0 4px rgba(37, 99, 235, 0.4);
+
+  --backdrop-glow:
+    radial-gradient(ellipse 1200px 800px at 20% -10%, rgba(37, 99, 235, 0.04), transparent 60%),
+    radial-gradient(ellipse 800px 600px at 90% 110%, rgba(37, 99, 235, 0.02), transparent 60%);
+
+  --hover-tint: rgba(15, 23, 42, 0.05);
   --press-tint: rgba(15, 23, 42, 0.08);
+  --divider:    rgba(15, 23, 42, 0.08);
 
   color-scheme: light;
 }
@@ -126,26 +167,40 @@
 }
 
 body {
-  background: var(--chat-bg, #0e1117);
+  background-color: var(--chat-bg, #0e1117);
+  background-image: var(--backdrop-glow, none);
+  background-attachment: fixed;
   color: var(--chat-text, #e4e4e7);
   font-family: var(--chat-font, var(--font-sans), system-ui, sans-serif);
-  font-feature-settings: "cv11", "ss01", "ss03";
+  font-feature-settings: "cv11", "ss01", "ss03", "tnum";
+  font-variant-numeric: tabular-nums;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Headings: slightly tighter tracking for intentional look */
-h1, h2, h3, h4 {
-  letter-spacing: -0.01em;
-  line-height: 1.25;
-}
+/* Typography rhythm — heading hierarchy with intentional weights */
+h1 { font-size: 1.5rem;   font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+h2 { font-size: 1.125rem; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; }
+h3 { font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; line-height: 1.35; }
 
 /* Apply theme font + bg to chat shell */
 .chat-shell {
   font-family: var(--chat-font);
   background: var(--chat-bg);
   color: var(--chat-text);
+}
+
+/* Subtle separator — gradient line, not flat 1px */
+.divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--divider), transparent);
+}
+.divider-vertical {
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--divider), transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -195,9 +250,16 @@ h1, h2, h3, h4 {
    SIDEBAR
    ═══════════════════════════════════════════════════════════════ */
 
+.sidebar-wrapper {
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--chat-surface) 50%, var(--chat-bg)), var(--chat-bg));
+  border-right: 1px solid var(--chat-border);
+  box-shadow: inset -1px 0 0 0 var(--divider);
+}
+
 .sidebar-logo {
   transition: filter var(--dur-base) var(--ease-out);
-  filter: drop-shadow(0 0 6px rgba(var(--chat-accent-rgb), 0.32));
+  filter: drop-shadow(0 0 8px rgba(var(--chat-accent-rgb), 0.35));
 }
 
 .sidebar-section-title {
@@ -205,26 +267,27 @@ h1, h2, h3, h4 {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--chat-muted);
+  color: var(--chat-subtle);
   padding: 0 0.75rem;
   margin: 0.75rem 0 0.5rem;
 }
 
-/* Active nav: soft accent-tinted background + 2px left bar */
+/* Active nav: tinted background + a subtle left accent bar */
 .sidebar-active {
   position: relative;
-  background: color-mix(in srgb, var(--chat-accent) 12%, transparent);
+  background: var(--chat-accent-soft);
   color: var(--chat-accent-strong);
 }
 .sidebar-active::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
+  top: 6px;
+  bottom: 6px;
   width: 2px;
   background: var(--chat-accent);
   border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px rgba(var(--chat-accent-rgb), 0.5);
 }
 
 /* Status indicator pulse */
@@ -328,6 +391,98 @@ h1, h2, h3, h4 {
   box-shadow: var(--elev-2);
 }
 .lift:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--elev-1);
+}
+
+/* Surface utility — panel with elevation + inset highlight */
+.surface {
+  background: var(--chat-surface);
+  border: 1px solid var(--chat-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-1), var(--inset-highlight);
+}
+.surface-elevated {
+  background: var(--chat-elevated);
+  border: 1px solid var(--chat-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-2), var(--inset-highlight);
+}
+
+/* Polished input — soft accent glow on focus instead of hard border */
+.input-field {
+  background: var(--chat-panel);
+  border: 1px solid var(--chat-border);
+  border-radius: var(--radius-md);
+  color: var(--chat-text);
+  padding: 0.625rem 0.875rem;
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    background-color var(--dur-base) var(--ease-out);
+}
+.input-field::placeholder { color: var(--chat-subtle); }
+.input-field:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--chat-border) 60%, var(--chat-text));
+}
+.input-field:focus,
+.input-field:focus-visible {
+  outline: none;
+  border-color: var(--chat-accent);
+  box-shadow:
+    0 0 0 3px var(--chat-accent-soft),
+    var(--inset-highlight);
+}
+
+/* Refined button base — gradient surface + elevation on hover */
+.btn-primary {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--chat-accent) 100%, white 8%),
+    var(--chat-accent)
+  );
+  color: white;
+  border: 1px solid var(--chat-accent-strong);
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  box-shadow:
+    var(--elev-1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: all var(--dur-base) var(--ease-out);
+}
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--chat-accent) 100%, white 14%),
+    var(--chat-accent-strong)
+  );
+  box-shadow:
+    var(--elev-2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  transform: translateY(-0.5px);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--elev-1), inset 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.btn-secondary {
+  background: var(--chat-panel);
+  color: var(--chat-text);
+  border: 1px solid var(--chat-border);
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  box-shadow: var(--elev-1), var(--inset-highlight);
+  transition: all var(--dur-base) var(--ease-out);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--chat-elevated);
+  border-color: color-mix(in srgb, var(--chat-border) 50%, var(--chat-text));
+  box-shadow: var(--elev-2), var(--inset-highlight);
+  transform: translateY(-0.5px);
+}
+.btn-secondary:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: var(--elev-1);
 }

@@ -99,11 +99,11 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   };
 
   return (
-    <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 md:p-4">
+    <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-3 md:p-5">
       <div className="relative flex items-end gap-2 max-w-3xl mx-auto">
         {isSlash && matches.length > 0 && (
           <div
-            className="absolute bottom-full mb-2 left-0 right-12 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] overflow-hidden z-20"
+            className="absolute bottom-full mb-2 left-0 right-12 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] overflow-hidden z-20"
             style={{ boxShadow: "var(--elev-2)" }}
           >
             {matches.map((c) => (
@@ -126,17 +126,15 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
           placeholder={placeholder || "Send a message..."}
           rows={1}
           className={cn(
-            "flex-1 resize-none bg-[var(--chat-panel)] text-[var(--chat-text)] rounded-md px-3 py-2.5 md:px-4 md:py-3",
-            "border border-[var(--chat-border)] focus:outline-none",
-            "placeholder:text-[var(--chat-muted)] text-sm leading-relaxed",
-            "scrollbar-thin",
-            "transition-[border-color,box-shadow] duration-200"
+            "input-field flex-1 resize-none scrollbar-thin",
+            "px-3.5 py-3 md:px-4 md:py-3.5 text-[15px] leading-[1.55]"
           )}
         />
         {isStreaming ? (
           <button
             onClick={onStop}
-            className="lift flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md bg-red-600/90 hover:bg-red-600 text-white flex items-center justify-center"
+            className="lift flex-shrink-0 w-10 h-10 md:w-11 md:h-11 rounded-md bg-red-600 hover:bg-red-500 text-white flex items-center justify-center"
+            style={{ boxShadow: "var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.15)" }}
             aria-label="Stop"
           >
             <Square size={16} />
@@ -149,10 +147,10 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
               disabled={!input.trim()}
               aria-label="Send message"
               className={cn(
-                "lift flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md flex items-center justify-center",
+                "flex-shrink-0 w-10 h-10 md:w-11 md:h-11 rounded-md flex items-center justify-center",
                 input.trim()
-                  ? "bg-[var(--chat-accent)] hover:bg-[var(--chat-accent-strong)] text-white"
-                  : "bg-[var(--chat-soft)] text-[var(--chat-muted)] cursor-not-allowed"
+                  ? "btn-primary"
+                  : "bg-[var(--chat-soft)] text-[var(--chat-subtle)] border border-[var(--chat-border)] cursor-not-allowed"
               )}
             >
               <Send size={16} />

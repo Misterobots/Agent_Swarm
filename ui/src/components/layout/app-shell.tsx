@@ -76,7 +76,7 @@ export function AppShell({ children }: AppShellProps) {
   const handleCloseDrawer = useCallback(() => setDrawerOpen(false), []);
 
   return (
-    <div data-theme={theme} className="flex h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
+    <div className="app-shell-root flex h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
       {/* Desktop/Tablet Sidebar */}
       {!isMobile && (
         <div

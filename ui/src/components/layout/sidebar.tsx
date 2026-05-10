@@ -89,24 +89,26 @@ export function Sidebar() {
   }, [conversations, searchQuery]);
 
   return (
-    <div className="sidebar-wrapper relative flex flex-col h-full bg-[color:color-mix(in_srgb,var(--chat-bg)_85%,var(--chat-surface))] border-r border-[var(--chat-border)]">
+    <div className="sidebar-wrapper relative flex flex-col h-full">
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-[var(--chat-border)]">
+      <div className="px-4 py-5 relative">
         <div className="flex items-center gap-3">
           <HiveLogo />
           <div>
-            <h1 className="text-base font-semibold text-[var(--chat-accent-strong)] tracking-wide">
-              HIVE MIND
+            <h1 className="text-[15px] font-semibold text-[var(--chat-text)] tracking-tight leading-none">
+              Memex
             </h1>
-            <p className="text-[10px] text-[var(--chat-muted)] mt-0.5">AI Swarm Interface</p>
+            <p className="text-[10px] text-[var(--chat-subtle)] mt-1.5 tracking-wide uppercase">Hive Mind</p>
           </div>
         </div>
+        <div className="absolute bottom-0 left-3 right-3 divider" />
       </div>
 
       {/* Mode Switcher - Admin only */}
       {isAdmin && (
-        <div className="px-3 py-3 border-b border-[var(--chat-border)]">
+        <div className="px-3 py-3 relative">
           <ModeSwitcher />
+          <div className="absolute bottom-0 left-3 right-3 divider" />
         </div>
       )}
 
@@ -229,7 +231,8 @@ export function Sidebar() {
       <BuddyWidget />
 
       {/* User & status footer */}
-      <div className="px-4 py-3 border-t border-[var(--chat-border)] space-y-2">
+      <div className="px-4 py-3 relative space-y-2">
+        <div className="absolute top-0 left-3 right-3 divider" />
         {authenticated ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
@@ -270,14 +273,13 @@ export function Sidebar() {
 
 function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-5">
-      <div className="flex items-center gap-2 px-3 pb-1.5">
-        <span className="sidebar-section-title text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chat-muted)]">
+    <div className="mb-4">
+      <div className="px-4 pb-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--chat-subtle)]">
           {title}
         </span>
-        <span className="flex-1 h-px bg-[var(--chat-border)] opacity-50" />
       </div>
-      <div className="space-y-0.5">{children}</div>
+      <div className="space-y-px">{children}</div>
     </div>
   );
 }
