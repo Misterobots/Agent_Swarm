@@ -19,24 +19,22 @@ logger = logging.getLogger("github_models_provider")
 # ---------------------------------------------------------------------------
 
 GITHUB_MODELS: list[dict[str, Any]] = [
-    {"id": "github/gpt-4o",              "label": "GPT-4o",           "context": 128_000},
-    {"id": "github/gpt-4o-mini",         "label": "GPT-4o Mini",      "context": 128_000},
-    {"id": "github/o1",                  "label": "o1",                "context": 200_000},
-    {"id": "github/o1-mini",             "label": "o1-mini",           "context": 128_000},
-    {"id": "github/o3-mini",             "label": "o3-mini",           "context": 200_000},
-    {"id": "github/claude-sonnet-4-20250514",  "label": "Claude Sonnet 4",   "context": 200_000},
-    {"id": "github/claude-haiku-3-5-20241022", "label": "Claude Haiku 3.5",  "context": 200_000},
-    {"id": "github/gemini-2.0-flash",    "label": "Gemini 2.0 Flash",  "context": 1_048_576},
-    {"id": "github/Llama-4-Scout-17B-16E-Instruct", "label": "Llama 4 Scout", "context": 131_072},
-    {"id": "github/Phi-4-mini-instruct", "label": "Phi-4 Mini",        "context": 131_072},
+    {"id": "openai/gpt-4o",                  "label": "GPT-4o",                "context": 128_000},
+    {"id": "openai/gpt-4o-mini",             "label": "GPT-4o Mini",           "context": 128_000},
+    {"id": "openai/gpt-4.1",                 "label": "GPT-4.1",               "context": 1_047_576},
+    {"id": "openai/o1",                      "label": "o1",                    "context": 200_000},
+    {"id": "openai/o1-mini",                 "label": "o1-mini",               "context": 128_000},
+    {"id": "openai/o3",                      "label": "o3",                    "context": 200_000},
+    {"id": "openai/o3-mini",                 "label": "o3-mini",               "context": 200_000},
+    {"id": "meta/llama-3.3-70b-instruct",    "label": "Llama 3.3 70B",         "context": 131_072},
+    {"id": "microsoft/phi-4-mini-instruct",  "label": "Phi-4 Mini",            "context": 131_072},
 ]
 
 INFERENCE_BASE = "https://models.github.ai/inference"
 
 
-def _model_name(model_id: str) -> str:
-    """Strip 'github/' prefix for the API call."""
-    return model_id.removeprefix("github/")
+# Catalog ids are stored verbatim in the form GitHub Models accepts
+# (publisher-prefixed, e.g. `openai/gpt-4o`). No stripping needed.
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +102,7 @@ class GitHubModelsProvider:
         import urllib.request
 
         payload = {
-            "model": _model_name(self.model),
+            "model": self.model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
@@ -136,7 +134,7 @@ class GitHubModelsProvider:
         import urllib.request
 
         payload = {
-            "model": _model_name(self.model),
+            "model": self.model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
@@ -199,7 +197,7 @@ class GitHubModelsProvider:
             iteration += 1
 
             payload: dict = {
-                "model": _model_name(self.model),
+                "model": self.model,
                 "messages": current_messages,
                 "tools": tools,
                 "tool_choice": "auto",

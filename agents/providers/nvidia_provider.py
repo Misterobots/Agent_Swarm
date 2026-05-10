@@ -17,11 +17,6 @@ logger = logging.getLogger("nvidia_provider")
 INFERENCE_BASE = "https://integrate.api.nvidia.com/v1"
 
 
-def _model_name(model_id: str) -> str:
-    """Strip 'nvidia/' prefix for the API call."""
-    return model_id.removeprefix("nvidia/")
-
-
 # ---------------------------------------------------------------------------
 # Normalised streaming chunk — same shape as other providers
 # ---------------------------------------------------------------------------
@@ -87,7 +82,7 @@ class NvidiaProvider:
         import urllib.request
 
         payload = {
-            "model": _model_name(self.model),
+            "model": self.model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
@@ -124,7 +119,7 @@ class NvidiaProvider:
         import urllib.request
 
         payload = {
-            "model": _model_name(self.model),
+            "model": self.model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,

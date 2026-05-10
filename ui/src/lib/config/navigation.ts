@@ -119,13 +119,6 @@ export const primaryNavigation: NavigationItem[] = [
     ],
   },
   {
-    label: "Training",
-    href: "/training",
-    icon: GraduationCap,
-    matchPrefixes: ["/training"],
-    adminOnly: true,
-  },
-  {
     label: "Palace",
     href: "/palace",
     icon: Castle,
@@ -146,6 +139,13 @@ export const secondaryNavigation: NavigationItem[] = [
       "/monitoring/control-room",
       "/governance",
     ],
+    adminOnly: true,
+  },
+  {
+    label: "Training",
+    href: "/training",
+    icon: GraduationCap,
+    matchPrefixes: ["/training"],
     adminOnly: true,
   },
 ];

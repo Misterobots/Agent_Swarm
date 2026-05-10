@@ -875,7 +875,9 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     import asyncio
 
     # Route GitHub Models requests directly to the GitHubModelsProvider
-    if request.model.startswith("github/"):
+    from providers.registry import provider_for
+    _provider = provider_for(request.model)
+    if _provider == "github":
         uid = http_request.headers.get("X-authentik-uid", "").strip()
         if not uid:
             raise HTTPException(status_code=401, detail="GitHub Models requires an authenticated Authentik session")
@@ -1000,7 +1002,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             }
 
     # Route NVIDIA NIM requests directly to the NvidiaProvider
-    if request.model.startswith("nvidia/"):
+    if _provider == "nvidia":
         uid = http_request.headers.get("X-authentik-uid", "").strip()
         if not uid:
             raise HTTPException(status_code=401, detail="NVIDIA NIM requires an authenticated session")
