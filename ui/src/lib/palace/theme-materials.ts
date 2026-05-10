@@ -90,10 +90,10 @@ function useThemeAttr() {
 
   useEffect(() => {
     const el = document.documentElement;
-    setTheme(el.getAttribute("data-theme") || "ember");
+    setTheme(el.getAttribute("data-theme") || "memex");
 
     const obs = new MutationObserver(() => {
-      const next = el.getAttribute("data-theme") || "ember";
+      const next = el.getAttribute("data-theme") || "memex";
       setTheme((prev) => (prev !== next ? next : prev));
     });
     obs.observe(el, { attributes: true, attributeFilter: ["data-theme"] });
@@ -234,5 +234,5 @@ function buildMaterials() {
 
 function useThemeFallback() {
   if (typeof document === "undefined") return "ember";
-  return document.documentElement.getAttribute("data-theme") || "ember";
+  return document.documentElement.getAttribute("data-theme") || "memex";
 }

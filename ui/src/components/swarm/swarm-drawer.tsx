@@ -263,7 +263,7 @@ export function SwarmPanelContent({
     <>
       {/* Phase label */}
       <div className="px-4 pt-3 pb-1 flex-shrink-0">
-        <p className="text-[11px] text-white/40 uppercase tracking-widest">
+        <p className="text-[11px] text-[var(--chat-muted)] uppercase tracking-widest">
           {phaseName || phaseLabel(theaterPhase)}
         </p>
       </div>
@@ -403,8 +403,8 @@ export function SwarmPanelContent({
               "flex flex-col items-center justify-center gap-3",
               previousPhaseWorkers.length > 0 ? "py-6 flex-shrink-0" : "h-full",
             )}>
-              <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-[var(--chat-accent)] animate-spin" />
-              <p className="text-xs text-white/40">Decomposing task&hellip;</p>
+              <div className="w-8 h-8 rounded-full border-2 border-[var(--chat-border)] border-t-[var(--chat-accent)] animate-spin" />
+              <p className="text-xs text-[var(--chat-muted)]">Decomposing task&hellip;</p>
             </div>
             {previousPhaseWorkers.length > 0 && (
               <div className="flex-1 overflow-y-auto border-t border-[var(--chat-border)]">
@@ -469,24 +469,24 @@ function SwarmMobilePanel() {
       >
         {/* Drag handle */}
         <div className="flex-shrink-0 flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-white/20" />
+          <div className="w-10 h-1 rounded-full bg-[var(--chat-border)]" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-white/8 flex-shrink-0">
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--chat-border)] flex-shrink-0">
           <div className={cn(
             "w-1.5 h-1.5 rounded-full",
             theaterPhase === "complete" ? "bg-emerald-400" : "bg-emerald-400 animate-pulse",
           )} />
-          <span className="text-xs font-semibold text-white/70 tracking-wide uppercase">
+          <span className="text-xs font-semibold text-[var(--chat-text)] opacity-80 tracking-wide uppercase">
             {theaterPhase === "complete" ? "Swarm Complete" : "Swarm Active"}
           </span>
-          <span className="text-[10px] text-white/30 ml-1">
+          <span className="text-[10px] text-[var(--chat-muted)] opacity-70 ml-1">
             {workers.length} pioneer{workers.length !== 1 ? "s" : ""}
           </span>
           <button
             onClick={() => setDismissed(true)}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-[var(--chat-muted)] hover:text-[var(--chat-text)] opacity-80 hover:bg-[var(--hover-tint)] transition-all"
             aria-label="Collapse swarm panel"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

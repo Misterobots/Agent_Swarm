@@ -2,12 +2,22 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Skill, Style } from "@/types/chat";
 
-export type ChatTheme = "ember" | "slate" | "signal" | "office" | "hacker" | "star-trek" | "cyberpunk" | "minimal";
+/**
+ * The retired 8-theme set is still typed for legacy migration. New installs
+ * land on "memex"; old persisted values get migrated to "memex" on load.
+ */
+export type ChatTheme =
+  | "memex"
+  | "ember" | "slate" | "signal" | "office"
+  | "hacker" | "star-trek" | "cyberpunk" | "minimal";
+
+export type ThemeMode = "system" | "dark" | "light";
 
 interface SettingsState {
   mode: "standard" | "developer";
   model: string;
   theme: ChatTheme;
+  themeMode: ThemeMode;
   skill: Skill;
   style: Style;
   researchMode: boolean;
@@ -25,6 +35,7 @@ interface SettingsState {
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
+  setThemeMode: (mode: ThemeMode) => void;
   setSkill: (skill: Skill) => void;
   setStyle: (style: Style) => void;
   setResearchMode: (on: boolean) => void;
@@ -45,7 +56,8 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       mode: "standard",
       model: "Home-AI-Swarm",
-      theme: "ember",
+      theme: "memex",
+      themeMode: "system",
       skill: "general",
       style: "default",
       researchMode: false,
@@ -62,6 +74,7 @@ export const useSettingsStore = create<SettingsState>()(
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),
+      setThemeMode: (themeMode) => set({ themeMode }),
       setSkill: (skill) => set({ skill }),
       setStyle: (style) => set({ style }),
       setResearchMode: (researchMode) => set({ researchMode }),
@@ -76,6 +89,24 @@ export const useSettingsStore = create<SettingsState>()(
       setSolvingMaxIter: (solvingMaxIter) => set({ solvingMaxIter }),
       setSolvingMaxTime: (solvingMaxTime) => set({ solvingMaxTime }),
     }),
-    { name: "hive-settings" }
+    {
+      name: "hive-settings",
+      version: 2,
+      migrate: (persisted: unknown, fromVersion: number) => {
+        const state = (persisted ?? {}) as Partial<SettingsState>;
+        if (fromVersion < 2) {
+          // Retire the 8 legacy themes. Anyone who had set one is moved to
+          // "memex" with the matching mode (light themes -> light, else dark).
+          const lightLegacy = new Set(["office", "minimal"]);
+          const previous = state.theme as ChatTheme | undefined;
+          if (previous && previous !== "memex") {
+            state.theme = "memex";
+            state.themeMode = lightLegacy.has(previous) ? "light" : "dark";
+          }
+          if (!state.themeMode) state.themeMode = "system";
+        }
+        return state as SettingsState;
+      },
+    }
   )
 );

@@ -66,12 +66,12 @@ export default function SwarmPopupPage() {
   return (
     <div className="flex flex-col h-screen bg-[var(--chat-bg)] overflow-hidden">
       {/* Minimal popup header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8 flex-shrink-0 bg-[var(--chat-surface)]">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--chat-border)] flex-shrink-0 bg-[var(--chat-surface)]">
         <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-xs font-semibold text-white/70 tracking-wide uppercase">
+        <span className="text-xs font-semibold text-[var(--chat-text)] opacity-80 tracking-wide uppercase">
           Agent Swarm — Live View
         </span>
-        <span className="ml-auto text-[10px] text-white/30">
+        <span className="ml-auto text-[10px] text-[var(--chat-muted)] opacity-70">
           {workers.length} pioneer{workers.length !== 1 ? "s" : ""}
         </span>
       </div>

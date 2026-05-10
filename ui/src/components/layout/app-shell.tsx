@@ -18,6 +18,7 @@ export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const theme = useSettingsStore((s) => s.theme);
+  const themeMode = useSettingsStore((s) => s.themeMode);
 
   // Close sidebar on mobile/tablet by default
   useEffect(() => {
@@ -30,10 +31,35 @@ export function AppShell({ children }: AppShellProps) {
     }
   }, [isMobile, isTablet]);
 
-  // Sync data-theme to <html> so body/root-level styles are also theme-aware
+  // Apply theme + mode to <html>. Mode is resolved (system -> dark|light)
+  // and re-resolves live if the user changes their OS preference.
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    const root = document.documentElement;
+    root.setAttribute("data-theme", theme);
+
+    // Legacy debug-flag: localStorage["memex-show-legacy"] === "1" enables
+    // the retired 8-theme bundle. Off by default.
+    const legacy = typeof window !== "undefined" && window.localStorage.getItem("memex-show-legacy") === "1";
+    if (legacy) root.setAttribute("data-legacy-themes", "1");
+    else root.removeAttribute("data-legacy-themes");
+
+    if (theme !== "memex") {
+      // Legacy themes don't use data-mode
+      root.removeAttribute("data-mode");
+      return;
+    }
+
+    const apply = (resolved: "dark" | "light") => root.setAttribute("data-mode", resolved);
+
+    if (themeMode === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      apply(mq.matches ? "dark" : "light");
+      const onChange = (e: MediaQueryListEvent) => apply(e.matches ? "dark" : "light");
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    }
+    apply(themeMode);
+  }, [theme, themeMode]);
 
   // Stable callbacks — must not recreate on every render or MobileDrawer's
   // useEffect([pathname, onClose]) will fire and immediately close the drawer.

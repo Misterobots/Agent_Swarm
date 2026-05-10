@@ -157,7 +157,7 @@ export function Sidebar() {
             <div className="px-3 py-2">
               <button
                 onClick={() => createConversation(model)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--chat-text)] rounded-lg border border-[var(--chat-border)] border-dashed hover:border-[var(--chat-accent)] hover:text-[var(--chat-accent)] transition-colors"
+                className="lift w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--chat-text)] rounded-md border border-dashed border-[var(--chat-border)] bg-[color:color-mix(in_srgb,var(--chat-panel)_40%,transparent)] hover:border-[var(--chat-accent)] hover:text-[var(--chat-accent)] hover:bg-[var(--chat-panel)] transition-colors"
               >
                 <Plus size={14} />
                 New Chat
@@ -200,10 +200,10 @@ export function Sidebar() {
                     key={conv.id}
                     onClick={() => setActive(conv.id)}
                     className={cn(
-                      "group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm mb-0.5 transition-colors",
+                      "group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm mb-0.5 transition-colors",
                       conv.id === activeId
                         ? "bg-[var(--chat-panel)] text-[var(--chat-text)]"
-                        : "text-[var(--chat-muted)] hover:bg-[color:color-mix(in_srgb,var(--chat-panel)_50%,transparent)] hover:text-[var(--chat-text)]"
+                        : "text-[var(--chat-muted)] hover:bg-[var(--hover-tint)] hover:text-[var(--chat-text)]"
                     )}
                   >
                     <MessageSquare size={14} className="flex-shrink-0" />
@@ -299,16 +299,13 @@ function SidebarNavItem({
     <Link
       href={href}
       className={cn(
-        "relative flex items-center rounded-lg transition-all duration-150",
+        "relative flex items-center rounded-md transition-colors duration-150",
         compact ? "mx-4 gap-2 px-3 py-1.5 text-xs" : "mx-2 gap-2.5 px-3 py-2 text-sm",
         active
-          ? "sidebar-active bg-[var(--chat-panel)] text-[var(--chat-text)]"
-          : "text-[var(--chat-muted)] hover:bg-[color:color-mix(in_srgb,var(--chat-panel)_50%,transparent)] hover:text-[var(--chat-text)]"
+          ? "sidebar-active"
+          : "text-[var(--chat-muted)] hover:bg-[var(--hover-tint)] hover:text-[var(--chat-text)]"
       )}
     >
-      {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--chat-accent)]" />
-      )}
       <Icon size={compact ? 13 : 16} className={cn("shrink-0 transition-colors", active && "text-[var(--chat-accent)]")} />
       <span className="truncate">{label}</span>
     </Link>

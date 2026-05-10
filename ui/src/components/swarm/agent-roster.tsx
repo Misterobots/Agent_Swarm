@@ -147,7 +147,7 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
                   className="px-2 py-1 flex items-center justify-between flex-shrink-0"
                   style={{ background: `${theme.accent}14`, borderBottom: `1px solid ${theme.accent}20` }}
                 >
-                  <span className="text-[6px] font-black tracking-[0.2em] text-white/40 uppercase">Hive Mind</span>
+                  <span className="text-[6px] font-black tracking-[0.2em] text-[var(--chat-muted)] uppercase">Hive Mind</span>
                   <span className="text-[5px] font-mono tracking-widest" style={{ color: `${theme.accent}80` }}>PIONEER</span>
                 </div>
               )}

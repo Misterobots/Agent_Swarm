@@ -1,6 +1,7 @@
 "use client";
 
 import { ModelSelector } from "@/components/chat/model-selector";
+import { ThemeSelector } from "@/components/chat/theme-selector";
 import { GitHubConnect } from "@/components/settings/github-connect";
 import { ProviderKeysConnect } from "@/components/settings/provider-keys-connect";
 import { useToolsStore } from "@/lib/stores/tools-store";
@@ -22,7 +23,7 @@ export default function SettingsPage() {
   const { isAdmin, loading: accessLoading, securityLevel } = useAccess();
 
   const modelAccessMessage = accessLoading
-    ? "Checking access level..."
+    ? "Checking access level…"
     : isAdmin
       ? "Admin access verified. Claude models are available for this session."
       : `Access level: ${securityLevel || "anonymous"}. Claude models are hidden and non-admin sessions use local-model fallback.`;
@@ -33,86 +34,113 @@ export default function SettingsPage() {
         <Settings size={18} className="text-[var(--chat-muted)]" />
         <h1 className="text-sm font-medium text-[var(--chat-text)]">Settings</h1>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 max-w-2xl">
-        <div className="space-y-6 md:space-y-8">
-          {/* Chat */}
-          <section>
-            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Chat</h2>
-            <div>
-              <label className="text-sm text-[var(--chat-text)] mb-2 block">Default Model</label>
+      <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="max-w-2xl mx-auto space-y-8">
+          <SettingsCard title="Appearance">
+            <Field label="Theme">
+              <ThemeSelector />
+              <p className="text-xs text-[var(--chat-muted)] mt-2">
+                Memex theme with light, dark, or system-preference modes.
+              </p>
+            </Field>
+          </SettingsCard>
+
+          <SettingsCard title="Chat">
+            <Field label="Default model">
               <ModelSelector />
-              <p className="mt-2 text-xs text-[var(--chat-muted)]">
-                {modelAccessMessage}
-              </p>
-            </div>
-          </section>
+              <p className="text-xs text-[var(--chat-muted)] mt-2">{modelAccessMessage}</p>
+            </Field>
+          </SettingsCard>
 
-          {/* Connected Accounts */}
-          <section>
-            
-            {/* GitHub OAuth */}
-            <div className="mb-6">
-              <h3 className="text-sm text-[var(--chat-text)] mb-2 font-medium">GitHub Models</h3>
+          <SettingsCard title="Connected accounts">
+            <Field label="GitHub Models">
               <GitHubConnect />
-              <p className="mt-2 text-xs text-[var(--chat-muted)]">
-                Connect your GitHub account to access GitHub Models (GPT-4o, Claude, Llama, and more) directly in the chat and editor.
+              <p className="text-xs text-[var(--chat-muted)] mt-2">
+                Access GPT-4o, Claude, Llama and others through your GitHub account.
               </p>
+            </Field>
+            <div className="border-t border-[var(--chat-border)] pt-6 mt-6">
+              <Field label="Provider API keys">
+                <ProviderKeysConnect />
+                <p className="text-xs text-[var(--chat-muted)] mt-2">
+                  Bring your own keys for Anthropic, Google Gemini, and NVIDIA NIM.
+                </p>
+              </Field>
             </div>
+          </SettingsCard>
 
-            {/* Provider API Keys */}
-            <div>
-              <h3 className="text-sm text-[var(--chat-text)] mb-2 font-medium">Provider API Keys</h3>
-              <ProviderKeysConnect />
-              <p className="mt-2 text-xs text-[var(--chat-muted)]">
-                Store your own API keys for Anthropic (Claude) and Google (Gemini) to access premium models with your subscription.
-              </p>
-            </div>
-          </section>
-
-          {/* Tools */}
-          <section>
-            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Tools</h2>
-            <div>
-              <label className="text-sm text-[var(--chat-text)] mb-2 block">Default Tool Tab</label>
-              <select
+          <SettingsCard title="Workspace defaults">
+            <Field label="Default tool tab">
+              <Select
                 value={activeTab}
-                onChange={(e) => setActiveTab(e.target.value)}
-                className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
-              >
-                {TOOL_OPTIONS.map((t) => (
-                  <option key={t.id} value={t.id}>{t.label}</option>
-                ))}
-              </select>
+                onChange={(v) => setActiveTab(v)}
+                options={TOOL_OPTIONS.map((t) => ({ value: t.id, label: t.label }))}
+              />
+            </Field>
+            <div className="mt-5">
+              <Field label="Default dashboard">
+                <Select
+                  value={activeDashboard}
+                  onChange={(v) => setActiveDashboard(v)}
+                  options={DASHBOARDS.map((d) => ({ value: d.uid, label: d.label }))}
+                />
+              </Field>
             </div>
-          </section>
+          </SettingsCard>
 
-          {/* Monitor */}
-          <section>
-            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">Monitor</h2>
-            <div>
-              <label className="text-sm text-[var(--chat-text)] mb-2 block">Default Dashboard</label>
-              <select
-                value={activeDashboard}
-                onChange={(e) => setActiveDashboard(e.target.value)}
-                className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)]"
-              >
-                {DASHBOARDS.map((d) => (
-                  <option key={d.uid} value={d.uid}>{d.label}</option>
-                ))}
-              </select>
-            </div>
-          </section>
-
-          {/* About */}
-          <section>
-            <h2 className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wider mb-4">About</h2>
-            <div className="space-y-2 text-sm text-[var(--chat-muted)]">
+          <SettingsCard title="About">
+            <div className="space-y-1 text-sm text-[var(--chat-muted)]">
               <p>Hive Mind Workspace v1.0</p>
               <p>Backend: {process.env.NEXT_PUBLIC_API_BASE_URL || "Agent Runtime"}</p>
             </div>
-          </section>
+          </SettingsCard>
         </div>
       </div>
     </div>
+  );
+}
+
+function SettingsCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section
+      className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] p-5 md:p-6"
+      style={{ boxShadow: "var(--elev-1)" }}
+    >
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-muted)] mb-4">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-[var(--chat-text)] mb-2">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function Select({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-md px-3 py-2 text-sm text-[var(--chat-text)] focus:outline-none focus:border-[var(--chat-accent)] transition-colors"
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
   );
 }
