@@ -88,6 +88,11 @@ export function Sidebar() {
     );
   }, [conversations, searchQuery]);
 
+  const groupedConversations = useMemo(
+    () => groupByDate(filteredConversations),
+    [filteredConversations],
+  );
+
   return (
     <div className="sidebar-wrapper relative flex flex-col h-full">
       {/* Logo */}
@@ -156,73 +161,71 @@ export function Sidebar() {
 
         {showConversations ? (
           <>
-            <div className="px-3 py-2">
+            <div className="px-3 pt-3 pb-2 space-y-2">
               <button
                 onClick={() => createConversation(model)}
-                className="lift w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--chat-text)] rounded-md border border-dashed border-[var(--chat-border)] bg-[color:color-mix(in_srgb,var(--chat-panel)_40%,transparent)] hover:border-[var(--chat-accent)] hover:text-[var(--chat-accent)] hover:bg-[var(--chat-panel)] transition-colors"
+                className="btn-secondary w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md transition-all"
               >
                 <Plus size={14} />
-                New Chat
+                <span>New Chat</span>
               </button>
-            </div>
 
-            {/* Quick Search */}
-            {conversations.length > 1 && (
-              <div className="px-3 pb-2">
+              {conversations.length > 1 && (
                 <div className="relative">
-                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--chat-muted)]" />
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--chat-subtle)] pointer-events-none" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search chats..."
-                    className="w-full pl-7 pr-7 py-1.5 text-xs rounded-md bg-[var(--chat-panel)] border border-[var(--chat-border)] text-[var(--chat-text)] placeholder:text-[var(--chat-muted)] focus:border-[var(--chat-accent)] focus:outline-none"
+                    placeholder="Search chats…"
+                    className="input-field w-full !py-1.5 pl-8 pr-7 text-[13px]"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--chat-subtle)] hover:text-[var(--chat-text)] transition-colors"
+                      aria-label="Clear search"
                     >
-                      <X size={12} />
+                      <X size={13} />
                     </button>
                   )}
                 </div>
+              )}
+            </div>
+
+            {filteredConversations.length === 0 ? (
+              <div className="mx-3 mt-2 rounded-md border border-dashed border-[var(--chat-border)] px-3 py-4 text-center">
+                <p className="text-[12px] text-[var(--chat-muted)]">
+                  {searchQuery ? "No matches" : "Your conversations will appear here"}
+                </p>
+              </div>
+            ) : (
+              <div className="mt-1">
+                {groupedConversations.map((group) => (
+                  <div key={group.label} className="mb-3">
+                    <div className="px-4 pb-1.5 pt-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--chat-subtle)]">
+                        {searchQuery && group.label === groupedConversations[0].label
+                          ? `Results (${filteredConversations.length})`
+                          : group.label}
+                      </span>
+                    </div>
+                    <div className="space-y-px">
+                      {group.items.map((conv) => (
+                        <ConversationRow
+                          key={conv.id}
+                          title={conv.title}
+                          isActive={conv.id === activeId}
+                          onClick={() => setActive(conv.id)}
+                          onDelete={() => deleteConversation(conv.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-
-            <SidebarSection title={searchQuery ? `Results (${filteredConversations.length})` : "Chat History"}>
-              {filteredConversations.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-[var(--chat-muted)]">
-                  {searchQuery ? "No matching conversations." : "Start a conversation to pin chat history here."}
-                </p>
-              ) : (
-                filteredConversations.map((conv) => (
-                  <div
-                    key={conv.id}
-                    onClick={() => setActive(conv.id)}
-                    className={cn(
-                      "group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm mb-0.5 transition-colors",
-                      conv.id === activeId
-                        ? "bg-[var(--chat-panel)] text-[var(--chat-text)]"
-                        : "text-[var(--chat-muted)] hover:bg-[var(--hover-tint)] hover:text-[var(--chat-text)]"
-                    )}
-                  >
-                    <MessageSquare size={14} className="flex-shrink-0" />
-                    <span className="flex-1 truncate">{conv.title}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteConversation(conv.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-[var(--chat-muted)] hover:text-red-400 transition-all"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </SidebarSection>
           </>
         ) : null}
       </div>
@@ -312,4 +315,93 @@ function SidebarNavItem({
       <span className="truncate">{label}</span>
     </Link>
   );
+}
+
+function ConversationRow({
+  title,
+  isActive,
+  onClick,
+  onDelete,
+}: {
+  title: string;
+  isActive: boolean;
+  onClick: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className={cn(
+        "group relative flex items-center gap-2 mx-2 px-3 py-2 rounded-md cursor-pointer text-[13px] transition-colors",
+        isActive
+          ? "sidebar-active"
+          : "text-[var(--chat-muted)] hover:bg-[var(--hover-tint)] hover:text-[var(--chat-text)]"
+      )}
+    >
+      <MessageSquare
+        size={13}
+        className={cn(
+          "flex-shrink-0 transition-colors",
+          isActive ? "text-[var(--chat-accent)]" : ""
+        )}
+      />
+      <span className="flex-1 truncate">{title}</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="opacity-0 group-hover:opacity-100 text-[var(--chat-subtle)] hover:text-red-400 transition-all"
+        aria-label="Delete conversation"
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  );
+}
+
+interface ConversationGroup {
+  label: string;
+  items: Array<{ id: string; title: string; updatedAt: number }>;
+}
+
+/** Bucket conversations by relative date for sidebar headers. */
+function groupByDate(
+  conversations: Array<{ id: string; title: string; updatedAt: number }>,
+): ConversationGroup[] {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 86_400_000;
+  const sevenDaysAgo = startOfToday - 6 * 86_400_000;
+  const thirtyDaysAgo = startOfToday - 29 * 86_400_000;
+
+  const buckets: Record<string, ConversationGroup["items"]> = {
+    Today: [],
+    Yesterday: [],
+    "Previous 7 Days": [],
+    "Previous 30 Days": [],
+    Older: [],
+  };
+
+  // Conversations come in already sorted (most recent first), preserve that.
+  for (const conv of conversations) {
+    const t = conv.updatedAt;
+    if (t >= startOfToday) buckets.Today.push(conv);
+    else if (t >= startOfYesterday) buckets.Yesterday.push(conv);
+    else if (t >= sevenDaysAgo) buckets["Previous 7 Days"].push(conv);
+    else if (t >= thirtyDaysAgo) buckets["Previous 30 Days"].push(conv);
+    else buckets.Older.push(conv);
+  }
+
+  return ["Today", "Yesterday", "Previous 7 Days", "Previous 30 Days", "Older"]
+    .map((label) => ({ label, items: buckets[label] }))
+    .filter((group) => group.items.length > 0);
 }
