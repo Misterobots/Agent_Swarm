@@ -36,51 +36,6 @@ export const primaryNavigation: NavigationItem[] = [
     matchPrefixes: ["/chat"],
   },
   {
-    label: "Monitoring",
-    href: "/monitoring",
-    icon: Radar,
-    matchPrefixes: ["/monitoring"],
-    adminOnly: true,
-    children: [
-      {
-        label: "Dashboard",
-        href: "/monitoring/dashboard",
-        icon: Activity,
-        matchPrefixes: ["/monitoring/dashboard"],
-      },
-      {
-        label: "Grafana",
-        href: "/monitoring/grafana",
-        icon: BarChart3,
-        matchPrefixes: ["/monitoring/grafana"],
-      },
-      {
-        label: "Swarm Observer",
-        href: "/monitoring/swarm-observer",
-        icon: Radar,
-        matchPrefixes: ["/monitoring/swarm-observer"],
-      },
-      {
-        label: "Traces",
-        href: "/monitoring/traces",
-        icon: Activity,
-        matchPrefixes: ["/monitoring/traces"],
-      },
-      {
-        label: "Evidence Locker",
-        href: "/monitoring/evidence-locker",
-        icon: FileText,
-        matchPrefixes: ["/monitoring/evidence-locker"],
-      },
-      {
-        label: "Service Health",
-        href: "/monitoring/service-health",
-        icon: HeartPulse,
-        matchPrefixes: ["/monitoring/service-health"],
-      },
-    ],
-  },
-  {
     label: "Media",
     href: "/media",
     icon: Paintbrush,
@@ -140,6 +95,51 @@ export const secondaryNavigation: NavigationItem[] = [
       "/governance",
     ],
     adminOnly: true,
+  },
+  {
+    label: "Monitoring",
+    href: "/monitoring",
+    icon: Radar,
+    matchPrefixes: ["/monitoring"],
+    adminOnly: true,
+    children: [
+      {
+        label: "Dashboard",
+        href: "/monitoring/dashboard",
+        icon: Activity,
+        matchPrefixes: ["/monitoring/dashboard"],
+      },
+      {
+        label: "Grafana",
+        href: "/monitoring/grafana",
+        icon: BarChart3,
+        matchPrefixes: ["/monitoring/grafana"],
+      },
+      {
+        label: "Swarm Observer",
+        href: "/monitoring/swarm-observer",
+        icon: Radar,
+        matchPrefixes: ["/monitoring/swarm-observer"],
+      },
+      {
+        label: "Traces",
+        href: "/monitoring/traces",
+        icon: Activity,
+        matchPrefixes: ["/monitoring/traces"],
+      },
+      {
+        label: "Evidence Locker",
+        href: "/monitoring/evidence-locker",
+        icon: FileText,
+        matchPrefixes: ["/monitoring/evidence-locker"],
+      },
+      {
+        label: "Service Health",
+        href: "/monitoring/service-health",
+        icon: HeartPulse,
+        matchPrefixes: ["/monitoring/service-health"],
+      },
+    ],
   },
   {
     label: "Training",
