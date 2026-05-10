@@ -60,10 +60,12 @@ PROVIDERS: dict[str, dict] = {
     "nvidia": {
         "label": "NVIDIA NIM",
         "models": [
-            {"id": "nvidia/llama-3.1-nemotron-70b-instruct",  "label": "Nemotron 70B",        "context": 131_072},
-            {"id": "nvidia/llama-3.3-nemotron-super-49b-v1.5","label": "Nemotron Super 49B",  "context": 131_072},
-            {"id": "mistralai/mistral-nemo-12b-instruct",     "label": "Mistral NeMo 12B",    "context": 128_000},
-            {"id": "deepseek-ai/deepseek-r1",                 "label": "DeepSeek R1 (NIM)",   "context": 128_000},
+            {"id": "nvidia/llama-3.1-nemotron-70b-instruct",   "label": "Nemotron 70B",         "context": 131_072},
+            {"id": "nvidia/llama-3.3-nemotron-super-49b-v1",   "label": "Nemotron Super 49B",   "context": 131_072},
+            {"id": "nvidia/llama-3.1-nemotron-nano-8b-v1",     "label": "Nemotron Nano 8B",     "context": 131_072},
+            {"id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",  "label": "Nemotron Ultra 253B",  "context": 131_072},
+            {"id": "mistralai/mistral-nemotron",               "label": "Mistral Nemotron",     "context": 128_000},
+            {"id": "deepseek-ai/deepseek-v4-pro",              "label": "DeepSeek V4 Pro",      "context": 128_000},
         ],
         "validate_url": "https://integrate.api.nvidia.com/v1/models",
         "key_prefix": "nvapi-",
