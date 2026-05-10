@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  Boxes,
   ClipboardCheck,
   Gauge,
   HeartPulse,
   RefreshCw,
+  ShieldAlert,
   Shield,
   Wrench,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { OpsDashboard } from "@/components/ops/ops-dashboard";
 import { MaintenanceQueue } from "@/components/mission-control/maintenance-queue";
@@ -120,21 +123,25 @@ export default function MissionControlPage() {
           <StatTile
             label="Pending Maintenance"
             value={pendingMaint}
+            icon={Wrench}
             tone={pendingMaint > 0 ? "warning" : "neutral"}
           />
           <StatTile
             label="Pending Approvals"
             value={pendingGov.length}
+            icon={ClipboardCheck}
             tone={pendingGov.length > 0 ? "warning" : "neutral"}
           />
           <StatTile
             label="Unhealthy Services"
             value={unhealthy.length}
+            icon={unhealthy.length > 0 ? ShieldAlert : Shield}
             tone={unhealthy.length > 0 ? "danger" : "neutral"}
           />
           <StatTile
             label="Cluster Containers"
             value={health?.running_count ?? 0}
+            icon={Boxes}
             tone="neutral"
           />
         </div>
@@ -189,66 +196,7 @@ export default function MissionControlPage() {
           })}
         </div>
 
-        {tab === "status" && (
-          <div className="space-y-6">
-            <OpsDashboard />
-            <div>
-              <SubsectionTitle>Inference nodes</SubsectionTitle>
-              <div className="grid gap-3 md:grid-cols-3">
-                {(health?.nodes ?? []).map((node) => (
-                  <Card key={node.name} padding="md">
-                    <p className="text-sm font-medium text-[var(--chat-text)]">{node.name}</p>
-                    <p className="mt-0.5 font-mono text-[11px] text-[var(--chat-subtle)]">
-                      {node.ip}
-                    </p>
-                    <p className="mt-3 text-[28px] font-semibold tabular-nums text-[var(--chat-text)] leading-none">
-                      {node.running_count}
-                    </p>
-                    <p className="mt-1.5 text-[11px] text-[var(--chat-muted)]">running containers</p>
-                  </Card>
-                ))}
-              </div>
-            </div>
-            <div>
-              <SubsectionTitle>Control plane</SubsectionTitle>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                {health?.control_plane.map((svc) => (
-                  <Card
-                    key={svc.name}
-                    padding="sm"
-                    className={cn(
-                      !svc.healthy && "!border-red-900/60",
-                    )}
-                    style={
-                      !svc.healthy
-                        ? { background: "color-mix(in srgb, #f87171 8%, var(--chat-surface))" }
-                        : undefined
-                    }
-                  >
-                    <p className="text-[13px] font-medium text-[var(--chat-text)]">{svc.name}</p>
-                    <p className="mt-0.5 font-mono text-[11px] text-[var(--chat-subtle)]">:{svc.port}</p>
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <span
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                          svc.healthy ? "bg-emerald-400" : "bg-red-400 animate-pulse"
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "text-[11px] font-medium",
-                          svc.healthy ? "text-emerald-400" : "text-red-400"
-                        )}
-                      >
-                        {svc.healthy ? "Healthy" : "Down"}
-                      </span>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {tab === "status" && <OpsDashboard />}
 
         {tab === "action-queue" && (
           <div className="space-y-8">
@@ -336,10 +284,12 @@ export default function MissionControlPage() {
 function StatTile({
   label,
   value,
+  icon: Icon,
   tone,
 }: {
   label: string;
   value: number;
+  icon: LucideIcon;
   tone: "neutral" | "warning" | "danger";
 }) {
   const valueClass = {
@@ -347,9 +297,17 @@ function StatTile({
     warning: "text-amber-400",
     danger:  "text-red-400",
   }[tone];
+  const iconClass = {
+    neutral: "text-[var(--chat-muted)]",
+    warning: "text-amber-400",
+    danger:  "text-red-400",
+  }[tone];
   return (
     <Card padding="md">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--chat-subtle)]">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--chat-subtle)]">{label}</p>
+        <Icon size={15} className={iconClass} />
+      </div>
       <p className={cn("mt-2 text-[28px] font-semibold tabular-nums leading-none", valueClass)}>
         {value}
       </p>

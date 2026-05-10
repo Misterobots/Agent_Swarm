@@ -1,85 +1,33 @@
 "use client";
 
 import { useServiceHealth } from "@/lib/hooks/use-service-health";
-import { MetricCard } from "./metric-card";
 import { ServiceGrid } from "./service-grid";
 import { AlertBanner } from "./alert-banner";
 import { TrainingStatusPanel } from "./training-status";
-import { Activity, Container, Shield, Clock, RefreshCw } from "lucide-react";
 
+/**
+ * Headless content block — renders inside MissionControlPage's WorkspaceShell.
+ * The page shell owns the title, refresh action, and padding.
+ */
 export function OpsDashboard() {
-  const { health, loading, refresh } = useServiceHealth();
+  const { health } = useServiceHealth();
 
   const nodes = health?.nodes || [];
   const controlPlane = health?.control_plane || [];
-  const healthyNodes = nodes.filter((n) => n.healthy).length;
-  const healthyServices = controlPlane.filter((s) => s.healthy).length;
-  const totalChecks = nodes.length + controlPlane.length;
-  const healthyChecks = healthyNodes + healthyServices;
-  const compliancePct = totalChecks > 0 ? Math.round((healthyChecks / totalChecks) * 100) : 0;
-  const totalContainers = health?.running_count ?? 0;
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-[var(--chat-text)]">Infrastructure Dashboard</h1>
-          <p className="text-xs text-[var(--chat-muted)] mt-0.5">
-            {health ? `Status: ${health.status}` : "Loading..."}
-          </p>
-        </div>
-        <button
-          onClick={refresh}
-          disabled={loading}
-          className="p-2 rounded-lg text-[var(--chat-muted)] hover:text-[var(--chat-accent)] hover:bg-[var(--chat-panel)] transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-        </button>
-      </div>
-
-      {/* Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Inference Nodes"
-          value={`${healthyNodes}/${nodes.length}`}
-          icon={Activity}
-          status={healthyNodes === nodes.length ? "ok" : "error"}
-        />
-        <MetricCard
-          label="Control Plane"
-          value={`${healthyServices}/${controlPlane.length}`}
-          icon={Container}
-          status={healthyServices === controlPlane.length ? "ok" : "warn"}
-        />
-        <MetricCard
-          label="Service Health"
-          value={`${compliancePct}%`}
-          delta={`${healthyChecks}/${totalChecks} checks passing`}
-          icon={Shield}
-          status={compliancePct === 100 ? "ok" : compliancePct >= 50 ? "warn" : "error"}
-        />
-        <MetricCard
-          label="Containers"
-          value={totalContainers}
-          delta="running across cluster"
-          icon={Clock}
-          status={totalContainers > 0 ? "ok" : "error"}
-        />
-      </div>
-
-      {/* Service Grids */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <ServiceGrid title="Inference Nodes" nodes={nodes} />
         <ServiceGrid title="Control Plane" services={controlPlane} />
       </div>
 
-      {/* Training Pipeline */}
       <TrainingStatusPanel />
 
-      {/* Alerts */}
       <div>
-        <h2 className="text-sm font-medium text-[var(--chat-muted)] mb-3">Recent Alerts</h2>
+        <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-subtle)]">
+          Recent Alerts
+        </h3>
         <AlertBanner services={controlPlane} nodes={nodes} />
       </div>
     </div>
