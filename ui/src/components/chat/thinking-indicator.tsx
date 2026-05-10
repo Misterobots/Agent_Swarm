@@ -53,7 +53,7 @@ interface ThinkingIndicatorProps {
 
 export function ThinkingIndicator({ statusMessage, latestThought, streamMode, swarmPhase }: ThinkingIndicatorProps) {
   const theme = useSettingsStore((s) => s.theme) as ChatTheme;
-  const verbs = THEME_AMBIENT_VERBS[theme] ?? THEME_AMBIENT_VERBS.ember;
+  const verbs = THEME_AMBIENT_VERBS[theme] ?? THEME_AMBIENT_VERBS.memex;
   const [verb, setVerb] = useState(() => pickRandom(verbs));
   const [thinkingPhase, setThinkingPhase] = useState(0);
 

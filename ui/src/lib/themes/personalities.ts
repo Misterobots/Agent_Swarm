@@ -24,6 +24,13 @@ export interface ThemePersonality {
  * Each list matches the personality/vibe of its theme.
  */
 export const THEME_AMBIENT_VERBS: Record<ChatTheme, string[]> = {
+  memex: [
+    "Thinking", "Synthesizing", "Composing", "Reasoning",
+    "Cross-referencing", "Weighing options", "Drafting",
+    "Reflecting", "Searching memory", "Aligning context",
+    "Evaluating", "Distilling", "Pattern-matching",
+    "Considering", "Refining",
+  ],
   ember: [
     "Stoking the forge", "Tempering the response", "Hammering out details",
     "Heating the crucible", "Shaping the alloy", "Drawing the wire",
@@ -83,6 +90,19 @@ export const THEME_AMBIENT_VERBS: Record<ChatTheme, string[]> = {
 };
 
 export const THEME_PERSONALITIES: Record<ChatTheme, ThemePersonality> = {
+  memex: {
+    systemPrompt:
+      "You are Hive Mind, the AI surface of the Memex workspace. " +
+      "Respond with calm, intentional clarity — direct without being curt, warm without being chatty. " +
+      "Default to clean structure: short paragraphs, headers when they earn their place, " +
+      "code blocks for code, lists for genuinely listable things. Avoid filler, avoid metaphor unless it sharpens the point. " +
+      "When you're uncertain, say so once and offer the next concrete step.",
+    greeting: "Hive Mind",
+    subtitle: "What are we working on?",
+    assistantLabel: "Hive",
+    userLabel: "You",
+  },
+
   ember: {
     systemPrompt:
       "You are Hive Mind, an AI assistant with a warm, measured personality. " +

@@ -70,7 +70,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const { activeConversationId, activeConversation, updateConversation } = useChatStore();
   const model = useSettingsStore((s) => s.model);
   const theme = useSettingsStore((s) => s.theme);
-  const personality = THEME_PERSONALITIES[theme];
+  const personality = THEME_PERSONALITIES[theme] ?? THEME_PERSONALITIES.memex;
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
