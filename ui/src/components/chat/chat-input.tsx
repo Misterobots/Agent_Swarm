@@ -8,6 +8,7 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useAccess } from "@/lib/hooks/use-access";
 import { canSelectModel } from "@/lib/utils/model-access";
 import { ChatSettingsMenu } from "./chat-settings-menu";
+import { IconButton } from "@/components/ui";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -150,30 +151,26 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
           )}
         />
         {isStreaming ? (
-          <button
+          <IconButton
+            label="Stop generation"
+            icon={<Square size={16} />}
             onClick={onStop}
-            className="lift flex-shrink-0 w-10 h-10 md:w-11 md:h-11 rounded-md bg-red-600 hover:bg-red-500 text-white flex items-center justify-center"
-            style={{ boxShadow: "var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.15)" }}
-            aria-label="Stop"
-          >
-            <Square size={16} />
-          </button>
+            variant="danger"
+            size="md"
+            className="md:w-11 md:h-11"
+          />
         ) : (
           <>
             <ChatSettingsMenu />
-            <button
+            <IconButton
+              label="Send message"
+              icon={<Send size={16} />}
               onClick={handleSend}
               disabled={!input.trim()}
-              aria-label="Send message"
-              className={cn(
-                "flex-shrink-0 w-10 h-10 md:w-11 md:h-11 rounded-md flex items-center justify-center",
-                input.trim()
-                  ? "btn-primary"
-                  : "bg-[var(--chat-soft)] text-[var(--chat-subtle)] border border-[var(--chat-border)] cursor-not-allowed"
-              )}
-            >
-              <Send size={16} />
-            </button>
+              variant={input.trim() ? "primary" : "secondary"}
+              size="md"
+              className="md:w-11 md:h-11"
+            />
           </>
         )}
       </div>

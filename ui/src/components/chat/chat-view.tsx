@@ -15,6 +15,7 @@ import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useSwarmBroadcast } from "@/lib/hooks/use-swarm-broadcast";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
 import { Bot, Sparkles, Code2, Search, Lightbulb } from "lucide-react";
+import { Card } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { ChatPreviewPane } from "./chat-preview-pane";
@@ -378,22 +379,27 @@ function EmptyChatState({
 
         <div className="w-full grid grid-cols-2 gap-2.5">
           {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }) => (
-            <button
+            <Card
               key={label}
-              type="button"
+              as="div"
+              role="button"
+              tabIndex={0}
+              padding="none"
+              interactive
               onClick={() => onPrompt(prompt)}
-              className="lift group flex items-center gap-3 px-4 py-3 rounded-md text-left transition-colors"
-              style={{
-                background: "var(--chat-surface)",
-                border: "1px solid var(--chat-border)",
-                boxShadow: "var(--elev-1), var(--inset-highlight)",
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onPrompt(prompt);
+                }
               }}
+              className="group flex items-center gap-3 px-4 py-3 text-left"
             >
               <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 bg-[var(--chat-panel)] border border-[var(--chat-border)] group-hover:border-[var(--chat-accent)] group-hover:text-[var(--chat-accent)] transition-colors text-[var(--chat-muted)]">
                 <Icon size={15} />
               </div>
               <span className="text-sm font-medium text-[var(--chat-text)]">{label}</span>
-            </button>
+            </Card>
           ))}
         </div>
       </div>

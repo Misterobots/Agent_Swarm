@@ -9,6 +9,7 @@ import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { DASHBOARDS } from "@/components/monitor/dashboard-selector";
 import { useAccess } from "@/lib/hooks/use-access";
 import { Settings } from "lucide-react";
+import { Card, CardHeader, CardTitle } from "@/components/ui";
 
 const TOOL_OPTIONS = [
   { id: "openhands", label: "OpenHands" },
@@ -102,15 +103,12 @@ export default function SettingsPage() {
 
 function SettingsCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section
-      className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] p-5 md:p-6"
-      style={{ boxShadow: "var(--elev-1)" }}
-    >
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-muted)] mb-4">
-        {title}
-      </h2>
+    <Card padding="lg">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
       {children}
-    </section>
+    </Card>
   );
 }
 
