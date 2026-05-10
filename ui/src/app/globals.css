@@ -44,39 +44,40 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
-  /* Brand accent — same in both modes for instant recognition */
-  --chat-accent: #f97316;
-  --chat-accent-strong: #fb923c;
-  --chat-accent-2: #ef4444;
-  --chat-thinking: #f97316;
-
-  /* RGB triples used by color-mix fallbacks */
-  --chat-accent-rgb: 249, 115, 22;
+  /* Brand accent — restrained sky blue. Same hue in both modes; the dark-mode
+     value is brighter for legibility on near-black, light-mode is deeper for
+     AA contrast on near-white. */
+  --chat-accent-2: #14b8a6;     /* secondary accent (teal) for state colors */
+  --chat-thinking: var(--chat-accent);
 
   /* Typography */
   --chat-font: var(--font-sans), "Inter", system-ui, sans-serif;
 }
 
-/* ── DARK mode (default) ─────────────────────────────────────── */
+/* ── DARK mode (default) — neutral zinc + sky accent ─────────── */
 [data-theme="memex"][data-mode="dark"],
 [data-theme="memex"]:not([data-mode]) {
-  --chat-bg:           #0e0b09;
-  --chat-surface:      #14110e;
-  --chat-surface-rgb:  20, 17, 14;
-  --chat-panel:        #1c1815;
-  --chat-soft:         #181410;
-  --chat-border:       #2a2420;
-  --chat-border-rgb:   42, 36, 32;
-  --chat-text:         #f3e8d8;
-  --chat-muted:        #a08673;
+  --chat-bg:           #09090b;   /* zinc-950 */
+  --chat-surface:      #0f0f12;
+  --chat-surface-rgb:  15, 15, 18;
+  --chat-panel:        #18181b;   /* zinc-900 */
+  --chat-soft:         #131316;
+  --chat-border:       #27272a;   /* zinc-800 */
+  --chat-border-rgb:   39, 39, 42;
+  --chat-text:         #fafafa;   /* zinc-50 */
+  --chat-muted:        #a1a1aa;   /* zinc-400 */
+
+  --chat-accent:       #38bdf8;   /* sky-400 */
+  --chat-accent-strong: #7dd3fc;  /* sky-300 */
+  --chat-accent-rgb:   56, 189, 248;
 
   /* Elevation (theme-aware shadows) */
-  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
-  --elev-2: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25);
-  --elev-3: 0 12px 32px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --elev-2: 0 4px 12px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --elev-3: 0 12px 32px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.4);
 
   /* Focus ring — accent at low opacity */
-  --ring: 0 0 0 3px rgba(249, 115, 22, 0.35);
+  --ring: 0 0 0 3px rgba(56, 189, 248, 0.35);
 
   /* Subtle hover surface tint */
   --hover-tint: rgba(255, 255, 255, 0.04);
@@ -85,32 +86,30 @@
   color-scheme: dark;
 }
 
-/* ── LIGHT mode — warm-tinted, not pure white ────────────────── */
+/* ── LIGHT mode — clean neutral whites ──────────────────────── */
 [data-theme="memex"][data-mode="light"] {
-  --chat-bg:           #faf6f1;
-  --chat-surface:      #f3ede4;
-  --chat-surface-rgb:  243, 237, 228;
-  --chat-panel:        #ffffff;
-  --chat-soft:         #f8f3ec;
-  --chat-border:       #e3dbd0;
-  --chat-border-rgb:   227, 219, 208;
-  --chat-text:         #2a221c;
-  --chat-muted:        #7a6a5e;
+  --chat-bg:           #fafafa;   /* zinc-50 */
+  --chat-surface:      #ffffff;
+  --chat-surface-rgb:  255, 255, 255;
+  --chat-panel:        #f4f4f5;   /* zinc-100 */
+  --chat-soft:         #fafafa;
+  --chat-border:       #e4e4e7;   /* zinc-200 */
+  --chat-border-rgb:   228, 228, 231;
+  --chat-text:         #18181b;   /* zinc-900 */
+  --chat-muted:        #71717a;   /* zinc-500 */
 
-  /* Light-mode accent is darker for AA contrast on light surfaces */
-  --chat-accent: #d97320;
-  --chat-accent-strong: #b8591a;
-  --chat-accent-rgb: 217, 115, 32;
-  --chat-thinking: #d97320;
+  --chat-accent:       #0284c7;   /* sky-600 — AA on white */
+  --chat-accent-strong: #0369a1;  /* sky-700 */
+  --chat-accent-rgb:   2, 132, 199;
 
-  --elev-1: 0 1px 2px rgba(60, 40, 20, 0.06), 0 1px 3px rgba(60, 40, 20, 0.04);
-  --elev-2: 0 4px 12px rgba(60, 40, 20, 0.08), 0 2px 6px rgba(60, 40, 20, 0.05);
-  --elev-3: 0 12px 32px rgba(60, 40, 20, 0.12), 0 4px 12px rgba(60, 40, 20, 0.06);
+  --elev-1: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --elev-2: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.05);
+  --elev-3: 0 12px 32px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.06);
 
-  --ring: 0 0 0 3px rgba(217, 115, 32, 0.3);
+  --ring: 0 0 0 3px rgba(2, 132, 199, 0.3);
 
-  --hover-tint: rgba(0, 0, 0, 0.04);
-  --press-tint: rgba(0, 0, 0, 0.08);
+  --hover-tint: rgba(15, 23, 42, 0.04);
+  --press-tint: rgba(15, 23, 42, 0.08);
 
   color-scheme: light;
 }

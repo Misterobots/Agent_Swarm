@@ -8,6 +8,7 @@ import type { Skill, Style } from "@/types/chat";
  */
 export type ChatTheme =
   | "memex"
+  | "amber"
   | "ember" | "slate" | "signal" | "office"
   | "hacker" | "star-trek" | "cyberpunk" | "minimal";
 
@@ -91,17 +92,16 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "hive-settings",
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, fromVersion: number) => {
         const state = (persisted ?? {}) as Partial<SettingsState>;
-        if (fromVersion < 2) {
-          // Retire the 8 legacy themes. Anyone who had set one is moved to
-          // "memex" with the matching mode (light themes -> light, else dark).
-          const lightLegacy = new Set(["office", "minimal"]);
+        // v1 -> v3: retired the 8 hand-curated themes plus the warm-amber
+        // Memex v1 in favour of a neutral Memex with light/dark/system modes.
+        // Anyone with a legacy theme is moved to "memex" w/ system mode.
+        if (fromVersion < 3) {
           const previous = state.theme as ChatTheme | undefined;
           if (previous && previous !== "memex") {
             state.theme = "memex";
-            state.themeMode = lightLegacy.has(previous) ? "light" : "dark";
           }
           if (!state.themeMode) state.themeMode = "system";
         }

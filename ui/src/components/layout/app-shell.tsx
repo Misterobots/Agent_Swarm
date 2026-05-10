@@ -19,6 +19,7 @@ export function AppShell({ children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const theme = useSettingsStore((s) => s.theme);
   const themeMode = useSettingsStore((s) => s.themeMode);
+  const setTheme = useSettingsStore((s) => s.setTheme);
 
   // Close sidebar on mobile/tablet by default
   useEffect(() => {
@@ -35,16 +36,24 @@ export function AppShell({ children }: AppShellProps) {
   // and re-resolves live if the user changes their OS preference.
   useEffect(() => {
     const root = document.documentElement;
-    root.setAttribute("data-theme", theme);
 
     // Legacy debug-flag: localStorage["memex-show-legacy"] === "1" enables
-    // the retired 8-theme bundle. Off by default.
+    // the retired theme bundle (ember/slate/hacker/cyberpunk/etc.).
     const legacy = typeof window !== "undefined" && window.localStorage.getItem("memex-show-legacy") === "1";
     if (legacy) root.setAttribute("data-legacy-themes", "1");
     else root.removeAttribute("data-legacy-themes");
 
+    // Self-heal: if a stale persisted theme survived the v1->v2 migration
+    // and the legacy flag isn't on, coerce back to "memex" so the mode
+    // toggle (light/dark/system) actually attaches.
+    if (theme !== "memex" && !legacy) {
+      setTheme("memex");
+      return;
+    }
+
+    root.setAttribute("data-theme", theme);
+
     if (theme !== "memex") {
-      // Legacy themes don't use data-mode
       root.removeAttribute("data-mode");
       return;
     }
@@ -59,7 +68,7 @@ export function AppShell({ children }: AppShellProps) {
       return () => mq.removeEventListener("change", onChange);
     }
     apply(themeMode);
-  }, [theme, themeMode]);
+  }, [theme, themeMode, setTheme]);
 
   // Stable callbacks — must not recreate on every render or MobileDrawer's
   // useEffect([pathname, onClose]) will fire and immediately close the drawer.

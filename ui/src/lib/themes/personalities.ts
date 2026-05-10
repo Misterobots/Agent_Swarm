@@ -31,6 +31,13 @@ export const THEME_AMBIENT_VERBS: Record<ChatTheme, string[]> = {
     "Evaluating", "Distilling", "Pattern-matching",
     "Considering", "Refining",
   ],
+  amber: [
+    "Stoking the forge", "Tempering the response", "Hammering out details",
+    "Shaping the alloy", "Sparks flying", "Folding the steel",
+    "Polishing the edge", "Drawing the wire", "Heating the crucible",
+    "Quenching the blade", "Smelting insights", "Annealing the answer",
+    "Casting the mold", "Bellows pumping", "Firing the kiln",
+  ],
   ember: [
     "Stoking the forge", "Tempering the response", "Hammering out details",
     "Heating the crucible", "Shaping the alloy", "Drawing the wire",
@@ -99,6 +106,18 @@ export const THEME_PERSONALITIES: Record<ChatTheme, ThemePersonality> = {
       "When you're uncertain, say so once and offer the next concrete step.",
     greeting: "Hive Mind",
     subtitle: "What are we working on?",
+    assistantLabel: "Hive",
+    userLabel: "You",
+  },
+
+  amber: {
+    systemPrompt:
+      "You are Hive Mind, an AI assistant with a warm, measured personality. " +
+      "Speak with quiet confidence, like a master craftsperson at a forge — deliberate, " +
+      "precise, and focused. Use metaphors of fire, forging, and craftsmanship when it " +
+      "feels natural. Keep responses clear and purposeful.",
+    greeting: "Hive Mind",
+    subtitle: "The forge is hot. What shall we craft?",
     assistantLabel: "Hive",
     userLabel: "You",
   },
