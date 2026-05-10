@@ -6,6 +6,8 @@ interface WorkspaceShellProps {
   title: string;
   description: string;
   icon: LucideIcon;
+  /** Optional actions rendered on the right side of the header. */
+  actions?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -19,20 +21,32 @@ export function WorkspaceShell({
   title,
   description,
   icon: Icon,
+  actions,
   children,
 }: WorkspaceShellProps) {
   return (
     <div className="flex h-full flex-col bg-[var(--chat-bg)] text-[var(--chat-text)]">
-      <div className="border-b border-[var(--chat-border)] bg-[var(--chat-surface)] px-6 py-5">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--chat-accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--chat-accent)_10%,transparent)] p-2 text-[var(--chat-accent)]">
-            <Icon size={18} />
+      <div className="relative bg-[var(--chat-surface)] px-6 py-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="rounded-md p-2.5 text-[var(--chat-accent)] flex-shrink-0"
+              style={{
+                background: "linear-gradient(135deg, var(--chat-accent-soft), color-mix(in srgb, var(--chat-accent) 4%, transparent))",
+                border: "1px solid color-mix(in srgb, var(--chat-accent) 25%, var(--chat-border))",
+                boxShadow: "var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.04)",
+              }}
+            >
+              <Icon size={18} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold tracking-tight text-[var(--chat-text)] truncate">{title}</h1>
+              <p className="mt-0.5 text-[13px] text-[var(--chat-muted)]">{description}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-[var(--chat-text)]">{title}</h1>
-            <p className="mt-1 text-sm text-[var(--chat-muted)]">{description}</p>
-          </div>
+          {actions && <div className="flex-shrink-0">{actions}</div>}
         </div>
+        <div className="absolute bottom-0 left-0 right-0 divider" />
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">{children}</div>
@@ -43,17 +57,22 @@ export function WorkspaceShell({
 export function WorkspaceSection({
   title,
   description,
+  actions,
   children,
 }: {
   title: string;
   description?: string;
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="mb-8">
-      <div className="mb-3">
-        <h2 className="text-sm font-medium text-[var(--chat-text)]">{title}</h2>
-        {description ? <p className="mt-1 text-xs text-[var(--chat-muted)]">{description}</p> : null}
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-subtle)]">{title}</h2>
+          {description ? <p className="mt-1 text-[13px] text-[var(--chat-muted)]">{description}</p> : null}
+        </div>
+        {actions && <div className="flex-shrink-0">{actions}</div>}
       </div>
       {children}
     </section>
@@ -68,16 +87,16 @@ export function WorkspaceLinkCard({ title, description, href }: WorkspaceLinkCar
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4 transition-colors hover:border-[var(--chat-accent)] hover:bg-[var(--chat-surface)]"
+      className="lift group surface block p-4 transition-colors hover:border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-medium text-[var(--chat-text)]">{title}</h3>
-          <p className="mt-2 text-sm leading-6 text-[var(--chat-muted)]">{description}</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--chat-muted)]">{description}</p>
         </div>
         <ArrowRight
-          size={16}
-          className="mt-0.5 shrink-0 text-[var(--chat-muted)] transition-colors group-hover:text-[var(--chat-accent)]"
+          size={15}
+          className="mt-0.5 shrink-0 text-[var(--chat-muted)] transition-all group-hover:text-[var(--chat-accent)] group-hover:translate-x-0.5"
         />
       </div>
     </Link>
@@ -92,9 +111,9 @@ export function WorkspacePlaceholder({
   body: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--chat-border)] bg-[var(--chat-panel)] p-5">
+    <div className="rounded-md border border-dashed border-[var(--chat-border)] bg-[color:color-mix(in_srgb,var(--chat-panel)_50%,transparent)] p-5">
       <h3 className="text-sm font-medium text-[var(--chat-text)]">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-[var(--chat-muted)]">{body}</p>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--chat-muted)]">{body}</p>
     </div>
   );
 }

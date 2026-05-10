@@ -21,6 +21,8 @@ import { fetchGovernanceRequests } from "@/lib/api/workspaces";
 import { fetchMaintenanceQueue } from "@/lib/api/maintenance";
 import type { OpsHealth } from "@/types/ops";
 import type { GovernanceRequest } from "@/types/workspaces";
+import { Button, Card } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 
 type TabId = "status" | "action-queue" | "service-health" | "diagnostics";
 
@@ -52,6 +54,13 @@ const DIAGNOSTIC_RUNBOOKS: { title: string; body: string; cmd: string }[] = [
     body: "Validate all inference nodes and loaded model state.",
     cmd: "GET /api/v1/health/nodes",
   },
+];
+
+const RELATED_SURFACES: { title: string; subtitle: string; href: string }[] = [
+  { title: "Health Dashboard", subtitle: "Cluster-wide containers", href: "/monitoring/dashboard" },
+  { title: "Grafana",          subtitle: "Metrics + logs",         href: "/monitoring/grafana"   },
+  { title: "Traces",           subtitle: "Request flow",           href: "/monitoring/traces"    },
+  { title: "Evidence Locker",  subtitle: "Runbook archive",        href: "/monitoring/evidence-locker" },
 ];
 
 export default function MissionControlPage() {
@@ -95,47 +104,50 @@ export default function MissionControlPage() {
       title="Mission Control"
       description="Unified operator surface for status, action queue, service health, and diagnostics."
       icon={Shield}
+      actions={
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={load}
+          iconLeft={<RefreshCw size={13} className={loading ? "animate-spin" : ""} />}
+        >
+          Refresh
+        </Button>
+      }
     >
       <WorkspaceSection title="At a glance">
-        <div className="grid gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Pending Maintenance</p>
-            <p className="mt-1 text-xl font-semibold text-amber-400">
-              {pendingMaint}
-            </p>
-          </div>
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Pending Approvals</p>
-            <p className="mt-1 text-xl font-semibold text-amber-400">
-              {pendingGov.length}
-            </p>
-          </div>
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Unhealthy Services</p>
-            <p className="mt-1 text-xl font-semibold text-red-400">
-              {unhealthy.length}
-            </p>
-          </div>
-          <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4">
-            <p className="text-xs text-[var(--chat-muted)]">Cluster Containers</p>
-            <p className="mt-1 text-xl font-semibold text-[var(--chat-text)]">
-              {health?.running_count ?? 0}
-            </p>
-          </div>
-        </div>
-        <div className="mt-3 flex justify-end">
-          <button
-            onClick={load}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-          >
-            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-            Refresh
-          </button>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile
+            label="Pending Maintenance"
+            value={pendingMaint}
+            tone={pendingMaint > 0 ? "warning" : "neutral"}
+          />
+          <StatTile
+            label="Pending Approvals"
+            value={pendingGov.length}
+            tone={pendingGov.length > 0 ? "warning" : "neutral"}
+          />
+          <StatTile
+            label="Unhealthy Services"
+            value={unhealthy.length}
+            tone={unhealthy.length > 0 ? "danger" : "neutral"}
+          />
+          <StatTile
+            label="Cluster Containers"
+            value={health?.running_count ?? 0}
+            tone="neutral"
+          />
         </div>
       </WorkspaceSection>
 
       <WorkspaceSection title="Workspaces">
-        <div className="mb-4 flex flex-wrap gap-2 border-b border-[var(--chat-border)] pb-2">
+        {/* Segmented tab control */}
+        <div
+          role="tablist"
+          aria-label="Mission Control sections"
+          className="mb-5 inline-flex items-center gap-1 p-1 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)]"
+          style={{ boxShadow: "var(--elev-1), inset 0 1px 2px rgba(0,0,0,0.08)" }}
+        >
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -148,22 +160,26 @@ export default function MissionControlPage() {
             return (
               <button
                 key={t.id}
+                role="tab"
+                aria-selected={active}
                 onClick={() => setTab(t.id)}
-                className={`inline-flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-sm transition-colors ${
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[13px] font-medium transition-all",
                   active
-                    ? "border-[var(--chat-accent)] text-[var(--chat-accent)]"
-                    : "border-transparent text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-                }`}
+                    ? "bg-[var(--chat-elevated)] text-[var(--chat-text)] shadow-[var(--elev-1)]"
+                    : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+                )}
               >
-                <Icon size={14} />
+                <Icon size={14} className={active ? "text-[var(--chat-accent)]" : ""} />
                 {t.label}
                 {badge !== null && badge > 0 && (
                   <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                    className={cn(
+                      "rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
                       t.id === "service-health"
-                        ? "bg-red-500/20 text-red-400"
-                        : "bg-amber-500/20 text-amber-400"
-                    }`}
+                        ? "bg-red-500/15 text-red-400"
+                        : "bg-amber-500/15 text-amber-400"
+                    )}
                   >
                     {badge}
                   </span>
@@ -176,49 +192,58 @@ export default function MissionControlPage() {
         {tab === "status" && (
           <div className="space-y-6">
             <OpsDashboard />
-            <div className="grid gap-3 md:grid-cols-3">
-              {(health?.nodes ?? []).map((node) => (
-                <div
-                  key={node.name}
-                  className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4"
-                >
-                  <p className="text-sm font-medium text-[var(--chat-text)]">
-                    {node.name}
-                  </p>
-                  <p className="mt-0.5 font-mono text-xs text-[var(--chat-muted)]">
-                    {node.ip}
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--chat-text)]">
-                    {node.running_count}
-                  </p>
-                  <p className="text-xs text-[var(--chat-muted)]">
-                    running containers
-                  </p>
-                </div>
-              ))}
+            <div>
+              <SubsectionTitle>Inference nodes</SubsectionTitle>
+              <div className="grid gap-3 md:grid-cols-3">
+                {(health?.nodes ?? []).map((node) => (
+                  <Card key={node.name} padding="md">
+                    <p className="text-sm font-medium text-[var(--chat-text)]">{node.name}</p>
+                    <p className="mt-0.5 font-mono text-[11px] text-[var(--chat-subtle)]">
+                      {node.ip}
+                    </p>
+                    <p className="mt-3 text-[28px] font-semibold tabular-nums text-[var(--chat-text)] leading-none">
+                      {node.running_count}
+                    </p>
+                    <p className="mt-1.5 text-[11px] text-[var(--chat-muted)]">running containers</p>
+                  </Card>
+                ))}
+              </div>
             </div>
             <div>
-              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--chat-muted)]">
-                Control plane
-              </h3>
+              <SubsectionTitle>Control plane</SubsectionTitle>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {health?.control_plane.map((svc) => (
-                  <div
+                  <Card
                     key={svc.name}
-                    className={`rounded-lg border p-3 ${svc.healthy ? "border-[var(--chat-border)] bg-[var(--chat-panel)]" : "border-red-900/60 bg-red-950/30"}`}
+                    padding="sm"
+                    className={cn(
+                      !svc.healthy && "!border-red-900/60",
+                    )}
+                    style={
+                      !svc.healthy
+                        ? { background: "color-mix(in srgb, #f87171 8%, var(--chat-surface))" }
+                        : undefined
+                    }
                   >
-                    <p className="text-xs font-medium text-[var(--chat-text)]">
-                      {svc.name}
-                    </p>
-                    <p className="mt-0.5 font-mono text-xs text-[var(--chat-muted)]">
-                      :{svc.port}
-                    </p>
-                    <p
-                      className={`mt-2 text-xs ${svc.healthy ? "text-emerald-400" : "text-red-400"}`}
-                    >
-                      {svc.healthy ? "Healthy" : "Down"}
-                    </p>
-                  </div>
+                    <p className="text-[13px] font-medium text-[var(--chat-text)]">{svc.name}</p>
+                    <p className="mt-0.5 font-mono text-[11px] text-[var(--chat-subtle)]">:{svc.port}</p>
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                          svc.healthy ? "bg-emerald-400" : "bg-red-400 animate-pulse"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "text-[11px] font-medium",
+                          svc.healthy ? "text-emerald-400" : "text-red-400"
+                        )}
+                      >
+                        {svc.healthy ? "Healthy" : "Down"}
+                      </span>
+                    </div>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -228,24 +253,24 @@ export default function MissionControlPage() {
         {tab === "action-queue" && (
           <div className="space-y-8">
             <section>
-              <div className="mb-3 flex items-baseline justify-between">
-                <h3 className="text-sm font-medium uppercase tracking-wide text-[var(--chat-muted)]">
-                  Maintenance ({pendingMaint})
-                </h3>
-                <p className="text-xs text-[var(--chat-muted)]">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <SubsectionTitle as="h3">
+                  Maintenance <span className="ml-1 tabular-nums text-[var(--chat-muted)]">({pendingMaint})</span>
+                </SubsectionTitle>
+                <p className="text-[12px] text-[var(--chat-muted)]">
                   Alerts routed by manifest. Agent-safe items dispatch automatically.
                 </p>
               </div>
               <MaintenanceQueue />
             </section>
             <section>
-              <div className="mb-3 flex items-baseline justify-between">
-                <h3 className="text-sm font-medium uppercase tracking-wide text-[var(--chat-muted)]">
-                  Governance ({pendingGov.length})
-                </h3>
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <SubsectionTitle as="h3">
+                  Governance <span className="ml-1 tabular-nums text-[var(--chat-muted)]">({pendingGov.length})</span>
+                </SubsectionTitle>
                 <Link
                   href="/governance"
-                  className="text-xs text-[var(--chat-accent)] underline-offset-2 hover:underline"
+                  className="text-[12px] text-[var(--chat-accent)] underline-offset-4 hover:underline"
                 >
                   Open in dedicated view →
                 </Link>
@@ -259,66 +284,90 @@ export default function MissionControlPage() {
 
         {tab === "diagnostics" && (
           <div className="space-y-6">
-            <p className="text-sm text-[var(--chat-muted)]">
-              Common reliability and incident-response references. Copy and run
-              from the execution plane.
+            <p className="text-[13px] text-[var(--chat-muted)]">
+              Common reliability and incident-response references. Copy and run from the execution plane.
             </p>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {DIAGNOSTIC_RUNBOOKS.map((card) => (
-                <div
-                  key={card.title}
-                  className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3"
-                >
-                  <p className="text-sm font-medium text-[var(--chat-text)]">
-                    {card.title}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--chat-muted)]">
-                    {card.body}
-                  </p>
-                  <code className="mt-2 block rounded bg-[var(--chat-bg)] px-2 py-1 text-xs text-[var(--chat-muted)]">
+                <Card key={card.title} padding="md">
+                  <p className="text-[13px] font-semibold text-[var(--chat-text)]">{card.title}</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-[var(--chat-muted)]">{card.body}</p>
+                  <code
+                    className="mt-3 block rounded-sm px-2.5 py-1.5 text-[11px] font-mono text-[var(--chat-text)]"
+                    style={{
+                      background: "var(--chat-bg)",
+                      border: "1px solid var(--chat-border)",
+                      boxShadow: "inset 0 1px 2px rgba(0,0,0,0.15)",
+                    }}
+                  >
                     {card.cmd}
                   </code>
-                </div>
+                </Card>
               ))}
             </div>
-            <div className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--chat-muted)]">
-                Related surfaces
-              </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <Link
-                  href="/monitoring/dashboard"
-                  className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 text-xs hover:border-[var(--chat-accent)]"
-                >
-                  <p className="text-[var(--chat-text)]">Health Dashboard</p>
-                  <p className="mt-0.5 text-[var(--chat-muted)]">Cluster-wide containers</p>
-                </Link>
-                <Link
-                  href="/monitoring/grafana"
-                  className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 text-xs hover:border-[var(--chat-accent)]"
-                >
-                  <p className="text-[var(--chat-text)]">Grafana</p>
-                  <p className="mt-0.5 text-[var(--chat-muted)]">Metrics + logs</p>
-                </Link>
-                <Link
-                  href="/monitoring/traces"
-                  className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 text-xs hover:border-[var(--chat-accent)]"
-                >
-                  <p className="text-[var(--chat-text)]">Traces</p>
-                  <p className="mt-0.5 text-[var(--chat-muted)]">Request flow</p>
-                </Link>
-                <Link
-                  href="/monitoring/evidence-locker"
-                  className="rounded border border-[var(--chat-border)] bg-[var(--chat-surface)] p-2 text-xs hover:border-[var(--chat-accent)]"
-                >
-                  <p className="text-[var(--chat-text)]">Evidence Locker</p>
-                  <p className="mt-0.5 text-[var(--chat-muted)]">Runbook archive</p>
-                </Link>
+            <Card padding="md">
+              <SubsectionTitle as="h3">Related surfaces</SubsectionTitle>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {RELATED_SURFACES.map((s) => (
+                  <Link
+                    key={s.href}
+                    href={s.href}
+                    className="lift group block rounded-md p-3 transition-colors"
+                    style={{
+                      background: "var(--chat-panel)",
+                      border: "1px solid var(--chat-border)",
+                    }}
+                  >
+                    <p className="text-[13px] font-medium text-[var(--chat-text)] group-hover:text-[var(--chat-accent-strong)] transition-colors">
+                      {s.title}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[var(--chat-muted)]">{s.subtitle}</p>
+                  </Link>
+                ))}
               </div>
-            </div>
+            </Card>
           </div>
         )}
       </WorkspaceSection>
     </WorkspaceShell>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "neutral" | "warning" | "danger";
+}) {
+  const valueClass = {
+    neutral: "text-[var(--chat-text)]",
+    warning: "text-amber-400",
+    danger:  "text-red-400",
+  }[tone];
+  return (
+    <Card padding="md">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--chat-subtle)]">{label}</p>
+      <p className={cn("mt-2 text-[28px] font-semibold tabular-nums leading-none", valueClass)}>
+        {value}
+      </p>
+    </Card>
+  );
+}
+
+function SubsectionTitle({
+  children,
+  as = "h3",
+}: {
+  children: React.ReactNode;
+  as?: "h2" | "h3";
+}) {
+  const Tag = as as React.ElementType;
+  return (
+    <Tag className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-subtle)]">
+      {children}
+    </Tag>
   );
 }
