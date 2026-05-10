@@ -163,7 +163,10 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
     <div className="chat-shell flex h-full overflow-hidden" data-route="chat">
       <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
       {/* Header */}
-      <div className="relative flex items-center justify-between bg-[var(--chat-surface)] px-3 md:px-5 py-3 min-w-0">
+      <div
+        className="relative flex items-center justify-between bg-[var(--chat-surface)] px-3 md:px-5 py-3 min-w-0"
+        style={{ paddingLeft: "calc(var(--sidebar-rail-pad, 0px) + 0.75rem)" }}
+      >
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <ModelSelector />
         </div>

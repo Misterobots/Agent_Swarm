@@ -5,7 +5,7 @@ import { Sidebar } from "./sidebar";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { MobileDrawer } from "./mobile-drawer";
 import { cn } from "@/lib/utils/cn";
-import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 
@@ -86,21 +86,30 @@ export function AppShell({ children }: AppShellProps) {
           )}
         >
           <div className="w-64 h-full">
-            <Sidebar />
+            <Sidebar onCollapse={() => setSidebarOpen(false)} />
           </div>
         </div>
       )}
 
       {/* Main content */}
-      <div className={cn("flex-1 flex flex-col min-w-0 overflow-hidden", isMobile && "pb-14")}>
-        {/* Toggle button — desktop/tablet only */}
-        {!isMobile && (
+      <div
+        className={cn("relative flex-1 flex flex-col min-w-0 overflow-hidden", isMobile && "pb-14")}
+        style={{
+          // Page headers reserve this much left-padding so the floating
+          // expand handle (when sidebar is collapsed) doesn't collide.
+          ["--sidebar-rail-pad" as string]: !isMobile && !sidebarOpen ? "2.75rem" : "0px",
+        }}
+      >
+        {/* Edge-anchored expand handle — only shows when sidebar is collapsed */}
+        {!isMobile && !sidebarOpen && (
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="absolute top-3 left-2 z-10 p-1.5 rounded-md text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-panel)] transition-colors"
-            style={{ left: sidebarOpen ? "17rem" : "0.5rem" }}
+            onClick={() => setSidebarOpen(true)}
+            className="absolute top-3 left-3 z-20 inline-flex items-center justify-center w-8 h-8 rounded-md bg-[var(--chat-panel)] text-[var(--chat-muted)] border border-[var(--chat-border)] hover:text-[var(--chat-text)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_50%,var(--chat-text))] transition-colors"
+            style={{ boxShadow: "var(--elev-1), var(--inset-highlight)" }}
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
           >
-            {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
+            <PanelLeft size={15} />
           </button>
         )}
 

@@ -14,7 +14,7 @@ import {
 } from "@/lib/config/navigation";
 import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
-import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User, PanelLeftClose } from "lucide-react";
 import { BuddyWidget } from "@/components/buddy/buddy-widget";
 import { useAccess } from "@/lib/hooks/use-access";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
@@ -57,7 +57,7 @@ function HiveLogo() {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
   const pathname = usePathname();
   const conversations = useChatStore((s) => s.conversations);
   const activeId = useChatStore((s) => s.activeConversationId);
@@ -97,14 +97,26 @@ export function Sidebar() {
     <div className="sidebar-wrapper relative flex flex-col h-full">
       {/* Logo */}
       <div className="px-4 py-5 relative">
-        <div className="flex items-center gap-3">
-          <HiveLogo />
-          <div>
-            <h1 className="text-[15px] font-semibold text-[var(--chat-text)] tracking-tight leading-none">
-              Memex
-            </h1>
-            <p className="text-[10px] text-[var(--chat-subtle)] mt-1.5 tracking-wide uppercase">Hive Mind</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <HiveLogo />
+            <div className="min-w-0">
+              <h1 className="text-[15px] font-semibold text-[var(--chat-text)] tracking-tight leading-none">
+                Memex
+              </h1>
+              <p className="text-[10px] text-[var(--chat-subtle)] mt-1.5 tracking-wide uppercase">Hive Mind</p>
+            </div>
           </div>
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--chat-subtle)] hover:text-[var(--chat-text)] hover:bg-[var(--hover-tint)] transition-colors"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose size={15} />
+            </button>
+          )}
         </div>
         <div className="absolute bottom-0 left-3 right-3 divider" />
       </div>

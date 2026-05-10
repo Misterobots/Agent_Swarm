@@ -26,7 +26,10 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   return (
     <div className="flex h-full flex-col bg-[var(--chat-bg)] text-[var(--chat-text)]">
-      <div className="relative bg-[var(--chat-surface)] px-6 py-5">
+      <div
+        className="relative bg-[var(--chat-surface)] py-5"
+        style={{ paddingLeft: "calc(var(--sidebar-rail-pad, 0px) + 1.5rem)", paddingRight: "1.5rem" }}
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div
