@@ -1055,8 +1055,10 @@ def chat_swarm(
                 return
 
             else:
-                # "plan_only" or freetext
-                logger.info("[Router] Dev mode gate: user chose plan-only.")
+                # "plan_only" or freetext — run the multi-perspective research swarm
+                # with no implementation. Matches the gate option label
+                # "Research & Plan Only · Run the swarm, no files written."
+                logger.info("[Router] Dev mode gate: user chose research & plan-only.")
                 user_input = original_prompt
                 from lamport import coordinate_task as _coord
                 for chunk in _coord(
@@ -1067,8 +1069,9 @@ def chat_swarm(
                     extracted_context=extracted_context,
                     ace_token=ace_token,
                     ultraplan_mode=ultraplan_mode,
-                    dev_mode=True,   # skip lamport's inner gate
-                    plan_mode=True,  # research & plan only — no file writes
+                    dev_mode=True,    # skip lamport's inner gate
+                    plan_mode=True,   # no file writes
+                    research_mode=True,  # multi-perspective converging/diverging swarm
                 ):
                     yield chunk
                 return
@@ -1644,13 +1647,17 @@ def chat_swarm(
         # --- ROUTE: COORDINATE (Multi-Worker Orchestration) ---
         if intent == "COORDINATE":
             # --- DEV MODE GATE: intercept build/project requests when not in dev mode ---
+            # Skipped if the user has explicitly opted into a "no files written" mode
+            # (research_mode = deep multi-perspective swarm; ultraplan_mode = plan-only).
+            # Those modes don't need dev tooling — the gate is purely about implementation.
             _build_keywords = (
                 "build", "create", "make", "develop", "implement", "write a ",
                 "code ", "design a", "design an", "generate a", "generate an",
                 "program ", "app", "game", "website", "web app", "tool",
             )
             _is_build_request = any(kw in user_input.lower() for kw in _build_keywords)
-            if not dev_mode and _is_build_request:
+            _research_only = research_mode or ultraplan_mode
+            if not dev_mode and _is_build_request and not _research_only:
                 logger.info("[Router] Coding/project request detected in standard mode — showing dev mode gate.")
                 try:
                     from brooks import save_pending_context as _save_ctx
