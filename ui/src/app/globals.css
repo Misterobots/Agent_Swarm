@@ -467,24 +467,56 @@
   text-transform: uppercase;
 }
 
-/* Nav blocks: flat rectangles, full-width, dark fill */
+/* Nav blocks: flat rectangles, full-width — L→R bevel + graduated fill */
 [data-theme^="lcars"] .sidebar-wrapper a.rounded-md,
 [data-theme^="lcars"] .sidebar-wrapper div.rounded-md {
   margin-left: 0 !important;
   margin-right: 6px !important;
   border-radius: 0 !important;
-  background: var(--lcars-nav-dark);
+  background-color: var(--lcars-nav-dark);
+  background-image: linear-gradient(to right, rgba(255,255,255,0.08) 0%, transparent 28%, rgba(0,0,0,0.22) 100%);
   color: var(--chat-muted);
   border-bottom: 1px solid color-mix(in srgb, var(--lcars-nav-dark) 60%, var(--chat-accent));
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 700;
-  transition: background var(--dur-base), color var(--dur-base);
+  transition: background-color var(--dur-base), color var(--dur-base);
 }
 [data-theme^="lcars"] .sidebar-wrapper a.rounded-md:hover,
 [data-theme^="lcars"] .sidebar-wrapper div.rounded-md:hover {
-  background: color-mix(in srgb, var(--lcars-nav-dark) 70%, var(--chat-accent));
+  background-color: color-mix(in srgb, var(--lcars-nav-dark) 48%, var(--chat-accent));
   color: var(--chat-accent-strong);
+}
+
+/* ── GRADUATED NAV STEPS — brightest at top, darkest at bottom ─── */
+/* Two DOM patterns:
+   Workspaces: .space-y-px > div:nth-child(N) > a.rounded-md
+   Operations/Preferences: .space-y-px > a.rounded-md:nth-child(N)  */
+
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(1) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(1) {
+  background-color: color-mix(in srgb, var(--lcars-nav-active) 70%, var(--lcars-nav-dark));
+  color: color-mix(in srgb, var(--lcars-nav-text-on) 80%, var(--chat-muted));
+}
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(2) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(2) {
+  background-color: color-mix(in srgb, var(--lcars-nav-active) 50%, var(--lcars-nav-dark));
+  color: color-mix(in srgb, var(--lcars-nav-text-on) 52%, var(--chat-muted));
+}
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(3) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(3) {
+  background-color: color-mix(in srgb, var(--lcars-nav-active) 34%, var(--lcars-nav-dark));
+  color: color-mix(in srgb, var(--lcars-nav-active) 55%, var(--chat-muted));
+}
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(4) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(4) {
+  background-color: color-mix(in srgb, var(--lcars-nav-active) 22%, var(--lcars-nav-dark));
+  color: color-mix(in srgb, var(--lcars-nav-active) 38%, var(--chat-muted));
+}
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(n+5) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(n+5) {
+  background-color: color-mix(in srgb, var(--lcars-nav-active) 12%, var(--lcars-nav-dark));
+  color: color-mix(in srgb, var(--lcars-nav-active) 24%, var(--chat-muted));
 }
 
 /* Active block: accent fill, dark text, glow pulse */
