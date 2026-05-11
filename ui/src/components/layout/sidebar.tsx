@@ -173,7 +173,7 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
 
         {showConversations ? (
           <>
-            <div className="px-3 pt-3 pb-2 space-y-2">
+            <div className="sidebar-new-chat px-3 pt-3 pb-2 space-y-2">
               <button
                 onClick={() => createConversation(model)}
                 className="btn-secondary w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md transition-all"

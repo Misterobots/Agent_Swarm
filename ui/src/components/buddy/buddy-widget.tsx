@@ -108,7 +108,7 @@ export function BuddyWidget() {
   /* ---------- Unhatched state ---------- */
   if (!hatched) {
     return (
-      <div className="px-3 py-3 border-t border-[var(--chat-border)]">
+      <div className="buddy-widget-container px-3 py-3 border-t border-[var(--chat-border)]">
         <button
           onClick={hatch}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-accent)] hover:border-[var(--chat-accent)] rounded-lg border border-[var(--chat-border)] border-dashed transition-colors"
@@ -129,7 +129,7 @@ export function BuddyWidget() {
     : 100;
 
   return (
-    <div className="relative">
+    <div className="buddy-widget-container relative">
       <div className="absolute top-0 left-3 right-3 divider" />
       {/* Evolution fanfare banner */}
       {showEvolutionBanner && (

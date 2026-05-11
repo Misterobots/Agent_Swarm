@@ -529,6 +529,41 @@
   margin-right: 6px;
 }
 
+/* ── SIDEBAR ALIGNMENT FIXES ──────────────────────────────────── */
+
+/* Section labels: reduce px-4 indent to align with nav items */
+[data-theme^="lcars"] .sidebar-wrapper .mb-4 > div:first-child,
+[data-theme^="lcars"] .sidebar-wrapper .mb-3 > div:first-child {
+  padding-left: 6px !important;
+}
+
+/* New Chat button: strip wrapper padding, flatten to LCARS block */
+[data-theme^="lcars"] .sidebar-new-chat {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: 1px !important;
+  padding-bottom: 1px !important;
+}
+[data-theme^="lcars"] .sidebar-new-chat .btn-secondary {
+  border-radius: 0 !important;
+  margin-right: 6px !important;
+  background-color: color-mix(in srgb, var(--lcars-nav-active) 16%, var(--lcars-nav-dark)) !important;
+  background-image: linear-gradient(to right, rgba(255,255,255,0.06) 0%, transparent 30%, rgba(0,0,0,0.15) 100%) !important;
+  border: none !important;
+  color: color-mix(in srgb, var(--lcars-nav-active) 38%, var(--chat-muted)) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  font-weight: 700 !important;
+}
+
+/* BMO widget: hide its top divider — footer already has one, two stacked = glitch */
+[data-theme^="lcars"] .buddy-widget-container > .divider {
+  display: none !important;
+}
+[data-theme^="lcars"] .buddy-widget-container.relative {
+  border-top: none !important;
+}
+
 /* ── DIVIDERS ─────────────────────────────────────────────────── */
 [data-theme^="lcars"] .divider {
   background: linear-gradient(to right, transparent, var(--chat-accent) 20%, var(--chat-accent) 80%, transparent);
