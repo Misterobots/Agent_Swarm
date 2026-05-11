@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Sun, Moon, Monitor, ChevronDown } from "lucide-react";
+import { Sun, Moon, Monitor, ChevronDown, Check } from "lucide-react";
 import { useSettingsStore, type ThemeMode } from "@/lib/stores/settings-store";
 import { cn } from "@/lib/utils/cn";
 
