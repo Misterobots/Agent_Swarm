@@ -183,17 +183,17 @@
   --chat-text:          #FFDDAA;
   --chat-muted:         #CC9944;
   --chat-subtle:        #886633;
-  /* Accent = active nav colour = bright golden yellow */
-  --chat-accent:        #FFCC00;
-  --chat-accent-strong: #FFEE55;
-  --chat-accent-soft:   rgba(255,204,0,0.16);
-  --chat-accent-rgb:    255, 204, 0;
+  /* Accent = active nav colour = warm orange-amber (reference match) */
+  --chat-accent:        #FFAA00;
+  --chat-accent-strong: #FFCC44;
+  --chat-accent-soft:   rgba(255,170,0,0.16);
+  --chat-accent-rgb:    255, 170, 0;
   --chat-accent-2:      #FF5500; /* deep red-orange, the elbow base */
-  --chat-thinking:      #FFEE00;
-  --elev-1: 0 0 0 1px rgba(255,180,0,0.35);
-  --elev-2: 0 0 0 2px rgba(255,180,0,0.5), 0 0 20px rgba(255,160,0,0.12);
-  --elev-3: 0 0 0 2px #FFCC00, 0 0 32px rgba(255,180,0,0.22);
-  --ring: 0 0 0 2px #0A0700, 0 0 0 4px #FFCC00, 0 0 14px rgba(255,200,0,0.5);
+  --chat-thinking:      #FFBB00;
+  --elev-1: 0 0 0 1px rgba(255,150,0,0.35);
+  --elev-2: 0 0 0 2px rgba(255,150,0,0.5), 0 0 20px rgba(255,130,0,0.12);
+  --elev-3: 0 0 0 2px #FFAA00, 0 0 32px rgba(255,150,0,0.22);
+  --ring: 0 0 0 2px #0A0700, 0 0 0 4px #FFAA00, 0 0 14px rgba(255,170,0,0.5);
   --hover-tint: rgba(255,180,0,0.09);
   --press-tint: rgba(255,180,0,0.20);
   --divider:    rgba(255,160,0,0.4);
@@ -202,10 +202,10 @@
   --lcars-elbow-b:     #FF6600;  /* bright orange */
   --lcars-elbow-c:     #FFAA00;  /* warm amber */
   --lcars-elbow-d:     #FFDD00;  /* bright yellow */
-  --lcars-nav-active:  #FFCC00;  /* bright golden yellow — the brightest button */
-  --lcars-nav-dark:    #1E1500;
-  --lcars-nav-text-on: #220E00;  /* dark warm text on bright button */
-  --lcars-section-title: #FFAA00;
+  --lcars-nav-active:  #FFAA00;  /* warm orange-amber — closer to reference */
+  --lcars-nav-dark:    #1A1100;
+  --lcars-nav-text-on: #1A0800;  /* dark warm text on bright button */
+  --lcars-section-title: #FF8800;
   color-scheme: dark;
 }
 
@@ -387,25 +387,9 @@
   box-shadow: none;
 }
 
-/* Right-edge strip — slow segment chaser with ease */
+/* Right-edge strip — removed per user feedback (too distracting) */
 [data-theme^="lcars"] .sidebar-wrapper::after {
-  content: "";
-  position: absolute;
-  right: 0; top: 0; bottom: 0;
-  width: 6px;
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--lcars-elbow-d) 0px,
-    var(--lcars-elbow-c) 12px,
-    var(--lcars-elbow-b) 24px,
-    var(--lcars-elbow-a) 36px,
-    color-mix(in srgb, var(--lcars-elbow-a) 30%, transparent) 48px,
-    transparent 56px,
-    transparent 80px
-  );
-  background-size: 6px 80px;
-  animation: lcars-stripe-chase 3.5s ease-in-out infinite;
-  z-index: 5;
+  display: none;
 }
 
 /* Elbow connector — top-left amber cap with large bottom-right curve */
@@ -474,9 +458,9 @@
   margin-right: 6px !important;
   border-radius: 0 !important;
   background-color: var(--lcars-nav-dark);
-  background-image: linear-gradient(to right, rgba(255,255,255,0.08) 0%, transparent 28%, rgba(0,0,0,0.22) 100%);
+  background-image: linear-gradient(to right, rgba(255,255,255,0.07) 0%, transparent 28%, rgba(0,0,0,0.18) 100%);
   color: var(--chat-muted);
-  border-bottom: 1px solid color-mix(in srgb, var(--lcars-nav-dark) 60%, var(--chat-accent));
+  border: none;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 700;
@@ -519,12 +503,13 @@
   color: color-mix(in srgb, var(--lcars-nav-active) 24%, var(--chat-muted));
 }
 
-/* Active block: accent fill, dark text, glow pulse */
+/* Active block: accent fill, dark text, soft inner glow */
 [data-theme^="lcars"] .sidebar-active {
   background: var(--lcars-nav-active) !important;
   color: var(--lcars-nav-text-on) !important;
   border-radius: 0 !important;
-  border-bottom: 1px solid color-mix(in srgb, var(--lcars-nav-active) 60%, black) !important;
+  border: none !important;
+  box-shadow: inset 0 0 12px rgba(255,255,255,0.12), 0 0 8px color-mix(in srgb, var(--lcars-nav-active) 40%, transparent) !important;
   animation: lcars-nav-pulse 6s ease-in-out infinite;
 }
 [data-theme^="lcars"] .sidebar-active::before { display: none; }
@@ -538,7 +523,7 @@
 
 [data-theme^="lcars"] .sidebar-wrapper > div:nth-child(2) {
   margin-right: 6px;
-  border-bottom: 2px solid color-mix(in srgb, var(--chat-accent) 20%, transparent);
+  border-bottom: none;
 }
 [data-theme^="lcars"] .sidebar-wrapper > div:last-child {
   margin-right: 6px;
