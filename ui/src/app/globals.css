@@ -753,6 +753,132 @@
 [data-theme^="lcars"] .streaming-caret::after { color: var(--chat-accent); }
 
 /* ═══════════════════════════════════════════════════════════════
+   CYBERPUNK / SHADOWRUN THEME
+   Neon-drenched corporate dystopia. Hot magenta primary,
+   electric cyan secondary, dark purple-black backgrounds.
+   Glassmorphism on sidebar and panels.
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="cyberpunk"] {
+  --chat-bg:            #04020C;
+  --chat-surface:       #080514;
+  --chat-surface-rgb:   8, 5, 20;
+  --chat-panel:         #0C0820;
+  --chat-soft:          #0A0618;
+  --chat-elevated:      #130E2A;
+  --chat-border:        #2D1A4A;
+  --chat-border-rgb:    45, 26, 74;
+  --chat-text:          #E8D8FF;
+  --chat-muted:         #8866AA;
+  --chat-subtle:        #4A3366;
+
+  --chat-accent:        #FF2D78;
+  --chat-accent-strong: #FF6699;
+  --chat-accent-soft:   rgba(255, 45, 120, 0.15);
+  --chat-accent-rgb:    255, 45, 120;
+  --chat-accent-2:      #00F5FF;   /* electric cyan */
+  --chat-thinking:      #CC00FF;   /* neon purple */
+
+  --elev-1:
+    0 1px 4px rgba(0,0,0,0.7),
+    0 0 0 1px rgba(255,45,120,0.18);
+  --elev-2:
+    0 4px 16px rgba(0,0,0,0.65),
+    0 0 0 1px rgba(255,45,120,0.28),
+    0 0 24px rgba(255,45,120,0.07);
+  --elev-3:
+    0 8px 32px rgba(0,0,0,0.75),
+    0 0 0 1px rgba(255,45,120,0.38),
+    0 0 48px rgba(255,45,120,0.10),
+    0 0 80px rgba(0,245,255,0.04);
+  --ring:
+    0 0 0 2px #04020C,
+    0 0 0 4px #FF2D78,
+    0 0 20px rgba(255,45,120,0.5);
+
+  --inset-highlight: inset 0 1px 0 rgba(255,45,120,0.07);
+  --hover-tint:      rgba(255, 45, 120, 0.08);
+  --press-tint:      rgba(255, 45, 120, 0.18);
+  --divider:         rgba(255, 45, 120, 0.2);
+
+  --backdrop-glow:
+    radial-gradient(ellipse 1400px 900px at 12% 10%, rgba(255,45,120,0.07), transparent 55%),
+    radial-gradient(ellipse 900px 700px at 88% 90%, rgba(0,245,255,0.05), transparent 55%),
+    radial-gradient(ellipse 700px 500px at 55% 45%, rgba(204,0,255,0.03), transparent 55%);
+
+  color-scheme: dark;
+}
+
+/* ── GRID BACKGROUND ──────────────────────────────────────────── */
+[data-theme="cyberpunk"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,45,120,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,45,120,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── SIDEBAR — glass panel ────────────────────────────────────── */
+[data-theme="cyberpunk"] .sidebar-wrapper {
+  background: rgba(4, 2, 12, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 45, 120, 0.18);
+  box-shadow: 2px 0 32px rgba(255, 45, 120, 0.06);
+}
+
+/* Logo band bottom-edge neon sweep */
+[data-theme="cyberpunk"] .sidebar-wrapper > div:first-child {
+  border-bottom: 1px solid rgba(255, 45, 120, 0.22);
+  position: relative;
+  overflow: hidden;
+}
+[data-theme="cyberpunk"] .sidebar-wrapper > div:first-child::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #FF2D78 40%, #00F5FF 60%, transparent);
+  animation: cp-scan-h 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Nav items — left neon bar on hover/active */
+[data-theme="cyberpunk"] nav a:hover,
+[data-theme="cyberpunk"] nav button:hover {
+  box-shadow: inset 2px 0 0 #FF2D78, 0 0 12px rgba(255,45,120,0.10);
+}
+
+/* ── FLOATING OVERLAYS — keep rectangular ─────────────────────── */
+[data-theme="cyberpunk"] .theme-picker-enter,
+[data-theme="cyberpunk"] [data-radix-popper-content-wrapper],
+[data-theme="cyberpunk"] [role="dialog"],
+[data-theme="cyberpunk"] [role="menu"] {
+  border-radius: 4px !important;
+}
+
+/* ── INDICATORS ───────────────────────────────────────────────── */
+[data-theme="cyberpunk"] .thinking-dot { background: #FF2D78; }
+[data-theme="cyberpunk"] .streaming-caret::after { color: #FF2D78; }
+
+/* ── ANIMATIONS ───────────────────────────────────────────────── */
+@keyframes cp-scan-h {
+  0%   { opacity: 0; transform: translateX(-110%); }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(110%); }
+}
+
+@keyframes cp-neon-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,45,120,0.3); }
+  50%       { box-shadow: 0 0 18px rgba(255,45,120,0.6), 0 0 36px rgba(0,245,255,0.12); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    GLOBAL BASE
    ═══════════════════════════════════════════════════════════════ */
 
