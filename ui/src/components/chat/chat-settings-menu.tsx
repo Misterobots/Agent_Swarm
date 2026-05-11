@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Settings2, Brain, Moon, Sun, Monitor, Tv2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { Settings2, Brain, Moon, Sun, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ResearchToggle } from "./research-toggle";
 import { UltraplanToggle } from "./ultraplan-toggle";
@@ -17,7 +18,10 @@ import { useSettingsStore, type ThemeMode } from "@/lib/stores/settings-store";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ bottom: 0, right: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
   const activeConversationId = useChatStore((s) => s.activeConversationId);
   const updateConversation = useChatStore((s) => s.updateConversation);
   const activeConv = useChatStore((s) => s.activeConversation());
@@ -31,25 +35,129 @@ export function ChatSettingsMenu() {
   const groundingFile = useSettingsStore((s) => s.groundingFile);
   const anyModeActive = ultraplanMode || ultrathinkMode || researchMode || swarmMode || groundingWeb || groundingDocs || groundingFile;
 
-  // Close menu when clicking outside
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setMenuPos({
+      bottom: window.innerHeight - r.top + 8,
+      right: window.innerWidth - r.right,
+    });
+  }, []);
+
+  const open = () => {
+    updatePos();
+    setIsOpen(true);
+  };
+
+  // Close on outside click
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+    if (!isOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        btnRef.current?.contains(e.target as Node) ||
+        menuRef.current?.contains(e.target as Node)
+      ) return;
+      setIsOpen(false);
     };
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [isOpen]);
 
+  // Close on scroll/resize
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = () => setIsOpen(false);
+    window.addEventListener("scroll", handler, true);
+    window.addEventListener("resize", handler);
+    return () => {
+      window.removeEventListener("scroll", handler, true);
+      window.removeEventListener("resize", handler);
+    };
+  }, [isOpen]);
+
+  const dropdown = isOpen ? (
+    <div
+      ref={menuRef}
+      className="fixed w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2 space-y-1.5 z-[9999] max-h-[70vh] overflow-y-auto scrollbar-thin theme-picker-enter"
+      style={{
+        bottom: menuPos.bottom,
+        right: menuPos.right,
+        boxShadow: "var(--elev-3)",
+      }}
+    >
+      <div className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wide mb-1">
+        Chat Settings
+      </div>
+
+      {/* Theme */}
+      <div className="space-y-1">
+        <label className="text-xs text-[var(--chat-muted)]">Theme</label>
+        <ThemeInline />
+      </div>
+
+      {/* Modes */}
+      <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
+        <label className="text-xs text-[var(--chat-muted)]">Modes</label>
+        <div className="grid grid-cols-2 gap-1">
+          <ResearchToggle />
+          <UltraplanToggle />
+          <UltrathinkToggle />
+          <SwarmToggle />
+          <DesignModeToggle />
+        </div>
+      </div>
+
+      {/* Grounding */}
+      <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
+        <label className="text-xs text-[var(--chat-muted)]">Grounding</label>
+        <div className="grid grid-cols-2 gap-1">
+          <WebGroundingToggle />
+          <DocGroundingToggle />
+          <FileGroundingToggle />
+        </div>
+      </div>
+
+      {/* Quality/Effort */}
+      <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
+        <label className="text-xs text-[var(--chat-muted)]">Quality & Effort</label>
+        <QualitySettingsPanel />
+      </div>
+
+      {/* Memory toggle */}
+      {activeConversationId && (
+        <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
+          <button
+            type="button"
+            onClick={() => {
+              updateConversation(activeConversationId, {
+                memoryEnabled: !(activeConv?.memoryEnabled ?? false),
+              });
+            }}
+            className={cn(
+              "w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs border transition-colors",
+              activeConv?.memoryEnabled
+                ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
+                : "bg-[var(--chat-panel)] text-[var(--chat-muted)] border-[var(--chat-border)] hover:text-[var(--chat-text)]"
+            )}
+            title="Toggle cross-session memory recall"
+          >
+            <Brain size={14} />
+            <span className="flex-1 text-left">Memory</span>
+            <span className="text-xs opacity-70">
+              {activeConv?.memoryEnabled ? "On" : "Off"}
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
-    <div className="relative" ref={menuRef}>
-      {/* Settings button */}
+    <div className="relative">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={open}
         className={cn(
           "flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-md flex items-center justify-center transition-colors relative",
           isOpen
@@ -66,83 +174,12 @@ export function ChatSettingsMenu() {
         )}
       </button>
 
-      {/* Settings menu dropdown */}
-      {isOpen && (
-        <div
-          className="absolute bottom-full right-0 mb-2 w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2 space-y-1.5 z-30 max-h-[75vh] overflow-y-auto scrollbar-thin theme-picker-enter"
-          style={{ boxShadow: "var(--elev-3)" }}
-        >
-          <div className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wide mb-1">
-            Chat Settings
-          </div>
-
-          {/* Theme — inline buttons, no nested dropdown */}
-          <div className="space-y-1.5">
-            <label className="text-xs text-[var(--chat-muted)]">Theme</label>
-            <ThemeInline />
-          </div>
-
-          {/* Modes */}
-          <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
-            <label className="text-xs text-[var(--chat-muted)]">Modes</label>
-            <div className="grid grid-cols-2 gap-1">
-              <ResearchToggle />
-              <UltraplanToggle />
-              <UltrathinkToggle />
-              <SwarmToggle />
-              <DesignModeToggle />
-            </div>
-          </div>
-
-          {/* Grounding */}
-          <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
-            <label className="text-xs text-[var(--chat-muted)]">Grounding</label>
-            <div className="grid grid-cols-2 gap-1">
-              <WebGroundingToggle />
-              <DocGroundingToggle />
-              <FileGroundingToggle />
-            </div>
-          </div>
-
-          {/* Quality/Effort Settings */}
-          <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
-            <label className="text-xs text-[var(--chat-muted)]">Quality & Effort</label>
-            <QualitySettingsPanel />
-          </div>
-
-          {/* Memory toggle */}
-          {activeConversationId && (
-            <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
-              <button
-                type="button"
-                onClick={() => {
-                  updateConversation(activeConversationId, {
-                    memoryEnabled: !(activeConv?.memoryEnabled ?? false),
-                  });
-                }}
-                className={cn(
-                  "w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs border transition-colors",
-                  activeConv?.memoryEnabled
-                    ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
-                    : "bg-[var(--chat-panel)] text-[var(--chat-muted)] border-[var(--chat-border)] hover:text-[var(--chat-text)]"
-                )}
-                title="Toggle cross-session memory recall"
-              >
-                <Brain size={14} />
-                <span className="flex-1 text-left">Memory</span>
-                <span className="text-xs opacity-70">
-                  {activeConv?.memoryEnabled ? "On" : "Off"}
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {typeof window !== "undefined" && createPortal(dropdown, document.body)}
     </div>
   );
 }
 
-/** Compact inline theme picker — no nested dropdown, safe inside other menus. */
+/** Compact inline theme picker — no nested dropdown. */
 function ThemeInline() {
   const theme = useSettingsStore((s) => s.theme);
   const setTheme = useSettingsStore((s) => s.setTheme);
@@ -163,7 +200,6 @@ function ThemeInline() {
 
   return (
     <div className="space-y-1">
-      {/* Memex modes — compact 3-col row */}
       <div className="flex gap-1">
         {modes.map((m) => {
           const active = theme === "memex" && themeMode === m.id;
@@ -180,12 +216,11 @@ function ThemeInline() {
               )}
             >
               {m.icon}
-              <span className="hidden sm:inline">{m.label}</span>
+              <span>{m.label}</span>
             </button>
           );
         })}
       </div>
-      {/* LCARS variants — compact 3-col row */}
       <div className="flex gap-1">
         {lcarsVariants.map((v) => {
           const active = theme === v.id;

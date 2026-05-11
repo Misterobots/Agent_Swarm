@@ -299,25 +299,61 @@
    All selectors use [data-theme^="lcars"] — matches all three variants.
    ═══════════════════════════════════════════════════════════════ */
 
+/* Horizontal scan line */
 @keyframes lcars-scan {
   0%   { transform: translateX(-110%); }
   100% { transform: translateX(110%); }
 }
+/* Vertical scan line — slower, the "CRT sweep" */
+@keyframes lcars-scan-v {
+  0%   { transform: translateY(-110%); }
+  100% { transform: translateY(110%); }
+}
+/* Active nav glow pulse */
 @keyframes lcars-nav-pulse {
   0%, 100% { box-shadow: none; }
   50%       { box-shadow: inset 0 0 14px rgba(255,255,255,0.1), 3px 0 18px rgba(var(--chat-accent-rgb),0.35); }
 }
+/* System indicator blink — fast double-flash */
 @keyframes lcars-blink {
-  0%, 85%, 100% { opacity: 1; }
-  90%            { opacity: 0.1; }
+  0%, 80%, 100% { opacity: 1; }
+  85%            { opacity: 0.05; }
+  90%            { opacity: 0.9; }
+  95%            { opacity: 0.05; }
 }
+/* Sensor ring rotation */
 @keyframes lcars-rotate {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+/* Heading amber glow pulse */
 @keyframes lcars-heading-glow {
   0%, 100% { text-shadow: none; }
   50%       { text-shadow: 0 0 16px rgba(var(--chat-accent-rgb),0.5), 0 0 32px rgba(var(--chat-accent-rgb),0.2); }
+}
+/* Right-strip segment chaser — bright segment moving down the strip */
+@keyframes lcars-stripe-chase {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 120px; }
+}
+/* Data bar fill/drain — used on decorative segment bars */
+@keyframes lcars-fill {
+  0%   { width: 20%; }
+  20%  { width: 78%; }
+  45%  { width: 52%; }
+  65%  { width: 91%; }
+  85%  { width: 38%; }
+  100% { width: 20%; }
+}
+/* Elbow pulse — breathes the amber connection point */
+@keyframes lcars-elbow-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.85; }
+}
+/* Section title cursor blink */
+@keyframes lcars-cursor {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 /* ── BASE ─────────────────────────────────────────────────────── */
@@ -337,13 +373,23 @@
   box-shadow: none;
 }
 
-/* Right-edge strip — uses per-variant --lcars-strip */
+/* Right-edge strip — animated segment chaser moves down the strip */
 [data-theme^="lcars"] .sidebar-wrapper::after {
   content: "";
   position: absolute;
   right: 0; top: 0; bottom: 0;
   width: 6px;
-  background: var(--lcars-strip);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--lcars-elbow-d) 0px,
+    var(--lcars-elbow-c) 10px,
+    var(--lcars-elbow-b) 20px,
+    var(--lcars-elbow-a) 30px,
+    transparent 30px,
+    transparent 40px
+  );
+  background-size: 6px 80px;
+  animation: lcars-stripe-chase 2s linear infinite;
   z-index: 5;
 }
 
@@ -360,6 +406,7 @@
   box-shadow: inset 0 -2px 8px rgba(0,0,0,0.35);
   position: relative;
   overflow: hidden;
+  animation: lcars-elbow-pulse 4s ease-in-out infinite;
 }
 /* Scan shimmer across the elbow */
 [data-theme^="lcars"] .sidebar-wrapper > div:first-child::after {
@@ -466,21 +513,86 @@
 }
 
 /* ── CHAT SURFACE ─────────────────────────────────────────────── */
-/* Scan line at top of content */
+/* Horizontal scan line at top of content */
 [data-theme^="lcars"] .chat-shell::before {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
-  background: linear-gradient(to right, transparent 0%, rgba(var(--chat-accent-rgb),0.6) 50%, transparent 100%);
+  background: linear-gradient(to right, transparent 0%, rgba(var(--chat-accent-rgb),0.7) 50%, transparent 100%);
   width: 50%;
-  animation: lcars-scan 10s linear infinite;
+  animation: lcars-scan 8s linear infinite;
   pointer-events: none;
   z-index: 100;
 }
 
+/* Subtle CRT scanline grid over entire chat area */
+[data-theme^="lcars"] .chat-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(var(--chat-accent-rgb), 0.012) 2px,
+    rgba(var(--chat-accent-rgb), 0.012) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Second slower vertical scan across the main panel */
+[data-theme^="lcars"] .chat-shell .flex-1 {
+  position: relative;
+  overflow: hidden;
+}
+[data-theme^="lcars"] .chat-shell .flex-1::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent 0%, rgba(var(--chat-accent-rgb),0.4) 50%, transparent 100%);
+  height: 40%;
+  animation: lcars-scan-v 15s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Section title gets an animated blinking cursor after */
+[data-theme^="lcars"] .sidebar-section-title::after {
+  content: "▋";
+  font-size: 0.55em;
+  margin-left: 0.3em;
+  animation: lcars-cursor 1.2s step-start infinite;
+  opacity: 0.6;
+}
+
+/* Animated data bar under active nav items */
+[data-theme^="lcars"] .sidebar-active::after {
+  content: "";
+  display: block;
+  position: absolute;
+  bottom: 0; left: 0;
+  height: 2px;
+  background: rgba(0,0,0,0.3);
+  animation: lcars-fill 6s ease-in-out infinite;
+}
+
 [data-theme^="lcars"] .msg-enter {
   border-left: 3px solid var(--chat-accent);
+  position: relative;
+  overflow: hidden;
+}
+/* Scan line through each new message */
+[data-theme^="lcars"] .msg-enter::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, rgba(var(--chat-accent-rgb),0.5), transparent);
+  animation: lcars-scan-v 3s ease-out 1;
+  pointer-events: none;
 }
 
 /* ── INPUTS & BUTTONS ─────────────────────────────────────────── */
