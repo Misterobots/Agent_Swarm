@@ -21,9 +21,21 @@ interface NamedTheme {
 const NAMED_THEMES: NamedTheme[] = [
   {
     id: "lcars",
-    label: "LCARS",
-    desc: "Star Trek computer interface",
-    swatch: { bg: "#000", accent: "#FF9900", accent2: "#CC6699" },
+    label: "LCARS Amber",
+    desc: "Lower Decks warm palette",
+    swatch: { bg: "#080600", accent: "#FFAA00", accent2: "#FF5500" },
+  },
+  {
+    id: "lcars-blue",
+    label: "LCARS Blue",
+    desc: "TNG cold palette",
+    swatch: { bg: "#02040E", accent: "#5577FF", accent2: "#AA66FF" },
+  },
+  {
+    id: "lcars-teal",
+    label: "LCARS Teal",
+    desc: "Green-teal palette",
+    swatch: { bg: "#020E08", accent: "#00CC77", accent2: "#FF6600" },
   },
 ];
 

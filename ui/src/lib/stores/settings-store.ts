@@ -9,6 +9,8 @@ import type { Skill, Style } from "@/types/chat";
 export type ChatTheme =
   | "memex"
   | "lcars"
+  | "lcars-blue"
+  | "lcars-teal"
   | "amber"
   | "ember" | "slate" | "signal" | "office"
   | "hacker" | "star-trek" | "cyberpunk" | "minimal";

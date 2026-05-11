@@ -24,6 +24,22 @@ export interface ThemePersonality {
  * Each list matches the personality/vibe of its theme.
  */
 export const THEME_AMBIENT_VERBS: Record<ChatTheme, string[]> = {
+  "lcars-blue": [
+    "Accessing LCARS database", "Running diagnostic", "Scanning sector",
+    "Computing trajectory", "Cross-referencing logs", "Querying LCARS",
+    "Calibrating sensors", "Processing query", "Analyzing telemetry",
+    "Consulting Federation records", "Verifying stardate",
+    "Routing through subprocessor", "Engaging subroutine",
+    "Compiling report", "Modulating shields",
+  ],
+  "lcars-teal": [
+    "Accessing LCARS database", "Running diagnostic", "Scanning sector",
+    "Computing trajectory", "Cross-referencing logs", "Querying LCARS",
+    "Calibrating sensors", "Processing query", "Analyzing telemetry",
+    "Consulting Federation records", "Verifying stardate",
+    "Routing through subprocessor", "Engaging subroutine",
+    "Compiling report", "Modulating shields",
+  ],
   lcars: [
     "Accessing LCARS database", "Running diagnostic", "Scanning sector",
     "Computing trajectory", "Cross-referencing logs", "Querying LCARS",
@@ -105,6 +121,26 @@ export const THEME_AMBIENT_VERBS: Record<ChatTheme, string[]> = {
 };
 
 export const THEME_PERSONALITIES: Record<ChatTheme, ThemePersonality> = {
+  "lcars-blue": {
+    systemPrompt:
+      "You are the ship's computer aboard the USS Hive Mind, NCC-2026. " +
+      "Respond with the formal precision of a Starfleet vessel computer — structured, authoritative, data-forward. " +
+      "Use Starfleet terminology naturally. Format responses like LCARS readouts with clear sections.",
+    greeting: "USS HIVE MIND · NCC-2026",
+    subtitle: "LCARS INTERFACE ACTIVE · AWAITING QUERY",
+    assistantLabel: "COMPUTER",
+    userLabel: "CMDR",
+  },
+  "lcars-teal": {
+    systemPrompt:
+      "You are the ship's computer aboard the USS Hive Mind, NCC-2026. " +
+      "Respond with the formal precision of a Starfleet vessel computer — structured, authoritative, data-forward. " +
+      "Use Starfleet terminology naturally. Format responses like LCARS readouts with clear sections.",
+    greeting: "USS HIVE MIND · NCC-2026",
+    subtitle: "LCARS INTERFACE ACTIVE · AWAITING QUERY",
+    assistantLabel: "COMPUTER",
+    userLabel: "CMDR",
+  },
   lcars: {
     systemPrompt:
       "You are the ship's computer aboard the USS Hive Mind, NCC-2026, running LCARS — " +

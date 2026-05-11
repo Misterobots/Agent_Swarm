@@ -156,256 +156,309 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LCARS THEME — Star Trek Lower Decks warm-amber LCARS variant.
-   Reference: Project RITOS (USS Cerritos / California Class build).
-   Always dark — no light/dark mode variant.
+   LCARS THEME FAMILY — Star Trek LCARS interfaces.
+   Reference: Project RITOS (USS Cerritos / California Class).
+   Three variants sharing structural CSS via [data-theme^="lcars"].
 
-   Palette (warm, not cold-blue TNG):
-     Amber   #FFAA00  — primary accent, active elements
-     Yellow  #FFDD44  — bright highlights, active text
-     Gold    #CC8800  — borders, inactive nav
-     Dk-gold #221800  — nav block backgrounds
-     Text    #FFCC88  — warm tan body text
-     Black   #080600  — warm near-black background
+     lcars        Warm amber / Lower Decks palette
+     lcars-blue   Cold blue / TNG palette
+     lcars-teal   Teal-green palette
 
-   Structure: thick amber elbow at top-left, flat rectangular nav
-   blocks stacked full-width, right-edge accent strip, square panels.
+   All are always dark — no light/dark variant.
    ═══════════════════════════════════════════════════════════════ */
 
+/* ── LCARS AMBER — warm Lower Decks palette ───────────────────── */
 [data-theme="lcars"] {
-  --chat-bg:           #080600;
-  --chat-surface:      #0f0c01;
-  --chat-surface-rgb:  15, 12, 1;
-  --chat-panel:        #1a1400;
-  --chat-soft:         #100c00;
-  --chat-elevated:     #251c00;
-
-  --chat-border:       #885500;
-  --chat-border-rgb:   136, 85, 0;
-
-  --chat-text:         #FFCC88;
-  --chat-muted:        #AA7733;
-  --chat-subtle:       #664400;
-
-  --chat-accent:       #FFAA00;
+  --chat-bg:            #080600;
+  --chat-surface:       #0f0c01;
+  --chat-surface-rgb:   15, 12, 1;
+  --chat-panel:         #1a1400;
+  --chat-soft:          #100c00;
+  --chat-elevated:      #251c00;
+  --chat-border:        #885500;
+  --chat-border-rgb:    136, 85, 0;
+  --chat-text:          #FFCC88;
+  --chat-muted:         #CC8833;
+  --chat-subtle:        #775522;
+  --chat-accent:        #FFAA00;
   --chat-accent-strong: #FFDD44;
-  --chat-accent-soft:  rgba(255, 170, 0, 0.18);
-  --chat-accent-rgb:   255, 170, 0;
-  --chat-accent-2:     #FF6600;
-  --chat-thinking:     #FFDD00;
+  --chat-accent-soft:   rgba(255,170,0,0.18);
+  --chat-accent-rgb:    255, 170, 0;
+  --chat-accent-2:      #FF5500; /* deep orange — richer complement */
+  --chat-thinking:      #FFDD00;
+  --elev-1: 0 0 0 1px rgba(255,170,0,0.4);
+  --elev-2: 0 0 0 2px rgba(255,170,0,0.6), 0 0 16px rgba(255,170,0,0.12);
+  --elev-3: 0 0 0 2px #FFAA00, 0 0 28px rgba(255,170,0,0.25);
+  --ring: 0 0 0 2px #000, 0 0 0 4px #FFAA00, 0 0 12px rgba(255,170,0,0.5);
+  --hover-tint: rgba(255,170,0,0.10);
+  --press-tint: rgba(255,170,0,0.22);
+  --divider:    rgba(255,170,0,0.45);
+  /* Variant-specific structural tokens */
+  --lcars-elbow-a:     #FF5500;
+  --lcars-elbow-b:     #FF8800;
+  --lcars-elbow-c:     #FFAA00;
+  --lcars-elbow-d:     #FFDD44;
+  --lcars-strip:       linear-gradient(to bottom, #FF5500, #FF8800 25%, #FFAA00 50%, #FFDD44 75%, #FF8800);
+  --lcars-nav-active:  #FFAA00;
+  --lcars-nav-dark:    #1f1500;
+  --lcars-nav-text-on: #1a0800;      /* text on active button */
+  --lcars-section-title: #FFAA00;
+  color-scheme: dark;
+}
 
+/* ── LCARS BLUE — cold TNG palette ───────────────────────────── */
+[data-theme="lcars-blue"] {
+  --chat-bg:            #02040E;
+  --chat-surface:       #060B1A;
+  --chat-surface-rgb:   6, 11, 26;
+  --chat-panel:         #0D1530;
+  --chat-soft:          #080E20;
+  --chat-elevated:      #141E3C;
+  --chat-border:        #334488;
+  --chat-border-rgb:    51, 68, 136;
+  --chat-text:          #AABBFF;
+  --chat-muted:         #5566AA;
+  --chat-subtle:        #334477;
+  --chat-accent:        #5577FF;
+  --chat-accent-strong: #99AAFF;
+  --chat-accent-soft:   rgba(85,119,255,0.18);
+  --chat-accent-rgb:    85, 119, 255;
+  --chat-accent-2:      #AA66FF; /* lavender complement */
+  --chat-thinking:      #99AAFF;
+  --elev-1: 0 0 0 1px rgba(85,119,255,0.4);
+  --elev-2: 0 0 0 2px rgba(85,119,255,0.6), 0 0 16px rgba(85,119,255,0.12);
+  --elev-3: 0 0 0 2px #5577FF, 0 0 28px rgba(85,119,255,0.25);
+  --ring: 0 0 0 2px #000, 0 0 0 4px #5577FF, 0 0 12px rgba(85,119,255,0.5);
+  --hover-tint: rgba(85,119,255,0.10);
+  --press-tint: rgba(85,119,255,0.22);
+  --divider:    rgba(85,119,255,0.4);
+  --lcars-elbow-a:     #1122AA;
+  --lcars-elbow-b:     #2244CC;
+  --lcars-elbow-c:     #5577FF;
+  --lcars-elbow-d:     #99AAFF;
+  --lcars-strip:       linear-gradient(to bottom, #1122AA, #2244CC 25%, #5577FF 50%, #AA66FF 75%, #2244CC);
+  --lcars-nav-active:  #5577FF;
+  --lcars-nav-dark:    #0D1530;
+  --lcars-nav-text-on: #000820;
+  --lcars-section-title: #5577FF;
+  color-scheme: dark;
+}
+
+/* ── LCARS TEAL — green-teal palette ─────────────────────────── */
+[data-theme="lcars-teal"] {
+  --chat-bg:            #020E08;
+  --chat-surface:       #051A0F;
+  --chat-surface-rgb:   5, 26, 15;
+  --chat-panel:         #0C2A18;
+  --chat-soft:          #081A10;
+  --chat-elevated:      #123820;
+  --chat-border:        #226644;
+  --chat-border-rgb:    34, 102, 68;
+  --chat-text:          #88FFCC;
+  --chat-muted:         #449966;
+  --chat-subtle:        #226644;
+  --chat-accent:        #00CC77;
+  --chat-accent-strong: #44FFAA;
+  --chat-accent-soft:   rgba(0,204,119,0.18);
+  --chat-accent-rgb:    0, 204, 119;
+  --chat-accent-2:      #FF6600; /* warm orange complement — matches reference */
+  --chat-thinking:      #44FFAA;
+  --elev-1: 0 0 0 1px rgba(0,204,119,0.4);
+  --elev-2: 0 0 0 2px rgba(0,204,119,0.6), 0 0 16px rgba(0,204,119,0.12);
+  --elev-3: 0 0 0 2px #00CC77, 0 0 28px rgba(0,204,119,0.25);
+  --ring: 0 0 0 2px #000, 0 0 0 4px #00CC77, 0 0 12px rgba(0,204,119,0.5);
+  --hover-tint: rgba(0,204,119,0.10);
+  --press-tint: rgba(0,204,119,0.22);
+  --divider:    rgba(0,204,119,0.4);
+  --lcars-elbow-a:     #005533;
+  --lcars-elbow-b:     #007744;
+  --lcars-elbow-c:     #00CC77;
+  --lcars-elbow-d:     #44FFAA;
+  --lcars-strip:       linear-gradient(to bottom, #005533, #007744 25%, #00CC77 50%, #FF6600 75%, #007744);
+  --lcars-nav-active:  #00CC77;
+  --lcars-nav-dark:    #0C2A18;
+  --lcars-nav-text-on: #001a0a;
+  --lcars-section-title: #00CC77;
+  color-scheme: dark;
+}
+
+/* ── SHARED RADIUS & SPACING (all variants) ───────────────────── */
+[data-theme^="lcars"] {
   --radius-sm:         999px;
   --radius-md:         999px;
   --radius-lg:         999px;
   --chat-radius:       0;
   --chat-input-radius: 1.5rem;
-
-  --elev-1: 0 0 0 1px rgba(255,170,0,0.4);
-  --elev-2: 0 0 0 2px rgba(255,170,0,0.6), 0 0 16px rgba(255,170,0,0.12);
-  --elev-3: 0 0 0 2px #FFAA00, 0 0 28px rgba(255,170,0,0.25);
-  --inset-highlight: inset 0 1px 0 rgba(255,220,100,0.12);
-  --ring: 0 0 0 2px #000, 0 0 0 4px #FFAA00, 0 0 12px rgba(255,170,0,0.5);
-  --hover-tint: rgba(255,170,0,0.10);
-  --press-tint: rgba(255,170,0,0.22);
-  --divider:    rgba(255,170,0,0.45);
-  --backdrop-glow: none;
+  --inset-highlight:   inset 0 1px 0 rgba(255,255,255,0.08);
+  --backdrop-glow:     none;
   --chat-font: "Gill Sans", "Trebuchet MS", "Arial Narrow", system-ui, sans-serif;
-
-  color-scheme: dark;
 }
 
-/* ── LCARS ANIMATIONS ─────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   LCARS SHARED ANIMATIONS & STRUCTURE
+   All selectors use [data-theme^="lcars"] — matches all three variants.
+   ═══════════════════════════════════════════════════════════════ */
 
-/* Horizontal scan line — sweeps across surfaces */
 @keyframes lcars-scan {
   0%   { transform: translateX(-110%); }
   100% { transform: translateX(110%); }
 }
-
-/* Active nav block glow pulse */
 @keyframes lcars-nav-pulse {
-  0%, 100% { box-shadow: inset 0 0 0 transparent, 3px 0 12px rgba(255,170,0,0.0); }
-  50%       { box-shadow: inset 0 0 12px rgba(255,220,0,0.15), 3px 0 20px rgba(255,170,0,0.35); }
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: inset 0 0 14px rgba(255,255,255,0.1), 3px 0 18px rgba(var(--chat-accent-rgb),0.35); }
 }
-
-/* System indicator blink (status dot, small data points) */
 @keyframes lcars-blink {
   0%, 85%, 100% { opacity: 1; }
   90%            { opacity: 0.1; }
 }
-
-/* Slow sensor ring rotation (logo area) */
 @keyframes lcars-rotate {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
-
-/* Section heading amber glow pulse */
 @keyframes lcars-heading-glow {
   0%, 100% { text-shadow: none; }
-  50%       { text-shadow: 0 0 16px rgba(255,210,0,0.55), 0 0 32px rgba(255,170,0,0.2); }
+  50%       { text-shadow: 0 0 16px rgba(var(--chat-accent-rgb),0.5), 0 0 32px rgba(var(--chat-accent-rgb),0.2); }
 }
 
-/* Data bar fill/drain (decorative animated segment bars) */
-@keyframes lcars-bar {
-  0%   { width: 35%; }
-  25%  { width: 72%; }
-  60%  { width: 48%; }
-  80%  { width: 91%; }
-  100% { width: 35%; }
-}
+/* ── BASE ─────────────────────────────────────────────────────── */
 
-/* ── LCARS BASE ───────────────────────────────────────────────── */
-
-[data-theme="lcars"] body,
-[data-theme="lcars"] .chat-shell {
+[data-theme^="lcars"] body,
+[data-theme^="lcars"] .chat-shell {
   font-family: "Gill Sans", "Trebuchet MS", "Arial Narrow", system-ui, sans-serif;
   letter-spacing: 0.03em;
-  background: #080600;
+  background: var(--chat-bg);
 }
 
 /* ── SIDEBAR ─────────────────────────────────────────────────── */
 
-/* Outer wrapper: warm-black bg, right-edge amber strip */
-[data-theme="lcars"] .sidebar-wrapper {
-  background: #080600;
+[data-theme^="lcars"] .sidebar-wrapper {
+  background: var(--chat-bg);
   border-right: none;
   box-shadow: none;
 }
 
-/* Right edge accent strip */
-[data-theme="lcars"] .sidebar-wrapper::after {
+/* Right-edge strip — uses per-variant --lcars-strip */
+[data-theme^="lcars"] .sidebar-wrapper::after {
   content: "";
   position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
+  right: 0; top: 0; bottom: 0;
   width: 6px;
-  background: linear-gradient(to bottom,
-    #FF8800 0%, #FFAA00 25%,
-    #FF8800 50%, #FFAA00 75%,
-    #FF8800 100%
-  );
+  background: var(--lcars-strip);
   z-index: 5;
 }
 
-/* Logo / header section = the LCARS "elbow"
-   Amber fill with large bottom-right curve — the signature connector. */
-[data-theme="lcars"] .sidebar-wrapper > div:first-child {
-  background: linear-gradient(160deg, #FF8800, #FFAA00);
+/* Elbow connector — top-left amber cap with large bottom-right curve */
+[data-theme^="lcars"] .sidebar-wrapper > div:first-child {
+  background: linear-gradient(160deg,
+    var(--lcars-elbow-a),
+    var(--lcars-elbow-b) 35%,
+    var(--lcars-elbow-c) 65%,
+    var(--lcars-elbow-d)
+  );
   border-radius: 0 0 2.5rem 0;
   margin-right: 6px;
-  box-shadow: inset 0 -2px 8px rgba(0,0,0,0.3);
+  box-shadow: inset 0 -2px 8px rgba(0,0,0,0.35);
   position: relative;
   overflow: hidden;
 }
-
-/* Scan line sweeping through the elbow every 7s */
-[data-theme="lcars"] .sidebar-wrapper > div:first-child::after {
+/* Scan shimmer across the elbow */
+[data-theme^="lcars"] .sidebar-wrapper > div:first-child::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right,
-    transparent 0%, rgba(255,255,200,0.25) 50%, transparent 100%);
+  background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
   width: 60%;
   animation: lcars-scan 7s ease-in-out infinite;
   pointer-events: none;
 }
-
-/* Text in elbow: dark (on amber bg) */
-[data-theme="lcars"] .sidebar-wrapper > div:first-child h1 {
-  color: #1a0a00;
+/* Text on elbow: dark on light bg */
+[data-theme^="lcars"] .sidebar-wrapper > div:first-child h1 {
+  color: rgba(0,0,0,0.75);
   letter-spacing: 0.15em;
   text-transform: uppercase;
   font-weight: 900;
 }
-[data-theme="lcars"] .sidebar-wrapper > div:first-child p {
+[data-theme^="lcars"] .sidebar-wrapper > div:first-child p {
   color: rgba(0,0,0,0.45);
   text-transform: uppercase;
   letter-spacing: 0.18em;
 }
-
-/* Collapse button in elbow: dark */
-[data-theme="lcars"] .sidebar-wrapper > div:first-child button {
-  color: rgba(0,0,0,0.5);
+[data-theme^="lcars"] .sidebar-wrapper > div:first-child button {
+  color: rgba(0,0,0,0.45);
 }
-[data-theme="lcars"] .sidebar-wrapper > div:first-child button:hover {
-  color: rgba(0,0,0,0.85);
+[data-theme^="lcars"] .sidebar-wrapper > div:first-child button:hover {
+  color: rgba(0,0,0,0.8);
   background: rgba(0,0,0,0.1);
 }
 
-/* Logo icon: slow sensor-ring rotation */
-[data-theme="lcars"] .sidebar-logo {
+/* Logo: slow sensor-ring rotation */
+[data-theme^="lcars"] .sidebar-logo {
   filter: drop-shadow(0 0 4px rgba(0,0,0,0.6));
   animation: lcars-rotate 24s linear infinite;
 }
 
-/* Section titles: small amber caps */
-[data-theme="lcars"] .sidebar-section-title {
-  color: #FFAA00;
+/* Section titles */
+[data-theme^="lcars"] .sidebar-section-title {
+  color: var(--lcars-section-title);
   letter-spacing: 0.2em;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-/* Nav items: LCARS flat rectangular blocks, full-width, dark-gold fill */
-[data-theme="lcars"] .sidebar-wrapper a.rounded-md,
-[data-theme="lcars"] .sidebar-wrapper div.rounded-md {
+/* Nav blocks: flat rectangles, full-width, dark fill */
+[data-theme^="lcars"] .sidebar-wrapper a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper div.rounded-md {
   margin-left: 0 !important;
   margin-right: 6px !important;
   border-radius: 0 !important;
-  background: #1f1500;
-  color: #AA7733;
-  border-bottom: 1px solid #2a1a00;
+  background: var(--lcars-nav-dark);
+  color: var(--chat-muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--lcars-nav-dark) 60%, var(--chat-accent));
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 700;
+  transition: background var(--dur-base), color var(--dur-base);
 }
-[data-theme="lcars"] .sidebar-wrapper a.rounded-md:hover,
-[data-theme="lcars"] .sidebar-wrapper div.rounded-md:hover {
-  background: #2c1e00;
-  color: #FFAA00;
+[data-theme^="lcars"] .sidebar-wrapper a.rounded-md:hover,
+[data-theme^="lcars"] .sidebar-wrapper div.rounded-md:hover {
+  background: color-mix(in srgb, var(--lcars-nav-dark) 70%, var(--chat-accent));
+  color: var(--chat-accent-strong);
 }
 
-/* Active nav block: bright amber, black text, animated glow */
-[data-theme="lcars"] .sidebar-active {
-  background: #FFAA00 !important;
-  color: #000 !important;
+/* Active block: accent fill, dark text, glow pulse */
+[data-theme^="lcars"] .sidebar-active {
+  background: var(--lcars-nav-active) !important;
+  color: var(--lcars-nav-text-on) !important;
   border-radius: 0 !important;
-  border-bottom: 1px solid #CC8800 !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--lcars-nav-active) 60%, black) !important;
   animation: lcars-nav-pulse 4s ease-in-out infinite;
 }
-[data-theme="lcars"] .sidebar-active::before { display: none; }
-[data-theme="lcars"] .sidebar-active svg { color: #000 !important; }
+[data-theme^="lcars"] .sidebar-active::before { display: none; }
+[data-theme^="lcars"] .sidebar-active svg { color: var(--lcars-nav-text-on) !important; }
 
-/* Status dot: amber blink */
-[data-theme="lcars"] .sidebar-status-dot {
-  background: #FFAA00;
+/* Status dot */
+[data-theme^="lcars"] .sidebar-status-dot {
+  background: var(--chat-accent);
   animation: lcars-blink 5s ease-in-out infinite;
 }
 
-/* Mode switcher section */
-[data-theme="lcars"] .sidebar-wrapper > div:nth-child(2) {
+[data-theme^="lcars"] .sidebar-wrapper > div:nth-child(2) {
   margin-right: 6px;
-  border-bottom: 2px solid #331a00;
+  border-bottom: 2px solid color-mix(in srgb, var(--chat-accent) 20%, transparent);
 }
-
-/* Footer: dark with amber divider */
-[data-theme="lcars"] .sidebar-wrapper > div:last-child {
+[data-theme^="lcars"] .sidebar-wrapper > div:last-child {
   margin-right: 6px;
 }
 
 /* ── DIVIDERS ─────────────────────────────────────────────────── */
-
-[data-theme="lcars"] .divider {
-  background: linear-gradient(to right, transparent, #FF8800 20%, #FF8800 80%, transparent);
+[data-theme^="lcars"] .divider {
+  background: linear-gradient(to right, transparent, var(--chat-accent) 20%, var(--chat-accent) 80%, transparent);
 }
 
 /* ── HEADINGS ─────────────────────────────────────────────────── */
-
-[data-theme="lcars"] h1,
-[data-theme="lcars"] h2,
-[data-theme="lcars"] h3 {
+[data-theme^="lcars"] h1,
+[data-theme^="lcars"] h2,
+[data-theme^="lcars"] h3 {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 800;
@@ -413,97 +466,82 @@
 }
 
 /* ── CHAT SURFACE ─────────────────────────────────────────────── */
-
-/* Scan line across the top of the main content area */
-[data-theme="lcars"] .chat-shell::before {
+/* Scan line at top of content */
+[data-theme^="lcars"] .chat-shell::before {
   content: "";
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 0; left: 0; right: 0;
   height: 2px;
-  background: linear-gradient(to right,
-    transparent 0%, rgba(255,200,0,0.6) 50%, transparent 100%);
+  background: linear-gradient(to right, transparent 0%, rgba(var(--chat-accent-rgb),0.6) 50%, transparent 100%);
   width: 50%;
   animation: lcars-scan 10s linear infinite;
   pointer-events: none;
   z-index: 100;
 }
 
-/* Assistant messages: amber left border + entry animation */
-[data-theme="lcars"] .msg-enter {
-  border-left: 3px solid #FFAA00;
+[data-theme^="lcars"] .msg-enter {
+  border-left: 3px solid var(--chat-accent);
 }
 
 /* ── INPUTS & BUTTONS ─────────────────────────────────────────── */
-
-[data-theme="lcars"] input:not([type="range"]),
-[data-theme="lcars"] select {
+[data-theme^="lcars"] input:not([type="range"]),
+[data-theme^="lcars"] select {
   border-radius: 999px;
-  border-color: #885500;
+  border-color: var(--chat-border);
 }
-[data-theme="lcars"] textarea {
+[data-theme^="lcars"] textarea {
   border-radius: 1.25rem;
-  border-color: #885500;
+  border-color: var(--chat-border);
 }
-
-[data-theme="lcars"] .btn-primary {
-  background: #FFAA00;
-  border-color: #FFAA00;
-  color: #000;
+[data-theme^="lcars"] .btn-primary {
+  background: var(--chat-accent);
+  border-color: var(--chat-accent);
+  color: var(--lcars-nav-text-on);
   border-radius: 999px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  box-shadow: 0 0 12px rgba(255,170,0,0.4), inset 0 1px 0 rgba(255,220,100,0.3);
+  box-shadow: 0 0 12px rgba(var(--chat-accent-rgb),0.4), inset 0 1px 0 rgba(255,255,255,0.15);
 }
-[data-theme="lcars"] .btn-primary:hover:not(:disabled) {
-  background: #FFDD44;
-  border-color: #FFDD44;
-  box-shadow: 0 0 20px rgba(255,210,0,0.6), inset 0 1px 0 rgba(255,255,200,0.3);
+[data-theme^="lcars"] .btn-primary:hover:not(:disabled) {
+  background: var(--chat-accent-strong);
+  border-color: var(--chat-accent-strong);
+  box-shadow: 0 0 22px rgba(var(--chat-accent-rgb),0.6), inset 0 1px 0 rgba(255,255,255,0.2);
 }
-[data-theme="lcars"] .btn-secondary {
-  background: #1a1400;
-  border-color: #885500;
-  color: #FFAA00;
+[data-theme^="lcars"] .btn-secondary {
+  background: var(--chat-panel);
+  border-color: var(--chat-border);
+  color: var(--chat-accent);
   border-radius: 999px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-[data-theme="lcars"] .btn-secondary:hover:not(:disabled) {
-  background: #251c00;
-  border-color: #FFAA00;
-  color: #FFDD44;
+[data-theme^="lcars"] .btn-secondary:hover:not(:disabled) {
+  background: var(--chat-elevated);
+  border-color: var(--chat-accent);
+  color: var(--chat-accent-strong);
 }
 
-/* ── SURFACES & CARDS ─────────────────────────────────────────── */
-
-[data-theme="lcars"] .surface,
-[data-theme="lcars"] .surface-elevated {
-  background: #100c00;
-  border: 1px solid #885500;
+/* ── SURFACES ─────────────────────────────────────────────────── */
+[data-theme^="lcars"] .surface,
+[data-theme^="lcars"] .surface-elevated {
+  background: var(--chat-surface);
+  border: 1px solid var(--chat-border);
   border-radius: 0;
-  box-shadow: 0 0 8px rgba(255,170,0,0.06);
+  box-shadow: 0 0 8px rgba(var(--chat-accent-rgb),0.06);
 }
 
 /* ── SCROLLBAR ────────────────────────────────────────────────── */
-
-[data-theme="lcars"] {
-  scrollbar-color: #885500 #0a0800;
+[data-theme^="lcars"] { scrollbar-color: var(--chat-border) var(--chat-bg); }
+[data-theme^="lcars"] ::-webkit-scrollbar-thumb {
+  background: var(--chat-border);
+  border: none; border-radius: 0;
 }
-[data-theme="lcars"] ::-webkit-scrollbar-thumb {
-  background: #885500;
-  border: none;
-  border-radius: 0;
-}
-[data-theme="lcars"] ::-webkit-scrollbar-track {
-  background: #080600;
-}
+[data-theme^="lcars"] ::-webkit-scrollbar-track { background: var(--chat-bg); }
 
 /* ── INDICATORS ───────────────────────────────────────────────── */
-
-[data-theme="lcars"] .thinking-dot { background: #FFAA00; }
-[data-theme="lcars"] .streaming-caret::after { color: #FFAA00; }
+[data-theme^="lcars"] .thinking-dot { background: var(--chat-accent); }
+[data-theme^="lcars"] .streaming-caret::after { color: var(--chat-accent); }
 
 /* ═══════════════════════════════════════════════════════════════
    GLOBAL BASE
