@@ -27,9 +27,9 @@ interface NamedTheme {
 const NAMED_THEMES: NamedTheme[] = [
   {
     id: "cyberpunk",
-    label: "Cyberpunk",
-    desc: "Neon magenta & cyan — Shadowrun",
-    dots: ["#FF2D78", "#00F5FF"],
+    label: "Shadowrun",
+    desc: "AR matrix overlay — teal & magenta",
+    dots: ["#00DDC0", "#CC44FF"],
   },
 ];
 

@@ -753,87 +753,99 @@
 [data-theme^="lcars"] .streaming-caret::after { color: var(--chat-accent); }
 
 /* ═══════════════════════════════════════════════════════════════
-   CYBERPUNK / SHADOWRUN THEME
-   Neon-drenched corporate dystopia. Hot magenta primary,
-   electric cyan secondary, dark purple-black backgrounds.
-   Glassmorphism on sidebar and panels.
+   SHADOWRUN THEME
+   AR matrix overlay aesthetic from the Shadowrun universe.
+   Teal-cyan primary, magenta secondary, zero-radius sharp panels,
+   glass backdrop, CRT scanlines, data-terminal typography.
    ═══════════════════════════════════════════════════════════════ */
 
 [data-theme="cyberpunk"] {
-  --chat-bg:            #04020C;
-  --chat-surface:       #080514;
-  --chat-surface-rgb:   8, 5, 20;
-  --chat-panel:         #0C0820;
-  --chat-soft:          #0A0618;
-  --chat-elevated:      #130E2A;
-  --chat-border:        #2D1A4A;
-  --chat-border-rgb:    45, 26, 74;
-  --chat-text:          #E8D8FF;
-  --chat-muted:         #8866AA;
-  --chat-subtle:        #4A3366;
+  /* Deep teal-black backgrounds */
+  --chat-bg:            #020C0A;
+  --chat-surface:       #050F0D;
+  --chat-surface-rgb:   5, 15, 13;
+  --chat-panel:         #0A1A16;
+  --chat-soft:          #071410;
+  --chat-elevated:      #0F2420;
+  --chat-border:        #1C5A48;
+  --chat-border-rgb:    28, 90, 72;
+  --chat-text:          #C8FFF0;
+  --chat-muted:         #4D9980;
+  --chat-subtle:        #2A5045;
 
-  --chat-accent:        #FF2D78;
-  --chat-accent-strong: #FF6699;
-  --chat-accent-soft:   rgba(255, 45, 120, 0.15);
-  --chat-accent-rgb:    255, 45, 120;
-  --chat-accent-2:      #00F5FF;   /* electric cyan */
-  --chat-thinking:      #CC00FF;   /* neon purple */
+  /* Teal-cyan primary, magenta secondary */
+  --chat-accent:        #00DDC0;
+  --chat-accent-strong: #55FFDD;
+  --chat-accent-soft:   rgba(0, 221, 192, 0.13);
+  --chat-accent-rgb:    0, 221, 192;
+  --chat-accent-2:      #CC44FF;   /* matrix magenta */
+  --chat-thinking:      #AA33EE;
 
   --elev-1:
-    0 1px 4px rgba(0,0,0,0.7),
-    0 0 0 1px rgba(255,45,120,0.18);
+    0 1px 4px rgba(0,0,0,0.85),
+    0 0 0 1px rgba(0,200,160,0.22);
   --elev-2:
-    0 4px 16px rgba(0,0,0,0.65),
-    0 0 0 1px rgba(255,45,120,0.28),
-    0 0 24px rgba(255,45,120,0.07);
+    0 4px 16px rgba(0,0,0,0.75),
+    0 0 0 1px rgba(0,200,160,0.32),
+    0 0 20px rgba(0,200,160,0.06);
   --elev-3:
-    0 8px 32px rgba(0,0,0,0.75),
-    0 0 0 1px rgba(255,45,120,0.38),
-    0 0 48px rgba(255,45,120,0.10),
-    0 0 80px rgba(0,245,255,0.04);
+    0 8px 32px rgba(0,0,0,0.85),
+    0 0 0 1px rgba(0,200,160,0.42),
+    0 0 40px rgba(0,200,160,0.10),
+    0 0 80px rgba(180,0,255,0.05);
   --ring:
-    0 0 0 2px #04020C,
-    0 0 0 4px #FF2D78,
-    0 0 20px rgba(255,45,120,0.5);
+    0 0 0 2px #020C0A,
+    0 0 0 4px #00DDC0,
+    0 0 16px rgba(0,221,192,0.45);
 
-  --inset-highlight: inset 0 1px 0 rgba(255,45,120,0.07);
-  --hover-tint:      rgba(255, 45, 120, 0.08);
-  --press-tint:      rgba(255, 45, 120, 0.18);
-  --divider:         rgba(255, 45, 120, 0.2);
+  --inset-highlight: inset 0 1px 0 rgba(0,221,192,0.07);
+  --hover-tint:      rgba(0, 221, 192, 0.07);
+  --press-tint:      rgba(0, 221, 192, 0.15);
+  --divider:         rgba(0, 200, 160, 0.18);
 
   --backdrop-glow:
-    radial-gradient(ellipse 900px 700px at -5% 5%,  rgba(255,45,120,0.28), transparent 55%),
-    radial-gradient(ellipse 700px 500px at 105% 95%, rgba(0,245,255,0.22), transparent 55%),
-    radial-gradient(ellipse 600px 500px at 60% 40%,  rgba(150,0,255,0.12), transparent 55%);
+    radial-gradient(ellipse 1000px 800px at -5% 0%,   rgba(0,200,160,0.26), transparent 55%),
+    radial-gradient(ellipse 700px 600px at 105% 100%, rgba(160,0,240,0.20), transparent 55%),
+    radial-gradient(ellipse 600px 500px at 40% 60%,   rgba(0,80,60,0.12),   transparent 60%);
+
+  /* Sharp — no rounding at all */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --chat-radius: 0px;
+  --chat-input-radius: 1px;
 
   color-scheme: dark;
 }
 
-/* ── GRID BACKGROUND ──────────────────────────────────────────── */
+/* ── CRT SCANLINES ────────────────────────────────────────────── */
 [data-theme="cyberpunk"] body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(255,45,120,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,45,120,0.025) 1px, transparent 1px);
-  background-size: 48px 48px;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 221, 192, 0.013) 3px,
+    rgba(0, 221, 192, 0.013) 4px
+  );
   pointer-events: none;
   z-index: 0;
 }
 
-/* ── SIDEBAR — glass panel ────────────────────────────────────── */
+/* ── SIDEBAR — AR glass panel ─────────────────────────────────── */
 [data-theme="cyberpunk"] .sidebar-wrapper {
-  background: rgba(4, 2, 12, 0.72);
+  background: rgba(2, 12, 10, 0.72);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-right: 1px solid rgba(255, 45, 120, 0.18);
-  box-shadow: 2px 0 32px rgba(255, 45, 120, 0.06);
+  border-right: 1px solid rgba(0, 200, 160, 0.25);
+  box-shadow: 2px 0 32px rgba(0, 180, 140, 0.07);
 }
 
-/* Logo band bottom-edge neon sweep */
+/* Logo band — teal→magenta sweep on bottom edge */
 [data-theme="cyberpunk"] .sidebar-wrapper > div:first-child {
-  border-bottom: 1px solid rgba(255, 45, 120, 0.22);
+  border-bottom: 1px solid rgba(0, 200, 160, 0.28);
   position: relative;
   overflow: hidden;
 }
@@ -842,28 +854,46 @@
   position: absolute;
   bottom: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #FF2D78 40%, #00F5FF 60%, transparent);
-  animation: cp-scan-h 5s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, #00DDC0 40%, #CC44FF 70%, transparent);
+  animation: cp-scan-h 6s ease-in-out infinite;
   pointer-events: none;
 }
 
-/* Nav items — left neon bar on hover/active */
-[data-theme="cyberpunk"] nav a:hover,
-[data-theme="cyberpunk"] nav button:hover {
-  box-shadow: inset 2px 0 0 #FF2D78, 0 0 12px rgba(255,45,120,0.10);
+/* Logo text — teal with AR uppercase letterform */
+[data-theme="cyberpunk"] .sidebar-wrapper > div:first-child h1 {
+  color: #00DDC0;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+[data-theme="cyberpunk"] .sidebar-wrapper > div:first-child p {
+  color: rgba(0, 221, 192, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+[data-theme="cyberpunk"] .sidebar-wrapper > div:first-child button {
+  color: rgba(0, 221, 192, 0.45);
+}
+[data-theme="cyberpunk"] .sidebar-wrapper > div:first-child button:hover {
+  color: #00DDC0;
 }
 
-/* ── FLOATING OVERLAYS — keep rectangular ─────────────────────── */
+/* Nav items — left teal bar on hover */
+[data-theme="cyberpunk"] nav a:hover,
+[data-theme="cyberpunk"] nav button:hover {
+  box-shadow: inset 2px 0 0 #00DDC0, 0 0 12px rgba(0,221,192,0.10);
+}
+
+/* ── FLOATING OVERLAYS — sharp, no radius ─────────────────────── */
 [data-theme="cyberpunk"] .theme-picker-enter,
 [data-theme="cyberpunk"] [data-radix-popper-content-wrapper],
 [data-theme="cyberpunk"] [role="dialog"],
 [data-theme="cyberpunk"] [role="menu"] {
-  border-radius: 4px !important;
+  border-radius: 0px !important;
 }
 
 /* ── INDICATORS ───────────────────────────────────────────────── */
-[data-theme="cyberpunk"] .thinking-dot { background: #FF2D78; }
-[data-theme="cyberpunk"] .streaming-caret::after { color: #FF2D78; }
+[data-theme="cyberpunk"] .thinking-dot { background: #00DDC0; }
+[data-theme="cyberpunk"] .streaming-caret::after { color: #00DDC0; }
 
 /* ── ANIMATIONS ───────────────────────────────────────────────── */
 @keyframes cp-scan-h {
@@ -874,8 +904,8 @@
 }
 
 @keyframes cp-neon-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(255,45,120,0.3); }
-  50%       { box-shadow: 0 0 18px rgba(255,45,120,0.6), 0 0 36px rgba(0,245,255,0.12); }
+  0%, 100% { box-shadow: 0 0 8px rgba(0,221,192,0.3); }
+  50%       { box-shadow: 0 0 18px rgba(0,221,192,0.6), 0 0 36px rgba(180,0,255,0.12); }
 }
 
 /* ═══════════════════════════════════════════════════════════════
