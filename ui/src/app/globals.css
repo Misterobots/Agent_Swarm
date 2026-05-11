@@ -305,6 +305,14 @@
   --chat-font: "Gill Sans", "Trebuchet MS", "Arial Narrow", system-ui, sans-serif;
 }
 
+/* Floating overlays must NOT inherit the pill radius — keep them rectangular */
+[data-theme^="lcars"] .theme-picker-enter,
+[data-theme^="lcars"] [data-radix-popper-content-wrapper],
+[data-theme^="lcars"] [role="dialog"],
+[data-theme^="lcars"] [role="menu"] {
+  border-radius: 4px !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    LCARS SHARED ANIMATIONS & STRUCTURE
    All selectors use [data-theme^="lcars"] — matches all three variants.
