@@ -42,15 +42,23 @@ export function AppShell({ children }: AppShellProps) {
     if (legacy) root.setAttribute("data-legacy-themes", "1");
     else root.removeAttribute("data-legacy-themes");
 
-    // Self-heal: if a stale persisted theme survived the v1->v2 migration
-    // and the legacy flag isn't on, coerce back to "memex" so the mode
-    // toggle (light/dark/system) actually attaches.
-    if (theme !== "memex" && !legacy) {
+    // Named themes (e.g. "lcars") are self-contained — no mode variants.
+    const NAMED_THEMES = new Set(["lcars"]);
+
+    // Self-heal: if a stale persisted theme (legacy 8-pack) survived migration
+    // and the legacy flag isn't on, coerce back to "memex".
+    if (theme !== "memex" && !NAMED_THEMES.has(theme) && !legacy) {
       setTheme("memex");
       return;
     }
 
     root.setAttribute("data-theme", theme);
+
+    // Named themes don't have light/dark variants.
+    if (NAMED_THEMES.has(theme)) {
+      root.removeAttribute("data-mode");
+      return;
+    }
 
     if (theme !== "memex") {
       root.removeAttribute("data-mode");

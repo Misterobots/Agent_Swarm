@@ -156,6 +156,226 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   LCARS THEME — Star Trek LCARS interface (Library Computer
+   Access/Retrieval System). Always dark — no light/dark modes.
+
+   Authentic LCARS palette:
+     Orange  #FF9900  — primary accent, borders, rails
+     Tan     #FFCC88  — body text, secondary fills
+     Mauve   #CC6699  — muted, section titles
+     Lavender #9999FF — secondary accent
+     Teal    #33CC99  — status / success
+     Blue    #66CCFF  — info / links
+
+   Shape language: full pills on controls, 0-radius on panels.
+   The sidebar carries the characteristic left colour rail.
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="lcars"] {
+  /* Surface */
+  --chat-bg:           #000000;
+  --chat-surface:      #0a0500;
+  --chat-surface-rgb:  10, 5, 0;
+  --chat-panel:        #140a00;
+  --chat-soft:         #0d0600;
+  --chat-elevated:     #1c0f00;
+  /* Border — orange borders are the LCARS signature */
+  --chat-border:       #FF9900;
+  --chat-border-rgb:   255, 153, 0;
+  /* Text */
+  --chat-text:         #FFCC88;
+  --chat-muted:        #CC6699;
+  --chat-subtle:       #7a4a5a;
+  /* Accent */
+  --chat-accent:       #FF9900;
+  --chat-accent-strong: #FFCC88;
+  --chat-accent-soft:  rgba(255, 153, 0, 0.15);
+  --chat-accent-rgb:   255, 153, 0;
+  --chat-accent-2:     #9999FF;
+  --chat-thinking:     #33CC99;
+  /* Radius — pills for controls, 0 for structural panels */
+  --radius-sm:          999px;
+  --radius-md:          999px;
+  --radius-lg:          999px;
+  --radius-pill:        999px;
+  --chat-radius:        999px;
+  --chat-input-radius:  999px;
+  /* Elevation — orange glow outlines instead of drop shadows */
+  --elev-1: 0 0 0 1px rgba(255, 153, 0, 0.5);
+  --elev-2: 0 0 0 2px rgba(255, 153, 0, 0.7), 0 0 12px rgba(255, 153, 0, 0.15);
+  --elev-3: 0 0 0 2px #FF9900, 0 0 24px rgba(255, 153, 0, 0.25);
+  --inset-highlight: inset 0 1px 0 rgba(255, 204, 136, 0.12);
+  /* Focus */
+  --ring: 0 0 0 2px #000, 0 0 0 4px #FF9900, 0 0 10px rgba(255, 153, 0, 0.5);
+  /* Interaction tints */
+  --hover-tint: rgba(255, 153, 0, 0.08);
+  --press-tint: rgba(255, 153, 0, 0.18);
+  --divider:    rgba(255, 153, 0, 0.5);
+  /* No backdrop glow — LCARS is pure black */
+  --backdrop-glow: none;
+  /* Font */
+  --chat-font: "Gill Sans", "Trebuchet MS", "Arial Narrow", system-ui, sans-serif;
+
+  color-scheme: dark;
+}
+
+/* ── LCARS structural overrides ───────────────────────────────── */
+
+/* Font + letter-spacing on all UI chrome */
+[data-theme="lcars"] body,
+[data-theme="lcars"] .chat-shell {
+  font-family: "Gill Sans", "Trebuchet MS", "Arial Narrow", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  background: #000;
+}
+
+/* Navigation, buttons, labels → LCARS uppercase treatment */
+[data-theme="lcars"] nav,
+[data-theme="lcars"] nav *,
+[data-theme="lcars"] button:not(:is(pre *, code *)),
+[data-theme="lcars"] [role="tab"],
+[data-theme="lcars"] [role="tablist"] *,
+[data-theme="lcars"] label,
+[data-theme="lcars"] .sidebar-section-title {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+/* Sidebar: thick left colour rail using a multi-stop gradient */
+[data-theme="lcars"] .sidebar-wrapper {
+  background: #000;
+  border-right: none;
+  box-shadow: none;
+  padding-left: 14px; /* reserve space for the rail */
+}
+[data-theme="lcars"] .sidebar-wrapper::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  background: linear-gradient(
+    to bottom,
+    #FF9900 0%,
+    #FF9900 40%,
+    #CC6699 55%,
+    #9999FF 70%,
+    #66CCFF 100%
+  );
+  z-index: 10;
+}
+
+/* Sidebar logo: deep orange glow */
+[data-theme="lcars"] .sidebar-logo {
+  filter:
+    drop-shadow(0 0 6px rgba(255, 153, 0, 1))
+    drop-shadow(0 0 16px rgba(255, 153, 0, 0.5));
+}
+
+/* Sidebar section titles: mauve, extra tracking */
+[data-theme="lcars"] .sidebar-section-title {
+  color: #CC6699;
+  letter-spacing: 0.2em;
+  font-weight: 800;
+}
+
+/* Active nav: filled orange pill, black text */
+[data-theme="lcars"] .sidebar-active {
+  background: #FF9900;
+  color: #000000 !important;
+  border-radius: 0 999px 999px 0;
+}
+[data-theme="lcars"] .sidebar-active::before {
+  display: none; /* rail is already the accent */
+}
+[data-theme="lcars"] .sidebar-active svg {
+  color: #000 !important;
+}
+
+/* Divider: orange line */
+[data-theme="lcars"] .divider {
+  background: linear-gradient(to right, transparent, #FF9900 15%, #FF9900 85%, transparent);
+}
+
+/* Status dot: teal pulse */
+[data-theme="lcars"] .sidebar-status-dot {
+  background: #33CC99;
+}
+
+/* Inputs: pills with orange border */
+[data-theme="lcars"] input:not([type="range"]),
+[data-theme="lcars"] select {
+  border-radius: 999px;
+}
+[data-theme="lcars"] textarea {
+  border-radius: 1.25rem; /* pill-ish but readable */
+}
+
+/* Buttons: pill-shaped, uppercase already via selector above */
+[data-theme="lcars"] .btn-primary {
+  background: #FF9900;
+  border-color: #FF9900;
+  color: #000;
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(255, 153, 0, 0.4), inset 0 1px 0 rgba(255,204,136,0.3);
+}
+[data-theme="lcars"] .btn-primary:hover:not(:disabled) {
+  background: #FFCC88;
+  border-color: #FFCC88;
+  box-shadow: 0 0 20px rgba(255, 153, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+[data-theme="lcars"] .btn-secondary {
+  background: #000;
+  border-color: #FF9900;
+  color: #FF9900;
+  border-radius: 999px;
+}
+[data-theme="lcars"] .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 153, 0, 0.12);
+  border-color: #FFCC88;
+  color: #FFCC88;
+}
+
+/* Surface cards: square corners, orange borders */
+[data-theme="lcars"] .surface,
+[data-theme="lcars"] .surface-elevated {
+  background: #140a00;
+  border: 1px solid #FF9900;
+  border-radius: 0;
+  box-shadow: 0 0 8px rgba(255, 153, 0, 0.12);
+}
+
+/* Scrollbar: LCARS orange */
+[data-theme="lcars"] {
+  scrollbar-color: #FF9900 #000;
+}
+[data-theme="lcars"] ::-webkit-scrollbar-thumb {
+  background: #FF9900;
+  border: none;
+  border-radius: 0;
+}
+[data-theme="lcars"] ::-webkit-scrollbar-track {
+  background: #000;
+}
+
+/* LCARS thinking indicator: teal */
+[data-theme="lcars"] .thinking-dot {
+  background: #33CC99;
+}
+
+/* Streaming caret: orange */
+[data-theme="lcars"] .streaming-caret::after {
+  color: #FF9900;
+}
+
+/* Message bubbles: square panels */
+[data-theme="lcars"] .msg-enter {
+  border-left: 3px solid #FF9900;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    GLOBAL BASE
    ═══════════════════════════════════════════════════════════════ */
 
