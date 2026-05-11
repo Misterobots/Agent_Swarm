@@ -221,33 +221,46 @@
 
 /* ── LCARS structural overrides ───────────────────────────────── */
 
-/* Font + letter-spacing on all UI chrome */
+/* Font + gentle letter-spacing on all UI chrome */
 [data-theme="lcars"] body,
 [data-theme="lcars"] .chat-shell {
   font-family: "Gill Sans", "Trebuchet MS", "Arial Narrow", system-ui, sans-serif;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   background: #000;
 }
 
-/* Navigation, buttons, labels → LCARS uppercase treatment */
-[data-theme="lcars"] nav,
-[data-theme="lcars"] nav *,
-[data-theme="lcars"] button:not(:is(pre *, code *)),
-[data-theme="lcars"] [role="tab"],
-[data-theme="lcars"] [role="tablist"] *,
-[data-theme="lcars"] label,
+/* Uppercase only on structural titles — never on free-form labels or
+   dropdown menus where text width is constrained. */
 [data-theme="lcars"] .sidebar-section-title {
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
+  font-weight: 800;
+  color: #CC6699;
+}
+
+/* Active nav item: orange filled — text already has the LCARS look */
+/* Subtle uppercase on nav LINK text only (not the flex container) */
+[data-theme="lcars"] .sidebar-active {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   font-weight: 700;
 }
 
-/* Sidebar: thick left colour rail using a multi-stop gradient */
+/* Header labels, status strip, section headers in workspace pages */
+[data-theme="lcars"] h1,
+[data-theme="lcars"] h2,
+[data-theme="lcars"] h3 {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+/* Sidebar: thick left colour rail.
+   The ::before rail is position:absolute — no padding needed on the wrapper. */
 [data-theme="lcars"] .sidebar-wrapper {
   background: #000;
   border-right: none;
   box-shadow: none;
-  padding-left: 14px; /* reserve space for the rail */
 }
 [data-theme="lcars"] .sidebar-wrapper::before {
   content: "";
