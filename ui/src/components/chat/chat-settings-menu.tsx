@@ -18,7 +18,7 @@ import { useSettingsStore, type ThemeMode } from "@/lib/stores/settings-store";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState({ bottom: 0, right: 0 });
+  const [menuPos, setMenuPos] = useState({ bottom: 0, right: 0, maxHeight: "70vh" });
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -38,9 +38,12 @@ export function ChatSettingsMenu() {
   const updatePos = useCallback(() => {
     if (!btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
+    // Clamp maxHeight so menu never overflows the top of the viewport
+    const spaceAbove = r.top - 16;
     setMenuPos({
       bottom: window.innerHeight - r.top + 8,
       right: window.innerWidth - r.right,
+      maxHeight: `${Math.min(spaceAbove, window.innerHeight * 0.7)}px`,
     });
   }, []);
 
@@ -78,10 +81,11 @@ export function ChatSettingsMenu() {
   const dropdown = isOpen ? (
     <div
       ref={menuRef}
-      className="fixed w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2 space-y-1.5 z-[9999] max-h-[70vh] overflow-y-auto scrollbar-thin theme-picker-enter"
+      className="fixed w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2 space-y-1.5 z-[9999] overflow-y-auto scrollbar-thin theme-picker-enter"
       style={{
         bottom: menuPos.bottom,
         right: menuPos.right,
+        maxHeight: menuPos.maxHeight,
         boxShadow: "var(--elev-3)",
       }}
     >

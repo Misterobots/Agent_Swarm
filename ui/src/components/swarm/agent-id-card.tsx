@@ -138,7 +138,7 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
             style={{ borderColor: `${theme.accent}25` }}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-black tracking-[0.3em] text-white/50 uppercase">Hive Mind</span>
+              <span className="text-[9px] font-black tracking-[0.3em] text-white/50 uppercase">AI Swarm</span>
               <span className="text-[8px] font-mono tracking-widest" style={{ color: `${theme.accent}99` }}>PIONEER DIVISION</span>
             </div>
             <div className="text-[8px] font-mono text-white/25 mt-0.5 tracking-wider">AGENT CREDENTIAL • ACTIVE SESSION</div>
