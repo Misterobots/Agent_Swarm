@@ -26,7 +26,7 @@ export interface ChatStreamOptions {
 
 export async function* sendChatStream(
   messages: Pick<ChatMessage, "role" | "content">[],
-  model: string = "hive-fast",
+  model: string = "memex-fast",
   signal?: AbortSignal,
   sessionId?: string,
   memoryEnabled: boolean = false,

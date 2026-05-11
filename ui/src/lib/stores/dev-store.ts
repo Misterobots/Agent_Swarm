@@ -136,7 +136,7 @@ export const useDevStore = create<DevState>()(
       setViewMode: (mode) => set({ viewMode: mode }),
     }),
     {
-      name: "hive-dev-store",
+      name: "memex-dev-store",
       // Persist settings and state
       partialize: (state) => ({
         agentEnabled: state.agentEnabled,

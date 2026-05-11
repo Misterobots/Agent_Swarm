@@ -5,13 +5,13 @@ import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { SwarmPanelContent } from "@/components/swarm/swarm-drawer";
 import type { SwarmTheaterPhase } from "@/lib/stores/swarm-store";
 
-const CHANNEL = "hive-swarm";
+const CHANNEL = "memex-swarm";
 
 /**
  * Standalone swarm panel page — opened as a detached popup window from the
  * desktop drawer's popout button.
  *
- * Receives live state via BroadcastChannel("hive-swarm") from the main tab.
+ * Receives live state via BroadcastChannel("memex-swarm") from the main tab.
  * Read-only: interactions (select worker etc.) are reflected locally only.
  */
 export default function SwarmPopupPage() {

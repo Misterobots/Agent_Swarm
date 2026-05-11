@@ -31,7 +31,7 @@ interface LogSource {
 
 const LOG_SOURCES: LogSource[] = [
   { id: "agent_runtime", name: "Agent Runtime", node: "Turing", active: false },
-  { id: "hive_ui", name: "Memex UI", node: "Turing", active: false },
+  { id: "memex_ui", name: "Memex UI", node: "Turing", active: false },
   { id: "postgres", name: "PostgreSQL", node: "Hopper", active: false },
   { id: "redis", name: "Redis", node: "Hopper", active: false },
   { id: "langfuse", name: "Langfuse", node: "Hopper", active: false },

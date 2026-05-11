@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import type { SwarmState } from "@/lib/stores/swarm-store";
 
-const CHANNEL = "hive-swarm";
+const CHANNEL = "memex-swarm";
 
 /**
  * Extract only the serializable (non-function) fields from SwarmState.

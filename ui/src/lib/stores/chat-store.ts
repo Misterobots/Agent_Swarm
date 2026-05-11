@@ -57,7 +57,7 @@ export const useChatStore = create<ChatState>()(
         return state.conversations.find((c) => c.id === state.activeConversationId);
       },
 
-      createConversation: (model = "hive-mind") => {
+      createConversation: (model = "memex") => {
         const id = generateId();
         const conv: Conversation = {
           id,
@@ -284,6 +284,6 @@ export const useChatStore = create<ChatState>()(
         })),
         })),
     }),
-    { name: "hive-chats" }
+    { name: "memex-chats" }
   )
 );

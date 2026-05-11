@@ -307,13 +307,13 @@ services:
       - "traefik.http.routers.grafana-ext.priority=20"
       - "traefik.http.routers.grafana-ext.service=grafana-ext"
       - "traefik.http.services.grafana-ext.loadbalancer.server.port=3000"
-      # Hive domain route: memex.shivelymedia.com/grafana/* → Grafana direct
+      # Memex domain route: memex.shivelymedia.com/grafana/* → Grafana direct
       # Needed so the iframe in the Monitoring page bypasses Next.js proxy
-      - "traefik.http.routers.grafana-hive.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/grafana`)"
-      - "traefik.http.routers.grafana-hive.entrypoints=websecure"
-      - "traefik.http.routers.grafana-hive.priority=30"
-      - "traefik.http.routers.grafana-hive.tls=true"
-      - "traefik.http.routers.grafana-hive.service=grafana"
+      - "traefik.http.routers.grafana-memex.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-memex.entrypoints=websecure"
+      - "traefik.http.routers.grafana-memex.priority=30"
+      - "traefik.http.routers.grafana-memex.tls=true"
+      - "traefik.http.routers.grafana-memex.service=grafana"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # TASK QUEUE & PERSISTENCE
@@ -417,7 +417,7 @@ services:
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # AGENT RUNTIME — FastAPI Backend (uvicorn :8000, exposed :8008)
-  # Runs on Turing; hive_ui and Traefik reach it via ai_lab_net DNS (agent_runtime)
+  # Runs on Turing; memex_ui and Traefik reach it via ai_lab_net DNS (agent_runtime)
   # ═══════════════════════════════════════════════════════════════════════════════
 
   agent-runtime:
@@ -445,7 +445,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
-      - 'VALID_API_KEYS={"sk-coder-identity":"hive_ui","sk-devops-identity":"devops_agent"}'
+      - 'VALID_API_KEYS={"sk-coder-identity":"memex_ui","sk-devops-identity":"devops_agent"}'
     extra_hosts:
       - "mempalace:${HOPPER_IP:-192.168.2.102}"
     volumes:
@@ -462,12 +462,12 @@ services:
   # UNIFIED UI (Hive Mind — Next.js)
   # ═══════════════════════════════════════════════════════════════════════════════
 
-  hive-ui:
+  memex-ui:
     build:
       context: ../ui
       dockerfile: Dockerfile
-    image: home-ai-lab/hive-ui:latest
-    container_name: hive_ui
+    image: home-ai-lab/memex-ui:latest
+    container_name: memex_ui
     restart: unless-stopped
     env_file:
       - ../network.env
@@ -501,46 +501,46 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=saltbox"
       # Internal LAN route (with Authentik auth)
-      - "traefik.http.routers.hive-ui.rule=PathPrefix(`/hive`)"
-      - "traefik.http.routers.hive-ui.entrypoints=web"
-      - "traefik.http.routers.hive-ui.middlewares=authentik@docker"
-      - "traefik.http.routers.hive-ui.service=hive-ui"
-      - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
+      - "traefik.http.routers.memex-ui.rule=PathPrefix(`/memex`)"
+      - "traefik.http.routers.memex-ui.entrypoints=web"
+      - "traefik.http.routers.memex-ui.middlewares=authentik@docker"
+      - "traefik.http.routers.memex-ui.service=memex-ui"
+      - "traefik.http.services.memex-ui.loadbalancer.server.port=3000"
       # External HTTPS route: memex.shivelymedia.com (behind Authentik)
-      - "traefik.http.routers.hive-ext.rule=Host(`memex.shivelymedia.com`)"
-      - "traefik.http.routers.hive-ext.entrypoints=websecure"
-      - "traefik.http.routers.hive-ext.priority=20"
-      - "traefik.http.routers.hive-ext.tls=true"
-      - "traefik.http.routers.hive-ext.tls.certresolver=cfdns"
-      - "traefik.http.routers.hive-ext.tls.domains[0].main=shivelymedia.com"
-      - "traefik.http.routers.hive-ext.tls.domains[0].sans=*.shivelymedia.com"
-      - "traefik.http.routers.hive-ext.tls.options=securetls@file"
-      - "traefik.http.routers.hive-ext.service=hive-ext"
-      - "traefik.http.routers.hive-ext.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@docker"
-      - "traefik.http.services.hive-ext.loadbalancer.server.port=3000"
+      - "traefik.http.routers.memex-ext.rule=Host(`memex.shivelymedia.com`)"
+      - "traefik.http.routers.memex-ext.entrypoints=websecure"
+      - "traefik.http.routers.memex-ext.priority=20"
+      - "traefik.http.routers.memex-ext.tls=true"
+      - "traefik.http.routers.memex-ext.tls.certresolver=cfdns"
+      - "traefik.http.routers.memex-ext.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.memex-ext.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.memex-ext.tls.options=securetls@file"
+      - "traefik.http.routers.memex-ext.service=memex-ext"
+      - "traefik.http.routers.memex-ext.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@docker"
+      - "traefik.http.services.memex-ext.loadbalancer.server.port=3000"
       # External HTTP route: redirect + Authentik (Cloudflare forwards here on port 80)
-      - "traefik.http.routers.hive-ext-http.rule=Host(`memex.shivelymedia.com`)"
-      - "traefik.http.routers.hive-ext-http.entrypoints=web"
-      - "traefik.http.routers.hive-ext-http.priority=20"
-      - "traefik.http.routers.hive-ext-http.service=hive-ext-http"
-      - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
-      - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
+      - "traefik.http.routers.memex-ext-http.rule=Host(`memex.shivelymedia.com`)"
+      - "traefik.http.routers.memex-ext-http.entrypoints=web"
+      - "traefik.http.routers.memex-ext-http.priority=20"
+      - "traefik.http.routers.memex-ext-http.service=memex-ext-http"
+      - "traefik.http.routers.memex-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
+      - "traefik.http.services.memex-ext-http.loadbalancer.server.port=3000"
       # Static asset bypass — no auth for Next.js assets to prevent post-login redirect to /manifest.json
       # Browser fetches these in the background; without bypass they hijack the Authentik redirect state
       # HTTPS bypass (websecure): static assets served directly, no ForwardAuth
-      - "traefik.http.routers.hive-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
-      - "traefik.http.routers.hive-static.entrypoints=websecure"
-      - "traefik.http.routers.hive-static.priority=30"
-      - "traefik.http.routers.hive-static.tls=true"
-      - "traefik.http.routers.hive-static.service=hive-ext"
+      - "traefik.http.routers.memex-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.memex-static.entrypoints=websecure"
+      - "traefik.http.routers.memex-static.priority=30"
+      - "traefik.http.routers.memex-static.tls=true"
+      - "traefik.http.routers.memex-static.service=memex-ext"
       # HTTP bypass (web): same paths on port 80 — redirect to HTTPS only, no authentik
-      # Root cause: authentik@docker fires before redirect-to-https in hive-ext-http middleware chain,
+      # Root cause: authentik@docker fires before redirect-to-https in memex-ext-http middleware chain,
       # so HTTP manifest.json requests get hijacked by OAuth before the HTTPS redirect runs
-      - "traefik.http.routers.hive-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
-      - "traefik.http.routers.hive-static-http.entrypoints=web"
-      - "traefik.http.routers.hive-static-http.priority=30"
-      - "traefik.http.routers.hive-static-http.middlewares=redirect-to-https@docker"
-      - "traefik.http.routers.hive-static-http.service=hive-ext-http"
+      - "traefik.http.routers.memex-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.memex-static-http.entrypoints=web"
+      - "traefik.http.routers.memex-static-http.priority=30"
+      - "traefik.http.routers.memex-static-http.middlewares=redirect-to-https@docker"
+      - "traefik.http.routers.memex-static-http.service=memex-ext-http"
       # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
       # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://memex.shivelymedia.com/ws/terminal
       - "traefik.http.routers.terminal-ws.rule=PathPrefix(`/ws/terminal`)"
@@ -824,12 +824,12 @@ services:
       - "traefik.http.services.docs.loadbalancer.server.port=80"
       - "traefik.http.middlewares.docs-strip.stripprefix.prefixes=/docs-site"
       # External HTTPS route (memex.shivelymedia.com/docs-site)
-      - "traefik.http.routers.docs-hive.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
-      - "traefik.http.routers.docs-hive.entrypoints=websecure"
-      - "traefik.http.routers.docs-hive.priority=30"
-      - "traefik.http.routers.docs-hive.tls=true"
-      - "traefik.http.routers.docs-hive.middlewares=docs-strip"
-      - "traefik.http.routers.docs-hive.service=docs"
+      - "traefik.http.routers.docs-memex.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
+      - "traefik.http.routers.docs-memex.entrypoints=websecure"
+      - "traefik.http.routers.docs-memex.priority=30"
+      - "traefik.http.routers.docs-memex.tls=true"
+      - "traefik.http.routers.docs-memex.middlewares=docs-strip"
+      - "traefik.http.routers.docs-memex.service=docs"
 
 networks:
   ai_lab_net:

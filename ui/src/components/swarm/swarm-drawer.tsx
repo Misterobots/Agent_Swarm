@@ -542,7 +542,7 @@ function SwarmDesktopDrawer() {
   }, [popoutOpen, setPopoutOpen, setDismissed]);
 
   const handlePopout = useCallback(() => {
-    const popup = window.open("/swarm", "hive-swarm-panel", "width=580,height=820,resizable=yes");
+    const popup = window.open("/swarm", "memex-swarm-panel", "width=580,height=820,resizable=yes");
     if (popup) {
       popupRef.current = popup;
       setPopoutOpen(true);

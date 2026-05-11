@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DL380 → R730 Swap Day Checklist</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1d2129;
+    --text: #e6e6e6;
+    --muted: #8a93a3;
+    --accent: #4ea1ff;
+    --done: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --border: #2a2f3a;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --panel-2: #f0f2f6;
+      --text: #1a1d23;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --done: #16a34a;
+      --warn: #d97706;
+      --danger: #dc2626;
+      --border: #e5e7eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 4px 0; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; }
+  .progress-bar {
+    height: 8px;
+    background: var(--panel-2);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--done));
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  .progress-text {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  button:hover { background: var(--panel); }
+  button.danger { color: var(--danger); border-color: var(--danger); }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  section.collapsed .section-body { display: none; }
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  h2 { font-size: 1.1rem; margin: 0; color: var(--accent); }
+  .stage-meta { font-size: 0.85rem; color: var(--muted); }
+  .toggle-icon {
+    font-size: 1.2rem;
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+  section.collapsed .toggle-icon { transform: rotate(-90deg); }
+  .item {
+    display: flex;
+    align-items: flex-start;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+    gap: 10px;
+  }
+  .item:last-child { border-bottom: none; }
+  .item input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    margin-top: 2px;
+    accent-color: var(--done);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .item label {
+    flex: 1;
+    cursor: pointer;
+    word-break: break-word;
+  }
+  .item input[type="checkbox"]:checked + label {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+  .item code {
+    background: var(--panel-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.85em;
+  }
+  .note {
+    font-size: 0.85rem;
+    color: var(--muted);
+    background: var(--panel-2);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 8px 0;
+    border-left: 3px solid var(--accent);
+  }
+  .note.warn { border-left-color: var(--warn); }
+  .note.danger { border-left-color: var(--danger); }
+  .stage-progress {
+    font-size: 0.75rem;
+    background: var(--panel-2);
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: var(--muted);
+  }
+  .stage-progress.done { background: var(--done); color: #000; }
+  h3 {
+    font-size: 0.95rem;
+    color: var(--text);
+    margin: 12px 0 6px 0;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+  }
+  h3:first-child { border-top: none; padding-top: 0; }
+  @media print {
+    body { background: white; color: black; padding: 8px; max-width: 100%; }
+    section { page-break-inside: avoid; border: 1px solid #999; background: white; }
+    h2 { color: black; }
+    .controls, .progress-bar, header { display: none; }
+    section.collapsed .section-body { display: block; }
+    .item input[type="checkbox"] { width: 14px; height: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DL380 → R730 Swap Day Checklist</h1>
+  <div class="subtitle">Companion to <code>DL380_TO_R730_HARDWARE_MIGRATION.md</code> · Progress saved automatically</div>
+  <div class="progress-bar"><div class="progress-fill" id="globalProgress"></div></div>
+  <div class="progress-text">
+    <span id="progressText">0 of 0 complete</span>
+    <span id="progressPct">0%</span>
+  </div>
+  <div class="controls">
+    <button onclick="expandAll()">Expand all</button>
+    <button onclick="collapseAll()">Collapse all</button>
+    <button onclick="window.print()">Print</button>
+    <button class="danger" onclick="resetAll()">Reset progress</button>
+  </div>
+</header>
+
+<section>
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Shopping list (before swap day)</h2>
+    <span class="stage-progress"></span>
+    <span class="toggle-icon">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="item"><input type="checkbox" id="s0-1"><label for="s0-1">2× Dell R730 standard heatsinks (≤120W, e.g. Dell PN 412-AAFT)</label></div>
+    <div class="item"><input type="checkbox" id="s0-2"><label for="s0-2">4–8× Dell R730 drive caddies (3.5" LFF for 12TB SAS, 2.5" SFF for 450GB)</label></div>
+    <div class="item"><input type="checkbox" id="s0-3"><label for="s0-3">Thermal paste (Arctic MX-4 or equivalent)</label></div>
+    <div class="item"><input type="checkbox" id="s0-4"><label for="s0-4">Anti-static wrist strap</label></div>
+    <div class="item"><input type="checkbox" id="s0-5"><label for="s0-5">R730 GPU enablement kit (riser cage + GPU power cable) — <strong>verify R730 already has this</strong></label></div>
+    <div class="item"><input type="checkbox" id="s0-6"><label for="s0-6">USB stick with Ubuntu Server installer (match DL380 version)</label></div>
+    <div class="item"><input type="checkbox" id="s0-7"><label for="s0-7">Notebook + pen for serial numbers / DIMM positions</label></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>T-7 days · Inventory and first backup</h2>
+    <span class="stage-progress"></span>
+    <span class="toggle-icon">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="item"><input type="checkbox" id="s1-1"><label for="s1-1">Run inventory commands (runbook §0.1), save to <code>~/migration/</code></label></div>
+    <div class="item"><input type="checkbox" id="s1-2"><label for="s1-2">Run backup commands (runbook §0.2)</label></div>
+    <div class="item"><input type="checkbox" id="s1-3"><label for="s1-3">Postgres dumps from every container</label></div>
+    <div class="item"><input type="checkbox" id="s1-4"><label for="s1-4"><strong>Verify a backup restores</strong> — untar one to scratch, spot-check</label></div>
+    <div class="item"><input type="checkbox" id="s1-5"><label for="s1-5">Push <code>~/migration/</code> to a second location (git, Lovelace, USB)</label></div>
+    <div class="item"><input type="checkbox" id="s1-6"><label for="s1-6">Snapshot Cloudflare DNS, Traefik config, Tailscale list</label></div>
+    <div class="note warn">Untested backups are wishes. Restore at least one before moving on.</div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>T-3 days · Pre-stage R730</h2>
+    <span class="stage-progress"></span>
+    <span class="toggle-icon">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="item"><input type="checkbox" id="s2-1"><label for="s2-1">R730 BIOS updated to ≥ 2.0.1 (<strong>before any CPU swap</strong>)</label></div>
+    <div class="item"><input type="checkbox" id="s2-2"><label for="s2-2">PERC H730 set to HBA mode (or RAID decision documented)</label></div>
+    <div class="item"><input type="checkbox" id="s2-3"><label for="s2-3">DL380: unmount <code>/mnt/vault</code>, remove from fstab, delete logical drive</label></div>
+    <div class="item"><input type="checkbox" id="s2-4"><label for="s2-4">Pull empty 12TB from DL380, install in R730 (Dell caddy)</label></div>
+    <div class="item"><input type="checkbox" id="s2-5"><label for="s2-5">Pull 1–2× 450GB unassigned from DL380, install in R730 as boot</label></div>
+    <div class="item"><input type="checkbox" id="s2-6"><label for="s2-6">Install Ubuntu Server on R730 (staging hostname, different IP)</label></div>
+    <div class="item"><input type="checkbox" id="s2-7"><label for="s2-7">Install Docker, NVIDIA stack, Saltbox prereqs</label></div>
+    <div class="item"><input type="checkbox" id="s2-8"><label for="s2-8">Format 12TB as <code>/mnt/buffer</code></label></div>
+    <div class="item"><input type="checkbox" id="s2-9"><label for="s2-9"><code>iperf3</code> between DL380 and R730 — record speed: <input type="text" placeholder="e.g. 940 Mbps" style="background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:2px 6px; border-radius:4px; width:140px;"></label></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>T-2 days · Replicate data</h2>
+    <span class="stage-progress"></span>
+    <span class="toggle-icon">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="item"><input type="checkbox" id="s3-1"><label for="s3-1">tmux session opened, rsync <code>disk1</code> running</label></div>
+    <div class="item"><input type="checkbox" id="s3-2"><label for="s3-2">After disk1 done: rsync <code>disk2</code></label></div>
+    <div class="item"><input type="checkbox" id="s3-3"><label for="s3-3">rsync <code>/opt</code> (Saltbox) — last</label></div>
+    <div class="item"><input type="checkbox" id="s3-4"><label for="s3-4">Pull backup tarballs and SQL dumps to R730</label></div>
+    <div class="item"><input type="checkbox" id="s3-5"><label for="s3-5">Stage agent_runtime on R730, smoke-test <code>/health</code> endpoint</label></div>
+    <div class="item"><input type="checkbox" id="s3-6"><label for="s3-6">Note any errors / files that didn't transfer</label></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>T-1 day · Final prep</h2>
+    <span class="stage-progress"></span>
+    <span class="toggle-icon">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="item"><input type="checkbox" id="s4-1"><label for="s4-1">Re-run inventory snapshot on DL380 (last-day changes)</label></div>
+    <div class="item"><input type="checkbox" id="s4-2"><label for="s4-2">Confirm R730 GPU power cable present, reachable to riser 2</label></div>
+    <div class="item"><input type="checkbox" id="s4-3"><label for="s4-3">Confirm Dell heatsinks and caddies have arrived</label></div>
+    <div class="item"><input type="checkbox" id="s4-4"><label for="s4-4">Block out 4–6 hours on calendar</label></div>
+    <div class="item"><input type="checkbox" id="s4-5"><label for="s4-5">Tell anyone who depends on the services (team of 3)</label></div>
+    <div class="item"><input type="checkbox" id="s4-6"><label for="s4-6">Charge phone, flashlight, clear workspace</label></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Swap day · T-0</h2>
+    <span class="stage-progress"></span>
+    <span class="toggle-icon">▼</span>
+  </div>
+  <div class="section-body">
+
+    <h3>Stage 1 · Final sync (30 min)</h3>
+    <div class="item"><input type="checkbox" id="d1-1"><label for="d1-1">Stop services on DL380: <code>cd /opt && docker compose down</code> (or <code>sb stop</code>)</label></div>
+    <div class="item"><input type="checkbox" id="d1-2"><label for="d1-2">Final delta rsync DL380 → R730 buffer</label></div>
+    <div class="item"><input type="checkbox" id="d1-3"><label for="d1-3">Stop services on R730 staging</label></div>
+    <div class="item"><input type="checkbox" id="d1-4"><label for="d1-4">Verify DL380 idle (<code>docker ps</code> empty)</label></div>
+
+    <h3>Stage 2 · Power down (5 min)</h3>
+    <div class="item"><input type="checkbox" id="d2-1"><label for="d2-1">DL380: <code>sudo shutdown -h now</code></label></div>
+    <div class="item"><input type="checkbox" id="d2-2"><label for="d2-2">Power down R730 cleanly</label></div>
+    <div class="item"><input type="checkbox" id="d2-3"><label for="d2-3"><strong>Unplug both power cables</strong> (CPUs share standby power)</label></div>
+    <div class="item"><input type="checkbox" id="d2-4"><label for="d2-4">Anti-static strap on, attached to chassis</label></div>
+
+    <h3>Stage 3a · RAM (10 min)</h3>
+    <div class="item"><input type="checkbox" id="d3-1"><label for="d3-1">Pull DDR4 DIMMs from DL380, note slots</label></div>
+    <div class="item"><input type="checkbox" id="d3-2"><label for="d3-2">Install in R730 — A1/B1/C1/D1 first per CPU (DIMM map in R730 manual)</label></div>
+    <div class="item"><input type="checkbox" id="d3-3"><label for="d3-3">All slots populated correctly per Dell channel order</label></div>
+
+    <h3>Stage 3b · CPUs (20 min)</h3>
+    <div class="item"><input type="checkbox" id="d3-4"><label for="d3-4">Pull v3 CPUs from R730, place in anti-static foam (resale)</label></div>
+    <div class="item"><input type="checkbox" id="d3-5"><label for="d3-5">Pull v4 CPUs from DL380, <strong>inspect socket pins</strong> with flashlight</label></div>
+    <div class="item"><input type="checkbox" id="d3-6"><label for="d3-6">Apply fresh thermal paste (pea-sized, center)</label></div>
+    <div class="item"><input type="checkbox" id="d3-7"><label for="d3-7">Install v4s in R730 — careful with 2-lever Dell retention frame</label></div>
+    <div class="item"><input type="checkbox" id="d3-8"><label for="d3-8">Install <strong>Dell heatsinks</strong> (not HPE) — cross-diagonal torque pattern</label></div>
+    <div class="note danger">If you bend a socket pin, the R730 board is done. Take your time.</div>
+
+    <h3>Stage 3c · GPU (10 min)</h3>
+    <div class="item"><input type="checkbox" id="d3-9"><label for="d3-9">Install RTX 3070 Ti in R730 riser 2 (x16 slot)</label></div>
+    <div class="item"><input type="checkbox" id="d3-10"><label for="d3-10">Connect GPU power cable from board GPU header</label></div>
+    <div class="item"><input type="checkbox" id="d3-11"><label for="d3-11">Riser cage seated and screwed</label></div>
+
+    <h3>Stage 3d · Drives (15 min)</h3>
+    <div class="item"><input type="checkbox" id="d3-12"><label for="d3-12">Pull <code>sdc</code> (MediaDrive1) from DL380, transfer to Dell caddy, install R730</label></div>
+    <div class="item"><input type="checkbox" id="d3-13"><label for="d3-13">Pull <code>sdd</code> (MediaDrive2) from DL380, transfer to Dell caddy, install R730</label></div>
+    <div class="item"><input type="checkbox" id="d3-14"><label for="d3-14">(Optional) wipe HPE metadata: <code>wipefs -a</code> after install</label></div>
+
+    <h3>Stage 3e · Cabling (5 min)</h3>
+    <div class="item"><input type="checkbox" id="d3-15"><label for="d3-15">Power, network (eno1 to switch), iDRAC network</label></div>
+    <div class="item"><input type="checkbox" id="d3-16"><label for="d3-16">Cable management — airflow paths clear</label></div>
+
+    <h3>Stage 4 · First boot (15 min)</h3>
+    <div class="item"><input type="checkbox" id="d4-1"><label for="d4-1">Power on R730 → enter BIOS</label></div>
+    <div class="item"><input type="checkbox" id="d4-2"><label for="d4-2">BIOS shows: 2× E5-2630 v4, full RAM total, GPU listed in PCIe</label></div>
+    <div class="item"><input type="checkbox" id="d4-3"><label for="d4-3">Save & exit, boot to OS</label></div>
+    <div class="item"><input type="checkbox" id="d4-4"><label for="d4-4"><code>nvidia-smi</code> shows the 3070 Ti</label></div>
+    <div class="item"><input type="checkbox" id="d4-5"><label for="d4-5"><code>lsblk</code> shows boot + buffer + 2× 12TB media drives</label></div>
+
+    <h3>Stage 5 · Mount and restore (60-90 min)</h3>
+    <div class="item"><input type="checkbox" id="d5-1"><label for="d5-1"><code>sudo blkid</code> — capture new UUIDs for sdc/sdd</label></div>
+    <div class="item"><input type="checkbox" id="d5-2"><label for="d5-2">Update <code>/etc/fstab</code> with new UUIDs</label></div>
+    <div class="item"><input type="checkbox" id="d5-3"><label for="d5-3"><code>sudo mount -a</code>, verify both 12TB drives mount with original data</label></div>
+    <div class="item"><input type="checkbox" id="d5-4"><label for="d5-4">Restore mergerfs config, mount union at <code>/mnt/unionfs</code></label></div>
+    <div class="item"><input type="checkbox" id="d5-5"><label for="d5-5">Move buffered Saltbox state to <code>/opt/</code></label></div>
+    <div class="item"><input type="checkbox" id="d5-6"><label for="d5-6">Bring up postgres container, restore dumps</label></div>
+    <div class="item"><input type="checkbox" id="d5-7"><label for="d5-7"><code>sb start</code> (or <code>docker compose up -d</code>)</label></div>
+
+    <h3>Stage 6 · Identity flip (15 min)</h3>
+    <div class="item"><input type="checkbox" id="d6-1"><label for="d6-1"><code>sudo hostnamectl set-hostname shivelyserver</code></label></div>
+    <div class="item"><input type="checkbox" id="d6-2"><label for="d6-2">Static IP changed to DL380's old IP (or Cloudflare DNS updated)</label></div>
+    <div class="item"><input type="checkbox" id="d6-3"><label for="d6-3">Tailscale rejoined as <code>shivelyserver</code> if applicable</label></div>
+    <div class="item"><input type="checkbox" id="d6-4"><label for="d6-4"><code>/etc/hosts</code> updated</label></div>
+
+    <h3>Stage 7 · Verification (30 min)</h3>
+    <div class="item"><input type="checkbox" id="d7-1"><label for="d7-1"><code>docker ps</code> — all expected containers Up and healthy</label></div>
+    <div class="item"><input type="checkbox" id="d7-2"><label for="d7-2">Mission Control loads at expected URL</label></div>
+    <div class="item"><input type="checkbox" id="d7-3"><label for="d7-3">GPU under Docker: <code>docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi</code></label></div>
+    <div class="item"><input type="checkbox" id="d7-4"><label for="d7-4">agent_runtime <code>/health</code> returns 200</label></div>
+    <div class="item"><input type="checkbox" id="d7-5"><label for="d7-5">One training preflight (dry-run) returns clean</label></div>
+    <div class="item"><input type="checkbox" id="d7-6"><label for="d7-6">Plex/Jellyfin plays a file from <code>/mnt/unionfs</code></label></div>
+    <div class="item"><input type="checkbox" id="d7-7"><label for="d7-7">Lovelace can reach R730 on expected hostname</label></div>
+
+    <h3>Stage 8 · Stand down (15 min)</h3>
+    <div class="item"><input type="checkbox" id="d8-1"><label for="d8-1">DL380 stays <strong>powered off but assembled</strong> for 1–2 week rollback window</label></div>
+    <div class="item"><input type="checkbox" id="d8-2"><label for="d8-2">Update <code>docs/INFRASTRUCTURE_REFERENCE.md</code> with new spec</label></div>
+    <div class="item"><input type="checkbox" id="d8-3"><label for="d8-3">Commit migration notes to git</label></div>
+    <div class="item"><input type="checkbox" id="d8-4"><label for="d8-4">Coffee. You earned it.</label></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Bail-out / rollback (only if R730 won't boot)</h2>
+    <span class="stage-progress"></span>
+    <span class="toggle-icon">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="note danger">Use only if the R730 fails to boot or services don't come up after Stage 7.</div>
+    <div class="item"><input type="checkbox" id="b-1"><label for="b-1">Power off R730, unplug</label></div>
+    <div class="item"><input type="checkbox" id="b-2"><label for="b-2">Pull <code>sdc</code> + <code>sdd</code> from R730 (Dell caddies → HPE caddies)</label></div>
+    <div class="item"><input type="checkbox" id="b-3"><label for="b-3">Reinstall in DL380</label></div>
+    <div class="item"><input type="checkbox" id="b-4"><label for="b-4">Move v4 CPUs back to DL380 (reverse heatsink swap)</label></div>
+    <div class="item"><input type="checkbox" id="b-5"><label for="b-5">DL380 boots, services resume from last good state</label></div>
+    <div class="item"><input type="checkbox" id="b-6"><label for="b-6">Diagnose R730 issue without time pressure</label></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Don't forget</h2>
+    <span class="stage-progress"></span>
+    <span class="toggle-icon">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="item"><input type="checkbox" id="r-1"><label for="r-1">PERC H730 firmware also wants to be current — not just system BIOS</label></div>
+    <div class="item"><input type="checkbox" id="r-2"><label for="r-2">iDRAC password — set, written down, not lost</label></div>
+    <div class="item"><input type="checkbox" id="r-3"><label for="r-3">DL380 iLO accessible during swap window for last-minute checks</label></div>
+    <div class="item"><input type="checkbox" id="r-4"><label for="r-4">If reusing DL380 hostname, clear DHCP lease on router (avoid phantom)</label></div>
+    <div class="item"><input type="checkbox" id="r-5"><label for="r-5">Backups are not safe until verified by restore test</label></div>
+  </div>
+</section>
+
+<script>
+  const STORAGE_KEY = 'dl380-r730-migration-checklist';
+
+  function saveState() {
+    const state = {};
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      state[cb.id] = cb.checked;
+    });
+    document.querySelectorAll('input[type="text"]').forEach((tb, i) => {
+      state['_text_' + i] = tb.value;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    updateProgress();
+  }
+
+  function loadState() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) { updateProgress(); return; }
+    const state = JSON.parse(saved);
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      if (state[cb.id]) cb.checked = true;
+    });
+    document.querySelectorAll('input[type="text"]').forEach((tb, i) => {
+      if (state['_text_' + i]) tb.value = state['_text_' + i];
+    });
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const all = document.querySelectorAll('input[type="checkbox"]');
+    const done = document.querySelectorAll('input[type="checkbox"]:checked');
+    const pct = all.length ? Math.round((done.length / all.length) * 100) : 0;
+    document.getElementById('globalProgress').style.width = pct + '%';
+    document.getElementById('progressText').textContent = `${done.length} of ${all.length} complete`;
+    document.getElementById('progressPct').textContent = pct + '%';
+
+    document.querySelectorAll('section').forEach(s => {
+      const sAll = s.querySelectorAll('input[type="checkbox"]');
+      const sDone = s.querySelectorAll('input[type="checkbox"]:checked');
+      const badge = s.querySelector('.stage-progress');
+      if (badge && sAll.length > 0) {
+        badge.textContent = `${sDone.length}/${sAll.length}`;
+        badge.classList.toggle('done', sDone.length === sAll.length);
+      }
+    });
+  }
+
+  function toggleSection(header) {
+    header.parentElement.classList.toggle('collapsed');
+  }
+  function expandAll() {
+    document.querySelectorAll('section').forEach(s => s.classList.remove('collapsed'));
+  }
+  function collapseAll() {
+    document.querySelectorAll('section').forEach(s => s.classList.add('collapsed'));
+  }
+  function resetAll() {
+    if (!confirm('Clear all progress?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[type="text"]').forEach(tb => tb.value = '');
+    updateProgress();
+  }
+
+  document.addEventListener('change', saveState);
+  document.addEventListener('input', e => { if (e.target.type === 'text') saveState(); });
+  loadState();
+</script>
+
+</body>
+</html>

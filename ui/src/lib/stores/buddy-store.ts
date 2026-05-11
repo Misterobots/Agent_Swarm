@@ -438,7 +438,7 @@ export const useBuddyStore = create<BuddyState>()(
         })),
     }),
     {
-      name: "hive-buddy",
+      name: "memex-buddy",
       version: 2,
       migrate: (state: unknown, version: number) => {
         const s = state as Record<string, unknown>;

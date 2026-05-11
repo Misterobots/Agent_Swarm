@@ -12,6 +12,6 @@ export const useToolsStore = create<ToolsState>()(
       activeTab: "openhands",
       setActiveTab: (tab) => set({ activeTab: tab }),
     }),
-    { name: "hive-tools" }
+    { name: "memex-tools" }
   )
 );

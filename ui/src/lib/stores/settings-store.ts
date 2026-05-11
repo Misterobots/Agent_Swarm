@@ -99,7 +99,7 @@ export const useSettingsStore = create<SettingsState>()(
       setSolvingMaxTime: (solvingMaxTime) => set({ solvingMaxTime }),
     }),
     {
-      name: "hive-settings",
+      name: "memex-settings",
       version: 3,
       migrate: (persisted: unknown, fromVersion: number) => {
         const state = (persisted ?? {}) as Partial<SettingsState>;

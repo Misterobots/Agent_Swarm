@@ -112,7 +112,7 @@ export function QuickActionsToolbar() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             node: "turing",
-            command: "docker restart hive_ui",
+            command: "docker restart memex_ui",
           }),
         });
       },
@@ -130,7 +130,7 @@ export function QuickActionsToolbar() {
           body: JSON.stringify({
             node: "turing",
             command:
-              "cd /home/misterobots/Home_AI_Lab && docker compose -f turing_gateway/docker-compose.yml build hive-ui && docker compose -f turing_gateway/docker-compose.yml up -d hive-ui",
+              "cd /home/misterobots/Home_AI_Lab && docker compose -f turing_gateway/docker-compose.yml build memex-ui && docker compose -f turing_gateway/docker-compose.yml up -d memex-ui",
           }),
         });
       },

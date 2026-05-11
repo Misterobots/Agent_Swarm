@@ -12,6 +12,6 @@ export const useMonitorStore = create<MonitorState>()(
       activeDashboard: "mission-control-uid",
       setActiveDashboard: (id) => set({ activeDashboard: id }),
     }),
-    { name: "hive-monitor" }
+    { name: "memex-monitor" }
   )
 );
