@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   
   // User is authenticated - redirect to chat
   // Use the host header to construct the correct URL
-  const host = request.headers.get('host') || 'hive.shivelymedia.com';
+  const host = request.headers.get('host') || 'memex.shivelymedia.com';
   const protocol = request.headers.get('x-forwarded-proto') || 'https';
   const redirectUrl = `${protocol}://${host}/chat`;
   
