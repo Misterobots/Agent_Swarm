@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Settings2, Brain, Moon, Sun, Monitor } from "lucide-react";
+import { Settings2, Brain } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ResearchToggle } from "./research-toggle";
 import { UltraplanToggle } from "./ultraplan-toggle";
@@ -14,7 +14,7 @@ import { SwarmToggle } from "./swarm-toggle";
 import { DesignModeToggle } from "./design-mode-toggle";
 import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
-import { useSettingsStore, type ThemeMode } from "@/lib/stores/settings-store";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -91,12 +91,6 @@ export function ChatSettingsMenu() {
     >
       <div className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wide mb-1">
         Chat Settings
-      </div>
-
-      {/* Theme */}
-      <div className="space-y-1">
-        <label className="text-xs text-[var(--chat-muted)]">Theme</label>
-        <ThemeInline />
       </div>
 
       {/* Modes */}
@@ -183,69 +177,3 @@ export function ChatSettingsMenu() {
   );
 }
 
-/** Compact inline theme picker — no nested dropdown. */
-function ThemeInline() {
-  const theme = useSettingsStore((s) => s.theme);
-  const setTheme = useSettingsStore((s) => s.setTheme);
-  const themeMode = useSettingsStore((s) => s.themeMode);
-  const setThemeMode = useSettingsStore((s) => s.setThemeMode);
-
-  const modes: Array<{ id: ThemeMode; icon: React.ReactNode; label: string }> = [
-    { id: "system", icon: <Monitor size={11} />, label: "System" },
-    { id: "dark",   icon: <Moon size={11} />,    label: "Dark"   },
-    { id: "light",  icon: <Sun size={11} />,     label: "Light"  },
-  ];
-
-  const lcarsVariants: Array<{ id: string; label: string; dot: string }> = [
-    { id: "lcars",       label: "Amber", dot: "#FFAA00" },
-    { id: "lcars-blue",  label: "Blue",  dot: "#5577FF" },
-    { id: "lcars-teal",  label: "Teal",  dot: "#00CC77" },
-  ];
-
-  return (
-    <div className="space-y-1">
-      <div className="flex gap-1">
-        {modes.map((m) => {
-          const active = theme === "memex" && themeMode === m.id;
-          return (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => { setTheme("memex"); setThemeMode(m.id); }}
-              className={cn(
-                "flex-1 inline-flex items-center justify-center gap-1 py-1 text-[11px] rounded-sm border transition-colors",
-                active
-                  ? "bg-[var(--chat-accent-soft)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))] text-[var(--chat-accent-strong)]"
-                  : "bg-[var(--chat-panel)] border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-              )}
-            >
-              {m.icon}
-              <span>{m.label}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex gap-1">
-        {lcarsVariants.map((v) => {
-          const active = theme === v.id;
-          return (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => setTheme(v.id as typeof theme)}
-              className={cn(
-                "flex-1 inline-flex items-center justify-center gap-1.5 py-1 text-[11px] rounded-sm border transition-colors",
-                active
-                  ? "bg-[var(--chat-accent-soft)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))] text-[var(--chat-accent-strong)]"
-                  : "bg-[var(--chat-panel)] border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-              )}
-            >
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: v.dot }} />
-              <span>{v.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
