@@ -43,7 +43,7 @@ export function AppShell({ children }: AppShellProps) {
     else root.removeAttribute("data-legacy-themes");
 
     // Named themes (e.g. "lcars") are self-contained — no mode variants.
-    const NAMED_THEMES = new Set(["lcars", "lcars-blue", "lcars-teal"]);
+    const NAMED_THEMES = new Set(["lcars", "lcars-blue", "lcars-teal", "cyberpunk"]);
 
     // Self-heal: if a stale persisted theme (legacy 8-pack) survived migration
     // and the legacy flag isn't on, coerce back to "memex".
