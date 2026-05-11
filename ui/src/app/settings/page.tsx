@@ -91,7 +91,7 @@ export default function SettingsPage() {
 
           <SettingsCard title="About">
             <div className="space-y-1 text-sm text-[var(--chat-muted)]">
-              <p>Hive Mind Workspace v1.0</p>
+              <p>Memex Workspace v1.0</p>
               <p>Backend: {process.env.NEXT_PUBLIC_API_BASE_URL || "Agent Runtime"}</p>
             </div>
           </SettingsCard>

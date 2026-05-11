@@ -104,7 +104,7 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
               <h1 className="text-[15px] font-semibold text-[var(--chat-text)] tracking-tight leading-none">
                 Memex
               </h1>
-              <p className="text-[10px] text-[var(--chat-subtle)] mt-1.5 tracking-wide uppercase">Hive Mind</p>
+              <p className="text-[10px] text-[var(--chat-subtle)] mt-1.5 tracking-wide uppercase">AI Swarm Interface</p>
             </div>
           </div>
           {onCollapse && (

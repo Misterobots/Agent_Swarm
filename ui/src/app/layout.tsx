@@ -16,13 +16,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Hive Mind — AI Swarm Interface",
+  title: "Memex — AI Swarm Interface",
   description: "Unified interface for the Home AI Lab swarm",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Hive Mind",
+    title: "Memex",
   },
 };
 

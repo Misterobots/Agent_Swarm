@@ -69,7 +69,7 @@ export function ChatSettingsMenu() {
       {/* Settings menu dropdown */}
       {isOpen && (
         <div
-          className="absolute bottom-full right-0 mb-2 w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2.5 space-y-2 z-30 max-h-[55vh] overflow-y-auto scrollbar-thin theme-picker-enter"
+          className="absolute bottom-full right-0 mb-2 w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2 space-y-1.5 z-30 max-h-[75vh] overflow-y-auto scrollbar-thin theme-picker-enter"
           style={{ boxShadow: "var(--elev-3)" }}
         >
           <div className="text-xs font-semibold text-[var(--chat-muted)] uppercase tracking-wide mb-1">
@@ -149,17 +149,21 @@ function ThemeInline() {
   const themeMode = useSettingsStore((s) => s.themeMode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
 
-  const isLcars = theme === "lcars";
-
   const modes: Array<{ id: ThemeMode; icon: React.ReactNode; label: string }> = [
-    { id: "system", icon: <Monitor size={12} />, label: "System" },
-    { id: "dark",   icon: <Moon size={12} />,    label: "Dark"   },
-    { id: "light",  icon: <Sun size={12} />,     label: "Light"  },
+    { id: "system", icon: <Monitor size={11} />, label: "System" },
+    { id: "dark",   icon: <Moon size={11} />,    label: "Dark"   },
+    { id: "light",  icon: <Sun size={11} />,     label: "Light"  },
+  ];
+
+  const lcarsVariants: Array<{ id: string; label: string; dot: string }> = [
+    { id: "lcars",       label: "Amber", dot: "#FFAA00" },
+    { id: "lcars-blue",  label: "Blue",  dot: "#5577FF" },
+    { id: "lcars-teal",  label: "Teal",  dot: "#00CC77" },
   ];
 
   return (
-    <div className="space-y-1.5">
-      {/* Memex modes row */}
+    <div className="space-y-1">
+      {/* Memex modes — compact 3-col row */}
       <div className="flex gap-1">
         {modes.map((m) => {
           const active = theme === "memex" && themeMode === m.id;
@@ -176,26 +180,33 @@ function ThemeInline() {
               )}
             >
               {m.icon}
-              <span>{m.label}</span>
+              <span className="hidden sm:inline">{m.label}</span>
             </button>
           );
         })}
       </div>
-      {/* Named themes row */}
-      <button
-        type="button"
-        onClick={() => setTheme("lcars")}
-        className={cn(
-          "w-full inline-flex items-center gap-2 px-2 py-1.5 text-[11px] rounded-sm border transition-colors",
-          isLcars
-            ? "bg-[var(--chat-accent-soft)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))] text-[var(--chat-accent-strong)]"
-            : "bg-[var(--chat-panel)] border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-        )}
-      >
-        <Tv2 size={12} className={isLcars ? "text-[var(--chat-accent)]" : ""} />
-        <span>LCARS</span>
-        {isLcars && <span className="ml-auto text-[var(--chat-accent)] text-[10px]">✓</span>}
-      </button>
+      {/* LCARS variants — compact 3-col row */}
+      <div className="flex gap-1">
+        {lcarsVariants.map((v) => {
+          const active = theme === v.id;
+          return (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => setTheme(v.id as typeof theme)}
+              className={cn(
+                "flex-1 inline-flex items-center justify-center gap-1.5 py-1 text-[11px] rounded-sm border transition-colors",
+                active
+                  ? "bg-[var(--chat-accent-soft)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))] text-[var(--chat-accent-strong)]"
+                  : "bg-[var(--chat-panel)] border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+              )}
+            >
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: v.dot }} />
+              <span>{v.label}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

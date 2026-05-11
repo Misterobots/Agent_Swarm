@@ -19,7 +19,7 @@ export default function OfflinePage() {
           You&apos;re Offline
         </h1>
         <p className="text-sm text-[var(--chat-muted)] max-w-xs mx-auto">
-          Hive Mind requires a network connection. Please check your connection and try again.
+          Memex requires a network connection. Please check your connection and try again.
         </p>
       </div>
       <button
