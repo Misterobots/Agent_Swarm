@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Settings2, Brain } from "lucide-react";
+import { Settings2, Brain, Moon, Sun, Monitor, Tv2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { ThemeSelector } from "./theme-selector";
 import { ResearchToggle } from "./research-toggle";
 import { UltraplanToggle } from "./ultraplan-toggle";
 import { UltrathinkToggle } from "./ultrathink-toggle";
@@ -14,7 +13,7 @@ import { SwarmToggle } from "./swarm-toggle";
 import { DesignModeToggle } from "./design-mode-toggle";
 import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
-import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useSettingsStore, type ThemeMode } from "@/lib/stores/settings-store";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -77,10 +76,10 @@ export function ChatSettingsMenu() {
             Chat Settings
           </div>
 
-          {/* Theme */}
-          <div className="space-y-1">
+          {/* Theme — inline buttons, no nested dropdown */}
+          <div className="space-y-1.5">
             <label className="text-xs text-[var(--chat-muted)]">Theme</label>
-            <ThemeSelector />
+            <ThemeInline />
           </div>
 
           {/* Modes */}
@@ -139,6 +138,64 @@ export function ChatSettingsMenu() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Compact inline theme picker — no nested dropdown, safe inside other menus. */
+function ThemeInline() {
+  const theme = useSettingsStore((s) => s.theme);
+  const setTheme = useSettingsStore((s) => s.setTheme);
+  const themeMode = useSettingsStore((s) => s.themeMode);
+  const setThemeMode = useSettingsStore((s) => s.setThemeMode);
+
+  const isLcars = theme === "lcars";
+
+  const modes: Array<{ id: ThemeMode; icon: React.ReactNode; label: string }> = [
+    { id: "system", icon: <Monitor size={12} />, label: "System" },
+    { id: "dark",   icon: <Moon size={12} />,    label: "Dark"   },
+    { id: "light",  icon: <Sun size={12} />,     label: "Light"  },
+  ];
+
+  return (
+    <div className="space-y-1.5">
+      {/* Memex modes row */}
+      <div className="flex gap-1">
+        {modes.map((m) => {
+          const active = theme === "memex" && themeMode === m.id;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => { setTheme("memex"); setThemeMode(m.id); }}
+              className={cn(
+                "flex-1 inline-flex items-center justify-center gap-1 py-1 text-[11px] rounded-sm border transition-colors",
+                active
+                  ? "bg-[var(--chat-accent-soft)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))] text-[var(--chat-accent-strong)]"
+                  : "bg-[var(--chat-panel)] border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+              )}
+            >
+              {m.icon}
+              <span>{m.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {/* Named themes row */}
+      <button
+        type="button"
+        onClick={() => setTheme("lcars")}
+        className={cn(
+          "w-full inline-flex items-center gap-2 px-2 py-1.5 text-[11px] rounded-sm border transition-colors",
+          isLcars
+            ? "bg-[var(--chat-accent-soft)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))] text-[var(--chat-accent-strong)]"
+            : "bg-[var(--chat-panel)] border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+        )}
+      >
+        <Tv2 size={12} className={isLcars ? "text-[var(--chat-accent)]" : ""} />
+        <span>LCARS</span>
+        {isLcars && <span className="ml-auto text-[var(--chat-accent)] text-[10px]">✓</span>}
+      </button>
     </div>
   );
 }
