@@ -104,7 +104,7 @@ export function QuickActionsToolbar() {
       id: "restart-ui",
       label: "Restart UI",
       icon: <Layers size={14} />,
-      description: "Restart hive_ui container",
+      description: "Restart Memex UI container",
       category: "docker",
       action: async () => {
         await fetch("/api/devops/ssh", {
@@ -121,7 +121,7 @@ export function QuickActionsToolbar() {
       id: "rebuild-ui",
       label: "Rebuild UI",
       icon: <Package size={14} />,
-      description: "Rebuild and restart hive-ui",
+      description: "Rebuild and restart Memex UI",
       category: "deploy",
       action: async () => {
         await fetch("/api/devops/ssh", {

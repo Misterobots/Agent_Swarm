@@ -39,7 +39,7 @@ const PIONEER_NODES: PioneerNode[] = [
 
 const SERVICES: Service[] = [
   { name: "Agent Runtime", container: "agent_runtime", node: "Turing", status: "unknown", port: 5001 },
-  { name: "Hive UI", container: "hive_ui", node: "Turing", status: "unknown", port: 3000 },
+  { name: "Memex UI", container: "hive_ui", node: "Turing", status: "unknown", port: 3000 },
   { name: "PostgreSQL", container: "postgres", node: "Hopper", status: "unknown", port: 5432 },
   { name: "Redis", container: "redis", node: "Hopper", status: "unknown", port: 6379 },
   { name: "Langfuse", container: "langfuse", node: "Hopper", status: "unknown", port: 3001 },

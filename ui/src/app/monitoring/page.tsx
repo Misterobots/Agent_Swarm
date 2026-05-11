@@ -49,7 +49,7 @@ export default function MonitoringPage() {
   return (
     <WorkspaceShell
       title="Monitoring"
-      description="Operations and observability surfaces for the full three-node Hive cluster."
+      description="Operations and observability surfaces for the full three-node Memex cluster."
       icon={Activity}
       actions={
         <Button

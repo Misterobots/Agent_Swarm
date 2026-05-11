@@ -9,7 +9,7 @@ const PIONEER_NODES = {
 
 const SERVICES = [
   { name: "Agent Runtime", container: "agent_runtime", node: "turing", port: 5001 },
-  { name: "Hive UI", container: "hive_ui", node: "turing", port: 3000 },
+  { name: "Memex UI", container: "hive_ui", node: "turing", port: 3000 },
   { name: "PostgreSQL", container: "postgres", node: "hopper", port: 5432 },
   { name: "Redis", container: "redis", node: "hopper", port: 6379 },
   { name: "Langfuse", container: "langfuse", node: "hopper", port: 3001 },

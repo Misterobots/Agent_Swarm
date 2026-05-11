@@ -19,7 +19,7 @@ import { BuddyWidget } from "@/components/buddy/buddy-widget";
 import { useAccess } from "@/lib/hooks/use-access";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
 
-function HiveLogo() {
+function MemexLogo() {
   return (
     <svg width="28" height="32" viewBox="0 0 28 32" fill="none" className="sidebar-logo">
       {/* Outer hexagon */}
@@ -99,7 +99,7 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
       <div className="px-4 py-5 relative">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <HiveLogo />
+            <MemexLogo />
             <div className="min-w-0">
               <h1 className="text-[15px] font-semibold text-[var(--chat-text)] tracking-tight leading-none">
                 Memex
