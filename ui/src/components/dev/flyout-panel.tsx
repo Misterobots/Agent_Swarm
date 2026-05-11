@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { IconButton } from "@/components/ui";
 
 interface FlyoutPanelProps {
   isOpen: boolean;
@@ -24,12 +25,10 @@ export function FlyoutPanel({
 }: FlyoutPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close on Escape key
+  // Close on Escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
+      if (e.key === "Escape" && isOpen) onClose();
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
@@ -40,7 +39,7 @@ export function FlyoutPanel({
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity animate-in fade-in"
           onClick={onClose}
         />
       )}
@@ -48,33 +47,49 @@ export function FlyoutPanel({
       {/* Flyout Panel */}
       <div
         ref={panelRef}
-        className={`fixed top-0 right-0 h-full bg-[var(--chat-bg)] border-l border-[var(--chat-border)] shadow-2xl z-50 flex flex-col transition-transform duration-200 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'
+        className={`fixed top-0 right-0 h-full z-50 flex flex-col transition-transform duration-200 ease-out ${
+          isOpen ? "translate-x-0" : "translate-x-full pointer-events-none"
         }`}
-        style={{ width }}
+        style={{
+          width,
+          background: "var(--chat-bg)",
+          borderLeft: "1px solid var(--chat-border)",
+          boxShadow: "var(--elev-3)",
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--chat-border)] bg-gradient-to-r from-[var(--chat-surface)] to-transparent">
-          <div className="flex items-center gap-2">
-            {icon && <div className="text-[var(--chat-accent)]">{icon}</div>}
-            <h2 className="text-sm font-semibold text-[var(--chat-text)]">{title}</h2>
+        <div className="relative flex items-center justify-between px-4 py-3 bg-[var(--chat-surface)]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {icon && (
+              <div
+                className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--chat-accent)] flex-shrink-0"
+                style={{
+                  background: "linear-gradient(135deg, var(--chat-accent-soft), color-mix(in srgb, var(--chat-accent) 4%, transparent))",
+                  border: "1px solid color-mix(in srgb, var(--chat-accent) 25%, var(--chat-border))",
+                  boxShadow: "var(--inset-highlight)",
+                }}
+              >
+                {icon}
+              </div>
+            )}
+            <h2 className="text-[13px] font-semibold text-[var(--chat-text)] tracking-tight truncate">{title}</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {headerAction}
-            <button
+            <IconButton
+              label="Close"
+              icon={<X size={14} />}
               onClick={onClose}
-              className="p-1.5 rounded hover:bg-[var(--chat-hover)] transition-colors"
+              variant="ghost"
+              size="sm"
               title="Close (Esc)"
-            >
-              <X size={16} className="text-[var(--chat-muted)]" />
-            </button>
+            />
           </div>
+          <div className="absolute bottom-0 left-0 right-0 divider" />
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">
-          {children}
-        </div>
+        <div className="flex-1 overflow-hidden">{children}</div>
       </div>
     </>
   );

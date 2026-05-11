@@ -175,22 +175,23 @@ export function ArtGenerator() {
       {isMobile && !showJointEditor && (
         <button
           onClick={() => setControlsOpen(!controlsOpen)}
-          className="flex items-center gap-2 px-4 py-2 border-b border-[var(--chat-border)] bg-[var(--chat-surface)] text-sm text-[var(--chat-muted)]"
+          className="relative flex items-center gap-2 px-4 py-2.5 bg-[var(--chat-surface)] text-[13px] font-medium text-[var(--chat-muted)]"
         >
-          {controlsOpen ? <X size={16} /> : <SlidersHorizontal size={16} />}
+          {controlsOpen ? <X size={15} /> : <SlidersHorizontal size={15} />}
           {controlsOpen ? "Hide Controls" : "Show Controls"}
+          <div className="absolute bottom-0 left-0 right-0 divider" />
         </button>
       )}
 
       {/* Left: Controls / Joint Editor Panel */}
       <div className={cn(
-        "border-r border-[var(--chat-border)] bg-[var(--chat-bg)] flex flex-col overflow-y-auto",
+        "border-r border-[var(--chat-border)] bg-[var(--chat-surface)] flex flex-col overflow-y-auto scrollbar-thin",
         isMobile
           ? cn("w-full border-r-0 border-b", controlsOpen ? "max-h-[50vh]" : "max-h-0 overflow-hidden")
           : "w-72"
       )}>
         {showJointEditor ? (
-          <Suspense fallback={<div className="p-4 text-[var(--chat-muted)] text-sm">Loading editor...</div>}>
+          <Suspense fallback={<div className="p-4 text-[var(--chat-muted)] text-sm">Loading editor…</div>}>
             <JointEditor
               meshPath={editorMeshPath}
               onSegmentComplete={handleSegmentComplete}
@@ -200,27 +201,36 @@ export function ArtGenerator() {
         ) : (
           <>
             <div className="p-4">
-              <h2 className="text-sm font-semibold text-[var(--chat-text)] mb-3">Generation Mode</h2>
-              <div className="flex gap-1 bg-[var(--chat-panel)] rounded-lg p-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-subtle)] mb-3">
+                Generation Mode
+              </p>
+              <div
+                className="flex gap-1 p-1 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)]"
+                style={{ boxShadow: "var(--elev-1), inset 0 1px 2px rgba(0,0,0,0.08)" }}
+                role="tablist"
+              >
                 {MODES.map((m) => (
                   <button
                     key={m.key}
+                    role="tab"
+                    aria-selected={mode === m.key}
                     onClick={() => setMode(m.key)}
                     className={cn(
-                      "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-md text-xs font-medium transition-all",
+                      "flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-sm text-[12px] font-medium transition-all",
                       mode === m.key
-                        ? "bg-violet-600 text-white shadow-lg"
-                        : "text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)]"
+                        ? "bg-[var(--chat-elevated)] text-[var(--chat-text)]"
+                        : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
                     )}
+                    style={mode === m.key ? { boxShadow: "var(--elev-1)" } : undefined}
                   >
-                    <m.icon size={14} />
+                    <m.icon size={13} className={mode === m.key ? "text-[var(--chat-accent)]" : ""} />
                     {m.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="border-t border-[var(--chat-border)]" />
+            <div className="divider mx-3" />
 
             <div className="p-4 flex-1">
               {mode === "image" && <ImageControls models={models} />}
@@ -235,7 +245,7 @@ export function ArtGenerator() {
       <div className="flex-1 flex flex-col">
         {/* Prompt Bar (hidden when joint editor is open) */}
         {!showJointEditor && (
-          <div className="border-b border-[var(--chat-border)] bg-[var(--chat-bg)] p-3 md:p-4">
+          <div className="relative bg-[var(--chat-surface)] p-3 md:p-4">
             <div className="flex gap-2 md:gap-3 max-w-4xl mx-auto">
               <input
                 type="text"
@@ -244,32 +254,33 @@ export function ArtGenerator() {
                 onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
                 placeholder={
                   mode === "image"
-                    ? "A cyberpunk samurai in neon rain..."
+                    ? "A cyberpunk samurai in neon rain…"
                     : mode === "3d"
-                    ? "A dragon warrior character..."
-                    : "A robot action figure with armor plating..."
+                    ? "A dragon warrior character…"
+                    : "A robot action figure with armor plating…"
                 }
-                className="flex-1 bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-lg px-4 py-2.5 text-sm text-[var(--chat-text)] placeholder:text-[var(--chat-muted)] focus:outline-none focus:border-violet-500 transition-colors"
+                className="input-field flex-1 !py-2.5 text-sm"
                 disabled={isGenerating}
               />
               <button
                 onClick={handleGenerate}
                 disabled={!prompt.trim() || isGenerating}
                 className={cn(
-                  "flex items-center gap-2 px-3 md:px-5 py-2.5 rounded-lg text-sm font-medium transition-all flex-shrink-0",
-                  isGenerating
-                    ? "bg-[var(--chat-surface)] text-[var(--chat-muted)] cursor-not-allowed"
-                    : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30"
+                  "inline-flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-md text-[13px] font-medium transition-all flex-shrink-0",
+                  isGenerating || !prompt.trim() ? "btn-secondary" : "btn-primary"
                 )}
               >
                 {isGenerating ? (
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2 size={15} className="animate-spin" />
                 ) : (
-                  <Sparkles size={16} />
+                  <Sparkles size={15} />
                 )}
-                {isGenerating ? (progressMsg || "Generating...") : "Generate"}
+                <span className="truncate max-w-[180px]">
+                  {isGenerating ? (progressMsg || "Generating…") : "Generate"}
+                </span>
               </button>
             </div>
+            <div className="absolute bottom-0 left-0 right-0 divider" />
           </div>
         )}
 
@@ -287,19 +298,30 @@ export function ArtGenerator() {
           ) : (
             <div className="h-full overflow-y-auto p-3 md:p-6">
               {history.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-[var(--chat-muted)] gap-4">
-                  <div className="w-20 h-20 rounded-2xl bg-violet-900/20 flex items-center justify-center">
-                    <Sparkles size={36} className="text-violet-400" />
+                <div className="flex flex-col items-center justify-center h-full px-6">
+                  <div className="relative mb-6">
+                    <div
+                      className="w-20 h-20 rounded-2xl flex items-center justify-center"
+                      style={{
+                        background: "linear-gradient(135deg, var(--chat-accent-soft), color-mix(in srgb, var(--chat-accent) 6%, transparent))",
+                        border: "1px solid color-mix(in srgb, var(--chat-accent) 30%, var(--chat-border))",
+                        boxShadow: "var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      <Sparkles size={36} className="text-[var(--chat-accent)]" />
+                    </div>
+                    <div
+                      className="absolute -inset-4 -z-10 rounded-3xl opacity-60 blur-2xl"
+                      style={{ background: "radial-gradient(circle, var(--chat-accent-soft), transparent 70%)" }}
+                    />
                   </div>
-                  <div className="text-center">
-                    <h2 className="text-lg font-medium text-[var(--chat-text)] mb-1">Art Studio</h2>
-                    <p className="text-sm text-[var(--chat-muted)]">
-                      Describe what you want to create and hit Generate
-                    </p>
-                    <p className="text-xs text-[var(--chat-muted)] mt-2">
-                      Image generation, 3D models, and posable action figures
-                    </p>
-                  </div>
+                  <h2 className="text-2xl font-semibold text-[var(--chat-text)] tracking-tight mb-2">Art Studio</h2>
+                  <p className="text-[15px] text-[var(--chat-muted)] text-center">
+                    Describe what you want to create and hit Generate.
+                  </p>
+                  <p className="mt-1 text-[12px] text-[var(--chat-subtle)] text-center">
+                    Image generation, 3D models, and posable action figures.
+                  </p>
                 </div>
               ) : (
                 <GenerationHistory entries={history} />

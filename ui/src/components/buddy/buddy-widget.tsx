@@ -129,12 +129,20 @@ export function BuddyWidget() {
     : 100;
 
   return (
-    <div className="border-t border-[var(--chat-border)]">
+    <div className="relative">
+      <div className="absolute top-0 left-3 right-3 divider" />
       {/* Evolution fanfare banner */}
       {showEvolutionBanner && (
-        <div className="mx-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] border border-[var(--chat-accent)]/40 text-xs text-[var(--chat-accent)] animate-in fade-in duration-300">
-          <Sparkles size={12} className="shrink-0" />
-          <span className="font-semibold">{name} evolved into {STAGE_LABEL[evolutionStage]}!</span>
+        <div
+          className="mx-3 mt-2 mb-1 inline-flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-semibold text-[var(--chat-accent-strong)] animate-in fade-in duration-300"
+          style={{
+            background: "var(--chat-accent-soft)",
+            border: "1px solid color-mix(in srgb, var(--chat-accent) 40%, var(--chat-border))",
+            boxShadow: "var(--elev-1), var(--inset-highlight)",
+          }}
+        >
+          <Sparkles size={12} className="shrink-0 text-[var(--chat-accent)]" />
+          <span>{name} evolved into {STAGE_LABEL[evolutionStage]}!</span>
         </div>
       )}
       {/* === Collapsed header === */}
@@ -160,10 +168,21 @@ export function BuddyWidget() {
             <span className="text-[10px] text-[var(--chat-muted)]">{MOOD_EMOJI[mood]}</span>
           </div>
           {/* XP progress bar */}
-          <div className="w-full h-1.5 mt-0.5 rounded-full bg-[var(--chat-border)] overflow-hidden">
+          <div
+            className="w-full h-1.5 mt-1 rounded-full overflow-hidden"
+            style={{
+              background: "var(--chat-panel)",
+              border: "1px solid var(--chat-border)",
+              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.15)",
+            }}
+          >
             <div
-              className="h-full rounded-full bg-[var(--chat-accent)] transition-all duration-500"
-              style={{ width: `${progressPct}%` }}
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${progressPct}%`,
+                background: "linear-gradient(90deg, var(--chat-accent), var(--chat-accent-strong))",
+                boxShadow: progressPct > 0 ? "0 0 6px rgba(var(--chat-accent-rgb), 0.5)" : "none",
+              }}
             />
           </div>
         </div>

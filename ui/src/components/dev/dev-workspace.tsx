@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { ChatView } from "@/components/chat/chat-view";
 import { TabbedEditor } from "./tabbed-editor";
 import { TabbedTerminal } from "./tabbed-terminal";
@@ -10,13 +10,14 @@ import { Code2, Eye, FileCode, Terminal, X, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 
 export function DevWorkspace() {
   const { isMobile } = useIsMobile();
   const router = useRouter();
-  const { 
-    viewMode, 
+  const {
+    viewMode,
     setViewMode,
     showEditorPanel,
     showTerminalPanel,
@@ -38,149 +39,214 @@ export function DevWorkspace() {
       {/* Quick Actions Toolbar */}
       <QuickActionsToolbar />
 
-      {/* View Mode Toggle & Panel Controls */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-[var(--chat-surface)] border-b border-[var(--chat-border)]">
-        <span className="text-xs text-[var(--chat-muted)] mr-2">View:</span>
-        <div className="flex items-center gap-1 bg-[var(--chat-input-bg)] rounded p-0.5">
-          <button
-            onClick={() => setViewMode("code")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors",
-              viewMode === "code"
-                ? "bg-[var(--chat-accent)] text-white"
-                : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-            )}
-            title="Code view (editor + terminal)"
-          >
-            <Code2 size={14} />
-            Code
-          </button>
-          <button
-            onClick={() => setViewMode("preview")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors",
-              viewMode === "preview"
-                ? "bg-[var(--chat-accent)] text-white"
-                : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-            )}
-            title="Preview mode (live output)"
-          >
-            <Eye size={14} />
-            Preview
-          </button>
-        </div>
+      {/* View Mode + Panel Controls */}
+      <div className="relative flex items-center gap-3 bg-[var(--chat-surface)] px-4 py-2">
+        <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
 
-        {/* Flyout Panel Toggles */}
-        <div className="ml-auto flex items-center gap-1">
-          <button
+        <div className="ml-auto flex items-center gap-1.5">
+          <ToolbarButton
             onClick={() => router.push("/dev/pioneers")}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors text-[var(--chat-muted)] hover:text-[var(--chat-text)] border border-[var(--chat-border)]"
-            title="Pioneer Academy - Build Your Team"
-          >
-            <Users size={14} />
-            Pioneers
-          </button>
-          <button
+            title="Pioneer Academy — build your team"
+            icon={<Users size={14} />}
+            label="Pioneers"
+          />
+          <ToolbarButton
             onClick={toggleEditorPanel}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors",
-              showEditorPanel
-                ? "bg-[var(--chat-accent)] text-white"
-                : "text-[var(--chat-muted)] hover:text-[var(--chat-text)] border border-[var(--chat-border)]"
-            )}
-            title={showEditorPanel ? "Hide Editor" : "Show Editor"}
-          >
-            <FileCode size={14} />
-            Editor
-          </button>
-          <button
+            active={showEditorPanel}
+            title={showEditorPanel ? "Hide editor" : "Show editor"}
+            icon={<FileCode size={14} />}
+            label="Editor"
+          />
+          <ToolbarButton
             onClick={toggleTerminalPanel}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors",
-              showTerminalPanel
-                ? "bg-[var(--chat-accent)] text-white"
-                : "text-[var(--chat-muted)] hover:text-[var(--chat-text)] border border-[var(--chat-border)]"
-            )}
-            title={showTerminalPanel ? "Hide Terminal" : "Show Terminal"}
-          >
-            <Terminal size={14} />
-            Terminal
-          </button>
+            active={showTerminalPanel}
+            title={showTerminalPanel ? "Hide terminal" : "Show terminal"}
+            icon={<Terminal size={14} />}
+            label="Terminal"
+          />
         </div>
+        <div className="absolute bottom-0 left-0 right-0 divider" />
       </div>
 
       {/* Main Workspace with Flyout Panels */}
       <div className="flex-1 overflow-hidden relative">
         {/* Primary Content: Chat or Preview */}
         <div className="h-full w-full">
-          {viewMode === "preview" ? (
-            <PreviewCanvas />
-          ) : (
-            <ChatView showDevContext />
-          )}
+          {viewMode === "preview" ? <PreviewCanvas /> : <ChatView showDevContext />}
         </div>
 
-        {/* Editor Flyout Panel (Right Side) */}
+        {/* Editor Flyout (right) */}
         {showEditorPanel && (
-          <div
-            className={cn(
-              "absolute top-0 right-0 h-full bg-[var(--chat-surface)] border-l border-[var(--chat-border)] shadow-2xl z-20",
-              "w-[50%]"
-            )}
+          <FlyoutSurface
+            position="right"
+            className="w-[50%]"
+            title="Code Editor"
+            icon={<FileCode size={14} />}
+            onClose={() => setShowEditorPanel(false)}
           >
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--chat-border)] bg-[var(--chat-input-bg)] relative z-30">
-              <div className="flex items-center gap-2">
-                <FileCode size={16} className="text-[var(--chat-accent)]" />
-                <span className="text-sm font-medium">Code Editor</span>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowEditorPanel(false);
-                }}
-                className="p-1 hover:bg-[var(--chat-hover)] rounded transition-colors"
-                title="Close Editor"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="h-[calc(100%-40px)]">
-              <TabbedEditor />
-            </div>
-          </div>
+            <TabbedEditor />
+          </FlyoutSurface>
         )}
 
-        {/* Terminal Flyout Panel (Bottom) */}
+        {/* Terminal Flyout (bottom) */}
         {showTerminalPanel && (
-          <div
-            className={cn(
-              "absolute bottom-0 left-0 right-0 bg-[var(--chat-surface)] border-t border-[var(--chat-border)] shadow-2xl transition-transform duration-300 ease-in-out z-20",
-              "h-[40%]",
-              showEditorPanel && "right-[50%]" // Adjust width when editor is open
-            )}
+          <FlyoutSurface
+            position="bottom"
+            className={cn("h-[40%]", showEditorPanel && "right-[50%]")}
+            title="Terminal"
+            icon={<Terminal size={14} />}
+            onClose={() => setShowTerminalPanel(false)}
           >
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--chat-border)] bg-[var(--chat-input-bg)] relative z-30">
-              <div className="flex items-center gap-2">
-                <Terminal size={16} className="text-[var(--chat-accent)]" />
-                <span className="text-sm font-medium">Terminal</span>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowTerminalPanel(false);
-                }}
-                className="p-1 hover:bg-[var(--chat-hover)] rounded transition-colors"
-                title="Close Terminal"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="h-[calc(100%-40px)]">
-              <TabbedTerminal />
-            </div>
-          </div>
+            <TabbedTerminal />
+          </FlyoutSurface>
         )}
       </div>
+    </div>
+  );
+}
+
+function ViewModeToggle({
+  viewMode,
+  onChange,
+}: {
+  viewMode: "code" | "preview";
+  onChange: (m: "code" | "preview") => void;
+}) {
+  return (
+    <div
+      className="inline-flex items-center gap-1 p-1 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)]"
+      style={{ boxShadow: "var(--elev-1), inset 0 1px 2px rgba(0,0,0,0.08)" }}
+      role="tablist"
+    >
+      <SegmentButton
+        active={viewMode === "code"}
+        onClick={() => onChange("code")}
+        icon={<Code2 size={13} />}
+        label="Code"
+      />
+      <SegmentButton
+        active={viewMode === "preview"}
+        onClick={() => onChange("preview")}
+        icon={<Eye size={13} />}
+        label="Preview"
+      />
+    </div>
+  );
+}
+
+function SegmentButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-[12px] font-medium transition-all",
+        active
+          ? "bg-[var(--chat-elevated)] text-[var(--chat-text)]"
+          : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+      )}
+      style={active ? { boxShadow: "var(--elev-1)" } : undefined}
+    >
+      <span className={active ? "text-[var(--chat-accent)]" : ""}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+function ToolbarButton({
+  onClick,
+  active = false,
+  title,
+  icon,
+  label,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  title: string;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium rounded-md transition-colors border",
+        active
+          ? "bg-[var(--chat-accent-soft)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
+          : "bg-[var(--chat-panel)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] border-[var(--chat-border)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_50%,var(--chat-text))]"
+      )}
+    >
+      <span className={active ? "text-[var(--chat-accent)]" : ""}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+function FlyoutSurface({
+  position,
+  className,
+  title,
+  icon,
+  onClose,
+  children,
+}: {
+  position: "right" | "bottom";
+  className?: string;
+  title: string;
+  icon: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const base = position === "right"
+    ? "absolute top-0 right-0 h-full"
+    : "absolute bottom-0 left-0 right-0";
+  const borderSide = position === "right"
+    ? "border-l border-[var(--chat-border)]"
+    : "border-t border-[var(--chat-border)]";
+
+  return (
+    <div
+      className={cn(base, borderSide, "bg-[var(--chat-surface)] z-20 flex flex-col", className)}
+      style={{ boxShadow: "var(--elev-3)" }}
+    >
+      <div
+        className="relative flex items-center justify-between px-4 py-2 bg-[var(--chat-surface)]"
+        style={{ borderBottom: "1px solid var(--chat-border)" }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <div
+            className="w-6 h-6 rounded-sm flex items-center justify-center text-[var(--chat-accent)]"
+            style={{
+              background: "var(--chat-accent-soft)",
+              border: "1px solid color-mix(in srgb, var(--chat-accent) 25%, var(--chat-border))",
+            }}
+          >
+            {icon}
+          </div>
+          <span className="text-[13px] font-semibold text-[var(--chat-text)]">{title}</span>
+        </div>
+        <IconButton
+          label={`Close ${title}`}
+          icon={<X size={14} />}
+          onClick={onClose}
+          variant="ghost"
+          size="sm"
+          onMouseDown={(e) => e.stopPropagation()}
+        />
+      </div>
+      <div className="flex-1 min-h-0">{children}</div>
     </div>
   );
 }
