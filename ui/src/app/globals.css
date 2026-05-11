@@ -167,114 +167,125 @@
    All are always dark — no light/dark variant.
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── LCARS AMBER — warm Lower Decks palette ───────────────────── */
+/* ── LCARS AMBER — warm Lower Decks palette (reference-accurate) ─ */
+/* Elbow: #CC3300 deep red-orange → #FF6600 orange → #FFAA00 amber → #FFDD00 yellow
+   Active nav: bright golden yellow #FFCC00 (top button = brightest)
+   Text on buttons: near-black (dark on light bg)                               */
 [data-theme="lcars"] {
-  --chat-bg:            #080600;
-  --chat-surface:       #0f0c01;
-  --chat-surface-rgb:   15, 12, 1;
-  --chat-panel:         #1a1400;
-  --chat-soft:          #100c00;
-  --chat-elevated:      #251c00;
-  --chat-border:        #885500;
-  --chat-border-rgb:    136, 85, 0;
-  --chat-text:          #FFCC88;
-  --chat-muted:         #CC8833;
-  --chat-subtle:        #775522;
-  --chat-accent:        #FFAA00;
-  --chat-accent-strong: #FFDD44;
-  --chat-accent-soft:   rgba(255,170,0,0.18);
-  --chat-accent-rgb:    255, 170, 0;
-  --chat-accent-2:      #FF5500; /* deep orange — richer complement */
-  --chat-thinking:      #FFDD00;
-  --elev-1: 0 0 0 1px rgba(255,170,0,0.4);
-  --elev-2: 0 0 0 2px rgba(255,170,0,0.6), 0 0 16px rgba(255,170,0,0.12);
-  --elev-3: 0 0 0 2px #FFAA00, 0 0 28px rgba(255,170,0,0.25);
-  --ring: 0 0 0 2px #000, 0 0 0 4px #FFAA00, 0 0 12px rgba(255,170,0,0.5);
-  --hover-tint: rgba(255,170,0,0.10);
-  --press-tint: rgba(255,170,0,0.22);
-  --divider:    rgba(255,170,0,0.45);
-  /* Variant-specific structural tokens */
-  --lcars-elbow-a:     #FF5500;
-  --lcars-elbow-b:     #FF8800;
-  --lcars-elbow-c:     #FFAA00;
-  --lcars-elbow-d:     #FFDD44;
-  --lcars-strip:       linear-gradient(to bottom, #FF5500, #FF8800 25%, #FFAA00 50%, #FFDD44 75%, #FF8800);
-  --lcars-nav-active:  #FFAA00;
-  --lcars-nav-dark:    #1f1500;
-  --lcars-nav-text-on: #1a0800;      /* text on active button */
+  --chat-bg:            #0A0700;
+  --chat-surface:       #120E00;
+  --chat-surface-rgb:   18, 14, 0;
+  --chat-panel:         #1E1500;
+  --chat-soft:          #160F00;
+  --chat-elevated:      #2A1C00;
+  --chat-border:        #996600;
+  --chat-border-rgb:    153, 102, 0;
+  --chat-text:          #FFDDAA;
+  --chat-muted:         #CC9944;
+  --chat-subtle:        #886633;
+  /* Accent = active nav colour = bright golden yellow */
+  --chat-accent:        #FFCC00;
+  --chat-accent-strong: #FFEE55;
+  --chat-accent-soft:   rgba(255,204,0,0.16);
+  --chat-accent-rgb:    255, 204, 0;
+  --chat-accent-2:      #FF5500; /* deep red-orange, the elbow base */
+  --chat-thinking:      #FFEE00;
+  --elev-1: 0 0 0 1px rgba(255,180,0,0.35);
+  --elev-2: 0 0 0 2px rgba(255,180,0,0.5), 0 0 20px rgba(255,160,0,0.12);
+  --elev-3: 0 0 0 2px #FFCC00, 0 0 32px rgba(255,180,0,0.22);
+  --ring: 0 0 0 2px #0A0700, 0 0 0 4px #FFCC00, 0 0 14px rgba(255,200,0,0.5);
+  --hover-tint: rgba(255,180,0,0.09);
+  --press-tint: rgba(255,180,0,0.20);
+  --divider:    rgba(255,160,0,0.4);
+  /* Structural colour tokens */
+  --lcars-elbow-a:     #CC3300;  /* deep red-orange — exact reference match */
+  --lcars-elbow-b:     #FF6600;  /* bright orange */
+  --lcars-elbow-c:     #FFAA00;  /* warm amber */
+  --lcars-elbow-d:     #FFDD00;  /* bright yellow */
+  --lcars-nav-active:  #FFCC00;  /* bright golden yellow — the brightest button */
+  --lcars-nav-dark:    #1E1500;
+  --lcars-nav-text-on: #220E00;  /* dark warm text on bright button */
   --lcars-section-title: #FFAA00;
   color-scheme: dark;
 }
 
-/* ── LCARS BLUE — cold TNG palette ───────────────────────────── */
+/* ── LCARS BLUE — TNG pale blue-lavender palette ─────────────── */
+/* TNG LCARS used soft, almost pastel blues and mauves on pure black.
+   Not a saturated blue — think slate/periwinkle with lavender accent. */
 [data-theme="lcars-blue"] {
-  --chat-bg:            #02040E;
-  --chat-surface:       #060B1A;
-  --chat-surface-rgb:   6, 11, 26;
-  --chat-panel:         #0D1530;
-  --chat-soft:          #080E20;
-  --chat-elevated:      #141E3C;
-  --chat-border:        #334488;
-  --chat-border-rgb:    51, 68, 136;
-  --chat-text:          #AABBFF;
-  --chat-muted:         #5566AA;
+  --chat-bg:            #000008;
+  --chat-surface:       #06070F;
+  --chat-surface-rgb:   6, 7, 15;
+  --chat-panel:         #0C0E1E;
+  --chat-soft:          #080912;
+  --chat-elevated:      #121428;
+  --chat-border:        #3344AA;
+  --chat-border-rgb:    51, 68, 170;
+  --chat-text:          #BBCCFF;
+  --chat-muted:         #6677BB;
   --chat-subtle:        #334477;
-  --chat-accent:        #5577FF;
-  --chat-accent-strong: #99AAFF;
-  --chat-accent-soft:   rgba(85,119,255,0.18);
-  --chat-accent-rgb:    85, 119, 255;
-  --chat-accent-2:      #AA66FF; /* lavender complement */
-  --chat-thinking:      #99AAFF;
-  --elev-1: 0 0 0 1px rgba(85,119,255,0.4);
-  --elev-2: 0 0 0 2px rgba(85,119,255,0.6), 0 0 16px rgba(85,119,255,0.12);
-  --elev-3: 0 0 0 2px #5577FF, 0 0 28px rgba(85,119,255,0.25);
-  --ring: 0 0 0 2px #000, 0 0 0 4px #5577FF, 0 0 12px rgba(85,119,255,0.5);
-  --hover-tint: rgba(85,119,255,0.10);
-  --press-tint: rgba(85,119,255,0.22);
-  --divider:    rgba(85,119,255,0.4);
-  --lcars-elbow-a:     #1122AA;
-  --lcars-elbow-b:     #2244CC;
-  --lcars-elbow-c:     #5577FF;
-  --lcars-elbow-d:     #99AAFF;
-  --lcars-strip:       linear-gradient(to bottom, #1122AA, #2244CC 25%, #5577FF 50%, #AA66FF 75%, #2244CC);
-  --lcars-nav-active:  #5577FF;
-  --lcars-nav-dark:    #0D1530;
-  --lcars-nav-text-on: #000820;
-  --lcars-section-title: #5577FF;
+  /* Accent = TNG mid-blue, not a saturated primary */
+  --chat-accent:        #88AAEE;
+  --chat-accent-strong: #BBCCFF;
+  --chat-accent-soft:   rgba(136,170,238,0.16);
+  --chat-accent-rgb:    136, 170, 238;
+  --chat-accent-2:      #CC99FF; /* TNG lavender/mauve complement */
+  --chat-thinking:      #BBCCFF;
+  --elev-1: 0 0 0 1px rgba(100,140,220,0.35);
+  --elev-2: 0 0 0 2px rgba(100,140,220,0.5), 0 0 20px rgba(100,140,220,0.10);
+  --elev-3: 0 0 0 2px #88AAEE, 0 0 30px rgba(100,140,220,0.20);
+  --ring: 0 0 0 2px #000008, 0 0 0 4px #88AAEE, 0 0 14px rgba(120,160,240,0.45);
+  --hover-tint: rgba(100,140,220,0.09);
+  --press-tint: rgba(100,140,220,0.20);
+  --divider:    rgba(100,140,220,0.35);
+  --lcars-elbow-a:     #221166;  /* deep purple-indigo base */
+  --lcars-elbow-b:     #3355AA;  /* mid blue-indigo */
+  --lcars-elbow-c:     #6688CC;  /* soft steel blue */
+  --lcars-elbow-d:     #AABBEE;  /* pale blue highlight */
+  --lcars-nav-active:  #88AAEE;  /* soft periwinkle active */
+  --lcars-nav-dark:    #0C0E1E;
+  --lcars-nav-text-on: #080614;
+  --lcars-section-title: #88AAEE;
   color-scheme: dark;
 }
 
-/* ── LCARS TEAL — green-teal palette ─────────────────────────── */
+/* ── LCARS TEAL — cyan-teal palette ──────────────────────────── */
+/* True cyan-teal (blue-green), not plain green. Warm orange complement
+   from the reference grid — the contrast reads very tech. */
 [data-theme="lcars-teal"] {
-  --chat-bg:            #020E08;
-  --chat-surface:       #051A0F;
-  --chat-surface-rgb:   5, 26, 15;
-  --chat-panel:         #0C2A18;
-  --chat-soft:          #081A10;
-  --chat-elevated:      #123820;
-  --chat-border:        #226644;
-  --chat-border-rgb:    34, 102, 68;
-  --chat-text:          #88FFCC;
-  --chat-muted:         #449966;
-  --chat-subtle:        #226644;
-  --chat-accent:        #00CC77;
-  --chat-accent-strong: #44FFAA;
-  --chat-accent-soft:   rgba(0,204,119,0.18);
-  --chat-accent-rgb:    0, 204, 119;
-  --chat-accent-2:      #FF6600; /* warm orange complement — matches reference */
-  --chat-thinking:      #44FFAA;
-  --elev-1: 0 0 0 1px rgba(0,204,119,0.4);
-  --elev-2: 0 0 0 2px rgba(0,204,119,0.6), 0 0 16px rgba(0,204,119,0.12);
-  --elev-3: 0 0 0 2px #00CC77, 0 0 28px rgba(0,204,119,0.25);
-  --ring: 0 0 0 2px #000, 0 0 0 4px #00CC77, 0 0 12px rgba(0,204,119,0.5);
-  --hover-tint: rgba(0,204,119,0.10);
-  --press-tint: rgba(0,204,119,0.22);
-  --divider:    rgba(0,204,119,0.4);
-  --lcars-elbow-a:     #005533;
-  --lcars-elbow-b:     #007744;
-  --lcars-elbow-c:     #00CC77;
-  --lcars-elbow-d:     #44FFAA;
-  --lcars-strip:       linear-gradient(to bottom, #005533, #007744 25%, #00CC77 50%, #FF6600 75%, #007744);
+  --chat-bg:            #000C0E;
+  --chat-surface:       #041214;
+  --chat-surface-rgb:   4, 18, 20;
+  --chat-panel:         #081E22;
+  --chat-soft:          #06161A;
+  --chat-elevated:      #0E2A30;
+  --chat-border:        #1A7788;
+  --chat-border-rgb:    26, 119, 136;
+  --chat-text:          #AAEEFF;
+  --chat-muted:         #449999;
+  --chat-subtle:        #226677;
+  /* Accent = cyan-teal, not plain green */
+  --chat-accent:        #00CCDD;
+  --chat-accent-strong: #55EEFF;
+  --chat-accent-soft:   rgba(0,204,221,0.16);
+  --chat-accent-rgb:    0, 204, 221;
+  --chat-accent-2:      #FF7700; /* warm orange — reference complement */
+  --chat-thinking:      #55EEFF;
+  --elev-1: 0 0 0 1px rgba(0,180,200,0.35);
+  --elev-2: 0 0 0 2px rgba(0,180,200,0.5), 0 0 20px rgba(0,180,200,0.10);
+  --elev-3: 0 0 0 2px #00CCDD, 0 0 30px rgba(0,180,200,0.20);
+  --ring: 0 0 0 2px #000C0E, 0 0 0 4px #00CCDD, 0 0 14px rgba(0,200,220,0.45);
+  --hover-tint: rgba(0,180,200,0.09);
+  --press-tint: rgba(0,180,200,0.20);
+  --divider:    rgba(0,180,200,0.35);
+  --lcars-elbow-a:     #004455;  /* deep teal-navy */
+  --lcars-elbow-b:     #007788;  /* mid teal */
+  --lcars-elbow-c:     #00AACC;  /* bright teal */
+  --lcars-elbow-d:     #44DDEE;  /* bright cyan highlight */
+  --lcars-nav-active:  #00CCDD;  /* vivid cyan active */
+  --lcars-nav-dark:    #081E22;
+  --lcars-nav-text-on: #001418;
+  --lcars-section-title: #00CCDD;
   --lcars-nav-active:  #00CC77;
   --lcars-nav-dark:    #0C2A18;
   --lcars-nav-text-on: #001a0a;
@@ -299,58 +310,61 @@
    All selectors use [data-theme^="lcars"] — matches all three variants.
    ═══════════════════════════════════════════════════════════════ */
 
-/* Horizontal scan line */
+/* Horizontal scan — ease-in-out gives an organic drifting feel */
 @keyframes lcars-scan {
-  0%   { transform: translateX(-110%); }
-  100% { transform: translateX(110%); }
+  0%   { transform: translateX(-110%); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translateX(110%); opacity: 0; }
 }
-/* Vertical scan line — slower, the "CRT sweep" */
+/* Vertical scan — slow drift down the panel */
 @keyframes lcars-scan-v {
-  0%   { transform: translateY(-110%); }
-  100% { transform: translateY(110%); }
+  0%   { transform: translateY(-110%); opacity: 0; }
+  8%   { opacity: 0.6; }
+  92%  { opacity: 0.6; }
+  100% { transform: translateY(110%); opacity: 0; }
 }
-/* Active nav glow pulse */
+/* Active nav glow — gentle, never harsh */
 @keyframes lcars-nav-pulse {
-  0%, 100% { box-shadow: none; }
-  50%       { box-shadow: inset 0 0 14px rgba(255,255,255,0.1), 3px 0 18px rgba(var(--chat-accent-rgb),0.35); }
+  0%, 100% { box-shadow: inset 0 0 0 transparent; }
+  50%       { box-shadow: inset 0 0 12px rgba(255,255,255,0.08), 0 0 14px rgba(var(--chat-accent-rgb),0.28); }
 }
-/* System indicator blink — fast double-flash */
+/* System blink — soft fade, not a hard flash */
 @keyframes lcars-blink {
-  0%, 80%, 100% { opacity: 1; }
-  85%            { opacity: 0.05; }
-  90%            { opacity: 0.9; }
-  95%            { opacity: 0.05; }
+  0%, 75%, 100% { opacity: 1; }
+  82%           { opacity: 0.25; }
+  88%           { opacity: 0.85; }
+  94%           { opacity: 0.25; }
 }
-/* Sensor ring rotation */
+/* Sensor ring — constant, never jerky */
 @keyframes lcars-rotate {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
-/* Heading amber glow pulse */
+/* Heading glow — very slow, almost subliminal */
 @keyframes lcars-heading-glow {
   0%, 100% { text-shadow: none; }
-  50%       { text-shadow: 0 0 16px rgba(var(--chat-accent-rgb),0.5), 0 0 32px rgba(var(--chat-accent-rgb),0.2); }
+  50%       { text-shadow: 0 0 12px rgba(var(--chat-accent-rgb),0.4), 0 0 28px rgba(var(--chat-accent-rgb),0.15); }
 }
-/* Right-strip segment chaser — bright segment moving down the strip */
+/* Strip segment chaser */
 @keyframes lcars-stripe-chase {
   0%   { background-position: 0 0; }
-  100% { background-position: 0 120px; }
+  100% { background-position: 0 80px; }
 }
-/* Data bar fill/drain — used on decorative segment bars */
+/* Data bar — slow, organic, never snappy */
 @keyframes lcars-fill {
-  0%   { width: 20%; }
-  20%  { width: 78%; }
-  45%  { width: 52%; }
-  65%  { width: 91%; }
-  85%  { width: 38%; }
-  100% { width: 20%; }
+  0%   { width: 18%; }
+  30%  { width: 74%; }
+  55%  { width: 49%; }
+  78%  { width: 88%; }
+  100% { width: 18%; }
 }
-/* Elbow pulse — breathes the amber connection point */
+/* Elbow breathe — subtle, long cycle */
 @keyframes lcars-elbow-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.85; }
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50%       { opacity: 0.88; filter: brightness(1.08); }
 }
-/* Section title cursor blink */
+/* Cursor blink — step-start keeps it crisp like a terminal */
 @keyframes lcars-cursor {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
@@ -373,7 +387,7 @@
   box-shadow: none;
 }
 
-/* Right-edge strip — animated segment chaser moves down the strip */
+/* Right-edge strip — slow segment chaser with ease */
 [data-theme^="lcars"] .sidebar-wrapper::after {
   content: "";
   position: absolute;
@@ -382,14 +396,15 @@
   background: repeating-linear-gradient(
     to bottom,
     var(--lcars-elbow-d) 0px,
-    var(--lcars-elbow-c) 10px,
-    var(--lcars-elbow-b) 20px,
-    var(--lcars-elbow-a) 30px,
-    transparent 30px,
-    transparent 40px
+    var(--lcars-elbow-c) 12px,
+    var(--lcars-elbow-b) 24px,
+    var(--lcars-elbow-a) 36px,
+    color-mix(in srgb, var(--lcars-elbow-a) 30%, transparent) 48px,
+    transparent 56px,
+    transparent 80px
   );
   background-size: 6px 80px;
-  animation: lcars-stripe-chase 2s linear infinite;
+  animation: lcars-stripe-chase 3.5s ease-in-out infinite;
   z-index: 5;
 }
 
@@ -406,16 +421,16 @@
   box-shadow: inset 0 -2px 8px rgba(0,0,0,0.35);
   position: relative;
   overflow: hidden;
-  animation: lcars-elbow-pulse 4s ease-in-out infinite;
+  animation: lcars-elbow-pulse 8s ease-in-out infinite;
 }
-/* Scan shimmer across the elbow */
+/* Scan shimmer across the elbow — slow drift, not a wipe */
 [data-theme^="lcars"] .sidebar-wrapper > div:first-child::after {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
   width: 60%;
-  animation: lcars-scan 7s ease-in-out infinite;
+  animation: lcars-scan 9s ease-in-out infinite;
   pointer-events: none;
 }
 /* Text on elbow: dark on light bg */
@@ -478,7 +493,7 @@
   color: var(--lcars-nav-text-on) !important;
   border-radius: 0 !important;
   border-bottom: 1px solid color-mix(in srgb, var(--lcars-nav-active) 60%, black) !important;
-  animation: lcars-nav-pulse 4s ease-in-out infinite;
+  animation: lcars-nav-pulse 6s ease-in-out infinite;
 }
 [data-theme^="lcars"] .sidebar-active::before { display: none; }
 [data-theme^="lcars"] .sidebar-active svg { color: var(--lcars-nav-text-on) !important; }
@@ -486,7 +501,7 @@
 /* Status dot */
 [data-theme^="lcars"] .sidebar-status-dot {
   background: var(--chat-accent);
-  animation: lcars-blink 5s ease-in-out infinite;
+  animation: lcars-blink 6s ease-in-out infinite;
 }
 
 [data-theme^="lcars"] .sidebar-wrapper > div:nth-child(2) {
@@ -509,7 +524,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 800;
-  animation: lcars-heading-glow 7s ease-in-out infinite;
+  animation: lcars-heading-glow 10s ease-in-out infinite;
 }
 
 /* ── CHAT SURFACE ─────────────────────────────────────────────── */
@@ -521,7 +536,7 @@
   height: 2px;
   background: linear-gradient(to right, transparent 0%, rgba(var(--chat-accent-rgb),0.7) 50%, transparent 100%);
   width: 50%;
-  animation: lcars-scan 8s linear infinite;
+  animation: lcars-scan 12s ease-in-out infinite;
   pointer-events: none;
   z-index: 100;
 }
@@ -554,7 +569,7 @@
   width: 2px;
   background: linear-gradient(to bottom, transparent 0%, rgba(var(--chat-accent-rgb),0.4) 50%, transparent 100%);
   height: 40%;
-  animation: lcars-scan-v 15s linear infinite;
+  animation: lcars-scan-v 18s ease-in-out infinite;
   pointer-events: none;
   z-index: 1;
 }
