@@ -200,7 +200,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         {tokenUsage.pct >= 0.95 && (
           <div className="mx-auto max-w-3xl mt-3 px-3 md:px-4">
             <div className="rounded-md border border-[color:color-mix(in_srgb,var(--chat-accent-2)_50%,var(--chat-border))] bg-[color:color-mix(in_srgb,var(--chat-accent-2)_10%,transparent)] px-3 py-2 text-xs text-[var(--chat-text)]">
