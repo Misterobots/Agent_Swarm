@@ -33,9 +33,14 @@ interface SettingsState {
   groundingWeb: boolean;
   groundingDocs: boolean;
   groundingFile: boolean;
-  // Quality/Effort settings
+  // Quality/Effort settings (overall)
   solvingMaxIter: number; // MarsRL max iterations (0 = unlimited)
   solvingMaxTime: number; // MarsRL max time in seconds (0 = unlimited)
+  // Developer-mode granular per-agent budgets. 0 = no per-call cap (fall back to overall).
+  solvingSolverNDrafts: number;       // Best-of-N solver drafts (1–3 in UI, 1 = single pass)
+  solvingSolverMaxTime: number;       // Per-call solver wall-clock (seconds, 0 = none)
+  solvingVerifierMaxTime: number;     // Per-call verifier wall-clock (seconds, 0 = none)
+  solvingCorrectorMaxTime: number;    // Per-call corrector wall-clock (seconds, 0 = none)
   // Layout
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -56,6 +61,10 @@ interface SettingsState {
   setGroundingFile: (on: boolean) => void;
   setSolvingMaxIter: (iter: number) => void;
   setSolvingMaxTime: (time: number) => void;
+  setSolvingSolverNDrafts: (n: number) => void;
+  setSolvingSolverMaxTime: (time: number) => void;
+  setSolvingVerifierMaxTime: (time: number) => void;
+  setSolvingCorrectorMaxTime: (time: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -78,6 +87,10 @@ export const useSettingsStore = create<SettingsState>()(
       groundingFile: false,
       solvingMaxIter: 2, // Default: 2 iterations
       solvingMaxTime: 0, // Default: no time limit
+      solvingSolverNDrafts: 1,      // Default: single pass (no best-of-N)
+      solvingSolverMaxTime: 0,      // Default: no per-call cap
+      solvingVerifierMaxTime: 0,
+      solvingCorrectorMaxTime: 0,
       sidebarOpen: true,
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setMode: (mode) => set({ mode }),
@@ -97,10 +110,14 @@ export const useSettingsStore = create<SettingsState>()(
       setGroundingFile: (groundingFile) => set({ groundingFile }),
       setSolvingMaxIter: (solvingMaxIter) => set({ solvingMaxIter }),
       setSolvingMaxTime: (solvingMaxTime) => set({ solvingMaxTime }),
+      setSolvingSolverNDrafts: (solvingSolverNDrafts) => set({ solvingSolverNDrafts }),
+      setSolvingSolverMaxTime: (solvingSolverMaxTime) => set({ solvingSolverMaxTime }),
+      setSolvingVerifierMaxTime: (solvingVerifierMaxTime) => set({ solvingVerifierMaxTime }),
+      setSolvingCorrectorMaxTime: (solvingCorrectorMaxTime) => set({ solvingCorrectorMaxTime }),
     }),
     {
       name: "memex-settings",
-      version: 3,
+      version: 4,
       migrate: (persisted: unknown, fromVersion: number) => {
         const state = (persisted ?? {}) as Partial<SettingsState>;
         // v1 -> v3: retired the 8 hand-curated themes plus the warm-amber
@@ -112,6 +129,13 @@ export const useSettingsStore = create<SettingsState>()(
             state.theme = "memex";
           }
           if (!state.themeMode) state.themeMode = "system";
+        }
+        // v3 -> v4: introduce granular per-agent quality budgets.
+        if (fromVersion < 4) {
+          if (state.solvingSolverNDrafts === undefined) state.solvingSolverNDrafts = 1;
+          if (state.solvingSolverMaxTime === undefined) state.solvingSolverMaxTime = 0;
+          if (state.solvingVerifierMaxTime === undefined) state.solvingVerifierMaxTime = 0;
+          if (state.solvingCorrectorMaxTime === undefined) state.solvingCorrectorMaxTime = 0;
         }
         return state as SettingsState;
       },

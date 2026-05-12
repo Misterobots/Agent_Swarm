@@ -91,6 +91,10 @@ export function useChatStream(options?: {
   const groundingFile = useSettingsStore((s) => s.groundingFile);
   const solvingMaxIter = useSettingsStore((s) => s.solvingMaxIter);
   const solvingMaxTime = useSettingsStore((s) => s.solvingMaxTime);
+  const solvingSolverNDrafts = useSettingsStore((s) => s.solvingSolverNDrafts);
+  const solvingSolverMaxTime = useSettingsStore((s) => s.solvingSolverMaxTime);
+  const solvingVerifierMaxTime = useSettingsStore((s) => s.solvingVerifierMaxTime);
+  const solvingCorrectorMaxTime = useSettingsStore((s) => s.solvingCorrectorMaxTime);
 
   useEffect(() => {
     const conv = activeConversation();
@@ -230,7 +234,7 @@ export function useChatStream(options?: {
           const controller = new AbortController();
           abortRef.current = controller;
           try {
-            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode)) {
+            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierMaxTime, solvingCorrectorMaxTime)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {

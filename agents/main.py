@@ -408,6 +408,11 @@ class ChatRequest(BaseModel):
     design_mode: bool = False         # route through Open Design Studio
     solving_max_iter: Optional[int] = None  # MarsRL max iterations (0 = unlimited, overrides config)
     solving_max_time: Optional[int] = None  # MarsRL max time in seconds (0 = unlimited, overrides config)
+    # Developer-mode granular per-agent budgets. Each overrides the overall budget for that agent.
+    solving_solver_n_drafts: Optional[int] = None       # Best-of-N solver drafts (1–10; UI exposes 1–3)
+    solving_solver_max_time: Optional[int] = None       # Per-call solver wall-clock (seconds)
+    solving_verifier_max_time: Optional[int] = None     # Per-call verifier wall-clock (seconds)
+    solving_corrector_max_time: Optional[int] = None    # Per-call corrector wall-clock (seconds)
 
 
 # ---------------------------------------------------------------------------
@@ -1128,6 +1133,10 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     dev_mode=request.dev_mode,
                     solving_max_iter=request.solving_max_iter,
                     solving_max_time=request.solving_max_time,
+                    solving_solver_n_drafts=request.solving_solver_n_drafts,
+                    solving_solver_max_time=request.solving_solver_max_time,
+                    solving_verifier_max_time=request.solving_verifier_max_time,
+                    solving_corrector_max_time=request.solving_corrector_max_time,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")

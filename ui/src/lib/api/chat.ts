@@ -22,6 +22,10 @@ export interface ChatStreamOptions {
   groundingFile?: boolean;
   solvingMaxIter?: number;
   solvingMaxTime?: number;
+  solvingSolverNDrafts?: number;
+  solvingSolverMaxTime?: number;
+  solvingVerifierMaxTime?: number;
+  solvingCorrectorMaxTime?: number;
 }
 
 export async function* sendChatStream(
@@ -44,6 +48,10 @@ export async function* sendChatStream(
   solvingMaxIter?: number,
   solvingMaxTime?: number,
   designMode?: boolean,
+  solvingSolverNDrafts?: number,
+  solvingSolverMaxTime?: number,
+  solvingVerifierMaxTime?: number,
+  solvingCorrectorMaxTime?: number,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -66,6 +74,10 @@ export async function* sendChatStream(
   if (designMode) body.design_mode = true;
   if (solvingMaxIter !== undefined) body.solving_max_iter = solvingMaxIter;
   if (solvingMaxTime !== undefined) body.solving_max_time = solvingMaxTime;
+  if (solvingSolverNDrafts !== undefined) body.solving_solver_n_drafts = solvingSolverNDrafts;
+  if (solvingSolverMaxTime !== undefined) body.solving_solver_max_time = solvingSolverMaxTime;
+  if (solvingVerifierMaxTime !== undefined) body.solving_verifier_max_time = solvingVerifierMaxTime;
+  if (solvingCorrectorMaxTime !== undefined) body.solving_corrector_max_time = solvingCorrectorMaxTime;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",

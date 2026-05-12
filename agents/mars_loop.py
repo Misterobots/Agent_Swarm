@@ -14,6 +14,7 @@ import re
 import logging
 import threading
 import queue
+import concurrent.futures
 from dataclasses import dataclass, field
 from typing import Optional, Callable
 
@@ -91,7 +92,12 @@ class MarsRLLoop:
         session_id: Optional[str] = None,
         token: Optional[str] = None,
         template_metadata: Optional[dict] = None,
-        max_time: Optional[int] = None,  # seconds
+        max_time: Optional[int] = None,  # seconds — overall wall-clock budget
+        # Per-agent granular controls (developer mode). 0 / None = no per-call cap.
+        solver_n_drafts: int = 1,
+        solver_max_time: Optional[int] = None,
+        verifier_max_time: Optional[int] = None,
+        corrector_max_time: Optional[int] = None,
     ):
         self.solver = solver
         self.verifier = verifier
@@ -103,6 +109,22 @@ class MarsRLLoop:
         self.template_metadata = template_metadata or {}
         # Use config default if not provided
         self.max_time = max_time if max_time is not None else SOLVING_MAX_TIME
+        # Per-agent budgets. Clamp drafts to [1, 10] for safety.
+        self.solver_n_drafts = max(1, min(int(solver_n_drafts or 1), 10))
+        self.solver_max_time = solver_max_time if solver_max_time else None
+        self.verifier_max_time = verifier_max_time if verifier_max_time else None
+        self.corrector_max_time = corrector_max_time if corrector_max_time else None
+
+    @staticmethod
+    def _call_with_timeout(fn, timeout_s: Optional[int], *args, **kwargs):
+        """Run a blocking fn with optional wall-clock cap. Raises concurrent.futures.TimeoutError on overrun.
+        Note: the worker thread keeps running on timeout (Python can't kill it remotely) — the LLM
+        call continues server-side until it finishes naturally. This just stops US from waiting."""
+        if not timeout_s or timeout_s <= 0:
+            return fn(*args, **kwargs)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(fn, *args, **kwargs)
+            return future.result(timeout=timeout_s)
 
     @observe(name="mars_loop")
     def run(self, task: str, event_callback: Optional[Callable[[dict], None]] = None, stream_timeout: float = 60.0) -> MarsLoopResult:
@@ -144,94 +166,79 @@ class MarsRLLoop:
         final_score = 0.0
         solver_score = 0.0
         start_time = time.time()
+        pre_winner_vr: Optional[VerifierResult] = None  # Pre-verified Best-of-N winner, if any
 
-        # --- Step 1: Solver ---
+        # --- Step 1: Solver (single pass OR Best-of-N drafts) ---
+        n_drafts = self.solver_n_drafts
+        # When N > 1, streaming is disabled across all drafts to avoid the UI
+        # seeing one draft's text replaced by a different winner.
+        allow_streaming = (n_drafts == 1)
+
         if event_callback:
-            event_callback({"type": "status", "content": "🏗️ MarsRL: Solver is generating initial response..."})
-            event_callback({"type": "thought", "content": f"→ MarsRL: Solver generating (max {self.max_iter} iterations)"})
+            if n_drafts > 1:
+                event_callback({"type": "status", "content": f"🏗️ MarsRL: Generating {n_drafts} solver drafts (best-of-N)..."})
+                event_callback({"type": "thought", "content": f"→ MarsRL: Best-of-{n_drafts} drafts, then up to {self.max_iter} verify/correct rounds"})
+            else:
+                event_callback({"type": "status", "content": "🏗️ MarsRL: Solver is generating initial response..."})
+                event_callback({"type": "thought", "content": f"→ MarsRL: Solver generating (max {self.max_iter} iterations)"})
 
-        t0 = time.time()
-        last_tok_time = time.time()
-
-        # Detect if the solver has tools registered. When tools are present,
-        # streaming captures raw tool-call JSON as text BEFORE Phi executes
-        # them. Use non-streaming mode so Phi can run tools and return the
-        # synthesized response.
-        _solver_has_tools = bool(getattr(self.solver, "tools", None))
-
-        _in_think = False  # Track <think> state across solver chunks
+        drafts: list[tuple[str, Optional[VerifierResult], float]] = []  # (response, verifier_result, elapsed_s)
 
         try:
-            if event_callback and not _solver_has_tools:
-                # --- Streaming mode (no tools) ---
-                current_response = ""
-                solver_stream = self.solver.run(task, stream=True)
-                for chunk in solver_stream:
-                    # Update heartbeat for timeout detection
-                    last_tok_time = time.time()
-                    
-                    if hasattr(chunk, "content") and chunk.content:
-                        raw = chunk.content
-                        # Parse <think>...</think> tags so reasoning shows
-                        # in the chat UI's ThinkingIndicator.
-                        parts = re.split(r'(<think>|</think>)', raw)
-                        for part in parts:
-                            if part == '<think>':
-                                _in_think = True
-                                continue
-                            elif part == '</think>':
-                                _in_think = False
-                                continue
-                            if not part:
-                                continue
-                            if _in_think:
-                                event_callback({"type": "thought", "content": part})
-                            else:
-                                current_response += part
-                                event_callback({"type": "message", "content": part})
-                    
-                    # Check for idle timeout during stream
-                    if time.time() - last_tok_time > stream_timeout:
-                        logger.warning(f"[MarsLoop] Solver stream idle for {stream_timeout}s. Current Response Len: {len(current_response)}")
-                        event_callback({"type": "log", "content": f"⚠️ Solver stream idle for {stream_timeout}s. Checking for results..."})
-                        break
-            else:
-                # --- Non-streaming mode (tools present, or no UI callback) ---
-                # Phi executes tool calls internally and returns the final
-                # synthesized response with tool results incorporated.
-                if _solver_has_tools and event_callback:
-                    event_callback({"type": "log", "content": "[MarsRL] Solver has tools — using non-streaming mode for tool execution"})
-                solver_resp = self.solver.run(task)
-                current_response = solver_resp.content if hasattr(solver_resp, "content") else str(solver_resp)
-                # Strip <think> blocks from stored response (verifier sees clean text);
-                # main.py SSE layer will parse them into thought events for the UI.
-                current_response = re.sub(r'<think>.*?</think>', '', current_response, flags=re.DOTALL).strip()
-                if event_callback:
-                    # Forward the raw response — main.py handles <think> parsing
-                    raw_resp = solver_resp.content if hasattr(solver_resp, "content") else str(solver_resp)
-                    event_callback({"type": "message", "content": raw_resp})
-                
-            iterations += 1
-            solver_elapsed = time.time() - t0
-            logger.info(f"[MarsLoop] Solver completed in {solver_elapsed:.2f}s")
+            for draft_idx in range(n_drafts):
+                if n_drafts > 1 and event_callback:
+                    event_callback({"type": "status", "content": f"🏗️ MarsRL: Solver draft {draft_idx + 1}/{n_drafts}..."})
 
-            # Langfuse span for solver generation
-            if USE_LANGFUSE and _langfuse and trace_id:
-                try:
-                    with _langfuse.start_as_current_observation(
-                        name="solver_generation",
-                        as_type="span",
-                        input=task[:2000],
-                        output=current_response[:2000],
-                        metadata={
-                            "model": getattr(self.solver, "model", {}).get("id", "unknown") if hasattr(self.solver, "model") and isinstance(getattr(self.solver, "model", None), dict) else str(getattr(self.solver, "model", "unknown")),
-                            "elapsed_s": round(solver_elapsed, 2),
-                            "response_len": len(current_response),
-                        },
-                    ):
-                        pass
-                except Exception as e_span:
-                    logger.debug(f"[MarsLoop] Solver span failed: {e_span}")
+                draft_resp, draft_elapsed = self._execute_solver_pass(
+                    task=task,
+                    event_callback=event_callback if allow_streaming else None,
+                    stream_timeout=stream_timeout,
+                    trace_id=trace_id,
+                    draft_idx=draft_idx,
+                    n_drafts=n_drafts,
+                )
+
+                # When N > 1, score each draft now so we can pick a winner
+                if n_drafts > 1:
+                    try:
+                        draft_vr = self._call_with_timeout(
+                            self.verifier.verify,
+                            self.verifier_max_time,
+                            task, draft_resp, intent=self.intent,
+                        )
+                    except concurrent.futures.TimeoutError:
+                        logger.warning(f"[MarsLoop] Draft {draft_idx + 1} verifier timeout after {self.verifier_max_time}s")
+                        draft_vr = VerifierResult(passed=False, reason=f"verifier timeout ({self.verifier_max_time}s)", score=0.0)
+                    except Exception as e:
+                        logger.warning(f"[MarsLoop] Draft {draft_idx + 1} verifier error: {e}")
+                        draft_vr = VerifierResult(passed=False, reason=f"verifier error: {e}", score=0.0)
+                    drafts.append((draft_resp, draft_vr, draft_elapsed))
+                    if event_callback:
+                        event_callback({"type": "log", "content": f"[Draft {draft_idx + 1}/{n_drafts}] Score: {draft_vr.score:.2f} | {'PASS' if draft_vr.passed else 'FAIL'} | {draft_elapsed:.1f}s"})
+                else:
+                    drafts.append((draft_resp, None, draft_elapsed))
+
+                # Respect overall budget across drafts
+                if self.max_time and (time.time() - start_time) > self.max_time:
+                    if event_callback:
+                        event_callback({"type": "log", "content": f"[MarsRL] Overall time limit reached during drafts — using best so far"})
+                    break
+
+            # Pick the winner
+            if n_drafts > 1 and any(vr is not None for _, vr, _ in drafts):
+                # Rank by (passed desc, score desc)
+                scored = [(r, vr, e) for r, vr, e in drafts if vr is not None]
+                scored.sort(key=lambda x: (1 if x[1].passed else 0, x[1].score), reverse=True)
+                current_response, pre_winner_vr, _ = scored[0]
+                if event_callback:
+                    event_callback({"type": "status", "content": f"✨ MarsRL: Best-of-{n_drafts} winner selected (score: {pre_winner_vr.score:.2f})"})
+                    event_callback({"type": "message", "content": current_response})
+            else:
+                current_response = drafts[0][0]
+
+            iterations += 1
+            solver_elapsed = time.time() - start_time
+            logger.info(f"[MarsLoop] Solver phase completed in {solver_elapsed:.2f}s ({n_drafts} draft(s))")
 
         except Exception as e:
             logger.error(f"[MarsLoop] Solver failed: {e}")
@@ -254,11 +261,22 @@ class MarsRLLoop:
             if event_callback:
                 event_callback({"type": "status", "content": f"🔍 MarsRL: Verifying attempt {attempt + 1}/{self.max_iter}..."})
 
-            try:
-                vr: VerifierResult = self.verifier.verify(task, current_response, intent=self.intent)
-            except Exception as e:
-                logger.error(f"[MarsLoop] Verifier error: {e}")
-                vr = VerifierResult(passed=True, reason="Verifier unavailable", score=0.7)
+            # Reuse the Best-of-N pre-verification for the first iteration (avoids a duplicate verifier call).
+            if attempt == 0 and pre_winner_vr is not None:
+                vr = pre_winner_vr
+            else:
+                try:
+                    vr = self._call_with_timeout(
+                        self.verifier.verify,
+                        self.verifier_max_time,
+                        task, current_response, intent=self.intent,
+                    )
+                except concurrent.futures.TimeoutError:
+                    logger.warning(f"[MarsLoop] Verifier timeout after {self.verifier_max_time}s — treating as pass")
+                    vr = VerifierResult(passed=True, reason=f"Verifier timeout ({self.verifier_max_time}s)", score=0.7)
+                except Exception as e:
+                    logger.error(f"[MarsLoop] Verifier error: {e}")
+                    vr = VerifierResult(passed=True, reason="Verifier unavailable", score=0.7)
 
             final_score = vr.score
             if event_callback:
@@ -292,11 +310,15 @@ class MarsRLLoop:
                 if event_callback:
                     event_callback({"type": "status", "content": f"🛠️ MarsRL: Correcting response..."})
                     event_callback({"type": "thought", "content": f"→ Verifier: FAIL (score: {vr.score:.2f}) — Corrector engaged"})
-                
+
                 corrector_invoked = True
                 t_corr = time.time()
                 try:
-                    corrected = self.corrector.run(task, current_response, vr.reason)
+                    corrected = self._call_with_timeout(
+                        self.corrector.run,
+                        self.corrector_max_time,
+                        task, current_response, vr.reason,
+                    )
                     current_response = corrected.content if hasattr(corrected, "content") else str(corrected)
                     iterations += 1
                     corr_elapsed = time.time() - t_corr
@@ -320,6 +342,11 @@ class MarsRLLoop:
 
                     if event_callback:
                          event_callback({"type": "log", "content": "[Corrector] Revised response generated."})
+                except concurrent.futures.TimeoutError:
+                    logger.warning(f"[MarsLoop] Corrector timeout after {self.corrector_max_time}s — stopping loop")
+                    if event_callback:
+                        event_callback({"type": "log", "content": f"⏰ Corrector timeout ({self.corrector_max_time}s) — returning best so far"})
+                    break
                 except Exception as e:
                     logger.error(f"[MarsLoop] Corrector failed: {e}")
                     break
@@ -357,6 +384,106 @@ class MarsRLLoop:
             token=self.token,
             template_metadata=self.template_metadata,
         )
+
+    def _execute_solver_pass(
+        self,
+        task: str,
+        event_callback: Optional[Callable[[dict], None]],
+        stream_timeout: float,
+        trace_id: Optional[str],
+        draft_idx: int,
+        n_drafts: int,
+    ) -> tuple[str, float]:
+        """One solver invocation. Returns (response_text, elapsed_seconds).
+
+        When event_callback is provided and the solver has no tools, streams chunks
+        via the callback. Otherwise uses non-streaming mode. The wall-clock cap
+        from self.solver_max_time is enforced in streaming mode by breaking the
+        chunk loop, and in non-streaming mode via _call_with_timeout."""
+        t0 = time.time()
+        last_tok_time = time.time()
+        _solver_has_tools = bool(getattr(self.solver, "tools", None))
+        _in_think = False
+        current_response = ""
+
+        if event_callback and not _solver_has_tools:
+            # --- Streaming mode (no tools, N == 1) ---
+            solver_deadline = t0 + self.solver_max_time if self.solver_max_time else None
+            solver_stream = self.solver.run(task, stream=True)
+            for chunk in solver_stream:
+                last_tok_time = time.time()
+
+                if hasattr(chunk, "content") and chunk.content:
+                    raw = chunk.content
+                    parts = re.split(r'(<think>|</think>)', raw)
+                    for part in parts:
+                        if part == '<think>':
+                            _in_think = True
+                            continue
+                        elif part == '</think>':
+                            _in_think = False
+                            continue
+                        if not part:
+                            continue
+                        if _in_think:
+                            event_callback({"type": "thought", "content": part})
+                        else:
+                            current_response += part
+                            event_callback({"type": "message", "content": part})
+
+                # Idle timeout
+                if time.time() - last_tok_time > stream_timeout:
+                    logger.warning(f"[MarsLoop] Solver stream idle for {stream_timeout}s. Len: {len(current_response)}")
+                    event_callback({"type": "log", "content": f"⚠️ Solver stream idle for {stream_timeout}s. Checking for results..."})
+                    break
+
+                # Wall-clock cap
+                if solver_deadline and time.time() > solver_deadline:
+                    logger.warning(f"[MarsLoop] Solver wall-clock {self.solver_max_time}s reached")
+                    event_callback({"type": "log", "content": f"⏰ Solver wall-clock cap ({self.solver_max_time}s) reached"})
+                    break
+        else:
+            # --- Non-streaming mode (tools present, Best-of-N, or no UI callback) ---
+            if _solver_has_tools and event_callback and n_drafts == 1:
+                event_callback({"type": "log", "content": "[MarsRL] Solver has tools — using non-streaming mode for tool execution"})
+            try:
+                solver_resp = self._call_with_timeout(self.solver.run, self.solver_max_time, task)
+            except concurrent.futures.TimeoutError:
+                logger.warning(f"[MarsLoop] Solver (draft {draft_idx + 1}) timeout after {self.solver_max_time}s")
+                if event_callback:
+                    event_callback({"type": "log", "content": f"⏰ Solver draft {draft_idx + 1} timeout ({self.solver_max_time}s)"})
+                return ("", time.time() - t0)
+            current_response = solver_resp.content if hasattr(solver_resp, "content") else str(solver_resp)
+            current_response = re.sub(r'<think>.*?</think>', '', current_response, flags=re.DOTALL).strip()
+            # Only forward to UI when streaming-equivalent (N == 1). N > 1 drafts are
+            # collected silently — the winner is emitted after selection.
+            if event_callback and n_drafts == 1:
+                raw_resp = solver_resp.content if hasattr(solver_resp, "content") else str(solver_resp)
+                event_callback({"type": "message", "content": raw_resp})
+
+        solver_elapsed = time.time() - t0
+
+        # Langfuse span per draft
+        if USE_LANGFUSE and _langfuse and trace_id:
+            try:
+                with _langfuse.start_as_current_observation(
+                    name=f"solver_draft_{draft_idx + 1}" if n_drafts > 1 else "solver_generation",
+                    as_type="span",
+                    input=task[:2000],
+                    output=current_response[:2000],
+                    metadata={
+                        "model": getattr(self.solver, "model", {}).get("id", "unknown") if hasattr(self.solver, "model") and isinstance(getattr(self.solver, "model", None), dict) else str(getattr(self.solver, "model", "unknown")),
+                        "elapsed_s": round(solver_elapsed, 2),
+                        "response_len": len(current_response),
+                        "draft_idx": draft_idx,
+                        "n_drafts": n_drafts,
+                    },
+                ):
+                    pass
+            except Exception as e_span:
+                logger.debug(f"[MarsLoop] Solver span failed: {e_span}")
+
+        return current_response, solver_elapsed
 
     def _inject_score(self, name: str, value: float, comment: str, trace_id: Optional[str]):
         if not USE_LANGFUSE or _langfuse is None:
