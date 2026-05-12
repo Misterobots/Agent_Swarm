@@ -39,7 +39,9 @@ interface SettingsState {
   // Developer-mode granular per-agent budgets. 0 = no per-call cap (fall back to overall).
   solvingSolverNDrafts: number;       // Best-of-N solver drafts (1–3 in UI, 1 = single pass)
   solvingSolverMaxTime: number;       // Per-call solver wall-clock (seconds, 0 = none)
+  solvingVerifierNRuns: number;       // N-way verifier consensus (1 = single pass, 1–5 in UI)
   solvingVerifierMaxTime: number;     // Per-call verifier wall-clock (seconds, 0 = none)
+  solvingCorrectorNPasses: number;    // N sequential corrector passes per round (1–3 in UI)
   solvingCorrectorMaxTime: number;    // Per-call corrector wall-clock (seconds, 0 = none)
   // Layout
   sidebarOpen: boolean;
@@ -63,7 +65,9 @@ interface SettingsState {
   setSolvingMaxTime: (time: number) => void;
   setSolvingSolverNDrafts: (n: number) => void;
   setSolvingSolverMaxTime: (time: number) => void;
+  setSolvingVerifierNRuns: (n: number) => void;
   setSolvingVerifierMaxTime: (time: number) => void;
+  setSolvingCorrectorNPasses: (n: number) => void;
   setSolvingCorrectorMaxTime: (time: number) => void;
 }
 
@@ -89,7 +93,9 @@ export const useSettingsStore = create<SettingsState>()(
       solvingMaxTime: 0, // Default: no time limit
       solvingSolverNDrafts: 1,      // Default: single pass (no best-of-N)
       solvingSolverMaxTime: 0,      // Default: no per-call cap
+      solvingVerifierNRuns: 1,      // Default: single verifier run
       solvingVerifierMaxTime: 0,
+      solvingCorrectorNPasses: 1,   // Default: single corrector pass
       solvingCorrectorMaxTime: 0,
       sidebarOpen: true,
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
@@ -112,12 +118,14 @@ export const useSettingsStore = create<SettingsState>()(
       setSolvingMaxTime: (solvingMaxTime) => set({ solvingMaxTime }),
       setSolvingSolverNDrafts: (solvingSolverNDrafts) => set({ solvingSolverNDrafts }),
       setSolvingSolverMaxTime: (solvingSolverMaxTime) => set({ solvingSolverMaxTime }),
+      setSolvingVerifierNRuns: (solvingVerifierNRuns) => set({ solvingVerifierNRuns }),
       setSolvingVerifierMaxTime: (solvingVerifierMaxTime) => set({ solvingVerifierMaxTime }),
+      setSolvingCorrectorNPasses: (solvingCorrectorNPasses) => set({ solvingCorrectorNPasses }),
       setSolvingCorrectorMaxTime: (solvingCorrectorMaxTime) => set({ solvingCorrectorMaxTime }),
     }),
     {
       name: "memex-settings",
-      version: 4,
+      version: 5,
       migrate: (persisted: unknown, fromVersion: number) => {
         const state = (persisted ?? {}) as Partial<SettingsState>;
         // v1 -> v3: retired the 8 hand-curated themes plus the warm-amber
@@ -136,6 +144,11 @@ export const useSettingsStore = create<SettingsState>()(
           if (state.solvingSolverMaxTime === undefined) state.solvingSolverMaxTime = 0;
           if (state.solvingVerifierMaxTime === undefined) state.solvingVerifierMaxTime = 0;
           if (state.solvingCorrectorMaxTime === undefined) state.solvingCorrectorMaxTime = 0;
+        }
+        // v4 -> v5: add per-agent iteration counts (verifier consensus runs, corrector passes).
+        if (fromVersion < 5) {
+          if (state.solvingVerifierNRuns === undefined) state.solvingVerifierNRuns = 1;
+          if (state.solvingCorrectorNPasses === undefined) state.solvingCorrectorNPasses = 1;
         }
         return state as SettingsState;
       },

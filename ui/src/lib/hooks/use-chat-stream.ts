@@ -93,7 +93,9 @@ export function useChatStream(options?: {
   const solvingMaxTime = useSettingsStore((s) => s.solvingMaxTime);
   const solvingSolverNDrafts = useSettingsStore((s) => s.solvingSolverNDrafts);
   const solvingSolverMaxTime = useSettingsStore((s) => s.solvingSolverMaxTime);
+  const solvingVerifierNRuns = useSettingsStore((s) => s.solvingVerifierNRuns);
   const solvingVerifierMaxTime = useSettingsStore((s) => s.solvingVerifierMaxTime);
+  const solvingCorrectorNPasses = useSettingsStore((s) => s.solvingCorrectorNPasses);
   const solvingCorrectorMaxTime = useSettingsStore((s) => s.solvingCorrectorMaxTime);
 
   useEffect(() => {
@@ -234,7 +236,7 @@ export function useChatStream(options?: {
           const controller = new AbortController();
           abortRef.current = controller;
           try {
-            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierMaxTime, solvingCorrectorMaxTime)) {
+            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {

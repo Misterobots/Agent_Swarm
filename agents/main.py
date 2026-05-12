@@ -411,7 +411,9 @@ class ChatRequest(BaseModel):
     # Developer-mode granular per-agent budgets. Each overrides the overall budget for that agent.
     solving_solver_n_drafts: Optional[int] = None       # Best-of-N solver drafts (1–10; UI exposes 1–3)
     solving_solver_max_time: Optional[int] = None       # Per-call solver wall-clock (seconds)
+    solving_verifier_n_runs: Optional[int] = None       # N-way verifier consensus (1 = single pass)
     solving_verifier_max_time: Optional[int] = None     # Per-call verifier wall-clock (seconds)
+    solving_corrector_n_passes: Optional[int] = None    # N sequential corrector passes per round
     solving_corrector_max_time: Optional[int] = None    # Per-call corrector wall-clock (seconds)
 
 
@@ -1135,7 +1137,9 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     solving_max_time=request.solving_max_time,
                     solving_solver_n_drafts=request.solving_solver_n_drafts,
                     solving_solver_max_time=request.solving_solver_max_time,
+                    solving_verifier_n_runs=request.solving_verifier_n_runs,
                     solving_verifier_max_time=request.solving_verifier_max_time,
+                    solving_corrector_n_passes=request.solving_corrector_n_passes,
                     solving_corrector_max_time=request.solving_corrector_max_time,
                 )
             except Exception as e:

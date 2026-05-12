@@ -724,7 +724,9 @@ def chat_swarm(
     solving_max_time: int | None = None,
     solving_solver_n_drafts: int | None = None,
     solving_solver_max_time: int | None = None,
+    solving_verifier_n_runs: int | None = None,
     solving_verifier_max_time: int | None = None,
+    solving_corrector_n_passes: int | None = None,
     solving_corrector_max_time: int | None = None,
 ):
     """
@@ -2058,7 +2060,9 @@ def chat_swarm(
                     max_time=solving_max_time if solving_max_time is not None else None,
                     solver_n_drafts=solving_solver_n_drafts if solving_solver_n_drafts is not None else 1,
                     solver_max_time=solving_solver_max_time,
+                    verifier_n_runs=solving_verifier_n_runs if solving_verifier_n_runs is not None else 1,
                     verifier_max_time=solving_verifier_max_time,
+                    corrector_n_passes=solving_corrector_n_passes if solving_corrector_n_passes is not None else 1,
                     corrector_max_time=solving_corrector_max_time,
                 )
 
@@ -3041,7 +3045,9 @@ You run on local hardware in a self-hosted home lab.""",
                         max_time=solving_max_time if solving_max_time is not None else None,
                         solver_n_drafts=solving_solver_n_drafts if solving_solver_n_drafts is not None else 1,
                         solver_max_time=solving_solver_max_time,
+                        verifier_n_runs=solving_verifier_n_runs if solving_verifier_n_runs is not None else 1,
                         verifier_max_time=solving_verifier_max_time,
+                        corrector_n_passes=solving_corrector_n_passes if solving_corrector_n_passes is not None else 1,
                         corrector_max_time=solving_corrector_max_time,
                     )
 

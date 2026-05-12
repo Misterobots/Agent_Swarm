@@ -98,6 +98,8 @@ class MarsRLLoop:
         solver_max_time: Optional[int] = None,
         verifier_max_time: Optional[int] = None,
         corrector_max_time: Optional[int] = None,
+        verifier_n_runs: int = 1,      # N-way consensus: call verifier N times, majority vote
+        corrector_n_passes: int = 1,   # N sequential corrector passes per round
     ):
         self.solver = solver
         self.verifier = verifier
@@ -114,6 +116,8 @@ class MarsRLLoop:
         self.solver_max_time = solver_max_time if solver_max_time else None
         self.verifier_max_time = verifier_max_time if verifier_max_time else None
         self.corrector_max_time = corrector_max_time if corrector_max_time else None
+        self.verifier_n_runs = max(1, min(int(verifier_n_runs or 1), 10))
+        self.corrector_n_passes = max(1, min(int(corrector_n_passes or 1), 5))
 
     @staticmethod
     def _call_with_timeout(fn, timeout_s: Optional[int], *args, **kwargs):
@@ -261,9 +265,37 @@ class MarsRLLoop:
             if event_callback:
                 event_callback({"type": "status", "content": f"🔍 MarsRL: Verifying attempt {attempt + 1}/{self.max_iter}..."})
 
-            # Reuse the Best-of-N pre-verification for the first iteration (avoids a duplicate verifier call).
-            if attempt == 0 and pre_winner_vr is not None:
+            # Reuse the Best-of-N pre-verification only when single-run verifier (consensus needs fresh calls).
+            if attempt == 0 and pre_winner_vr is not None and self.verifier_n_runs == 1:
                 vr = pre_winner_vr
+            elif self.verifier_n_runs > 1:
+                # N-way consensus: call verifier N times, majority vote determines pass/fail
+                if event_callback:
+                    event_callback({"type": "log", "content": f"[Verifier] Running {self.verifier_n_runs}-way consensus..."})
+                consensus_runs: list[VerifierResult] = []
+                for run_i in range(self.verifier_n_runs):
+                    try:
+                        r = self._call_with_timeout(
+                            self.verifier.verify,
+                            self.verifier_max_time,
+                            task, current_response, intent=self.intent,
+                        )
+                        consensus_runs.append(r)
+                    except concurrent.futures.TimeoutError:
+                        logger.warning(f"[MarsLoop] Verifier consensus run {run_i + 1} timeout")
+                        consensus_runs.append(VerifierResult(passed=False, reason=f"timeout ({self.verifier_max_time}s)", score=0.0))
+                    except Exception as e:
+                        logger.error(f"[MarsLoop] Verifier consensus run {run_i + 1} error: {e}")
+                        consensus_runs.append(VerifierResult(passed=True, reason=f"error: {e}", score=0.7))
+                avg_score = sum(r.score for r in consensus_runs) / len(consensus_runs)
+                n_pass = sum(1 for r in consensus_runs if r.passed)
+                vr = VerifierResult(
+                    passed=n_pass > len(consensus_runs) / 2,
+                    reason=f"Consensus {n_pass}/{len(consensus_runs)} pass | avg score {avg_score:.2f}",
+                    score=avg_score,
+                )
+                if event_callback:
+                    event_callback({"type": "log", "content": f"[Verifier] Consensus: {n_pass}/{len(consensus_runs)} pass, avg {avg_score:.2f}"})
             else:
                 try:
                     vr = self._call_with_timeout(
@@ -307,19 +339,26 @@ class MarsRLLoop:
 
             # --- Step 3: Corrector ---
             if attempt < self.max_iter - 1:
+                n_passes = self.corrector_n_passes
                 if event_callback:
-                    event_callback({"type": "status", "content": f"🛠️ MarsRL: Correcting response..."})
+                    corr_label = f"Correcting ({n_passes} passes)..." if n_passes > 1 else "Correcting response..."
+                    event_callback({"type": "status", "content": f"🛠️ MarsRL: {corr_label}"})
                     event_callback({"type": "thought", "content": f"→ Verifier: FAIL (score: {vr.score:.2f}) — Corrector engaged"})
 
                 corrector_invoked = True
                 t_corr = time.time()
                 try:
-                    corrected = self._call_with_timeout(
-                        self.corrector.run,
-                        self.corrector_max_time,
-                        task, current_response, vr.reason,
-                    )
-                    current_response = corrected.content if hasattr(corrected, "content") else str(corrected)
+                    for pass_i in range(n_passes):
+                        if n_passes > 1 and event_callback:
+                            event_callback({"type": "status", "content": f"🛠️ MarsRL: Corrector pass {pass_i + 1}/{n_passes}..."})
+                        corrected = self._call_with_timeout(
+                            self.corrector.run,
+                            self.corrector_max_time,
+                            task, current_response, vr.reason,
+                        )
+                        current_response = corrected.content if hasattr(corrected, "content") else str(corrected)
+                        if n_passes > 1 and event_callback:
+                            event_callback({"type": "log", "content": f"[Corrector] Pass {pass_i + 1}/{n_passes} complete."})
                     iterations += 1
                     corr_elapsed = time.time() - t_corr
 
@@ -334,14 +373,16 @@ class MarsRLLoop:
                                 metadata={
                                     "elapsed_s": round(corr_elapsed, 2),
                                     "response_len": len(current_response),
+                                    "n_passes": n_passes,
                                 },
                             ):
                                 pass
                         except Exception as e_span:
                             logger.debug(f"[MarsLoop] Corrector span failed: {e_span}")
 
+                    finish_label = f"{n_passes}-pass revision" if n_passes > 1 else "Revised response"
                     if event_callback:
-                         event_callback({"type": "log", "content": "[Corrector] Revised response generated."})
+                        event_callback({"type": "log", "content": f"[Corrector] {finish_label} generated."})
                 except concurrent.futures.TimeoutError:
                     logger.warning(f"[MarsLoop] Corrector timeout after {self.corrector_max_time}s — stopping loop")
                     if event_callback:

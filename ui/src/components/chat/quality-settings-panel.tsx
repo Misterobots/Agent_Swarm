@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Zap, Layers, ShieldCheck, Wrench } from "lucide-react";
+import { Clock, Zap, Layers, ShieldCheck, Wrench, Repeat } from "lucide-react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // Proportional split of the overall time budget when used as a preset.
@@ -18,11 +18,15 @@ export function QualitySettingsPanel() {
 
   const solvingSolverNDrafts = useSettingsStore((s) => s.solvingSolverNDrafts);
   const solvingSolverMaxTime = useSettingsStore((s) => s.solvingSolverMaxTime);
+  const solvingVerifierNRuns = useSettingsStore((s) => s.solvingVerifierNRuns);
   const solvingVerifierMaxTime = useSettingsStore((s) => s.solvingVerifierMaxTime);
+  const solvingCorrectorNPasses = useSettingsStore((s) => s.solvingCorrectorNPasses);
   const solvingCorrectorMaxTime = useSettingsStore((s) => s.solvingCorrectorMaxTime);
   const setSolvingSolverNDrafts = useSettingsStore((s) => s.setSolvingSolverNDrafts);
   const setSolvingSolverMaxTime = useSettingsStore((s) => s.setSolvingSolverMaxTime);
+  const setSolvingVerifierNRuns = useSettingsStore((s) => s.setSolvingVerifierNRuns);
   const setSolvingVerifierMaxTime = useSettingsStore((s) => s.setSolvingVerifierMaxTime);
+  const setSolvingCorrectorNPasses = useSettingsStore((s) => s.setSolvingCorrectorNPasses);
   const setSolvingCorrectorMaxTime = useSettingsStore((s) => s.setSolvingCorrectorMaxTime);
 
   const isDevMode = mode === "developer";
@@ -181,6 +185,32 @@ export function QualitySettingsPanel() {
             />
           </div>
 
+          {/* Verifier: consensus runs */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-[var(--chat-muted)] flex items-center gap-1">
+                <Repeat size={12} />
+                Verifier — Consensus Runs
+              </label>
+              <span className="text-xs text-[var(--chat-text)] font-mono">{solvingVerifierNRuns}</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="5"
+              step="1"
+              value={solvingVerifierNRuns}
+              onChange={(e) => setSolvingVerifierNRuns(parseInt(e.target.value, 10))}
+              className="w-full h-1.5 bg-[var(--chat-border)] rounded-lg appearance-none cursor-pointer accent-[var(--chat-accent)]"
+            />
+            <p className="text-xs text-[var(--chat-muted)] mt-1">
+              {solvingVerifierNRuns === 1 && "Single pass (standard behavior)"}
+              {solvingVerifierNRuns === 2 && "2-way consensus — majority vote (2/2 = pass)"}
+              {solvingVerifierNRuns === 3 && "3-way consensus — majority vote (≥2/3 = pass)"}
+              {solvingVerifierNRuns >= 4 && `${solvingVerifierNRuns}-way consensus — stronger signal, higher cost`}
+            </p>
+          </div>
+
           {/* Verifier: per-call wall clock */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -201,6 +231,31 @@ export function QualitySettingsPanel() {
               onChange={(e) => setVerifierWithSync(parseInt(e.target.value, 10))}
               className="w-full h-1.5 bg-[var(--chat-border)] rounded-lg appearance-none cursor-pointer accent-[var(--chat-accent)]"
             />
+          </div>
+
+          {/* Corrector: refinement passes */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-[var(--chat-muted)] flex items-center gap-1">
+                <Repeat size={12} />
+                Corrector — Refinement Passes
+              </label>
+              <span className="text-xs text-[var(--chat-text)] font-mono">{solvingCorrectorNPasses}</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="3"
+              step="1"
+              value={solvingCorrectorNPasses}
+              onChange={(e) => setSolvingCorrectorNPasses(parseInt(e.target.value, 10))}
+              className="w-full h-1.5 bg-[var(--chat-border)] rounded-lg appearance-none cursor-pointer accent-[var(--chat-accent)]"
+            />
+            <p className="text-xs text-[var(--chat-muted)] mt-1">
+              {solvingCorrectorNPasses === 1 && "Single pass (standard behavior)"}
+              {solvingCorrectorNPasses === 2 && "2 sequential passes — each refines the previous output"}
+              {solvingCorrectorNPasses === 3 && "3 sequential passes — thorough refinement, ~3× corrector cost"}
+            </p>
           </div>
 
           {/* Corrector: per-call wall clock */}

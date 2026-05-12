@@ -24,7 +24,9 @@ export interface ChatStreamOptions {
   solvingMaxTime?: number;
   solvingSolverNDrafts?: number;
   solvingSolverMaxTime?: number;
+  solvingVerifierNRuns?: number;
   solvingVerifierMaxTime?: number;
+  solvingCorrectorNPasses?: number;
   solvingCorrectorMaxTime?: number;
 }
 
@@ -50,7 +52,9 @@ export async function* sendChatStream(
   designMode?: boolean,
   solvingSolverNDrafts?: number,
   solvingSolverMaxTime?: number,
+  solvingVerifierNRuns?: number,
   solvingVerifierMaxTime?: number,
+  solvingCorrectorNPasses?: number,
   solvingCorrectorMaxTime?: number,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
@@ -76,7 +80,9 @@ export async function* sendChatStream(
   if (solvingMaxTime !== undefined) body.solving_max_time = solvingMaxTime;
   if (solvingSolverNDrafts !== undefined) body.solving_solver_n_drafts = solvingSolverNDrafts;
   if (solvingSolverMaxTime !== undefined) body.solving_solver_max_time = solvingSolverMaxTime;
+  if (solvingVerifierNRuns !== undefined) body.solving_verifier_n_runs = solvingVerifierNRuns;
   if (solvingVerifierMaxTime !== undefined) body.solving_verifier_max_time = solvingVerifierMaxTime;
+  if (solvingCorrectorNPasses !== undefined) body.solving_corrector_n_passes = solvingCorrectorNPasses;
   if (solvingCorrectorMaxTime !== undefined) body.solving_corrector_max_time = solvingCorrectorMaxTime;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
