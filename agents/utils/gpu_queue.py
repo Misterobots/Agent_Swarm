@@ -203,25 +203,32 @@ def evict_comfyui():
         logger.warning(f"[GPU Queue] Failed to evict ComfyUI VRAM: {e}")
 
 def evict_ollama():
-    """Unloads active models from Ollama by sending a generation request with keep_alive=0"""
-    try:
-        logger.info("[GPU Queue] Evicting Ollama models from VRAM...")
-        ps_resp = requests.get(f"{OLLAMA_HOST}/api/ps", timeout=5)
-        if ps_resp.status_code == 200:
-            models = ps_resp.json().get("models", [])
-            if not models:
-                logger.info("[GPU Queue] No active models in Ollama to evict.")
-                return
-            for model in models:
-                model_name = model.get("name")
-                logger.info(f"[GPU Queue] Unloading model: {model_name}")
-                requests.post(f"{OLLAMA_HOST}/api/generate", json={
-                    "model": model_name,
-                    "keep_alive": 0
-                }, timeout=5)
-            logger.info("[GPU Queue] Ollama VRAM evicted successfully.")
-    except Exception as e:
-        logger.warning(f"[GPU Queue] Failed to evict Ollama VRAM: {e}")
+    """Unloads active models from all Ollama hosts (primary + secondary) via keep_alive=0.
+    Both hosts must be evicted — large models run on SECONDARY_OLLAMA_HOST (Lovelace) which
+    shares physical GPUs with ComfyUI. Evicting only OLLAMA_HOST (Turing, no GPU) is a no-op."""
+    hosts_to_evict = [OLLAMA_HOST]
+    if SECONDARY_OLLAMA_HOST and SECONDARY_OLLAMA_HOST != OLLAMA_HOST:
+        hosts_to_evict.append(SECONDARY_OLLAMA_HOST)
+
+    for host in hosts_to_evict:
+        try:
+            logger.info(f"[GPU Queue] Evicting Ollama models from VRAM on {host}...")
+            ps_resp = requests.get(f"{host}/api/ps", timeout=5)
+            if ps_resp.status_code == 200:
+                models = ps_resp.json().get("models", [])
+                if not models:
+                    logger.info(f"[GPU Queue] No active models on {host} to evict.")
+                    continue
+                for model in models:
+                    model_name = model.get("name")
+                    logger.info(f"[GPU Queue] Unloading {model_name} from {host}")
+                    requests.post(f"{host}/api/generate", json={
+                        "model": model_name,
+                        "keep_alive": 0
+                    }, timeout=5)
+                logger.info(f"[GPU Queue] Ollama VRAM evicted on {host}.")
+        except Exception as e:
+            logger.warning(f"[GPU Queue] Failed to evict Ollama VRAM on {host}: {e}")
 
 @contextmanager
 def request_lock(context: str, timeout: int = 300):
