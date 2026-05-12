@@ -52,7 +52,7 @@ export function WorkspaceShell({
         <div className="absolute bottom-0 left-0 right-0 divider" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6">{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">{children}</div>
     </div>
   );
 }

@@ -119,7 +119,7 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   }, []);
 
   return (
-    <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-3 md:p-5">
+    <div className="border-t border-[var(--chat-border)] bg-[var(--chat-surface)] p-3 md:p-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-[max(1.25rem,env(safe-area-inset-bottom))]">
       <div className="relative flex items-end gap-2 max-w-3xl mx-auto">
         {isSlash && matches.length > 0 && (
           <div

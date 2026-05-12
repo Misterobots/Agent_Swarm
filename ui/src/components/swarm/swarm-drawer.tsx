@@ -332,7 +332,7 @@ export function SwarmPanelContent({
             {/* Horizontal split: list left, detail right */}
             <div className="flex-1 flex flex-row overflow-hidden">
               {/* Worker list — grouped by phase with timeline dividers */}
-              <div className="flex-1 min-w-0 overflow-y-auto">
+              <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
                 {showPhaseDividers ? (
                   sortedPhaseKeys.map((phaseKey) => {
                     const group = phaseGroups[phaseKey];

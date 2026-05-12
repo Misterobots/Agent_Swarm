@@ -100,7 +100,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main content */}
       <div
-        className={cn("relative flex-1 flex flex-col min-w-0 overflow-hidden", isMobile && "pb-14")}
+        className={cn("relative flex-1 flex flex-col min-w-0 overflow-hidden", isMobile && "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]")}
         style={{
           // Page headers reserve this much left-padding so the floating
           // expand handle (when sidebar is collapsed) doesn't collide.

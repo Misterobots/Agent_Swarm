@@ -39,7 +39,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Page Content */}
-      {children}
+      <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
     </div>
   );
 }
