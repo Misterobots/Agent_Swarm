@@ -78,7 +78,14 @@ export const useChatStore = create<ChatState>()(
       setActiveConversation: (id) => set({ activeConversationId: id }),
 
       replaceConversations: (conversations) =>
-        set({ conversations }),
+        set((state) => ({
+          conversations,
+          // Preserve active conversation if it exists in the new list.
+          // If it doesn't (user switch / stale ID), fall back to first or null.
+          activeConversationId: conversations.some((c) => c.id === state.activeConversationId)
+            ? state.activeConversationId
+            : (conversations[0]?.id ?? null),
+        })),
 
       deleteConversation: (id) =>
         set((state) => {
