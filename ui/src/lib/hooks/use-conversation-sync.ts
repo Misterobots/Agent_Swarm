@@ -30,33 +30,20 @@ const USER_SCOPED_KEYS = [
 
 function clearUserScopedStorage() {
   for (const key of USER_SCOPED_KEYS) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // localStorage unavailable (SSR or private mode)
-    }
+    try { localStorage.removeItem(key); } catch { /* SSR / private mode */ }
   }
 }
 
 function getStoredIdentity(): string | null {
-  try {
-    return localStorage.getItem(IDENTITY_KEY);
-  } catch {
-    return null;
-  }
+  try { return localStorage.getItem(IDENTITY_KEY); } catch { return null; }
 }
 
 function setStoredIdentity(username: string) {
-  try {
-    localStorage.setItem(IDENTITY_KEY, username);
-  } catch {
-    // best-effort
-  }
+  try { localStorage.setItem(IDENTITY_KEY, username); } catch { /* best-effort */ }
 }
 
 export function useConversationSync() {
   const replaceConversations = useChatStore((s) => s.replaceConversations);
-  const clearConversations = useChatStore((s) => s.clearConversations ?? (() => replaceConversations([])));
   const deleteConversationLocal = useChatStore((s) => s.deleteConversation);
 
   useEffect(() => {
@@ -73,19 +60,17 @@ export function useConversationSync() {
         // Network unavailable — proceed with existing local state
       }
 
-      // Step 2: Check for user switch and clear stale state if needed
+      // Step 2: Detect user switch — clear stale state before loading new user's data
       if (currentUser) {
         const storedUser = getStoredIdentity();
         if (storedUser && storedUser !== currentUser) {
-          // Different user logged in — wipe all user-scoped local state
           clearUserScopedStorage();
-          clearConversations();
+          replaceConversations([]);
         }
-        // Always update the stored identity to the current user
         setStoredIdentity(currentUser);
       }
 
-      // Step 3: Load conversations from server (source of truth)
+      // Step 3: Load conversations from server (source of truth for cross-device sync)
       try {
         const r = await fetch(API);
         if (!r.ok) return;
@@ -95,7 +80,7 @@ export function useConversationSync() {
           replaceConversations(data.conversations as any[]);
         } else if (currentUser) {
           // Authenticated user with no server conversations — clear any local remnants
-          clearConversations();
+          replaceConversations([]);
         }
       } catch {
         // Network unavailable — keep local store as-is

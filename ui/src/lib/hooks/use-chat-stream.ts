@@ -221,14 +221,16 @@ export function useChatStream(options?: {
       
       const MAX_RETRIES = 3;
       let retryCount = 0;
-      let streamSucceeded = false;
+      let connectionError: Error | null = null;
 
-      while (!streamSucceeded && retryCount <= MAX_RETRIES) {
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      try {
-        for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode)) {
+      // Retry loop — only retries when the connection fails before any content arrives.
+      // All UI cleanup happens in the outer try/finally, not inside the loop.
+      const runStream = async () => {
+        while (retryCount <= MAX_RETRIES) {
+          const controller = new AbortController();
+          abortRef.current = controller;
+          try {
+            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
@@ -400,32 +402,39 @@ export function useChatStream(options?: {
             appendToMessage(convId!, assistantId, event.content || "");
           }
         }
-        streamSucceeded = true;
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-          streamSucceeded = true; // don't retry user cancels
-        } else {
-          const currentContent = (
-            useChatStore.getState().conversations
-              .find((c) => c.id === convId)?.messages
-              .find((m) => m.id === assistantId)?.content ?? ""
-          ).trim();
-
-          const canRetry = currentContent.length === 0 && retryCount < MAX_RETRIES;
-          if (canRetry) {
-            retryCount++;
-            const delaySec = retryCount * 2;
-            setStatusMessage(`Backend unavailable — retrying in ${delaySec}s… (${retryCount}/${MAX_RETRIES})`);
-            await new Promise((r) => setTimeout(r, delaySec * 1000));
-            setStatusMessage(null);
-            // continue the while loop — new controller created on next iteration
-          } else {
-            streamSucceeded = true; // exit loop and show error
-            appendToMessage(convId!, assistantId, "\n\n*Error: Connection failed. The backend may be restarting — please try again in a moment.*");
+            return; // stream completed successfully
+          } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") {
+              return; // user cancelled — don't retry
+            }
+            const currentContent = (
+              useChatStore.getState().conversations
+                .find((c) => c.id === convId)?.messages
+                .find((m) => m.id === assistantId)?.content ?? ""
+            ).trim();
+            const canRetry = currentContent.length === 0 && retryCount < MAX_RETRIES;
+            if (canRetry) {
+              retryCount++;
+              const delaySec = retryCount * 2;
+              setStatusMessage(`Backend unavailable — retrying in ${delaySec}s… (${retryCount}/${MAX_RETRIES})`);
+              await new Promise((r) => setTimeout(r, delaySec * 1000));
+              setStatusMessage(null);
+              // loop continues with new controller
+            } else {
+              connectionError = err instanceof Error ? err : new Error(String(err));
+              return; // exit loop, outer finally will show the error
+            }
           }
         }
+      };
+
+      try {
+        await runStream();
+        if (connectionError) {
+          appendToMessage(convId!, assistantId, "\n\n*Error: Connection failed. The backend may be restarting — please try again in a moment.*");
+        }
       } finally {
-        // Persist collected metadata to store
+        // Persist collected trace metadata — runs exactly once after stream completes or fails
         if (thoughtTraceRef.current.length > 0) {
           setMessageThoughtTrace(convId!, assistantId, thoughtTraceRef.current);
         }
@@ -441,7 +450,6 @@ export function useChatStream(options?: {
         if (turnMetadataRef.current && setMessageTurnMetadata) {
           setMessageTurnMetadata(convId!, assistantId, turnMetadataRef.current);
         }
-        // Clear any remaining pending approvals (stream ended — no more waiting)
         if (pendingApprovalsRef.current.length > 0) {
           setMessagePendingApprovals(convId!, assistantId, []);
           pendingApprovalsRef.current = [];
@@ -451,12 +459,10 @@ export function useChatStream(options?: {
         setStatusMessage(null);
         setLatestThought(null);
         setStreamMode(null);
-        // Mark swarm complete so drawer can auto-dismiss
         const swarmState = useSwarmStore.getState();
         if (swarmState.active && swarmState.theaterPhase !== "idle") {
           swarmState.setTheaterPhase("complete");
         }
-        // Persist completed conversation to server for cross-device sync
         if (convId) {
           const conv = useChatStore.getState().conversations.find((c) => c.id === convId);
           if (conv) {
@@ -477,7 +483,6 @@ export function useChatStream(options?: {
         continuationHintRef.current = null;
         abortRef.current = null;
       }
-      } // end retry while loop
     },
     [
       activeConversationId,
