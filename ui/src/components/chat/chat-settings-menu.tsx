@@ -66,22 +66,27 @@ export function ChatSettingsMenu() {
     return () => document.removeEventListener("mousedown", handler);
   }, [isOpen]);
 
-  // Close on scroll/resize
+  // Close on outer scroll/resize. Scrolls that originate inside the menu's own
+  // overflow-y-auto container don't count — capture-phase listener sees them too.
   useEffect(() => {
     if (!isOpen) return;
-    const handler = () => setIsOpen(false);
-    window.addEventListener("scroll", handler, true);
-    window.addEventListener("resize", handler);
+    const scrollHandler = (e: Event) => {
+      if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
+      setIsOpen(false);
+    };
+    const resizeHandler = () => setIsOpen(false);
+    window.addEventListener("scroll", scrollHandler, true);
+    window.addEventListener("resize", resizeHandler);
     return () => {
-      window.removeEventListener("scroll", handler, true);
-      window.removeEventListener("resize", handler);
+      window.removeEventListener("scroll", scrollHandler, true);
+      window.removeEventListener("resize", resizeHandler);
     };
   }, [isOpen]);
 
   const dropdown = isOpen ? (
     <div
       ref={menuRef}
-      className="fixed w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2 space-y-1.5 z-[9999] overflow-y-auto scrollbar-thin theme-picker-enter"
+      className="fixed w-56 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] p-2 space-y-1.5 z-[9999] overflow-y-auto overscroll-contain scrollbar-thin theme-picker-enter"
       style={{
         bottom: menuPos.bottom,
         right: menuPos.right,
