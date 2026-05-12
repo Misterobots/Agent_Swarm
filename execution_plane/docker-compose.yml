@@ -71,7 +71,7 @@ services:
       # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
       - OLLAMA_NUM_PARALLEL=2          # Concurrent requests across 2 GPUs
-      - OLLAMA_KEEP_ALIVE=-1           # Primary model pinned permanently in VRAM
+      - OLLAMA_KEEP_ALIVE=10m          # Unload after 10min idle; gpu_queue evicts immediately on context switch
     volumes:
       - ollama_models:/root/.ollama
     ports:
@@ -280,6 +280,7 @@ services:
     container_name: comfyui_gpu
     hostname: comfyui
     restart: always
+    command: ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", "--highvram"]
     ports:
       - "8188:8188"
     volumes:
