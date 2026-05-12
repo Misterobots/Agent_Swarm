@@ -78,10 +78,9 @@ export function useConversationSync() {
         if (data?.conversations && data.conversations.length > 0) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           replaceConversations(data.conversations as any[]);
-        } else if (currentUser) {
-          // Authenticated user with no server conversations — clear any local remnants
-          replaceConversations([]);
         }
+        // If server returns 0 conversations, keep local state — user may have
+        // conversations not yet synced, and clearing would orphan activeConversationId.
       } catch {
         // Network unavailable — keep local store as-is
       }
