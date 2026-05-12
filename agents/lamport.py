@@ -456,13 +456,15 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
                     parsed["clarification_question"] = None
 
             # --- Scope override: creation/build requests must always be codebase ---
+            # Only fires when the LLM returned 'unknown' — never overrides an explicit
+            # 'external' classification (e.g. "build out data centers" is research, not code).
             _BUILD_KEYWORDS = (
                 "build", "make", "create", "develop", "implement", "write", "code",
                 "generate a game", "generate a web", "generate an app",
                 "a game", "a web app", "a website", "an app", "a tool",
             )
             _input_lower = user_input.lower()
-            if parsed.get("scope") != "codebase" and any(kw in _input_lower for kw in _BUILD_KEYWORDS):
+            if parsed.get("scope") == "unknown" and any(kw in _input_lower for kw in _BUILD_KEYWORDS):
                 logger.info(
                     f"[Coordinator] Scope override: '{parsed.get('scope')}' → 'codebase' "
                     f"(detected build intent in user request)"
