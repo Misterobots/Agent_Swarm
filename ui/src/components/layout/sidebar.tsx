@@ -271,7 +271,7 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
               </div>
             </div>
             <a
-              href="/outpost.goauthentik.io/sign_out?rd=https://auth.shivelymedia.com/if/flow/default-invalidation-flow/"
+              href="https://auth.shivelymedia.com/if/flow/default-invalidation-flow/"
               className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--chat-subtle)] hover:text-[var(--chat-text)] hover:bg-[var(--hover-tint)] transition-colors"
               title="Sign out"
               aria-label="Sign out"
