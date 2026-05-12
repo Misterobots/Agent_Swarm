@@ -993,6 +993,80 @@ def chat_swarm(
                 yield {"type": "log", "content": "[Context Manager] Plan-only mode — research and plan without code changes."}
                 # Fall through to normal routing below
 
+        elif pending_ctx.get("type") == "task_intent_clarification":
+            original_prompt = pending_ctx.get("prompt", "")
+            saved_summary = pending_ctx.get("summary", "")
+            intent_choice = user_input  # capture before reassignment
+            clear_context(session_id=session_id, owner_id=owner_id)
+            user_input = original_prompt
+
+            if intent_choice.startswith("research_it"):
+                logger.info("[Router] Task intent: user chose research.")
+                yield {"type": "log", "content": "[Context Manager] Routing as deep research task..."}
+                from lamport import coordinate_task as _coord
+                for chunk in _coord(
+                    user_input,
+                    session_id=session_id,
+                    owner_id=owner_id,
+                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
+                    extracted_context=extracted_context,
+                    ace_token=ace_token,
+                    research_mode=True,
+                ):
+                    yield chunk
+                return
+
+            elif intent_choice.startswith("plan_it"):
+                logger.info("[Router] Task intent: user chose planning.")
+                yield {"type": "log", "content": "[Context Manager] Routing as planning/architecture task..."}
+                from lamport import coordinate_task as _coord
+                for chunk in _coord(
+                    user_input,
+                    session_id=session_id,
+                    owner_id=owner_id,
+                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
+                    extracted_context=extracted_context,
+                    ace_token=ace_token,
+                    plan_mode=True,
+                    research_mode=True,
+                ):
+                    yield chunk
+                return
+
+            elif intent_choice.startswith("build_it"):
+                # Re-use the dev_project_clarification flow to ask existing vs new
+                logger.info("[Router] Task intent: user chose build — asking project type.")
+                try:
+                    from brooks import save_pending_context as _save_ctx
+                    _save_ctx(
+                        {"type": "dev_project_clarification", "prompt": user_input, "summary": saved_summary},
+                        session_id=session_id,
+                        owner_id=owner_id,
+                    )
+                except Exception as _e:
+                    logger.warning(f"[Router] Could not save dev_project context: {_e}")
+                yield {
+                    "type": "clarification_card",
+                    "clarification": {
+                        "question": "Is this for an existing project or a new one?",
+                        "context": f"Building: *{saved_summary}*",
+                        "options": [
+                            {"label": "Existing project", "value": "existing_project", "description": "I'll work within your current codebase"},
+                            {"label": "New project", "value": "new_project", "description": "Walk me through setup"},
+                            {"label": "Just plan it", "value": "plan_only", "description": "Research and plan, no files changed"},
+                        ],
+                        "allow_freetext": False,
+                        "card_type": "dev_project",
+                    },
+                }
+                return
+
+            else:
+                # Freetext — treat as research
+                logger.info("[Router] Task intent: freetext — routing as research.")
+                yield {"type": "log", "content": "[Context Manager] Routing as research task..."}
+                # Fall through to normal routing below
+
         elif pending_ctx.get("type") == "dev_mode_gate":
             original_prompt = pending_ctx.get("prompt", "")
             clear_context(session_id=session_id, owner_id=owner_id)

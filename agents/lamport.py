@@ -455,23 +455,33 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
                     parsed["clarification_needed"] = False
                     parsed["clarification_question"] = None
 
-            # --- Scope override: creation/build requests must always be codebase ---
-            # Only fires when the LLM returned 'unknown' — never overrides an explicit
-            # 'external' classification (e.g. "build out data centers" is research, not code).
-            _BUILD_KEYWORDS = (
+            # --- Scope override: only when a SOFTWARE build verb + software artifact are BOTH present ---
+            # Bare verbs ("build", "create", etc.) are too broad — "build data centers" is research.
+            # Requires scope='unknown' AND both a build verb AND a software artifact noun.
+            # If scope='external' the LLM was confident; we trust it and leave it alone.
+            _BUILD_VERBS = frozenset({
                 "build", "make", "create", "develop", "implement", "write", "code",
-                "generate a game", "generate a web", "generate an app",
-                "a game", "a web app", "a website", "an app", "a tool",
-            )
+            })
+            _SOFTWARE_ARTIFACTS = frozenset({
+                "app", "website", "web app", "web application", "script", "function",
+                "class", "api", "bot", "tool", "game", "program", "widget", "component",
+                "feature", "backend", "frontend", "endpoint", "service", "microservice",
+                "plugin", "extension", "dashboard", "cli", "command line", "mobile app",
+                "interface", "module", "library", "package",
+            })
             _input_lower = user_input.lower()
-            if parsed.get("scope") == "unknown" and any(kw in _input_lower for kw in _BUILD_KEYWORDS):
-                logger.info(
-                    f"[Coordinator] Scope override: '{parsed.get('scope')}' → 'codebase' "
-                    f"(detected build intent in user request)"
-                )
-                parsed["scope"] = "codebase"
-                if parsed.get("project_type") not in ("existing", "new"):
-                    parsed["project_type"] = "new"
+            if parsed.get("scope") == "unknown":
+                _has_verb = bool(set(_input_lower.split()) & _BUILD_VERBS)
+                _has_artifact = any(a in _input_lower for a in _SOFTWARE_ARTIFACTS)
+                if _has_verb and _has_artifact:
+                    logger.info(
+                        "[Coordinator] Scope override: 'unknown' → 'codebase' "
+                        "(software build verb + artifact detected)"
+                    )
+                    parsed["scope"] = "codebase"
+                    if parsed.get("project_type") not in ("existing", "new"):
+                        parsed["project_type"] = "new"
+                # else: scope stays 'unknown' — low-confidence gate in coordinate_task handles it
 
             return parsed
     except Exception as e:
@@ -1217,6 +1227,48 @@ def coordinate_task(
                     "options": [],
                     "allow_freetext": True,
                     "card_type": "ambiguity",
+                },
+            }
+            return
+
+        # --- LOW CONFIDENCE GATE: scope still unknown after decomposition + keyword check ---
+        # Fires when the LLM couldn't determine scope AND no software verb+artifact was found.
+        # Skipped when research_mode or plan_mode is already set (user or upstream already decided).
+        if scope == "unknown" and not dev_mode and not research_mode and not plan_mode:
+            logger.info("[Coordinator] Scope unknown after decomposition — prompting user to classify intent.")
+            try:
+                from brooks import save_pending_context as _save_ctx
+                _save_ctx(
+                    {"type": "task_intent_clarification", "prompt": user_input, "summary": summary},
+                    session_id=session_id,
+                    owner_id=owner_id,
+                )
+            except Exception as _e:
+                logger.warning(f"[Coordinator] Could not save task_intent context: {_e}")
+            yield {
+                "type": "clarification_card",
+                "clarification": {
+                    "question": "How would you like to approach this?",
+                    "context": f"I wasn't sure how to classify this request: *{summary}*",
+                    "options": [
+                        {
+                            "label": "Research it",
+                            "value": "research_it",
+                            "description": "Deep-dive, multi-perspective analysis — no code changes",
+                        },
+                        {
+                            "label": "Plan it",
+                            "value": "plan_it",
+                            "description": "Architecture and design documents — no code written",
+                        },
+                        {
+                            "label": "Build it",
+                            "value": "build_it",
+                            "description": "Create or modify code in a project",
+                        },
+                    ],
+                    "allow_freetext": True,
+                    "card_type": "task_intent",
                 },
             }
             return
