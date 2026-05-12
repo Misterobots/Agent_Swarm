@@ -38,7 +38,11 @@ export async function fetchGallery(kind: "all" | "image" | "audio" | "model"): P
   const res = await fetch(`${API_BASE}/api/v1/media/gallery?kind=${kind}`);
   if (!res.ok) return [];
   const data = await res.json();
-  return data.items ?? [];
+  return (data.items ?? []).map((item: GalleryItem) => ({
+    ...item,
+    url: item.url?.startsWith("/") ? `${API_BASE}${item.url}` : item.url,
+    download_url: item.download_url?.startsWith("/") ? `${API_BASE}${item.download_url}` : item.download_url,
+  }));
 }
 
 export async function fetchGovernanceRequests(): Promise<GovernanceRequest[]> {
