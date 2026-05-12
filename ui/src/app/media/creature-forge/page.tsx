@@ -1,8 +1,9 @@
 "use client";
 
-import { Hammer, RefreshCw } from "lucide-react";
+import { Hammer, RefreshCw, CheckCircle2 } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { fetchComfyStatus, fetchGallery, generateCreatureForge } from "@/lib/api/workspaces";
+import type { GalleryItem } from "@/types/workspaces";
 import { useEffect, useState } from "react";
 
 const WORKFLOWS = [
@@ -25,17 +26,26 @@ const WORKFLOWS = [
 
 export default function CreatureForgePage() {
   const [imagePath, setImagePath] = useState("");
+  const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [workflowName, setWorkflowName] = useState(WORKFLOWS[0].name);
   const [comfyOnline, setComfyOnline] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState("");
+  const [imageGallery, setImageGallery] = useState<GalleryItem[]>([]);
   const [recentMedia, setRecentMedia] = useState<Array<{ name: string; url: string; updated_at: number }>>([]);
+  const [galleryLoading, setGalleryLoading] = useState(true);
 
   async function load() {
-    const [status, gallery] = await Promise.all([fetchComfyStatus(), fetchGallery("all")]);
+    const [status, images, all] = await Promise.all([
+      fetchComfyStatus(),
+      fetchGallery("image"),
+      fetchGallery("all"),
+    ]);
     setComfyOnline(Boolean(status?.healthy));
+    setImageGallery(images);
+    setGalleryLoading(false);
 
-    const modelArtifacts = gallery
+    const modelArtifacts = all
       .filter((item) => {
         const ext = item.name.toLowerCase();
         return ext.endsWith(".glb") || ext.endsWith(".obj") || ext.endsWith(".3mf");
@@ -49,12 +59,18 @@ export default function CreatureForgePage() {
     load();
   }, []);
 
+  function selectGalleryImage(item: GalleryItem) {
+    setSelectedImage(item);
+    setImagePath(`/workspace/delivered_artifacts/${item.name}`);
+  }
+
   async function generate() {
-    if (!imagePath.trim()) return;
+    const path = imagePath.trim();
+    if (!path) return;
     setGenerating(true);
     setResult("Queueing Creature Forge...");
 
-    const response = await generateCreatureForge({ image_path: imagePath.trim(), workflow_name: workflowName });
+    const response = await generateCreatureForge({ image_path: path, workflow_name: workflowName });
     setResult(response?.result ?? "Creature Forge failed");
     setGenerating(false);
     await load();
@@ -66,14 +82,75 @@ export default function CreatureForgePage() {
       description="Convert 2D concept art into 3D assets using TripoSG and Hunyuan Paint workflows."
       icon={Hammer}
     >
-      <WorkspaceSection title="2D to 3D Conversion">
+      <WorkspaceSection title="Select Source Image">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs text-[var(--chat-muted)]">Pick from your delivered image artifacts</p>
+          <button
+            onClick={load}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] px-3 py-2 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+          >
+            <RefreshCw size={12} className={galleryLoading ? "animate-spin" : ""} /> Refresh
+          </button>
+        </div>
+
+        {galleryLoading ? (
+          <p className="py-6 text-center text-sm text-[var(--chat-muted)]">Loading image gallery...</p>
+        ) : imageGallery.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[var(--chat-muted)]">
+            No image artifacts found. Generate images in Studio first, then return here.
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {imageGallery.map((item) => {
+              const isSelected = selectedImage?.name === item.name;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => selectGalleryImage(item)}
+                  className={`group relative overflow-hidden rounded-lg border text-left transition-all ${
+                    isSelected
+                      ? "border-[var(--chat-accent)] ring-1 ring-[var(--chat-accent)]"
+                      : "border-[var(--chat-border)] hover:border-[var(--chat-accent)]/50"
+                  }`}
+                >
+                  <img
+                    src={item.url}
+                    alt={item.name}
+                    className="h-32 w-full object-cover"
+                    loading="lazy"
+                  />
+                  {isSelected && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-[var(--chat-accent)]/20">
+                      <CheckCircle2 size={28} className="text-[var(--chat-accent)]" />
+                    </div>
+                  )}
+                  <div className="p-2">
+                    <p className="truncate text-[11px] text-[var(--chat-muted)]">{item.name}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {selectedImage && (
+          <p className="mt-3 text-xs text-[var(--chat-accent)]">
+            Selected: <span className="font-mono">{selectedImage.name}</span>
+          </p>
+        )}
+      </WorkspaceSection>
+
+      <WorkspaceSection title="Run Conversion">
         <div className="grid gap-3 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs text-[var(--chat-muted)]">Source Image Path</label>
+            <label className="mb-1 block text-xs text-[var(--chat-muted)]">
+              Source Image Path
+              <span className="ml-2 text-[var(--chat-subtle)]">(auto-filled from selection above, or enter manually)</span>
+            </label>
             <input
               value={imagePath}
-              onChange={(e) => setImagePath(e.target.value)}
-              placeholder="/workspace/delivered_artifacts/ComfyUI_action_figure_001.png"
+              onChange={(e) => { setImagePath(e.target.value); setSelectedImage(null); }}
+              placeholder="/workspace/delivered_artifacts/ComfyUI_00001.png"
               className="w-full rounded border border-[var(--chat-border)] bg-[var(--chat-bg)] px-3 py-2 text-sm text-[var(--chat-text)]"
             />
           </div>
@@ -109,19 +186,11 @@ export default function CreatureForgePage() {
             </button>
           </div>
 
-          {result && <p className="md:col-span-2 rounded bg-[var(--chat-bg)] px-3 py-2 text-xs text-[var(--chat-text)]">{result}</p>}
-        </div>
-      </WorkspaceSection>
-
-      <WorkspaceSection title="Workflow Catalog">
-        <div className="grid gap-3 md:grid-cols-3">
-          {WORKFLOWS.map((workflow) => (
-            <div key={workflow.name} className="rounded-lg border border-[var(--chat-border)] bg-[var(--chat-panel)] p-3">
-              <p className="text-sm font-medium text-[var(--chat-text)]">{workflow.label}</p>
-              <p className="mt-1 text-xs text-[var(--chat-muted)]">{workflow.description}</p>
-              <code className="mt-2 block rounded bg-[var(--chat-bg)] px-2 py-1 text-[11px] text-[var(--chat-muted)]">{workflow.name}</code>
-            </div>
-          ))}
+          {result && (
+            <p className="md:col-span-2 rounded bg-[var(--chat-bg)] px-3 py-2 text-xs text-[var(--chat-text)]">
+              {result}
+            </p>
+          )}
         </div>
       </WorkspaceSection>
 
@@ -136,7 +205,7 @@ export default function CreatureForgePage() {
         </div>
 
         {recentMedia.length === 0 ? (
-          <p className="py-8 text-center text-sm text-[var(--chat-muted)]">No 3D artifacts detected in delivered artifacts yet.</p>
+          <p className="py-8 text-center text-sm text-[var(--chat-muted)]">No 3D artifacts detected yet.</p>
         ) : (
           <div className="space-y-2">
             {recentMedia.map((item) => (
@@ -146,7 +215,7 @@ export default function CreatureForgePage() {
                     <p className="text-sm font-medium text-[var(--chat-text)]">{item.name}</p>
                     <p className="text-xs text-[var(--chat-muted)]">{new Date(item.updated_at * 1000).toLocaleString()}</p>
                   </div>
-                  <a href={item.download_url || item.url} download={item.name} className="text-xs text-[var(--chat-accent)]">
+                  <a href={item.url} download={item.name} className="text-xs text-[var(--chat-accent)]">
                     Download
                   </a>
                 </div>
