@@ -219,6 +219,11 @@ export function useChatStream(options?: {
       continuationHintRef.current = null;
       mediaAttachmentsRef.current = [];
       
+      const MAX_RETRIES = 3;
+      let retryCount = 0;
+      let streamSucceeded = false;
+
+      while (!streamSucceeded && retryCount <= MAX_RETRIES) {
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -395,11 +400,29 @@ export function useChatStream(options?: {
             appendToMessage(convId!, assistantId, event.content || "");
           }
         }
+        streamSucceeded = true;
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-          // User cancelled
+          streamSucceeded = true; // don't retry user cancels
         } else {
-          appendToMessage(convId!, assistantId, "\n\n*Error: Connection failed.*");
+          const currentContent = (
+            useChatStore.getState().conversations
+              .find((c) => c.id === convId)?.messages
+              .find((m) => m.id === assistantId)?.content ?? ""
+          ).trim();
+
+          const canRetry = currentContent.length === 0 && retryCount < MAX_RETRIES;
+          if (canRetry) {
+            retryCount++;
+            const delaySec = retryCount * 2;
+            setStatusMessage(`Backend unavailable — retrying in ${delaySec}s… (${retryCount}/${MAX_RETRIES})`);
+            await new Promise((r) => setTimeout(r, delaySec * 1000));
+            setStatusMessage(null);
+            // continue the while loop — new controller created on next iteration
+          } else {
+            streamSucceeded = true; // exit loop and show error
+            appendToMessage(convId!, assistantId, "\n\n*Error: Connection failed. The backend may be restarting — please try again in a moment.*");
+          }
         }
       } finally {
         // Persist collected metadata to store
@@ -454,6 +477,7 @@ export function useChatStream(options?: {
         continuationHintRef.current = null;
         abortRef.current = null;
       }
+      } // end retry while loop
     },
     [
       activeConversationId,
