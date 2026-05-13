@@ -13,6 +13,7 @@ logger = setup_logger("CreativeStudio")
 # Configuration
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://host.docker.internal:8188")
+KLEIN_HOST = os.getenv("KLEIN_HOST", "http://klein_service:8189")
 MODEL_NAME = "qwen2.5-coder:14b" # Logic model
 DEPLOYED_FALLBACK_CHECKPOINT = "sd_xl_turbo_1.0_fp16.safetensors"
 
@@ -20,8 +21,15 @@ IMAGE_MODEL_REGISTRY = {
     "auto": {
         "label": "Auto Best Available",
         "category": "adaptive",
-        "description": "Select the strongest available curated profile in priority order.",
-        "priority": ["flux-dev-quality", "flux-schnell-preview", "sdxl-general", "sdxl-turbo-preview", "sd15-fast-legacy"],
+        "description": "Klein 9B first (Diffusers/dual-GPU), then ComfyUI checkpoint priority order.",
+        "priority": ["klein-9b", "flux-dev-quality", "flux-schnell-preview", "sdxl-general", "sdxl-turbo-preview", "sd15-fast-legacy"],
+    },
+    "klein-9b": {
+        "label": "FLUX.2 Klein 9B",
+        "category": "quality",
+        "description": "FLUX.2 Klein 9B via Diffusers — spreads across both 5060 Ti GPUs (30GB combined). Highest quality.",
+        "backend": "klein",
+        "defaults": {"width": 1024, "height": 1024, "steps": 4, "guidance_scale": 3.5},
     },
     "flux-dev-quality": {
         "label": "FLUX Dev Quality",
@@ -257,23 +265,79 @@ def get_model_params(model_type: str):
         return {"cfg": 7.0, "steps": 25, "sampler": "euler_ancestral", "scheduler": "normal", "width": 768, "height": 768}
 
 # --- LAYER 4: PROMPT REFINEMENT ---
+def _detect_subject_type(p_lower: str) -> str:
+    if any(kw in p_lower for kw in [
+        "person", "man", "woman", "girl", "boy", "face", "model", "human",
+        "people", "child", "baby", "portrait", "selfie", "lady", "guy", "couple",
+    ]):
+        return "person"
+    if any(kw in p_lower for kw in [
+        "cat", "dog", "bird", "animal", "lion", "tiger", "wolf", "horse",
+        "elephant", "fox", "bear", "rabbit", "fish", "wildlife", "eagle", "owl",
+    ]):
+        return "animal"
+    if any(kw in p_lower for kw in [
+        "food", "dish", "meal", "cake", "coffee", "drink", "fruit", "vegetable",
+        "pizza", "burger", "sushi", "dessert", "soup", "salad", "bread", "cookie",
+    ]):
+        return "food"
+    if any(kw in p_lower for kw in [
+        "mountain", "forest", "ocean", "beach", "city", "skyline", "field",
+        "valley", "desert", "lake", "waterfall", "sunset", "sunrise", "landscape",
+        "cliff", "canyon", "river", "meadow", "jungle", "tundra",
+    ]):
+        return "landscape"
+    if any(kw in p_lower for kw in [
+        "building", "house", "castle", "temple", "bridge", "tower",
+        "skyscraper", "church", "mansion", "architecture", "cathedral",
+    ]):
+        return "architecture"
+    return "general"
+
 def apply_style_heuristics(prompt: str, model_type: str) -> str:
     """
-    Analyzes the prompt to infer style. If no style is detected, defaults to Photorealism.
+    Analyzes the prompt to infer style. If no explicit style is detected,
+    applies subject-aware photorealistic defaults (Gemini-style auto-enrichment).
     """
     p_lower = prompt.lower()
-    styles = ["painting", "drawing", "sketch", "anime", "cartoon", "render", "illustration", "art", "graphic"]
-    if any(s in p_lower for s in styles):
-        return prompt 
-        
-    if "TURBO" in model_type:
-        style_boost = "photograph, realistic, raw photo, sharp focus, 4k"
+
+    # User stated an explicit artistic intent — don't override
+    explicit_styles = [
+        "painting", "oil paint", "watercolor", "acrylic", "gouache", "impressionist",
+        "drawing", "sketch", "pencil", "charcoal", "ink", "pastel",
+        "anime", "manga", "cartoon", "comic", "chibi", "disney", "pixar",
+        "3d render", "cgi", "blender", "octane", "unreal engine",
+        "digital art", "digital painting", "illustration", "concept art",
+        "vector", "flat design", "isometric", "low poly", "pixel art",
+        "vintage", "retro", "noir", "surreal", "abstract", "graphic", "render",
+    ]
+    if any(s in p_lower for s in explicit_styles):
+        return prompt
+
+    # Subject-aware context enrichment — mirrors Gemini's implicit quality defaults
+    subject = _detect_subject_type(p_lower)
+    if subject == "person":
+        context = "professional portrait photography, soft cinematic lighting, shallow depth of field, bokeh background, sharp facial details, natural skin texture"
+    elif subject == "animal":
+        context = "wildlife photography, natural golden-hour lighting, sharp focus on subject, rich environmental detail, National Geographic quality"
+    elif subject == "food":
+        context = "professional food photography, soft studio lighting, shallow depth of field, vibrant colors, clean background, appetizing presentation"
+    elif subject == "landscape":
+        context = "landscape photography, dramatic golden hour, wide angle lens, vivid colors, detailed foreground, cinematic atmosphere"
+    elif subject == "architecture":
+        context = "architectural photography, dramatic natural lighting, sharp geometric lines, professional composition, rich shadow detail"
+    else:
+        context = "cinematic photography, professional studio lighting, sharp focus, beautifully composed, rich detail"
+
+    # Quality prefix scaled to model capability
+    if "TURBO" in model_type or "SCHNELL" in model_type:
+        quality = "photograph, realistic, raw photo, 4k"
     elif "FLUX" in model_type:
-        style_boost = "Cinematic shot, photorealistic, incredibly detailed"
-    else: 
-        style_boost = "photograph, photorealistic, cinematic lighting, 8k, highly detailed"
-        
-    return f"{style_boost}, {prompt}"
+        quality = "photorealistic, ultra-detailed, cinematic"
+    else:
+        quality = "photograph, photorealistic, cinematic lighting, 8k, highly detailed"
+
+    return f"{quality}, {context}, {prompt}"
 
 def refine_prompt(prompt: str, model_type: str) -> str:
     styled_prompt = apply_style_heuristics(prompt, model_type)
@@ -342,6 +406,14 @@ def queue_prompt(prompt_text: str, **kwargs):
         f"--- [ComfyUI] Config: {model_type} | Profile: {target['profile_id']} | "
         f"Ckpt: {ckpt_name} | Params: {params} ---"
     )
+
+    # Flush ComfyUI's cached tensors before each job — prevents OOM from leftover buffers
+    # without unloading the model (keeps generation fast on repeated requests).
+    try:
+        requests.post(f"{comfyui_host}/free", json={"unload_models": False, "free_memory": True}, timeout=5)
+        logger.info("[ComfyUI] Pre-generation memory flush sent.")
+    except Exception as e:
+        logger.warning(f"[ComfyUI] Pre-generation memory flush failed (non-fatal): {e}")
 
     # 3. Payload
     p = {
@@ -591,6 +663,70 @@ def verify_semantics(image_path: str, prompt: str) -> tuple[bool, str]:
         pass
     return True, "Semantic Check Skipped (VLM Unavailable)"
 
+# ---------------------------------------------------------------------------
+# Klein Diffusers path
+# ---------------------------------------------------------------------------
+
+def _klein_is_healthy() -> bool:
+    try:
+        r = requests.get(f"{KLEIN_HOST}/health", timeout=5)
+        data = r.json()
+        return r.status_code == 200 and data.get("pipeline_loaded", False)
+    except Exception:
+        return False
+
+
+def _generate_via_klein(
+    prompt: str,
+    width: int = 1024,
+    height: int = 1024,
+    steps: int = 4,
+    guidance_scale: float = 3.5,
+    seed: int = -1,
+    negative_prompt: str = "",
+    output_dir: str = "/tmp/comfyui_images",
+) -> str | None:
+    """
+    Calls the Klein service, saves the returned image locally, and returns
+    the filename — or None on failure.
+    """
+    try:
+        resp = requests.post(
+            f"{KLEIN_HOST}/generate",
+            json={
+                "prompt": prompt,
+                "negative_prompt": negative_prompt or "",
+                "width": width,
+                "height": height,
+                "steps": steps,
+                "guidance_scale": guidance_scale,
+                "seed": seed,
+            },
+            timeout=180,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        logger.error(f"[Klein] Request failed: {e}")
+        return None
+
+    filename = data.get("filename")
+    img_b64 = data.get("image_b64")
+    elapsed = data.get("elapsed", 0)
+
+    if not filename or not img_b64:
+        logger.error("[Klein] Response missing filename or image_b64")
+        return None
+
+    os.makedirs(output_dir, exist_ok=True)
+    dest = os.path.join(output_dir, filename)
+    with open(dest, "wb") as f:
+        f.write(base64.b64decode(img_b64))
+
+    logger.info(f"[Klein] Saved {filename} in {elapsed:.1f}s")
+    return filename
+
+
 def generate_image(
     prompt: str,
     model_name: str = "auto",
@@ -606,17 +742,8 @@ def generate_image(
     skip_refinement: bool = False,
 ) -> str:
     """
-    Generates an image using ComfyUI. 
-    Args:
-        prompt: Description of the image.
-        model_name: Checkpoint name.
-        cfg: Classifier Free Guidance scale.
-        steps: Number of sampling steps.
-        width: Image width.
-        height: Image height.
-        sampler: Sampling method (euler, dpmpp_2m, etc).
-        scheduler: Scheduler type (normal, karras, etc).
-        seed: Random seed (-1 for random).
+    Generates an image. Tries the Klein 9B Diffusers service first (auto/klein-9b),
+    falls back to ComfyUI for all other model requests or if Klein is unavailable.
     """
     # Pack arguments into a dict for internal use.
     # When model_name is "auto", omit generation params so queue_prompt's
@@ -647,33 +774,26 @@ def generate_image(
 
     if target_device != "auto":
         logger.info(f"--- [Creative Studio] Targeted Generation on {target_device} ---")
-    
+
     MAX_RETRIES = 2
-    import os
     import json
-    
-    print(f"DEBUG: generate_image called with prompt='{prompt}' device='{target_device}'")
-    logger.info(f"DEBUG: generate_image called with prompt='{prompt}' device='{target_device}'")
 
     workspace_root = _resolve_workspace_root()
-    # PATH DISCOVERY LOGIC
-    # We need to find where ComfyUI is dumping images.
     candidate_paths = [
-        "/tmp/comfyui_images",  # Downloaded images from remote ComfyUI
+        "/tmp/comfyui_images",
         os.getenv("COMFYUI_OUTPUT_DIR"),
-        "C:/Users/panca/Documents/ComfyUI/ComfyUI/output", # Host Default
-        "/app/comfy_io/output", # Docker Map
-        os.path.join(workspace_root, "output") # Relative Default
+        "C:/Users/panca/Documents/ComfyUI/ComfyUI/output",
+        "/app/comfy_io/output",
+        os.path.join(workspace_root, "output")
     ]
-    
+
     output_dir = None
     for p in candidate_paths:
         if p and os.path.exists(p):
             output_dir = p
             logger.info(f"Targeting ComfyUI Output: {output_dir}")
             break
-    
-    # If no existing output_dir found, create /tmp/comfyui_images
+
     if not output_dir:
         output_dir = "/tmp/comfyui_images"
         os.makedirs(output_dir, exist_ok=True)
@@ -681,6 +801,20 @@ def generate_image(
 
     last_candidate: dict | None = None
 
+    # If Klein isn't loaded yet, evict Ollama first so it gets clean VRAM.
+    # This runs regardless of Redis availability — the GPU lock may skip evictions
+    # when Redis is down (fail-open), so we handle the transition here directly.
+    if model_name in ("auto", "klein-9b") and not skip_refinement and not _klein_is_healthy():
+        try:
+            from utils.gpu_queue import evict_ollama, warmup_klein
+            logger.info("[Creative Studio] Evicting Ollama to free VRAM, then loading Klein...")
+            evict_ollama()
+            warmup_klein()
+        except Exception as e:
+            logger.warning(f"[Creative Studio] Klein VRAM prep failed: {e}")
+
+    # GPU lock serializes concurrent requests and handles zone transitions
+    # when Redis IS available. When Redis is down it's a no-op (fail-open).
     try:
         from utils.gpu_queue import request_lock as _request_lock
         _gpu_ctx = _request_lock("image", timeout=600)
@@ -689,88 +823,108 @@ def generate_image(
         _gpu_ctx = nullcontext()
 
     with _gpu_ctx:
-      for attempt in range(MAX_RETRIES + 1):
-        if attempt > 0:
-            logger.info(f"--- [Creative Studio] Verification Failed. Retrying ({attempt}/{MAX_RETRIES})... ---")
-            
-        result_msg = queue_prompt(prompt, **kwargs)
-        
-        if "Error" in result_msg:
-             return result_msg
-             
-        try:
-            filename = result_msg.split("Generated Image: ")[1].split(" ")[0]
-            resolved_target = resolve_generation_target(model_name, list_available_models())
-            img_path = os.path.join(output_dir, filename)
-            
-            if not os.path.exists(img_path):
-                if os.path.exists(filename): img_path = filename
-                else: 
-                     logger.warning(f"Could not find image at {img_path}.")
-                     return result_msg
-            
-            # 0. Save Metadata Sidecar
-            try:
-                meta = {
-                    "prompt": prompt,
-                    "params": kwargs,
-                    "model": model_name,
-                    "resolved_profile": resolved_target["profile_id"],
-                    "resolved_checkpoint": resolved_target["checkpoint"],
-                    "resolved_model_type": detect_model_type(resolved_target["checkpoint"]),
-                    "timestamp": time.time()
-                }
-                meta_path = img_path + ".json"
-                with open(meta_path, "w") as f:
-                    json.dump(meta, f, indent=2)
-            except Exception as e:
-                logger.warning(f"Failed to save metadata sidecar: {e}")
+        # --- KLEIN PATH (FLUX.2 Klein 9B, dual-GPU Diffusers) ---
+        # GPU lock already evicted Ollama and warmed up Klein, so VRAM is clear.
+        use_klein = model_name in ("auto", "klein-9b") and not skip_refinement
+        if use_klein and _klein_is_healthy():
+            logger.info("[Creative Studio] Routing to Klein service (FLUX.2 9B)")
+            klein_defaults = IMAGE_MODEL_REGISTRY["klein-9b"]["defaults"]
+            enriched = refine_prompt(prompt, "FLUX_DEV")
+            klein_output_dir = "/tmp/comfyui_images"
+            os.makedirs(klein_output_dir, exist_ok=True)
+            klein_file = _generate_via_klein(
+                prompt=enriched,
+                width=width if width != 1024 else klein_defaults["width"],
+                height=height if height != 1024 else klein_defaults["height"],
+                steps=steps if steps != 20 else klein_defaults["steps"],
+                guidance_scale=cfg if cfg != 7.0 else klein_defaults["guidance_scale"],
+                seed=seed,
+                negative_prompt=negative_prompt or "",
+                output_dir=klein_output_dir,
+            )
+            if klein_file:
+                return f"Generated Image: {klein_file}"
+            logger.warning("[Creative Studio] Klein generation failed — falling back to ComfyUI")
 
-            # 1. Structural Verification
-            struct_ok, struct_reason = verify_structure(img_path)
-            if not struct_ok:
-                logger.warning(f"Structure Check Failed: {struct_reason}")
-                last_candidate = {
-                    "filename": filename,
-                    "img_path": img_path,
-                    "warning": f"Structure warning: {struct_reason}",
-                }
-                continue 
-            
-            # 2. Semantic Verification
-            sem_ok, sem_reason = verify_semantics(img_path, prompt)
-            if not sem_ok:
-                logger.warning(f"Semantic Check Failed: {sem_reason}")
-                last_candidate = {
-                    "filename": filename,
-                    "img_path": img_path,
-                    "warning": f"Semantic warning: {sem_reason}",
-                }
-                continue 
-                
-            # 3. Delivery (New in v2)
+        # --- COMFYUI FALLBACK ---
+        for attempt in range(MAX_RETRIES + 1):
+            if attempt > 0:
+                logger.info(f"--- [Creative Studio] Verification Failed. Retrying ({attempt}/{MAX_RETRIES})... ---")
+
+            result_msg = queue_prompt(prompt, **kwargs)
+
+            if "Error" in result_msg:
+                return result_msg
+
             try:
-                import shutil
-                delivery_dir = os.path.join(workspace_root, "delivered_artifacts")
-                os.makedirs(delivery_dir, exist_ok=True)
-                
-                target_path = os.path.join(delivery_dir, filename)
-                shutil.copy(img_path, target_path)
-                
-                # Copy sidecar
-                if os.path.exists(img_path + ".json"):
-                    shutil.copy(img_path + ".json", target_path + ".json")
-                    
-                return f"Generated Image: {filename} (Saved to Gallery) | ✅ Verified."
+                filename = result_msg.split("Generated Image: ")[1].split(" ")[0]
+                resolved_target = resolve_generation_target(model_name, list_available_models())
+                img_path = os.path.join(output_dir, filename)
+
+                if not os.path.exists(img_path):
+                    if os.path.exists(filename):
+                        img_path = filename
+                    else:
+                        logger.warning(f"Could not find image at {img_path}.")
+                        return result_msg
+
+                # 0. Save Metadata Sidecar
+                try:
+                    meta = {
+                        "prompt": prompt,
+                        "params": kwargs,
+                        "model": model_name,
+                        "resolved_profile": resolved_target["profile_id"],
+                        "resolved_checkpoint": resolved_target["checkpoint"],
+                        "resolved_model_type": detect_model_type(resolved_target["checkpoint"]),
+                        "timestamp": time.time()
+                    }
+                    meta_path = img_path + ".json"
+                    with open(meta_path, "w") as f:
+                        json.dump(meta, f, indent=2)
+                except Exception as e:
+                    logger.warning(f"Failed to save metadata sidecar: {e}")
+
+                # 1. Structural Verification
+                struct_ok, struct_reason = verify_structure(img_path)
+                if not struct_ok:
+                    logger.warning(f"Structure Check Failed: {struct_reason}")
+                    last_candidate = {
+                        "filename": filename,
+                        "img_path": img_path,
+                        "warning": f"Structure warning: {struct_reason}",
+                    }
+                    continue
+
+                # 2. Semantic Verification
+                sem_ok, sem_reason = verify_semantics(img_path, prompt)
+                if not sem_ok:
+                    logger.warning(f"Semantic Check Failed: {sem_reason}")
+                    last_candidate = {
+                        "filename": filename,
+                        "img_path": img_path,
+                        "warning": f"Semantic warning: {sem_reason}",
+                    }
+                    continue
+
+                # 3. Delivery
+                try:
+                    import shutil
+                    delivery_dir = os.path.join(workspace_root, "delivered_artifacts")
+                    os.makedirs(delivery_dir, exist_ok=True)
+                    target_path = os.path.join(delivery_dir, filename)
+                    shutil.copy(img_path, target_path)
+                    if os.path.exists(img_path + ".json"):
+                        shutil.copy(img_path + ".json", target_path + ".json")
+                    return f"Generated Image: {filename} (Saved to Gallery) | ✅ Verified."
+                except Exception as e:
+                    logger.error(f"Delivery Failed: {e}")
+                    return f"{result_msg} | ✅ Verified but Delivery Failed: {e}"
+
             except Exception as e:
-                logger.error(f"Delivery Failed: {e}")
-                return f"{result_msg} | ✅ Verified but Delivery Failed: {e}"
-            
-        except Exception as e:
-            logger.error(f"Verification Logic Error: {e}")
-            pass
-            
-        return result_msg 
+                logger.error(f"Verification Logic Error: {e}")
+
+            return result_msg
 
     if last_candidate:
         try:

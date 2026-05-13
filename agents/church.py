@@ -2220,50 +2220,11 @@ def chat_swarm(
                  " surrounded by", " against a ", " against the ",
              ])
              
-             # Emit structured clarification if missing critical info
-             if not has_style:
-                 save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
-                 yield {
-                     "type": "clarification_card",
-                     "clarification": {
-                         "question": "What visual style would you like?",
-                         "options": [
-                             {"id": "photo", "label": "📷 Photorealistic", "value": "A photorealistic image", "description": "Realistic photography style"},
-                             {"id": "painting", "label": "🎨 Artistic Painting", "value": "A painted artwork", "description": "Oil, watercolor, or acrylic style"},
-                             {"id": "3d", "label": "🔮 3D Rendered", "value": "A 3D rendered scene", "description": "CGI/Blender style rendering"},
-                             {"id": "sketch", "label": "✏️ Hand-drawn Sketch", "value": "A pencil sketch", "description": "Line art or pencil drawing"},
-                         ],
-                         "allow_custom": True,
-                         "allow_multiple": False,
-                         "card_type": "art_direction"
-                     }
-                 }
-                 _score_trace(lf_trace, langfuse, 0.7, output="Style clarification requested")
-                 AGENT_STATE.labels(agent_name="ArtDirector").set(1)
-                 return
-             
-             if not has_setting:
-                 save_pending_image_clarification(user_input, session_id=session_id, owner_id=owner_id)
-                 yield {
-                     "type": "clarification_card",
-                     "clarification": {
-                         "question": "Where should this be located?",
-                         "options": [
-                             {"id": "white_bg", "label": "⬜ Plain white background", "value": "on a plain white background", "description": "Clean, minimal background"},
-                             {"id": "studio", "label": "🎬 Studio lighting", "value": "in a professional photography studio", "description": "Professional studio setup"},
-                             {"id": "nature", "label": "🌳 Outdoor/Nature", "value": "in a natural outdoor setting", "description": "Natural environment"},
-                             {"id": "indoor", "label": "🏠 Indoor scene", "value": "in an indoor room setting", "description": "Interior environment"},
-                         ],
-                         "allow_custom": True,
-                         "allow_multiple": False,
-                         "card_type": "art_direction"
-                     }
-                 }
-                 _score_trace(lf_trace, langfuse, 0.7, output="Setting clarification requested")
-                 AGENT_STATE.labels(agent_name="ArtDirector").set(1)
-                 return
-             
-             # All checks passed - proceed to generation
+             # Apply subject-aware defaults silently (Gemini-style) — no clarification interrupts
+             if not has_style or not has_setting:
+                 yield {"type": "log", "content": "[Art Director] Applying cinematic defaults — generating now."}
+
+             # Proceed to generation
              yield {"type": "log", "content": "[Art Director] Prompt approved for Execution."}
              AGENT_STATE.labels(agent_name="ArtDirector").set(1)
              

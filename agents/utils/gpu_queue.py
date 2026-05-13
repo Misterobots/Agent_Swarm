@@ -26,6 +26,7 @@ REDIS_HOST = os.getenv("REDIS_HOST", "redis_queue")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
+KLEIN_HOST = os.getenv("KLEIN_HOST", "http://klein_service:8189")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
 TRAINING_WINDOW_START = int(os.getenv("TRAINING_WINDOW_START", "2"))   # hour (24h)
@@ -202,10 +203,36 @@ def evict_comfyui():
     except Exception as e:
         logger.warning(f"[GPU Queue] Failed to evict ComfyUI VRAM: {e}")
 
+def evict_klein():
+    """Fully unloads the Klein model weights from VRAM so Ollama can use both GPUs."""
+    try:
+        logger.info("[GPU Queue] Evicting Klein model from VRAM...")
+        response = requests.post(f"{KLEIN_HOST}/evict", timeout=10)
+        if response.status_code == 200:
+            logger.info("[GPU Queue] Klein VRAM evicted successfully.")
+        else:
+            logger.warning(f"[GPU Queue] Klein /evict returned status {response.status_code}.")
+    except Exception as e:
+        logger.warning(f"[GPU Queue] Failed to evict Klein VRAM: {e}")
+
+def warmup_klein():
+    """Triggers Klein to pre-load its model into VRAM before generation starts."""
+    try:
+        logger.info("[GPU Queue] Warming up Klein pipeline...")
+        # 600s: first load from HF cache takes ~400s; subsequent loads ~60s
+        response = requests.post(f"{KLEIN_HOST}/warmup", timeout=600)
+        if response.status_code == 200:
+            logger.info("[GPU Queue] Klein pipeline warm.")
+        else:
+            logger.warning(f"[GPU Queue] Klein /warmup returned status {response.status_code}.")
+    except Exception as e:
+        logger.warning(f"[GPU Queue] Klein warmup failed (will cold-start on first request): {e}")
+
 def evict_ollama():
     """Unloads active models from all Ollama hosts (primary + secondary) via keep_alive=0.
     Both hosts must be evicted — large models run on SECONDARY_OLLAMA_HOST (Lovelace) which
-    shares physical GPUs with ComfyUI. Evicting only OLLAMA_HOST (Turing, no GPU) is a no-op."""
+    shares physical GPUs with ComfyUI. Evicting only OLLAMA_HOST (Turing, no GPU) is a no-op.
+    Polls /api/ps after eviction to confirm VRAM is actually free before returning."""
     hosts_to_evict = [OLLAMA_HOST]
     if SECONDARY_OLLAMA_HOST and SECONDARY_OLLAMA_HOST != OLLAMA_HOST:
         hosts_to_evict.append(SECONDARY_OLLAMA_HOST)
@@ -214,19 +241,39 @@ def evict_ollama():
         try:
             logger.info(f"[GPU Queue] Evicting Ollama models from VRAM on {host}...")
             ps_resp = requests.get(f"{host}/api/ps", timeout=5)
-            if ps_resp.status_code == 200:
-                models = ps_resp.json().get("models", [])
-                if not models:
-                    logger.info(f"[GPU Queue] No active models on {host} to evict.")
-                    continue
-                for model in models:
-                    model_name = model.get("name")
-                    logger.info(f"[GPU Queue] Unloading {model_name} from {host}")
+            if ps_resp.status_code != 200:
+                logger.warning(f"[GPU Queue] Could not reach Ollama /api/ps on {host}, skipping.")
+                continue
+
+            models = ps_resp.json().get("models", [])
+            if not models:
+                logger.info(f"[GPU Queue] No active models on {host} to evict.")
+                continue
+
+            for model in models:
+                model_name = model.get("name")
+                logger.info(f"[GPU Queue] Unloading {model_name} from {host}")
+                try:
                     requests.post(f"{host}/api/generate", json={
                         "model": model_name,
                         "keep_alive": 0
-                    }, timeout=5)
-                logger.info(f"[GPU Queue] Ollama VRAM evicted on {host}.")
+                    }, timeout=10)
+                except Exception as e:
+                    logger.warning(f"[GPU Queue] keep_alive=0 request timed out for {model_name} on {host}: {e}")
+
+            # Poll /api/ps until models list is empty — unload is async, VRAM needs time to free
+            deadline = time.time() + 20
+            while time.time() < deadline:
+                time.sleep(2)
+                try:
+                    check = requests.get(f"{host}/api/ps", timeout=3)
+                    if check.status_code == 200 and not check.json().get("models", []):
+                        logger.info(f"[GPU Queue] Ollama VRAM confirmed free on {host}.")
+                        break
+                except Exception:
+                    break
+            else:
+                logger.warning(f"[GPU Queue] Ollama VRAM may not be fully free on {host} after 20s — proceeding anyway.")
         except Exception as e:
             logger.warning(f"[GPU Queue] Failed to evict Ollama VRAM on {host}: {e}")
 
@@ -269,15 +316,18 @@ def request_lock(context: str, timeout: int = 300):
         if current_zone != context:
             logger.info(f"[GPU Queue] Context switch detected: '{current_zone}' -> '{context}'. Prepping VRAM...")
             if context == "text":
-                # Switching to text -> we need VRAM for coding models. Dump ComfyUI.
+                # Switching to text -> evict image backends so Ollama can use both GPUs.
                 evict_comfyui()
+                evict_klein()
             elif context == "image":
-                # Switching to image -> we need VRAM for Flux/Forge. Dump Ollama.
+                # Switching to image -> evict Ollama, then warm Klein before the job lands.
                 evict_ollama()
+                warmup_klein()
             elif context == "training":
                 # Training needs exclusive VRAM — evict everything
                 evict_ollama()
                 evict_comfyui()
+                evict_klein()
             else:
                 logger.warning(f"[GPU Queue] Unknown context '{context}'.")
 

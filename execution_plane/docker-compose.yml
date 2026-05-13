@@ -183,6 +183,7 @@ services:
       - OPENHANDS_URL=http://openhands:3000
       - OPENHANDS_API_KEY=sk-sandbox-local
       - COMFYUI_HOST=http://comfyui_gpu:8188
+      - KLEIN_HOST=http://klein_service:8189
       - "VALID_API_KEYS={\"sk-coder-identity\": \"coding_user\", \"sk-devops-identity\": \"devops_user\"}"
       # Open Design daemon (LAN-accessible from agent_runtime on same execution_net)
       - OPEN_DESIGN_URL=http://open_design:7456
@@ -274,13 +275,49 @@ services:
     labels:
       - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/image-training-worker"
 
-  # --- COMFYUI (Creature Minsky) ---
+  # --- KLEIN INFERENCE SERVICE (FLUX.2 Klein 9B via Diffusers, dual-GPU) ---
+  klein_service:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile.klein
+    image: home-ai-lab/klein-service:latest
+    container_name: klein_service
+    restart: always
+    env_file:
+      - ../network.env
+    environment:
+      - KLEIN_MODEL_ID=${KLEIN_MODEL_ID:-black-forest-labs/FLUX.2-klein-9B}
+      - OUTPUT_DIR=/output
+      - HF_HOME=/model_cache
+      # GPU 0 has ~12 GB occupied by Windows host/display overhead on this machine.
+      # Leave 3 GiB for model layers; GPU 1 carries the bulk (15 GiB).
+      # device_map="auto" fills GPU 0 first (3 GiB), then GPU 1 (15 GiB) = 18 GiB total.
+      - KLEIN_GPU0_MEM=3GiB
+      - KLEIN_GPU1_MEM=15GiB
+    volumes:
+      - C:/Users/panca/Documents/ComfyUI_app/output:/output:rw
+      - klein_model_cache:/model_cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0', '1']
+              capabilities: [gpu]
+    ports:
+      - "8290:8189"
+    networks:
+      execution_net:
+        aliases:
+          - klein_service
+
+  # --- COMFYUI (Creature Minsky — specialized workflows: LoRA, 3D, action figures) ---
   comfyui:
     image: comfyui:blackwell-sm120
     container_name: comfyui_gpu
     hostname: comfyui
     restart: always
-    command: ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", "--highvram"]
+    command: ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", "--highvram", "--disable-cuda-malloc"]
     ports:
       - "8188:8188"
     volumes:
@@ -712,6 +749,7 @@ networks:
 volumes:
   bmo_models:
   ollama_models:
+  klein_model_cache:
   vscode_config_devops:
   vscode_config_coding:
   database_authentik:
