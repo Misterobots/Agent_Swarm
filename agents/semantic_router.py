@@ -1,4 +1,4 @@
-﻿from phi.agent import Agent, RunResponse
+from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 import json
 import os
@@ -8,12 +8,13 @@ import logging
 _router_logger = logging.getLogger("SemanticRouter")
 
 # ---------------------------------------------------------------------------
-# Keyword Fast-Path: Regex patterns that bypass the LLM router entirely.
-# Ordered by expected frequency. Each tuple: (compiled regex, intent, base confidence).
-# The LLM is only called when no pattern matches (ambiguous/complex inputs).
+# Keyword Fast-Path: Reserved for genuinely unambiguous, single-intent signals
+# whose vocabulary cannot appear in a different-intent context.
+# Everything else goes to the LLM router so confidence scores are real.
+# Each tuple: (compiled regex, intent, base confidence).
 # ---------------------------------------------------------------------------
 _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
-    # VISION — user is asking to look at an image they provide
+    # VISION — user is asking to look at an image they already have
     (re.compile(
         r"what do you see|describe this image|analyze this image|what is in this picture"
         r"|read this screenshot|ocr|identify.*image|what'?s happening in this photo"
@@ -21,123 +22,30 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
         re.I,
     ), "VISION", 0.92),
 
-    # ACTION_FIGURE — very specific keywords (checked before 3D/IMAGE)
+    # ACTION_FIGURE — highly domain-specific vocabulary, no overlap with other intents
     (re.compile(
         r"action figure|posable|ball joint|figurine|poseable|articulated figure|3d print figure",
         re.I,
     ), "ACTION_FIGURE", 0.95),
 
-    # IMAGE — generate visual art
-    (re.compile(
-        r"\b(draw|paint|generate\s+(an?\s+)?image|picture of|illustration of|concept art of"
-        r"|create\s+(an?\s+)?image|make\s+(an?\s+)?image|render\s+(an?\s+)?image)\b",
-        re.I,
-    ), "IMAGE", 0.90),
-
-    # 3D — generate 3D geometry/meshes
-    (re.compile(
-        r"\b(3d model|mesh|\.glb|\.obj|forge|blender model|3d generate)\b",
-        re.I,
-    ), "3D", 0.90),
-
-    # IOT_CONTROL — smart home commands
+    # IOT_CONTROL — smart home commands; verb + device phrasing is unambiguous
     (re.compile(
         r"\b(turn (on|off)|lights?\s+(on|off)|set (temperature|thermostat)|unlock\b"
         r"|home assistant|(run|activate|trigger)\s+scene\b)",
         re.I,
     ), "IOT_CONTROL", 0.92),
 
-    # IOT_DEV — firmware / embedded development
+    # IOT_DEV — firmware / embedded; vocabulary never appears in general prompts
     (re.compile(
         r"\b(wokwi|flash esp32|compile firmware|mqtt|arduino|simulate circuit)\b",
         re.I,
     ), "IOT_DEV", 0.90),
 
-    # TRAIN — teaching system new rules
+    # TRAIN — explicit system-teaching directives
     (re.compile(
         r"\b(remember that|learn this|correction:|from now on|teach you)\b",
         re.I,
     ), "TRAIN", 0.92),
-
-    # DEVOPS — infrastructure, Docker, servers
-    (re.compile(
-        r"\b(docker(?:file|-compose)?|kubernetes|k8s|deploy|nginx|systemd|firewall"
-        r"|pipeline|bash script|ci/?cd|terraform|ansible|server config"
-        r"|compose (up|down|build|restart)|helm)\b",
-        re.I,
-    ), "DEVOPS", 0.88),
-
-    # CODE — software engineering (must explicitly request building/writing code)
-    (re.compile(
-        r"\b(write\s+(a\s+)?script|fix\s+(the\s+)?bug|implement\s+|refactor\b"
-        r"|write\s+(a\s+)?(function|class|module|program|api)|debug\s+this"
-        r"|code\s+(this|that|it)|create\s+(a\s+)?(script|app|program)"
-        r"|build\s+(me\s+)?(a\s+)?(\w+\s+){0,3}(app|application|script|program|tool|service|api|website|bot|game|extension|plugin|cli|library)"
-        r"|develop\s+(a\s+)?(app|application|script|program|feature|tool|service|api|website|bot|game)"
-        r"|work\s+on\s+(improving|fixing|updating|the)\s+(\w+\s+){0,3}(code|implementation|logic|script|module|service|feature|function)"
-        r"|improve\s+(the\s+)?(\w+\s+){0,3}(code|implementation|logic|script|module|service|feature|function)"
-        r"|(?:let'?s|can\s+you|help\s+me)\s+(fix|update|improve|refactor|optimize|rewrite)\s+(\w+\s+){0,4}(code|implementation|script|module|function|class|service|feature))\b",
-        re.I,
-    ), "CODE", 0.88),
-
-    # DATA — SQL, analytics, data processing
-    (re.compile(
-        r"\b(sql\s+query|analyze\s+data|csv|dataframe|pandas|statistics|aggregate"
-        r"|chart|polars|write\s+a\s+query)\b",
-        re.I,
-    ), "DATA", 0.88),
-
-    # CREATIVE — fiction, scene/story/description writing, creative prompts
-    (re.compile(
-        r"\b(write\s+a\s+(scene|story|description|narrative|poem|script|dialogue|character|lore|legend|myth)"
-        r"|describe\s+(a\s+)?(scene|character|place|moment|battle|fight|setting|world)"
-        r"|vivid\s+(description|scene|depiction|detail)"
-        r"|detailed\s+description\s+of"
-        r"|creative\s+(writing|fiction|story|prompt)"
-        r"|set\s+in\s+the\s+(universe|world|setting)\s+of"
-        r"|shadowrun|cyberpunk|fantasy\s+(scene|setting|world)"
-        r"|roleplay|role-?play|fan.?fic|fanfic|worldbuilding)\b",
-        re.I,
-    ), "CREATIVE", 0.88),
-
-    # RESEARCH — deep knowledge / analysis
-    # Confidence deliberately low (0.72): single words like "research" appear in many
-    # non-research prompts. Falls below the 0.80 confidence gate → triggers clarification
-    # unless a more specific pattern (e.g. CREATIVE) already matched first.
-    (re.compile(
-        r"\b(research\b|deep\s+dive|history\s+of|literature\s+review|what\s+caused"
-        r"|compare\s+and\s+(contrast|analyze)|academic|multi-source)\b",
-        re.I,
-    ), "RESEARCH", 0.72),
-
-    # DOCUMENTATION — rewriting, formatting, summarizing
-    (re.compile(
-        r"\b(rewrite|summarize\s+(this|the)|format\s+(this|the)\s+(document|markdown)"
-        r"|write\s+a\s+(guide|readme|doc)|technical\s+writing)\b",
-        re.I,
-    ), "DOCUMENTATION", 0.85),
-
-    # COORDINATE — complex multi-step orchestration
-    (re.compile(
-        r"\b(plan\s+and\s+build|coordinate|multi-?step|build\s+a\s+full"
-        r"|end-?to-?end|full\s+stack|set\s+up\s+a\s+system|design\s+and\s+implement)\b",
-        re.I,
-    ), "COORDINATE", 0.85),
-    
-    # ANTI-COORDINATE: Simple list requests should NOT trigger multi-agent coordination
-    (re.compile(
-        r"\b(list|show|what)\s+(tools?|files?|capabilities|access|have)\b"
-        r"|\b(provide|give)\s+(a\s+)?(succinct|brief|short|quick|simple)\s+(list|summary)\b",
-        re.I,
-    ), "CONVERSATION", 0.92),
-
-    # CONVERSATION — greetings, meta-questions, casual chat (broad catch)
-    (re.compile(
-        r"^(hi|hello|hey|howdy|yo|sup|good\s+(morning|evening|afternoon))\b"
-        r"|what (can you|are your|do you)\s+(do|capabilities|access|have)"
-        r"|who are you|tell me about yourself|how do you work|help me understand you",
-        re.I,
-    ), "CONVERSATION", 0.90),
 ]
 
 
@@ -149,10 +57,10 @@ class SemanticRouter:
         from utils.gpu_queue import select_available_model
         _preferred = os.getenv("ROUTER_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:8b"))
         self.model_name, self.host = select_available_model(_preferred, ["qwen3:8b"])
-        
+
         # Self-Healing: Ensure model exists before Agent init
         self.ensure_model(self.model_name)
-        
+
         self.agent = Agent(
             name="Semantic Router",
             model=Ollama(id=self.model_name, host=self.host, client_kwargs={"timeout": 300.0}),
@@ -160,10 +68,10 @@ class SemanticRouter:
             instructions="""
             You are the Frontal Cortex of the AI Swarm. Your GOAL is to function as a strict Intent Classifier.
             Analyze the User's input and select exactly ONE category.
-            
+
             **CONTEXTUAL ANALYSIS RULES**:
             If the input contains "Original Request", "System Question", and "User Answer", merge the "User Answer" into the "Original Request" context to deduce the final intent.
-            
+
             CATEGORIES:
             1. **CONVERSATION**: Greetings, casual chat, small talk, simple factual questions, meta-questions about the AI system itself, simple list requests, or anything social in nature. Default for any message that is unclear but does not require specialized tools. ALWAYS use this for requests to "list", "show", "what tools", "what files", "what access" especially if user adds "succinct", "brief", "quick", or "short". (Keywords: "hello", "hi", "how are you", "what is", "tell me about", "who are you", "what can you do", "what do you have access to", "what files do you have", "what tools", "what are your capabilities", "tell me about yourself", "how do you work", "help me understand you", "list the", "show me", "succinct", "brief", "quick list")
             2. **CODE**: Software engineering, writing scripts (Python/JS/etc.), debugging, fixing errors, building apps, or improving existing code. The user must be asking you to BUILD, WRITE, FIX, DEBUG, MODIFY, IMPROVE, OPTIMIZE, or WORK ON software — not merely asking about files or capabilities. (Keywords: "write script", "fix bug", "function", "develop", "code", "implement", "refactor", "improve the code", "work on the code", "optimize", "enhance", "update the implementation")
@@ -214,16 +122,16 @@ class SemanticRouter:
                 # Check for exact match or formatted match
                 if any(model_name in m for m in models):
                     return # Model exists
-            
+
             # 2. Pull if missing
             print(f"--- [Router] Model '{model_name}' missing. Auto-pulling... ---")
             pull_res = requests.post(f"{self.host}/api/pull", json={"name": model_name, "stream": False})
-            
+
             if pull_res.status_code == 200:
                 print(f"--- [Router] Successfully pulled '{model_name}'. ---")
             else:
                 print(f"--- [Router] Failed to pull '{model_name}': {pull_res.text} ---")
-                
+
         except Exception as e:
             print(f"--- [Router] Self-Healing Failed: {e} ---")
 
@@ -263,7 +171,7 @@ class SemanticRouter:
 
         _router_logger.info(f"[Router] No fast-path match — falling back to LLM router")
         max_retries = 2
-        
+
         for attempt in range(max_retries):
             try:
                 # Provide a sharper prompt on retry
@@ -273,27 +181,27 @@ class SemanticRouter:
                     prompt = f"Input: {user_input}\n\nWARNING: Your previous classification was AMBIGUOUS or had low confidence (< 0.6). Please re-evaluate carefully using strict logical deduction. Ensure you provide a distinct categorization. If truly ambiguous, you MUST provide a disambiguation_question."
 
                 response: RunResponse = self.agent.run(prompt)
-                
+
                 # Parse JSON
                 content = response.content
                 if "```json" in content:
                     content = content.replace("```json", "").replace("```", "")
-                
+
                 decision = json.loads(content.strip())
                 confidence = float(decision.get("confidence", 0.0))
-                
+
                 # Success criteria: High confidence and not explicitly ambiguous
                 if confidence >= 0.75 and decision.get("intent") != "AMBIGUOUS":
                     return decision
-                    
+
             except Exception as e:
                 error_str = str(e)
                 print(f"[Router Error - Attempt {attempt+1}] {error_str}")
-                
+
                 if "404" in error_str and "not found" in error_str:
                     return {
                         "intent": "RESEARCH",
-                        "confidence": 0.0, 
+                        "confidence": 0.0,
                         "reasoning": f"CRITICAL: Model '{self.model_name}' missing. Please run 'ollama pull {self.model_name}'"
                     }
 
@@ -311,5 +219,4 @@ def get_semantic_router() -> SemanticRouter:
     if _router_instance is None:
         _router_instance = SemanticRouter()
     return _router_instance
-
 
