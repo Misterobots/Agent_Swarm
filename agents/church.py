@@ -749,7 +749,13 @@ def chat_swarm(
         _lower = user_input.lower()
         if _is_explicit_train_request(user_input) and intent != "TRAIN":
             intent = "TRAIN"; confidence = 0.98; reasoning = "Keyword override: explicit training directive"
-        if any(kw in _lower for kw in ["generate image", "generate an image", "create image", "create an image", "make image", "make an image", "draw", "paint", "generate art", "create art"]) and intent not in ("IMAGE", "ACTION_FIGURE"):
+        import re as _re_img
+        _IMAGE_KW_PATTERN = _re_img.compile(
+            r"\b(generate\s+an?\s+image|create\s+an?\s+image|make\s+an?\s+image"
+            r"|draw|paint|generate\s+art|create\s+art)\b",
+            _re_img.I,
+        )
+        if _IMAGE_KW_PATTERN.search(_lower) and intent not in ("IMAGE", "ACTION_FIGURE", "CREATIVE"):
             intent = "IMAGE"; confidence = 0.95; reasoning = "Keyword override: image generation keywords"
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
             intent = "ACTION_FIGURE"; confidence = 0.95; reasoning = "Keyword override: action figure keywords"
