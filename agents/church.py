@@ -745,29 +745,17 @@ def chat_swarm(
         routing_decision = locals().get("routing_decision", {})
         constraint_context = _extract_constraint_context(history, user_input)
 
-        # Keyword overrides
+        # Keyword overrides — kept minimal; only genuinely unambiguous signals
         _lower = user_input.lower()
         if _is_explicit_train_request(user_input) and intent != "TRAIN":
             intent = "TRAIN"; confidence = 0.98; reasoning = "Keyword override: explicit training directive"
-        import re as _re_img
-        _IMAGE_KW_PATTERN = _re_img.compile(
-            r"\b(generate\s+an?\s+image|create\s+an?\s+image|make\s+an?\s+image"
-            r"|draw|paint|generate\s+art|create\s+art)\b",
-            _re_img.I,
-        )
-        if _IMAGE_KW_PATTERN.search(_lower) and intent not in ("IMAGE", "ACTION_FIGURE", "CREATIVE"):
-            intent = "IMAGE"; confidence = 0.95; reasoning = "Keyword override: image generation keywords"
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
             intent = "ACTION_FIGURE"; confidence = 0.95; reasoning = "Keyword override: action figure keywords"
-        _design_keywords = ["landing page", "saas landing", "mockup", "wireframe", "prototype", "design a", "design me a", "design the", "ui design", "ux design", "pitch deck", "slide deck", "presentation deck", "html slideshow", "dashboard design", "design dashboard", "design a dashboard", "mobile app design", "mobile ui", "app screen design", "web prototype", "html prototype"]
+        _design_keywords = ["landing page", "saas landing", "mockup", "wireframe", "prototype", "ui design", "ux design", "pitch deck", "slide deck", "presentation deck", "html slideshow", "dashboard design", "mobile app design", "mobile ui", "web prototype", "html prototype"]
         if any(kw in _lower for kw in _design_keywords) and intent not in ("IMAGE", "ACTION_FIGURE"):
             intent = "DESIGN"; confidence = 0.95; reasoning = "Keyword override: design/UI keywords"
         if _lower.strip().startswith("/standardize-doc"):
             intent = "DOC_STANDARDS"; confidence = 1.0; reasoning = "Slash command: /standardize-doc"
-        import re as _re
-        if intent not in ("COORDINATE", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "DEVOPS"):
-            if _re.search(r'\b(build|create|make)\b', _lower) and _re.search(r'\b(app|application|game|dashboard|site|website|tool|page|program|calculator)\b', _lower):
-                intent = "COORDINATE"; confidence = 0.92; reasoning = "Keyword override: build verb + artifact type"
         if intent == "CODE":
             intent = "COORDINATE"; confidence = max(confidence, 0.88); reasoning = "CODE promoted to COORDINATE"
 
@@ -780,6 +768,42 @@ def chat_swarm(
             intent = "CONVERSATION"; confidence = max(confidence, 0.75)
 
         yield _t(f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)")
+
+        # ---------------------------------------------------------------------------
+        # Confidence gate — when the router isn't sure, ask rather than guess wrong.
+        # Intents exempt: CONVERSATION and TRAIN are low-risk guesses; VISION and
+        # ACTION_FIGURE fast-paths are highly specific; DOC_STANDARDS is a slash cmd.
+        # ---------------------------------------------------------------------------
+        _CONFIDENCE_GATE = 0.80
+        _GATE_EXEMPT = frozenset({
+            "CONVERSATION", "TRAIN", "VISION", "ACTION_FIGURE", "DOC_STANDARDS", "AMBIGUOUS",
+        })
+        if confidence < _CONFIDENCE_GATE and intent not in _GATE_EXEMPT:
+            _disam_q = (
+                routing_decision.get("disambiguation_question")
+                or f"I want to make sure I handle this correctly — what would you like me to do?"
+            )
+            from brooks import save_pending_context as _save_amb
+            _save_amb(
+                {"type": "ambiguity_resolution", "prompt": user_input, "question": _disam_q},
+                session_id=session_id,
+                owner_id=owner_id,
+            )
+            yield _l(f"[Router] Confidence gate triggered: {intent} at {confidence:.0%} < {_CONFIDENCE_GATE:.0%}")
+            yield {"type": "clarification_card", "clarification": {
+                "question": _disam_q,
+                "context": f"I classified this as **{intent}** but I'm only {confidence:.0%} confident — I'd rather ask than get it wrong.",
+                "options": [
+                    {"label": "Generate an image", "value": "IMAGE", "description": "Render a visual using the AI art studio"},
+                    {"label": "Write creative content", "value": "CREATIVE", "description": "Stories, scene descriptions, fiction, lore"},
+                    {"label": "Research this topic", "value": "RESEARCH", "description": "Deep knowledge and analysis"},
+                    {"label": "Build / code something", "value": "COORDINATE", "description": "Apps, scripts, or complex tasks"},
+                    {"label": "Just answer me", "value": "CONVERSATION", "description": "Conversational response"},
+                ],
+                "allow_freetext": True,
+                "card_type": "ambiguity",
+            }}
+            return
 
         _fast_mode = (model == "hive-fast")
         if _fast_mode:

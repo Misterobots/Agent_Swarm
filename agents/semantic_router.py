@@ -101,11 +101,14 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
     ), "CREATIVE", 0.88),
 
     # RESEARCH — deep knowledge / analysis
+    # Confidence deliberately low (0.72): single words like "research" appear in many
+    # non-research prompts. Falls below the 0.80 confidence gate → triggers clarification
+    # unless a more specific pattern (e.g. CREATIVE) already matched first.
     (re.compile(
         r"\b(research\b|deep\s+dive|history\s+of|literature\s+review|what\s+caused"
         r"|compare\s+and\s+(contrast|analyze)|academic|multi-source)\b",
         re.I,
-    ), "RESEARCH", 0.85),
+    ), "RESEARCH", 0.72),
 
     # DOCUMENTATION — rewriting, formatting, summarizing
     (re.compile(
@@ -280,7 +283,7 @@ class SemanticRouter:
                 confidence = float(decision.get("confidence", 0.0))
                 
                 # Success criteria: High confidence and not explicitly ambiguous
-                if confidence >= 0.6 and decision.get("intent") != "AMBIGUOUS":
+                if confidence >= 0.75 and decision.get("intent") != "AMBIGUOUS":
                     return decision
                     
             except Exception as e:
