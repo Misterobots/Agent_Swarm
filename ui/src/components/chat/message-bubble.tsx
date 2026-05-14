@@ -184,7 +184,7 @@ interface MessageBubbleProps {
   onUseAlternativeModel?: (modelName: string) => void;
 }
 
-const COLLAPSE_THRESHOLD = 600;
+const COLLAPSE_THRESHOLD = 1200;
 
 function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
@@ -303,7 +303,7 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
           <>
             {/* Collapsible response body */}
             <div className="relative">
-              <div className={cn(isCollapsed && "max-h-[108px] overflow-hidden")}>
+              <div className={cn(isCollapsed && "max-h-[320px] overflow-hidden")}>
                 {message.content.includes(SWARM_MARKER) ? (
                   <SwarmResponseRenderer content={message.content} isStreaming={isStreaming} />
                 ) : (
@@ -361,7 +361,7 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
                   <div className="px-3 py-2 bg-[var(--chat-soft)]">
                     {message.turnMetadata && (
                       <div className="mb-2 flex items-center gap-2 flex-wrap">
-                        <div className="inline-flex items-center gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--chat-muted)]">
+                        <div className="inline-flex items-center gap-2 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1 text-[10px] tracking-wide text-[var(--chat-muted)]">
                           <span>Turn {message.turnMetadata.turnId.slice(0, 8)}</span>
                           {message.turnMetadata.agentName ? <span>{message.turnMetadata.agentName}</span> : null}
                         </div>
