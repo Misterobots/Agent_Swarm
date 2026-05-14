@@ -1,6 +1,9 @@
 import json
 import os
+import time
 import logging
+
+_CONTEXT_TTL_SECONDS = 1800  # 30 minutes — stale contexts corrupt fresh sessions
 
 # Define context directory within the agents directory
 CONTEXT_DIR = os.path.join(os.path.dirname(__file__), "context_sessions")
@@ -29,8 +32,9 @@ def save_pending_context(data: dict, session_id: str = "default", owner_id: str 
     """Save generic context dictionary scoped to a session and optional owner."""
     try:
         path = _context_file(session_id, owner_id=owner_id)
+        payload = {**data, "_saved_at": time.time()}
         with open(path, 'w') as f:
-            json.dump(data, f)
+            json.dump(payload, f)
         logger.info(
             "Saved pending context for session %s owner=%s: %s",
             session_id,
@@ -48,7 +52,10 @@ def save_pending_image_clarification(original_prompt: str, session_id: str = "de
     }, session_id=session_id, owner_id=owner_id)
 
 def get_pending_context(session_id: str = "default", owner_id: str | None = None):
-    """Retrieve pending context for a specific session and optional owner."""
+    """Retrieve pending context for a specific session and optional owner.
+
+    Returns None (and removes the file) if the context is older than _CONTEXT_TTL_SECONDS.
+    """
     path = _context_file(session_id, owner_id=owner_id)
     if not os.path.exists(path):
         return None
@@ -56,6 +63,20 @@ def get_pending_context(session_id: str = "default", owner_id: str | None = None
     try:
         with open(path, 'r') as f:
             data = json.load(f)
+
+        saved_at = data.pop("_saved_at", None)
+        if saved_at is None or (time.time() - saved_at) > _CONTEXT_TTL_SECONDS:
+            logger.warning(
+                "Pending context for session %s expired (%.0fs old) — discarding.",
+                session_id,
+                time.time() - saved_at,
+            )
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            return None
+
         return data
     except Exception as e:
         logger.error(f"Failed to load context: {e}")
