@@ -43,7 +43,7 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
     # IOT_CONTROL — smart home commands
     (re.compile(
         r"\b(turn (on|off)|lights?\s+(on|off)|set (temperature|thermostat)|unlock\b"
-        r"|home assistant|scene\s+\w+)",
+        r"|home assistant|(run|activate|trigger)\s+scene\b)",
         re.I,
     ), "IOT_CONTROL", 0.92),
 
