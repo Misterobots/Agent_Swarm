@@ -801,14 +801,15 @@ def generate_image(
 
     last_candidate: dict | None = None
 
-    # If Klein isn't loaded yet, evict Ollama first so it gets clean VRAM.
-    # This runs regardless of Redis availability — the GPU lock may skip evictions
-    # when Redis is down (fail-open), so we handle the transition here directly.
+    # If Klein isn't loaded yet, evict Ollama + ComfyUI first so both GPUs are clear.
+    # ComfyUI holds ~15 GiB on GPU 1; Klein needs that space for its balanced layout.
+    # This runs regardless of Redis availability (GPU lock fails open when Redis is down).
     if model_name in ("auto", "klein-9b") and not skip_refinement and not _klein_is_healthy():
         try:
-            from utils.gpu_queue import evict_ollama, warmup_klein
-            logger.info("[Creative Studio] Evicting Ollama to free VRAM, then loading Klein...")
+            from utils.gpu_queue import evict_ollama, evict_comfyui, warmup_klein
+            logger.info("[Creative Studio] Evicting Ollama + ComfyUI to free both GPUs for Klein...")
             evict_ollama()
+            evict_comfyui()
             warmup_klein()
         except Exception as e:
             logger.warning(f"[Creative Studio] Klein VRAM prep failed: {e}")
@@ -828,6 +829,14 @@ def generate_image(
         use_klein = model_name in ("auto", "klein-9b") and not skip_refinement
         if use_klein and _klein_is_healthy():
             logger.info("[Creative Studio] Routing to Klein service (FLUX.2 9B)")
+            # Always evict ComfyUI before generating via Klein. Klein's transformer+VAE
+            # live on physical GPU 1; ComfyUI also uses GPU 1 and may have reloaded since
+            # the last zone eviction. Without this, GPU 1 runs out of headroom mid-generation.
+            try:
+                from utils.gpu_queue import evict_comfyui as _evict_comfyui_pre
+                _evict_comfyui_pre()
+            except Exception as _e:
+                logger.warning(f"[Creative Studio] Pre-generation ComfyUI eviction failed: {_e}")
             klein_defaults = IMAGE_MODEL_REGISTRY["klein-9b"]["defaults"]
             enriched = refine_prompt(prompt, "FLUX_DEV")
             klein_output_dir = "/tmp/comfyui_images"
@@ -847,6 +856,24 @@ def generate_image(
             logger.warning("[Creative Studio] Klein generation failed — falling back to ComfyUI")
 
         # --- COMFYUI FALLBACK ---
+        # Evict Klein before ComfyUI — Klein's text encoders (~11 GB) occupy GPU 0,
+        # and its transformer+VAE (~9 GB) occupy GPU 1. ComfyUI only has device_ids=['1']
+        # (physical GPU 1, 15.93 GB) and FLUX alone exceeds that. Evict first, then
+        # redirect to SDXL so ComfyUI never attempts FLUX which would OOM on GPU 1.
+        if _klein_is_healthy():
+            try:
+                from utils.gpu_queue import evict_klein as _evict_klein
+                logger.info("[Creative Studio] Evicting Klein to free GPU 0 before ComfyUI...")
+                _evict_klein()
+            except Exception as e:
+                logger.warning(f"[Creative Studio] Klein eviction failed: {e}")
+
+        # FLUX cannot fit on ComfyUI's single GPU 1 (15.93 GB). When falling back from
+        # Klein (model_name auto/klein-9b), redirect to SDXL which fits comfortably.
+        if kwargs.get("model_name") in ("auto", "klein-9b"):
+            logger.info("[Creative Studio] Redirecting ComfyUI fallback from FLUX to sdxl-general (FLUX OOM on single GPU)")
+            kwargs = {**kwargs, "model_name": "sdxl-general"}
+
         for attempt in range(MAX_RETRIES + 1):
             if attempt > 0:
                 logger.info(f"--- [Creative Studio] Verification Failed. Retrying ({attempt}/{MAX_RETRIES})... ---")

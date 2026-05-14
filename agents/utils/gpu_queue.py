@@ -35,13 +35,20 @@ TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (2
 def _get_preferred_host(model_name: str) -> str:
     """
     Static hardware-aware routing (no health checks).
-    - Lovelace (SECONDARY): 2x 16GB VRAM (5060 Ti, 32GB total). Primary for all large models.
-    - Turing (OLLAMA_HOST): 8GB VRAM (3070 Ti). Small models, safety, and embeddings only.
 
-    Default: Lovelace. Only models that fit within Turing's 8GB VRAM route there.
+    Current topology (all execution-plane services run on Lovelace, 192.168.2.101):
+    - OLLAMA_HOST     = http://ollama:11434           → Lovelace local Ollama (2× 5060 Ti, 32GB)
+    - SECONDARY_OLLAMA_HOST = http://192.168.2.103:11434 → Turing (3070 Ti 8GB, currently offline)
+
+    Small models are sent directly to OLLAMA_HOST (Lovelace).
+    Large models try SECONDARY_OLLAMA_HOST (Turing) first; when Turing is offline the
+    health check in get_swarm_worker_host() falls back to OLLAMA_HOST (Lovelace).
+    Net effect: all traffic lands on http://ollama:11434 until Turing is back online.
     """
-    # Models confirmed to fit on Turing (≤8B params / safety / embeddings)
-    turing_safe = ["llama-guard", "nomic-embed", "qwen3:0", "qwen3:1", "qwen3:4", "qwen3:8b"]
+    # Models confirmed to fit on Turing (≤8B params / safety / embeddings).
+    # Use precise prefixes: "qwen3:1." matches "qwen3:1.7b" but NOT "qwen3:14b";
+    # "qwen3:4b" matches exactly; bare "qwen3:1" would be a substring of "qwen3:14b".
+    turing_safe = ["llama-guard", "nomic-embed", "qwen3:0.", "qwen3:1.", "qwen3:4b", "qwen3:8b"]
 
     if any(m in model_name for m in turing_safe):
         return OLLAMA_HOST
@@ -146,17 +153,29 @@ def get_swarm_worker_host(model_name: str) -> str:
         # Large model — Lovelace only; no round-robin to Turing (OOM risk)
         candidates = [SECONDARY_OLLAMA_HOST]
 
-    if len(candidates) == 1:
-        logger.debug(f"[GPU Round-Robin] Single eligible host for '{model_name}': {candidates[0]}.")
-        return candidates[0]
-
-    # Filter to healthy hosts; fall back to all candidates if health check fails
+    # Filter to healthy hosts
     try:
         from inference.node_health import get_node_monitor
         monitor = get_node_monitor()
         healthy = [h for h in candidates if monitor.is_healthy(h)]
     except Exception:
         healthy = []
+
+    if not healthy:
+        # All preferred candidates are down — fall back to primary host so
+        # swarm workers degrade gracefully instead of routing to a dead host.
+        # e.g. Turing (SECONDARY) offline → fall back to Lovelace Ollama container.
+        fallback_candidates = [h for h in [OLLAMA_HOST, SECONDARY_OLLAMA_HOST]
+                               if h and h not in candidates]
+        try:
+            monitor = get_node_monitor() if 'monitor' not in dir() else monitor
+            healthy = [h for h in fallback_candidates if monitor.is_healthy(h)]
+        except Exception:
+            healthy = []
+        if not healthy:
+            # Last resort: primary host unconditionally
+            logger.warning(f"[GPU Round-Robin] All hosts down for '{model_name}', fail-open to {OLLAMA_HOST}.")
+            return OLLAMA_HOST
 
     pool = healthy if healthy else candidates
 
@@ -166,6 +185,73 @@ def get_swarm_worker_host(model_name: str) -> str:
 
     logger.info(f"[GPU Round-Robin] Worker slot {idx}: '{model_name}' → {host} ({len(pool)} hosts in pool).")
     return host
+
+
+def select_available_model(preferred: str, fallbacks: list) -> tuple:
+    """
+    Pre-flight VRAM check with model fallback waterfall.
+
+    Returns (model_name, host) — the best model from the preference chain
+    that is currently available, prioritising models already hot in VRAM.
+
+    Strategy:
+      1. Any model in the chain already hot in VRAM → use it (no load latency)
+      2. Preferred model available on disk → accept cold-start cost
+      3. Any fallback on disk → use it rather than risk an OOM cold start
+      4. Last resort: return preferred + best host (let Ollama handle it)
+
+    Typical call:
+        model, host = select_available_model("qwen3:14b", ["qwen3:8b"])
+    """
+    try:
+        from inference.node_health import get_node_monitor
+        monitor = get_node_monitor()
+    except Exception:
+        host = get_best_host_for_model(preferred)
+        logger.warning(f"[GPU Queue] select_available_model: node monitor unavailable, using {preferred}.")
+        return preferred, host
+
+    chain = [preferred] + list(fallbacks)
+
+    # Pass 1: prefer anything already hot in VRAM (zero load cost)
+    for model in chain:
+        try:
+            loaded = monitor.get_hosts_with_model_loaded(model)
+        except Exception:
+            loaded = []
+        if loaded:
+            pref = _get_preferred_host(model)
+            host = pref if pref in loaded else loaded[0]
+            logger.info(f"[GPU Queue] Model waterfall: '{model}' hot in VRAM on {host}.")
+            return model, host
+
+    # Pass 2: preferred model on disk (accept cold start)
+    try:
+        avail = monitor.get_hosts_with_model(preferred)
+    except Exception:
+        avail = []
+    if avail:
+        pref = _get_preferred_host(preferred)
+        host = pref if pref in avail else avail[0]
+        logger.info(f"[GPU Queue] Model waterfall: '{preferred}' on disk at {host} (cold start).")
+        return preferred, host
+
+    # Pass 3: any fallback on disk
+    for model in fallbacks:
+        try:
+            avail = monitor.get_hosts_with_model(model)
+        except Exception:
+            avail = []
+        if avail:
+            pref = _get_preferred_host(model)
+            host = pref if pref in avail else avail[0]
+            logger.info(f"[GPU Queue] Model waterfall: fallback '{model}' on disk at {host}.")
+            return model, host
+
+    # Last resort
+    host = get_best_host_for_model(preferred)
+    logger.warning(f"[GPU Queue] Model waterfall: no model found in chain {chain}, using '{preferred}' on {host}.")
+    return preferred, host
 
 
 def is_training_window() -> bool:
@@ -192,10 +278,14 @@ LOCK_KEY = "swarm_gpu_lock"
 ZONE_KEY = "swarm_gpu_zone"  # Track whether VRAM is currently dedicated to "text", "image", or "training"
 
 def evict_comfyui():
-    """Sends a request to ComfyUI to completely dump its VRAM (models)."""
+    """Unloads ComfyUI model weights from VRAM (unload_models=True frees the checkpoint)."""
     try:
-        logger.info("[GPU Queue] Sending /free request to ComfyUI to evict VRAM...")
-        response = requests.post(f"{COMFYUI_HOST}/free", timeout=5)
+        logger.info("[GPU Queue] Evicting ComfyUI model weights from VRAM...")
+        response = requests.post(
+            f"{COMFYUI_HOST}/free",
+            json={"unload_models": True, "free_memory": True},
+            timeout=10,
+        )
         if response.status_code == 200:
             logger.info("[GPU Queue] ComfyUI VRAM evicted successfully.")
         else:
@@ -203,30 +293,102 @@ def evict_comfyui():
     except Exception as e:
         logger.warning(f"[GPU Queue] Failed to evict ComfyUI VRAM: {e}")
 
-def evict_klein():
-    """Fully unloads the Klein model weights from VRAM so Ollama can use both GPUs."""
+def _restart_container(name: str) -> bool:
+    """Restart a Docker container by name via the Docker Unix socket.
+
+    On WDDM (Windows), PyTorch's empty_cache() calls cudaFree but WDDM may
+    hold physical GPU pages in the process context indefinitely — even minutes
+    after the cache is cleared. Restarting the container destroys the CUDA
+    context, forcing WDDM to immediately return all physical pages to the pool.
+
+    Returns True if the restart succeeded, False otherwise.
+    """
+    import socket as _socket
     try:
-        logger.info("[GPU Queue] Evicting Klein model from VRAM...")
-        response = requests.post(f"{KLEIN_HOST}/evict", timeout=10)
+        s = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+        s.settimeout(15)
+        s.connect("/var/run/docker.sock")
+        req = f"POST /containers/{name}/restart HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        s.sendall(req.encode())
+        resp = b""
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            resp += chunk
+        s.close()
+        status_line = resp.split(b"\r\n")[0].decode(errors="replace")
+        # 204 No Content = success; 404 = container not found
+        if b"204" in resp[:50]:
+            logger.info(f"[GPU Queue] Container '{name}' restarted (WDDM VRAM released).")
+            return True
+        else:
+            logger.warning(f"[GPU Queue] Container restart returned: {status_line}")
+            return False
+    except Exception as e:
+        logger.warning(f"[GPU Queue] Could not restart container '{name}': {e}")
+        return False
+
+
+def evict_klein():
+    """Fully unloads the Klein model weights from VRAM so Ollama/ComfyUI can use both GPUs.
+
+    Two-phase eviction:
+    1. Graceful: POST /evict → Klein moves tensors to CPU + calls synchronize/empty_cache.
+    2. Hard: restart the container → destroys the CUDA context so WDDM immediately returns
+       the physical GPU pages (~9.7 GB text-encoder residual on GPU 0, ~9.1 GB transformer
+       residual on GPU 1). Without this, WDDM holds those pages in Klein's process context
+       indefinitely, causing the next Klein reload to map into system RAM instead of VRAM.
+    """
+    # Phase 1: graceful unload
+    try:
+        logger.info("[GPU Queue] Evicting Klein model from VRAM (graceful)...")
+        response = requests.post(f"{KLEIN_HOST}/evict", timeout=30)
         if response.status_code == 200:
-            logger.info("[GPU Queue] Klein VRAM evicted successfully.")
+            logger.info("[GPU Queue] Klein VRAM evicted (graceful phase complete).")
         else:
             logger.warning(f"[GPU Queue] Klein /evict returned status {response.status_code}.")
     except Exception as e:
-        logger.warning(f"[GPU Queue] Failed to evict Klein VRAM: {e}")
+        logger.warning(f"[GPU Queue] Graceful Klein eviction failed: {e}")
+
+    # Phase 2: container restart — frees WDDM-held physical pages
+    # Wait briefly for the graceful eviction to finish writing to CPU before restart.
+    time.sleep(2)
+    _restart_container("klein_service")
+
+    # Wait for Klein to come back up (FastAPI cold start without model load ≈ 5s).
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        time.sleep(2)
+        try:
+            h = requests.get(f"{KLEIN_HOST}/health", timeout=3).json()
+            if h.get("status") == "ok":
+                logger.info("[GPU Queue] Klein container back up after restart.")
+                break
+        except Exception:
+            pass
+
 
 def warmup_klein():
-    """Triggers Klein to pre-load its model into VRAM before generation starts."""
-    try:
-        logger.info("[GPU Queue] Warming up Klein pipeline...")
-        # 600s: first load from HF cache takes ~400s; subsequent loads ~60s
-        response = requests.post(f"{KLEIN_HOST}/warmup", timeout=600)
-        if response.status_code == 200:
-            logger.info("[GPU Queue] Klein pipeline warm.")
-        else:
-            logger.warning(f"[GPU Queue] Klein /warmup returned status {response.status_code}.")
-    except Exception as e:
-        logger.warning(f"[GPU Queue] Klein warmup failed (will cold-start on first request): {e}")
+    """Triggers Klein to pre-load its model into VRAM before generation starts.
+    Retries once after a WDDM grace delay — if the first attempt fails (e.g.
+    GPU 0 pages from a prior eviction not yet returned), wait 20s and retry."""
+    for attempt in range(2):
+        try:
+            logger.info(f"[GPU Queue] Warming up Klein pipeline (attempt {attempt + 1})...")
+            # 600s: first load from HF cache takes ~400s; subsequent loads ~60s
+            response = requests.post(f"{KLEIN_HOST}/warmup", timeout=600)
+            if response.status_code == 200:
+                logger.info("[GPU Queue] Klein pipeline warm.")
+                return
+            else:
+                logger.warning(f"[GPU Queue] Klein /warmup returned status {response.status_code}.")
+        except Exception as e:
+            logger.warning(f"[GPU Queue] Klein warmup attempt {attempt + 1} failed: {e}")
+
+        if attempt == 0:
+            logger.info("[GPU Queue] Klein warmup failed — waiting 20s for WDDM page reclaim, then retrying...")
+            time.sleep(20)
 
 def evict_ollama():
     """Unloads active models from all Ollama hosts (primary + secondary) via keep_alive=0.
@@ -320,8 +482,10 @@ def request_lock(context: str, timeout: int = 300):
                 evict_comfyui()
                 evict_klein()
             elif context == "image":
-                # Switching to image -> evict Ollama, then warm Klein before the job lands.
+                # Switching to image -> evict Ollama + ComfyUI to clear both GPUs,
+                # then warm Klein (needs GPU 1's full 15 GiB free to load).
                 evict_ollama()
+                evict_comfyui()
                 warmup_klein()
             elif context == "training":
                 # Training needs exclusive VRAM — evict everything

@@ -132,21 +132,51 @@ Templates support:
 - **Version tracking** for rollback
 - **Parameter overrides** per template
 
+## Router Architecture
+
+`church.py` is the main dispatch generator called by the API layer. It was refactored from a 3,173-line monolith into a **thin wrapper (~500 lines) + handler package** in May 2026. See [ADR-005](decisions/adr-005-church-handlers.md) for the full rationale.
+
+```
+agents/
+├── church.py                  # Thin wrapper — session init, routing, dispatch
+├── semantic_router.py         # Intent classification (Nemotron)
+├── intent_capabilities.py     # Intent → JWT-ACE capability mapping
+├── handlers/
+│   ├── base.py                # Shared emitters, Langfuse helpers, RAG utilities
+│   ├── architect.py           # Default code/arch — fast-pass or MarsRL
+│   ├── conversation.py        # CONVERSATION — 3-tier access
+│   ├── coordinate.py          # COORDINATE — Lamport multi-agent
+│   ├── devops.py              # DEVOPS, DATA, AMBIGUOUS
+│   ├── image.py               # IMAGE — Art Director + QC delivery
+│   ├── media.py               # 3D, ACTION_FIGURE
+│   ├── research.py            # RESEARCH, DOCUMENTATION, DOC_STANDARDS
+│   ├── design.py              # DESIGN — OpenDesign client
+│   ├── train.py               # TRAIN, IOT_CONTROL
+│   └── vision.py              # VISION — Moondream VLM
+└── routing/
+    └── gates.py               # Pending-context dispatch (9 multi-turn types)
+```
+
+Each handler is a **generator function** `handle_X(user_input: str, ctx: dict)` that yields SSE events. Shared state flows through the `ctx` dict built by `chat_swarm()`.
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
+| `agents/church.py` | Request handling, token issuance, intent dispatch |
+| `agents/handlers/` | One module per intent group |
+| `agents/routing/gates.py` | Multi-turn pending-context gates |
 | `agents/semantic_router.py` | Intent classification using Nemotron |
-| `agents/router.py` | Request handling, token issuance, agent dispatch |
-| `agents/coordinator.py` | Multi-worker orchestration |
+| `agents/coordination/` | Multi-worker orchestration (Lamport) |
 | `agents/mars_loop.py` | MarsRL verification pipeline |
 | `agents/expertise/template_registry.py` | Model/parameter resolution |
 | `agents/intent_capabilities.py` | Intent → capability mapping |
 
 ## Related
 
+- [ADR-005: church.py Handler Package](decisions/adr-005-church-handlers.md) — router refactor rationale
 - [Architecture: Data Flow](data-flow.md) — full request lifecycle
-- [Architecture: MarsRL](marsrl.md) — quality verification details
+- [Architecture: MarsRL](marsrl-deep-dive.md) — quality verification details
 - [Module: Router](../modules/router.md) — implementation reference
 - [Module: Coordinator](../modules/coordinator.md) — orchestration details
 - [Developer Guide: Adding Agents](../developer-guide/adding-agents.md) — create new agents

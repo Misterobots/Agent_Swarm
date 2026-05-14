@@ -32,6 +32,7 @@ COPY execution_plane/klein_service/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY execution_plane/klein_service/app.py .
+COPY execution_plane/klein_service/schnell_transformer_config.json .
 
 EXPOSE 8189
 

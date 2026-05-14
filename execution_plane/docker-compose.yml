@@ -70,7 +70,7 @@ services:
     environment:
       # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
-      - OLLAMA_NUM_PARALLEL=2          # Concurrent requests across 2 GPUs
+      - OLLAMA_NUM_PARALLEL=1          # 1 slot: KV cache halved so 14B models (~14.2 GB) fit on a 16 GB GPU
       - OLLAMA_KEEP_ALIVE=10m          # Unload after 10min idle; gpu_queue evicts immediately on context switch
     volumes:
       - ollama_models:/root/.ollama
@@ -208,8 +208,10 @@ services:
       - HOME_LON=${HOME_LON:--87.6298}
       - HOME_CITY=${HOME_CITY:-your area}
       # Heavy models — all served by Lovelace Ollama (2x 5060 Ti, 32GB combined)
+      # ROUTER_MODEL uses 8b: fits alongside Klein (22GB) so routing never blocks on VRAM.
+      # All execution models (coordinator, architect, workers) use 14b after Klein is evicted.
       - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
-      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:14b}
+      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
       - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
       - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
@@ -275,7 +277,7 @@ services:
     labels:
       - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/image-training-worker"
 
-  # --- KLEIN INFERENCE SERVICE (FLUX.2 Klein 9B via Diffusers, dual-GPU) ---
+  # --- KLEIN INFERENCE SERVICE (FLUX.1-schnell + Kijai FP8 transformer, dual-GPU) ---
   klein_service:
     build:
       context: ..
@@ -286,14 +288,11 @@ services:
     env_file:
       - ../network.env
     environment:
-      - KLEIN_MODEL_ID=${KLEIN_MODEL_ID:-black-forest-labs/FLUX.2-klein-9B}
+      - KLEIN_MODEL_ID=${KLEIN_MODEL_ID:-black-forest-labs/FLUX.1-schnell}
       - OUTPUT_DIR=/output
       - HF_HOME=/model_cache
-      # GPU 0 has ~12 GB occupied by Windows host/display overhead on this machine.
-      # Leave 3 GiB for model layers; GPU 1 carries the bulk (15 GiB).
-      # device_map="auto" fills GPU 0 first (3 GiB), then GPU 1 (15 GiB) = 18 GiB total.
-      - KLEIN_GPU0_MEM=3GiB
-      - KLEIN_GPU1_MEM=15GiB
+      # cuda:0 — CLIP + T5-XXL (~9.7 GB bfloat16)
+      # cuda:1 — FP8 transformer (~8.6 GB) + VAE (~0.5 GB)
     volumes:
       - C:/Users/panca/Documents/ComfyUI_app/output:/output:rw
       - klein_model_cache:/model_cache

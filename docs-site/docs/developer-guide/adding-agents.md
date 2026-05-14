@@ -10,10 +10,13 @@ How to create a new specialized agent in Memex.
 
 To add a new agent, you need:
 
-1. An agent class with a `run()` method
+1. An agent class or a handler generator function
 2. A new intent in the Semantic Router (or map to an existing one)
-3. Router dispatch wiring
-4. A JWT-ACE capability profile
+3. A handler module in `agents/handlers/`
+4. Router dispatch wiring in `church.py`
+5. A JWT-ACE capability profile
+
+> **Handler pattern**: Since the May 2026 refactor, all dispatch logic lives in `agents/handlers/<name>.py` as a generator function `handle_X(user_input: str, ctx: dict)`. `church.py` is a thin wrapper that calls `yield from handle_X(...)`. See [ADR-005](../architecture/decisions/adr-005-church-handlers.md).
 
 ## Step 1: Create the Agent
 
@@ -78,18 +81,59 @@ INTENTS = [
 
 Update the router prompt to include the new intent description.
 
-## Step 3: Wire Dispatch
+## Step 3: Create a Handler Module
 
-In `agents/router.py`, add the dispatch case:
+Create `agents/handlers/my_agent.py` as a generator:
 
 ```python
-# In the route_request() method:
-elif intent == "MY_INTENT":
-    from agents.specialized.my_agent import MyAgent
-    agent = MyAgent(self.config)
-    result = await agent.run(messages, session_id, token)
-    return result.response
+# agents/handlers/my_agent.py
+import logging
+from metrics import AGENT_STATE, WORKFLOW_STEPS
+from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace
+
+logger = logging.getLogger("Router")
+
+
+def handle_my_intent(user_input: str, ctx: dict):
+    """Generator — MY_INTENT handler."""
+    turn_id = ctx["turn_id"]
+    session_id = ctx["session_id"]
+    lf_trace = ctx["lf_trace"]
+    langfuse = ctx["langfuse"]
+    use_langfuse = ctx["use_langfuse"]
+
+    yield _emit_turn_metadata(turn_id, "MyAgent", ["thinking", "responding"])
+    yield _emit_stream_mode("thinking")
+    yield {"type": "status", "content": "⚙️ MyAgent: Running..."}
+    AGENT_STATE.labels(agent_name="MyAgent").set(2)
+
+    from specialized.my_agent import MyAgent
+    agent = MyAgent()
+
+    try:
+        result = agent.run(user_input)
+        yield {"type": "response", "content": result}
+        _score_trace(lf_trace, langfuse, 1.0, output=result, use_langfuse=use_langfuse)
+    except Exception as e:
+        yield {"type": "error", "content": f"MyAgent error: {e}"}
+        _score_trace(lf_trace, langfuse, 0.0, use_langfuse=use_langfuse)
+
+    AGENT_STATE.labels(agent_name="MyAgent").set(1)
+    WORKFLOW_STEPS.labels(status="success", agent_type="MyAgent").inc()
 ```
+
+## Step 4: Wire Dispatch in church.py
+
+In `agents/church.py`, add the dispatch case to the handler dispatch block:
+
+```python
+if intent == "MY_INTENT":
+    from handlers.my_agent import handle_my_intent
+    yield from handle_my_intent(user_input, ctx)
+    return
+```
+
+The `ctx` dict is already built by `chat_swarm()` — it carries session state, history, Langfuse handles, MarsRL tuning params, and everything else the handler needs.
 
 ## Step 4: Define Capabilities
 
