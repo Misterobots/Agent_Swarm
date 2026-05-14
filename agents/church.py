@@ -1,9 +1,21 @@
-﻿from phi.agent import Agent, RunResponse
+"""
+church.py — Router thin wrapper.
+
+All intent handlers live in agents/handlers/<name>.py.
+Pending-context dispatch lives in agents/routing/gates.py.
+
+Public API preserved:
+  handle_task_event(event)
+  chat_swarm(user_input, ...)
+  get_best_host_for_model(model)  — re-exported from gpu_queue
+  run_swarm(user_input)
+"""
+
+from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 from leibniz_agent import get_architect_agent
 from security_agent import get_security_agent
 
-# MarsRL Loop — Solver → Verifier → Corrector
 from mars_loop import MarsRLLoop, mars_loop_stream
 from verifier_agent import get_verifier
 from dijkstra_agent import get_corrector
@@ -44,7 +56,6 @@ except ImportError:
     ANTHROPIC_MODEL = ""
     logger.debug("[Router] Anthropic provider not loaded")
 
-# Shared storage for conversationalist sessions (same pattern as architect_agent)
 _conv_storage = PgAgentStorage(
     table_name="conversation_sessions",
     db_url=AGNO_DB_URL,
@@ -82,12 +93,29 @@ except ImportError as e:
     AB_TESTING_AVAILABLE = False
     logger.warning(f"[Router] A/B testing not available: {e}")
 
+# --- Langfuse Tracing ---
+try:
+    from langfuse import Langfuse, observe
+
+    langfuse = Langfuse(
+        secret_key=os.getenv("LANGFUSE_SECRET_KEY", "sk-lf-dev"),
+        public_key=os.getenv("LANGFUSE_PUBLIC_KEY", "pk-lf-dev"),
+        host=os.getenv("LANGFUSE_HOST", "http://localhost:3001"),
+    )
+    USE_LANGFUSE = True
+    logger.info("[Router] Langfuse tracing enabled")
+except ImportError:
+    USE_LANGFUSE = False
+    observe = lambda *args, **kwargs: lambda f: f
+    logger.warning("[Router] Langfuse not available, tracing disabled")
+
+
+# ---------------------------------------------------------------------------
+# Template / A/B model resolution
+# ---------------------------------------------------------------------------
+
 def _resolve_model_for_intent(intent: str, fallback_model: str) -> str:
-    """
-    Look up the default_model from the ExpertiseTemplate registry for a given intent.
-    If an active A/B test exists for the template, probabilistically route to candidate.
-    Falls back to the provided default if templates are unavailable or no match found.
-    """
+    """Look up the default model from the ExpertiseTemplate registry for a given intent."""
     if not TEMPLATES_AVAILABLE:
         return fallback_model
     try:
@@ -97,153 +125,98 @@ def _resolve_model_for_intent(intent: str, fallback_model: str) -> str:
             resolved = templates[0].default_model
             template_id = templates[0].id
             logger.debug(f"[Router] Template resolved model for {intent}: {resolved}")
-
-            # A/B test hook: check for active test and probabilistically route
             if AB_TESTING_AVAILABLE:
                 try:
                     ab_mgr = get_ab_manager()
                     resolved = ab_mgr.route_model(template_id, resolved)
                 except Exception as e:
                     logger.debug(f"[Router] A/B routing check failed: {e}")
-
             return resolved
     except Exception as e:
         logger.debug(f"[Router] Template model lookup failed for {intent}: {e}")
     return fallback_model
 
 
-# --- Langfuse Tracing ---
-try:
-    from langfuse import Langfuse, observe
-    import os
-    
-    langfuse = Langfuse(
-        secret_key=os.getenv("LANGFUSE_SECRET_KEY", "sk-lf-dev"),
-        public_key=os.getenv("LANGFUSE_PUBLIC_KEY", "pk-lf-dev"),
-        host=os.getenv("LANGFUSE_HOST", "http://localhost:3001")
-    )
-    USE_LANGFUSE = True
-    logger.info("[Router] Langfuse tracing enabled")
-except ImportError:
-    USE_LANGFUSE = False
-    observe = lambda *args, **kwargs: lambda f: f  # No-op decorator
-    logger.warning("[Router] Langfuse not available, tracing disabled")
+# ---------------------------------------------------------------------------
+# JWT-ACE helpers
+# ---------------------------------------------------------------------------
 
-@observe(name="handle_task_event")  # Langfuse traces this function
+@observe(name="handle_task_event")
 def handle_task_event(event: Event):
-    """
-    Callback for Dispatcher.
-    Unwraps event and runs the swarm.
-    Traced by Langfuse for observability.
-    """
+    """Callback for Dispatcher. Unwraps event and runs the swarm."""
     print(f"DEBUG ROUTER: handle_task_event called with payload keys: {event.payload.keys()}")
     user_input = event.payload.get("task")
-    intent = event.payload.get("intent", "DEFAULT") # From Dispatcher
+    intent = event.payload.get("intent", "DEFAULT")
     target_device = event.payload.get("target_device", "auto")
     session_id = event.payload.get("session_id", "default_session")
     owner_id = event.payload.get("owner_id")
 
     if not user_input:
         return
-    
-    # Enrich the current Langfuse trace (created by @observe decorator)
+
     if USE_LANGFUSE and langfuse:
         try:
-            langfuse.update_current_span(
-                metadata={
-                    "intent": intent,
-                    "target_device": target_device,
-                    "session_id": session_id,
-                    "owner_id": owner_id,
-                }
-            )
+            langfuse.update_current_span(metadata={
+                "intent": intent, "target_device": target_device,
+                "session_id": session_id, "owner_id": owner_id,
+            })
         except Exception as e:
             logger.warning(f"[Router] Trace update failed: {e}")
-        
+
     logger.info(f"--- [Router] Processing Async Event: {user_input} (Intent: {intent}) ---")
 
     try:
         if intent == "VISION":
-            # Direct Route to VLM for image analysis
-            logger.info(f"[Router] Routing to Vision Analyst (moondream)")
-            # Vision requires image data in the payload; without it, log and skip
             image_data = event.payload.get("image_data")
             if not image_data:
                 logger.info("[Vision] No image data attached to async task — skipping VLM call")
-                # Fall through to Orchestrator for a text-based response
                 from teams import get_orchestrator
                 orchestrator = get_orchestrator()
                 response = orchestrator.run(user_input)
                 logger.info(f"[Orchestrator] Final Response: {response.content}")
             else:
                 vision_host = get_best_host_for_model("moondream:latest")
-                payload = {
-                    "model": "moondream:latest",
-                    "prompt": user_input,
-                    "images": [image_data],
-                    "stream": False
-                }
+                payload = {"model": "moondream:latest", "prompt": user_input, "images": [image_data], "stream": False}
                 res = requests.post(f"{vision_host}/api/generate", json=payload, timeout=120)
                 if res.status_code == 200:
-                    analysis = res.json().get("response", "No analysis returned.")
-                    logger.info(f"[Vision] Analysis: {analysis}")
+                    logger.info(f"[Vision] Analysis: {res.json().get('response', 'No analysis returned.')}")
                 else:
                     logger.error(f"[Vision] VLM returned status {res.status_code}")
 
         elif intent == "3D":
-             # Direct Route to 3D Pipeline
-             from specialized.image_gen import generate_image
-             # ... (Add 3D logic if needed, or just use image gen for concept art first)
-             logger.info("[Router] Routing to 3D Pipeline (starting with concept art)...")
-             with request_lock(context="image"):
-                 response = generate_image(f"Concept art for 3d modeling: {user_input}", target_device=target_device)
-             logger.info(f"[3D] Concept Art Result: {response}")
-             # trigger forge here if implemented
+            from specialized.image_gen import generate_image
+            logger.info("[Router] Routing to 3D Pipeline (starting with concept art)...")
+            with request_lock(context="image"):
+                response = generate_image(f"Concept art for 3d modeling: {user_input}", target_device=target_device)
+            logger.info(f"[3D] Concept Art Result: {response}")
 
         elif intent == "COORDINATE":
-            # Multi-worker orchestration via Lamport Mode
             from lamport import coordinate_task
             logger.info(f"[Router] Routing to Lamport Mode (async path)")
-            for update in coordinate_task(
-                user_input=user_input,
-                session_id=session_id,
-                owner_id=owner_id,
-                ultraplan_mode=False,  # Legacy dispatcher path doesn't have ultraplan_mode
-            ):
+            for update in coordinate_task(user_input=user_input, session_id=session_id, owner_id=owner_id, ultraplan_mode=False):
                 if update.get("type") == "response":
                     logger.info(f"[Coordinator] Final: {update['content'][:200]}")
                 elif update.get("type") == "error":
                     logger.error(f"[Coordinator] Error: {update['content']}")
-             
+
         else:
-            # Default: Orchestrator with session persistence
             from teams import get_orchestrator
             orchestrator = get_orchestrator()
-            # Run the orchestrator (it handles delegation to teams)
             response = orchestrator.run(user_input)
             logger.info(f"[Orchestrator] Final Response: {response.content}")
-        
+
     except Exception as e:
         logger.error(f"Task Execution Failed: {e}")
 
-    # Reset state after loop
     AGENT_STATE.labels(agent_name="Router").set(1)
 
-# --- JWT-ACE Token Issuance ---
-def _issue_ephemeral_token(intent: str, session_id: str, owner_id: str | None = None) -> tuple:
-    """
-    Issue a JWT-ACE token for the given intent.
 
-    Returns:
-        (token_str, template_metadata_dict) or (None, {}) on failure
-    """
+def _issue_ephemeral_token(intent: str, session_id: str, owner_id=None) -> tuple:
+    """Issue a JWT-ACE token for the given intent. Returns (token_str, metadata) or (None, {})."""
     if not JWT_ACE_AVAILABLE:
         return None, {}
-
     try:
         caps = get_capabilities_for_intent(intent)
-
-        # Look up template version if registry is available
         template_version = "1.0"
         template_system_prompt = None
         if TEMPLATES_AVAILABLE:
@@ -266,10 +239,8 @@ def _issue_ephemeral_token(intent: str, session_id: str, owner_id: str | None = 
             session_id=session_id,
             expiry_hours=caps["expiry_hours"],
         )
-
         issuer = get_token_issuer()
         token = issuer.issue_token(card)
-
         metadata = {
             "template_id": caps["template_id"],
             "template_version": template_version,
@@ -277,33 +248,19 @@ def _issue_ephemeral_token(intent: str, session_id: str, owner_id: str | None = 
             "token_capabilities": caps["capabilities"],
             "system_prompt_override": template_system_prompt,
         }
-
-        logger.info(
-            f"[JWT-ACE] Token issued for {caps['agent_name']} "
-            f"(template: {caps['template_id']} v{template_version}, "
-            f"{len(caps['capabilities'])} capabilities)"
-        )
+        logger.info(f"[JWT-ACE] Token issued for {caps['agent_name']} (template: {caps['template_id']} v{template_version})")
         return token, metadata
-
     except Exception as e:
         logger.warning(f"[JWT-ACE] Token issuance failed (non-fatal): {e}")
         return None, {}
 
 
-def _issue_session_card(session_id: str, owner_id: str | None = None) -> tuple:
-    """
-    Issue a session-level JWT-ACE card with the **union** of all intent
-    capabilities.  Per-intent narrowing is handled via ``set_active_scope()``.
-
-    Returns:
-        (token_str, card, metadata_dict)  or  (None, None, {})  on failure
-    """
+def _issue_session_card(session_id: str, owner_id=None) -> tuple:
+    """Issue a session-level JWT-ACE card. Returns (token_str, card, metadata) or (None, None, {})."""
     if not JWT_ACE_AVAILABLE:
         return None, None, {}
-
     try:
         session_caps = get_session_capabilities()
-
         template_version = "1.0"
         if TEMPLATES_AVAILABLE:
             try:
@@ -324,24 +281,16 @@ def _issue_session_card(session_id: str, owner_id: str | None = None) -> tuple:
             session_id=session_id,
             expiry_hours=session_caps["expiry_hours"],
         )
-
         issuer = get_token_issuer()
         token = issuer.issue_token(card)
-
         metadata = {
             "template_id": session_caps["template_id"],
             "template_version": template_version,
             "agent_instance_id": card.agent_instance_id,
             "token_capabilities": session_caps["capabilities"],
         }
-
-        logger.info(
-            f"[JWT-ACE] Session card issued for {session_id} "
-            f"({len(session_caps['capabilities'])} capabilities, "
-            f"level {session_caps['security_level']})"
-        )
+        logger.info(f"[JWT-ACE] Session card issued for {session_id} ({len(session_caps['capabilities'])} capabilities)")
         return token, card, metadata
-
     except Exception as e:
         logger.warning(f"[JWT-ACE] Session card issuance failed (non-fatal): {e}")
         return None, None, {}
@@ -371,54 +320,23 @@ def _record_performance(intent: str, template_metadata: dict, result_data: dict)
         logger.debug(f"[JWT-ACE] Performance recording failed (non-fatal): {e}")
 
 
-# --- SPECIALIZED INTENT DETECTION ---
-# (Keyword-based detect_intent() was removed in favor of neural semantic_router)
+# ---------------------------------------------------------------------------
+# Security / session helpers
+# ---------------------------------------------------------------------------
+
 def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None):
-    """Score the current Langfuse trace as a training candidate and optionally set its output."""
-    if not langfuse_inst or not USE_LANGFUSE:
-        return
-    try:
-        if output:
-            langfuse_inst.set_current_trace_io(output={"response": output[:4000]})
-        langfuse_inst.score_current_trace(
-            name="training_candidate",
-            value=score,
-        )
-    except Exception as e:
-        logger.debug(f"[Router] Trace scoring failed: {e}")
+    """Score the current Langfuse trace. Delegates to handlers.base for the real impl."""
+    from handlers.base import _score_trace as _base_score
+    _base_score(lf_trace, langfuse_inst, score, output=output, use_langfuse=USE_LANGFUSE)
 
 
 from contextlib import contextmanager
 
 @contextmanager
 def _langfuse_span(name: str, agent_name: str, model_id: str, input_text: str):
-    """Create a Langfuse observation span around an agent execution.
-    Yields a dict that the caller should populate with 'output' when done."""
-    result = {"output": ""}
-    if USE_LANGFUSE and langfuse:
-        try:
-            ctx = langfuse.start_as_current_observation(
-                name=name,
-                as_type="generation",
-                input={"prompt": input_text[:4000]},
-                metadata={"agent": agent_name, "model": model_id},
-            )
-            ctx.__enter__()
-            try:
-                yield result
-            finally:
-                try:
-                    langfuse.update_current_observation(
-                        output={"response": result["output"][:4000]},
-                        metadata={"response_len": len(result["output"])},
-                    )
-                except Exception:
-                    pass
-                ctx.__exit__(None, None, None)
-        except Exception as e:
-            logger.debug(f"[Router] Span creation failed for {name}: {e}")
-            yield result
-    else:
+    """Langfuse generation span. Delegates to handlers.base."""
+    from handlers.base import _langfuse_span as _base_span
+    with _base_span(name, agent_name, model_id, input_text, langfuse=langfuse, use_langfuse=USE_LANGFUSE) as result:
         yield result
 
 
@@ -426,55 +344,27 @@ def _is_explicit_train_request(text: str) -> bool:
     """Return True only for clear, intentional memory-training instructions."""
     if not text:
         return False
-
     normalized = text.strip().lower()
-    explicit_prefixes = (
-        "learn:",
-        "correction:",
-        "remember that",
-        "remember this rule",
-        "store this rule",
-        "add rule",
-    )
+    explicit_prefixes = ("learn:", "correction:", "remember that", "remember this rule", "store this rule", "add rule")
     if normalized.startswith(explicit_prefixes):
         return True
-
-    # Structured teaching pattern used by the trainer route.
-    teach_pattern = re.search(
+    return bool(re.search(
         r"(?:remember that|correction:|learn:)\s+(.+?)\s+(?:means|is|should be)\s+(.+)",
-        text,
-        re.IGNORECASE,
-    )
-    return bool(teach_pattern)
+        text, re.IGNORECASE,
+    ))
 
 
 def _extract_constraint_context(history: list | None, user_input: str) -> str:
     """Extract important user constraints from prior turns for requirement continuity."""
     if not history:
         return ""
-
-    # Include brevity keywords to detect user frustration with verbose responses
     keywords = (
-        "constraint",
-        "must",
-        "avoid",
-        "maintenance window",
-        "no-downtime",
-        "no downtime",
-        "requirement",
-        "succinct",
-        "brief",
-        "concise",
-        "short",
-        "quick",
-        "simple list",
-        "just list",
-        "keep it short",
-        "don't elaborate",
+        "constraint", "must", "avoid", "maintenance window", "no-downtime", "no downtime",
+        "requirement", "succinct", "brief", "concise", "short", "quick",
+        "simple list", "just list", "keep it short", "don't elaborate",
     )
     constraints = []
-    brevity_count = 0  # Track if user keeps asking for brevity
-    
+    brevity_count = 0
     for msg in history:
         _role = msg.get("role", "user") if isinstance(msg, dict) else getattr(msg, "role", "user")
         if _role != "user":
@@ -486,49 +376,31 @@ def _extract_constraint_context(history: list | None, user_input: str) -> str:
         lowered = content.lower()
         if any(k in lowered for k in keywords):
             constraints.append(content)
-            # Count brevity requests
             if any(brev in lowered for brev in ("succinct", "brief", "concise", "short", "quick", "simple list")):
                 brevity_count += 1
-
     if not constraints:
         return ""
-
-    # Keep only the most recent few constraints to reduce prompt bloat.
     recent = constraints[-3:]
     block = "\n".join([f"- {c}" for c in recent])
-    
-    # If user has requested brevity multiple times, escalate the constraint
     if brevity_count >= 2:
         block += "\n- CRITICAL: User has requested brevity MULTIPLE times. Provide ONLY a concise bulleted list. NO explanations, NO elaboration, NO project plans."
-    
-    return (
-        "[Active User Constraints - Must Respect]\n"
-        f"{block}\n"
-        "Do not ignore these constraints in the final answer."
-    )
+    return f"[Active User Constraints - Must Respect]\n{block}\nDo not ignore these constraints in the final answer."
 
 
-def _is_admin_session(session_id: str, owner_id: str | None) -> bool:
+def _is_admin_session(session_id: str, owner_id=None) -> bool:
     """Check if the current session holds L3_ADMIN or higher."""
     if not JWT_ACE_AVAILABLE:
         return False
     try:
         from security.execution_context import get_current_token
         from security.token_issuer import get_token_validator
-
         token = get_current_token()
         if not token:
             return False
-
         validator = get_token_validator()
         card = validator.validate_token(token)
         level = str(getattr(card, "security_level", "L1_PUBLIC"))
-        ranks = {
-            "L1_PUBLIC": 1,
-            "L2_USER": 2,
-            "L3_ADMIN": 3,
-            "L4_SYSTEM": 4,
-        }
+        ranks = {"L1_PUBLIC": 1, "L2_USER": 2, "L3_ADMIN": 3, "L4_SYSTEM": 4}
         return ranks.get(level, 0) >= ranks["L3_ADMIN"]
     except Exception:
         pass
@@ -536,170 +408,17 @@ def _is_admin_session(session_id: str, owner_id: str | None) -> bool:
 
 
 def _is_anthropic_model(model_name: str) -> bool:
-    """Return True if the requested model is an Anthropic/Claude model."""
     return model_name in ADMIN_ONLY_MODELS or model_name.startswith("claude-")
 
 
-def _audit_security_event(event_type: str, context: dict[str, object]) -> None:
-    """Emit structured security audit events with contextual fields."""
-    payload = {
-        "event_type": event_type,
-        "component": "router",
-        "source": "chat_swarm",
-        **context,
-    }
+def _audit_security_event(event_type: str, context: dict) -> None:
+    payload = {"event_type": event_type, "component": "router", "source": "chat_swarm", **context}
     security_audit_logger.warning(json.dumps(payload, ensure_ascii=True))
 
 
-# --- Stream Event Helper Functions ---
-def _emit_stream_mode(mode: str) -> dict:
-    """Emit a stream mode indicator (thinking, responding, tool-use, requesting, compacting)."""
-    return {"type": "stream_mode", "streamMode": mode}
-
-
-def _emit_turn_metadata(turn_id: str, agent_name: str, stream_modes: list = None) -> dict:
-    """Emit turn-level metadata for UI turn grouping and navigation."""
-    return {
-        "type": "turn_metadata",
-        "turnId": turn_id,
-        "turnMetadata": {
-            "turnId": turn_id,
-            "agentName": agent_name,
-            "streamModes": stream_modes or [],
-            "toolsInvoked": [],
-            "continuable": True,
-        },
-    }
-
-
-def _emit_turn_boundary(turn_id: str, final_status: str = "completed") -> dict:
-    """Emit a turn boundary marker to help frontend group messages by turn."""
-    return {
-        "type": "turn_boundary",
-        "content": f"[Turn {turn_id} {final_status}]",
-        "turnId": turn_id,
-    }
-
-
-def _emit_tool_start(tool_call_id: str, tool_name: str, tool_input: dict = None) -> dict:
-    """Emit a tool execution start event."""
-    return {
-        "type": "tool_start",
-        "tool_call_id": tool_call_id,
-        "tool_name": tool_name,
-        "tool_input": tool_input or {},
-        "tool_state": "queued",
-    }
-
-
-def _emit_tool_progress(tool_call_id: str, tool_name: str, progress: float = 0, status_msg: str = "") -> dict:
-    """Emit a tool in-progress event."""
-    return {
-        "type": "tool_progress",
-        "tool_call_id": tool_call_id,
-        "tool_name": tool_name,
-        "tool_state": "executing",
-        "tool_progress": min(progress, 100),
-        "content": status_msg,
-    }
-
-
-def _emit_tool_result(tool_call_id: str, tool_name: str, output: str, success: bool = True, artifacts: list = None) -> dict:
-    """Emit a tool result event with optional artifacts."""
-    return {
-        "type": "tool_result",
-        "tool_call_id": tool_call_id,
-        "tool_name": tool_name,
-        "tool_output": output,
-        "tool_state": "completed" if success else "error",
-        "content": output,
-        "artifacts": artifacts or [],
-    }
-
-
-def _emit_continuation_hint(hint_type: str = "auto_continue", reason: str = "") -> dict:
-    """Emit a hint about whether conversation should auto-continue after tool execution."""
-    return {
-        "type": "continuation",
-        "continuationHint": hint_type,
-        "content": reason,
-    }
-
-
-def _parse_think_tags(text: str):
-    """Parse streaming text that may contain <think>...</think> blocks.
-    
-    Yields (type, content) tuples where type is 'thought' or 'message'.
-    Handles partial tags across chunk boundaries via a simple state machine.
-    """
-    import re
-    # Split on think tags, preserving them
-    parts = re.split(r'(<think>|</think>)', text)
-    in_think = False
-    for part in parts:
-        if part == '<think>':
-            in_think = True
-            continue
-        elif part == '</think>':
-            in_think = False
-            continue
-        if part:
-            yield ("thought" if in_think else "message", part)
-
-
 # ---------------------------------------------------------------------------
-# Grounding helpers
+# chat_swarm — main dispatch generator
 # ---------------------------------------------------------------------------
-
-# Keywords that suggest the query needs live / external information
-_WEB_GROUNDING_KEYWORDS = frozenset([
-    "latest", "current", "today", "now", "news", "recent", "recently",
-    "yesterday", "this week", "this month", "this year", "2024", "2025",
-    "who won", "what is the price", "stock price", "weather", "trending",
-    "breaking", "just announced", "released", "update", "version",
-])
-
-
-def _needs_web_grounding(query: str) -> bool:
-    """Return True when the query likely benefits from live web results."""
-    q = query.lower()
-    return any(kw in q for kw in _WEB_GROUNDING_KEYWORDS)
-
-
-def _retrieve_doc_context(query: str, owner_id: str | None, limit: int = 5) -> list[dict]:
-    """Query PgVector for the top-*limit* relevant knowledge-base chunks.
-
-    Returns a list of dicts with keys ``source`` and ``content``.
-    Returns an empty list on any error so the caller can stay non-fatal.
-    """
-    try:
-        import os as _os
-        from agno.vectordb.pgvector import PgVector, SearchType
-        from agno.embedder.ollama import OllamaEmbedder
-
-        db_url = _os.getenv("AGNO_DB_URL", "postgresql+psycopg://ai:ai@localhost:5532/ai")
-        collection = "architect_knowledge"
-
-        embedder = OllamaEmbedder(id="nomic-embed-text", dimensions=768)
-        vdb = PgVector(
-            table_name=collection,
-            db_url=db_url,
-            search_type=SearchType.hybrid,
-            embedder=embedder,
-        )
-        rows = vdb.search(query=query, limit=limit)
-        results: list[dict] = []
-        for row in rows or []:
-            content = getattr(row, "content", None) or str(row)
-            meta = getattr(row, "meta_data", {}) or {}
-            source = meta.get("source", meta.get("name", "unknown"))
-            results.append({"source": source, "content": content})
-        return results
-    except Exception as exc:
-        import logging as _logging
-        _logging.getLogger("Router").debug("[Router] Doc grounding retrieval failed: %s", exc)
-        return []
-
 
 def chat_swarm(
     user_input: str,
@@ -729,54 +448,30 @@ def chat_swarm(
     solving_corrector_n_passes: int | None = None,
     solving_corrector_max_time: int | None = None,
 ):
-    """
-    Generator that yields status updates and final response for UI.
-    - history: Optional list of OpenAI-formatted messages [{"role": "user", "content": "..."}]
-    - memory_enabled: If True, inject recent session summaries as system context.
-    - skill: Routing hint to bias intent classification.
-    - style: Response style modifier for the system prompt.
-    - research_mode: If True, forces deep multi-step reasoning via MarsRL.
-    - ultraplan_mode: If True, decompose task into plan only — no execution.
-    - ultrathink_mode: If True, use deeper reasoning with visible chain-of-thought.
-    - attachments: File attachments from the UI.
-    - dev_mode: If True, enable workspace-scoped file/terminal tools (developer mode).
-    - grounding_web: If True and owner has permission, run intent-aware web search
-      and inject top results as [Web Grounding Context] before the prompt.
-    - grounding_docs: If True and owner has permission, query the knowledge base and
-      inject relevant chunks as [Document Context] before the prompt.
-    - grounding_file: If True and owner has permission, scan the workspace for relevant
-      files and inject matched content as [File Context] before the prompt.
-    """
+    """Generator: yield status/message/error events for the UI."""
     AGENT_STATE.labels(agent_name="Router").set(2)
     WORKFLOW_STEPS.labels(status="started", agent_type="Router").inc()
-    logger.info("--- [Router] chat_swarm v4.1 (ACTION_FIGURE + context-session-scoped) ---")
+    logger.info("--- [Router] chat_swarm v5.0 (modular handlers) ---")
 
-    # JWT-ACE state (initialized here so finally block can always access them)
+    # State that the finally block always needs
     ace_token = None
-    ace_card = None  # EphemeralAgentCard for this session
+    ace_card = None
     template_metadata = {}
     route_start_time = time.time()
-    lf_trace = None  # Langfuse trace handle (populated below if Langfuse is active)
+    lf_trace = None
     turn_id = f"{session_id}-{int(time.time()*1000)}"
-    
-    # Extract user ID for team builder configuration
-    # (will be None for anonymous users, who get defaults)
-    uid = owner_id if owner_id else None
-
-    # Collect thought/log events for Langfuse trace narrative
-    _trace_thoughts = []  # {"type": "thought"|"log", "content": "..."}
+    uid = owner_id
+    _trace_thoughts = []
 
     def _t(content: str) -> dict:
-        """Create a thought event and collect it for tracing."""
         _trace_thoughts.append({"type": "thought", "content": content, "ts": time.time()})
         return {"type": "thought", "content": content}
 
     def _l(content: str) -> dict:
-        """Create a log event and collect it for tracing."""
         _trace_thoughts.append({"type": "log", "content": content, "ts": time.time()})
         return {"type": "log", "content": content}
 
-    # --- Langfuse top-level trace for all intents (v4 context manager) ---
+    # Langfuse top-level trace
     _lf_ctx = None
     if USE_LANGFUSE and langfuse:
         try:
@@ -792,16 +487,14 @@ def chat_swarm(
             _lf_ctx = None
             logger.debug(f"[Router] Trace creation failed: {e}")
 
-    # --- JWT-ACE: Issue session-level card (broad capabilities) ---
+    # JWT-ACE session card
     if JWT_ACE_AVAILABLE:
         ace_token, ace_card, template_metadata = _issue_session_card(session_id, owner_id)
         if ace_token:
             set_current_token(ace_token)
             yield {"type": "log", "content": f"[JWT-ACE] Session card issued ({template_metadata.get('template_id', 'session_agent')})"}
 
-    # --- HISTORY CONVERSION ---
-    # PHI Agents use their own storage/history, but we can seed it or pass it.
-    # For now, we'll use history to enhance the prompt if provided.
+    # History → history_context string
     history_context = ""
     if history:
         history_context = "\n\n[Previous Conversation History]:\n"
@@ -809,496 +502,140 @@ def chat_swarm(
             role = msg.get("role", "user") if isinstance(msg, dict) else getattr(msg, "role", "user")
             content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
             history_context += f"- {role.upper()}: {content}\n"
-    
-    # --- RAG CONTEXT INTERCEPTION ---
-    import re
+
+    # RAG context interception
     extracted_context = ""
     context_match = re.search(r'<context>.*?</context>', user_input, re.DOTALL)
     if context_match:
         extracted_context = context_match.group(0)
-        # Strip Open-WebUI's boilerplate injection
         user_input = re.sub(r'### Task:.*?<context>.*?</context>\s*', '', user_input, flags=re.DOTALL).strip()
         yield _l(f"[Router] Intercepted RAG Context ({len(extracted_context)} chars).")
-    
-    # 1. Load Context (Memory Bridge)
+
+    # ---------------------------------------------------------------------------
+    # Pending context dispatch
+    # ---------------------------------------------------------------------------
     from brooks import get_pending_context, clear_context, save_pending_image_clarification
     pending_ctx = get_pending_context(session_id=session_id, owner_id=owner_id)
-    
-    # Check if this is a reply to a clarification
+
     if pending_ctx:
-        if pending_ctx.get("type") == "image_clarification":
-            original_prompt = pending_ctx.get("prompt", "")
-            
-            # Detect if user is starting a NEW image request (not answering clarification)
-            user_lower = user_input.lower().strip()
-            new_image_keywords = ["generate", "create", "make", "draw", "paint", "design", "produce"]
-            is_new_request = any(user_lower.startswith(kw) for kw in new_image_keywords)
-            
-            # Also check for snowballed prompts (multiple commas indicate repeated merges)
-            comma_count = original_prompt.count(",")
-            is_snowballed = comma_count >= 2 or len(original_prompt) > 150
-            
-            if is_new_request or is_snowballed:
-                # This is a NEW request, not an answer to old clarification - clear stale context
-                logger.warning(f"--- [Router] Discarding stale image context (new_request={is_new_request}, snowballed={is_snowballed}) ---")
-                yield {"type": "log", "content": "[Context Manager] Stale clarification cleared."}
-                clear_context(session_id=session_id, owner_id=owner_id)
-            else:
-                # User is answering clarification - merge
-                logger.info(f"--- [Router] Answering clarification. Original: '{original_prompt}' + Answer: '{user_input}' ---")
-                user_input = f"{original_prompt}, {user_input}"
-                yield {"type": "log", "content": f"[Context Manager] Clarification answered."}
-                clear_context(session_id=session_id, owner_id=owner_id)
-            
-        elif pending_ctx.get("type") == "art_studio_redirect":
-            # This was saved for the Art Studio workspace — clear it, don't merge
-            clear_context(session_id=session_id, owner_id=owner_id)
-
-        elif pending_ctx.get("type") == "swarm_clarification":
-            original = pending_ctx.get("prompt", "")
-            question = pending_ctx.get("question", "")
-            logger.info(
-                f"--- [Router] Resolving Swarm Clarification. "
-                f"Original: '{original[:80]}' + Answer: '{user_input[:80]}' ---"
-            )
-            user_input = f"{original}\n\nAdditional context: {user_input}"
-            yield {"type": "log", "content": "[Context Manager] Swarm clarification resolved. Launching coordinator..."}
-            clear_context(session_id=session_id, owner_id=owner_id)
-
-        elif pending_ctx.get("type") == "ambiguity_resolution":
-            original = pending_ctx.get("prompt")
-            question = pending_ctx.get("question")
-            logger.info(f"--- [Router] Resolving Ambiguity. Original: '{original}' + Answer: '{user_input}' ---")
-            
-            # Composite prompt for the Semantic Router
-            user_input = f"Original Request: '{original}'\nSystem Question: '{question}'\nUser Answer: '{user_input}'"
-            
-            yield {"type": "log", "content": f"[Context Manager] Ambiguity Resolved. Analying composite input..."}
-            clear_context(session_id=session_id, owner_id=owner_id)
-
-        elif pending_ctx.get("type") == "project_onboarding_step_1":
-            original_prompt = pending_ctx.get("original_prompt", "")
-            project_type_answer = user_input  # e.g. "type:web" or freetext
-            clear_context(session_id=session_id, owner_id=owner_id)
-            try:
-                from brooks import save_pending_context as _save_ctx
-                _save_ctx(
-                    {
-                        "type": "project_onboarding_step_2",
-                        "original_prompt": original_prompt,
-                        "project_type": project_type_answer,
-                    },
-                    session_id=session_id,
-                    owner_id=owner_id,
-                )
-            except Exception as _e:
-                logger.warning(f"[Onboarding] Could not save step 2 context: {_e}")
-            yield {
-                "type": "clarification_card",
-                "clarification": {
-                    "question": "What's the project name?",
-                    "context": f"Project type: *{project_type_answer}*",
-                    "options": [],
-                    "allow_freetext": True,
-                    "card_type": "onboarding",
-                },
-            }
+        from routing.gates import handle_pending_context
+        _pending_result = {"handled": False, "user_input": user_input}
+        yield from handle_pending_context(
+            pending_ctx, user_input,
+            session_id=session_id,
+            owner_id=owner_id,
+            history=history,
+            extracted_context=extracted_context,
+            ace_token=ace_token,
+            ultraplan_mode=ultraplan_mode,
+            dev_mode=dev_mode,
+            result=_pending_result,
+        )
+        if _pending_result["handled"]:
             return
-
-        elif pending_ctx.get("type") == "project_onboarding_step_2":
-            original_prompt = pending_ctx.get("original_prompt", "")
-            project_type_answer = pending_ctx.get("project_type", "")
-            project_name = user_input.strip().replace(" ", "-").lower()
-            clear_context(session_id=session_id, owner_id=owner_id)
-
-            # Create workspace directory
-            workspace_path = Path(__file__).parent.parent / "workspace" / project_name
-            try:
-                workspace_path.mkdir(parents=True, exist_ok=True)
-                (workspace_path / "README.md").write_text(
-                    f"# {project_name}\n\n{original_prompt}\n",
-                    encoding="utf-8",
-                )
-                logger.info(f"[Onboarding] Created workspace at {workspace_path}")
-            except Exception as _e:
-                logger.warning(f"[Onboarding] Could not create workspace: {_e}")
-
-            yield {
-                "type": "clarification_card",
-                "clarification": {
-                    "question": f"Project **{project_name}** is ready. Open the developer workspace to start building?",
-                    "context": f"Workspace created at `workspace/{project_name}/`",
-                    "options": [
-                        {
-                            "label": "Open Dev Workspace",
-                            "value": f"open_dev:{project_name}",
-                            "description": "Switch to editor + terminal",
-                            "redirect": "/dev",
-                        },
-                        {
-                            "label": "Generate starter code",
-                            "value": f"generate_starter:{project_name}",
-                            "description": "Let me scaffold the project first",
-                        },
-                    ],
-                    "allow_freetext": False,
-                    "card_type": "onboarding",
-                },
-            }
-            return
-
-        elif pending_ctx.get("type") == "dev_project_clarification":
-            original_prompt = pending_ctx.get("prompt", "")
-            clear_context(session_id=session_id, owner_id=owner_id)
-
-            if user_input.startswith("existing_project"):
-                logger.info("[Router] Dev project: routing as existing codebase task.")
-                user_input = original_prompt
-                yield {"type": "log", "content": "[Context Manager] Routing to existing project coordinator..."}
-                # Re-route as codebase coordinate with scope already established
-                from lamport import coordinate_task as _coord
-                yield {"type": "status", "content": "🛠️ Launching codebase coordinator..."}
-                for chunk in _coord(
-                    user_input,
-                    session_id=session_id,
-                    owner_id=owner_id,
-                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                    extracted_context=extracted_context,
-                    ace_token=ace_token,
-                    ultraplan_mode=ultraplan_mode,
-                    dev_mode=dev_mode,
-                ):
-                    yield chunk
-                return
-
-            elif user_input.startswith("new_project"):
-                # Always route directly to coordinator — skip multi-step onboarding for new projects.
-                # dev_mode=True unlocks workspace-scoped tools so pioneers can write files.
-                logger.info("[Router] Dev project (new): routing directly to coordinator for implementation.")
-                user_input = original_prompt
-                yield {"type": "log", "content": "[Context Manager] New project: launching coordinator..."}
-                from lamport import coordinate_task as _coord
-                yield {"type": "status", "content": "🛠️ Launching coordinator..."}
-                for chunk in _coord(
-                    user_input,
-                    session_id=session_id,
-                    owner_id=owner_id,
-                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                    extracted_context=extracted_context,
-                    ace_token=ace_token,
-                    ultraplan_mode=ultraplan_mode,
-                    dev_mode=True,
-                ):
-                    yield chunk
-                return
-
-            else:
-                # plan_only or freetext — treat as external research
-                logger.info("[Router] Dev project: plan-only mode, routing as external.")
-                user_input = original_prompt
-                yield {"type": "log", "content": "[Context Manager] Plan-only mode — research and plan without code changes."}
-                # Fall through to normal routing below
-
-        elif pending_ctx.get("type") == "task_intent_clarification":
-            original_prompt = pending_ctx.get("prompt", "")
-            saved_summary = pending_ctx.get("summary", "")
-            intent_choice = user_input  # capture before reassignment
-            clear_context(session_id=session_id, owner_id=owner_id)
-            user_input = original_prompt
-
-            if intent_choice.startswith("research_it"):
-                logger.info("[Router] Task intent: user chose research.")
-                yield {"type": "log", "content": "[Context Manager] Routing as deep research task..."}
-                from lamport import coordinate_task as _coord
-                for chunk in _coord(
-                    user_input,
-                    session_id=session_id,
-                    owner_id=owner_id,
-                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                    extracted_context=extracted_context,
-                    ace_token=ace_token,
-                    research_mode=True,
-                ):
-                    yield chunk
-                return
-
-            elif intent_choice.startswith("plan_it"):
-                logger.info("[Router] Task intent: user chose planning.")
-                yield {"type": "log", "content": "[Context Manager] Routing as planning/architecture task..."}
-                from lamport import coordinate_task as _coord
-                for chunk in _coord(
-                    user_input,
-                    session_id=session_id,
-                    owner_id=owner_id,
-                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                    extracted_context=extracted_context,
-                    ace_token=ace_token,
-                    plan_mode=True,
-                    research_mode=True,
-                ):
-                    yield chunk
-                return
-
-            elif intent_choice.startswith("build_it"):
-                # Re-use the dev_project_clarification flow to ask existing vs new
-                logger.info("[Router] Task intent: user chose build — asking project type.")
-                try:
-                    from brooks import save_pending_context as _save_ctx
-                    _save_ctx(
-                        {"type": "dev_project_clarification", "prompt": user_input, "summary": saved_summary},
-                        session_id=session_id,
-                        owner_id=owner_id,
-                    )
-                except Exception as _e:
-                    logger.warning(f"[Router] Could not save dev_project context: {_e}")
-                yield {
-                    "type": "clarification_card",
-                    "clarification": {
-                        "question": "Is this for an existing project or a new one?",
-                        "context": f"Building: *{saved_summary}*",
-                        "options": [
-                            {"label": "Existing project", "value": "existing_project", "description": "I'll work within your current codebase"},
-                            {"label": "New project", "value": "new_project", "description": "Walk me through setup"},
-                            {"label": "Just plan it", "value": "plan_only", "description": "Research and plan, no files changed"},
-                        ],
-                        "allow_freetext": False,
-                        "card_type": "dev_project",
-                    },
-                }
-                return
-
-            else:
-                # Freetext — treat as research
-                logger.info("[Router] Task intent: freetext — routing as research.")
-                yield {"type": "log", "content": "[Context Manager] Routing as research task..."}
-                # Fall through to normal routing below
-
-        elif pending_ctx.get("type") == "dev_mode_gate":
-            original_prompt = pending_ctx.get("prompt", "")
-            clear_context(session_id=session_id, owner_id=owner_id)
-
-            if user_input.startswith("switch_to_dev_mode"):
-                logger.info("[Router] Dev mode gate: user chose to switch to Dev Mode.")
-                yield {
-                    "type": "delta",
-                    "content": (
-                        "Opening the **Developer** workspace...\n\n"
-                        "Your request has been saved. In the **Developer** tab:\n"
-                        "1. Enable the **🤖 Agent** toggle\n"
-                        "2. Re-send your request for full implementation (file creation, code execution, live preview)\n\n"
-                        f"Your original request was:\n> *{original_prompt[:200]}{'...' if len(original_prompt) > 200 else ''}*"
-                    ),
-                }
-                return
-
-            elif user_input.startswith("request_dev_access"):
-                logger.info("[Router] Dev mode gate: user requested dev access via governance.")
-                try:
-                    from liskov import governance_manager, RequestType
-                    item = governance_manager.submit_request(
-                        type=RequestType.DEV_MODE,
-                        description=(
-                            f"User {owner_id!r} requests Dev Mode access. "
-                            f"Task: {original_prompt[:300]}"
-                        ),
-                        user=owner_id or "anonymous",
-                    )
-                    yield {
-                        "type": "delta",
-                        "content": (
-                            f"✅ Dev Mode access request submitted (ID: `{item.id}`). "
-                            f"An admin will review your request.\n\n"
-                            "In the meantime, running a **research & planning pass**:\n"
-                        ),
-                    }
-                except Exception as _gov_e:
-                    logger.warning(f"[DevModeGate] Governance request failed: {_gov_e}")
-                    yield {
-                        "type": "delta",
-                        "content": "⚠️ Could not submit governance request. Running research & planning pass:\n",
-                    }
-                # Fall through: run in plan_mode after yielding the message
-                user_input = original_prompt
-                from lamport import coordinate_task as _coord
-                for chunk in _coord(
-                    user_input,
-                    session_id=session_id,
-                    owner_id=owner_id,
-                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                    extracted_context=extracted_context,
-                    ace_token=ace_token,
-                    ultraplan_mode=ultraplan_mode,
-                    dev_mode=True,   # skip lamport's inner gate
-                    plan_mode=True,  # research & plan only — no file writes
-                ):
-                    yield chunk
-                return
-
-            else:
-                # "plan_only" or freetext — run the multi-perspective research swarm
-                # with no implementation. Matches the gate option label
-                # "Research & Plan Only · Run the swarm, no files written."
-                logger.info("[Router] Dev mode gate: user chose research & plan-only.")
-                user_input = original_prompt
-                from lamport import coordinate_task as _coord
-                for chunk in _coord(
-                    user_input,
-                    session_id=session_id,
-                    owner_id=owner_id,
-                    history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                    extracted_context=extracted_context,
-                    ace_token=ace_token,
-                    ultraplan_mode=ultraplan_mode,
-                    dev_mode=True,    # skip lamport's inner gate
-                    plan_mode=True,   # no file writes
-                    research_mode=True,  # multi-perspective converging/diverging swarm
-                ):
-                    yield chunk
-                return
+        user_input = _pending_result["user_input"]
 
     try:
+        from handlers.base import _emit_turn_metadata, _emit_stream_mode, _emit_turn_boundary, _emit_continuation_hint
+
         yield _emit_turn_metadata(turn_id, "Router", ["thinking"])
         yield _emit_stream_mode("thinking")
-        # 1b. Memory Recall — inject prior session summaries as system context
+
+        # Memory recall
         if memory_enabled:
             try:
                 from memory_system import memory as _mem
                 recent = _mem.get_recent_summaries(n=5, owner_id=owner_id)
                 if recent:
-                    recall_text = "\n".join(
-                        f"- [{s.get('date', '?')}] {s.get('topic', '')}: {s.get('summary', '')}"
-                        for s in recent
-                    )
+                    recall_text = "\n".join(f"- [{s.get('date', '?')}] {s.get('topic', '')}: {s.get('summary', '')}" for s in recent)
                     recall_msg = {"role": "system", "content": f"[Prior Session Context]\n{recall_text}"}
-                    if history is None:
-                        history = [recall_msg]
-                    else:
-                        history = [recall_msg] + list(history)
+                    history = [recall_msg] + list(history) if history else [recall_msg]
                     yield _t(f"→ Memory: Recalled {len(recent)} prior session summaries")
             except Exception as _mem_err:
                 logger.debug(f"[Router] Memory recall failed (non-fatal): {_mem_err}")
 
-        # 1c. MemPalace Semantic Recall — inject relevant memories from vector store
+        # MemPalace semantic recall
         if memory_enabled:
             try:
                 import httpx as _httpx_recall
                 _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
                 with _httpx_recall.Client(timeout=10.0) as _mp_client:
-                    _mp_resp = _mp_client.post(
-                        f"{_mp_url}/v1/memories/search",
-                        json={"query": user_input, "owner_id": owner_id, "limit": 5},
-                    )
+                    _mp_resp = _mp_client.post(f"{_mp_url}/v1/memories/search", json={"query": user_input, "owner_id": owner_id, "limit": 5})
                 if _mp_resp.status_code == 200:
-                    relevant = _mp_resp.json()
-                    strong = [m for m in relevant if (m.get("score") or 0) > 0.5]
+                    strong = [m for m in _mp_resp.json() if (m.get("score") or 0) > 0.5]
                     if strong:
-                        semantic_text = "\n".join(f"- {m['content']}" for m in strong)
-                        mp_msg = {"role": "system", "content": f"[Relevant Memories]\n{semantic_text}"}
-                        if history is None:
-                            history = [mp_msg]
-                        else:
-                            history.append(mp_msg)
+                        mp_msg = {"role": "system", "content": f"[Relevant Memories]\n" + "\n".join(f"- {m['content']}" for m in strong)}
+                        history = list(history) + [mp_msg] if history else [mp_msg]
                         yield _t(f"→ MemPalace: {len(strong)} relevant memories recalled")
             except Exception as _mp_err:
                 logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
 
-        # 1d. Web Grounding — inject live search results when permitted and intent warrants it
+        # Web grounding
         if grounding_web:
             try:
                 from grounding_permissions import grounding_permissions as _gp
+                from handlers.base import _needs_web_grounding
                 if _gp.is_permitted(owner_id or "", "web_grounding"):
                     if _needs_web_grounding(user_input):
                         from tools.web_browser import web_search as _web_search
                         yield {"type": "status", "content": "🌐 Web Grounding: Searching..."}
                         results = _web_search(user_input, num_results=5)
                         if results:
-                            snippets = "\n".join(
-                                f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('snippet','')}"
-                                for i, r in enumerate(results)
-                            )
-                            web_msg = {"role": "system", "content": f"[Web Grounding Context]\n{snippets}"}
-                            if history is None:
-                                history = [web_msg]
-                            else:
-                                history.append(web_msg)
+                            snippets = "\n".join(f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('snippet','')}" for i, r in enumerate(results))
+                            history = list(history or []) + [{"role": "system", "content": f"[Web Grounding Context]\n{snippets}"}]
+                            web_ctx = snippets
+                            extracted_context = (extracted_context + f"\n\n[Web Grounding Results]\n{web_ctx}") if extracted_context else f"[Web Grounding Results]\n{web_ctx}"
                             yield _t(f"→ Web grounding: {len(results)} results injected")
                         else:
                             yield _t("→ Web grounding: no results returned")
                     else:
                         yield _t("→ Web grounding: skipped (query does not need live data)")
-                    # Append web results to extracted_context so coordinator workers can use them
-                    if results:
-                        web_ctx = "\n".join(
-                            f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('snippet','')}"
-                            for i, r in enumerate(results)
-                        )
-                        if extracted_context:
-                            extracted_context += f"\n\n[Web Grounding Results]\n{web_ctx}"
-                        else:
-                            extracted_context = f"[Web Grounding Results]\n{web_ctx}"
                 else:
-                    logger.warning(
-                        "[Router] Web grounding requested by %s but permission not granted", owner_id
-                    )
                     yield {"type": "status", "content": "⚠️ Web grounding not permitted — submit a governance request."}
             except Exception as _wg_err:
                 logger.error("[Router] Web grounding failed (non-fatal): %s", _wg_err)
 
-        # 1e. Document Grounding — inject relevant knowledge-base chunks when permitted
+        # Doc grounding
         if grounding_docs:
             try:
                 from grounding_permissions import grounding_permissions as _gp
+                from handlers.base import _retrieve_doc_context
                 if _gp.is_permitted(owner_id or "", "docs_grounding"):
                     chunks = _retrieve_doc_context(user_input, owner_id, limit=5)
                     if chunks:
-                        doc_text = "\n\n".join(
-                            f"[Source: {c.get('source','unknown')}]\n{c.get('content','')}"
-                            for c in chunks
-                        )
-                        doc_msg = {"role": "system", "content": f"[Document Context]\n{doc_text}"}
-                        if history is None:
-                            history = [doc_msg]
-                        else:
-                            history.append(doc_msg)
+                        doc_text = "\n\n".join(f"[Source: {c.get('source','unknown')}]\n{c.get('content','')}" for c in chunks)
+                        history = list(history or []) + [{"role": "system", "content": f"[Document Context]\n{doc_text}"}]
                         yield _t(f"→ Doc grounding: {len(chunks)} chunks injected")
                     else:
                         yield _t("→ Doc grounding: no relevant chunks found")
                 else:
-                    logger.warning(
-                        "[Router] Doc grounding requested by %s but permission not granted", owner_id
-                    )
                     yield {"type": "status", "content": "⚠️ Document grounding not permitted — submit a governance request."}
             except Exception as _dg_err:
                 logger.error("[Router] Doc grounding failed (non-fatal): %s", _dg_err)
 
-        # 1f. File Grounding — inject workspace file content when permitted
+        # File grounding
         if grounding_file:
             try:
                 from grounding_permissions import grounding_permissions as _gp
                 if _gp.is_permitted(owner_id or "", "file_grounding"):
-                    import os as _os
-                    _workspace_root = _os.environ.get("WORKSPACE_PATH", "/workspace")
+                    _workspace_root = os.environ.get("WORKSPACE_PATH", "/workspace")
                     yield {"type": "status", "content": "📁 File Grounding: Scanning workspace..."}
                     _query_words = set(user_input.lower().split())
                     _file_snippets: list[str] = []
                     try:
-                        for _root, _dirs, _files in _os.walk(_workspace_root):
-                            # Skip hidden dirs and common noise dirs
-                            _dirs[:] = [d for d in _dirs if not d.startswith(".") and d not in (
-                                "__pycache__", "node_modules", ".git", ".venv", "venv"
-                            )]
+                        for _root, _dirs, _files in os.walk(_workspace_root):
+                            _dirs[:] = [d for d in _dirs if not d.startswith(".") and d not in ("__pycache__", "node_modules", ".git", ".venv", "venv")]
                             for _fname in _files:
                                 if not _fname.endswith((".py", ".md", ".txt", ".json", ".yaml", ".yml", ".sh", ".env")):
                                     continue
-                                _fpath = _os.path.join(_root, _fname)
-                                _rel = _os.path.relpath(_fpath, _workspace_root)
-                                # Relevance: filename or path words must intersect query
+                                _fpath = os.path.join(_root, _fname)
+                                _rel = os.path.relpath(_fpath, _workspace_root)
                                 _path_words = set(_rel.lower().replace("/", " ").replace("_", " ").replace("-", " ").split())
                                 if not _query_words.intersection(_path_words):
                                     continue
                                 try:
                                     with open(_fpath, "r", encoding="utf-8", errors="ignore") as _fh:
-                                        _content = _fh.read(2000)  # cap at 2 KB per file
+                                        _content = _fh.read(2000)
                                     _file_snippets.append(f"[File: {_rel}]\n{_content}")
                                     if len(_file_snippets) >= 5:
                                         break
@@ -1309,42 +646,32 @@ def chat_swarm(
                     except Exception as _walk_err:
                         logger.warning("[Router] File grounding walk error: %s", _walk_err)
                     if _file_snippets:
-                        file_msg = {"role": "system", "content": "[File Context]\n" + "\n\n".join(_file_snippets)}
-                        if history is None:
-                            history = [file_msg]
-                        else:
-                            history.append(file_msg)
+                        history = list(history or []) + [{"role": "system", "content": "[File Context]\n" + "\n\n".join(_file_snippets)}]
                         yield _t(f"→ File grounding: {len(_file_snippets)} file(s) injected")
                     else:
                         yield _t("→ File grounding: no matching files found")
                 else:
-                    logger.warning(
-                        "[Router] File grounding requested by %s but permission not granted", owner_id
-                    )
                     yield {"type": "status", "content": "⚠️ File grounding not permitted — submit a governance request."}
             except Exception as _fg_err:
                 logger.error("[Router] File grounding failed (non-fatal): %s", _fg_err)
+
+        # Security scan
         yield {"type": "status", "content": "🔒 Security Agent: Scanning input..."}
         security = get_security_agent()
         AGENT_STATE.labels(agent_name="Security").set(2)
-        
         security_check: RunResponse = security.run(f"Validate this user command for safety: {user_input}")
         yield {"type": "log", "content": f"[Security Analysis] Algo: Llama-Guard | Output: {security_check.content}"}
-        
         AGENT_STATE.labels(agent_name="Security").set(1)
-        
         if "UNSAFE" in security_check.content.upper():
             yield {"type": "error", "content": f"🚫 BLOCKED: {security_check.content}"}
             WORKFLOW_STEPS.labels(status="blocked", agent_type="Security").inc()
-            return # HITL Block
-
+            return
         yield {"type": "status", "content": "✅ Security Agent: Input Cleared."}
         yield _t("→ Security: PASS")
         WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
 
-        # --- ANTHROPIC FAST-PATH (per-user key, or admin env var as fallback) ---
+        # Anthropic fast-path
         if model and _is_anthropic_model(model):
-            # 1. Try the user's own stored key first
             _user_anthropic_key: str | None = None
             if owner_id:
                 try:
@@ -1353,29 +680,15 @@ def chat_swarm(
                     if _key_record:
                         _user_anthropic_key = _key_record.get_api_key()
                 except Exception as _pk_err:
-                    logger.warning(f"[Router] Could not fetch user Anthropic key for {owner_id!r}: {_pk_err}")
+                    logger.warning(f"[Router] Could not fetch user Anthropic key: {_pk_err}")
 
-            # 2. Fall back to admin env-var key only for admin sessions
-            _use_admin_key = (
-                not _user_anthropic_key
-                and _is_admin_session(session_id, owner_id)
-                and ANTHROPIC_ENABLED
-            )
+            _use_admin_key = not _user_anthropic_key and _is_admin_session(session_id, owner_id) and ANTHROPIC_ENABLED
             _resolved_key = _user_anthropic_key or (ANTHROPIC_API_KEY if _use_admin_key else None)
             _key_source = "user-stored" if _user_anthropic_key else "admin-env"
 
             if not _resolved_key:
-                yield {
-                    "type": "error",
-                    "content": (
-                        "🔑 No Anthropic API key found. "
-                        "Add your key in **Settings → Provider API Keys** to use Claude models."
-                    ),
-                }
-                logger.warning(
-                    f"[Router] Anthropic key missing for user {owner_id!r}, model {model!r}"
-                )
-                model = None  # Fall through to normal Ollama routing
+                yield {"type": "error", "content": "🔑 No Anthropic API key found. Add your key in **Settings → Provider API Keys** to use Claude models."}
+                model = None
             else:
                 yield {"type": "status", "content": f"☁️ Claude ({model}): Generating..."}
                 yield _t(f"→ Provider: Anthropic ({model}) [{_key_source}]")
@@ -1385,14 +698,8 @@ def chat_swarm(
                     if history:
                         api_messages = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in history]
                         api_messages.append({"role": "user", "content": user_input})
-
-                    for chunk in provider.generate_stream(
-                        prompt=user_input,
-                        messages=api_messages,
-                        system="You are Hive Mind, a helpful AI assistant in a self-hosted home lab.",
-                    ):
+                    for chunk in provider.generate_stream(prompt=user_input, messages=api_messages, system="You are Hive Mind, a helpful AI assistant in a self-hosted home lab."):
                         yield chunk.as_dict()
-
                     _score_trace(lf_trace, langfuse, 0.9, output="[anthropic stream]")
                     WORKFLOW_STEPS.labels(status="success", agent_type="Anthropic").inc()
                 except Exception as e:
@@ -1403,13 +710,24 @@ def chat_swarm(
                     AGENT_STATE.labels(agent_name="Router").set(1)
                 return
 
-        # 3. Intent Routing (Neural Upgrade)
-        # Short-circuit: swarm_mode has a fixed intent, skip the LLM neural router
+        # ---------------------------------------------------------------------------
+        # Intent routing
+        # ---------------------------------------------------------------------------
         if swarm_mode:
-            intent = "COORDINATE"
-            confidence = 1.0
-            reasoning = "swarm_mode=True bypasses neural router"
-            yield {"type": "status", "content": "🧩 Swarm Mode: Routing directly to multi-agent coordinator..."}
+            # Run the router first so we can respect CREATIVE (and IMAGE/DESIGN) before forcing COORDINATE
+            from semantic_router import get_semantic_router
+            _pre_router = get_semantic_router()
+            _pre_decision = _pre_router.route(user_input)
+            _pre_intent = _pre_decision.get("intent", "COORDINATE")
+            if _pre_intent in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN", "CREATIVE"):
+                intent = _pre_intent
+                confidence = _pre_decision.get("confidence", 0.95)
+                reasoning = f"swarm_mode override exempted: {_pre_intent}"
+            else:
+                intent = "COORDINATE"
+                confidence = 1.0
+                reasoning = "swarm_mode=True bypasses neural router"
+                yield {"type": "status", "content": "🧩 Swarm Mode: Routing directly to multi-agent coordinator..."}
         elif design_mode:
             intent = "DESIGN"
             confidence = 1.0
@@ -1417,109 +735,63 @@ def chat_swarm(
             yield {"type": "status", "content": "🎨 Design Studio: Activating..."}
         else:
             from semantic_router import get_semantic_router
-            
             yield {"type": "status", "content": "🧠 Neural Cortex: Analyzing intent..."}
-            
             router_inst = get_semantic_router()
             routing_decision = router_inst.route(user_input)
-            intent = routing_decision.get("intent", "RESEARCH") # Fail safe default
+            intent = routing_decision.get("intent", "RESEARCH")
             confidence = routing_decision.get("confidence", 0.0)
             reasoning = routing_decision.get("reasoning", "No reasoning provided.")
 
+        routing_decision = locals().get("routing_decision", {})
         constraint_context = _extract_constraint_context(history, user_input)
 
-        # --- KEYWORD OVERRIDE: Catch intents the LLM doesn't know about ---
+        # Keyword overrides
         _lower = user_input.lower()
         if _is_explicit_train_request(user_input) and intent != "TRAIN":
-            intent = "TRAIN"
-            confidence = 0.98
-            reasoning = f"Keyword override: explicit training directive detected in '{user_input[:60]}'"
-        # IMAGE generation keywords
+            intent = "TRAIN"; confidence = 0.98; reasoning = "Keyword override: explicit training directive"
         if any(kw in _lower for kw in ["generate image", "generate an image", "create image", "create an image", "make image", "make an image", "draw", "paint", "generate art", "create art"]) and intent not in ("IMAGE", "ACTION_FIGURE"):
-            intent = "IMAGE"
-            confidence = 0.95
-            reasoning = f"Keyword override: image generation keywords detected in '{user_input[:60]}'"
+            intent = "IMAGE"; confidence = 0.95; reasoning = "Keyword override: image generation keywords"
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
-            intent = "ACTION_FIGURE"
-            confidence = 0.95
-            reasoning = f"Keyword override: action figure keywords detected in '{user_input[:60]}'"
-        # DESIGN generation keywords (UI, landing pages, dashboards, decks, prototypes)
-        _design_keywords = [
-            "landing page", "saas landing", "mockup", "wireframe", "prototype",
-            "design a", "design me a", "design the", "ui design", "ux design",
-            "pitch deck", "slide deck", "presentation deck", "html slideshow",
-            "dashboard design", "design dashboard", "design a dashboard",
-            "mobile app design", "mobile ui", "app screen design",
-            "web prototype", "html prototype",
-        ]
+            intent = "ACTION_FIGURE"; confidence = 0.95; reasoning = "Keyword override: action figure keywords"
+        _design_keywords = ["landing page", "saas landing", "mockup", "wireframe", "prototype", "design a", "design me a", "design the", "ui design", "ux design", "pitch deck", "slide deck", "presentation deck", "html slideshow", "dashboard design", "design dashboard", "design a dashboard", "mobile app design", "mobile ui", "app screen design", "web prototype", "html prototype"]
         if any(kw in _lower for kw in _design_keywords) and intent not in ("IMAGE", "ACTION_FIGURE"):
-            intent = "DESIGN"
-            confidence = 0.95
-            reasoning = f"Keyword override: design/UI keywords detected in '{user_input[:60]}'"
-        # --- /standardize-doc command (admin-only) ---
+            intent = "DESIGN"; confidence = 0.95; reasoning = "Keyword override: design/UI keywords"
         if _lower.strip().startswith("/standardize-doc"):
-            intent = "DOC_STANDARDS"
-            confidence = 1.0
-            reasoning = "Slash command: /standardize-doc"
-        # BUILD/GAME/APP creation should route to COORDINATE (Lamport)
-        # Two-part check: build/create/make verb + artifact type anywhere in sentence
-        # (avoids strict adjacency failures like "build me a simple space explorer game")
+            intent = "DOC_STANDARDS"; confidence = 1.0; reasoning = "Slash command: /standardize-doc"
         import re as _re
         if intent not in ("COORDINATE", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "DEVOPS"):
-            _build_verb_re = r'\b(build|create|make)\b'
-            _artifact_re = r'\b(app|application|game|dashboard|site|website|tool|page|program|calculator)\b'
-            if _re.search(_build_verb_re, _lower) and _re.search(_artifact_re, _lower):
-                intent = "COORDINATE"
-                confidence = 0.92
-                reasoning = f"Keyword override: build/create/make + artifact type detected in '{user_input[:60]}'"
-        
+            if _re.search(r'\b(build|create|make)\b', _lower) and _re.search(r'\b(app|application|game|dashboard|site|website|tool|page|program|calculator)\b', _lower):
+                intent = "COORDINATE"; confidence = 0.92; reasoning = "Keyword override: build verb + artifact type"
+        if intent == "CODE":
+            intent = "COORDINATE"; confidence = max(confidence, 0.88); reasoning = "CODE promoted to COORDINATE"
+
         yield _l(f"[Router] Intent: {intent} ({confidence * 100:.1f}%) | Reason: {reasoning}")
         logger.info(f"--- [Router] Neural Decision: {intent} (Conf: {confidence}) ---")
 
         if intent == "TRAIN" and not _is_explicit_train_request(user_input):
-            logger.info(
-                "[Router] TRAIN intent downgraded to CONVERSATION due to missing explicit training directive. "
-                f"Input preview: {user_input[:120]}"
-            )
-            yield {
-                "type": "log",
-                "content": "[Router] TRAIN intent downgraded to CONVERSATION (missing explicit training directive).",
-            }
-            intent = "CONVERSATION"
-            confidence = max(confidence, 0.75)
+            logger.info("[Router] TRAIN intent downgraded to CONVERSATION (missing explicit training directive).")
+            yield {"type": "log", "content": "[Router] TRAIN intent downgraded to CONVERSATION."}
+            intent = "CONVERSATION"; confidence = max(confidence, 0.75)
 
         yield _t(f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)")
 
-        # --- FAST MODE: hive-fast skips MarsRL verification loop ---
         _fast_mode = (model == "hive-fast")
         if _fast_mode:
             yield _l("[Router] Hive Fast mode — single-pass, no MarsRL verification.")
 
-        # --- SKILL HINT OVERRIDE ---
-        # If the UI sent an explicit skill hint, override intent when confidence is low
-        _skill_to_intent = {
-            "code": "DEVOPS",
-            "devops": "DEVOPS",
-            "data": "DATA",
-            "creative": "IMAGE",
-            "research": "RESEARCH",
-        }
+        # Skill hint override
+        _skill_to_intent = {"code": "DEVOPS", "devops": "DEVOPS", "data": "DATA", "creative": "IMAGE", "research": "RESEARCH"}
         if skill and skill in _skill_to_intent and confidence < 0.80:
             old_intent = intent
             intent = _skill_to_intent[skill]
             yield _t(f"→ Skill override: {old_intent} → {intent} (skill={skill})")
 
-        # --- RESEARCH MODE OVERRIDE ---
         if research_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN"):
-            intent = "RESEARCH"
-            yield _t("→ Research mode activated: forcing RESEARCH intent")
+            intent = "RESEARCH"; yield _t("→ Research mode activated: forcing RESEARCH intent")
+        if swarm_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN", "CREATIVE"):
+            intent = "COORDINATE"; yield _t("→ Swarm Mode: routing to multi-agent coordinator")
 
-        # --- SWARM MODE OVERRIDE ---
-        if swarm_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN"):
-            intent = "COORDINATE"
-            yield _t("→ Swarm Mode: routing to multi-agent coordinator")
-
-        # --- ULTRAPLAN MODE: Plan-Only (no execution) ---
+        # UltraPlan mode (plan only)
         if ultraplan_mode:
             yield _emit_turn_metadata(turn_id, "Planner", ["thinking", "responding"])
             yield _emit_stream_mode("thinking")
@@ -1528,31 +800,17 @@ def chat_swarm(
 
             PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
             OLLAMA_HOST = get_best_host_for_model(PLAN_MODEL)
-
             plan_system_prompt = (
                 "You are a task planning agent. Your ONLY job is to analyze the user's request "
                 "and produce a structured execution plan. You must NOT execute any steps.\n\n"
-                "Output format:\n"
-                "## Plan: [Brief title]\n\n"
-                "**Goal**: [One sentence summary of what the user wants]\n\n"
-                "**Steps**:\n"
-                "1. **[Step Name]** — [Description of what this step does]\n"
-                "   - Dependencies: [none | step numbers this depends on]\n"
-                "   - Agent: [which specialist would handle this: Code Developer, Art Director, Librarian, etc.]\n"
-                "2. **[Step Name]** — [Description]\n"
-                "   ...\n\n"
-                "**Estimated Complexity**: [Low | Medium | High]\n"
-                "**Notes**: [Any caveats, risks, or alternative approaches]\n\n"
-                "IMPORTANT: Output ONLY the plan. Do NOT execute, implement, or produce any code/content. "
-                "The user will review this plan and decide whether to proceed."
+                "Output format:\n## Plan: [Brief title]\n\n**Goal**: [One sentence summary]\n\n"
+                "**Steps**:\n1. **[Step Name]** — [Description]\n   - Dependencies: [none | step numbers]\n"
+                "   - Agent: [specialist]\n\n"
+                "**Estimated Complexity**: [Low | Medium | High]\n**Notes**: [caveats, risks]\n\n"
+                "IMPORTANT: Output ONLY the plan. Do NOT execute, implement, or produce any code/content."
             )
-
             if ultrathink_mode:
-                plan_system_prompt += (
-                    "\n\nBefore writing the plan, think deeply about the request. "
-                    "Consider edge cases, dependencies, and potential issues. "
-                    "Show your reasoning process wrapped in <think>...</think> tags before the plan."
-                )
+                plan_system_prompt += "\n\nBefore writing the plan, wrap your reasoning in <think>...</think> tags."
 
             planner = Agent(
                 name="Planner",
@@ -1561,50 +819,38 @@ def chat_swarm(
                 instructions=plan_system_prompt,
                 show_tool_calls=False,
             )
-
             try:
                 with request_lock(context="text"):
                     yield _emit_stream_mode("responding")
-                    response_stream = planner.run(user_input, stream=True)
                     plan_chunks = 0
                     start_time = time.time()
-                    for chunk in response_stream:
+                    for chunk in planner.run(user_input, stream=True):
                         if chunk.content:
                             yield {"type": "plan", "content": chunk.content}
                             plan_chunks += 1
-                        # Check iteration limit
                         if PLANNING_MAX_ITER and plan_chunks >= PLANNING_MAX_ITER:
                             yield {"type": "status", "content": f"🛑 Planning iteration limit reached ({PLANNING_MAX_ITER}). Stopping."}
                             break
-                        # Check time limit
                         if PLANNING_MAX_TIME and (time.time() - start_time) > PLANNING_MAX_TIME:
                             yield {"type": "status", "content": f"⏰ Planning time limit reached ({PLANNING_MAX_TIME}s). Stopping."}
                             break
             except Exception as e:
                 yield {"type": "error", "content": f"Plan generation failed: {e}"}
-                logger.error(f"[Router] UltraPlan failed: {e}", exc_info=True)
-
+                logger.error("[Router] UltraPlan failed: %s", e, exc_info=True)
             WORKFLOW_STEPS.labels(status="success", agent_type="Planner").inc()
             AGENT_STATE.labels(agent_name="Router").set(1)
             return
 
-        # --- ULTRATHINK MODE: Inject chain-of-thought system prompt ---
+        # UltraThink
         if ultrathink_mode:
-            think_instruction = (
+            think_msg = {"role": "system", "content": (
                 "[Deep Reasoning Mode] Think through this problem step-by-step before answering. "
-                "Show your reasoning process: identify the key aspects, consider alternatives, "
-                "evaluate tradeoffs, and then provide your final answer. "
-                "Wrap your internal reasoning in <think>...</think> tags. "
-                "After the thinking block, provide your clear final response."
-            )
-            think_msg = {"role": "system", "content": think_instruction}
-            if history is None:
-                history = [think_msg]
-            else:
-                history = list(history) + [think_msg]
+                "Wrap your reasoning in <think>...</think> tags. After the thinking block, provide your clear final response."
+            )}
+            history = list(history) + [think_msg] if history else [think_msg]
             yield _t("→ UltraThink: deep reasoning mode activated")
 
-        # --- STYLE SYSTEM PROMPT ---
+        # Style system prompt
         _style_prompts = {
             "concise": "Respond as concisely as possible. Use bullet points and short sentences.",
             "explanatory": "Explain your reasoning step-by-step. Be thorough and educational.",
@@ -1614,44 +860,28 @@ def chat_swarm(
         }
         _style_instruction = _style_prompts.get(style or "", "")
         if _style_instruction:
-            style_msg = {"role": "system", "content": f"[Style Instruction] {_style_instruction}"}
-            if history is None:
-                history = [style_msg]
-            else:
-                history = list(history) + [style_msg]
+            history = list(history or []) + [{"role": "system", "content": f"[Style Instruction] {_style_instruction}"}]
             yield _t(f"→ Style: {style}")
 
+        # Langfuse intent classification span
         if USE_LANGFUSE and langfuse:
             try:
-                langfuse.update_current_span(
-                    metadata={
-                        "intent": intent,
-                        "confidence": confidence,
-                        "reasoning": reasoning[:200],
-                        "owner_id": owner_id,
-                    }
-                )
-                # Create a dedicated span for intent classification
+                langfuse.update_current_span(metadata={"intent": intent, "confidence": confidence, "reasoning": reasoning[:200], "owner_id": owner_id})
                 with langfuse.start_as_current_observation(
-                    name="intent_classification",
-                    as_type="span",
+                    name="intent_classification", as_type="span",
                     input={"user_input": user_input[:2000]},
                     output={"intent": intent, "confidence": confidence, "reasoning": reasoning[:200]},
-                    metadata={
-                        "model": router_inst.model_name if hasattr(router_inst, "model_name") else "semantic_router",
-                        "fast_mode": _fast_mode,
-                    },
+                    metadata={"fast_mode": _fast_mode},
                 ):
                     pass
             except Exception:
                 pass
 
-        # --- JWT-ACE: Set active scope for this intent ---
+        # JWT-ACE scope for this intent
         if JWT_ACE_AVAILABLE:
             intent_caps = get_capabilities_for_intent(intent)
             set_active_scope(intent_caps.get("capabilities", []))
-            yield {"type": "log", "content": f"[JWT-ACE] Active scope set for {intent_caps.get('template_id', intent)} ({len(intent_caps.get('capabilities', []))} caps)"}
-            # Preserve per-intent metadata for performance recording
+            yield {"type": "log", "content": f"[JWT-ACE] Active scope set for {intent_caps.get('template_id', intent)}"}
             template_metadata.update({
                 "template_id": intent_caps.get("template_id", template_metadata.get("template_id")),
                 "template_version": template_metadata.get("template_version", "1.0"),
@@ -1660,1420 +890,143 @@ def chat_swarm(
 
         route_start_time = time.time()
 
-        # --- ROUTE: VISION (Image Analysis via VLM) ---
-        # Must be checked BEFORE CREATIVE_INTENTS to prevent "what do you see
-        # in this image?" from being redirected to the Art Studio.
+        # Build shared handler context
+        is_admin = _is_admin_session(session_id, owner_id)
+        ctx = {
+            "session_id": session_id,
+            "owner_id": owner_id,
+            "uid": uid,
+            "turn_id": turn_id,
+            "history": history,
+            "history_context": history_context,
+            "constraint_context": constraint_context,
+            "extracted_context": extracted_context,
+            "model": model,
+            "ace_token": ace_token,
+            "template_metadata": template_metadata,
+            "lf_trace": lf_trace,
+            "langfuse": langfuse,
+            "use_langfuse": USE_LANGFUSE,
+            "fast_mode": _fast_mode,
+            "research_mode": research_mode,
+            "ultraplan_mode": ultraplan_mode,
+            "dev_mode": dev_mode,
+            "conv_storage": _conv_storage,
+            "is_admin": is_admin,
+            "intent": intent,
+            "routing_decision": routing_decision,
+            "solving_max_iter": solving_max_iter,
+            "solving_max_time": solving_max_time,
+            "solving_solver_n_drafts": solving_solver_n_drafts,
+            "solving_solver_max_time": solving_solver_max_time,
+            "solving_verifier_n_runs": solving_verifier_n_runs,
+            "solving_verifier_max_time": solving_verifier_max_time,
+            "solving_corrector_n_passes": solving_corrector_n_passes,
+            "solving_corrector_max_time": solving_corrector_max_time,
+        }
+
+        # ---------------------------------------------------------------------------
+        # Handler dispatch
+        # ---------------------------------------------------------------------------
         if intent == "VISION":
-            yield _emit_turn_metadata(turn_id, "Vision Analyst", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "👁️ Vision Analyst: Analyzing image..."}
-            AGENT_STATE.labels(agent_name="VisionAnalyst").set(2)
-
-            VISION_MODEL = "moondream:latest"
-            VISION_HOST = get_best_host_for_model(VISION_MODEL)
-
-            try:
-                # Extract base64 image from attachments if present
-                image_data = None
-                if extracted_context:
-                    # Check if extracted_context contains base64 image data
-                    b64_match = re.search(r'data:image/[^;]+;base64,([A-Za-z0-9+/=]+)', extracted_context)
-                    if b64_match:
-                        image_data = b64_match.group(1)
-                    elif extracted_context.startswith("/9j/") or extracted_context.startswith("iVBOR"):
-                        # Raw base64 without data URI prefix
-                        image_data = extracted_context
-
-                if not image_data:
-                    yield {"type": "response", "content": (
-                        "👁️ **Vision Analyst**\n\n"
-                        "I can analyze images, but I don't see one attached to your message. "
-                        "Please upload an image and ask your question again."
-                    )}
-                    _score_trace(lf_trace, langfuse, 0.5)
-                    AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
-                    return
-
-                vlm_prompt = user_input
-                if history_context:
-                    vlm_prompt = f"{history_context}\n\n{vlm_prompt}"
-
-                payload = {
-                    "model": VISION_MODEL,
-                    "prompt": vlm_prompt,
-                    "images": [image_data],
-                    "stream": False
-                }
-
-                yield _emit_stream_mode("responding")
-                res = requests.post(f"{VISION_HOST}/api/generate", json=payload, timeout=120)
-                if res.status_code == 200:
-                    analysis = res.json().get("response", "No analysis returned.")
-                    yield {"type": "response", "content": f"👁️ **Vision Analyst**\n\n{analysis}"}
-                    _score_trace(lf_trace, langfuse, 0.9, output=analysis)
-                else:
-                    yield {"type": "error", "content": f"Vision model returned status {res.status_code}"}
-                    _score_trace(lf_trace, langfuse, 0.0)
-
-            except Exception as e:
-                logger.error(f"[Vision] Analysis failed: {e}", exc_info=True)
-                yield {"type": "error", "content": f"Vision analysis failed: {e}"}
-                _score_trace(lf_trace, langfuse, 0.0)
-
-            AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="VisionAnalyst").inc()
+            from handlers.vision import handle_vision
+            yield from handle_vision(user_input, ctx)
             return
 
-        # --- ROUTE: COORDINATE (Multi-Worker Orchestration) ---
         if intent == "COORDINATE":
-            # --- DEV MODE GATE: intercept build/project requests when not in dev mode ---
-            # Skipped if the user has explicitly opted into a "no files written" mode
-            # (research_mode = deep multi-perspective swarm; ultraplan_mode = plan-only).
-            # Those modes don't need dev tooling — the gate is purely about implementation.
-            _build_keywords = (
-                "build", "create", "make", "develop", "implement", "write a ",
-                "code ", "design a", "design an", "generate a", "generate an",
-                "program ", "app", "game", "website", "web app", "tool",
-            )
-            _is_build_request = any(kw in user_input.lower() for kw in _build_keywords)
-            _research_only = research_mode or ultraplan_mode
-            if not dev_mode and _is_build_request and not _research_only:
-                logger.info("[Router] Coding/project request detected in standard mode — showing dev mode gate.")
-                try:
-                    from brooks import save_pending_context as _save_ctx
-                    _save_ctx(
-                        {"type": "dev_mode_gate", "prompt": user_input},
-                        session_id=session_id,
-                        owner_id=owner_id,
-                    )
-                except Exception as _e:
-                    logger.warning(f"[DevModeGate] Could not save context: {_e}")
-                yield {
-                    "type": "clarification_card",
-                    "clarification": {
-                        "question": "This looks like a project build request. Dev Mode unlocks file creation, code execution, and a live workspace. How would you like to proceed?",
-                        "context": "You're in standard chat mode. Switching to **Dev Mode** gives the swarm full implementation tools.",
-                        "options": [
-                            {
-                                "label": "Switch to Dev Mode",
-                                "value": "switch_to_dev_mode",
-                                "description": "Open the Developer workspace",
-                                "redirect": "/dev",
-                            },
-                            {
-                                "label": "Request Dev Access",
-                                "value": "request_dev_access",
-                                "description": "Submit a governance request",
-                            },
-                            {
-                                "label": "Research & Plan Only",
-                                "value": "plan_only",
-                                "description": "Run the swarm, no files written",
-                            },
-                        ],
-                        "allow_freetext": False,
-                        "card_type": "dev_mode_gate",
-                    },
-                }
-                return
-            # --- END DEV MODE GATE ---
-
-            logger.info(f"[Coordinator] DEBUG: About to call coordinate_task with ultraplan_mode={ultraplan_mode}")
-            yield _emit_turn_metadata(turn_id, "Coordinator", ["thinking", "tool-use", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "🧩 Coordinator Mode: Initializing multi-worker orchestration..."}
-            AGENT_STATE.labels(agent_name="Coordinator").set(2)
-
-            try:
-                from lamport import coordinate_task
-
-                tool_call_id = f"tool-coordinator-{int(time.time()*1000)}"
-                yield _emit_tool_start(tool_call_id, "coordinate_task", {"intent": "COORDINATE"})
-                yield _emit_stream_mode("tool-use")
-
-                for update in coordinate_task(
-                    user_input=user_input,
-                    session_id=session_id,
-                    owner_id=owner_id,
-                    history_context=history_context,
-                    extracted_context=extracted_context,
-                    ace_token=ace_token,
-                    template_metadata=template_metadata,
-                    ultraplan_mode=ultraplan_mode,
-                    dev_mode=dev_mode,
-                    plan_mode=ultraplan_mode,  # ultraplan_mode = plan-only in execution layer
-                    research_mode=research_mode,  # enable perspective research swarm
-                ):
-                    yield update
-
-                yield _emit_tool_result(tool_call_id, "coordinate_task", "Coordination complete", True)
-                _score_trace(lf_trace, langfuse, 0.9)
-            except Exception as e:
-                logger.error(f"[Coordinator] Failed: {e}", exc_info=True)
-                if 'tool_call_id' in locals():
-                    yield _emit_tool_result(tool_call_id, "coordinate_task", f"Coordination failed: {e}", False)
-                yield {"type": "error", "content": f"Coordination failed: {e}"}
-                _score_trace(lf_trace, langfuse, 0.0)
-
-            AGENT_STATE.labels(agent_name="Coordinator").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="Coordinator").inc()
+            from handlers.coordinate import handle_coordinate
+            yield from handle_coordinate(user_input, ctx)
             return
 
-        # --- ART WORKSPACE OFFER (for creative intents) ---
-        # DISABLED: Allow inline media generation in chat instead of redirecting to Art Studio
-        # Creative intents will now proceed to actual generation code with media_attachment events
-        # CREATIVE_INTENTS = {"IMAGE", "3D", "ACTION_FIGURE"}
-        # if intent in CREATIVE_INTENTS:
-        #     mode_label = {"IMAGE": "Image", "3D": "3D Model", "ACTION_FIGURE": "Action Figure"}.get(intent, intent)
-        #     yield {
-        #         "type": "workspace_offer",
-        #         "content": json.dumps({
-        #             "intent": intent,
-        #             "prompt": user_input,
-        #             "message": f"This looks like a creative request. Switch to the Art Studio for {mode_label} generation."
-        #         })
-        #     }
-        #     yield {
-        #         "type": "response",
-        #         "content": (
-        #             f"🎨 **Creative Request Detected: {mode_label}**\n\n"
-        #             f"Switch to the **Art Studio** workspace (sidebar) for:\n"
-        #             f"- Advanced generation controls & model selection\n"
-        #             f"- Real-time 3D preview\n"
-        #             f"- Gallery management & batch export\n"
-        #             f"- Image upload for direct 3D conversion\n\n"
-        #             f"Your prompt has been saved and will auto-fill when you enter the Art Studio."
-        #         )
-        #     }
-        #     # Save prompt so Art Studio can pick it up
-        #     from brooks import save_pending_context
-        #     save_pending_context({
-        #         "type": "art_studio_redirect",
-        #         "intent": intent,
-        #         "prompt": user_input
-        #     }, session_id=session_id, owner_id=owner_id)
-        #     AGENT_STATE.labels(agent_name="Router").set(1)
-        #     return
-
-        # --- ROUTE: CONVERSATION / CASUAL CHAT ---
         if intent == "CONVERSATION":
-            yield _emit_turn_metadata(turn_id, "Hive Mind", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
-            AGENT_STATE.labels(agent_name="Conversationalist").set(2)
-
-            CONV_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
-            OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
-            
-            # THREE-TIER ACCESS CONTROL
-            is_admin = _is_admin_session(session_id, owner_id)
-            # dev_mode passed as parameter from API request
-            
-            # Determine capability tier
-            if is_admin:
-                # L3_ADMIN: Full system access + git operations
-                from tools.file_ops import read_file, write_file, list_dir
-                from tools.terminal import run_command
-                from tools.admin_file_ops import admin_read_file, admin_write_file, admin_list_dir
-                from tools.git_ops import git_status, git_checkout, git_commit, git_push, git_pull, git_branch_list
-                
-                agent_tools = [read_file, write_file, list_dir, run_command,
-                              admin_read_file, admin_write_file, admin_list_dir,
-                              git_status, git_checkout, git_commit, git_push, git_pull, git_branch_list]
-                
-                instructions = """You are Hive Mind, the AI assistant for the Agent Swarm infrastructure.
-                
-                ADMIN MODE ACTIVE - Full System Access:
-                
-                YOUR CAPABILITIES:
-                1. **Workspace Files**: read_file, write_file, list_dir (sandbox: /workspace/)
-                2. **Admin Files**: admin_read_file, admin_write_file, admin_list_dir (any path on any node)
-                3. **Terminal**: run_command (execute commands, Docker, SSH)
-                4. **Git Operations**: git_status, git_checkout, git_commit, git_push, git_pull, git_branch_list
-                   - Operates on Lovelace (192.168.2.101), Turing (192.168.2.103), Hopper (192.168.2.102)
-                   - Example: git_status("turing", "/home/misterobots/Home_AI_Lab")
-                5. **Task Routing**: Dispatch to CODE, DEVOPS, IMAGE, 3D, RESEARCH agents
-                
-                INFRASTRUCTURE:
-                - Docker (Turing gateway, services across all nodes)
-                - PostgreSQL, Redis (Hopper)
-                - Ollama LLMs (Turing qwen3:8b, Lovelace dual GPUs)
-                - Git repos on all nodes
-                
-                Keep responses concise. You have unrestricted system access."""
-                yield {"type": "log", "content": "[Conversationalist] Admin mode active - full system access"}
-                
-            elif dev_mode:
-                # L2_USER + dev_mode: Workspace-scoped only
-                from tools.file_ops import read_file, write_file, list_dir
-                from tools.terminal import run_command
-                
-                agent_tools = [read_file, write_file, list_dir, run_command]
-                
-                instructions = """You are Hive Mind, a friendly AI coding assistant.
-                
-                DEVELOPER MODE ACTIVE - Workspace Access:
-                
-                YOUR CAPABILITIES:
-                1. **Workspace Files**: read_file, write_file, list_dir (restricted to /workspace/ only)
-                2. **Terminal**: run_command (sandboxed shell, no SSH to other nodes)
-                3. **Task Routing**: Dispatch to CODE, DEVOPS, IMAGE, 3D, RESEARCH agents for specialized work
-                
-                RESTRICTIONS:
-                - File operations limited to /workspace/ directory (sandbox enforced)
-                - NO git operations (request admin access for this)
-                - NO SSH to Lovelace/Turing/Hopper (admin only)
-                - NO system-wide file access (admin only)
-                
-                Keep responses concise and focused on the coding task."""
-                yield {"type": "log", "content": "[Conversationalist] Developer mode - workspace sandbox active"}
-                
-            else:
-                # L1_PUBLIC / L2_USER: Conversation only
-                agent_tools = None
-                
-                instructions = """You are Hive Mind, a friendly AI assistant.
-                
-                YOUR CAPABILITIES:
-                - Answer questions and explain concepts clearly
-                - Provide research and analysis
-                - Have natural conversations
-                - Route complex tasks to specialized agents:
-                  * CODE: Software engineering, debugging, scripts
-                  * DEVOPS: Infrastructure, Docker, servers, deployment
-                  * IMAGE: 2D art generation
-                  * 3D: 3D modeling and action figures
-                  * RESEARCH: Deep analysis and investigation
-                  * DOCUMENTATION: Technical writing
-                
-                WHAT YOU CANNOT DO:
-                - Direct file system access (requires developer mode)
-                - Execute terminal commands (requires developer mode)
-                - Git operations (requires admin access)
-                - System administration (requires admin access)
-                
-                To unlock developer tools, ask your admin to enable developer mode for your session.
-                Keep responses concise and friendly."""
-                yield {"type": "log", "content": "[Conversationalist] Regular user mode - conversation only"}
-
-            conversationalist = Agent(
-                name="Hive Mind",
-                model=Ollama(
-                    id=CONV_MODEL,
-                    host=OLLAMA_HOST,
-                    client_kwargs={"timeout": 120.0},
-                ),
-                storage=_conv_storage,
-                session_id=session_id,
-                add_history_to_messages=True,
-                num_history_responses=10,
-                instructions=instructions,
-                tools=agent_tools,
-                show_tool_calls=False,
-                run_tool_calls=bool(agent_tools),
-            )
-
-            full_content = ""
-            try:
-                with _langfuse_span("conversation_generation", "Conversationalist", CONV_MODEL, user_input) as span_result:
-                    with request_lock(context="text"):
-                        response_stream = conversationalist.run(user_input, stream=True)
-                        for chunk in response_stream:
-                            if chunk.content:
-                                yield _emit_stream_mode("responding")
-                                full_content += chunk.content
-                                yield {"type": "message", "content": chunk.content}
-                    span_result["output"] = full_content
-                _score_trace(lf_trace, langfuse, 0.85, output=full_content)
-            except Exception as e:
-                _score_trace(lf_trace, langfuse, 0.0)
-                yield {"type": "error", "content": f"Conversation failed: {e}"}
-
-            AGENT_STATE.labels(agent_name="Conversationalist").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="Conversationalist").inc()
+            from handlers.conversation import handle_conversation
+            yield from handle_conversation(user_input, ctx)
             return
 
-        # --- ROUTE: DEVOPS / INFRASTRUCTURE ---
         if intent == "DEVOPS":
-            yield _emit_turn_metadata(turn_id, "DevOps Engineer", ["thinking", "tool-use", "responding"])
-            # Use team builder to resolve model for devops role
-            DEVOPS_MODEL = get_model_for_role(uid, "devops", default=DEVOPS_MODEL)
-            DEVOPS_MODEL = _resolve_model_for_intent("DEVOPS", DEVOPS_MODEL)
-            yield {"type": "status", "content": "🖥️ DevOps Engineer: Analyzing infrastructure task..."}
-            AGENT_STATE.labels(agent_name="DevOps").set(2)
-
-            OLLAMA_HOST = get_best_host_for_model(DEVOPS_MODEL)
-
-            devops_input = f"[DEVOPS TASK] {user_input}"
-            if history_context:
-                devops_input = f"{history_context}\n\n{devops_input}"
-                yield {"type": "log", "content": "[DevOps] Reviewed prior turns for continuity."}
-            if constraint_context:
-                devops_input = f"{constraint_context}\n\n{devops_input}"
-                yield {"type": "log", "content": "[DevOps] Injected active user constraints."}
-            if extracted_context:
-                devops_input = f"{devops_input}\n\n[Attached Context]:\n{extracted_context}"
-
-            if _fast_mode:
-                # --- HIVE FAST: single-pass Ollama (no MarsRL) ---
-                yield _t(f"→ Hive Fast: single-pass DevOps ({DEVOPS_MODEL})")
-                devops_agent = Agent(
-                    name="DevOps Engineer",
-                    model=Ollama(id=DEVOPS_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
-                    storage=_conv_storage,
-                    session_id=session_id,
-                    add_history_to_messages=True,
-                    num_history_responses=10,
-                    instructions="You are a DevOps engineer in a self-hosted home lab. Help with infrastructure, Docker, networking, and system administration tasks.",
-                    show_tool_calls=False,
-                )
-                full_content = ""
-                try:
-                    with _langfuse_span("devops_fast_generation", "DevOps", DEVOPS_MODEL, devops_input) as span_result:
-                        with request_lock(context="text"):
-                            yield _emit_stream_mode("responding")
-                            response_stream = devops_agent.run(devops_input, stream=True)
-                            for chunk in response_stream:
-                                if chunk.content:
-                                    full_content += chunk.content
-                                    yield {"type": "message", "content": chunk.content}
-                        span_result["output"] = full_content
-                    _score_trace(lf_trace, langfuse, 0.85, output=full_content)
-                except Exception as e:
-                    _score_trace(lf_trace, langfuse, 0.0)
-                    yield {"type": "error", "content": f"DevOps task failed: {e}"}
-            else:
-                # --- HIVE MIND: full MarsRL loop ---
-                solver = get_architect_agent(session_id=session_id)
-                verifier = get_verifier()
-                corrector = get_corrector()
-
-                mars = MarsRLLoop(
-                    solver=solver,
-                    verifier=verifier,
-                    corrector=corrector,
-                    max_iter=solving_max_iter if solving_max_iter is not None else 2,
-                    intent=intent,
-                    session_id=session_id,
-                    token=ace_token,
-                    template_metadata=template_metadata,
-                    max_time=solving_max_time if solving_max_time is not None else None,
-                    solver_n_drafts=solving_solver_n_drafts if solving_solver_n_drafts is not None else 1,
-                    solver_max_time=solving_solver_max_time,
-                    verifier_n_runs=solving_verifier_n_runs if solving_verifier_n_runs is not None else 1,
-                    verifier_max_time=solving_verifier_max_time,
-                    corrector_n_passes=solving_corrector_n_passes if solving_corrector_n_passes is not None else 1,
-                    corrector_max_time=solving_corrector_max_time,
-                )
-
-                yield {"type": "log", "content": f"[DevOps] Routing to MarsRL with infra context."}
-                yield _t(f"→ Routing to Architect ({DEVOPS_MODEL}) via MarsRL loop")
-                try:
-                    tool_call_id = f"tool-devops-{int(time.time()*1000)}"
-                    yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": "DEVOPS", "model": DEVOPS_MODEL})
-                    with request_lock(context="text"):
-                        yield _emit_stream_mode("tool-use")
-                        yield _emit_tool_progress(tool_call_id, "marsrl_loop", 25, "Initializing MarsRL loop")
-                        for update in mars_loop_stream(devops_input, mars):
-                            yield update
-                        yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "MarsRL loop complete")
-                    yield _emit_tool_result(tool_call_id, "marsrl_loop", "DevOps plan generated", True)
-                    _score_trace(lf_trace, langfuse, 0.9)
-                except Exception as e:
-                    yield _emit_tool_result(tool_call_id, "marsrl_loop", f"DevOps execution failed: {e}", False)
-                    _score_trace(lf_trace, langfuse, 0.0)
-                    raise e
-
-            AGENT_STATE.labels(agent_name="DevOps").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="DevOps").inc()
+            from handlers.devops import handle_devops
+            yield from handle_devops(user_input, ctx)
             return
 
-        # --- ROUTE: DATA ANALYSIS ---
         if intent == "DATA":
-            yield _emit_turn_metadata(turn_id, "Data Analyst", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "📊 Data Analyst: Processing your data request..."}
-            # Use team builder to resolve model for analyst role
-            DATA_MODEL = get_model_for_role(uid, "analyst", default=ANALYST_MODEL)
-            DATA_MODEL = _resolve_model_for_intent("DATA", DATA_MODEL)
-            OLLAMA_HOST = get_best_host_for_model(DATA_MODEL)
-
-            data_agent = Agent(
-                name="Data Analyst",
-                model=Ollama(id=DATA_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}),
-                instructions="""You are a Staff-Level Data Engineer and Analyst.
-                Expertise: SQL, Python (pandas/numpy/polars), data pipelines, statistical analysis, and data visualization.
-                For SQL queries: write clean, well-commented SQL with CTEs where appropriate.
-                For Python: use pandas or polars, include sample output in comments.
-                For analysis: provide clear findings with supporting logic.
-                Always explain your approach before diving into code.""",
-                show_tool_calls=False,
-            )
-
-            full_content = ""
-            try:
-                final_input = user_input
-                if history_context:
-                    final_input = f"{history_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[DataAnalyst] Reviewed prior turns for continuity."}
-                if extracted_context:
-                    yield {"type": "log", "content": f"[DataAnalyst] Reading attached context ({len(extracted_context)} chars)..."}
-                    final_input = f"{final_input}\n\n[Data Context]:\n{extracted_context}"
-
-                with _langfuse_span("data_analysis_generation", "DataAnalyst", DATA_MODEL, final_input) as span_result:
-                    with request_lock(context="text"):
-                        response_stream = data_agent.run(final_input, stream=True)
-                        yield {"type": "status", "content": "📊 Data Analyst: Generating analysis..."}
-                        for chunk in response_stream:
-                            if chunk.content:
-                                yield _emit_stream_mode("responding")
-                                full_content += chunk.content
-                                yield {"type": "message", "content": chunk.content}
-                    span_result["output"] = full_content
-                _score_trace(lf_trace, langfuse, 0.85, output=full_content)
-            except Exception as e:
-                _score_trace(lf_trace, langfuse, 0.0)
-                yield {"type": "error", "content": f"Data analysis failed: {e}"}
-
-            AGENT_STATE.labels(agent_name="DataAnalyst").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="DataAnalyst").inc()
+            from handlers.devops import handle_data
+            yield from handle_data(user_input, ctx)
             return
 
-        # --- AMBIGUITY CHECK ---
         if intent == "AMBIGUOUS":
-             question = routing_decision.get("disambiguation_question", "Could you clarify your request?")
-             
-             # SAVE CONTEXT so we remember what was ambiguous
-             from brooks import save_pending_context
-             save_pending_context({
-                 "type": "ambiguity_resolution",
-                 "prompt": user_input,
-                 "question": question
-             }, session_id=session_id, owner_id=owner_id)
-             
-             yield {
-                 "type": "clarification_card",
-                 "clarification": {
-                     "question": question,
-                     "context": None,
-                     "options": [],
-                     "allow_freetext": True,
-                     "card_type": "ambiguity",
-                 },
-             }
-             _score_trace(lf_trace, langfuse, 0.7, output=question)
-             AGENT_STATE.labels(agent_name="Router").set(1)
-             return
-        
-        # --- CONSULTATIVE LAYER: ART DIRECTOR ---
+            from handlers.devops import handle_ambiguous
+            yield from handle_ambiguous(user_input, ctx)
+            return
+
         if intent == "IMAGE":
-             # The user rejected fast-path: We ALWAYS consult the Art Director.
-             yield {"type": "status", "content": "🎨 Art Director: Reviewing your vision..."}
-             AGENT_STATE.labels(agent_name="ArtDirector").set(2)
-             
-             # Use team builder to resolve model for architect role (IMAGE uses architectural thinking)
-             MODEL_NAME = get_model_for_role(uid, "architect", default=ARCHITECT_MODEL)
-             MODEL_NAME = _resolve_model_for_intent("IMAGE", MODEL_NAME)
-             OLLAMA_HOST = get_best_host_for_model(MODEL_NAME)
-             
-             # SIMPLE DETERMINISTIC CHECKS (no LLM needed)
-             prompt_lower = user_input.lower()
-             
-             # Check for style keywords
-             has_style = any(kw in prompt_lower for kw in [
-                 # Photography / realism
-                 "photo", "photograph", "realistic", "hyperrealistic", "photorealistic",
-                 # Painting
-                 "painting", "oil painting", "watercolor", "acrylic", "gouache",
-                 "impressionist", "expressionist", "abstract",
-                 # Digital / illustration
-                 "digital art", "digital painting", "illustration", "concept art",
-                 "vector", "flat design", "isometric", "low poly", "pixel art",
-                 # Drawing / traditional
-                 "sketch", "drawing", "pencil", "charcoal", "ink", "pastel", "crayon",
-                 # 3D / render
-                 "3d render", "3d", "render", "cgi", "blender", "octane", "unreal engine",
-                 # Stylized
-                 "anime", "manga", "cartoon", "comic", "disney", "pixar", "chibi",
-                 "vintage", "retro", "noir", "cinematic", "fantasy", "surreal",
-                 # Portrait / decorative
-                 "portrait", "landscape", "minimalist", "sticker",
-             ])
-
-             # Check for setting / composition keywords
-             has_setting = any(kw in prompt_lower for kw in [
-                 # Explicit location nouns
-                 "background", "setting", "location", "scene", "environment",
-                 "forest", "jungle", "woods", "park",
-                 "city", "urban", "street", "alley", "skyline",
-                 "ocean", "sea", "beach", "lake", "river", "waterfall",
-                 "mountain", "desert", "field", "meadow", "valley",
-                 "space", "galaxy", "cosmos", "planet",
-                 "studio", "indoors", "outdoors", "room", "kitchen", "bedroom",
-                 "castle", "temple", "library", "lab", "dungeon",
-                 "white background", "black background", "gradient",
-                 # Prepositions as strong location indicators
-                 " in a ", " in the ", " on a ", " on the ",
-                 " at the ", " at a ", " inside ", " outside ",
-                 " under a ", " under the ", " above the ",
-                 " beside ", " near the ", " near a ",
-                 " surrounded by", " against a ", " against the ",
-             ])
-             
-             # Apply subject-aware defaults silently (Gemini-style) — no clarification interrupts
-             if not has_style or not has_setting:
-                 yield {"type": "log", "content": "[Art Director] Applying cinematic defaults — generating now."}
-
-             # Proceed to generation
-             yield {"type": "log", "content": "[Art Director] Prompt approved for Execution."}
-             AGENT_STATE.labels(agent_name="ArtDirector").set(1)
-             
-             # Execute generation inline (don't fall through to elif)
-             yield {"type": "status", "content": "🎨 Creative Studio: Spinning up..."}
-             AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
-             
-             # Use auto mode to let image_gen.py select best available model (FLUX)
-             from agents.specialized.image_gen import generate_image
-             yield {"type": "log", "content": f"[CreativeStudio] Generating: '{user_input}'"}
-             with request_lock(context="image"):
-                 response = generate_image(user_input, model_name="auto")
-             
-             # Extraction logic for artifact delivery
-             import re
-             image_match = re.search(r"Generated Image: ([\w\.-]+)", response)
-             if image_match:
-                 filename = image_match.group(1)
-                 
-                 # Source: where image_gen.py saved it (in agent_runtime container)
-                 source_path = os.path.join("/tmp/comfyui_images", filename)
-                 
-                 # === QUALITY CONTROL INSPECTION ===
-                 yield {"type": "status", "content": "🔍 Quality Control: Inspecting image..."}
-                 try:
-                     from specialized.quality_control_agent import inspect_generated_image
-                     qc_result = inspect_generated_image(source_path, user_input)
-                     
-                     overall_score = qc_result.get("overall_score", 0.0)
-                     passed = qc_result.get("passed", False)
-                     issues = qc_result.get("issues", [])
-                     
-                     logger.info(f"[QualityControl] Score: {overall_score:.1f}/10 | Passed: {passed}")
-                     
-                     if not passed:
-                         # Log issues but continue delivery (non-blocking QC for now)
-                         issue_text = ", ".join(issues) if issues and issues[0].lower() != "none" else "Minor quality concerns"
-                         yield {
-                             "type": "log",
-                             "content": f"⚠️ Quality Check: {overall_score:.1f}/10 - {issue_text}"
-                         }
-                         logger.warning(f"[QualityControl] Image quality below threshold but delivering anyway")
-                     else:
-                         yield {
-                             "type": "log",
-                             "content": f"✓ Quality Check: {overall_score:.1f}/10 - Excellent!"
-                         }
-                 except Exception as qc_error:
-                     logger.warning(f"[QualityControl] Inspection failed, proceeding with delivery: {qc_error}")
-                     yield {"type": "log", "content": "⚠️ Quality inspection unavailable, proceeding..."}
-                 
-                 # Destination: delivered_artifacts for UI serving
-                 delivery_dir = "/workspace/delivered_artifacts"
-                 if not os.path.exists(delivery_dir):
-                     os.makedirs(delivery_dir, exist_ok=True)
-                 delivery_path = os.path.join(delivery_dir, filename)
-                 
-                 try:
-                     # Copy from temp directory to delivered_artifacts
-                     if os.path.exists(source_path):
-                         import shutil
-                         shutil.copy2(source_path, delivery_path)
-                         logger.info(f"[CreativeStudio] Copied image to delivered_artifacts: {filename}")
-                         
-                         # Use media_metadata to create proper attachment structure
-                         from utils.media_metadata import extract_media_metadata
-                         media_meta = extract_media_metadata(
-                             filename,
-                             base_path=delivery_dir,
-                             url_prefix="/api/backend/delivered_artifacts"
-                         )
-                         
-                         if media_meta:
-                             yield {
-                                 "type": "media_attachment",
-                                 "content": media_meta
-                             }
-                             yield {"type": "response", "content": f"✨ Image generated: {filename}"}
-                             WORKFLOW_STEPS.labels(status="success", agent_type="CreativeStudio").inc()
-                         else:
-                             yield {"type": "error", "content": "Failed to create media metadata"}
-                     else:
-                         logger.error(f"[CreativeStudio] Source image not found: {source_path}")
-                         yield {"type": "error", "content": f"Image file not found after generation"}
-                 except Exception as e:
-                     logger.error(f"[CreativeStudio] Failed to deliver image: {e}")
-                     yield {"type": "error", "content": f"Image delivery failed: {e}"}
-             else:
-                 yield {"type": "error", "content": f"Could not extract filename from: {response}"}
-             
-             AGENT_STATE.labels(agent_name="CreativeStudio").set(1)
-             return
-
-        # --- ROUTE: DOC STANDARDS AGENT (admin-only /standardize-doc) ---
-        if intent == "DOC_STANDARDS":
-            yield _emit_turn_metadata(turn_id, "Doc Standards Agent", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-
-            # Admin gate
-            if not _is_admin_session(session_id, owner_id):
-                yield {"type": "error", "content": "🔒 `/standardize-doc` requires admin privileges (L3_ADMIN)."}
-                _audit_security_event("doc_standards_access_denied", {
-                    "session_id": session_id, "owner_id": owner_id,
-                    "reason": "insufficient_security_level",
-                })
-                logger.warning(f"[Router] Non-admin tried /standardize-doc: {owner_id}")
-                return
-
-            yield {"type": "status", "content": "📄 Doc Standards Agent: Parsing command..."}
-            AGENT_STATE.labels(agent_name="DocStandards").set(2)
-
-            # Parse command: /standardize-doc <filepath> [--flag ...]
-            import shlex
-            try:
-                parts = shlex.split(user_input)
-            except ValueError:
-                parts = user_input.split()
-
-            # Strip the command prefix
-            parts = [p for p in parts if not p.lower().startswith("/standardize")]
-            filepath = parts[0] if parts else ""
-            flags = parts[1:] if len(parts) > 1 else []
-
-            if not filepath:
-                # No filepath → full DocSite alignment scan
-                yield {"type": "status", "content": "📄 Doc Standards Agent: No file specified — running full DocSite alignment..."}
-                try:
-                    from specialized.doc_standards_agent import batch_scan
-                    for event in batch_scan(
-                        model=model,
-                        auto_fix=not dry_run,
-                        full_rewrite=full_rewrite,
-                    ):
-                        etype = event.get("type", "")
-                        econtent = event.get("content", "")
-                        if etype in ("response", "message"):
-                            yield _emit_stream_mode("responding")
-                            yield {"type": "message", "content": econtent}
-                        else:
-                            yield event
-                except Exception as e:
-                    logger.error(f"[DocStandards] Batch scan failed: {e}", exc_info=True)
-                    yield {"type": "error", "content": f"Doc Standards batch scan error: {e}"}
-
-                AGENT_STATE.labels(agent_name="DocStandards").set(1)
-                WORKFLOW_STEPS.labels(status="success", agent_type="DocStandards").inc()
-                return
-
-            full_rewrite = "--full-rewrite" in flags
-            dry_run = "--dry-run" in flags
-            source_ref = ""
-            external_urls = []
-
-            # Parse --source-ref value
-            if "--source-ref" in flags:
-                idx = flags.index("--source-ref")
-                if idx + 1 < len(flags):
-                    source_ref = flags[idx + 1]
-
-            # Parse --urls values
-            if "--urls" in flags:
-                idx = flags.index("--urls")
-                for u in flags[idx + 1:]:
-                    if u.startswith("--"):
-                        break
-                    if u.startswith("http"):
-                        external_urls.append(u)
-
-            try:
-                from specialized.doc_standards_agent import standardize_document
-                for event in standardize_document(
-                    filepath,
-                    model=model,
-                    source_ref=source_ref,
-                    external_urls=external_urls or None,
-                    full_rewrite=full_rewrite,
-                    dry_run=dry_run,
-                ):
-                    etype = event.get("type", "")
-                    econtent = event.get("content", "")
-                    if etype == "response":
-                        yield _emit_stream_mode("responding")
-                        yield {"type": "message", "content": econtent}
-                    else:
-                        yield event
-            except Exception as e:
-                logger.error(f"[DocStandards] Agent failed: {e}", exc_info=True)
-                yield {"type": "error", "content": f"Doc Standards Agent error: {e}"}
-
-            AGENT_STATE.labels(agent_name="DocStandards").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="DocStandards").inc()
+            from handlers.image import handle_image
+            yield from handle_image(user_input, ctx)
             return
 
-        # --- ROUTE: DOCUMENTATION / TECHNICAL WRITING ---
-        if intent == "DOCUMENTATION":
-            yield _emit_turn_metadata(turn_id, "Technical Writer", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "📝 Technical Writer: Reviewing document structure..."}
-            AGENT_STATE.labels(agent_name="TechnicalWriter").set(2)
-            
-            # Template-driven model selection with health-aware routing
-            TECH_MODEL = _resolve_model_for_intent("DOCUMENTATION", os.getenv("ARCHITECT_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))
-            OLLAMA_HOST = get_best_host_for_model(TECH_MODEL)
-            
-            tech_writer = Agent(
-                name="Technical Writer",
-                model=Ollama(id=TECH_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}),
-                instructions="""You are a Staff-Level Technical Writer.
-                Your goal is to rewrite, format, and organize documentation into professional, polished markdown.
-                If provided with large context files, synthesize the information accurately.
-                Focus on clarity, tone, accurate citations, and structured formatting (headings, lists, bolding).
-                """,
-                show_tool_calls=False
-            )
-            
-            try:
-                final_input = user_input
-                if history_context:
-                    final_input = f"{history_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[TechnicalWriter] Reviewed prior turns for continuity."}
-                if constraint_context:
-                    final_input = f"{constraint_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[TechnicalWriter] Injected active user constraints."}
-                
-                # Context integration
-                from memory_system import memory
-                doc_rules = memory.get_relevant_rules(user_input, "general_rules")
-                if doc_rules:
-                    rule_block = "\n".join([f"- {r}" for r in doc_rules])
-                    final_input = f"{final_input}\n\n[🧠 MEMORY] Apply these rules:\n{rule_block}"
-                    yield {"type": "log", "content": f"[Memory] Injected {len(doc_rules)} stylistic rules."}
-                    
-                if extracted_context:
-                    yield {"type": "log", "content": f"[TechnicalWriter] Reading Attached RAG Context ({len(extracted_context)} chars)..."}
-                    final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
-                    
-                with _langfuse_span("documentation_generation", "TechnicalWriter", TECH_MODEL, final_input) as span_result:
-                    with request_lock(context="text"):
-                        response_stream = tech_writer.run(final_input, stream=True)
-                        yield {"type": "status", "content": "📝 Technical Writer: Generating document..."}
-                        full_content = ""
-                        for chunk in response_stream:
-                            if chunk.content:
-                                yield _emit_stream_mode("responding")
-                                full_content += chunk.content
-                                yield {"type": "message", "content": chunk.content}
-                    
-                        yield {"type": "log", "content": "[TechnicalWriter] Document Transformation Complete."}
-                    span_result["output"] = full_content
-                _score_trace(lf_trace, langfuse, 0.85, output=full_content)
-
-            except Exception as e:
-                _score_trace(lf_trace, langfuse, 0.0)
-                yield {"type": "error", "content": f"Technical Writing Failed: {e}"}
-
-            AGENT_STATE.labels(agent_name="TechnicalWriter").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="TechnicalWriter").inc()
-            return
-
-        # --- ROUTE: RESEARCH / CHAT ---
-        if intent == "RESEARCH":
-            yield _emit_turn_metadata(turn_id, "Librarian", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "📚 Librarian Agent: Accessing Archives..."}
-            AGENT_STATE.labels(agent_name="Librarian").set(2)
-            
-            from agents.config import LIBRARIAN_MODEL
-
-            resolved_model = _resolve_model_for_intent("RESEARCH", LIBRARIAN_MODEL)
-            resolved_host = get_best_host_for_model(resolved_model)
-
-            researcher = Agent(
-                name="Librarian",
-                model=Ollama(id=resolved_model, host=resolved_host),
-                instructions="""You are the Hive Librarian and Scholar.
-                Your goal is to provide deep historical context, literary analysis, and general knowledge.
-                You are the guardian of facts and culture. Focus on: History, Literature, Philosophy, Science, and Factual Explanations.
-                If the user asks for code, decline and suggest they ask the Architect.
-                If the user asks for images, decline and suggest they ask the Art Director.
-                """,
-                show_tool_calls=False
-            )
-            
-            try:
-                final_input = user_input
-                if history_context:
-                    final_input = f"{history_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[Librarian] Reviewed prior turns for continuity."}
-                if constraint_context:
-                    final_input = f"{constraint_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[Librarian] Injected active user constraints."}
-                if extracted_context:
-                    yield {"type": "log", "content": "[Librarian] Reading Attached RAG Context..."}
-                    final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
-                    
-                with _langfuse_span("research_generation", "Librarian", resolved_model, final_input) as span_result:
-                    with request_lock(context="text"):
-                        response_stream = researcher.run(final_input, stream=True)
-                        yield {"type": "status", "content": "📚 Librarian Agent: Drafting response..."}
-                        full_content = ""
-                        for chunk in response_stream:
-                            if chunk.content:
-                                yield _emit_stream_mode("responding")
-                                full_content += chunk.content
-                                yield {"type": "message", "content": chunk.content}
-                    span_result["output"] = full_content
-                
-                yield {"type": "log", "content": f"[Research] Completed query: {user_input}"}
-                _score_trace(lf_trace, langfuse, 0.85, output=full_content)
-
-            except Exception as e:
-                _score_trace(lf_trace, langfuse, 0.0)
-                yield {"type": "error", "content": f"Research Failed: {e}"}
-
-            AGENT_STATE.labels(agent_name="Librarian").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="Librarian").inc()
-            return
-
-        # --- ROUTE: 3D GENERATION ---
         if intent == "3D":
-            yield {"type": "status", "content": "🔮 Router: Detected 3D Generation Request."}
-            
-            # Step A: Concept Art
-            yield {"type": "status", "content": "🎨 Creative Studio: Generating Concept Art..."}
-            AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
-            
-            from specialized.image_gen import generate_image
-            
-            concept_prompt = f"Concept art for 3d modeling, neutral background: {user_input}"
-            yield {"type": "log", "content": f"[CreativeStudio] Prompt Optimized: '{concept_prompt}'"}
-            
-            try:
-                with request_lock(context="image"):
-                    img_result = generate_image(concept_prompt) 
-                yield {"type": "status", "content": f"🖼️ {img_result}"}
-                yield {"type": "log", "content": f"[CreativeStudio] Output: {img_result}"}
-                AGENT_STATE.labels(agent_name="CreativeStudio").set(1)
-                
-                import re
-                match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
-                
-                if match:
-                    filename = match.group(1)
-                    full_image_path = f"/app/comfy_io/output/{filename}" 
-                    
-                    # Step B: 3D Forge
-                    yield {"type": "status", "content": "⚒️ Creature Forge: Hammering Geometry..."}
-                    AGENT_STATE.labels(agent_name="Forge").set(2)
-                    
-                    from specialized.forge_agent import generate_3d_model
-                    
-                    yield {"type": "log", "content": f"[Forge] Processing: {full_image_path} (High-Res Mode)"}
-                    with request_lock(context="image"):
-                        forge_result = generate_3d_model(full_image_path)
-                    AGENT_STATE.labels(agent_name="Forge").set(1)
-                    
-                    # Yield 3D Artifact
-                    yield {
-                        "type": "artifact", 
-                        "content": {
-                            "type": "3d_model", 
-                            "path": f"{filename}.glb", 
-                            "name": f"Creature_{filename}"
-                        }
-                    }
-                    
-                    yield {"type": "response", "content": forge_result}
-                    WORKFLOW_STEPS.labels(status="success", agent_type="Forge").inc()
-                    return
-                else:
-                    yield {"type": "error", "content": f"Failed to parse image filename from: {img_result}"}
-                    WORKFLOW_STEPS.labels(status="error", agent_type="CreativeStudio").inc()
-                    return
-            except Exception as e:
-                yield {"type": "error", "content": f"Concept Generation Failed: {e}"}
-                yield {"type": "log", "content": f"[Exception] {str(e)}"}
-                return
+            from handlers.media import handle_3d
+            yield from handle_3d(user_input, ctx)
+            return
 
-        # --- ROUTE: ACTION FIGURE GENERATION ---
         if intent == "ACTION_FIGURE":
-            yield {"type": "status", "content": "🦾 Router: Detected Action Figure Request."}
-
-            # Step A: Concept Art (T-Pose optimized)
-            yield {"type": "status", "content": "🎨 Action Figure Forge: Generating T-Pose Concept Art..."}
-            AGENT_STATE.labels(agent_name="ActionFigureForge").set(2)
-
-            from specialized.image_gen import generate_image
-
-            concept_prompt = (
-                f"T-pose character concept art for 3D action figure, "
-                f"full body front view, neutral gray background, "
-                f"arms extended to sides, symmetrical pose, "
-                f"clean silhouette for 3D modeling: {user_input}"
-            )
-            yield {"type": "log", "content": f"[ActionFigureForge] Prompt: '{concept_prompt}'"}
-
-            try:
-                with request_lock(context="image"):
-                    img_result = generate_image(concept_prompt)
-                yield {"type": "status", "content": f"🖼️ {img_result}"}
-                yield {"type": "log", "content": f"[ActionFigureForge] Concept Art: {img_result}"}
-
-                import re
-                match = re.search(r"Generated Image: ([\w\.-]+)", img_result)
-
-                if match:
-                    filename = match.group(1)
-                    full_image_path = f"/app/comfy_io/output/{filename}"
-
-                    # Step B: Action Figure Pipeline (3D mesh + segmentation + joints)
-                    yield {"type": "status", "content": "⚒️ Action Figure Forge: Generating mesh & adding ball-socket joints..."}
-
-                    from specialized.action_figure_agent import generate_action_figure
-
-                    yield {"type": "log", "content": f"[ActionFigureForge] Processing: {full_image_path}"}
-                    with request_lock(context="image"):
-                        figure_result = generate_action_figure(full_image_path)
-                    AGENT_STATE.labels(agent_name="ActionFigureForge").set(1)
-
-                    # Yield Action Figure Artifact
-                    yield {
-                        "type": "artifact",
-                        "content": {
-                            "type": "action_figure",
-                            "path": f"action_figures/",
-                            "name": f"ActionFigure_{filename}"
-                        }
-                    }
-
-                    yield {"type": "response", "content": figure_result}
-                    WORKFLOW_STEPS.labels(status="success", agent_type="ActionFigureForge").inc()
-                    return
-                else:
-                    yield {"type": "error", "content": f"Failed to parse image filename from: {img_result}"}
-                    WORKFLOW_STEPS.labels(status="error", agent_type="ActionFigureForge").inc()
-                    return
-            except Exception as e:
-                yield {"type": "error", "content": f"Action Figure Generation Failed: {e}"}
-                yield {"type": "log", "content": f"[Exception] {str(e)}"}
-                return
-
-        # --- ROUTE: IMAGE GENERATION ---
-        elif intent == "IMAGE":
-            yield {"type": "status", "content": "🎨 Creative Studio: Spinning up..."}
-            AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
-            
-            # Use auto mode to let image_gen.py select best available model (FLUX)
-            from agents.specialized.image_gen import generate_image
-            with request_lock(context="image"):
-                response = generate_image(user_input, model_name="auto")
-            
-            # Extraction logic for artifact delivery
-            import re
-            image_match = re.search(r"Generated Image: ([\w\.-]+)", response)
-            if image_match:
-                filename = image_match.group(1)
-                
-                # Source: where image_gen.py saved it (in agent_runtime container)
-                source_path = os.path.join("/tmp/comfyui_images", filename)
-                
-                # === QUALITY CONTROL INSPECTION ===
-                yield {"type": "status", "content": "🔍 Quality Control: Inspecting image..."}
-                try:
-                    from specialized.quality_control_agent import inspect_generated_image
-                    qc_result = inspect_generated_image(source_path, user_input)
-                    
-                    overall_score = qc_result.get("overall_score", 0.0)
-                    passed = qc_result.get("passed", False)
-                    issues = qc_result.get("issues", [])
-                    
-                    logger.info(f"[QualityControl] Score: {overall_score:.1f}/10 | Passed: {passed}")
-                    
-                    if not passed:
-                        # Log issues but continue delivery (non-blocking QC for now)
-                        issue_text = ", ".join(issues) if issues and issues[0].lower() != "none" else "Minor quality concerns"
-                        yield {
-                            "type": "log",
-                            "content": f"⚠️ Quality Check: {overall_score:.1f}/10 - {issue_text}"
-                        }
-                        logger.warning(f"[QualityControl] Image quality below threshold but delivering anyway")
-                    else:
-                        yield {
-                            "type": "log",
-                            "content": f"✓ Quality Check: {overall_score:.1f}/10 - Excellent!"
-                        }
-                except Exception as qc_error:
-                    logger.warning(f"[QualityControl] Inspection failed, proceeding with delivery: {qc_error}")
-                    yield {"type": "log", "content": "⚠️ Quality inspection unavailable, proceeding..."}
-                
-                # Destination: delivered_artifacts for UI serving
-                delivery_dir = "/workspace/delivered_artifacts"
-                if not os.path.exists(delivery_dir):
-                    os.makedirs(delivery_dir, exist_ok=True)
-                delivery_path = os.path.join(delivery_dir, filename)
-                
-                try:
-                    # Copy from temp directory to delivered_artifacts
-                    if os.path.exists(source_path):
-                        import shutil
-                        shutil.copy2(source_path, delivery_path)
-                        logger.info(f"[CreativeStudio] Copied image to delivered_artifacts: {filename}")
-                        
-                        # Use media_metadata to create proper attachment structure
-                        from utils.media_metadata import extract_media_metadata
-                        media_meta = extract_media_metadata(
-                            filename,
-                            base_path=delivery_dir,
-                            url_prefix="/api/backend/delivered_artifacts"
-                        )
-                        
-                        if media_meta:
-                            # Emit media_attachment event for UI
-                            yield {
-                                "type": "media_attachment",
-                                "content": media_meta  # content, not media
-                            }
-                            logger.info(f"[CreativeStudio] Media attachment emitted: {filename}")
-                    else:
-                        logger.warning(f"[CreativeStudio] Image not found at {source_path}")
-                except Exception as e:
-                    logger.error(f"[CreativeStudio] Error delivering image: {e}", exc_info=True)
-            
-            # Clear quality preference after use so it doesn't persist to next image
-            from brooks import clear_context
-            clear_context(session_id=session_id, owner_id=owner_id)
-            
-            AGENT_STATE.labels(agent_name="CreativeStudio").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="CreativeStudio").inc()
-            yield {"type": "response", "content": response}
-            _score_trace(lf_trace, langfuse, 0.9, output=response)
+            from handlers.media import handle_action_figure
+            yield from handle_action_figure(user_input, ctx)
             return
 
-        # --- ROUTE: DESIGN STUDIO (Open Design) ---
+        if intent == "DOC_STANDARDS":
+            from handlers.research import handle_doc_standards
+            yield from handle_doc_standards(user_input, ctx)
+            return
+
+        if intent == "DOCUMENTATION":
+            from handlers.research import handle_documentation
+            yield from handle_documentation(user_input, ctx)
+            return
+
+        if intent == "CREATIVE":
+            from handlers.creative import handle_creative
+            yield from handle_creative(user_input, ctx)
+            return
+
+        if intent == "RESEARCH":
+            from handlers.research import handle_research
+            yield from handle_research(user_input, ctx)
+            return
+
         if intent == "DESIGN":
-            yield _emit_turn_metadata(turn_id, "Design Studio", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "🎨 Design Studio: Preparing..."}
-            AGENT_STATE.labels(agent_name="DesignStudio").set(2)
+            from handlers.design import handle_design
+            yield from handle_design(user_input, ctx)
+            return
 
-            try:
-                from specialized.open_design_client import OpenDesignClient
-                import os as _os
-
-                od = OpenDesignClient()
-
-                # Skill mapping based on request content
-                _dl = user_input.lower()
-                if any(kw in _dl for kw in ["deck", "slide", "ppt", "presentation"]):
-                    skill_id = "guizang-ppt"
-                elif any(kw in _dl for kw in ["dashboard", "analytics", "metrics"]):
-                    skill_id = "dashboard"
-                elif any(kw in _dl for kw in ["landing", "saas", "marketing page"]):
-                    skill_id = "saas-landing"
-                elif any(kw in _dl for kw in ["mobile", "ios", "android", "app screen"]):
-                    skill_id = "mobile-app"
-                else:
-                    skill_id = "web-prototype"
-
-                yield {"type": "log", "content": f"[DesignStudio] Skill: {skill_id}"}
-
-                # Create project
-                yield {"type": "status", "content": "🎨 Design Studio: Creating project..."}
-                project = od.create_project(
-                    name=f"design-{int(__import__('time').time())}",
-                    skill_id=skill_id,
-                )
-                project_id = project["project"]["id"]
-                yield {"type": "log", "content": f"[DesignStudio] Project: {project_id}"}
-
-                # Create and start a run
-                yield {"type": "status", "content": "🎨 Design Studio: Running design agent..."}
-                run_resp = od.start_run(
-                    project_id=project_id,
-                    message=user_input,
-                    skill_id=skill_id,
-                )
-                run_id = run_resp["runId"]
-                yield {"type": "log", "content": f"[DesignStudio] Run: {run_id}"}
-
-                # Stream and collect the artifact HTML
-                html_content = None
-                artifact_id = None
-                for art_event in od.stream_run(run_id):
-                    if art_event["type"] == "artifact:end":
-                        html_content = art_event["fullContent"]
-                        artifact_id = art_event["identifier"]
-                    elif art_event["type"] == "text":
-                        pass  # agent commentary — ignore
-
-                if not html_content:
-                    yield {"type": "error", "content": "Design Studio: No artifact generated."}
-                    logger.error("[DesignStudio] No artifact generated for run %s", run_id)
-                    return
-
-                # Save to delivered_artifacts for serving
-                delivery_dir = "/workspace/delivered_artifacts"
-                _os.makedirs(delivery_dir, exist_ok=True)
-                filename = f"design_{project_id}.html"
-                delivery_path = _os.path.join(delivery_dir, filename)
-                with open(delivery_path, "w", encoding="utf-8") as _fh:
-                    _fh.write(html_content)
-                yield {"type": "log", "content": f"[DesignStudio] Saved: {filename}"}
-
-                AGENT_STATE.labels(agent_name="DesignStudio").set(1)
-                WORKFLOW_STEPS.labels(status="success", agent_type="DesignStudio").inc()
-
-                yield {
-                    "type": "design_artifact",
-                    "content": {
-                        "html": html_content,
-                        "project_id": project_id,
-                        "project_url": "http://192.168.2.101:17573",
-                        "filename": filename,
-                        "skill": skill_id,
-                    }
-                }
-                yield {"type": "response", "content": f"✨ Design created! [Open in Design Studio](http://192.168.2.101:17573)"}
-                _score_trace(lf_trace, langfuse, 0.9, output=f"design_artifact:{filename}")
-                return
-
-            except Exception as e:
-                AGENT_STATE.labels(agent_name="DesignStudio").set(1)
-                WORKFLOW_STEPS.labels(status="error", agent_type="DesignStudio").inc()
-                logger.error("[DesignStudio] Exception: %s", str(e), exc_info=True)
-                yield {"type": "error", "content": f"Design Studio failed: {e}"}
-                yield {"type": "log", "content": f"[DesignStudio] Exception: {str(e)}"}
-                return
-
-        # --- ROUTE: TRAINER (FEEDBACK LOOP) ---
         if intent == "TRAIN":
-            yield _emit_turn_metadata(turn_id, "Memory Controller", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "🧠 Memory Controller: Learning new skill..."}
-            from memory_system import memory
-            
-            domain = "general_rules" 
-            keyword = "general"
-            rule = user_input
-            
-            if "code" in user_input or "python" in user_input or "script" in user_input:
-                domain = "coding_rules"
-            elif "image" in user_input or "style" in user_input or "look" in user_input:
-                domain = "visual_rules"
-                
-            import re
-            match = re.search(r"(?:remember that|correction:|learn:) (.+?) (?:means|is|should be) (.+)", user_input, re.IGNORECASE)
-            
-            if match:
-                keyword = match.group(1).strip()
-                rule = match.group(2).strip()
-                
-            result = memory.add_rule(domain, keyword, rule)
-
-            # Also mirror into MemPalace as a procedural memory via the HTTP
-            # service. Failure is non-critical — the rule is already in
-            # Skills Memory; this only adds semantic recall.
-            # chat_swarm is a sync generator, so use sync requests here.
-            try:
-                _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
-                requests.post(
-                    f"{_mp_url}/v1/memories",
-                    json={
-                        "content": f"{keyword}: {rule}",
-                        "memory_type": "procedural",
-                        "domain": domain.replace("_rules", ""),
-                        "owner_id": owner_id,
-                    },
-                    timeout=5.0,
-                )
-            except Exception as _mp_exc:
-                logger.debug("[MemPalace] TRAIN mirror failed: %s", _mp_exc)
-
-            yield {"type": "response", "content": f"🧠 **Learned**: {result}"}
-            _score_trace(lf_trace, langfuse, 1.0, output=result)
+            from handlers.train import handle_train
+            yield from handle_train(user_input, ctx)
             return
 
-        # --- ROUTE: IOT CONTROLLER (HOME ASSISTANT) ---
         if intent == "IOT_CONTROL":
-            yield _emit_turn_metadata(turn_id, "IoT Controller", ["thinking", "responding"])
-            yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "🏠 IoT Controller: Connecting to Home..."}
-            AGENT_STATE.labels(agent_name="IoTController").set(2)
-
-            from specialized.iot_agent import get_iot_agent
-            iot_agent = get_iot_agent()
-
-            try:
-                yield {"type": "log", "content": f"[IoT] Dispatching: '{user_input}'"}
-                response: RunResponse = iot_agent.run(user_input)
-                yield {"type": "response", "content": response.content}
-                _score_trace(lf_trace, langfuse, 1.0, output=response.content)
-            except Exception as e:
-                _score_trace(lf_trace, langfuse, 0.0)
-                yield {"type": "error", "content": f"IoT Error: {e}"}
-
-            AGENT_STATE.labels(agent_name="IoTController").set(1)
-            WORKFLOW_STEPS.labels(status="success", agent_type="IoTController").inc()
+            from handlers.train import handle_iot_control
+            yield from handle_iot_control(user_input, ctx)
             return
 
-        # --- ROUTE: STANDARD ARCHITECT / CODE (MarsRL Loop or Fast Pass) ---
-        # Only fall through if no specialized route handled this intent
-        if intent not in ("CONVERSATION", "DEVOPS", "DATA", "AMBIGUOUS", "IMAGE",
-                          "DOCUMENTATION", "RESEARCH", "3D", "ACTION_FIGURE"):
-            # Use team builder to resolve model for coder/architect role
-            ARCH_MODEL = get_model_for_role(uid, "coder", default=ARCHITECT_MODEL)
-            ARCH_MODEL = os.getenv('ARCHITECT_MODEL', ARCH_MODEL)
-            OLLAMA_HOST = get_best_host_for_model(ARCH_MODEL)
-
-            try:
-                from memory_system import memory
-                code_rules = memory.get_relevant_rules(user_input, "coding_rules")
-                
-                final_input = user_input
-                if history_context:
-                    final_input = f"{history_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[Architect] Reviewed prior turns for continuity."}
-                if constraint_context:
-                    final_input = f"{constraint_context}\n\n{final_input}"
-                    yield {"type": "log", "content": "[Architect] Injected active user constraints."}
-                if code_rules:
-                    rule_block = "\n".join([f"- {r}" for r in code_rules])
-                    final_input = f"{final_input}\n\n[🧠 MEMORY] Apply these user-taught coding rules:\n{rule_block}"
-                    yield {"type": "log", "content": f"[Memory] Injected {len(code_rules)} coding rules."}
-
-                if extracted_context:
-                    final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
-
-                if _fast_mode:
-                    # --- HIVE FAST: single-pass Ollama (no MarsRL) ---
-                    yield _emit_turn_metadata(turn_id, "Architect (Fast)", ["thinking", "responding"])
-                    yield _emit_stream_mode("thinking")
-                    yield {"type": "status", "content": "⚡ Architect (Fast): Generating..."}
-                    AGENT_STATE.labels(agent_name="Architect").set(2)
-                    yield _t(f"→ Hive Fast: single-pass Architect ({ARCH_MODEL})")
-
-                    fast_agent = Agent(
-                        name="Architect",
-                        model=Ollama(id=ARCH_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
-                        storage=_conv_storage,
-                        session_id=session_id,
-                        add_history_to_messages=True,
-                        num_history_responses=10,
-                        instructions="""You are the Hive Mind Architect, an expert software engineer and system designer.
-Write clean, correct, production-quality code. Explain your reasoning concisely.
-You run on local hardware in a self-hosted home lab.""",
-                        show_tool_calls=False,
-                    )
-                    full_content = ""
-                    with _langfuse_span("architect_fast_generation", "Architect", ARCH_MODEL, final_input) as span_result:
-                        with request_lock(context="text"):
-                            yield _emit_stream_mode("responding")
-                            response_stream = fast_agent.run(final_input, stream=True)
-                            for chunk in response_stream:
-                                if chunk.content:
-                                    full_content += chunk.content
-                                    yield {"type": "message", "content": chunk.content}
-                        span_result["output"] = full_content
-                    _score_trace(lf_trace, langfuse, 0.85, output=full_content)
-                else:
-                    # --- HIVE MIND: full MarsRL loop ---
-                    yield _emit_turn_metadata(turn_id, "Architect", ["thinking", "tool-use", "responding"])
-                    yield _emit_stream_mode("thinking")
-                    yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}
-                    AGENT_STATE.labels(agent_name="Architect").set(2)
-
-                    solver = get_architect_agent(session_id=session_id)
-                    verifier = get_verifier()
-                    corrector = get_corrector()
-
-                    mars = MarsRLLoop(
-                        solver=solver,
-                        verifier=verifier,
-                        corrector=corrector,
-                        max_iter=solving_max_iter if solving_max_iter is not None else 2,
-                        intent=intent,
-                        session_id=session_id,
-                        token=ace_token,
-                        template_metadata=template_metadata,
-                        max_time=solving_max_time if solving_max_time is not None else None,
-                        solver_n_drafts=solving_solver_n_drafts if solving_solver_n_drafts is not None else 1,
-                        solver_max_time=solving_solver_max_time,
-                        verifier_n_runs=solving_verifier_n_runs if solving_verifier_n_runs is not None else 1,
-                        verifier_max_time=solving_verifier_max_time,
-                        corrector_n_passes=solving_corrector_n_passes if solving_corrector_n_passes is not None else 1,
-                        corrector_max_time=solving_corrector_max_time,
-                    )
-
-                    yield {"type": "log", "content": f"[MarsRL] Intent: {intent} | Loop initialized."}
-
-                    yield _t(f"→ Routing to Architect ({ARCH_MODEL}) via MarsRL loop")
-                    tool_call_id = f"tool-architect-{int(time.time()*1000)}"
-                    yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": intent})
-                    with request_lock(context="text"):
-                        yield _emit_stream_mode("tool-use")
-                        yield _emit_tool_progress(tool_call_id, "marsrl_loop", 20, "Solver started")
-                        for update in mars_loop_stream(final_input, mars):
-                            if update.get("type") == "log" and "[MarsRL] Iterations:" in update.get("content", ""):
-                                pass
-                            yield update
-                        yield _emit_tool_progress(tool_call_id, "marsrl_loop", 100, "Loop complete")
-                    yield _emit_tool_result(tool_call_id, "marsrl_loop", "Architect response generated", True)
-
-            except Exception as e:
-                error_str = str(e)
-                if 'tool_call_id' in locals():
-                    yield _emit_tool_result(tool_call_id, "marsrl_loop", f"Architect loop failed: {error_str}", False)
-                yield {"type": "log", "content": f"[Exception] MarsRL Crash: {error_str}"}
-
-                package_match = re.search(r"No module named '(\w+)'", error_str) or \
-                                re.search(r"custom_nodes\\(\w+)", error_str)
-
-                if package_match:
-                    missing_pkg = package_match.group(1)
-                    yield {"type": "status", "content": f"🚨 Gatekeeper: Missing '{missing_pkg}'"}
-                    security = get_security_agent()
-                    review = security.review_dependency(missing_pkg)
-                    # Allow only normalized package names (no URL/options/extras markers).
-                    is_valid_pkg = bool(re.fullmatch(r"[A-Za-z0-9_\-]+", missing_pkg))
-                    if review.content == "SAFE" and is_valid_pkg:
-                        subprocess.check_call([sys.executable, "-m", "pip", "install", missing_pkg])
-                        yield {"type": "status", "content": f"💾 Fixed: Installed '{missing_pkg}'."}
-                    elif not is_valid_pkg:
-                        yield {"type": "error", "content": f"🚫 Security: Blocked invalid package token '{missing_pkg}'"}
-                        return
-                    else:
-                        yield {"type": "error", "content": f"🚫 Security: Blocked '{missing_pkg}'"}
-                        return
-                else:
-                    raise e
-
-            WORKFLOW_STEPS.labels(status="success", agent_type="Architect").inc()
-            AGENT_STATE.labels(agent_name="Architect").set(1)
+        # Default: architect / code
+        from handlers.architect import handle_architect
+        yield from handle_architect(user_input, ctx)
 
     except Exception as e:
         yield {"type": "error", "content": f"🔥 Error: {e}"}
         WORKFLOW_STEPS.labels(status="error", agent_type="Router").inc()
+
     finally:
         try:
-            # Emit the Langfuse trace ID as turn metadata so the UI can
-            # show it in the expandable Agent Trace, not in the response body.
+            from handlers.base import _emit_stream_mode, _emit_turn_boundary, _emit_continuation_hint
             if USE_LANGFUSE and lf_trace:
                 yield {"type": "turn_metadata", "turnMetadata": {"traceId": lf_trace}}
-            # Fallback: if web_builder wrote a URL during this turn (any routing path),
-            # emit set_preview_url so the chat preview pane opens automatically.
+            # Fallback preview URL
             try:
                 _url_file = "/tmp/web_builder_last_url.txt"
                 if os.path.exists(_url_file):
                     _url_mtime = os.path.getmtime(_url_file)
-                    _turn_start = route_start_time if 'route_start_time' in locals() else 0
+                    _turn_start = route_start_time if 'route_start_time' in dir() else 0
                     if _url_mtime >= _turn_start:
                         with open(_url_file) as _f:
                             _fallback_url = _f.read().strip()
@@ -3088,26 +1041,17 @@ You run on local hardware in a self-hosted home lab.""",
         except Exception:
             pass
         AGENT_STATE.labels(agent_name="Router").set(1)
-        # Close Langfuse trace context and flush
+
+        # Flush Langfuse
         if USE_LANGFUSE and langfuse:
             try:
-                # Flush collected thoughts/logs as a dedicated reasoning span
                 if _trace_thoughts:
-                    reasoning_text = "\n".join(
-                        f"[{t.get('type','?')}] {t.get('content','')}" for t in _trace_thoughts
-                    )
+                    reasoning_text = "\n".join(f"[{t.get('type','?')}] {t.get('content','')}" for t in _trace_thoughts)
                     with langfuse.start_as_current_observation(
-                        name="reasoning_narrative",
-                        as_type="span",
+                        name="reasoning_narrative", as_type="span",
                         input={"user_input": user_input[:2000]},
                         output={"reasoning": reasoning_text[:8000]},
-                        metadata={
-                            "step_count": len(_trace_thoughts),
-                            "intent": intent if 'intent' in dir() else "UNKNOWN",
-                            "model": model,
-                            "fast_mode": _fast_mode if '_fast_mode' in dir() else False,
-                            "elapsed_s": round(time.time() - route_start_time, 2),
-                        },
+                        metadata={"step_count": len(_trace_thoughts), "intent": intent if 'intent' in dir() else "UNKNOWN", "model": model, "fast_mode": _fast_mode if '_fast_mode' in dir() else False, "elapsed_s": round(time.time() - route_start_time, 2)},
                     ):
                         pass
             except Exception as e:
@@ -3121,42 +1065,38 @@ You run on local hardware in a self-hosted home lab.""",
                 langfuse.flush()
             except Exception:
                 pass
-        # Clean up JWT-ACE execution context
+
+        # JWT-ACE cleanup
         if JWT_ACE_AVAILABLE:
             try:
                 clear_active_scope()
                 clear_current_token()
             except Exception:
                 pass
-        # Record performance metrics
+
+        # Performance recording
         if template_metadata:
             latency_ms = int((time.time() - route_start_time) * 1000) if 'route_start_time' in dir() else None
-            _record_performance(intent if 'intent' in dir() else "UNKNOWN", template_metadata, {
-                "session_id": session_id,
-                "latency_ms": latency_ms,
-            })
-        # Record A/B test result if applicable
+            _record_performance(intent if 'intent' in dir() else "UNKNOWN", template_metadata, {"session_id": session_id, "latency_ms": latency_ms})
+
+        # A/B test result
         if AB_TESTING_AVAILABLE and template_metadata.get("template_id"):
             try:
                 ab_mgr = get_ab_manager()
-                # Use final_score from performance if available, else default
                 ab_score = template_metadata.get("final_score", 0.0)
                 model_used = template_metadata.get("model_used")
                 if model_used and ab_score:
-                    ab_mgr.record_result(
-                        template_id=template_metadata["template_id"],
-                        model_used=model_used,
-                        score=ab_score,
-                        latency_ms=latency_ms,
-                    )
+                    ab_mgr.record_result(template_id=template_metadata["template_id"], model_used=model_used, score=ab_score, latency_ms=latency_ms)
             except Exception:
                 pass
 
+
 def run_swarm(user_input: str):
-    """CLI Wrapper for chat_swarm"""
+    """CLI wrapper for chat_swarm."""
     print(f"--- [Swarm] Receiving Task: {user_input} ---")
     for update in chat_swarm(user_input, session_id="cli_session"):
         print(f"[{update['type'].upper()}] {update['content']}")
+
 
 if __name__ == "__main__":
     run_swarm("Write a Python script to calculate the Fibonacci sequence.")

@@ -71,7 +71,12 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(
         r"\b(write\s+(a\s+)?script|fix\s+(the\s+)?bug|implement\s+|refactor\b"
         r"|write\s+(a\s+)?(function|class|module|program|api)|debug\s+this"
-        r"|code\s+(this|that|it)|create\s+(a\s+)?(script|app|program))\b",
+        r"|code\s+(this|that|it)|create\s+(a\s+)?(script|app|program)"
+        r"|build\s+(me\s+)?(a\s+)?(\w+\s+){0,3}(app|application|script|program|tool|service|api|website|bot|game|extension|plugin|cli|library)"
+        r"|develop\s+(a\s+)?(app|application|script|program|feature|tool|service|api|website|bot|game)"
+        r"|work\s+on\s+(improving|fixing|updating|the)\s+(\w+\s+){0,3}(code|implementation|logic|script|module|service|feature|function)"
+        r"|improve\s+(the\s+)?(\w+\s+){0,3}(code|implementation|logic|script|module|service|feature|function)"
+        r"|(?:let'?s|can\s+you|help\s+me)\s+(fix|update|improve|refactor|optimize|rewrite)\s+(\w+\s+){0,4}(code|implementation|script|module|function|class|service|feature))\b",
         re.I,
     ), "CODE", 0.88),
 
@@ -81,6 +86,19 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
         r"|chart|polars|write\s+a\s+query)\b",
         re.I,
     ), "DATA", 0.88),
+
+    # CREATIVE — fiction, scene/story/description writing, creative prompts
+    (re.compile(
+        r"\b(write\s+a\s+(scene|story|description|narrative|poem|script|dialogue|character|lore|legend|myth)"
+        r"|describe\s+(a\s+)?(scene|character|place|moment|battle|fight|setting|world)"
+        r"|vivid\s+(description|scene|depiction|detail)"
+        r"|detailed\s+description\s+of"
+        r"|creative\s+(writing|fiction|story|prompt)"
+        r"|set\s+in\s+the\s+(universe|world|setting)\s+of"
+        r"|shadowrun|cyberpunk|fantasy\s+(scene|setting|world)"
+        r"|roleplay|role-?play|fan.?fic|fanfic|worldbuilding)\b",
+        re.I,
+    ), "CREATIVE", 0.88),
 
     # RESEARCH — deep knowledge / analysis
     (re.compile(
@@ -122,12 +140,12 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
 
 class SemanticRouter:
     def __init__(self):
-        # After TTFT optimization: router uses the primary model (qwen3.6:27b) on
-        # Lovelace instead of nemotron-orchestrator on Turing. This eliminates
-        # the cross-network hop and keeps the model already hot in VRAM.
-        self.model_name = os.getenv("ROUTER_MODEL", os.getenv("PRIMARY_MODEL", "qwen3.6:27b"))
-        from utils.gpu_queue import get_best_host_for_model
-        self.host = get_best_host_for_model(self.model_name)
+        # Use select_available_model so routing survives VRAM pressure.
+        # ROUTER_MODEL defaults to qwen3:8b (fits alongside Klein).
+        # Falls back to qwen3:8b explicitly if env isn't set.
+        from utils.gpu_queue import select_available_model
+        _preferred = os.getenv("ROUTER_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:8b"))
+        self.model_name, self.host = select_available_model(_preferred, ["qwen3:8b"])
         
         # Self-Healing: Ensure model exists before Agent init
         self.ensure_model(self.model_name)
@@ -145,13 +163,14 @@ class SemanticRouter:
             
             CATEGORIES:
             1. **CONVERSATION**: Greetings, casual chat, small talk, simple factual questions, meta-questions about the AI system itself, simple list requests, or anything social in nature. Default for any message that is unclear but does not require specialized tools. ALWAYS use this for requests to "list", "show", "what tools", "what files", "what access" especially if user adds "succinct", "brief", "quick", or "short". (Keywords: "hello", "hi", "how are you", "what is", "tell me about", "who are you", "what can you do", "what do you have access to", "what files do you have", "what tools", "what are your capabilities", "tell me about yourself", "how do you work", "help me understand you", "list the", "show me", "succinct", "brief", "quick list")
-            2. **CODE**: Software engineering, writing scripts (Python/JS/etc.), debugging, fixing errors, or building apps. The user must be asking you to BUILD, WRITE, FIX, or MODIFY software — not merely asking about files or capabilities. (Keywords: "write script", "fix bug", "function", "develop", "code", "implement", "refactor")
+            2. **CODE**: Software engineering, writing scripts (Python/JS/etc.), debugging, fixing errors, building apps, or improving existing code. The user must be asking you to BUILD, WRITE, FIX, DEBUG, MODIFY, IMPROVE, OPTIMIZE, or WORK ON software — not merely asking about files or capabilities. (Keywords: "write script", "fix bug", "function", "develop", "code", "implement", "refactor", "improve the code", "work on the code", "optimize", "enhance", "update the implementation")
             3. **DEVOPS**: Infrastructure, Docker, Kubernetes, CI/CD pipelines, Linux administration, networking, shell scripts, server configuration, or cloud deployment. (Keywords: "docker", "kubernetes", "deploy", "nginx", "server", "firewall", "pipeline", "bash script", "systemd", "compose")
             4. **DATA**: Data analysis, SQL queries, CSV/JSON processing, statistics, charts, dashboards, or data transformation. (Keywords: "query", "sql", "analyze data", "csv", "dataframe", "statistics", "chart", "pandas", "aggregate")
             5. **IMAGE**: Generating 2D visual art, photos, concept art, or textures. (Keywords: "draw", "generate image", "picture of", "photo", "paint", "illustration")
             6. **3D**: Creating 3D geometry, meshes, or 3D models. (Keywords: "3d model", "mesh", "glb", "obj", "forge", "blender")
             7. **ACTION_FIGURE**: Converting an image into a 3D-printable posable action figure with joints. (Keywords: "action figure", "posable", "ball joint", "articulated", "figurine", "3d print figure", "poseable", "joint")
             8. **RESEARCH**: Deep knowledge quests, academic research, History, Literature, Humanities, Philosophy, Science facts, or multi-source analysis. Requires depth beyond a quick answer. (Keywords: "research", "analyze", "compare", "history of", "literature review", "what caused", "deep dive")
+            8b. **CREATIVE**: Creative or fictional writing — scene descriptions, stories, narratives, poems, roleplay scenarios, fictional world/character descriptions, lore, fan fiction, or any request to write/describe imaginative or fictional content. The user wants generated written content, not information. (Keywords: "write a scene", "describe a scene", "vivid description", "write a story", "creative writing", "fiction", "roleplay", "shadowrun", "lore", "narrative", "set in the universe of", "detailed description of")
             9. **DOCUMENTATION**: Rewriting text, formatting markdown documents, technical writing, or summarizing large RAG files. (Keywords: "rewrite", "document", "summarize", "format", "write a guide", "write a readme")
             10. **TRAIN**: Teaching the system new rules, instructions, or corrections to its behavior. (Keywords: "remember that", "learn this", "correction:", "from now on")
             11. **IOT_CONTROL**: Turning on/off smart home devices, lights, sending raw commands to home automation. (Keywords: "turn on", "lights", "temperature", "unlock", "scene", "home assistant")
@@ -170,7 +189,7 @@ class SemanticRouter:
             CRITICAL DIRECTIVES:
             - CONVERSATION is the default for social, general, or ambiguous inputs. Prefer CONVERSATION over AMBIGUOUS unless the user is asking for a specific capability you cannot determine.
             - META-QUESTIONS: If the user asks about YOUR files, YOUR access, YOUR tools, YOUR capabilities, or YOUR identity — ALWAYS classify as CONVERSATION. These are questions ABOUT the system, not requests to BUILD software. Example: "What files do you have access to?" → CONVERSATION (not CODE).
-            - Only classify as CODE when the user explicitly wants you to BUILD, WRITE, FIX, DEBUG, or MODIFY software artifacts.
+            - Only classify as CODE when the user explicitly wants you to BUILD, WRITE, FIX, DEBUG, MODIFY, IMPROVE, OPTIMIZE, or WORK ON software artifacts. "Let's work on improving the X code/feature" = CODE. "help me improve the implementation" = CODE.
             - Only output AMBIGUOUS if the user is asking for something that could be CODE, IMAGE, DEVOPS, or another capability-specific intent but you cannot tell which.
             - If confidence is < 0.50, output AMBIGUOUS with a disambiguation_question.
             - Output VALID JSON only. Do not wrap in markdown or add conversational text.
