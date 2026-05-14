@@ -113,6 +113,7 @@ services:
 networks:
   execution_net:
     external: true
+    name: execution_plane_execution_net
 
 volumes:
   spire_socket:
