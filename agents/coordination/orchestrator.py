@@ -649,6 +649,14 @@ def coordinate_task(
                 break
 
             if synth_pass >= max_synth_passes:
+                # Creative writing tasks never need visual style clarification — just produce the content.
+                if _is_creative_task:
+                    logger.info(
+                        "[Coordinator] Synthesis thresholds not met on creative task — "
+                        "skipping clarification, proceeding with available synthesis."
+                    )
+                    break
+
                 logger.warning(
                     f"[Coordinator] Synthesis thresholds not met after {max_synth_passes} passes "
                     f"(confidence={synth_confidence:.0%}, ambiguity={synth_ambiguity:.0%}). "
