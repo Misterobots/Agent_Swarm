@@ -11,6 +11,7 @@ from logger_setup import setup_logger
 # Redis Configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "redis_queue")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD") or None
 
 # --- SELF-HEALING: Mock Redis for Fallback ---
 class MockRedis:
@@ -122,7 +123,7 @@ class Dispatcher:
         
         if REDIS_LIB_AVAILABLE:
             try:
-                self.redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
+                self.redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, db=0)
                 self.redis.ping()
                 logger.info(f"--- [Dispatcher] Connected to Redis at {REDIS_HOST}:{REDIS_PORT} ---")
                 self.redis_available = True
