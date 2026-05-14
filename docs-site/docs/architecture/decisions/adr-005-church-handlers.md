@@ -31,6 +31,7 @@ agents/handlers/
     architect.py          # ARCHITECT / CODE default
     conversation.py       # CONVERSATION
     coordinate.py         # COORDINATE
+    creative.py           # CREATIVE — fiction, scene descriptions, narratives
     devops.py             # DEVOPS, DATA, AMBIGUOUS
     image.py              # IMAGE
     media.py              # 3D, ACTION_FIGURE
@@ -82,6 +83,10 @@ if _pending_result["handled"]:
 user_input = _pending_result["user_input"]
 ```
 
+### Confidence Gate in church.py
+
+The same refactor phase added a **confidence gate** (`_CONFIDENCE_GATE = 0.80`) in `chat_swarm()`. If the router returns confidence below 0.80 for a non-exempt intent, `church.py` saves an `ambiguity_resolution` pending context and yields a `clarification_card` event — asking the user to clarify rather than dispatching to a handler with low confidence. Gate-exempt intents (`CONVERSATION`, `TRAIN`, `VISION`, `ACTION_FIGURE`, `DOC_STANDARDS`, `AMBIGUOUS`) bypass this check.
+
 ### Shared Utilities in handlers/base.py
 
 `_score_trace` and `_langfuse_span` moved to `handlers/base.py` with explicit `use_langfuse=` kwargs. `church.py` keeps thin wrappers that inject the module-level `USE_LANGFUSE` and `langfuse` variables so call sites in the rest of the file are unchanged.
@@ -105,7 +110,8 @@ user_input = _pending_result["user_input"]
 
 ### Neutral
 
-- The monolith line count reduction (3,173 → ~500) happened alongside a lamport.py → `agents/coordination/` refactor completed in the same phase
+- The monolith line count reduction (3,173 → ~500) happened alongside a `lamport.py` → `agents/coordination/` refactor (decomposer, executor, synthesizer, palace, pioneers, session, orchestrator modules) completed in the same phase
+- `semantic_router.py` was also simplified in this phase: the fast-path was reduced from ~16 rules to 5, with broad intents (IMAGE, CODE, DEVOPS, etc.) moved to the LLM router so confidence scores reflect real signal
 - All handlers were smoke-tested inside the running Docker container (`agent_runtime`) before merging
 
 ## Related

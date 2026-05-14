@@ -252,9 +252,9 @@ Both toggles persist in browser local storage (key: `hive-settings`). They remai
 
 ### Modifying the Plan Prompt
 
-The plan system prompt is defined inline in `agents/router.py` within the `chat_swarm()` function's UltraPlan block. To change plan output format:
+The plan system prompt is defined inline in `agents/church.py` within the `chat_swarm()` function's UltraPlan block. To change plan output format:
 
-1. Locate the `PLAN_SYSTEM_PROMPT` string in `router.py`.
+1. Locate the `plan_system_prompt` string in `church.py` (inside the `if ultraplan_mode:` block).
 2. Edit the prompt to change decomposition style, output format, or detail level.
 3. Restart the FastAPI server.
 
@@ -286,7 +286,7 @@ To add a new cognitive mode (e.g., "Critique Mode"):
 | lucide-react icons | `npm update lucide-react` in `ui/` |
 | Zustand store | No external dependency — internal state only |
 | SSE parser | No external dependency — internal utility |
-| Router prompts | Edit `agents/router.py` — no package dependency |
+| Router prompts | Edit `agents/church.py` — no package dependency |
 
 ---
 
@@ -343,9 +343,9 @@ curl -X POST http://localhost:8008/v1/chat \
     | Plan toggle component | `ui/src/components/chat/ultraplan-toggle.tsx` |
     | Plan event handling | `ui/src/lib/hooks/use-chat-stream.ts` |
     | SSE event parsing | `ui/src/lib/utils/sse-parser.ts` |
-    | Backend plan interception | `agents/router.py` — `chat_swarm()` UltraPlan block |
-    | Backend think injection | `agents/router.py` — `chat_swarm()` UltraThink block |
-    | Think tag parser | `agents/router.py` — `_parse_think_tags()` |
+    | Backend plan interception | `agents/church.py` — `chat_swarm()` UltraPlan block |
+    | Backend think injection | `agents/church.py` — `chat_swarm()` UltraThink block |
+    | Think tag parser | `agents/church.py` — `_parse_think_tags()` |
     | ChatRequest model | `agents/main.py` — `ChatRequest` class |
 
 

@@ -15,7 +15,7 @@ The Semantic Router is the entry point for all user requests. It classifies inte
 | File | Purpose |
 |------|---------|
 | `agents/church.py` | Thin wrapper — session init, intent routing, ctx dict, dispatch |
-| `agents/semantic_router.py` | Intent classification (Nemotron LLM) |
+| `agents/semantic_router.py` | Intent classification — 5-rule keyword fast-path + qwen3:8b LLM fallback |
 | `agents/intent_capabilities.py` | Intent → JWT-ACE capability mapping |
 
 ### Handler Modules (`agents/handlers/`)
@@ -29,6 +29,7 @@ The Semantic Router is the entry point for all user requests. It classifies inte
 | `handlers/devops.py` | `DEVOPS`, `DATA`, `AMBIGUOUS` |
 | `handlers/image.py` | `IMAGE` — Art Director pipeline + QC delivery |
 | `handlers/media.py` | `3D`, `ACTION_FIGURE` |
+| `handlers/creative.py` | `CREATIVE` — fiction, scene descriptions, narratives |
 | `handlers/research.py` | `RESEARCH`, `DOCUMENTATION`, `DOC_STANDARDS` |
 | `handlers/design.py` | `DESIGN` — OpenDesign client |
 | `handlers/train.py` | `TRAIN`, `IOT_CONTROL` |
@@ -42,18 +43,34 @@ The Semantic Router is the entry point for all user requests. It classifies inte
 
 ## Intent Classification
 
-Uses {{ router_model }} to classify messages into intents:
+### Fast-Path (keyword bypass, < 1 ms)
+
+`SemanticRouter.fast_classify()` checks 5 regex rules before the LLM is invoked. Only these highly specific, unambiguous intents are in the fast path:
+
+```python
+_FAST_PATH_RULES = [
+    (VISION_PATTERN,        "VISION",        0.92),
+    (ACTION_FIGURE_PATTERN, "ACTION_FIGURE", 0.95),
+    (IOT_CONTROL_PATTERN,   "IOT_CONTROL",   0.92),
+    (IOT_DEV_PATTERN,       "IOT_DEV",       0.90),
+    (TRAIN_PATTERN,         "TRAIN",         0.92),
+]
+```
+
+All other intents (IMAGE, CODE, DEVOPS, DATA, CREATIVE, RESEARCH, COORDINATE, CONVERSATION, etc.) fall through to the LLM router so confidence scores are real.
+
+### LLM Router (qwen3:8b)
+
+The LLM router classifies the remaining messages into intents:
 
 ```python
 INTENTS = [
     "CONVERSATION", "CODE", "DEVOPS", "DATA",
-    "IMAGE", "3D", "ACTION_FIGURE", "DESIGN",
+    "IMAGE", "3D", "ACTION_FIGURE", "CREATIVE", "DESIGN",
     "RESEARCH", "DOCUMENTATION", "DOC_STANDARDS", "TRAIN",
     "IOT_CONTROL", "VISION", "COORDINATE", "AMBIGUOUS",
 ]
 ```
-
-### Classification Prompt
 
 The router sends a structured prompt to the LLM with:
 
@@ -61,14 +78,25 @@ The router sends a structured prompt to the LLM with:
 - List of available intents with descriptions
 - Instructions to return JSON: `{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}`
 
-### Fallback Logic
+### LLM Fallback Logic
 
 | Condition | Action |
 |-----------|--------|
-| Confidence ≥ 0.60 | Accept intent |
-| Confidence < 0.60 | Retry with stronger prompt |
-| Intent = AMBIGUOUS | Save pending context, show disambiguation card |
+| Confidence ≥ 0.75 and not AMBIGUOUS | Accept intent |
+| Confidence < 0.75 | Retry with stronger prompt (max 2 retries) |
 | Timeout / error | Fallback to CONVERSATION |
+
+### Confidence Gate
+
+After the router returns an intent, `chat_swarm()` applies a **confidence gate** (`_CONFIDENCE_GATE = 0.80`). If confidence is below the gate threshold and the intent is not exempt, the system saves pending context and yields a `clarification_card` event asking the user to clarify.
+
+**Gate-exempt intents** (skipped because they are low-risk defaults or came from the high-precision fast-path):
+
+```python
+_GATE_EXEMPT = frozenset({
+    "CONVERSATION", "TRAIN", "VISION", "ACTION_FIGURE", "DOC_STANDARDS", "AMBIGUOUS",
+})
+```
 
 ### Keyword Overrides
 
@@ -77,11 +105,9 @@ After neural classification, `chat_swarm()` applies deterministic overrides that
 | Trigger | Override |
 |---------|----------|
 | `learn:`, `correction:`, `remember that` prefix | `TRAIN` |
-| `generate image`, `draw`, `paint` | `IMAGE` |
 | `action figure`, `ball joint`, `posable` | `ACTION_FIGURE` |
 | `landing page`, `mockup`, `wireframe`, `prototype` | `DESIGN` |
 | `/standardize-doc` slash command | `DOC_STANDARDS` |
-| `build/create/make` + artifact noun | `COORDINATE` |
 | `CODE` intent received | promoted to `COORDINATE` |
 
 ## Dispatch Flow
@@ -175,6 +201,7 @@ token = issue_token(
 | `IMAGE` | `handlers/image.py` | Art Director → ComfyUI |
 | `3D` | `handlers/media.py` | Concept art → Forge mesh |
 | `ACTION_FIGURE` | `handlers/media.py` | T-pose art → figure pipeline |
+| `CREATIVE` | `handlers/creative.py` | Creative Writer agent (direct, no coordinator) |
 | `RESEARCH` | `handlers/research.py` | Librarian agent |
 | `DOCUMENTATION` | `handlers/research.py` | Technical Writer |
 | `DOC_STANDARDS` | `handlers/research.py` | Batch standardize |
@@ -189,10 +216,12 @@ token = issue_token(
 
 | Setting | Value | Description |
 |---------|-------|-------------|
-| Router model | {{ router_model }} | Intent classification LLM |
-| Min confidence | 0.60 | Below this triggers retry |
-| Max retries | 2 | Classification retry limit |
-| Timeout | 10s | LLM response timeout |
+| Router model | `qwen3:8b` (default, override via `ROUTER_MODEL` env) | Intent classification LLM |
+| Fast-path rules | 5 regex rules | VISION, ACTION_FIGURE, IOT_CONTROL, IOT_DEV, TRAIN |
+| LLM accept threshold | 0.75 | Below this triggers retry |
+| Confidence gate | 0.80 | Below this emits clarification_card (unless gate-exempt) |
+| Max LLM retries | 2 | Classification retry limit |
+| LLM request timeout | 300s | Ollama client timeout |
 
 ## Related
 

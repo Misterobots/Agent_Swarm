@@ -69,17 +69,23 @@ class MyAgent:
 
 ## Step 2: Add Intent (Optional)
 
-If your agent needs a new intent, update the Semantic Router:
+If your agent needs a new intent, update `agents/semantic_router.py` in two places:
+
+**a) Add a description to the LLM router prompt** (inside the `instructions=` string in `SemanticRouter.__init__`). Follow the existing numbered format and include example keywords.
+
+**b) Optional — add a fast-path rule** if the intent has highly specific vocabulary that never appears in other intents (like "wokwi" for IOT_DEV). Add an entry to `_FAST_PATH_RULES`:
 
 ```python
-# In agents/semantic_router.py, add to the intent list:
-INTENTS = [
-    # ... existing intents ...
-    "MY_INTENT",
+# agents/semantic_router.py
+_FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
+    # ... existing rules ...
+    (re.compile(r"\byour_keyword\b", re.I), "MY_INTENT", 0.92),
 ]
 ```
 
-Update the router prompt to include the new intent description.
+Only add a fast-path rule if the vocabulary is genuinely unambiguous and cannot appear in a different-intent context. Otherwise leave it for the LLM router.
+
+**c) If the intent should bypass the confidence gate**, add it to `_GATE_EXEMPT` in `chat_swarm()` in `agents/church.py`. Only do this if the intent is low-risk to guess wrong (like CONVERSATION) or came from the high-precision fast-path.
 
 ## Step 3: Create a Handler Module
 

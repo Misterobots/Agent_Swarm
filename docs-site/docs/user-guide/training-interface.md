@@ -44,7 +44,7 @@ graph LR
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | Base Solver | `Qwen/Qwen2.5-Coder-7B-Instruct` | Starting model |
-| Base Router | `nvidia/Nemotron-Mini-4B-Instruct` | Router model |
+| Base Router | `qwen3:8b` (default, override via `ROUTER_MODEL`) | Router model |
 | LoRA Rank | 16 | Low-rank adaptation rank |
 | LoRA Alpha | 32 | LoRA scaling factor |
 | Batch Size | 1 | Training batch size |

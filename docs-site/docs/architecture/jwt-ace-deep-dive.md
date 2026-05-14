@@ -316,7 +316,7 @@ Both are stored in `threading.local()` and are safe for concurrent worker thread
 ### Adding New Capabilities
 
 1. Add the capability string to the relevant intent(s) in `agents/intent_capabilities.py`.
-2. If needed, add a new role in `agents/coordinator.py` `_ROLE_CAPS` mapping.
+2. If needed, add a new role capability mapping in `agents/coordination/executor.py`.
 3. The session card auto-includes all intent capabilities — no card template changes needed.
 4. Update the capability gate if the new capability requires special enforcement logic.
 
@@ -428,8 +428,8 @@ print('ALL SECURITY CHECKS PASSED')
     | Capability gate (two-stage check) | `agents/security/capability_gate.py` |
     | Authorization middleware | `agents/security/authorization_middleware.py` |
     | Intent → capability mapping | `agents/intent_capabilities.py` |
-    | Session card issuance + scope | `agents/router.py` |
-    | Child card derivation for workers | `agents/coordinator.py` |
+    | Session card issuance + scope | `agents/church.py` (`_issue_session_card`, `set_active_scope`) |
+    | Child card derivation for workers | `agents/coordination/executor.py` (`_derive_worker_token`) |
     | Audit logging | `agents/security/audit_logger.py` |
 
 

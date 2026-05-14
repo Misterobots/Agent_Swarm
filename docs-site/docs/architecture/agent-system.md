@@ -8,47 +8,73 @@ How Memex classifies user intent, selects the right agent, and orchestrates comp
 
 ## Semantic Router
 
-The router is the "frontal cortex" of the system. It uses {{ router_model }} to classify every user message into one of 14 intents.
+The router is the "frontal cortex" of the system. It uses **qwen3:8b** (default, configurable via `ROUTER_MODEL` env var) to classify every user message into one of 15 intents. A keyword fast-path (`fast_classify`) handles 5 high-confidence patterns in < 1 ms before the LLM is invoked.
+
+### Fast-Path Rules (keyword bypass)
+
+Five intents match via regex before the LLM is called:
+
+| Intent | Pattern examples | Confidence |
+|--------|-----------------|------------|
+| `VISION` | "what do you see", "describe this image", "analyze this image", "OCR" | 0.92 |
+| `ACTION_FIGURE` | "action figure", "posable", "ball joint", "articulated figure" | 0.95 |
+| `IOT_CONTROL` | "turn on/off", "lights on/off", "set temperature", "run scene" | 0.92 |
+| `IOT_DEV` | "wokwi", "flash esp32", "compile firmware", "mqtt", "arduino" | 0.90 |
+| `TRAIN` | "remember that", "learn this", "correction:", "from now on" | 0.92 |
+
+All other intents (IMAGE, CODE, DEVOPS, DATA, CREATIVE, RESEARCH, COORDINATE, CONVERSATION, etc.) fall through to the LLM router so confidence scores are real.
 
 ### Intent Categories
 
 | Intent | Description | Routes To |
 |--------|-------------|-----------|
 | `CONVERSATION` | Chat, questions, small talk | MarsRL Loop |
-| `CODE` | Programming, debugging, scripts | MarsRL Loop |
+| `CODE` | Programming, debugging, scripts | Promoted to `COORDINATE` |
 | `DEVOPS` | Docker, CI/CD, Linux | MarsRL Loop |
 | `DATA` | SQL, analytics, CSV, stats | MarsRL Loop |
 | `IMAGE` | 2D art, photos, illustrations | Image Agent → ComfyUI |
 | `3D` | 3D models, meshes, geometry | 3D Pipeline |
 | `ACTION_FIGURE` | Posable figure design | Action Figure Agent |
-| `RESEARCH` | Deep analysis, comparison | Coordinator |
-| `DOCUMENTATION` | Writing, reformatting, summaries | MarsRL Loop |
+| `CREATIVE` | Fiction, stories, scene descriptions, lore | Creative Writer agent |
+| `RESEARCH` | Deep analysis, comparison | Librarian agent |
+| `DOCUMENTATION` | Writing, reformatting, summaries | Technical Writer agent |
 | `TRAIN` | Teaching preferences / rules | Memory System |
 | `IOT_CONTROL` | Smart home device control | IoT Agent → Home Assistant |
 | `IOT_DEV` | Firmware, circuits, MQTT | IoT Dev Agent |
 | `VISION` | Analyzing images | Vision Agent (Moondream) |
-| `COORDINATE` | Complex multi-step tasks | Coordinator |
+| `COORDINATE` | Complex multi-step tasks | Lamport Coordinator |
 
 ### Classification Flow
 
 ```mermaid
 graph TD
-    A[User Message] --> B[Semantic Router]
-    B -->|"Nemotron-8B"| C{Confidence}
-    C -->|"≥ 0.60"| D[Accept Intent]
-    C -->|"< 0.60 or AMBIGUOUS"| E[Retry with stronger prompt]
-    E --> C
-    C -->|"Timeout/failure"| F[Fallback: CONVERSATION]
-    D --> G[Route to Agent]
+    A[User Message] --> B{Fast-path regex?}
+    B -->|"VISION / ACTION_FIGURE / IOT_CONTROL / IOT_DEV / TRAIN"| D[Accept Intent]
+    B -->|"no match"| C[LLM Router — qwen3:8b]
+    C --> E{Confidence}
+    E -->|"≥ 0.75"| D
+    E -->|"< 0.75"| F[Retry with stronger prompt]
+    F --> E
+    E -->|"Timeout/failure"| G[Fallback: CONVERSATION]
+    D --> H{Confidence gate ≥ 0.80?}
+    H -->|"yes or gate-exempt"| I[Dispatch to handler]
+    H -->|"no"| J[clarification_card — ask user]
 ```
+
+### Confidence Gate
+
+After the router returns an intent, `chat_swarm()` applies a **confidence gate** at `_CONFIDENCE_GATE = 0.80`. If the intent is not in the exempt set and confidence is below 0.80, the system yields a `clarification_card` event asking the user to clarify rather than guessing.
+
+Gate-exempt intents (low-risk or highly specific, skip the gate):
+`CONVERSATION`, `TRAIN`, `VISION`, `ACTION_FIGURE`, `DOC_STANDARDS`, `AMBIGUOUS`
 
 ### Router Output
 
 ```json
 {
-    "intent": "CODE",
-    "confidence": 0.92,
-    "reasoning": "User requested a Python function implementation",
+    "intent": "CREATIVE",
+    "confidence": 0.91,
+    "reasoning": "User requested a vivid scene description for fiction",
     "disambiguation_question": null
 }
 ```
@@ -139,13 +165,14 @@ Templates support:
 ```
 agents/
 ├── church.py                  # Thin wrapper — session init, routing, dispatch
-├── semantic_router.py         # Intent classification (Nemotron)
+├── semantic_router.py         # Intent classification (qwen3:8b LLM + 5-rule fast-path)
 ├── intent_capabilities.py     # Intent → JWT-ACE capability mapping
 ├── handlers/
 │   ├── base.py                # Shared emitters, Langfuse helpers, RAG utilities
 │   ├── architect.py           # Default code/arch — fast-pass or MarsRL
 │   ├── conversation.py        # CONVERSATION — 3-tier access
 │   ├── coordinate.py          # COORDINATE — Lamport multi-agent
+│   ├── creative.py            # CREATIVE — fiction, scene descriptions, narratives
 │   ├── devops.py              # DEVOPS, DATA, AMBIGUOUS
 │   ├── image.py               # IMAGE — Art Director + QC delivery
 │   ├── media.py               # 3D, ACTION_FIGURE
@@ -166,7 +193,7 @@ Each handler is a **generator function** `handle_X(user_input: str, ctx: dict)` 
 | `agents/church.py` | Request handling, token issuance, intent dispatch |
 | `agents/handlers/` | One module per intent group |
 | `agents/routing/gates.py` | Multi-turn pending-context gates |
-| `agents/semantic_router.py` | Intent classification using Nemotron |
+| `agents/semantic_router.py` | Intent classification using qwen3:8b (LLM) + 5-rule keyword fast-path |
 | `agents/coordination/` | Multi-worker orchestration (Lamport) |
 | `agents/mars_loop.py` | MarsRL verification pipeline |
 | `agents/expertise/template_registry.py` | Model/parameter resolution |

@@ -26,7 +26,7 @@ sequenceDiagram
     GW->>RT: Forward to execution node
 
     RT->>SR: Classify intent
-    SR->>Sol: Nemotron-8B analysis
+    SR->>Sol: qwen3:8b analysis (or fast-path regex)
     Sol-->>SR: {intent, confidence}
     SR-->>RT: INTENT=CODE, conf=0.92
 
@@ -56,13 +56,12 @@ The Hive UI sends a `POST /swarm/v1/chat/completions` request to the Traefik rev
 
 ### 2. Intent Classification
 
-The Semantic Router uses {{ router_model }} to classify the user's message into one of 14 intent categories. The classification includes:
+The Semantic Router classifies the user's message in two stages:
 
-- **Intent**: The category (CODE, IMAGE, CONVERSATION, etc.)
-- **Confidence**: 0.0–1.0 score
-- **Reasoning**: Short explanation of why this intent was chosen
+1. **Fast-path** (`fast_classify`): 5 regex rules match VISION, ACTION_FIGURE, IOT_CONTROL, IOT_DEV, and TRAIN intents in < 1 ms at high confidence.
+2. **LLM router** (`qwen3:8b`): All other intents are classified by the LLM with a structured JSON output including intent, confidence (0.0–1.0), and reasoning.
 
-If confidence is below 0.60 or the intent is `AMBIGUOUS`, the router retries with stronger prompts or falls back to `CONVERSATION`.
+If LLM confidence is below 0.75, the router retries with a stronger prompt (max 2 retries) before falling back to `CONVERSATION`. After routing, a **confidence gate** at 0.80 checks non-exempt intents — if the gate trips, a `clarification_card` is sent to the user instead of guessing.
 
 ### 3. Token Issuance
 
@@ -79,10 +78,12 @@ Depending on the intent, the request is dispatched to the appropriate agent:
 
 | Intent | Agent | Pipeline |
 |--------|-------|----------|
-| CODE, CONVERSATION, DEVOPS, DATA | MarsRL Loop | Solver → Verifier → Corrector |
-| IMAGE | Image Agent | ComfyUI pipeline |
+| CONVERSATION, DEVOPS, DATA | MarsRL Loop | Solver → Verifier → Corrector |
+| CODE | Lamport Coordinator | CODE is promoted to COORDINATE |
+| IMAGE | Image Agent | Art Director → ComfyUI |
+| CREATIVE | Creative Writer agent | Direct single-agent generation (no coordinator) |
 | 3D, ACTION_FIGURE | 3D Pipeline | Concept art → mesh reconstruction |
-| COORDINATE | Coordinator | Decompose → Research → Synthesize → Implement |
+| COORDINATE | Lamport Coordinator | Decompose → Research → Synthesize → Implement |
 | IOT_CONTROL | IoT Agent | Home Assistant API calls |
 | VISION | Vision Agent | VLM (Moondream) image analysis |
 

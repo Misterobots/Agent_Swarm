@@ -11,7 +11,7 @@ Reviewers: Security, Platform
 Status: Approved
 Version: 1.0
 Last Updated: 2026-03-31
-Source of Truth: agents/router.py, agents/registry.py, agents/security_agent.py, agents/corrector_agent.py
+Source of Truth: agents/church.py, agents/handlers/, agents/routing/gates.py, agents/security_agent.py, agents/corrector_agent.py
 
 ## Purpose
 Describe how skill execution and hook processing are orchestrated with policy controls and identity context propagation.

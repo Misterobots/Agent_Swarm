@@ -68,16 +68,21 @@ INTENT_MAP = {
 }
 ```
 
-## Step 3: Register with the Coordinator
+## Step 3: Wire the Handler
 
-In `agents/coordinator.py`, register your agent:
+Follow the handler pattern documented in [Adding Agents](../developer-guide/adding-agents.md):
+
+1. Create `agents/handlers/my_agent.py` as a generator function `handle_my_intent(user_input, ctx)`.
+2. Add the dispatch case in `agents/church.py`:
 
 ```python
-from agents.my_agent import MyAgent
-
-# In the initialization
-self.agents["my_agent"] = MyAgent()
+if intent == "MY_INTENT":
+    from handlers.my_agent import handle_my_intent
+    yield from handle_my_intent(user_input, ctx)
+    return
 ```
+
+If your agent needs to participate in multi-worker coordination, add a role entry in `agents/coordination/executor.py` — `_get_agent_for_role()` maps role strings to agent instances.
 
 ## Step 4: Add Tools (Optional)
 

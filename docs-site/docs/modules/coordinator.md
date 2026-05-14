@@ -8,9 +8,18 @@ Multi-agent orchestration for complex, multi-step tasks.
 
 ## Files
 
+`agents/lamport.py` is a thin re-export wrapper. All implementation lives in the `agents/coordination/` package:
+
 | File | Purpose |
 |------|---------|
-| `agents/coordinator.py` | Coordinator class — phases and workers |
+| `agents/lamport.py` | Public entry point — re-exports `coordinate_task`, `coordinate_project_onboarding`, session types |
+| `agents/coordination/orchestrator.py` | `coordinate_task`, `coordinate_project_onboarding` — main generator loop |
+| `agents/coordination/decomposer.py` | `_decompose_task`, `_decompose_task_perspectives` — LLM task breakdown |
+| `agents/coordination/executor.py` | `_run_worker`, `_get_agent_for_role`, `_derive_worker_token` — worker execution |
+| `agents/coordination/synthesizer.py` | `_synthesize_findings`, `_synthesize_perspective_matrix`, `_generate_followups` |
+| `agents/coordination/palace.py` | MemPalace HTTP client — team store + project registry |
+| `agents/coordination/pioneers.py` | Worker persona pool (named after computing pioneers) and perspective taxonomy |
+| `agents/coordination/session.py` | `WorkerState`, `WorkerInfo`, `CoordinatorSession` — worker lifecycle tracking |
 
 ## When Used
 
@@ -39,25 +48,27 @@ graph LR
 | **Implement** | Execute the plan | 1–3 |
 | **Verify** | Fresh worker validates results | 1 |
 
-## Worker Roles
+## Worker Roles and Personas
 
-```python
-WORKERS = {
-    "architect": ArchitectAgent,
-    "coder": ArchitectAgent,
-    "devops": ArchitectAgent,
-    "analyst": DataAnalyst,
-    "researcher": ResearchWorker,
-    "verifier": VerificationWorker,
-}
-```
+Workers are assigned personas from `coordination/pioneers.py` — a pool of named computing pioneers scoped to each role:
+
+| Role | Example personas | Notes |
+|------|-----------------|-------|
+| `researcher` | Shannon, Minsky, Johnson | Investigate unknowns |
+| `architect` | Babbage, Dijkstra, Hamilton | System design |
+| `coder` | Knuth, Lovelace, Ritchie | Implementation |
+| `devops` | Cerf, Torvalds, Perlman | Infrastructure |
+| `analyst` | Codd, Hopper, Boole | Data and analysis |
+| `verifier` | Hoare, Turing, Liskov | Validation |
+
+Additional perspective roles (`technical`, `ethical`, `economic`, `scientific`, `regulatory`, `end_user`) are used in ultraplan/perspective-matrix synthesis.
 
 ## Scratchpad
 
-Workers communicate via a shared scratchpad — a filesystem directory containing intermediate artifacts:
+Workers communicate via a shared scratchpad — a filesystem directory (`agents/scratchpad/`) containing intermediate artifacts:
 
 ```
-workspace/coordinator_sessions/{session_id}/
+agents/scratchpad/{coordination_id}/
 ├── plan.json           # Decomposed task plan
 ├── research_1.md       # Worker 1 findings
 ├── research_2.md       # Worker 2 findings

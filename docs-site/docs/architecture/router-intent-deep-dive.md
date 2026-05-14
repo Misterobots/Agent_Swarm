@@ -9,9 +9,9 @@ Domain: Architecture
 Owner: Architecture
 Reviewers: Security, Platform
 Status: Approved
-Version: 1.0
-Last Updated: 2026-03-31
-Source of Truth: agents/router.py, agents/main.py, agents/security/authorization_middleware.py
+Version: 2.0
+Last Updated: 2026-05-14
+Source of Truth: agents/church.py, agents/semantic_router.py, agents/handlers/, agents/routing/gates.py
 
 ## Purpose
 Describe the end-to-end routing pipeline from request ingress through intent classification, context propagation, and token issuance hooks.
@@ -25,9 +25,14 @@ Describe the end-to-end routing pipeline from request ingress through intent cla
 1. Ingress request arrives in FastAPI app (`agents/main.py`).
 2. Authorization middleware classifies endpoint class and token profile (`agents/security/authorization_middleware.py`).
 3. Request-scoped identity context is attached to request state (including `owner_id` when available).
-4. Router receives normalized request and performs intent classification (`agents/router.py`).
-5. Router resolves session context and dispatches to orchestrated handlers.
-6. Trace metadata is emitted with session and owner context for observability.
+4. `chat_swarm()` in `agents/church.py` receives the normalized request:
+   a. Checks for saved pending context (multi-turn gates in `routing/gates.py`).
+   b. Runs security scan.
+   c. Calls `SemanticRouter.route()` in `agents/semantic_router.py` — fast-path first, then LLM.
+   d. Applies keyword overrides and the confidence gate (`_CONFIDENCE_GATE = 0.80`).
+   e. Dispatches to the matching handler in `agents/handlers/<name>.py`.
+5. Handler yields SSE events streamed back to the caller.
+6. Trace metadata is emitted with session and owner context for observability (Langfuse).
 
 ## Endpoint Class to Routing Behavior
 - Public: utility/read endpoints with no privileged action.
