@@ -802,10 +802,15 @@ def generate_image(
 
     last_candidate: dict | None = None
 
+    # Track whether Klein was attempted so we know to evict it before ComfyUI even
+    # if warmup failed — a failed warmup may leave partial VRAM allocations that
+    # WDDM holds until the process terminates (container restart forces reclaim).
+    _klein_was_attempted = model_name in ("auto", "klein-9b") and not skip_refinement
+
     # If Klein isn't loaded yet, evict Ollama + ComfyUI first so both GPUs are clear.
     # ComfyUI holds ~15 GiB on GPU 1; Klein needs that space for its balanced layout.
     # This runs regardless of Redis availability (GPU lock fails open when Redis is down).
-    if model_name in ("auto", "klein-9b") and not skip_refinement and not _klein_is_healthy():
+    if _klein_was_attempted and not _klein_is_healthy():
         try:
             from utils.gpu_queue import evict_ollama, evict_comfyui, warmup_klein
             logger.info("[Creative Studio] Evicting Ollama + ComfyUI to free both GPUs for Klein...")
@@ -861,19 +866,24 @@ def generate_image(
         # and its transformer+VAE (~9 GB) occupy GPU 1. ComfyUI only has device_ids=['1']
         # (physical GPU 1, 15.93 GB) and FLUX alone exceeds that. Evict first, then
         # redirect to SDXL so ComfyUI never attempts FLUX which would OOM on GPU 1.
-        if _klein_is_healthy():
+        # Also evict if warmup was attempted but failed: a failed _load_pipeline() call
+        # invokes _force_free_vram() internally but WDDM may still hold physical pages;
+        # the container restart in evict_klein() forces WDDM to return them immediately.
+        if _klein_is_healthy() or _klein_was_attempted:
             try:
                 from utils.gpu_queue import evict_klein as _evict_klein
-                logger.info("[Creative Studio] Evicting Klein to free GPU 0 before ComfyUI...")
+                logger.info("[Creative Studio] Evicting Klein to free GPU pages before ComfyUI...")
                 _evict_klein()
             except Exception as e:
                 logger.warning(f"[Creative Studio] Klein eviction failed: {e}")
 
         # FLUX cannot fit on ComfyUI's single GPU 1 (15.93 GB). When falling back from
-        # Klein (model_name auto/klein-9b), redirect to SDXL which fits comfortably.
+        # Klein (model_name auto/klein-9b), redirect to SDXL Turbo which fits (~5 GB).
+        # Note: sdxl-general excludes "turbo" checkpoints — use sdxl-turbo-preview which
+        # matches sd_xl_turbo_1.0_fp16.safetensors (the deployed SDXL checkpoint).
         if kwargs.get("model_name") in ("auto", "klein-9b"):
-            logger.info("[Creative Studio] Redirecting ComfyUI fallback from FLUX to sdxl-general (FLUX OOM on single GPU)")
-            kwargs = {**kwargs, "model_name": "sdxl-general"}
+            logger.info("[Creative Studio] Redirecting ComfyUI fallback from FLUX to sdxl-turbo-preview (FLUX OOM on single GPU)")
+            kwargs = {**kwargs, "model_name": "sdxl-turbo-preview"}
 
         for attempt in range(MAX_RETRIES + 1):
             if attempt > 0:
