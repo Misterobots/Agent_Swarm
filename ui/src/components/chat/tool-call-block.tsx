@@ -54,10 +54,10 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
 
   return (
     <div className="mt-3 rounded-md border border-[var(--chat-border)] bg-[var(--chat-bg)] overflow-hidden">
-      <div className="px-3 py-2 border-b border-[var(--chat-border)] text-xs uppercase tracking-wider text-[#cc9a84]">
+      <div className="px-3 py-2 border-b border-[var(--chat-border)] text-xs uppercase tracking-wider text-[var(--chat-muted)]">
         Tool Calls ({toolCalls.length})
       </div>
-      <div className="divide-y divide-[#2a2521]">
+      <div className="divide-y divide-[var(--chat-border)]">
         {toolCalls.map((t, idx) => {
           const stateEvent = getToolState(t.tool_call_id || "", toolLifecycle);
           const result = getToolResult(t.tool_call_id || "", toolResults);
@@ -68,12 +68,12 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
             <div key={`${t.tool_call_id || t.timestamp}-${idx}`} className="px-3 py-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs font-semibold text-[#d9b8a7] truncate">{t.tool_name}</span>
+                  <span className="text-xs font-semibold text-[var(--chat-text)] truncate">{t.tool_name}</span>
                   <span className={`flex items-center gap-1 text-xs font-medium ${badge.color}`}>
                     {badge.icon} {badge.label}
                   </span>
                 </div>
-                <span className="text-[10px] text-[#8a7a6f]">{new Date(t.timestamp).toLocaleTimeString()}</span>
+                <span className="text-[10px] text-[var(--chat-subtle)]">{new Date(t.timestamp).toLocaleTimeString()}</span>
               </div>
 
               {typeof stateEvent?.progress === "number" && (
@@ -95,7 +95,7 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
 
               {result?.artifacts?.length ? (
                 <div className="space-y-2">
-                  <div className="text-xs text-[#8a7a6f] font-mono">Artifacts: {result.artifacts.length}</div>
+                  <div className="text-xs text-[var(--chat-subtle)] font-mono">Artifacts: {result.artifacts.length}</div>
                   {result.artifacts.map((artifact) => {
                     const state = artifactState[artifact.id];
                     return (
@@ -104,7 +104,7 @@ export function ToolCallBlock({ toolCalls, toolLifecycle, toolResults, onArtifac
                         className="rounded border border-[var(--chat-border)] bg-[var(--chat-soft)] p-2"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] text-[#d9b8a7] truncate">
+                          <span className="text-[11px] text-[var(--chat-text)] truncate">
                             {artifact.type}{artifact.language ? ` (${artifact.language})` : ""}
                           </span>
                           {state ? (
