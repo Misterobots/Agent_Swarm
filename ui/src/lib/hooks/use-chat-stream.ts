@@ -413,6 +413,7 @@ export function useChatStream(options?: {
             if (err instanceof Error && err.name === "AbortError") {
               return; // user cancelled — don't retry
             }
+            console.error("[use-chat-stream] Stream error caught:", err, err instanceof Error ? err.stack : "");
             const currentContent = (
               useChatStore.getState().conversations
                 .find((c) => c.id === convId)?.messages
