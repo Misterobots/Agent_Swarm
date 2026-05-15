@@ -71,7 +71,7 @@ services:
       # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
       - OLLAMA_NUM_PARALLEL=1          # 1 slot: KV cache halved so 14B models (~14.2 GB) fit on a 16 GB GPU
-      - OLLAMA_KEEP_ALIVE=10m          # Unload after 10min idle; gpu_queue evicts immediately on context switch
+      - OLLAMA_KEEP_ALIVE=1h            # Unload after 1h idle; cold loads spike WSL2 RAM, keeping warm amortizes that cost
     volumes:
       - ollama_models:/root/.ollama
     ports:

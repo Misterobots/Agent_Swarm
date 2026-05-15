@@ -111,12 +111,12 @@ TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION",
 # Context Window Management
 # ---------------------------------------------------------------------------
 CONTEXT_WINDOWS: dict[str, int] = {
-    "qwen3:14b": 40960,
-    "qwen3:8b": 32768,
+    "qwen3:14b": 16384,
+    "qwen3:8b": 16384,
     "qwen2.5-coder:14b": 16384,
     "qwen2.5-coder:14b-instruct-q4_k_m": 16384,
-    "qwen3.5:9b": 32768,
-    "nemotron-orchestrator:8b": 32768,
+    "qwen3.5:9b": 16384,
+    "nemotron-orchestrator:8b": 16384,
     "nemotron-mini": 4096,
     "qwen2.5:3b": 8192,
     "llama3.2:3b": 8192,
