@@ -37,7 +37,7 @@ from role_model_resolver import get_model_for_role
 from config import (
     AGNO_DB_URL, PLANNING_MAX_ITER, PLANNING_MAX_TIME,
     ARCHITECT_MODEL, COORDINATOR_MODEL, CODER_MODEL, DEVOPS_MODEL,
-    RESEARCHER_MODEL, ANALYST_MODEL, VERIFIER_MODEL
+    RESEARCHER_MODEL, ANALYST_MODEL, VERIFIER_MODEL, get_ollama_options
 )
 
 logger = setup_logger("Router")
@@ -844,7 +844,7 @@ def chat_swarm(
 
             planner = Agent(
                 name="Planner",
-                model=Ollama(id=PLAN_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+                model=Ollama(id=PLAN_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}, options=get_ollama_options(PLAN_MODEL)),
                 session_id=session_id,
                 instructions=plan_system_prompt,
                 show_tool_calls=False,

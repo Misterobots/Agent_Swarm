@@ -7,7 +7,7 @@ import re as _re
 import requests
 from ollama import Client
 
-from config import COORDINATOR_MODEL
+from config import COORDINATOR_MODEL, CONTEXT_WINDOWS
 from logger_setup import setup_logger
 from utils.gpu_queue import get_swarm_worker_host, request_lock, select_available_model
 
@@ -64,7 +64,7 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                 "prompt": prompt,
                 "system": system_prompt,
                 "stream": False,
-                "options": {"temperature": 0.4, "num_predict": 8192, "num_ctx": 32768},
+                "options": {"temperature": 0.4, "num_predict": 8192, "num_ctx": CONTEXT_WINDOWS.get(synth_model, CONTEXT_WINDOWS["default"])},
             },
             timeout=45,
         )

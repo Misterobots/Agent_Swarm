@@ -11,6 +11,7 @@ from tools.home_assistant import HomeAssistantTool
 from specialized.voice_cloning import clone_voice
 from phi.agent import Agent
 from phi.model.ollama import Ollama
+from config import get_ollama_options
 from phi.tools import Toolkit
 from specialized.voice_samples_map import get_sample_path, find_sample_in_response
 from specialized.bmo_persona import BMO_SYSTEM_PROMPT, detect_bmo_emotion
@@ -184,7 +185,7 @@ class VoiceAssistantAgent:
         
         # LLM Agent with all tools
         self.llm_agent = Agent(
-            model=Ollama(id=BMO_MODEL, host=BMO_OLLAMA_HOST),
+            model=Ollama(id=BMO_MODEL, host=BMO_OLLAMA_HOST, options=get_ollama_options(BMO_MODEL)),
             description=BMO_SYSTEM_PROMPT,
             tools=[self.smart_home, self.weather, self.time_tool, self.news, self.web_search],
             show_tool_calls=False,

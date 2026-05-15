@@ -7,6 +7,7 @@ import shutil
 import logging
 from phi.agent import Agent
 from phi.model.ollama import Ollama
+from config import get_ollama_options
 
 # Logging Setup
 logger = logging.getLogger(__name__)
@@ -366,7 +367,7 @@ def generate_3d_model(image_path: str, workflow_name: str = "workflow_triposg.js
 def get_forge_agent():
     return Agent(
         name="Creature Forge",
-        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST),
+        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST, options=get_ollama_options(MODEL_NAME)),
         description="I am the 3D Blacksmith. I turn images into 3D models using the Forge pipeline.",
         instructions="Use `generate_3d_model` to convert 2D concept art into 3D assets. You need a source image path first.",
         tools=[generate_3d_model],

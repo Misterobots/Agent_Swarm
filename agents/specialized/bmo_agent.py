@@ -3,6 +3,7 @@ from phi.model.ollama import Ollama
 import os
 import requests
 from specialized.bmo_persona import BMO_SYSTEM_PROMPT
+from config import get_ollama_options
 
 def get_bmo_agent() -> Agent:
     """
@@ -37,7 +38,7 @@ def get_bmo_agent() -> Agent:
 
     return Agent(
         name="BMO Agent",
-        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST),
+        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST, options=get_ollama_options(MODEL_NAME)),
         description=BMO_SYSTEM_PROMPT,
         instructions=[
             "When asked to generate speech, use the 'generate_bmo_speech' tool.",

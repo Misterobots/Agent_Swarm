@@ -4,6 +4,7 @@ import json
 import os
 import re
 import logging
+from config import get_ollama_options
 
 _router_logger = logging.getLogger("SemanticRouter")
 
@@ -63,7 +64,7 @@ class SemanticRouter:
 
         self.agent = Agent(
             name="Semantic Router",
-            model=Ollama(id=self.model_name, host=self.host, client_kwargs={"timeout": 300.0}),
+            model=Ollama(id=self.model_name, host=self.host, client_kwargs={"timeout": 300.0}, options=get_ollama_options(self.model_name)),
             description="You are the Frontal Cortex of the AI Swarm.",
             instructions="""
             You are the Frontal Cortex of the AI Swarm. Your GOAL is to function as a strict Intent Classifier.

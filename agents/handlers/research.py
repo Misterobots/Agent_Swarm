@@ -24,7 +24,7 @@ def handle_research(user_input: str, ctx: dict):
     use_langfuse = ctx["use_langfuse"]
 
     from church import _resolve_model_for_intent
-    from agents.config import LIBRARIAN_MODEL
+    from agents.config import LIBRARIAN_MODEL, get_ollama_options
 
     yield _emit_turn_metadata(turn_id, "Librarian", ["thinking", "responding"])
     yield _emit_stream_mode("thinking")
@@ -36,7 +36,7 @@ def handle_research(user_input: str, ctx: dict):
 
     researcher = Agent(
         name="Librarian",
-        model=Ollama(id=resolved_model, host=resolved_host),
+        model=Ollama(id=resolved_model, host=resolved_host, options=get_ollama_options(resolved_model)),
         instructions=(
             "You are the Hive Librarian and Scholar.\n"
             "Your goal is to provide deep historical context, literary analysis, and general knowledge.\n"
@@ -92,7 +92,7 @@ def handle_documentation(user_input: str, ctx: dict):
     use_langfuse = ctx["use_langfuse"]
 
     from church import _resolve_model_for_intent
-    from config import ARCHITECT_MODEL
+    from config import ARCHITECT_MODEL, get_ollama_options as _get_ollama_options
 
     yield _emit_turn_metadata(turn_id, "Technical Writer", ["thinking", "responding"])
     yield _emit_stream_mode("thinking")
@@ -107,7 +107,7 @@ def handle_documentation(user_input: str, ctx: dict):
 
     tech_writer = Agent(
         name="Technical Writer",
-        model=Ollama(id=TECH_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}),
+        model=Ollama(id=TECH_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}, options=_get_ollama_options(TECH_MODEL)),
         instructions=(
             "You are a Staff-Level Technical Writer.\n"
             "Your goal is to rewrite, format, and organize documentation into professional, polished markdown.\n"

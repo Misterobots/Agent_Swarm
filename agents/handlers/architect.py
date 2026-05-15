@@ -38,7 +38,7 @@ def handle_architect(user_input: str, ctx: dict):
     uid = ctx.get("uid")
 
     from church import _resolve_model_for_intent
-    from config import ARCHITECT_MODEL
+    from config import ARCHITECT_MODEL, get_ollama_options
     from role_model_resolver import get_model_for_role
     from security_agent import get_security_agent
     from mars_loop import MarsRLLoop, mars_loop_stream
@@ -80,7 +80,7 @@ def handle_architect(user_input: str, ctx: dict):
 
         fast_agent = Agent(
             name="Architect",
-            model=Ollama(id=ARCH_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+            model=Ollama(id=ARCH_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}, options=get_ollama_options(ARCH_MODEL)),
             storage=conv_storage,
             session_id=session_id,
             add_history_to_messages=True,
