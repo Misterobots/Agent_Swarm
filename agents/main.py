@@ -253,7 +253,27 @@ async def serve_voice_sample(filename: str):
 # --- Endpoints ---
 @app.get("/")
 async def root():
-    return {"status": "online", "system": "Home AI Lab Swarm"}
+    import subprocess
+    try:
+        git_sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd="/workspace", stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        git_sha = "unknown"
+
+    redis_mode = "connected"
+    try:
+        if dispatcher.redis_available and hasattr(dispatcher.redis, 'ping'):
+            dispatcher.redis.ping()
+        else:
+            redis_mode = "in-memory"
+    except Exception:
+        redis_mode = "unavailable"
+
+    return {
+        "status": "online",
+        "system": "Home AI Lab Swarm",
+        "redis": redis_mode,
+        "commit": git_sha,
+    }
 
 @app.get("/api/v1/identity")
 async def get_my_identity(request: Request, auth_claims: dict = Depends(SpiffeJWTBearer(auto_error=False))):

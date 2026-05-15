@@ -155,6 +155,15 @@ PHASE_ORDINALS: dict[str, int] = {
 PHASE_NAMES: dict[int, str] = {v: k for k, v in PHASE_ORDINALS.items()}
 
 # ---------------------------------------------------------------------------
+# Infrastructure Health Metrics
+# ---------------------------------------------------------------------------
+
+REDIS_CONNECTED = Gauge(
+    'redis_connected',
+    'Whether the dispatcher is connected to real Redis (1=connected, 0=in-memory fallback)'
+)
+
+# ---------------------------------------------------------------------------
 # IoT Sensitive Action Metrics
 # ---------------------------------------------------------------------------
 

@@ -24,13 +24,40 @@ scrape_configs:
           node: 'Lovelace'
 
   # Lovelace — Agent Runtime (custom Prometheus metrics: agent_state, workflow_steps, training_*, ab_test_*)
-  - job_name: 'agent-runtime'
+  - job_name: 'agent-runtime-lovelace'
     metrics_path: /metrics/
-    scrape_interval: 30s   # Was 5s — reduced to match cAdvisor; saves ~6× TSDB space
+    scrape_interval: 30s
     static_configs:
       - targets: ['192.168.2.101:8008']
         labels:
           node: 'Lovelace'
+
+  # Turing — Agent Runtime (same metrics, separate instance serving memex.shivelymedia.com)
+  - job_name: 'agent-runtime-turing'
+    metrics_path: /metrics/
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['192.168.2.103:8008']
+        labels:
+          node: 'Turing'
+
+  # Health check — blackbox probe on both agent_runtime health endpoints
+  - job_name: 'agent-runtime-health'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - http://192.168.2.101:8008/
+          - http://192.168.2.103:8008/
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
 
   # NOTE: Ollama v0.15.x does not expose /metrics regardless of OLLAMA_METRICS=1.
   # Re-enable when Ollama adds confirmed Prometheus support:
