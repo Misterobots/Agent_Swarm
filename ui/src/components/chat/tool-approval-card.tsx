@@ -31,8 +31,8 @@ function ArgPreview({ args }: { args?: Record<string, unknown> }) {
     <div className="mt-1.5 rounded bg-[var(--chat-soft)] border border-[var(--chat-border)] px-2 py-1.5 space-y-0.5 text-xs font-mono text-[var(--chat-text)] overflow-x-auto max-h-28">
       {Object.entries(args).map(([k, v]) => (
         <div key={k} className="flex gap-2 items-start">
-          <span className="text-[#cc9a84] shrink-0">{k}:</span>
-          <span className="text-[#d9b8a7] whitespace-pre-wrap break-all">
+          <span className="text-[var(--chat-muted)] shrink-0">{k}:</span>
+          <span className="text-[var(--chat-text)] whitespace-pre-wrap break-all">
             {typeof v === "string" && v.length > 200
               ? v.slice(0, 200) + "…"
               : JSON.stringify(v)}

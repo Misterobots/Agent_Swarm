@@ -642,7 +642,7 @@
 /* Second slower vertical scan across the main panel */
 [data-theme^="lcars"] .chat-shell .flex-1 {
   position: relative;
-  overflow: hidden;
+  overflow: clip; /* clip paint without blocking child scroll (unlike overflow:hidden) */
 }
 [data-theme^="lcars"] .chat-shell .flex-1::before {
   content: "";
