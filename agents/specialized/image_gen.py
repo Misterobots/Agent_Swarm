@@ -6,6 +6,7 @@ import time
 import base64
 from logger_setup import setup_logger
 from agents.specialized.gpu_pool_manager import get_gpu_pool
+from config import get_ollama_options
 
 # Logging Setup
 logger = setup_logger("CreativeStudio")
@@ -990,7 +991,7 @@ from phi.model.ollama import Ollama
 def get_image_gen_agent():
     return Agent(
         name="Creative Studio",
-        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST),
+        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST, options=get_ollama_options(MODEL_NAME)),
         description="I am the Creative Studio. I generate images using ComfyUI.",
         instructions="You are an artist. You receive prompts and use the `generate_image` tool. Always return the filename.",
         tools=[generate_image],

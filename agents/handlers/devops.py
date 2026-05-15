@@ -34,7 +34,7 @@ def handle_devops(user_input: str, ctx: dict):
     uid = ctx.get("uid")
 
     from church import _resolve_model_for_intent
-    from config import DEVOPS_MODEL as _DEVOPS_MODEL_DEFAULT
+    from config import DEVOPS_MODEL as _DEVOPS_MODEL_DEFAULT, get_ollama_options
     from role_model_resolver import get_model_for_role
     from mars_loop import MarsRLLoop, mars_loop_stream
     from leibniz_agent import get_architect_agent
@@ -64,7 +64,7 @@ def handle_devops(user_input: str, ctx: dict):
         yield {"type": "thought", "content": f"→ Hive Fast: single-pass DevOps ({DEVOPS_MODEL})"}
         devops_agent = Agent(
             name="DevOps Engineer",
-            model=Ollama(id=DEVOPS_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+            model=Ollama(id=DEVOPS_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}, options=get_ollama_options(DEVOPS_MODEL)),
             storage=conv_storage,
             session_id=session_id,
             add_history_to_messages=True,
@@ -143,7 +143,7 @@ def handle_data(user_input: str, ctx: dict):
     uid = ctx.get("uid")
 
     from church import _resolve_model_for_intent
-    from config import ANALYST_MODEL as _ANALYST_MODEL_DEFAULT
+    from config import ANALYST_MODEL as _ANALYST_MODEL_DEFAULT, get_ollama_options as _get_ollama_options
     from role_model_resolver import get_model_for_role
 
     yield _emit_turn_metadata(turn_id, "Data Analyst", ["thinking", "responding"])
@@ -157,7 +157,7 @@ def handle_data(user_input: str, ctx: dict):
 
     data_agent = Agent(
         name="Data Analyst",
-        model=Ollama(id=DATA_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}),
+        model=Ollama(id=DATA_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}, options=_get_ollama_options(DATA_MODEL)),
         instructions=(
             "You are a Staff-Level Data Engineer and Analyst.\n"
             "Expertise: SQL, Python (pandas/numpy/polars), data pipelines, statistical analysis, and data visualization.\n"

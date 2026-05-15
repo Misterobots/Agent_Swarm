@@ -124,6 +124,12 @@ CONTEXT_WINDOWS: dict[str, int] = {
 }
 COMPACT_AUTO_THRESHOLD = 0.95
 
+
+def get_ollama_options(model_name: str, **extra) -> dict:
+    """Return Ollama API options with the per-model context window from CONTEXT_WINDOWS."""
+    ctx = CONTEXT_WINDOWS.get(model_name, CONTEXT_WINDOWS["default"])
+    return {"num_ctx": ctx, **extra}
+
 # ---------------------------------------------------------------------------
 # LLM Provider Configuration (multi-provider BYOK support)
 # Local Ollama models are free for all users. External providers

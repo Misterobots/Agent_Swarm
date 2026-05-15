@@ -23,7 +23,7 @@ def handle_creative(user_input: str, ctx: dict):
     use_langfuse = ctx["use_langfuse"]
 
     from church import _resolve_model_for_intent
-    from config import LIBRARIAN_MODEL
+    from config import LIBRARIAN_MODEL, get_ollama_options
 
     yield _emit_turn_metadata(turn_id, "Creative Writer", ["thinking", "responding"])
     yield _emit_stream_mode("thinking")
@@ -35,7 +35,7 @@ def handle_creative(user_input: str, ctx: dict):
 
     writer = Agent(
         name="Creative Writer",
-        model=Ollama(id=resolved_model, host=resolved_host),
+        model=Ollama(id=resolved_model, host=resolved_host, options=get_ollama_options(resolved_model)),
         instructions=(
             "You are a professional Creative Writer and worldbuilder.\n"
             "Your goal is to produce vivid, immersive, richly detailed creative writing: "

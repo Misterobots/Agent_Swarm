@@ -30,7 +30,7 @@ def handle_conversation(user_input: str, ctx: dict):
     # Lazy import to avoid circular deps
     from church import _resolve_model_for_intent
     import os
-    from config import ARCHITECT_MODEL
+    from config import ARCHITECT_MODEL, get_ollama_options
 
     yield _emit_turn_metadata(turn_id, "Hive Mind", ["thinking", "responding"])
     yield _emit_stream_mode("thinking")
@@ -111,7 +111,7 @@ def handle_conversation(user_input: str, ctx: dict):
 
     conversationalist = Agent(
         name="Hive Mind",
-        model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}),
+        model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}, options=get_ollama_options(CONV_MODEL)),
         storage=conv_storage,
         session_id=session_id,
         add_history_to_messages=True,

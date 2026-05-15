@@ -6,6 +6,7 @@ import time
 from logger_setup import setup_logger
 from phi.agent import Agent
 from phi.model.ollama import Ollama
+from config import get_ollama_options
 
 # Logging Setup
 logger = setup_logger("VoiceCloningExpert")
@@ -220,7 +221,7 @@ def clone_voice(
 def get_voice_cloning_agent():
     return Agent(
         name="Voice Cloning Expert",
-        model=Ollama(id=MODEL_NAME),
+        model=Ollama(id=MODEL_NAME, options=get_ollama_options(MODEL_NAME)),
         description="I am the Voice Cloning Expert. I can generate speech in any voice using Qwen3-TTS.",
         instructions="You are a voice synthesis specialist. Use `clone_voice` to generate audio. precise and technical.",
         tools=[clone_voice],

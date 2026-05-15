@@ -2,6 +2,7 @@ from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 import os
 import sys
+from config import get_ollama_options
 
 # Add tools to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
@@ -50,6 +51,7 @@ def get_iot_agent() -> Agent:
             id=MODEL_NAME,
             host=OLLAMA_HOST,
             request_params={"think": False},  # No thinking — direct tool dispatch
+            options=get_ollama_options(MODEL_NAME),
         ),
         description="You are the Home Automation Specialist. You control lights, switches, and scenes via Home Assistant, and develop firmware via Wokwi/ESPHome.",
         instructions=INSTRUCTIONS,

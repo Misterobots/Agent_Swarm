@@ -1,6 +1,7 @@
 ﻿import os
 from phi.agent import Agent
 from phi.model.ollama import Ollama
+from config import get_ollama_options
 
 # Import Specialized Agents
 from leibniz_agent import get_architect_agent
@@ -27,7 +28,7 @@ def get_coding_team():
     
     team = Agent(
         name="Coding Team",
-        model=Ollama(id="qwen2.5-coder:14b", host=OLLAMA_HOST),
+        model=Ollama(id="qwen2.5-coder:14b", host=OLLAMA_HOST, options=get_ollama_options("qwen2.5-coder:14b")),
         team=[architect],
         description="A team of autonomous coding agents led by the Architect.",
         instructions=["Your goal is to write, debug, and execute code.", "Always delegate to the Architect for implementation."],
@@ -70,7 +71,7 @@ def get_creative_team(session_id: str = None):
     
     art_director = Agent(
         name="Art Director",
-        model=Ollama(id="qwen2.5-coder:14b", host=OLLAMA_HOST),
+        model=Ollama(id="qwen2.5-coder:14b", host=OLLAMA_HOST, options=get_ollama_options("qwen2.5-coder:14b")),
         storage=storage,
         session_id=session_id,
         add_history_to_messages=True,  # Include conversation history
@@ -130,7 +131,7 @@ def get_orchestrator():
     
     orchestrator = Agent(
         name="Orchestrator",
-        model=Ollama(id=ORCHESTRATOR_MODEL, host=SECONDARY_OLLAMA_HOST),
+        model=Ollama(id=ORCHESTRATOR_MODEL, host=SECONDARY_OLLAMA_HOST, options=get_ollama_options(ORCHESTRATOR_MODEL)),
         team=[coding_team, creative_team, iot_team],
         description="The Head of the Swarm. You route requests to the specialized teams.",
         instructions=[

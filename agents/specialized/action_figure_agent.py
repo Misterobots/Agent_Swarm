@@ -419,10 +419,11 @@ def generate_action_figure(
 def get_action_figure_agent():
     from phi.agent import Agent
     from phi.model.ollama import Ollama
+    from config import get_ollama_options
 
     return Agent(
         name="Action Figure Forge",
-        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST),
+        model=Ollama(id=MODEL_NAME, host=OLLAMA_HOST, options=get_ollama_options(MODEL_NAME)),
         description=(
             "I convert images into 3D-printable posable action figures. "
             "I generate a base 3D mesh, detect the skeleton, segment into "
