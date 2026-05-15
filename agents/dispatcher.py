@@ -7,6 +7,7 @@ import os
 from typing import Callable, Dict, List
 from enum import Enum
 from logger_setup import setup_logger
+from metrics import REDIS_CONNECTED
 
 # Redis Configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "redis_queue")
@@ -127,14 +128,17 @@ class Dispatcher:
                 self.redis.ping()
                 logger.info(f"--- [Dispatcher] Connected to Redis at {REDIS_HOST}:{REDIS_PORT} ---")
                 self.redis_available = True
+                REDIS_CONNECTED.set(1)
             except Exception as e:
                 logger.warning(f"--- [Dispatcher] Redis Connection Failed: {e}. Switching to In-Memory Fallback. ---")
                 self.redis = MockRedis()
-                self.redis_available = True # We are "available" via mock
+                self.redis_available = True
+                REDIS_CONNECTED.set(0)
         else:
             logger.warning("--- [Dispatcher] 'redis' module missing. Switching to In-Memory Fallback. ---")
             self.redis = MockRedis()
             self.redis_available = True
+            REDIS_CONNECTED.set(0)
         
         # Queue Configuration: (Queue Name, Concurrency Limit)
         self.queues = {

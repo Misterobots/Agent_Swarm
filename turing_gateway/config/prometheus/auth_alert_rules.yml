@@ -1,9 +1,34 @@
 groups:
+  - name: infrastructure-health
+    interval: 30s
+    rules:
+      - alert: AgentRuntimeRedisDisconnected
+        expr: redis_connected{job=~"agent-runtime-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: agent-runtime
+          category: infrastructure
+        annotations:
+          summary: "Agent runtime on {{ $labels.node }} fell back to in-memory Redis"
+          description: "The dispatcher on {{ $labels.node }} lost its Redis connection and is using in-memory fallback. Queue persistence and GPU arbitration are degraded. Check Redis at 192.168.2.102:6379."
+
+      - alert: AgentRuntimeDown
+        expr: up{job=~"agent-runtime-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: agent-runtime
+          category: availability
+        annotations:
+          summary: "Agent runtime on {{ $labels.node }} is unreachable"
+          description: "Prometheus cannot scrape the agent-runtime metrics endpoint on {{ $labels.node }} for 2 minutes."
+
   - name: auth-key-compromise
     interval: 15s
     rules:
       - alert: AgentRuntimeMetricsUnavailable
-        expr: up{job="agent-runtime"} == 0
+        expr: up{job=~"agent-runtime-.*"} == 0
         for: 5m
         labels:
           severity: critical
@@ -15,7 +40,7 @@ groups:
           description: Prometheus cannot scrape the agent-runtime metrics endpoint for 5 minutes. Investigate auth pipeline visibility before ruling out a key compromise.
 
       - alert: AgentRuntimeAuth401RateSpike
-        expr: increase(http_requests_total{job="agent-runtime",status_code="401"}[5m]) > 100
+        expr: increase(http_requests_total{job=~"agent-runtime-.*",status_code="401"}[5m]) > 100
         for: 5m
         labels:
           severity: critical
@@ -27,7 +52,7 @@ groups:
           description: More than 100 HTTP 401 responses were observed on the agent-runtime in 5 minutes. This matches the key-compromise detection threshold in the incident runbook.
 
       - alert: AgentRuntimeAuth403RateSpike
-        expr: increase(http_requests_total{job="agent-runtime",status_code="403"}[5m]) > 50
+        expr: increase(http_requests_total{job=~"agent-runtime-.*",status_code="403"}[5m]) > 50
         for: 5m
         labels:
           severity: warning
@@ -39,7 +64,7 @@ groups:
           description: More than 50 HTTP 403 responses were observed on the agent-runtime in 5 minutes. Review recent auth policy or role/scope changes before escalating.
 
       - alert: AgentRuntimeRequestVolumeDrop
-        expr: increase(http_requests_total{job="agent-runtime"}[15m]) < 1
+        expr: increase(http_requests_total{job=~"agent-runtime-.*"}[15m]) < 1
         for: 15m
         labels:
           severity: warning
@@ -51,7 +76,7 @@ groups:
           description: No HTTP requests were observed on the agent-runtime for 15 minutes. Confirm telemetry health before using auth rate metrics for key-compromise triage.
 
       - alert: AgentRuntimeSensitiveIotActionsBlockedSpike
-        expr: increase(iot_sensitive_actions_blocked_total{job="agent-runtime"}[10m]) > 20
+        expr: increase(iot_sensitive_actions_blocked_total{job=~"agent-runtime-.*"}[10m]) > 20
         for: 10m
         labels:
           severity: warning
@@ -63,7 +88,7 @@ groups:
           description: More than 20 sensitive IoT actions were blocked in 10 minutes due to missing confirmation. Check for abuse, automation drift, or client UX regressions.
 
       - alert: AgentRuntimeSensitiveIotUnlockExecuted
-        expr: increase(iot_sensitive_actions_total{job="agent-runtime",domain="lock",service="unlock",outcome=~"executed_.*"}[10m]) > 0
+        expr: increase(iot_sensitive_actions_total{job=~"agent-runtime-.*",domain="lock",service="unlock",outcome=~"executed_.*"}[10m]) > 0
         for: 0m
         labels:
           severity: warning
