@@ -881,9 +881,11 @@ def generate_image(
         # Klein (model_name auto/klein-9b), redirect to SDXL Turbo which fits (~5 GB).
         # Note: sdxl-general excludes "turbo" checkpoints — use sdxl-turbo-preview which
         # matches sd_xl_turbo_1.0_fp16.safetensors (the deployed SDXL checkpoint).
+        logger.warning(f"[TRACE] ComfyUI fallback: kwargs model_name={kwargs.get('model_name')!r}, _klein_was_attempted={_klein_was_attempted}")
         if kwargs.get("model_name") in ("auto", "klein-9b"):
             logger.info("[Creative Studio] Redirecting ComfyUI fallback from FLUX to sdxl-turbo-preview (FLUX OOM on single GPU)")
             kwargs = {**kwargs, "model_name": "sdxl-turbo-preview"}
+        logger.warning(f"[TRACE] After redirect: kwargs model_name={kwargs.get('model_name')!r}")
 
         for attempt in range(MAX_RETRIES + 1):
             if attempt > 0:
