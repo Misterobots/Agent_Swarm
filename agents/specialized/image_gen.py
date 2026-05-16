@@ -257,7 +257,7 @@ def get_model_params(model_type: str):
     if model_type == "FLUX_SCHNELL":
         return {"cfg": 1.0, "steps": 4, "sampler": "euler", "scheduler": "simple", "width": 1024, "height": 1024}
     elif model_type == "FLUX_DEV":
-        return {"cfg": 3.5, "steps": 20, "sampler": "euler", "scheduler": "simple", "width": 1024, "height": 1024}
+        return {"cfg": 3.5, "steps": 20, "sampler": "euler", "scheduler": "beta", "width": 1024, "height": 1024}
     elif model_type == "SDXL_TURBO":
         return {"cfg": 1.0, "steps": 2, "sampler": "euler_ancestral", "scheduler": "normal", "width": 1024, "height": 1024}
     elif model_type == "SDXL":
@@ -270,6 +270,9 @@ def _detect_subject_type(p_lower: str) -> str:
     if any(kw in p_lower for kw in [
         "person", "man", "woman", "girl", "boy", "face", "model", "human",
         "people", "child", "baby", "portrait", "selfie", "lady", "guy", "couple",
+        "decker", "runner", "soldier", "warrior", "knight", "hero", "villain",
+        "character", "fighter", "mercenary", "assassin", "mage", "wizard",
+        "ranger", "rogue", "paladin", "cyberpunk", "operative", "agent",
     ]):
         return "person"
     if any(kw in p_lower for kw in [
