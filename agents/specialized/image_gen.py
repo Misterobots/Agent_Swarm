@@ -810,10 +810,16 @@ def generate_image(
 
     last_candidate: dict | None = None
 
+    # Any FLUX request goes to Klein. The single-GPU ComfyUI path (device_ids=['1'])
+    # cannot fit FLUX FP8 + CLIP + T5 on 16 GiB; Klein's dual-GPU split is the only
+    # working FLUX route on this hardware. flux-dev-quality is silently downgraded
+    # to schnell (Klein's loaded weights) rather than letting ComfyUI OOM for 10+min.
+    _flux_request = model_name in ("auto", "klein-9b", "flux-schnell-preview", "flux-dev-quality")
+
     # Track whether Klein was attempted so we know to evict it before ComfyUI even
     # if warmup failed — a failed warmup may leave partial VRAM allocations that
     # WDDM holds until the process terminates (container restart forces reclaim).
-    _klein_was_attempted = model_name in ("auto", "klein-9b") and not skip_refinement
+    _klein_was_attempted = _flux_request and not skip_refinement
 
     # If Klein isn't loaded yet, evict Ollama + ComfyUI first so both GPUs are clear.
     # ComfyUI holds ~15 GiB on GPU 1; Klein needs that space for its balanced layout.
@@ -840,7 +846,10 @@ def generate_image(
     with _gpu_ctx:
         # --- KLEIN PATH (FLUX.2 Klein 9B, dual-GPU Diffusers) ---
         # GPU lock already evicted Ollama and warmed up Klein, so VRAM is clear.
-        use_klein = model_name in ("auto", "klein-9b") and not skip_refinement
+        # All FLUX model_names route here — ComfyUI single-GPU OOMs on FLUX, so
+        # Klein is the only working path. flux-dev-quality silently downgrades to
+        # whatever Klein has loaded (currently schnell FP8).
+        use_klein = _flux_request and not skip_refinement
         if use_klein and _klein_is_healthy():
             logger.info("[Creative Studio] Routing to Klein service (FLUX.2 9B)")
             # Always evict ComfyUI before generating via Klein. Klein's transformer+VAE
@@ -906,8 +915,8 @@ def generate_image(
         # Klein (model_name auto/klein-9b), redirect to SDXL Turbo which fits (~5 GB).
         # Note: sdxl-general excludes "turbo" checkpoints — use sdxl-turbo-preview which
         # matches sd_xl_turbo_1.0_fp16.safetensors (the deployed SDXL checkpoint).
-        if kwargs.get("model_name") in ("auto", "klein-9b"):
-            logger.info("[Creative Studio] Redirecting ComfyUI fallback from FLUX to sdxl-turbo-preview (FLUX OOM on single GPU)")
+        if kwargs.get("model_name") in ("auto", "klein-9b", "flux-schnell-preview", "flux-dev-quality"):
+            logger.info(f"[Creative Studio] Redirecting ComfyUI fallback from {kwargs.get('model_name')!r} to sdxl-turbo-preview (FLUX OOM on single GPU; Klein unavailable)")
             kwargs = {**kwargs, "model_name": "sdxl-turbo-preview"}
 
         for attempt in range(MAX_RETRIES + 1):
