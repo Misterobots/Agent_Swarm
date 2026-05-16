@@ -20,34 +20,34 @@ DEPLOYED_FALLBACK_CHECKPOINT = "sd_xl_turbo_1.0_fp16.safetensors"
 
 IMAGE_MODEL_REGISTRY = {
     "auto": {
-        "label": "Auto Best Available",
+        "label": "Auto (Fast)",
         "category": "adaptive",
-        "description": "Klein 9B first (Diffusers/dual-GPU), then ComfyUI checkpoint priority order.",
-        "priority": ["klein-9b", "flux-dev-quality", "flux-schnell-preview", "sdxl-general", "sdxl-turbo-preview", "sd15-fast-legacy"],
+        "description": "Defaults to FLUX.1-schnell on Klein (~10s/image). Pick FLUX Dev for higher quality at ~55s/image.",
+        "priority": ["klein-9b", "flux-schnell-preview", "flux-dev-quality", "sdxl-general", "sdxl-turbo-preview", "sd15-fast-legacy"],
     },
     "klein-9b": {
-        "label": "FLUX.2 Klein 9B",
-        "category": "quality",
-        "description": "FLUX.2 Klein 9B via Diffusers — spreads across both 5060 Ti GPUs (30GB combined). Highest quality.",
+        "label": "FLUX.1 Schnell (Fast)",
+        "category": "preview",
+        "description": "FLUX.1-schnell FP8 via Klein dual-GPU pipeline. 4 steps, ~10s/image. Great for iteration.",
         "backend": "klein",
+        "variant": "schnell",
         "defaults": {"width": 1024, "height": 1024, "steps": 4, "guidance_scale": 3.5},
     },
     "flux-dev-quality": {
-        "label": "FLUX Dev Quality",
+        "label": "FLUX.1 Dev (Quality)",
         "category": "quality",
-        "description": "Highest prompt fidelity and image quality when FLUX dev checkpoints are available.",
-        "match_any": ["flux"],
-        "match_all": ["dev"],
-        "defaults": {"width": 1024, "height": 1024},
-        "trainable": True,
+        "description": "FLUX.1-dev FP8 via Klein dual-GPU pipeline. 25 steps, ~55s/image. Higher fidelity, real CFG. First switch from Schnell costs ~40s extra.",
+        "backend": "klein",
+        "variant": "dev",
+        "defaults": {"width": 1024, "height": 1024, "steps": 25, "guidance_scale": 3.5},
     },
     "flux-schnell-preview": {
         "label": "FLUX Schnell Preview",
         "category": "preview",
-        "description": "Fast FLUX ideation path for previews and iteration.",
-        "match_all": ["flux", "schnell"],
-        "defaults": {"width": 1024, "height": 1024},
-        "trainable": True,
+        "description": "Alias for klein-9b / FLUX.1 Schnell on Klein. ~10s/image.",
+        "backend": "klein",
+        "variant": "schnell",
+        "defaults": {"width": 1024, "height": 1024, "steps": 4, "guidance_scale": 3.5},
     },
     "sdxl-general": {
         "label": "SDXL General",
@@ -686,25 +686,36 @@ def _generate_via_klein(
     seed: int = -1,
     negative_prompt: str = "",
     output_dir: str = "/tmp/comfyui_images",
+    variant: str | None = None,
 ) -> str | None:
     """
     Calls the Klein service, saves the returned image locally, and returns
     the filename — or None on failure.
+
+    `variant` selects which FLUX model to use ("schnell" or "dev"). If the
+    requested variant isn't currently loaded on Klein, the service evicts the
+    current pipeline and loads the requested one (~40s). Pass None to use
+    whatever is currently loaded.
     """
     t_http_start = time.monotonic()
+    body = {
+        "prompt": prompt,
+        "negative_prompt": negative_prompt or "",
+        "width": width,
+        "height": height,
+        "steps": steps,
+        "guidance_scale": guidance_scale,
+        "seed": seed,
+    }
+    if variant:
+        body["variant"] = variant
     try:
         resp = requests.post(
             f"{KLEIN_HOST}/generate",
-            json={
-                "prompt": prompt,
-                "negative_prompt": negative_prompt or "",
-                "width": width,
-                "height": height,
-                "steps": steps,
-                "guidance_scale": guidance_scale,
-                "seed": seed,
-            },
-            timeout=180,
+            json=body,
+            # 180s for schnell, but dev at 25 steps takes ~55s + potential variant
+            # swap (~40s). 300s covers both cases.
+            timeout=300,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -854,37 +865,57 @@ def generate_image(
             except Exception as _e:
                 logger.warning(f"[Creative Studio] Pre-generation ComfyUI eviction failed: {_e}")
             logger.info(f"[Timing] pre_klein_comfy_evict={time.monotonic() - t_pre_evict_start:.2f}s")
-            klein_defaults = IMAGE_MODEL_REGISTRY["klein-9b"]["defaults"]
+            # Map user-facing model_name → Klein variant. flux-dev-quality is
+            # the only one that takes the quality path; everything else (auto,
+            # klein-9b, flux-schnell-preview) runs schnell for speed.
+            if model_name == "flux-dev-quality":
+                klein_variant = "dev"
+                # FLUX.1-dev wants 20-30 steps + real CFG. Clamp to a sane range
+                # for cost predictability: 12 floor (below which quality drops
+                # noticeably), 30 ceiling (diminishing returns past 25).
+                KLEIN_STEPS_DEFAULT = 25
+                KLEIN_STEPS_MIN, KLEIN_STEPS_MAX = 12, 30
+                KLEIN_CFG_DEFAULT   = 3.5
+                KLEIN_CFG_MIN, KLEIN_CFG_MAX = 1.5, 7.0
+                # If the UI sent the SDXL-style default (steps=20, cfg=7.0),
+                # swap to the dev-recommended defaults rather than passing through.
+                if steps == 20 and cfg == 7.0:
+                    clamped_steps = KLEIN_STEPS_DEFAULT
+                    clamped_cfg   = KLEIN_CFG_DEFAULT
+                else:
+                    clamped_steps = min(max(steps, KLEIN_STEPS_MIN), KLEIN_STEPS_MAX)
+                    clamped_cfg   = min(max(cfg, KLEIN_CFG_MIN), KLEIN_CFG_MAX)
+            else:
+                klein_variant = "schnell"
+                # FLUX.1-schnell is distilled for exactly 4 steps with no CFG.
+                # Anything above 4 steps wastes compute (2x time = 0% quality
+                # gain since schnell's flow-matching collapses past step 4).
+                # Allow fewer steps for faster previews; force cfg to default.
+                klein_defaults = IMAGE_MODEL_REGISTRY["klein-9b"]["defaults"]
+                KLEIN_STEPS_OPT = klein_defaults["steps"]              # 4
+                KLEIN_CFG       = klein_defaults["guidance_scale"]     # 3.5
+                clamped_steps = min(max(steps, 1), KLEIN_STEPS_OPT)
+                clamped_cfg   = KLEIN_CFG
+
+            if clamped_steps != steps or clamped_cfg != cfg:
+                logger.info(
+                    f"[Creative Studio] Klein {klein_variant} params: "
+                    f"steps {steps}→{clamped_steps}, cfg {cfg}→{clamped_cfg}"
+                )
+
             enriched = refine_prompt(prompt, "FLUX_DEV")
             klein_output_dir = "/tmp/comfyui_images"
             os.makedirs(klein_output_dir, exist_ok=True)
-            # FLUX.1-schnell is distilled for exactly 4 steps with no CFG.
-            # Anything above 4 steps wastes compute (2x time = 0% quality gain
-            # since schnell's flow-matching collapses past step 4). cfg > 0 is
-            # noise (schnell isn't trained for classifier-free guidance).
-            #
-            # Allow the user to pick FEWER steps (2-3) for faster previews, but
-            # clamp the upper bound to the schnell-optimal. cfg is forced to
-            # the registered default — there's no good reason to vary it for
-            # schnell, and the SDXL-style cfg=7 slider just produces artifacts.
-            KLEIN_STEPS_OPT = klein_defaults["steps"]              # 4
-            KLEIN_CFG       = klein_defaults["guidance_scale"]     # 3.5
-            clamped_steps = min(max(steps, 1), KLEIN_STEPS_OPT)
-            clamped_cfg   = KLEIN_CFG  # always — schnell doesn't honor CFG
-            if clamped_steps != steps or clamped_cfg != cfg:
-                logger.info(
-                    f"[Creative Studio] Clamped schnell params: "
-                    f"steps {steps}→{clamped_steps}, cfg {cfg}→{clamped_cfg}"
-                )
             klein_file = _generate_via_klein(
                 prompt=enriched,
-                width=width if width != 1024 else klein_defaults["width"],
-                height=height if height != 1024 else klein_defaults["height"],
+                width=width,
+                height=height,
                 steps=clamped_steps,
                 guidance_scale=clamped_cfg,
                 seed=seed,
                 negative_prompt=negative_prompt or "",
                 output_dir=klein_output_dir,
+                variant=klein_variant,
             )
             if klein_file:
                 # Copy to delivered_artifacts so Art Studio gallery + media handlers can serve it.

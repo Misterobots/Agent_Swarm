@@ -10,6 +10,15 @@ const ASPECTS = [
   { label: "9:16 Portrait", w: 768, h: 1344 },
 ];
 
+// Klein-backed quality tiers. These are always available (Klein runs locally
+// on Lovelace, no ComfyUI checkpoint required) and they're the only path
+// that actually fits FLUX on this hardware. Listed before any ComfyUI
+// checkpoints so they're the obvious first pick.
+const KLEIN_OPTIONS = [
+  { value: "auto",              label: "Auto (Fast — FLUX Schnell, ~10s)" },
+  { value: "flux-dev-quality",  label: "FLUX Dev (Quality, ~55s)" },
+];
+
 export function ImageControls({ models }: { models: string[] }) {
   const { imageSettings, setImageSettings } = useArtStore();
 
@@ -30,16 +39,24 @@ export function ImageControls({ models }: { models: string[] }) {
           onChange={(e) => setImageSettings({ model: e.target.value })}
           className="mt-1 w-full bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded-md px-3 py-1.5 text-sm text-[var(--chat-text)] focus:outline-none focus:border-violet-500"
         >
-          <option value="auto">Auto-detect</option>
-          {models.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
+          <optgroup label="FLUX (Klein dual-GPU)">
+            {KLEIN_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </optgroup>
+          {models.length > 0 && (
+            <optgroup label="ComfyUI checkpoints">
+              {models.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </optgroup>
+          )}
         </select>
-        {models.length === 0 && (
-          <p className="mt-2 text-xs text-[var(--chat-muted)]">
-            No ComfyUI checkpoints detected on this node — Auto still works via Klein (FLUX.1-schnell FP8). Checkpoint-specific options unavailable until a model is mounted in ComfyUI.
-          </p>
-        )}
+        <p className="mt-2 text-xs text-[var(--chat-muted)]">
+          {imageSettings.model === "flux-dev-quality"
+            ? "First Dev request after Schnell costs ~40s extra for the variant swap."
+            : "Schnell is distilled for 4 steps; the steps/CFG sliders below get clamped to schnell-safe values."}
+        </p>
       </label>
 
       <div className="grid grid-cols-2 gap-3">
