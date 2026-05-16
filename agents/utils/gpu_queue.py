@@ -333,17 +333,21 @@ def _restart_container(name: str) -> bool:
 def evict_klein():
     """Fully unloads the Klein model weights from VRAM so Ollama/ComfyUI can use both GPUs.
 
-    Two-phase eviction:
-    1. Graceful: POST /evict → Klein moves tensors to CPU + calls synchronize/empty_cache.
-    2. Hard: restart the container → destroys the CUDA context so WDDM immediately returns
-       the physical GPU pages (~9.7 GB text-encoder residual on GPU 0, ~9.1 GB transformer
-       residual on GPU 1). Without this, WDDM holds those pages in Klein's process context
-       indefinitely, causing the next Klein reload to map into system RAM instead of VRAM.
+    Phase 1 (always): POST /evict → Klein moves tensors to CPU + synchronize/empty_cache/gc.
+        Long timeout because BF16 text encoders + FP8 transformer are several GB to move,
+        and the FP8 forward-patch closures create reference cycles that gc has to break.
+
+    Phase 2 (opt-in, EVICT_CONTAINER_RESTART=true): restart the klein_service container to
+        destroy the CUDA context. Needed on WDDM (Windows) hosts where empty_cache() may
+        not return physical pages immediately. Only meaningful when this process has docker
+        socket write access to the Klein container — i.e. the agent_runtime running on the
+        same host as klein_service (Lovelace). Remote agent_runtimes (e.g. Turing) skip
+        this phase since they don't own the container.
     """
-    # Phase 1: graceful unload
+    # Phase 1: graceful unload — generous timeout, the actual work happens on Klein
     try:
         logger.info("[GPU Queue] Evicting Klein model from VRAM (graceful)...")
-        response = requests.post(f"{KLEIN_HOST}/evict", timeout=30)
+        response = requests.post(f"{KLEIN_HOST}/evict", timeout=180)
         if response.status_code == 200:
             logger.info("[GPU Queue] Klein VRAM evicted (graceful phase complete).")
         else:
@@ -351,10 +355,16 @@ def evict_klein():
     except Exception as e:
         logger.warning(f"[GPU Queue] Graceful Klein eviction failed: {e}")
 
-    # Phase 2: container restart — frees WDDM-held physical pages
-    # Wait briefly for the graceful eviction to finish writing to CPU before restart.
+    # Phase 2: optional container restart — only on the host that owns the container
+    if os.getenv("EVICT_CONTAINER_RESTART", "false").lower() not in ("true", "1", "yes"):
+        logger.info("[GPU Queue] Skipping Klein container restart (EVICT_CONTAINER_RESTART not set).")
+        return
+
     time.sleep(2)
-    _restart_container("klein_service")
+    restarted = _restart_container("klein_service")
+    if not restarted:
+        logger.warning("[GPU Queue] Klein container restart did not succeed; relying on graceful eviction.")
+        return
 
     # Wait for Klein to come back up (FastAPI cold start without model load ≈ 5s).
     deadline = time.time() + 30
@@ -364,9 +374,10 @@ def evict_klein():
             h = requests.get(f"{KLEIN_HOST}/health", timeout=3).json()
             if h.get("status") == "ok":
                 logger.info("[GPU Queue] Klein container back up after restart.")
-                break
+                return
         except Exception:
             pass
+    logger.warning("[GPU Queue] Klein container did not respond to /health within 30s after restart.")
 
 
 def warmup_klein():
