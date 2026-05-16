@@ -858,6 +858,21 @@ def generate_image(
                 output_dir=klein_output_dir,
             )
             if klein_file:
+                # Copy to delivered_artifacts so Art Studio gallery + media handlers can serve it.
+                # Chat flow's handlers/image.py also calls shutil.copy2 from the same source; the
+                # second copy is idempotent (overwrites the same bytes).
+                try:
+                    import shutil as _shutil
+                    workspace_root = os.environ.get("WORKSPACE_ROOT", "/workspace")
+                    delivery_dir = os.path.join(workspace_root, "delivered_artifacts")
+                    os.makedirs(delivery_dir, exist_ok=True)
+                    src = os.path.join(klein_output_dir, klein_file)
+                    dst = os.path.join(delivery_dir, klein_file)
+                    if os.path.exists(src) and not os.path.exists(dst):
+                        _shutil.copy2(src, dst)
+                        logger.info(f"[Creative Studio] Klein → delivered_artifacts: {klein_file}")
+                except Exception as _copy_err:
+                    logger.warning(f"[Creative Studio] Failed to copy Klein output to delivery dir: {_copy_err}")
                 return f"Generated Image: {klein_file}"
             logger.warning("[Creative Studio] Klein generation failed — falling back to ComfyUI")
 
