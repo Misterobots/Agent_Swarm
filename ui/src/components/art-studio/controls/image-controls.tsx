@@ -10,13 +10,32 @@ const ASPECTS = [
   { label: "9:16 Portrait", w: 768, h: 1344 },
 ];
 
-// Klein-backed quality tiers. These are always available (Klein runs locally
+// Klein-backed FLUX variants. Both are always available (Klein runs locally
 // on Lovelace, no ComfyUI checkpoint required) and they're the only path
-// that actually fits FLUX on this hardware. Listed before any ComfyUI
-// checkpoints so they're the obvious first pick.
-const KLEIN_OPTIONS = [
-  { value: "auto",              label: "Auto (Fast — FLUX Schnell, ~10s)" },
-  { value: "flux-dev-quality",  label: "FLUX Dev (Quality, ~55s)" },
+// that actually fits FLUX on this hardware.
+//
+// IMPORTANT: Dev is NOT strictly higher quality than Schnell — it's a
+// different model with a different aesthetic prior. A/B testing showed Dev
+// shifts toward a "composed/stylized" look while Schnell stays closer to
+// literal prompt rendering (better photorealism). Tooltips reflect this
+// honest framing so users pick based on the task, not assumed "quality."
+const KLEIN_OPTIONS: { value: string; label: string; tooltip: string }[] = [
+  {
+    value: "auto",
+    label: "Auto (Fast — FLUX Schnell, ~10s)",
+    tooltip:
+      "FLUX.1-schnell via Klein dual-GPU. Best for: photorealism, drafts, fast iteration. " +
+      "4 steps, no CFG. ~10 seconds per image. Stays closer to the literal prompt.",
+  },
+  {
+    value: "flux-dev-quality",
+    label: "FLUX Dev (Composed, ~55s)",
+    tooltip:
+      "FLUX.1-dev via Klein dual-GPU. Best for: stylized scenes, multi-element compositions, " +
+      "text in images, complex spatial layouts. 25 steps with real CFG. ~55 seconds per image. " +
+      "First Dev request after Schnell costs an extra ~40s for the variant swap. " +
+      "Not strictly 'higher quality' than Schnell — different aesthetic, more painterly.",
+  },
 ];
 
 export function ImageControls({ models }: { models: string[] }) {
@@ -41,7 +60,7 @@ export function ImageControls({ models }: { models: string[] }) {
         >
           <optgroup label="FLUX (Klein dual-GPU)">
             {KLEIN_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value} title={o.tooltip}>{o.label}</option>
             ))}
           </optgroup>
           {models.length > 0 && (
@@ -52,11 +71,21 @@ export function ImageControls({ models }: { models: string[] }) {
             </optgroup>
           )}
         </select>
-        <p className="mt-2 text-xs text-[var(--chat-muted)]">
-          {imageSettings.model === "flux-dev-quality"
-            ? "First Dev request after Schnell costs ~40s extra for the variant swap."
-            : "Schnell is distilled for 4 steps; the steps/CFG sliders below get clamped to schnell-safe values."}
-        </p>
+        {(() => {
+          const selected = KLEIN_OPTIONS.find((o) => o.value === imageSettings.model);
+          if (selected) {
+            return (
+              <p className="mt-2 text-xs text-[var(--chat-muted)] leading-relaxed">
+                {selected.tooltip}
+              </p>
+            );
+          }
+          return (
+            <p className="mt-2 text-xs text-[var(--chat-muted)]">
+              ComfyUI checkpoint selected — Klein FLUX path bypassed. Step/CFG sliders honored as-is.
+            </p>
+          );
+        })()}
       </label>
 
       <div className="grid grid-cols-2 gap-3">
