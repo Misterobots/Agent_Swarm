@@ -6,7 +6,7 @@ import re
 import shutil
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
-from utils.gpu_queue import request_lock, get_best_host_for_model
+
 from handlers.base import _score_trace
 
 logger = logging.getLogger("Router")
@@ -136,8 +136,7 @@ def handle_image(user_input: str, ctx: dict):
 
     from agents.specialized.image_gen import generate_image
     yield {"type": "log", "content": f"[CreativeStudio] Generating: '{user_input}'"}
-    with request_lock(context="image"):
-        response = generate_image(user_input, model_name="auto")
+    response = generate_image(user_input, model_name="auto")
 
     image_match = re.search(r"Generated Image: ([\w\.-]+)", response)
     if image_match:

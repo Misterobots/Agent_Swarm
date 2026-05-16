@@ -72,18 +72,36 @@ export function GenerationHistory({ entries }: { entries: GenerationEntry[] }) {
 
                 <p className="text-sm text-[var(--chat-text)] mb-2">{entry.prompt}</p>
 
-                {entry.result && (
-                  <div
-                    className={cn(
-                      "rounded-lg p-3 text-xs font-mono",
-                      entry.status === "complete"
-                        ? "bg-[var(--chat-panel)] text-[var(--chat-muted)]"
-                        : "bg-red-950/30 text-red-400"
-                    )}
-                  >
-                    {entry.result}
-                  </div>
-                )}
+                {entry.result && (() => {
+                  const imgMatch = entry.mode === "image" && entry.status === "complete"
+                    ? entry.result.match(/Generated Image: ([\w.\-]+)/)
+                    : null;
+                  const filename = imgMatch?.[1];
+                  if (filename) {
+                    return (
+                      <div className="rounded-lg overflow-hidden mt-1">
+                        <img
+                          src={`/api/backend/v1/art/gallery/images/${filename}`}
+                          alt={entry.prompt}
+                          className="w-full rounded-lg object-cover max-h-96"
+                        />
+                        <p className="text-[10px] text-[var(--chat-muted)] mt-1 font-mono">{filename}</p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      className={cn(
+                        "rounded-lg p-3 text-xs font-mono",
+                        entry.status === "complete"
+                          ? "bg-[var(--chat-panel)] text-[var(--chat-muted)]"
+                          : "bg-red-950/30 text-red-400"
+                      )}
+                    >
+                      {entry.result}
+                    </div>
+                  );
+                })()}
 
                 {entry.status === "generating" && (
                   <div className="flex items-center gap-2 mt-2">

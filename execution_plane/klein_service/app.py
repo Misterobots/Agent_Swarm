@@ -26,13 +26,45 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [Klein] %(message)s")
 logger = logging.getLogger("KleinService")
 
-KLEIN_MODEL_ID = os.getenv("KLEIN_MODEL_ID", "black-forest-labs/FLUX.1-schnell")
-FLUX_FP8_REPO  = os.getenv("FLUX_FP8_REPO",  "Kijai/flux-fp8")
-FLUX_FP8_FILE  = os.getenv("FLUX_FP8_FILE",  "flux1-schnell-fp8-e4m3fn.safetensors")
-HF_TOKEN       = os.getenv("HF_TOKEN",        None)
-OUTPUT_DIR     = os.getenv("OUTPUT_DIR",      "/output")
+FLUX_FP8_REPO   = os.getenv("FLUX_FP8_REPO",  "Kijai/flux-fp8")
+HF_TOKEN        = os.getenv("HF_TOKEN",        None)
+OUTPUT_DIR      = os.getenv("OUTPUT_DIR",      "/output")
+DEFAULT_VARIANT = os.getenv("KLEIN_DEFAULT_VARIANT", "schnell")
+
+# Model variants supported by Klein. Both share the same architecture (FLUX
+# transformer + dual text encoders + VAE) and the same FP8 patch — only the
+# weights differ. The pipeline can hot-swap variants by unloading the current
+# pipeline and reloading with a different model_id + transformer file.
+#
+#   schnell — distilled, 4 steps, no CFG. ~10s/image, fast iteration.
+#   dev     — full quality, 20-30 steps, real CFG. ~30-45s/image, gated on HF.
+VARIANTS = {
+    "schnell": {
+        "model_id": "black-forest-labs/FLUX.1-schnell",
+        "fp8_file": "flux1-schnell-fp8-e4m3fn.safetensors",
+        "default_steps": 4,
+        "default_guidance": 3.5,
+    },
+    "dev": {
+        "model_id": "black-forest-labs/FLUX.1-dev",
+        "fp8_file": "flux1-dev-fp8-e4m3fn.safetensors",
+        "default_steps": 25,
+        "default_guidance": 3.5,
+    },
+}
+
+# Legacy env vars override the default variant's config when set (back-compat
+# with single-variant deployments). KLEIN_MODEL_ID and FLUX_FP8_FILE take
+# precedence over VARIANTS[DEFAULT_VARIANT].
+_legacy_model_id = os.getenv("KLEIN_MODEL_ID")
+_legacy_fp8_file = os.getenv("FLUX_FP8_FILE")
+if _legacy_model_id:
+    VARIANTS[DEFAULT_VARIANT]["model_id"] = _legacy_model_id
+if _legacy_fp8_file:
+    VARIANTS[DEFAULT_VARIANT]["fp8_file"] = _legacy_fp8_file
 
 _pipeline = None
+_current_variant = None  # which variant is currently loaded, or None if cold
 
 
 def _log_vram():
@@ -81,10 +113,28 @@ def _force_free_vram():
             torch.cuda.empty_cache()
 
 
-def _load_pipeline():
-    global _pipeline
-    if _pipeline is not None:
+def _load_pipeline(variant: str = None):
+    """Load a variant's pipeline into VRAM. If a different variant is already
+    loaded, this evicts it first (~10s) before loading the new one (~40s)."""
+    global _pipeline, _current_variant
+
+    target = variant or DEFAULT_VARIANT
+    if target not in VARIANTS:
+        raise ValueError(f"Unknown variant {target!r}; valid: {list(VARIANTS)}")
+
+    # Already loaded with target variant — no-op
+    if _pipeline is not None and _current_variant == target:
+        logger.info(f"Variant {target!r} already loaded, no-op.")
         return
+
+    # Different variant currently loaded — evict before switching
+    if _pipeline is not None and _current_variant != target:
+        logger.info(f"Variant switch: {_current_variant!r} → {target!r}. Unloading current pipeline.")
+        _unload_pipeline()
+
+    cfg = VARIANTS[target]
+    model_id = cfg["model_id"]
+    fp8_file = cfg["fp8_file"]
 
     t0 = time.time()
     transformer = None  # tracked for cleanup on failure
@@ -93,10 +143,11 @@ def _load_pipeline():
     from huggingface_hub import hf_hub_download
 
     try:
-        logger.info(f"Downloading FP8 transformer: {FLUX_FP8_REPO}/{FLUX_FP8_FILE} ...")
+        logger.info(f"Loading variant {target!r}: {model_id} + {FLUX_FP8_REPO}/{fp8_file}")
+        logger.info(f"Downloading FP8 transformer: {FLUX_FP8_REPO}/{fp8_file} ...")
         fp8_path = hf_hub_download(
             repo_id=FLUX_FP8_REPO,
-            filename=FLUX_FP8_FILE,
+            filename=fp8_file,
             token=HF_TOKEN or None,
         )
 
@@ -116,9 +167,9 @@ def _load_pipeline():
 
         _log_vram()
 
-        logger.info(f"Assembling FluxPipeline from {KLEIN_MODEL_ID} ...")
+        logger.info(f"Assembling FluxPipeline from {model_id} ...")
         _pipeline = FluxPipeline.from_pretrained(
-            KLEIN_MODEL_ID,
+            model_id,
             transformer=transformer,
             torch_dtype=torch.bfloat16,
             token=HF_TOKEN or None,
@@ -146,7 +197,8 @@ def _load_pipeline():
                 return torch.device("cuda:1")
         _pipeline.__class__ = _KleinFluxPipeline
 
-        logger.info(f"Pipeline ready in {time.time() - t0:.1f}s")
+        _current_variant = target
+        logger.info(f"Pipeline ready ({target}) in {time.time() - t0:.1f}s")
 
     except Exception:
         # Release any partially-loaded tensors so CUDA memory is not permanently
@@ -154,16 +206,17 @@ def _load_pipeline():
         # and every subsequent warmup attempt also OOMs.
         logger.exception("Pipeline load failed — releasing partially-allocated VRAM")
         _pipeline = None
+        _current_variant = None
         del transformer
         _force_free_vram()
         raise
 
 
 def _unload_pipeline():
-    global _pipeline
+    global _pipeline, _current_variant
     if _pipeline is None:
         return
-    logger.info("Evicting Klein model from VRAM...")
+    logger.info(f"Evicting Klein {_current_variant!r} model from VRAM...")
     # Move all components to CPU synchronously before deleting the pipeline.
     # This immediately releases CUDA memory regardless of Python GC timing.
     # Without this, the FP8 forward patches create reference cycles
@@ -179,6 +232,7 @@ def _unload_pipeline():
                 pass
     del _pipeline
     _pipeline = None
+    _current_variant = None
     _force_free_vram()
     logger.info("Klein VRAM freed.")
 
@@ -199,12 +253,24 @@ app = FastAPI(title="Klein Inference Service", lifespan=lifespan)
 
 class GenerateRequest(BaseModel):
     prompt: str
-    negative_prompt: str = ""
     width: int = 1024
     height: int = 1024
     steps: int = 4
     guidance_scale: float = 3.5
     seed: int = -1
+    # If set, switches Klein to this variant before generating (~40s if cold-load
+    # or variant-swap, ~10s if already loaded). Default: use whatever is loaded.
+    variant: str | None = None
+    # FLUX is flow-matching; negative prompts are not part of the model's training
+    # signal and have no effect. Field accepted for backwards-compatible callers
+    # but explicitly ignored at runtime. Use prompt phrasing to exclude unwanted
+    # elements (e.g. "without text, without watermarks").
+    negative_prompt: str | None = None
+
+
+class WarmupRequest(BaseModel):
+    # Pre-load this variant. If None, loads DEFAULT_VARIANT.
+    variant: str | None = None
 
 
 class GenerateResponse(BaseModel):
@@ -212,6 +278,7 @@ class GenerateResponse(BaseModel):
     elapsed: float
     seed: int
     image_b64: str
+    variant: str  # which variant was used to generate this image
 
 
 # ---------------------------------------------------------------------------
@@ -220,20 +287,26 @@ class GenerateResponse(BaseModel):
 
 @app.get("/health")
 def health():
+    loaded_cfg = VARIANTS.get(_current_variant) if _current_variant else None
     return {
         "status": "ok",
-        "model": KLEIN_MODEL_ID,
-        "fp8_transformer": f"{FLUX_FP8_REPO}/{FLUX_FP8_FILE}",
+        "model": loaded_cfg["model_id"] if loaded_cfg else None,
+        "fp8_transformer": f"{FLUX_FP8_REPO}/{loaded_cfg['fp8_file']}" if loaded_cfg else None,
         "pipeline_loaded": _pipeline is not None,
+        "loaded_variant": _current_variant,
+        "available_variants": list(VARIANTS),
+        "default_variant": DEFAULT_VARIANT,
         "cuda_devices": torch.cuda.device_count(),
     }
 
 
 @app.post("/warmup")
-def warmup():
-    """Pre-load model weights into VRAM. Safe to call multiple times."""
-    _load_pipeline()
-    return {"status": "ready", "model": KLEIN_MODEL_ID}
+def warmup(req: WarmupRequest = None):
+    """Pre-load a variant's weights into VRAM. Safe to call multiple times.
+    If a different variant is currently loaded, it gets evicted first."""
+    target = (req.variant if req else None) or DEFAULT_VARIANT
+    _load_pipeline(target)
+    return {"status": "ready", "variant": _current_variant, "model": VARIANTS[_current_variant]["model_id"]}
 
 
 @app.post("/evict")
@@ -252,8 +325,14 @@ def free_memory():
 
 @app.post("/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest):
-    if _pipeline is None:
-        logger.info("Pipeline not loaded — loading now (cold start)...")
+    # If caller requested a specific variant that isn't currently loaded,
+    # switch to it. This may cost ~40s (eviction + reload) but the caller
+    # opted into the variant by setting it explicitly.
+    if req.variant and req.variant != _current_variant:
+        logger.info(f"Variant requested: {req.variant!r} (current: {_current_variant!r}) — switching")
+        _load_pipeline(req.variant)
+    elif _pipeline is None:
+        logger.info("Pipeline not loaded — loading default variant (cold start)...")
         _load_pipeline()
 
     seed = req.seed if req.seed != -1 else random.randint(0, 2 ** 32 - 1)
@@ -313,4 +392,5 @@ def generate(req: GenerateRequest):
         elapsed=elapsed,
         seed=seed,
         image_b64=img_b64,
+        variant=_current_variant,
     )

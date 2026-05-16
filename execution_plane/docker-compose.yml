@@ -184,6 +184,11 @@ services:
       - OPENHANDS_API_KEY=sk-sandbox-local
       - COMFYUI_HOST=http://comfyui_gpu:8188
       - KLEIN_HOST=http://klein_service:8189
+      # This agent_runtime is co-located with klein_service on Lovelace, so it
+      # owns the docker socket needed for the WDDM container-restart eviction phase.
+      # Remote agent_runtimes (Turing) must leave this unset; they rely on Klein's
+      # in-process /evict to release VRAM.
+      - EVICT_CONTAINER_RESTART=true
       - "VALID_API_KEYS={\"sk-coder-identity\": \"coding_user\", \"sk-devops-identity\": \"devops_user\"}"
       # Open Design daemon (LAN-accessible from agent_runtime on same execution_net)
       - OPEN_DESIGN_URL=http://open_design:7456

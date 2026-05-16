@@ -20,34 +20,34 @@ DEPLOYED_FALLBACK_CHECKPOINT = "sd_xl_turbo_1.0_fp16.safetensors"
 
 IMAGE_MODEL_REGISTRY = {
     "auto": {
-        "label": "Auto Best Available",
+        "label": "Auto (Fast)",
         "category": "adaptive",
-        "description": "Klein 9B first (Diffusers/dual-GPU), then ComfyUI checkpoint priority order.",
-        "priority": ["klein-9b", "flux-dev-quality", "flux-schnell-preview", "sdxl-general", "sdxl-turbo-preview", "sd15-fast-legacy"],
+        "description": "Defaults to FLUX.1-schnell on Klein (~10s/image). Pick FLUX Dev for higher quality at ~55s/image.",
+        "priority": ["klein-9b", "flux-schnell-preview", "flux-dev-quality", "sdxl-general", "sdxl-turbo-preview", "sd15-fast-legacy"],
     },
     "klein-9b": {
-        "label": "FLUX.2 Klein 9B",
-        "category": "quality",
-        "description": "FLUX.2 Klein 9B via Diffusers — spreads across both 5060 Ti GPUs (30GB combined). Highest quality.",
+        "label": "FLUX.1 Schnell (Fast)",
+        "category": "preview",
+        "description": "FLUX.1-schnell FP8 via Klein dual-GPU pipeline. 4 steps, ~10s/image. Great for iteration.",
         "backend": "klein",
+        "variant": "schnell",
         "defaults": {"width": 1024, "height": 1024, "steps": 4, "guidance_scale": 3.5},
     },
     "flux-dev-quality": {
-        "label": "FLUX Dev Quality",
+        "label": "FLUX.1 Dev (Quality)",
         "category": "quality",
-        "description": "Highest prompt fidelity and image quality when FLUX dev checkpoints are available.",
-        "match_any": ["flux"],
-        "match_all": ["dev"],
-        "defaults": {"width": 1024, "height": 1024},
-        "trainable": True,
+        "description": "FLUX.1-dev FP8 via Klein dual-GPU pipeline. 25 steps, ~55s/image. Higher fidelity, real CFG. First switch from Schnell costs ~40s extra.",
+        "backend": "klein",
+        "variant": "dev",
+        "defaults": {"width": 1024, "height": 1024, "steps": 25, "guidance_scale": 3.5},
     },
     "flux-schnell-preview": {
         "label": "FLUX Schnell Preview",
         "category": "preview",
-        "description": "Fast FLUX ideation path for previews and iteration.",
-        "match_all": ["flux", "schnell"],
-        "defaults": {"width": 1024, "height": 1024},
-        "trainable": True,
+        "description": "Alias for klein-9b / FLUX.1 Schnell on Klein. ~10s/image.",
+        "backend": "klein",
+        "variant": "schnell",
+        "defaults": {"width": 1024, "height": 1024, "steps": 4, "guidance_scale": 3.5},
     },
     "sdxl-general": {
         "label": "SDXL General",
@@ -698,30 +698,43 @@ def _generate_via_klein(
     seed: int = -1,
     negative_prompt: str = "",
     output_dir: str = "/tmp/comfyui_images",
+    variant: str | None = None,
 ) -> str | None:
     """
     Calls the Klein service, saves the returned image locally, and returns
     the filename — or None on failure.
+
+    `variant` selects which FLUX model to use ("schnell" or "dev"). If the
+    requested variant isn't currently loaded on Klein, the service evicts the
+    current pipeline and loads the requested one (~40s). Pass None to use
+    whatever is currently loaded.
     """
+    t_http_start = time.monotonic()
+    body = {
+        "prompt": prompt,
+        "negative_prompt": negative_prompt or "",
+        "width": width,
+        "height": height,
+        "steps": steps,
+        "guidance_scale": guidance_scale,
+        "seed": seed,
+    }
+    if variant:
+        body["variant"] = variant
     try:
         resp = requests.post(
             f"{KLEIN_HOST}/generate",
-            json={
-                "prompt": prompt,
-                "negative_prompt": negative_prompt or "",
-                "width": width,
-                "height": height,
-                "steps": steps,
-                "guidance_scale": guidance_scale,
-                "seed": seed,
-            },
-            timeout=180,
+            json=body,
+            # 180s for schnell, but dev at 25 steps takes ~55s + potential variant
+            # swap (~40s). 300s covers both cases.
+            timeout=300,
         )
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
         logger.error(f"[Klein] Request failed: {e}")
         return None
+    t_http = time.monotonic() - t_http_start
 
     filename = data.get("filename")
     img_b64 = data.get("image_b64")
@@ -731,12 +744,18 @@ def _generate_via_klein(
         logger.error("[Klein] Response missing filename or image_b64")
         return None
 
+    t_save_start = time.monotonic()
     os.makedirs(output_dir, exist_ok=True)
     dest = os.path.join(output_dir, filename)
     with open(dest, "wb") as f:
         f.write(base64.b64decode(img_b64))
+    t_save = time.monotonic() - t_save_start
 
     logger.info(f"[Klein] Saved {filename} in {elapsed:.1f}s")
+    logger.info(
+        f"[Timing] klein_http={t_http:.2f}s service_inference={elapsed:.2f}s "
+        f"transport_overhead={t_http - elapsed:.2f}s save_b64={t_save:.2f}s"
+    )
     return filename
 
 
@@ -814,18 +833,21 @@ def generate_image(
 
     last_candidate: dict | None = None
 
-    # If Klein isn't loaded yet, evict Ollama + ComfyUI first so both GPUs are clear.
-    # ComfyUI holds ~15 GiB on GPU 1; Klein needs that space for its balanced layout.
-    # This runs regardless of Redis availability (GPU lock fails open when Redis is down).
-    if model_name in ("auto", "klein-9b") and not skip_refinement and not _klein_is_healthy():
-        try:
-            from utils.gpu_queue import evict_ollama, evict_comfyui, warmup_klein
-            logger.info("[Creative Studio] Evicting Ollama + ComfyUI to free both GPUs for Klein...")
-            evict_ollama()
-            evict_comfyui()
-            warmup_klein()
-        except Exception as e:
-            logger.warning(f"[Creative Studio] Klein VRAM prep failed: {e}")
+    # Any FLUX request goes to Klein. The single-GPU ComfyUI path (device_ids=['1'])
+    # cannot fit FLUX FP8 + CLIP + T5 on 16 GiB; Klein's dual-GPU split is the only
+    # working FLUX route on this hardware. flux-dev-quality is silently downgraded
+    # to schnell (Klein's loaded weights) rather than letting ComfyUI OOM for 10+min.
+    _flux_request = model_name in ("auto", "klein-9b", "flux-schnell-preview", "flux-dev-quality")
+
+    # Track whether Klein was attempted so we know to evict it before ComfyUI even
+    # if warmup failed — a failed warmup may leave partial VRAM allocations that
+    # WDDM holds until the process terminates (container restart forces reclaim).
+    _klein_was_attempted = _flux_request and not skip_refinement
+
+    # Note: VRAM prep (evict Ollama/ComfyUI, warmup Klein) is handled INSIDE
+    # request_lock's zone-switch logic (gpu_queue.py:request_lock). Doing it here
+    # would be a race condition — two parallel image requests would both pre-evict
+    # outside the lock and collide on Klein VRAM. Trust the lock.
 
     # GPU lock serializes concurrent requests and handles zone transitions
     # when Redis IS available. When Redis is down it's a no-op (fail-open).
@@ -839,32 +861,90 @@ def generate_image(
     with _gpu_ctx:
         # --- KLEIN PATH (FLUX.2 Klein 9B, dual-GPU Diffusers) ---
         # GPU lock already evicted Ollama and warmed up Klein, so VRAM is clear.
-        use_klein = model_name in ("auto", "klein-9b") and not skip_refinement
+        # All FLUX model_names route here — ComfyUI single-GPU OOMs on FLUX, so
+        # Klein is the only working path. flux-dev-quality silently downgrades to
+        # whatever Klein has loaded (currently schnell FP8).
+        use_klein = _flux_request and not skip_refinement
         if use_klein and _klein_is_healthy():
             logger.info("[Creative Studio] Routing to Klein service (FLUX.2 9B)")
             # Always evict ComfyUI before generating via Klein. Klein's transformer+VAE
             # live on physical GPU 1; ComfyUI also uses GPU 1 and may have reloaded since
             # the last zone eviction. Without this, GPU 1 runs out of headroom mid-generation.
+            t_pre_evict_start = time.monotonic()
             try:
                 from utils.gpu_queue import evict_comfyui as _evict_comfyui_pre
                 _evict_comfyui_pre()
             except Exception as _e:
                 logger.warning(f"[Creative Studio] Pre-generation ComfyUI eviction failed: {_e}")
-            klein_defaults = IMAGE_MODEL_REGISTRY["klein-9b"]["defaults"]
+            logger.info(f"[Timing] pre_klein_comfy_evict={time.monotonic() - t_pre_evict_start:.2f}s")
+            # Map user-facing model_name → Klein variant. flux-dev-quality is
+            # the only one that takes the quality path; everything else (auto,
+            # klein-9b, flux-schnell-preview) runs schnell for speed.
+            if model_name == "flux-dev-quality":
+                klein_variant = "dev"
+                # FLUX.1-dev wants 20-30 steps + real CFG. Clamp to a sane range
+                # for cost predictability: 12 floor (below which quality drops
+                # noticeably), 30 ceiling (diminishing returns past 25).
+                KLEIN_STEPS_DEFAULT = 25
+                KLEIN_STEPS_MIN, KLEIN_STEPS_MAX = 12, 30
+                KLEIN_CFG_DEFAULT   = 3.5
+                KLEIN_CFG_MIN, KLEIN_CFG_MAX = 1.5, 7.0
+                # If the UI sent the SDXL-style default (steps=20, cfg=7.0),
+                # swap to the dev-recommended defaults rather than passing through.
+                if steps == 20 and cfg == 7.0:
+                    clamped_steps = KLEIN_STEPS_DEFAULT
+                    clamped_cfg   = KLEIN_CFG_DEFAULT
+                else:
+                    clamped_steps = min(max(steps, KLEIN_STEPS_MIN), KLEIN_STEPS_MAX)
+                    clamped_cfg   = min(max(cfg, KLEIN_CFG_MIN), KLEIN_CFG_MAX)
+            else:
+                klein_variant = "schnell"
+                # FLUX.1-schnell is distilled for exactly 4 steps with no CFG.
+                # Anything above 4 steps wastes compute (2x time = 0% quality
+                # gain since schnell's flow-matching collapses past step 4).
+                # Allow fewer steps for faster previews; force cfg to default.
+                klein_defaults = IMAGE_MODEL_REGISTRY["klein-9b"]["defaults"]
+                KLEIN_STEPS_OPT = klein_defaults["steps"]              # 4
+                KLEIN_CFG       = klein_defaults["guidance_scale"]     # 3.5
+                clamped_steps = min(max(steps, 1), KLEIN_STEPS_OPT)
+                clamped_cfg   = KLEIN_CFG
+
+            if clamped_steps != steps or clamped_cfg != cfg:
+                logger.info(
+                    f"[Creative Studio] Klein {klein_variant} params: "
+                    f"steps {steps}→{clamped_steps}, cfg {cfg}→{clamped_cfg}"
+                )
+
             enriched = refine_prompt(prompt, "FLUX_DEV")
             klein_output_dir = "/tmp/comfyui_images"
             os.makedirs(klein_output_dir, exist_ok=True)
             klein_file = _generate_via_klein(
                 prompt=enriched,
-                width=width if width != 1024 else klein_defaults["width"],
-                height=height if height != 1024 else klein_defaults["height"],
-                steps=steps if steps != 20 else klein_defaults["steps"],
-                guidance_scale=cfg if cfg != 7.0 else klein_defaults["guidance_scale"],
+                width=width,
+                height=height,
+                steps=clamped_steps,
+                guidance_scale=clamped_cfg,
                 seed=seed,
                 negative_prompt=negative_prompt or "",
                 output_dir=klein_output_dir,
+                variant=klein_variant,
             )
             if klein_file:
+                # Copy to delivered_artifacts so Art Studio gallery + media handlers can serve it.
+                # Chat flow's handlers/image.py also calls shutil.copy2 from the same source; the
+                # second copy is idempotent (overwrites the same bytes).
+                try:
+                    import shutil as _shutil
+                    workspace_root = os.environ.get("WORKSPACE_ROOT", "/workspace")
+                    delivery_dir = os.path.join(workspace_root, "delivered_artifacts")
+                    os.makedirs(delivery_dir, exist_ok=True)
+                    src = os.path.join(klein_output_dir, klein_file)
+                    dst = os.path.join(delivery_dir, klein_file)
+                    if os.path.exists(src) and not os.path.exists(dst):
+                        _shutil.copy2(src, dst)
+                        logger.info(f"[Creative Studio] Klein → delivered_artifacts: {klein_file}")
+                except Exception as _copy_err:
+                    logger.warning(f"[Creative Studio] Failed to copy Klein output to delivery dir: {_copy_err}")
                 return f"Generated Image: {klein_file}"
             logger.warning("[Creative Studio] Klein generation failed — falling back to ComfyUI")
 
@@ -873,19 +953,24 @@ def generate_image(
         # and its transformer+VAE (~9 GB) occupy GPU 1. ComfyUI only has device_ids=['1']
         # (physical GPU 1, 15.93 GB) and FLUX alone exceeds that. Evict first, then
         # redirect to SDXL so ComfyUI never attempts FLUX which would OOM on GPU 1.
-        if _klein_is_healthy():
+        # Also evict if warmup was attempted but failed: a failed _load_pipeline() call
+        # invokes _force_free_vram() internally but WDDM may still hold physical pages;
+        # the container restart in evict_klein() forces WDDM to return them immediately.
+        if _klein_is_healthy() or _klein_was_attempted:
             try:
                 from utils.gpu_queue import evict_klein as _evict_klein
-                logger.info("[Creative Studio] Evicting Klein to free GPU 0 before ComfyUI...")
+                logger.info("[Creative Studio] Evicting Klein to free GPU pages before ComfyUI...")
                 _evict_klein()
             except Exception as e:
                 logger.warning(f"[Creative Studio] Klein eviction failed: {e}")
 
         # FLUX cannot fit on ComfyUI's single GPU 1 (15.93 GB). When falling back from
-        # Klein (model_name auto/klein-9b), redirect to SDXL which fits comfortably.
-        if kwargs.get("model_name") in ("auto", "klein-9b"):
-            logger.info("[Creative Studio] Redirecting ComfyUI fallback from FLUX to sdxl-general (FLUX OOM on single GPU)")
-            kwargs = {**kwargs, "model_name": "sdxl-general"}
+        # Klein (model_name auto/klein-9b), redirect to SDXL Turbo which fits (~5 GB).
+        # Note: sdxl-general excludes "turbo" checkpoints — use sdxl-turbo-preview which
+        # matches sd_xl_turbo_1.0_fp16.safetensors (the deployed SDXL checkpoint).
+        if kwargs.get("model_name") in ("auto", "klein-9b", "flux-schnell-preview", "flux-dev-quality"):
+            logger.info(f"[Creative Studio] Redirecting ComfyUI fallback from {kwargs.get('model_name')!r} to sdxl-turbo-preview (FLUX OOM on single GPU; Klein unavailable)")
+            kwargs = {**kwargs, "model_name": "sdxl-turbo-preview"}
 
         for attempt in range(MAX_RETRIES + 1):
             if attempt > 0:

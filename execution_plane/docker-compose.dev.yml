@@ -1,0 +1,121 @@
+# DEV SANDBOX — isolated agent_runtime + UI on separate ports
+#
+# Shares all GPU/infra services with the production stack (Ollama, Klein,
+# ComfyUI, Postgres, Redis) via the existing execution_net network.
+# No GPU services are duplicated.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml down
+#   docker compose -f docker-compose.dev.yml logs -f agent-runtime-dev
+#
+# Dev endpoints:
+#   UI:      http://localhost:3301
+#   API:     http://localhost:8009
+#   Health:  http://localhost:8009/
+
+services:
+
+  agent-runtime-dev:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile
+    image: home-ai-lab/agent-runtime:latest
+    container_name: agent_runtime_dev
+    restart: unless-stopped
+    env_file:
+      - ../network.env
+    environment:
+      - OLLAMA_HOST=http://ollama_gpu:11434
+      - BMO_OLLAMA_HOST=http://ollama_gpu:11434
+      - OPENHANDS_URL=http://openhands_sandbox:3000
+      - OPENHANDS_API_KEY=sk-sandbox-local
+      - COMFYUI_HOST=http://comfyui_gpu:8188
+      - KLEIN_HOST=http://klein_service:8189
+      - OPEN_DESIGN_URL=http://open_design:7456
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
+      - PYTHONPATH=/app
+      - MEMPALACE_API_URL=${MEMPALACE_API_URL:-http://192.168.2.102:8200}
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}
+      - REDIS_HOST=192.168.2.102
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
+      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
+      - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
+      - "VALID_API_KEYS={\"sk-coder-identity\": \"coding_user\", \"sk-devops-identity\": \"devops_user\"}"
+      - FISH_AUDIO_API_KEY=9c84d88f61174cdba215e69e65daff4d
+      - FISH_AUDIO_MODEL_ID=323847d4c5394c678e5909c2206725f6
+      - BMO_LLM_MODEL=qwen3:14b
+      - HOME_LAT=${HOME_LAT:-41.8781}
+      - HOME_LON=${HOME_LON:--87.6298}
+      - HOME_CITY=${HOME_CITY:-your area}
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/output:/app/comfy_io/output
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/input:/app/comfy_io/input
+      - //var/run/docker.sock:/var/run/docker.sock:ro
+      - spire_socket:/var/run/spire:ro
+    group_add:
+      - "0"
+    command: ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug", "--reload"]
+    ports:
+      - "8009:8000"
+    networks:
+      - execution_net
+
+  hive-ui-dev:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_GATEWAY_URL: "http://192.168.2.101:8009"
+    image: home-ai-lab/hive-ui-dev:latest
+    container_name: hive_ui_dev
+    restart: unless-stopped
+    depends_on:
+      - agent-runtime-dev
+    env_file:
+      - ../network.env
+    environment:
+      - API_BASE_URL=http://agent_runtime_dev:8000
+      - MEMPALACE_BASE_URL=http://${HOPPER_IP:-192.168.2.102}:8200
+      - LANGFUSE_URL=http://${HOPPER_IP:-192.168.2.102}:3000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - HOPPER_IP=${HOPPER_IP:-192.168.2.102}
+      - NEXT_PUBLIC_GRAFANA_URL=http://${TURING_IP:-192.168.2.103}/grafana
+      - GRAFANA_INTERNAL_URL=http://${TURING_IP:-192.168.2.103}/grafana
+    extra_hosts:
+      - "${HOPPER_HOST:-hopper}:${HOPPER_IP:-192.168.2.102}"
+    volumes:
+      - ../docs:/app/docs:ro
+    ports:
+      - "3301:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - execution_net
+
+networks:
+  execution_net:
+    external: true
+    name: execution_plane_execution_net
+
+volumes:
+  spire_socket:
+    external: true
+    name: execution_plane_spire_socket

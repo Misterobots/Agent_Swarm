@@ -333,17 +333,21 @@ def _restart_container(name: str) -> bool:
 def evict_klein():
     """Fully unloads the Klein model weights from VRAM so Ollama/ComfyUI can use both GPUs.
 
-    Two-phase eviction:
-    1. Graceful: POST /evict → Klein moves tensors to CPU + calls synchronize/empty_cache.
-    2. Hard: restart the container → destroys the CUDA context so WDDM immediately returns
-       the physical GPU pages (~9.7 GB text-encoder residual on GPU 0, ~9.1 GB transformer
-       residual on GPU 1). Without this, WDDM holds those pages in Klein's process context
-       indefinitely, causing the next Klein reload to map into system RAM instead of VRAM.
+    Phase 1 (always): POST /evict → Klein moves tensors to CPU + synchronize/empty_cache/gc.
+        Long timeout because BF16 text encoders + FP8 transformer are several GB to move,
+        and the FP8 forward-patch closures create reference cycles that gc has to break.
+
+    Phase 2 (opt-in, EVICT_CONTAINER_RESTART=true): restart the klein_service container to
+        destroy the CUDA context. Needed on WDDM (Windows) hosts where empty_cache() may
+        not return physical pages immediately. Only meaningful when this process has docker
+        socket write access to the Klein container — i.e. the agent_runtime running on the
+        same host as klein_service (Lovelace). Remote agent_runtimes (e.g. Turing) skip
+        this phase since they don't own the container.
     """
-    # Phase 1: graceful unload
+    # Phase 1: graceful unload — generous timeout, the actual work happens on Klein
     try:
         logger.info("[GPU Queue] Evicting Klein model from VRAM (graceful)...")
-        response = requests.post(f"{KLEIN_HOST}/evict", timeout=30)
+        response = requests.post(f"{KLEIN_HOST}/evict", timeout=180)
         if response.status_code == 200:
             logger.info("[GPU Queue] Klein VRAM evicted (graceful phase complete).")
         else:
@@ -351,10 +355,16 @@ def evict_klein():
     except Exception as e:
         logger.warning(f"[GPU Queue] Graceful Klein eviction failed: {e}")
 
-    # Phase 2: container restart — frees WDDM-held physical pages
-    # Wait briefly for the graceful eviction to finish writing to CPU before restart.
+    # Phase 2: optional container restart — only on the host that owns the container
+    if os.getenv("EVICT_CONTAINER_RESTART", "false").lower() not in ("true", "1", "yes"):
+        logger.info("[GPU Queue] Skipping Klein container restart (EVICT_CONTAINER_RESTART not set).")
+        return
+
     time.sleep(2)
-    _restart_container("klein_service")
+    restarted = _restart_container("klein_service")
+    if not restarted:
+        logger.warning("[GPU Queue] Klein container restart did not succeed; relying on graceful eviction.")
+        return
 
     # Wait for Klein to come back up (FastAPI cold start without model load ≈ 5s).
     deadline = time.time() + 30
@@ -364,9 +374,10 @@ def evict_klein():
             h = requests.get(f"{KLEIN_HOST}/health", timeout=3).json()
             if h.get("status") == "ok":
                 logger.info("[GPU Queue] Klein container back up after restart.")
-                break
+                return
         except Exception:
             pass
+    logger.warning("[GPU Queue] Klein container did not respond to /health within 30s after restart.")
 
 
 def warmup_klein():
@@ -446,6 +457,7 @@ def request_lock(context: str, timeout: int = 300):
     context must be either "text" or "image".
     Fail-open: if Redis is unavailable, skip the lock and run without GPU mutex.
     """
+    t_total_start = time.monotonic()
     try:
         client = get_redis_client()
         client.ping()  # Verify connection before proceeding
@@ -457,8 +469,12 @@ def request_lock(context: str, timeout: int = 300):
     lock_id = os.urandom(16).hex()
     acquired = False
     logger.info(f"[GPU Queue] Attempting to acquire GPU lock for context: '{context}'...")
-    
+
     start_time = time.time()
+    t_acquire_start = time.monotonic()
+    t_lock_wait = 0.0
+    t_eviction = 0.0
+    t_work = 0.0
     try:
         # Spin loop until lock is acquired or timeout
         while time.time() - start_time < timeout:
@@ -466,15 +482,17 @@ def request_lock(context: str, timeout: int = 300):
             # ex=timeout ensures the lock expires even if the process crashes
             if client.set(LOCK_KEY, lock_id, nx=True, ex=timeout):
                 acquired = True
+                t_lock_wait = time.monotonic() - t_acquire_start
                 logger.info(f"[GPU Queue] Lock acquired for context: '{context}'.")
                 break
             time.sleep(1)
-        
+
         if not acquired:
             raise TimeoutError("[GPU Queue] Failed to acquire GPU lock within timeout.")
 
         # Smart Context Switching
         current_zone = client.get(ZONE_KEY)
+        t_evict_start = time.monotonic()
         if current_zone != context:
             logger.info(f"[GPU Queue] Context switch detected: '{current_zone}' -> '{context}'. Prepping VRAM...")
             if context == "text":
@@ -499,9 +517,12 @@ def request_lock(context: str, timeout: int = 300):
             client.set(ZONE_KEY, context)
         else:
             logger.info(f"[GPU Queue] GPU is already in '{context}' zone. No eviction needed.")
+        t_eviction = time.monotonic() - t_evict_start
 
         # Yield back to the block doing the work
+        t_work_start = time.monotonic()
         yield
+        t_work = time.monotonic() - t_work_start
 
     finally:
         if acquired:
@@ -509,6 +530,11 @@ def request_lock(context: str, timeout: int = 300):
             if client.get(LOCK_KEY) == lock_id:
                 client.delete(LOCK_KEY)
                 logger.info(f"[GPU Queue] Lock released for context: '{context}'.")
+            t_total = time.monotonic() - t_total_start
+            logger.info(
+                f"[Timing] context={context} lock_wait={t_lock_wait:.2f}s "
+                f"eviction={t_eviction:.2f}s work={t_work:.2f}s total={t_total:.2f}s"
+            )
 
 
 # ---------------------------------------------------------------------------
