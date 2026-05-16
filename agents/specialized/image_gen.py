@@ -821,18 +821,10 @@ def generate_image(
     # WDDM holds until the process terminates (container restart forces reclaim).
     _klein_was_attempted = _flux_request and not skip_refinement
 
-    # If Klein isn't loaded yet, evict Ollama + ComfyUI first so both GPUs are clear.
-    # ComfyUI holds ~15 GiB on GPU 1; Klein needs that space for its balanced layout.
-    # This runs regardless of Redis availability (GPU lock fails open when Redis is down).
-    if _klein_was_attempted and not _klein_is_healthy():
-        try:
-            from utils.gpu_queue import evict_ollama, evict_comfyui, warmup_klein
-            logger.info("[Creative Studio] Evicting Ollama + ComfyUI to free both GPUs for Klein...")
-            evict_ollama()
-            evict_comfyui()
-            warmup_klein()
-        except Exception as e:
-            logger.warning(f"[Creative Studio] Klein VRAM prep failed: {e}")
+    # Note: VRAM prep (evict Ollama/ComfyUI, warmup Klein) is handled INSIDE
+    # request_lock's zone-switch logic (gpu_queue.py:request_lock). Doing it here
+    # would be a race condition — two parallel image requests would both pre-evict
+    # outside the lock and collide on Klein VRAM. Trust the lock.
 
     # GPU lock serializes concurrent requests and handles zone transitions
     # when Redis IS available. When Redis is down it's a no-op (fail-open).
