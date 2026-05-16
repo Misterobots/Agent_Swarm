@@ -446,6 +446,7 @@ def request_lock(context: str, timeout: int = 300):
     context must be either "text" or "image".
     Fail-open: if Redis is unavailable, skip the lock and run without GPU mutex.
     """
+    t_total_start = time.monotonic()
     try:
         client = get_redis_client()
         client.ping()  # Verify connection before proceeding
@@ -457,8 +458,12 @@ def request_lock(context: str, timeout: int = 300):
     lock_id = os.urandom(16).hex()
     acquired = False
     logger.info(f"[GPU Queue] Attempting to acquire GPU lock for context: '{context}'...")
-    
+
     start_time = time.time()
+    t_acquire_start = time.monotonic()
+    t_lock_wait = 0.0
+    t_eviction = 0.0
+    t_work = 0.0
     try:
         # Spin loop until lock is acquired or timeout
         while time.time() - start_time < timeout:
@@ -466,15 +471,17 @@ def request_lock(context: str, timeout: int = 300):
             # ex=timeout ensures the lock expires even if the process crashes
             if client.set(LOCK_KEY, lock_id, nx=True, ex=timeout):
                 acquired = True
+                t_lock_wait = time.monotonic() - t_acquire_start
                 logger.info(f"[GPU Queue] Lock acquired for context: '{context}'.")
                 break
             time.sleep(1)
-        
+
         if not acquired:
             raise TimeoutError("[GPU Queue] Failed to acquire GPU lock within timeout.")
 
         # Smart Context Switching
         current_zone = client.get(ZONE_KEY)
+        t_evict_start = time.monotonic()
         if current_zone != context:
             logger.info(f"[GPU Queue] Context switch detected: '{current_zone}' -> '{context}'. Prepping VRAM...")
             if context == "text":
@@ -499,9 +506,12 @@ def request_lock(context: str, timeout: int = 300):
             client.set(ZONE_KEY, context)
         else:
             logger.info(f"[GPU Queue] GPU is already in '{context}' zone. No eviction needed.")
+        t_eviction = time.monotonic() - t_evict_start
 
         # Yield back to the block doing the work
+        t_work_start = time.monotonic()
         yield
+        t_work = time.monotonic() - t_work_start
 
     finally:
         if acquired:
@@ -509,6 +519,11 @@ def request_lock(context: str, timeout: int = 300):
             if client.get(LOCK_KEY) == lock_id:
                 client.delete(LOCK_KEY)
                 logger.info(f"[GPU Queue] Lock released for context: '{context}'.")
+            t_total = time.monotonic() - t_total_start
+            logger.info(
+                f"[Timing] context={context} lock_wait={t_lock_wait:.2f}s "
+                f"eviction={t_eviction:.2f}s work={t_work:.2f}s total={t_total:.2f}s"
+            )
 
 
 # ---------------------------------------------------------------------------

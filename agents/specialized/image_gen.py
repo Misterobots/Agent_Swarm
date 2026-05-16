@@ -691,6 +691,7 @@ def _generate_via_klein(
     Calls the Klein service, saves the returned image locally, and returns
     the filename — or None on failure.
     """
+    t_http_start = time.monotonic()
     try:
         resp = requests.post(
             f"{KLEIN_HOST}/generate",
@@ -710,6 +711,7 @@ def _generate_via_klein(
     except Exception as e:
         logger.error(f"[Klein] Request failed: {e}")
         return None
+    t_http = time.monotonic() - t_http_start
 
     filename = data.get("filename")
     img_b64 = data.get("image_b64")
@@ -719,12 +721,18 @@ def _generate_via_klein(
         logger.error("[Klein] Response missing filename or image_b64")
         return None
 
+    t_save_start = time.monotonic()
     os.makedirs(output_dir, exist_ok=True)
     dest = os.path.join(output_dir, filename)
     with open(dest, "wb") as f:
         f.write(base64.b64decode(img_b64))
+    t_save = time.monotonic() - t_save_start
 
     logger.info(f"[Klein] Saved {filename} in {elapsed:.1f}s")
+    logger.info(
+        f"[Timing] klein_http={t_http:.2f}s service_inference={elapsed:.2f}s "
+        f"transport_overhead={t_http - elapsed:.2f}s save_b64={t_save:.2f}s"
+    )
     return filename
 
 
@@ -838,11 +846,13 @@ def generate_image(
             # Always evict ComfyUI before generating via Klein. Klein's transformer+VAE
             # live on physical GPU 1; ComfyUI also uses GPU 1 and may have reloaded since
             # the last zone eviction. Without this, GPU 1 runs out of headroom mid-generation.
+            t_pre_evict_start = time.monotonic()
             try:
                 from utils.gpu_queue import evict_comfyui as _evict_comfyui_pre
                 _evict_comfyui_pre()
             except Exception as _e:
                 logger.warning(f"[Creative Studio] Pre-generation ComfyUI eviction failed: {_e}")
+            logger.info(f"[Timing] pre_klein_comfy_evict={time.monotonic() - t_pre_evict_start:.2f}s")
             klein_defaults = IMAGE_MODEL_REGISTRY["klein-9b"]["defaults"]
             enriched = refine_prompt(prompt, "FLUX_DEV")
             klein_output_dir = "/tmp/comfyui_images"
