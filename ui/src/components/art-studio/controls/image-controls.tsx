@@ -22,19 +22,21 @@ const ASPECTS = [
 const KLEIN_OPTIONS: { value: string; label: string; tooltip: string }[] = [
   {
     value: "auto",
-    label: "Auto (Fast — FLUX Schnell, ~10s)",
+    label: "Auto (FLUX Schnell — fast, ~10s)",
     tooltip:
-      "FLUX.1-schnell via Klein dual-GPU. Best for: photorealism, drafts, fast iteration. " +
-      "4 steps, no CFG. ~10 seconds per image. Stays closer to the literal prompt.",
+      "FLUX.1-schnell via Klein dual-GPU. The right default for almost everything: " +
+      "photorealism, illustrations, anime, drafts, fast iteration. 4 steps, ~10 seconds. " +
+      "Limitation: text in the image will be garbled — use FLUX Dev when text matters.",
   },
   {
     value: "flux-dev-quality",
-    label: "FLUX Dev (Composed, ~55s)",
+    label: "FLUX Dev (text-in-image, ~55s)",
     tooltip:
-      "FLUX.1-dev via Klein dual-GPU. Best for: stylized scenes, multi-element compositions, " +
-      "text in images, complex spatial layouts. 25 steps with real CFG. ~55 seconds per image. " +
-      "First Dev request after Schnell costs an extra ~40s for the variant swap. " +
-      "Not strictly 'higher quality' than Schnell — different aesthetic, more painterly.",
+      "FLUX.1-dev via Klein dual-GPU. Pick this specifically when your image needs to contain " +
+      "legible text (signs, labels, words) or has complex multi-element composition where Schnell " +
+      "gets confused. 25 steps with real CFG. ~55 seconds. First Dev request after Schnell costs " +
+      "an extra ~40s for the variant swap. " +
+      "Not a general 'quality upgrade' — for plain photoreal or illustration, Schnell is better.",
   },
 ];
 

@@ -253,9 +253,6 @@ app = FastAPI(title="Klein Inference Service", lifespan=lifespan)
 
 class GenerateRequest(BaseModel):
     prompt: str
-    # FLUX is flow-matching; negative_prompt is not honored by the pipeline.
-    # Kept in the schema for callers that send it, but ignored at runtime.
-    negative_prompt: str = ""
     width: int = 1024
     height: int = 1024
     steps: int = 4
@@ -264,6 +261,11 @@ class GenerateRequest(BaseModel):
     # If set, switches Klein to this variant before generating (~40s if cold-load
     # or variant-swap, ~10s if already loaded). Default: use whatever is loaded.
     variant: str | None = None
+    # FLUX is flow-matching; negative prompts are not part of the model's training
+    # signal and have no effect. Field accepted for backwards-compatible callers
+    # but explicitly ignored at runtime. Use prompt phrasing to exclude unwanted
+    # elements (e.g. "without text, without watermarks").
+    negative_prompt: str | None = None
 
 
 class WarmupRequest(BaseModel):
