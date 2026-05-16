@@ -36,8 +36,8 @@ export function ImageControls({ models }: { models: string[] }) {
           ))}
         </select>
         {models.length === 0 && (
-          <p className="mt-2 text-xs text-amber-400">
-            No ComfyUI checkpoints detected. Image generation will stay unavailable until a model is mounted in ComfyUI.
+          <p className="mt-2 text-xs text-[var(--chat-muted)]">
+            No ComfyUI checkpoints detected on this node — Auto still works via Klein (FLUX.1-schnell FP8). Checkpoint-specific options unavailable until a model is mounted in ComfyUI.
           </p>
         )}
       </label>
