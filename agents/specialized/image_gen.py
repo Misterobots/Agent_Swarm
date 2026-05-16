@@ -401,6 +401,15 @@ def queue_prompt(prompt_text: str, **kwargs):
         "width": int(kwargs.get("width", profile_defaults.get("width", raw_params["width"]))),
         "height": int(kwargs.get("height", profile_defaults.get("height", raw_params["height"])))
     }
+
+    # Distilled-model step ceilings. Running past the distilled training distribution
+    # over-denoises and degrades output (schnell is trained for 4 steps; turbo for 1-4).
+    if model_type == "FLUX_SCHNELL" and params["steps"] > 8:
+        logger.warning(f"Capping FLUX_SCHNELL steps from {params['steps']} to 8 (distilled model — more steps degrade output)")
+        params["steps"] = 8
+    elif model_type == "SDXL_TURBO" and params["steps"] > 4:
+        logger.warning(f"Capping SDXL_TURBO steps from {params['steps']} to 4 (distilled model — more steps degrade output)")
+        params["steps"] = 4
     
     if kwargs.get("skip_refinement"):
         final_prompt = prompt_text
