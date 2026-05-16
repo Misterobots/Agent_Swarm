@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useArtStore } from "@/lib/stores/art-store";
 
 const SAMPLERS = ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"];
@@ -19,6 +20,40 @@ const ASPECTS = [
 // shifts toward a "composed/stylized" look while Schnell stays closer to
 // literal prompt rendering (better photorealism). Tooltips reflect this
 // honest framing so users pick based on the task, not assumed "quality."
+// Per-model slider constraints. The backend (image_gen.py) clamps anything
+// out of range as a safety net, but the UI shouldn't let users drag into the
+// wasted-compute zone in the first place. Each entry mirrors the backend's
+// accepted range and recommended default.
+type SliderConfig = {
+  cfg:   { min: number; max: number; step: number; recommended: number; disabled?: boolean; note?: string };
+  steps: { min: number; max: number; step: number; recommended: number };
+};
+const MODEL_SLIDER_DEFAULTS: SliderConfig = {
+  // Generic ComfyUI fallback (SDXL-style). Used when a checkpoint is selected.
+  cfg:   { min: 1.0, max: 20.0, step: 0.5, recommended: 7.0 },
+  steps: { min: 1, max: 50, step: 1, recommended: 20 },
+};
+function getSliderConfig(model: string): SliderConfig {
+  // Klein FLUX.1-schnell — distilled for 4 steps, ignores CFG.
+  if (model === "auto" || model === "klein-9b" || model === "flux-schnell-preview") {
+    return {
+      cfg:   {
+        min: 3.5, max: 3.5, step: 0.5, recommended: 3.5, disabled: true,
+        note: "Schnell ignores CFG (flow-matching).",
+      },
+      steps: { min: 1, max: 4, step: 1, recommended: 4 },
+    };
+  }
+  // Klein FLUX.1-dev — real CFG, 12-30 step sweet spot.
+  if (model === "flux-dev-quality") {
+    return {
+      cfg:   { min: 1.5, max: 7.0, step: 0.5, recommended: 3.5 },
+      steps: { min: 12, max: 30, step: 1, recommended: 25 },
+    };
+  }
+  return MODEL_SLIDER_DEFAULTS;
+}
+
 const KLEIN_OPTIONS: { value: string; label: string; tooltip: string }[] = [
   {
     value: "auto",
@@ -42,10 +77,32 @@ const KLEIN_OPTIONS: { value: string; label: string; tooltip: string }[] = [
 
 export function ImageControls({ models }: { models: string[] }) {
   const { imageSettings, setImageSettings } = useArtStore();
+  const sliderConfig = getSliderConfig(imageSettings.model);
 
   const currentAspect = ASPECTS.find(
     (a) => a.w === imageSettings.width && a.h === imageSettings.height
   ) || ASPECTS[0];
+
+  // When the user switches model, snap stored slider values into the new model's
+  // valid range. Preserves the user's intent when current values are already in
+  // range; otherwise jumps to the recommended default for the new model. The ref
+  // tracks the previous model so the effect only fires on actual model changes,
+  // not every render.
+  const prevModelRef = useRef(imageSettings.model);
+  useEffect(() => {
+    if (prevModelRef.current === imageSettings.model) return;
+    prevModelRef.current = imageSettings.model;
+    const cfg = imageSettings.cfg;
+    const steps = imageSettings.steps;
+    const cfgInRange   = cfg   >= sliderConfig.cfg.min   && cfg   <= sliderConfig.cfg.max;
+    const stepsInRange = steps >= sliderConfig.steps.min && steps <= sliderConfig.steps.max;
+    const patch: Partial<{ cfg: number; steps: number }> = {};
+    if (!cfgInRange)   patch.cfg   = sliderConfig.cfg.recommended;
+    if (!stepsInRange) patch.steps = sliderConfig.steps.recommended;
+    if (patch.cfg !== undefined || patch.steps !== undefined) {
+      setImageSettings(patch);
+    }
+  }, [imageSettings.model, imageSettings.cfg, imageSettings.steps, sliderConfig, setImageSettings]);
 
   return (
     <div className="space-y-4">
@@ -91,27 +148,50 @@ export function ImageControls({ models }: { models: string[] }) {
       </label>
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="text-xs text-[var(--chat-muted)]">CFG Scale</span>
+        <label className={`block ${sliderConfig.cfg.disabled ? "opacity-50" : ""}`}>
+          <span className="text-xs text-[var(--chat-muted)]">
+            CFG Scale
+            {sliderConfig.cfg.note && (
+              <span className="ml-1 text-[10px] italic" title={sliderConfig.cfg.note}>
+                (ignored)
+              </span>
+            )}
+          </span>
           <input
             type="range"
-            min={1} max={20} step={0.5}
+            min={sliderConfig.cfg.min}
+            max={sliderConfig.cfg.max}
+            step={sliderConfig.cfg.step}
             value={imageSettings.cfg}
+            disabled={sliderConfig.cfg.disabled}
             onChange={(e) => setImageSettings({ cfg: parseFloat(e.target.value) })}
-            className="w-full mt-1 accent-violet-500"
+            className="w-full mt-1 accent-violet-500 disabled:cursor-not-allowed"
+            title={sliderConfig.cfg.note}
           />
-          <span className="text-xs text-[var(--chat-muted)]">{imageSettings.cfg}</span>
+          <span className="text-xs text-[var(--chat-muted)]">
+            {imageSettings.cfg}
+            <span className="ml-2 text-[10px] opacity-60">
+              [{sliderConfig.cfg.min}–{sliderConfig.cfg.max}]
+            </span>
+          </span>
         </label>
         <label className="block">
           <span className="text-xs text-[var(--chat-muted)]">Steps</span>
           <input
             type="range"
-            min={1} max={50} step={1}
+            min={sliderConfig.steps.min}
+            max={sliderConfig.steps.max}
+            step={sliderConfig.steps.step}
             value={imageSettings.steps}
             onChange={(e) => setImageSettings({ steps: parseInt(e.target.value) })}
             className="w-full mt-1 accent-violet-500"
           />
-          <span className="text-xs text-[var(--chat-muted)]">{imageSettings.steps}</span>
+          <span className="text-xs text-[var(--chat-muted)]">
+            {imageSettings.steps}
+            <span className="ml-2 text-[10px] opacity-60">
+              [{sliderConfig.steps.min}–{sliderConfig.steps.max}]
+            </span>
+          </span>
         </label>
       </div>
 
