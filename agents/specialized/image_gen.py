@@ -866,12 +866,26 @@ def generate_image(
             enriched = refine_prompt(prompt, "FLUX_DEV")
             klein_output_dir = "/tmp/comfyui_images"
             os.makedirs(klein_output_dir, exist_ok=True)
+            # FLUX.1-schnell is distilled for 1-4 steps with no CFG. The UI
+            # sliders default to SDXL-style values (20 steps / 7.0 cfg) and
+            # users can drag them to 30/10 — at those values a single image
+            # takes 60+ seconds (vs ~10s) AND produces worse quality because
+            # schnell isn't trained for that regime. Clamp to a safe range.
+            KLEIN_STEPS_MAX = 8       # 4 is optimal; 8 is the upper bound that still benefits
+            KLEIN_CFG_MAX   = 4.0     # schnell prefers 0; 4 is the upper bound before degradation
+            clamped_steps = min(max(steps, 1), KLEIN_STEPS_MAX)
+            clamped_cfg   = min(max(cfg,   0.0), KLEIN_CFG_MAX)
+            if clamped_steps != steps or clamped_cfg != cfg:
+                logger.info(
+                    f"[Creative Studio] Clamped schnell params: "
+                    f"steps {steps}→{clamped_steps}, cfg {cfg}→{clamped_cfg}"
+                )
             klein_file = _generate_via_klein(
                 prompt=enriched,
                 width=width if width != 1024 else klein_defaults["width"],
                 height=height if height != 1024 else klein_defaults["height"],
-                steps=steps if steps != 20 else klein_defaults["steps"],
-                guidance_scale=cfg if cfg != 7.0 else klein_defaults["guidance_scale"],
+                steps=clamped_steps,
+                guidance_scale=clamped_cfg,
                 seed=seed,
                 negative_prompt=negative_prompt or "",
                 output_dir=klein_output_dir,
