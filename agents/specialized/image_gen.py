@@ -349,6 +349,72 @@ def refine_prompt(prompt: str, model_type: str) -> str:
         return f"masterpiece, best quality, {styled_prompt}"
     return styled_prompt
 
+
+# Threshold for triggering FLUX prompt condensation. T5-XXL's context is 512
+# tokens; refine_prompt adds ~60-100 tokens of style prefix. We want the user's
+# content to fit in ~400 tokens after refinement → ~1500 chars (4 chars/token
+# average for English narrative text).
+_FLUX_CONDENSE_THRESHOLD_CHARS = 1500
+_FLUX_CONDENSE_MODEL = os.getenv("FLUX_CONDENSE_MODEL", "qwen2.5-coder:14b")
+_FLUX_CONDENSE_SYSTEM = (
+    "You convert long narrative scene descriptions into compact FLUX.1-dev image prompts. "
+    "Output ONE paragraph of 80-150 tokens. "
+    "Rules:\n"
+    "- Visual-noun-heavy: concrete objects, materials, lighting, composition.\n"
+    "- ONE primary focal subject, plus at most ONE secondary subject in the frame.\n"
+    "- Drop quoted dialogue, character names, abstract mood adjectives, and any meta-instructions.\n"
+    "- Keep: lighting direction, color palette, atmosphere (fog/rain/etc), art style cues, camera framing.\n"
+    "- No bullet points, no headings, no markdown. Single dense paragraph.\n"
+    "Output the prompt text only. No preamble, no quotes, no explanation."
+)
+
+
+def _condense_for_flux(prompt: str) -> str:
+    """Condense long narrative prompts into FLUX-friendly form using a local LLM.
+
+    FLUX's T5-XXL encoder has a 512-token ceiling and silently truncates past it.
+    Long structured descriptions (sections, dialogue, mood adjectives) also confuse
+    the model. This pre-processes such prompts into a compact single paragraph
+    optimized for diffusion. Falls back to the original prompt on any failure.
+    """
+    if len(prompt) <= _FLUX_CONDENSE_THRESHOLD_CHARS:
+        return prompt
+
+    try:
+        resp = requests.post(
+            f"{OLLAMA_HOST}/api/generate",
+            json={
+                "model": _FLUX_CONDENSE_MODEL,
+                "system": _FLUX_CONDENSE_SYSTEM,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.3, "num_predict": 300},
+            },
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            logger.warning(
+                f"[FLUX prompt condense] Ollama returned HTTP {resp.status_code} — using original prompt"
+            )
+            return prompt
+        condensed = (resp.json().get("response") or "").strip()
+        # Strip wrapping quotes/markdown the LLM sometimes adds despite instructions
+        if condensed.startswith(('"', "'")) and condensed.endswith(('"', "'")):
+            condensed = condensed[1:-1].strip()
+        if not condensed or len(condensed) >= len(prompt):
+            logger.warning(
+                f"[FLUX prompt condense] Output empty or not shorter ({len(condensed)} vs {len(prompt)}) — using original"
+            )
+            return prompt
+        logger.info(
+            f"[FLUX prompt condense] {len(prompt)} → {len(condensed)} chars "
+            f"(preview: {condensed[:120]}...)"
+        )
+        return condensed
+    except Exception as e:
+        logger.warning(f"[FLUX prompt condense] failed: {e} — using original prompt")
+        return prompt
+
 def queue_prompt(prompt_text: str, **kwargs):
     """
     Sends a prompt to ComfyUI with optional manual overrides.
@@ -818,6 +884,13 @@ def generate_image(
 
     if target_device != "auto":
         logger.info(f"--- [Creative Studio] Targeted Generation on {target_device} ---")
+
+    # Condense long prompts BEFORE acquiring the GPU lock — once the lock flips
+    # to the image zone, Ollama gets evicted, and calling /api/generate would
+    # force a re-swap mid-flow. FLUX paths (auto/klein-9b/flux-*) all hit T5-XXL's
+    # 512-token ceiling; SDXL fallback also benefits since CLIP is even tighter.
+    if not skip_refinement and model_name in ("auto", "klein-9b", "flux-schnell-preview", "flux-dev-quality"):
+        prompt = _condense_for_flux(prompt)
 
     MAX_RETRIES = 2
     import json
