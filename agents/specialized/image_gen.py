@@ -388,9 +388,11 @@ def _condense_for_flux(prompt: str) -> str:
                 "system": _FLUX_CONDENSE_SYSTEM,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"temperature": 0.3, "num_predict": 300},
+                "options": {"temperature": 0.3, "num_predict": 300, "keep_alive": "1h"},
             },
-            timeout=30,
+            # Cold-load of qwen2.5-coder:14b can take 30-60s; warm calls are 5-15s.
+            # Keep_alive=1h above ensures repeated calls stay warm.
+            timeout=90,
         )
         if resp.status_code != 200:
             logger.warning(
