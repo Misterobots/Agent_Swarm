@@ -27,6 +27,7 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
 KLEIN_HOST = os.getenv("KLEIN_HOST", "http://klein_service:8189")
+OMNIGEN_HOST = os.getenv("OMNIGEN_HOST", "http://omnigen_service:8190")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
 TRAINING_WINDOW_START = int(os.getenv("TRAINING_WINDOW_START", "2"))   # hour (24h)
@@ -401,6 +402,52 @@ def warmup_klein():
             logger.info("[GPU Queue] Klein warmup failed — waiting 20s for WDDM page reclaim, then retrying...")
             time.sleep(20)
 
+def evict_omnigen():
+    """Unloads OmniGen2 weights via POST /evict. Used in the Klein↔OmniGen swap
+    inside the image zone. Mirrors evict_klein's graceful-only approach — we
+    don't restart the container because OmniGen runs on a single GPU and
+    torch.cuda.empty_cache() is typically sufficient (no dual-GPU WDDM trap)."""
+    try:
+        logger.info("[GPU Queue] Evicting OmniGen2 model from VRAM (graceful)...")
+        response = requests.post(f"{OMNIGEN_HOST}/evict", timeout=180)
+        if response.status_code == 200:
+            logger.info("[GPU Queue] OmniGen2 VRAM evicted.")
+        else:
+            logger.warning(f"[GPU Queue] OmniGen2 /evict returned status {response.status_code}.")
+    except Exception as e:
+        logger.warning(f"[GPU Queue] OmniGen2 eviction failed (non-fatal): {e}")
+
+
+def _omnigen_is_healthy() -> bool:
+    """Health check analog to Klein's. Returns True if the service is reachable
+    and reports pipeline_loaded OR is loadable (mirroring the Klein cold-start
+    fix — explicit /warmup call before /compose handles the actual load)."""
+    try:
+        r = requests.get(f"{OMNIGEN_HOST}/health", timeout=3)
+        if r.status_code != 200:
+            return False
+        data = r.json()
+        return bool(data.get("pipeline_loaded") or data.get("model") is not None)
+    except Exception:
+        return False
+
+
+def warmup_omnigen():
+    """Pre-load OmniGen2 weights. First load from HF cache ~200s; warm ~30s."""
+    for attempt in range(2):
+        try:
+            logger.info(f"[GPU Queue] Warming up OmniGen2 pipeline (attempt {attempt + 1})...")
+            response = requests.post(f"{OMNIGEN_HOST}/warmup", timeout=600)
+            if response.status_code == 200:
+                logger.info("[GPU Queue] OmniGen2 pipeline warm.")
+                return
+            logger.warning(f"[GPU Queue] OmniGen2 /warmup returned status {response.status_code}.")
+        except Exception as e:
+            logger.warning(f"[GPU Queue] OmniGen2 warmup attempt {attempt + 1} failed: {e}")
+        if attempt == 0:
+            time.sleep(20)
+
+
 def evict_ollama():
     """Unloads active models from all Ollama hosts (primary + secondary) via keep_alive=0.
     Both hosts must be evicted — large models run on SECONDARY_OLLAMA_HOST (Lovelace) which
@@ -499,17 +546,30 @@ def request_lock(context: str, timeout: int = 300):
                 # Switching to text -> evict image backends so Ollama can use both GPUs.
                 evict_comfyui()
                 evict_klein()
+                evict_omnigen()
             elif context == "image":
-                # Switching to image -> evict Ollama + ComfyUI to clear both GPUs,
+                # Switching to image -> evict Ollama + ComfyUI + OmniGen to clear both GPUs,
                 # then warm Klein (needs GPU 1's full 15 GiB free to load).
                 evict_ollama()
                 evict_comfyui()
+                evict_omnigen()
                 warmup_klein()
+            elif context == "compose":
+                # OmniGen2 multi-image composition zone. Mutually exclusive with Klein
+                # at the GPU layer — both target physical GPU 1. Evicts everything
+                # else (ollama, comfyui, klein) before warming OmniGen. Distinct
+                # from "image" so we don't accidentally warm Klein for a compose job
+                # or vice-versa.
+                evict_ollama()
+                evict_comfyui()
+                evict_klein()
+                warmup_omnigen()
             elif context == "training":
                 # Training needs exclusive VRAM — evict everything
                 evict_ollama()
                 evict_comfyui()
                 evict_klein()
+                evict_omnigen()
             else:
                 logger.warning(f"[GPU Queue] Unknown context '{context}'.")
 

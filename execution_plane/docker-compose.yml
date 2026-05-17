@@ -315,6 +315,44 @@ services:
         aliases:
           - klein_service
 
+  # --- OMNIGEN2 COMPOSITION SERVICE (multi-character scene composer) ---
+  # Mutually exclusive with klein_service at the GPU layer — request_lock's
+  # zone-switch evicts one before warming the other. Both target the "image"
+  # zone; the lock metadata's image_engine field selects which to warm.
+  omnigen_service:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile.omnigen
+    image: home-ai-lab/omnigen-service:latest
+    container_name: omnigen_service
+    restart: always
+    env_file:
+      - ../network.env
+    environment:
+      - OMNIGEN_MODEL_ID=${OMNIGEN_MODEL_ID:-VectorSpaceLab/OmniGen2}
+      - OMNIGEN_QUANTIZATION=${OMNIGEN_QUANTIZATION:-fp8}
+      - OUTPUT_DIR=/output
+      - HF_HOME=/model_cache
+    volumes:
+      - C:/Users/panca/Documents/ComfyUI_app/output:/output:rw
+      - omnigen_model_cache:/model_cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              # device_ids=['1'] = same physical 5060 Ti as ComfyUI. OmniGen2 FP8
+              # (~12 GB) fits with headroom. ComfyUI is evicted in the image zone
+              # before either Klein or OmniGen warms up, so no contention.
+              device_ids: ['1']
+              capabilities: [gpu]
+    ports:
+      - "8291:8190"
+    networks:
+      execution_net:
+        aliases:
+          - omnigen_service
+
   # --- COMFYUI (Creature Minsky — specialized workflows: LoRA, 3D, action figures) ---
   comfyui:
     image: comfyui:blackwell-sm120
@@ -754,6 +792,7 @@ volumes:
   bmo_models:
   ollama_models:
   klein_model_cache:
+  omnigen_model_cache:
   vscode_config_devops:
   vscode_config_coding:
   database_authentik:

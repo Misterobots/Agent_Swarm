@@ -1,0 +1,39 @@
+# OmniGen2 Composition Service — VectorSpaceLab unified multimodal model
+# Composes N reference character images + a scene prompt into a single coherent image.
+# Mirrors klein_service Dockerfile so the PyTorch/CUDA stack matches Blackwell (sm_120).
+
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    git \
+    wget \
+    curl \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python3
+
+RUN python3.11 -m pip install --no-cache-dir --upgrade pip
+
+# Blackwell (sm_120) requires PyTorch built against CUDA 13.0 (same as Klein).
+RUN pip3 install --no-cache-dir \
+    torch==2.11.0+cu130 \
+    torchvision==0.26.0+cu130 \
+    --index-url https://download.pytorch.org/whl/cu130
+
+WORKDIR /app
+
+COPY execution_plane/omnigen_service/requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+COPY execution_plane/omnigen_service/app.py .
+
+EXPOSE 8190
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8190", "--log-level", "info"]

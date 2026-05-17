@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+diffusers>=0.32.0
+transformers>=4.45.0
+accelerate>=0.35.0
+huggingface_hub>=0.24.0
+sentencepiece
+protobuf
+Pillow>=10.0.0
+# OmniGen2 — VectorSpaceLab unified multimodal model for compositional image generation.
+# Repo: https://github.com/VectorSpaceLab/OmniGen2 (HF: VectorSpaceLab/OmniGen2)
+OmniGen2>=1.0.0
