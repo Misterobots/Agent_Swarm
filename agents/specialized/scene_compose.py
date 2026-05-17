@@ -110,9 +110,14 @@ def decompose_scene(prompt: str) -> Optional[SceneDecomposition]:
                 "prompt": prompt,
                 "stream": False,
                 "format": "json",  # Ollama JSON-mode forces valid JSON output
-                "options": {"temperature": 0.2, "num_predict": 1500, "keep_alive": "1h"},
+                # num_predict=800 covers the expected JSON output (~500-700 tokens)
+                # without making the model run to completion for verbose ramble.
+                "options": {"temperature": 0.2, "num_predict": 800, "keep_alive": "1h"},
             },
-            timeout=120,
+            # 240s: a long FLUX-narrative prompt (~3000 chars) is ~750 tokens of input;
+            # qwen2.5-coder:14b at ~25 tok/s needs ~30s for output + prefill time.
+            # 120s was too tight when the prompt hit the prefill phase.
+            timeout=240,
         )
         if resp.status_code != 200:
             logger.warning(f"[SceneCompose] decompose HTTP {resp.status_code}")

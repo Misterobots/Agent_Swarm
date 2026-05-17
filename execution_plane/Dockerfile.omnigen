@@ -32,11 +32,28 @@ WORKDIR /app
 COPY execution_plane/omnigen_service/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# OmniGen2 runtime deps — explicit list filtered from their requirements.txt
+# to exclude torch==2.6.0 / torchvision==0.21.0 which would clobber our
+# Blackwell sm_120 torch build. transformers is pinned to 4.51.3 (their
+# tested version) — older than what diffusers might want but compatible.
+RUN pip3 install --no-cache-dir \
+    timm \
+    einops \
+    accelerate \
+    transformers==4.51.3 \
+    diffusers \
+    opencv-python-headless \
+    scipy \
+    matplotlib \
+    Pillow \
+    tqdm \
+    omegaconf \
+    python-dotenv \
+    ninja \
+    wheel
+
 # Clone OmniGen2 source — they don't ship a setup.py / pyproject.toml.
-# We deliberately do NOT run their pip install -r requirements.txt because it
-# pins torch==2.6.0+cu124 which UNINSTALLS our Blackwell sm_120 torch build.
-# Instead we add the clone to PYTHONPATH so imports resolve, and rely on the
-# diffusers/transformers we already installed above.
+# PYTHONPATH lets `from omnigen2.* import ...` resolve from the clone.
 #
 # Known risk: OmniGen2 runtime may fail on sm_120 if upstream embedded any
 # CUDA kernels not yet rebuilt for Blackwell. If /warmup returns an error
