@@ -42,12 +42,14 @@ VARIANTS = {
     "schnell": {
         "model_id": "black-forest-labs/FLUX.1-schnell",
         "fp8_file": "flux1-schnell-fp8-e4m3fn.safetensors",
+        "transformer_config": "/app/schnell_transformer_config.json",
         "default_steps": 4,
-        "default_guidance": 3.5,
+        "default_guidance": 1.0,  # Schnell is distilled — CFG is ignored; 1.0 is a no-op
     },
     "dev": {
         "model_id": "black-forest-labs/FLUX.1-dev",
         "fp8_file": "flux1-dev-fp8-e4m3fn.safetensors",
+        "transformer_config": "/app/dev_transformer_config.json",  # guidance_embeds: true
         "default_steps": 25,
         "default_guidance": 3.5,
     },
@@ -151,10 +153,11 @@ def _load_pipeline(variant: str = None):
             token=HF_TOKEN or None,
         )
 
-        logger.info("Loading FP8 transformer → cuda:1 ...")
+        transformer_config = cfg["transformer_config"]
+        logger.info(f"Loading FP8 transformer → cuda:1 (config: {transformer_config}) ...")
         transformer = FluxTransformer2DModel.from_single_file(
             fp8_path,
-            config="/app/schnell_transformer_config.json",
+            config=transformer_config,
             torch_dtype=torch.float8_e4m3fn,
             token=HF_TOKEN or None,
         ).to("cuda:1")
@@ -383,14 +386,4 @@ def generate(req: GenerateRequest):
     filepath = Path(OUTPUT_DIR) / filename
     image.save(str(filepath))
 
-    buf = io.BytesIO()
-    image.save(buf, format="PNG")
-    img_b64 = base64.b64encode(buf.getvalue()).decode()
-
-    return GenerateResponse(
-        filename=filename,
-        elapsed=elapsed,
-        seed=seed,
-        image_b64=img_b64,
-        variant=_current_variant,
-    )
+  
