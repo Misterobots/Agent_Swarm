@@ -725,9 +725,9 @@ def _generate_via_klein(
         resp = requests.post(
             f"{KLEIN_HOST}/generate",
             json=body,
-            # 180s for schnell, but dev at 25 steps takes ~55s + potential variant
-            # swap (~40s). 300s covers both cases.
-            timeout=300,
+            # Schnell: ~10s. Dev at 25 steps: ~55s. Variant swap (if pre-warmup
+            # failed): +40s evict + up to 260s download/load. 600s covers all paths.
+            timeout=600,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -918,6 +918,26 @@ def generate_image(
             enriched = refine_prompt(prompt, "FLUX_DEV")
             klein_output_dir = "/tmp/comfyui_images"
             os.makedirs(klein_output_dir, exist_ok=True)
+
+            # Pre-warm the exact variant BEFORE the generate call.
+            # gpu_queue.request_lock's zone-switch warmup always loads schnell
+            # (it has no visibility into which model was requested). For dev,
+            # that warmup is wasted — the generate call would then trigger a
+            # variant swap inside the generate timeout, which is too short if
+            # dev weights aren't yet cached (~200s download + ~60s load).
+            # By pre-warming here (600s timeout) we ensure dev is fully in VRAM
+            # before generate starts, so the generate timeout only needs to cover
+            # the actual diffusion steps (~55s).
+            try:
+                _prewarm_resp = requests.post(
+                    f"{KLEIN_HOST}/warmup",
+                    json={"variant": klein_variant},
+                    timeout=600,  # first-time dev download ~200s + load ~60s
+                )
+                logger.info(f"[Klein] Pre-warmup ({klein_variant}): {_prewarm_resp.json()}")
+            except Exception as _pw_err:
+                logger.warning(f"[Klein] Pre-warmup failed (generate will attempt variant load): {_pw_err}")
+
             klein_file = _generate_via_klein(
                 prompt=enriched,
                 width=width,

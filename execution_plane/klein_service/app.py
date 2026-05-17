@@ -386,4 +386,14 @@ def generate(req: GenerateRequest):
     filepath = Path(OUTPUT_DIR) / filename
     image.save(str(filepath))
 
-  
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    return GenerateResponse(
+        filename=filename,
+        elapsed=elapsed,
+        seed=seed,
+        image_b64=img_b64,
+        variant=_current_variant,
+    )

@@ -37,4 +37,4 @@ COPY execution_plane/klein_service/dev_transformer_config.json .
 
 EXPOSE 8189
 
-CMD ["uvicorn", "app:app
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8189", "--log-level", "info"]
