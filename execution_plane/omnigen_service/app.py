@@ -13,14 +13,13 @@ POST /warmup   — preload weights into VRAM (idempotent).
 POST /evict    — unload weights (used by gpu_queue zone-switches).
 POST /compose  — generate a composite from refs + scene prompt.
 
-GPU layout (FP8, ~12 GB)
-------------------------
-cuda:1 (Lovelace device_ids=['1']) — the same physical GPU ComfyUI uses.
+GPU layout (bf16 + CPU offload, ~16 GB peak)
+--------------------------------------------
+cuda:1 (Lovelace device_ids=['1']) — same physical GPU ComfyUI uses.
+OmniGen2 has no native FP8; bf16 with `enable_model_cpu_offload()` achieves
+equivalent "fits on a 5060 Ti" headroom at a small inference-speed cost.
 OmniGen2 and Klein are mutually exclusive at the GPU layer; the request_lock
-zone-switch must evict one before warming the other.
-
-Status: scaffold. Model loading and inference are stubbed (NotImplementedError)
-pending OmniGen2 FP8 weight selection + multi-image pipeline integration.
+"compose" zone-switch evicts one before warming the other.
 """
 from __future__ import annotations
 
@@ -36,9 +35,6 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-# Diffusers / OmniGen2 imports are deferred to runtime — the container can
-# start (and answer /health) even if the weights aren't downloaded yet.
-
 logger = logging.getLogger("omnigen_service")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -47,12 +43,18 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 # ---------------------------------------------------------------------------
 
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "/output")
-MODEL_ID = os.getenv("OMNIGEN_MODEL_ID", "VectorSpaceLab/OmniGen2")
-# FP8 quantized weights for 5060 Ti (16 GB). FP16 is ~24 GB → doesn't fit.
-QUANTIZATION = os.getenv("OMNIGEN_QUANTIZATION", "fp8")
-DEVICE = os.getenv("OMNIGEN_DEVICE", "cuda:0")  # inside the container, cuda:0 is the only visible GPU
+MODEL_ID = os.getenv("OMNIGEN_MODEL_ID", "OmniGen2/OmniGen2")
+# OmniGen2's reference inference.py supports fp32 / fp16 / bf16. bf16 + CPU
+# offload is the right combo for 16 GB GPUs (~17 GB at bf16 without offload).
+DTYPE = os.getenv("OMNIGEN_DTYPE", "bf16")
+DEVICE = os.getenv("OMNIGEN_DEVICE", "cuda:0")  # inside container, cuda:0 is the only visible GPU
+USE_MODEL_CPU_OFFLOAD = os.getenv("OMNIGEN_CPU_OFFLOAD", "true").lower() in ("1", "true", "yes")
+
+# OmniGen2 defaults from their reference scripts (NOT FLUX defaults)
 DEFAULT_STEPS = int(os.getenv("OMNIGEN_DEFAULT_STEPS", "50"))
-DEFAULT_GUIDANCE = float(os.getenv("OMNIGEN_DEFAULT_GUIDANCE", "3.0"))
+DEFAULT_TEXT_GUIDANCE = float(os.getenv("OMNIGEN_DEFAULT_TEXT_GUIDANCE", "5.0"))
+DEFAULT_IMAGE_GUIDANCE = float(os.getenv("OMNIGEN_DEFAULT_IMAGE_GUIDANCE", "2.0"))
+DEFAULT_MAX_SEQ_LEN = int(os.getenv("OMNIGEN_MAX_SEQ_LEN", "1024"))
 
 Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -60,8 +62,19 @@ Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 # Pipeline state
 # ---------------------------------------------------------------------------
 
-_pipeline = None        # OmniGen2Pipeline instance once loaded
+_pipeline = None
 _loaded_at: Optional[float] = None
+_torch = None  # lazy import — keeps container start fast
+
+
+def _dtype_obj():
+    """Map env string to torch dtype object. Lazy import so container starts
+    even if torch isn't installed (shouldn't happen, but defensive)."""
+    global _torch
+    if _torch is None:
+        import torch as _t
+        _torch = _t
+    return {"fp32": _torch.float32, "fp16": _torch.float16, "bf16": _torch.bfloat16}[DTYPE]
 
 
 def _load_pipeline() -> None:
@@ -70,21 +83,27 @@ def _load_pipeline() -> None:
     if _pipeline is not None:
         return
 
-    logger.info(f"Loading OmniGen2 ({MODEL_ID}, quantization={QUANTIZATION}) onto {DEVICE}...")
+    logger.info(f"Loading OmniGen2 ({MODEL_ID}, dtype={DTYPE}, offload={USE_MODEL_CPU_OFFLOAD}) onto {DEVICE}...")
     t0 = time.time()
 
-    # TODO: actual OmniGen2 pipeline load. Expected shape:
-    #   from omnigen2 import OmniGen2Pipeline
-    #   _pipeline = OmniGen2Pipeline.from_pretrained(
-    #       MODEL_ID,
-    #       torch_dtype=torch.float8_e4m3fn if QUANTIZATION == "fp8" else torch.bfloat16,
-    #   ).to(DEVICE)
-    # OmniGen2 may not yet ship FP8 weights officially; fall back to bfloat16
-    # with CPU offload if VRAM is tight. Decision deferred until first build.
-    raise NotImplementedError(
-        "OmniGen2 pipeline load not yet implemented — wire up once FP8 weight "
-        "format is confirmed. See https://github.com/VectorSpaceLab/OmniGen2."
+    from omnigen2.pipelines.omnigen2.pipeline_omnigen2 import OmniGen2Pipeline
+    from omnigen2.models.transformers.transformer_omnigen2 import OmniGen2Transformer2DModel
+
+    dtype = _dtype_obj()
+    _pipeline = OmniGen2Pipeline.from_pretrained(MODEL_ID, torch_dtype=dtype, trust_remote_code=True)
+    # The reference inference loads the transformer separately so the dtype is
+    # applied to it explicitly — without this, the transformer can stay in fp32
+    # and blow the VRAM budget.
+    _pipeline.transformer = OmniGen2Transformer2DModel.from_pretrained(
+        MODEL_ID, subfolder="transformer", torch_dtype=dtype
     )
+
+    if USE_MODEL_CPU_OFFLOAD:
+        # Keeps most of the model on CPU, swaps modules to GPU as needed.
+        # ~17 GB → ~10-12 GB peak GPU usage; ~20% slower inference vs full GPU.
+        _pipeline.enable_model_cpu_offload(device=DEVICE)
+    else:
+        _pipeline = _pipeline.to(DEVICE)
 
     _loaded_at = time.time()
     logger.info(f"OmniGen2 loaded in {_loaded_at - t0:.1f}s")
@@ -96,9 +115,17 @@ def _unload_pipeline() -> None:
     if _pipeline is None:
         return
     logger.info("Unloading OmniGen2...")
-    # TODO: actual unload — del weights, torch.cuda.empty_cache(), gc.collect()
+    import gc
+    del _pipeline
     _pipeline = None
     _loaded_at = None
+    gc.collect()
+    try:
+        import torch
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    except Exception as e:
+        logger.warning(f"empty_cache failed (non-fatal): {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +144,10 @@ class ComposeRequest(BaseModel):
     width: int = 1024
     height: int = 1024
     steps: int = DEFAULT_STEPS
-    guidance_scale: float = DEFAULT_GUIDANCE
+    text_guidance_scale: float = DEFAULT_TEXT_GUIDANCE
+    image_guidance_scale: float = DEFAULT_IMAGE_GUIDANCE
+    max_sequence_length: int = DEFAULT_MAX_SEQ_LEN
+    negative_prompt: str = ""
     seed: int = -1
 
 
@@ -129,7 +159,35 @@ class ComposeResponse(BaseModel):
 
 
 class WarmupRequest(BaseModel):
-    pass  # OmniGen2 has only one variant; nothing to pick
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _decode_b64_image(b64: str):
+    """Base64 → PIL.Image in RGB."""
+    from PIL import Image
+    raw = base64.b64decode(b64)
+    return Image.open(io.BytesIO(raw)).convert("RGB")
+
+
+def _build_instruction(scene_prompt: str, refs: list[ReferenceImage]) -> str:
+    """OmniGen2 uses ordinal references ('image 1', 'image 2', ...) in the
+    instruction text to bind input_images positionally. Build the final
+    instruction by prefixing role context, then the scene prompt."""
+    parts: list[str] = []
+    for idx, ref in enumerate(refs, start=1):
+        label = ref.name or ref.role
+        if ref.role == "establishing_shot":
+            parts.append(f"Image {idx} is the establishing shot of the scene.")
+        elif ref.role == "character":
+            parts.append(f"Image {idx} is {label}.")
+        elif ref.role == "style":
+            parts.append(f"Image {idx} is a style reference.")
+    parts.append(scene_prompt)
+    return " ".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -141,11 +199,11 @@ app = FastAPI(title="OmniGen2 Composition Service", version="0.1.0")
 
 @app.get("/health")
 def health() -> dict:
-    """Readiness probe. gpu_queue's _omnigen_is_healthy() consumes this."""
     return {
         "status": "ok",
         "model": MODEL_ID if _pipeline is not None else None,
-        "quantization": QUANTIZATION,
+        "dtype": DTYPE,
+        "cpu_offload": USE_MODEL_CPU_OFFLOAD,
         "pipeline_loaded": _pipeline is not None,
         "loaded_at": _loaded_at,
         "device": DEVICE,
@@ -154,14 +212,12 @@ def health() -> dict:
 
 @app.post("/warmup")
 def warmup(_req: WarmupRequest = None) -> dict:
-    """Pre-load weights into VRAM. Safe to call repeatedly."""
     _load_pipeline()
-    return {"status": "ready", "model": MODEL_ID}
+    return {"status": "ready", "model": MODEL_ID, "dtype": DTYPE}
 
 
 @app.post("/evict")
 def evict() -> dict:
-    """Unload weights from VRAM (gpu_queue zone-switch path)."""
     _unload_pipeline()
     return {"status": "evicted"}
 
@@ -170,14 +226,13 @@ def evict() -> dict:
 def compose(req: ComposeRequest) -> ComposeResponse:
     """Generate a composite from N reference images + scene prompt.
 
-    Pattern A (per design discussion): caller provides an establishing-shot
-    reference + per-character reference images. OmniGen2 places each character
-    into the establishing scene preserving identity.
+    Pattern A: caller provides an establishing-shot reference + per-character
+    reference images. OmniGen2 places each character into the establishing
+    scene preserving identity.
     """
     if _pipeline is None:
         _load_pipeline()
 
-    # Validate roles
     char_refs = [r for r in req.reference_images if r.role == "character"]
     est_refs = [r for r in req.reference_images if r.role == "establishing_shot"]
     if not char_refs:
@@ -185,17 +240,41 @@ def compose(req: ComposeRequest) -> ComposeResponse:
     if len(est_refs) > 1:
         raise HTTPException(400, "Only one establishing_shot reference is supported")
 
+    import torch
+    seed = req.seed if req.seed >= 0 else int(time.time() * 1000) & 0x7FFFFFFF
+    generator = torch.Generator(device="cpu").manual_seed(seed)
+
+    # Decode all references in the same order they're referenced in the instruction.
+    input_images = [_decode_b64_image(r.image_b64) for r in req.reference_images]
+    instruction = _build_instruction(req.scene_prompt, req.reference_images)
+    logger.info(f"OmniGen2 compose: {len(input_images)} refs, instruction={instruction[:200]!r}")
+
     t0 = time.time()
-
-    # TODO: decode b64 → PIL.Image list, build OmniGen2 multi-image input,
-    # call _pipeline(...), save output, return.
-    raise NotImplementedError(
-        "Compose pipeline not yet wired — pending OmniGen2 multi-image input "
-        "API confirmation and pipeline load implementation."
+    result = _pipeline(
+        prompt=instruction,
+        input_images=input_images,
+        width=req.width,
+        height=req.height,
+        num_inference_steps=req.steps,
+        max_sequence_length=req.max_sequence_length,
+        text_guidance_scale=req.text_guidance_scale,
+        image_guidance_scale=req.image_guidance_scale,
+        negative_prompt=req.negative_prompt or None,
+        num_images_per_prompt=1,
+        generator=generator,
+        output_type="pil",
     )
-
     elapsed = time.time() - t0
+
+    # result.images is the standard diffusers output container.
+    image = result.images[0]
     filename = f"omnigen_{int(time.time())}_{uuid.uuid4().hex[:8]}.png"
-    return ComposeResponse(
-        filename=filename, elapsed=elapsed, seed=req.seed, image_b64="..."
-    )
+    filepath = Path(OUTPUT_DIR) / filename
+    image.save(str(filepath))
+
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    logger.info(f"Composed {filename} in {elapsed:.1f}s")
+    return ComposeResponse(filename=filename, elapsed=elapsed, seed=seed, image_b64=img_b64)

@@ -3229,6 +3229,235 @@ async def art_generate_image(req: ImageGenRequest):
     _art_asyncio.get_event_loop().create_task(_run())
     return {"job_id": job_id, "status": "running"}
 
+
+# ── Scene Composer (complex-scene decomposition + OmniGen2 composite) ───────
+# UX pattern: card grid analogous to swarm panel. Each card = one image asset.
+# Parent job tracks the cards list; children are regular art jobs.
+
+class SceneStartRequest(BaseModel):
+    prompt: str
+    engine: str = "omnigen"  # "omnigen" | "flux-inpaint" (future)
+
+
+def _scene_resolve_workspace_image_path(filename: str) -> str | None:
+    """Locate a delivered image by filename. Mirrors the lookup used elsewhere
+    in main.py for serving art assets."""
+    for base in (
+        "/tmp/comfyui_images",
+        os.getenv("COMFYUI_OUTPUT_DIR"),
+        "/app/comfy_io/output",
+    ):
+        if not base:
+            continue
+        candidate = os.path.join(base, filename)
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def _scene_kick_child_gen(parent_job_id: str, card_id: str) -> str:
+    """Spawn a child image-gen job for one card. Returns the child job_id.
+    The card's prompt + role drive parameters: characters use flux-dev-quality
+    portrait framing; establishing shots use the same model but wider framing."""
+    parent = _store_get_art_job(parent_job_id)
+    if not parent:
+        raise HTTPException(404, "Scene job not found")
+
+    cards = parent.get("cards") or []
+    card = next((c for c in cards if c["card_id"] == card_id), None)
+    if not card:
+        raise HTTPException(404, "Card not found in scene job")
+
+    # Mark generating BEFORE async dispatch so the UI reflects state immediately.
+    card["status"] = "generating"
+    card["image_path"] = None
+    _store_update_art_job(parent_job_id, cards=cards)
+
+    child_job_id = _art_job_create("image", card["prompt"])
+    card["child_job_id"] = child_job_id
+    _store_update_art_job(parent_job_id, cards=cards)
+
+    async def _run_child():
+        try:
+            from specialized.image_gen import generate_image
+            result = await _art_asyncio.to_thread(
+                generate_image,
+                prompt=card["prompt"],
+                model_name="flux-dev-quality",
+                cfg=3.5,
+                steps=25,
+                width=1024,
+                height=1024,
+                seed=card.get("seed", -1),
+            )
+            status = "error" if result.startswith("Error") or result.startswith("Failed") else "ok"
+            _art_job_finish(child_job_id, status, result)
+
+            # Propagate back to the parent card
+            parent_refresh = _store_get_art_job(parent_job_id)
+            if not parent_refresh:
+                return
+            cards_now = parent_refresh.get("cards") or []
+            for c in cards_now:
+                if c["card_id"] == card_id:
+                    if status == "ok":
+                        # result format: "Generated Image: <filename> (Saved to Gallery) | ✅ Verified."
+                        try:
+                            fname = result.split("Generated Image: ")[1].split(" ")[0]
+                            c["image_path"] = fname
+                        except Exception:
+                            pass
+                        c["status"] = "ready"
+                    else:
+                        c["status"] = "error"
+                        c["error"] = result
+                    break
+            _store_update_art_job(parent_job_id, cards=cards_now)
+        except Exception as e:
+            logger.error(f"Scene child gen failed: {e}")
+            _art_job_finish(child_job_id, "error", str(e))
+
+    _art_asyncio.get_event_loop().create_task(_run_child())
+    return child_job_id
+
+
+@app.post("/v1/art/scene/start")
+async def art_scene_start(req: SceneStartRequest):
+    """Decompose a complex scene prompt and spawn child gens for each card."""
+    from specialized.scene_compose import decompose_scene, build_scene_job, is_complex_scene
+
+    parent_id = _art_job_create("scene", req.prompt)
+    _store_update_art_job(parent_id, engine=req.engine, state="decomposing", cards=[])
+
+    async def _decompose_and_kick():
+        try:
+            if not is_complex_scene(req.prompt):
+                _art_job_finish(parent_id, "error",
+                    "Prompt does not appear complex enough for decomposition. "
+                    "Use /v1/art/generate/image directly.")
+                return
+            decomp = await _art_asyncio.to_thread(decompose_scene, req.prompt)
+            if decomp is None:
+                _art_job_finish(parent_id, "error", "Scene decomposition failed (Ollama error).")
+                return
+            scene_job = build_scene_job(parent_id, req.prompt, decomp)
+            cards = [
+                {
+                    "card_id": c.card_id,
+                    "role": c.role,
+                    "name": c.name,
+                    "prompt": c.prompt,
+                    "status": "pending",
+                    "image_path": None,
+                    "child_job_id": None,
+                    "seed": c.seed,
+                }
+                for c in scene_job.cards
+            ]
+            _store_update_art_job(parent_id, state="generating", cards=cards)
+            # Kick child gens for every card
+            for c in cards:
+                _scene_kick_child_gen(parent_id, c["card_id"])
+        except Exception as e:
+            logger.error(f"Scene decomposition failed: {e}")
+            _art_job_finish(parent_id, "error", str(e))
+
+    _art_asyncio.get_event_loop().create_task(_decompose_and_kick())
+    return {"job_id": parent_id, "status": "running"}
+
+
+@app.get("/v1/art/scene/{job_id}")
+async def art_scene_get(job_id: str):
+    """Poll the full scene state — parent + all card states."""
+    job = _store_get_art_job(job_id)
+    if not job:
+        raise HTTPException(404, "Scene job not found")
+    return job
+
+
+@app.post("/v1/art/scene/{job_id}/regenerate/{card_id}")
+async def art_scene_regenerate(job_id: str, card_id: str):
+    """Re-run generation for one card (e.g. user didn't like the result)."""
+    child = _scene_kick_child_gen(job_id, card_id)
+    return {"card_id": card_id, "child_job_id": child, "status": "regenerating"}
+
+
+@app.post("/v1/art/scene/{job_id}/approve/{card_id}")
+async def art_scene_approve(job_id: str, card_id: str):
+    """Mark a card as approved by the user. When all cards are approved, the
+    UI can call /compose to trigger the final composite."""
+    job = _store_get_art_job(job_id)
+    if not job:
+        raise HTTPException(404, "Scene job not found")
+    cards = job.get("cards") or []
+    for c in cards:
+        if c["card_id"] == card_id:
+            if c["status"] != "ready":
+                raise HTTPException(409, f"Card not ready (status={c['status']})")
+            c["status"] = "approved"
+            break
+    else:
+        raise HTTPException(404, "Card not found")
+    _store_update_art_job(job_id, cards=cards)
+    all_approved = all(c["status"] == "approved" for c in cards)
+    new_state = "awaiting_compose" if all_approved else "generating"
+    _store_update_art_job(job_id, state=new_state)
+    return {"card_id": card_id, "status": "approved", "all_approved": all_approved}
+
+
+@app.post("/v1/art/scene/{job_id}/compose")
+async def art_scene_compose(job_id: str):
+    """Trigger the final OmniGen2 composite from all approved cards."""
+    job = _store_get_art_job(job_id)
+    if not job:
+        raise HTTPException(404, "Scene job not found")
+    cards = job.get("cards") or []
+    if not all(c["status"] == "approved" for c in cards):
+        unapproved = [c["name"] for c in cards if c["status"] != "approved"]
+        raise HTTPException(409, f"Not all cards approved: {unapproved}")
+
+    _store_update_art_job(job_id, state="composing")
+
+    async def _run_compose():
+        try:
+            from specialized.scene_compose import compose_via_omnigen
+            from utils.gpu_queue import request_lock
+
+            est_card = next((c for c in cards if c["role"] == "establishing_shot"), None)
+            char_cards = [c for c in cards if c["role"] == "character"]
+
+            est_path = _scene_resolve_workspace_image_path(est_card["image_path"]) if est_card else None
+            char_paths: list[tuple[str, str]] = []
+            for c in char_cards:
+                p = _scene_resolve_workspace_image_path(c["image_path"])
+                if p:
+                    char_paths.append((c["name"], p))
+
+            if not char_paths:
+                _art_job_finish(job_id, "error", "No character images resolved on disk.")
+                return
+
+            # Use the "compose" GPU zone — evicts Klein, warms OmniGen.
+            with request_lock("compose", timeout=900):
+                composite = await _art_asyncio.to_thread(
+                    compose_via_omnigen,
+                    scene_prompt=job.get("prompt", ""),
+                    character_image_paths=char_paths,
+                    establishing_shot_path=est_path,
+                )
+            if not composite:
+                _art_job_finish(job_id, "error", "OmniGen2 compose returned no output.")
+                return
+            _store_update_art_job(job_id, composite_path=composite, state="done")
+            _art_job_finish(job_id, "ok", f"Composite: {composite}")
+        except Exception as e:
+            logger.error(f"Scene compose failed: {e}")
+            _art_job_finish(job_id, "error", str(e))
+
+    _art_asyncio.get_event_loop().create_task(_run_compose())
+    return {"job_id": job_id, "status": "composing"}
+
+
 @app.post("/v1/art/generate/3d")
 async def art_generate_3d(req: ThreeDGenRequest):
     """Queue a 3D model generation job. Returns job_id for polling."""

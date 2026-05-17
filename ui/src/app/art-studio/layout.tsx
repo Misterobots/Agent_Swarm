@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn";
 
 const TABS = [
   { label: "Generate", href: "/art-studio" },
+  { label: "Scene Composer", href: "/art-studio/scene" },
   { label: "Gallery", href: "/art-studio/gallery" },
   { label: "Exports", href: "/art-studio/exports" },
 ] as const;
