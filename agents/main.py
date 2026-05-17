@@ -3331,11 +3331,9 @@ async def art_scene_start(req: SceneStartRequest):
 
     async def _decompose_and_kick():
         try:
-            if not is_complex_scene(req.prompt):
-                _art_job_finish(parent_id, "error",
-                    "Prompt does not appear complex enough for decomposition. "
-                    "Use /v1/art/generate/image directly.")
-                return
+            # NB: is_complex_scene() is for auto-routing from /v1/art/generate/image.
+            # If the caller explicitly hit /scene/start they want decomposition —
+            # let the LLM decide how many characters to extract.
             decomp = await _art_asyncio.to_thread(decompose_scene, req.prompt)
             if decomp is None:
                 _art_job_finish(parent_id, "error", "Scene decomposition failed (Ollama error).")

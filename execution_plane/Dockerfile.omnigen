@@ -32,12 +32,18 @@ WORKDIR /app
 COPY execution_plane/omnigen_service/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Install OmniGen2 from source (not published to PyPI). Pin to main HEAD for now;
-# bump the commit hash if upstream breaks API compatibility.
-RUN git clone --depth 1 https://github.com/VectorSpaceLab/OmniGen2.git /opt/OmniGen2 \
-    && cd /opt/OmniGen2 \
-    && pip3 install --no-cache-dir -r requirements.txt \
-    && pip3 install --no-cache-dir -e .
+# Clone OmniGen2 source — they don't ship a setup.py / pyproject.toml.
+# We deliberately do NOT run their pip install -r requirements.txt because it
+# pins torch==2.6.0+cu124 which UNINSTALLS our Blackwell sm_120 torch build.
+# Instead we add the clone to PYTHONPATH so imports resolve, and rely on the
+# diffusers/transformers we already installed above.
+#
+# Known risk: OmniGen2 runtime may fail on sm_120 if upstream embedded any
+# CUDA kernels not yet rebuilt for Blackwell. If /warmup returns an error
+# referencing CUDA arch, the next step is to apply an sm_120 patch analog to
+# the FLUX FP8 patch Klein uses — that work is upstream of this scaffold.
+RUN git clone --depth 1 https://github.com/VectorSpaceLab/OmniGen2.git /opt/OmniGen2
+ENV PYTHONPATH=/opt/OmniGen2:$PYTHONPATH
 
 COPY execution_plane/omnigen_service/app.py .
 
