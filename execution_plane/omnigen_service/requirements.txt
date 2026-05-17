@@ -8,5 +8,5 @@ sentencepiece
 protobuf
 Pillow>=10.0.0
 # OmniGen2 — VectorSpaceLab unified multimodal model for compositional image generation.
-# Repo: https://github.com/VectorSpaceLab/OmniGen2 (HF: VectorSpaceLab/OmniGen2)
-OmniGen2>=1.0.0
+# Repo: https://github.com/VectorSpaceLab/OmniGen2 (HF: OmniGen2/OmniGen2)
+# Not published to PyPI — installed from source in the Dockerfile.

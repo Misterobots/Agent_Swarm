@@ -32,6 +32,13 @@ WORKDIR /app
 COPY execution_plane/omnigen_service/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Install OmniGen2 from source (not published to PyPI). Pin to main HEAD for now;
+# bump the commit hash if upstream breaks API compatibility.
+RUN git clone --depth 1 https://github.com/VectorSpaceLab/OmniGen2.git /opt/OmniGen2 \
+    && cd /opt/OmniGen2 \
+    && pip3 install --no-cache-dir -r requirements.txt \
+    && pip3 install --no-cache-dir -e .
+
 COPY execution_plane/omnigen_service/app.py .
 
 EXPOSE 8190
