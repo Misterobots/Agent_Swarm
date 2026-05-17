@@ -681,10 +681,22 @@ def verify_semantics(image_path: str, prompt: str) -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 
 def _klein_is_healthy() -> bool:
+    """Klein is healthy when the service is reachable AND either:
+      - a pipeline is already loaded (hot path — generate is fast), OR
+      - the service advertises available_variants (cold path — the explicit
+        /warmup call in generate_image will load the requested variant).
+
+    Requiring pipeline_loaded=True deadlocks the cold-start case:
+    request_lock's zone-switch warmup only loads schnell, so a dev request
+    after restart finds pipeline_loaded=False and falls through to ComfyUI,
+    never giving the auto-warmup a chance to fire.
+    """
     try:
         r = requests.get(f"{KLEIN_HOST}/health", timeout=5)
+        if r.status_code != 200:
+            return False
         data = r.json()
-        return r.status_code == 200 and data.get("pipeline_loaded", False)
+        return bool(data.get("pipeline_loaded") or data.get("available_variants"))
     except Exception:
         return False
 
