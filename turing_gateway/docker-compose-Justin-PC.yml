@@ -235,9 +235,9 @@ services:
       - "traefik.http.routers.grafana-ext.priority=20"
       - "traefik.http.routers.grafana-ext.service=grafana-ext"
       - "traefik.http.services.grafana-ext.loadbalancer.server.port=3000"
-      # Hive domain route: hive.shivelymedia.com/grafana/* → Grafana direct
+      # Hive domain route: memex.shivelymedia.com/grafana/* → Grafana direct
       # Needed so the iframe in the Monitoring page bypasses Next.js proxy
-      - "traefik.http.routers.grafana-hive.rule=Host(`hive.shivelymedia.com`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-hive.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/grafana`)"
       - "traefik.http.routers.grafana-hive.entrypoints=websecure"
       - "traefik.http.routers.grafana-hive.priority=30"
       - "traefik.http.routers.grafana-hive.tls=true"
@@ -443,8 +443,8 @@ services:
       - "traefik.http.routers.hive-ui.middlewares=authentik@docker"
       - "traefik.http.routers.hive-ui.service=hive-ui"
       - "traefik.http.services.hive-ui.loadbalancer.server.port=3000"
-      # External HTTPS route: hive.shivelymedia.com (behind Authentik)
-      - "traefik.http.routers.hive-ext.rule=Host(`hive.shivelymedia.com`)"
+      # External HTTPS route: memex.shivelymedia.com (behind Authentik)
+      - "traefik.http.routers.hive-ext.rule=Host(`memex.shivelymedia.com`)"
       - "traefik.http.routers.hive-ext.entrypoints=websecure"
       - "traefik.http.routers.hive-ext.priority=20"
       - "traefik.http.routers.hive-ext.tls=true"
@@ -456,21 +456,21 @@ services:
       - "traefik.http.routers.hive-ext.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@docker"
       - "traefik.http.services.hive-ext.loadbalancer.server.port=3000"
       # External HTTP route: redirect + Authentik (Cloudflare forwards here on port 80)
-      - "traefik.http.routers.hive-ext-http.rule=Host(`hive.shivelymedia.com`)"
+      - "traefik.http.routers.hive-ext-http.rule=Host(`memex.shivelymedia.com`)"
       - "traefik.http.routers.hive-ext-http.entrypoints=web"
       - "traefik.http.routers.hive-ext-http.priority=20"
       - "traefik.http.routers.hive-ext-http.service=hive-ext-http"
       - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
       - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
       # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
-      # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://hive.shivelymedia.com/ws/terminal
+      # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://memex.shivelymedia.com/ws/terminal
       - "traefik.http.routers.terminal-ws.rule=PathPrefix(`/ws/terminal`)"
       - "traefik.http.routers.terminal-ws.entrypoints=web"
       - "traefik.http.routers.terminal-ws.priority=30"
       - "traefik.http.routers.terminal-ws.service=terminal-ws"
       - "traefik.http.routers.terminal-ws.middlewares=authentik@docker"
       - "traefik.http.services.terminal-ws.loadbalancer.server.url=http://agent_runtime:8000"
-      - "traefik.http.routers.terminal-ws-ext.rule=Host(`hive.shivelymedia.com`) && PathPrefix(`/ws/terminal`)"
+      - "traefik.http.routers.terminal-ws-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/ws/terminal`)"
       - "traefik.http.routers.terminal-ws-ext.entrypoints=websecure"
       - "traefik.http.routers.terminal-ws-ext.priority=30"
       - "traefik.http.routers.terminal-ws-ext.tls=true"
@@ -741,8 +741,8 @@ services:
       - "traefik.http.routers.docs.service=docs"
       - "traefik.http.services.docs.loadbalancer.server.port=80"
       - "traefik.http.middlewares.docs-strip.stripprefix.prefixes=/docs-site"
-      # External HTTPS route (hive.shivelymedia.com/docs-site)
-      - "traefik.http.routers.docs-hive.rule=Host(`hive.shivelymedia.com`) && PathPrefix(`/docs-site`)"
+      # External HTTPS route (memex.shivelymedia.com/docs-site)
+      - "traefik.http.routers.docs-hive.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
       - "traefik.http.routers.docs-hive.entrypoints=websecure"
       - "traefik.http.routers.docs-hive.priority=30"
       - "traefik.http.routers.docs-hive.tls=true"
