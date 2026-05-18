@@ -43,7 +43,7 @@ services:
       - spire_agent_data:/run/spire/agent
       - spire_socket:/var/run/spire
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: ["-config", "/etc/spire/agent/agent.conf"]
+    command: ["-config", "/etc/spire/agent/agent.conf", "-joinToken", "${SPIRE_TURING_JOIN_TOKEN}"]
     healthcheck:
       test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck", "-socketPath", "/var/run/spire/agent.sock"]
       interval: 30s
