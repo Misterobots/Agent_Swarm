@@ -460,7 +460,7 @@ services:
       - "traefik.http.routers.hive-ext-http.entrypoints=web"
       - "traefik.http.routers.hive-ext-http.priority=20"
       - "traefik.http.routers.hive-ext-http.service=hive-ext-http"
-      - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,robotHeaders@file,authentik@docker"
+      - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,robotHeaders@file"
       - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
       # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
       # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://memex.shivelymedia.com/ws/terminal
