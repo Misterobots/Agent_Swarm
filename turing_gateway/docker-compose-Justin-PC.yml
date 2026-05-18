@@ -460,7 +460,7 @@ services:
       - "traefik.http.routers.hive-ext-http.entrypoints=web"
       - "traefik.http.routers.hive-ext-http.priority=20"
       - "traefik.http.routers.hive-ext-http.service=hive-ext-http"
-      - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
+      - "traefik.http.routers.hive-ext-http.middlewares=globalHeaders@file,robotHeaders@file,authentik@docker"
       - "traefik.http.services.hive-ext-http.loadbalancer.server.port=3000"
       # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
       # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://memex.shivelymedia.com/ws/terminal
@@ -717,7 +717,7 @@ services:
       - "traefik.http.routers.ntfy-http.rule=Host(`notify.shivelymedia.com`)"
       - "traefik.http.routers.ntfy-http.entrypoints=web"
       - "traefik.http.routers.ntfy-http.priority=20"
-      - "traefik.http.routers.ntfy-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file"
+      - "traefik.http.routers.ntfy-http.middlewares=globalHeaders@file,robotHeaders@file"
       - "traefik.http.routers.ntfy-http.service=ntfy"
 
   # ── Documentation Site ──────────────────────────────────────────
