@@ -30,6 +30,17 @@ services:
       - ai_lab_net
 
   # ═══════════════════════════════════════════════════════════════════════════════
+  # CLOUDFLARE TUNNEL (outbound — no port forwarding required)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}
+    networks:
+      - saltbox
+
   # WORKLOAD IDENTITY (SPIRE Agent)
   # ═══════════════════════════════════════════════════════════════════════════════
 
