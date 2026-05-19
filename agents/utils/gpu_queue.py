@@ -37,14 +37,12 @@ def _get_preferred_host(model_name: str) -> str:
     """
     Static hardware-aware routing (no health checks).
 
-    Current topology (all execution-plane services run on Lovelace, 192.168.2.101):
-    - OLLAMA_HOST     = http://ollama:11434           → Lovelace local Ollama (2× 5060 Ti, 32GB)
-    - SECONDARY_OLLAMA_HOST = http://192.168.2.103:11434 → Turing (3070 Ti 8GB, currently offline)
+    Topology:
+    - OLLAMA_HOST           → Lovelace (2× RTX 5060 Ti, 32 GB) — primary, large models
+    - SECONDARY_OLLAMA_HOST → Turing   (RTX 3070 Ti,  8 GB)  — safety + embeddings
 
-    Small models are sent directly to OLLAMA_HOST (Lovelace).
-    Large models try SECONDARY_OLLAMA_HOST (Turing) first; when Turing is offline the
-    health check in get_swarm_worker_host() falls back to OLLAMA_HOST (Lovelace).
-    Net effect: all traffic lands on http://ollama:11434 until Turing is back online.
+    Small/safe models go to Turing (SECONDARY_OLLAMA_HOST); everything else to Lovelace.
+    Health-aware callers fall back to the other host if the preferred one is down.
     """
     # Models confirmed to fit on Turing (≤8B params / safety / embeddings).
     # Use precise prefixes: "qwen3:1." matches "qwen3:1.7b" but NOT "qwen3:14b";
@@ -52,9 +50,9 @@ def _get_preferred_host(model_name: str) -> str:
     turing_safe = ["llama-guard", "nomic-embed", "qwen3:0.", "qwen3:1.", "qwen3:4b", "qwen3:8b"]
 
     if any(m in model_name for m in turing_safe):
-        return OLLAMA_HOST
-    # Everything else goes to Lovelace (dual 5060 Ti, 32GB VRAM)
-    return SECONDARY_OLLAMA_HOST
+        return SECONDARY_OLLAMA_HOST  # Turing: safety + embeddings (8 GB)
+    # Everything else → Lovelace (dual 5060 Ti, 32 GB VRAM)
+    return OLLAMA_HOST
 
 
 def _get_fallback_host(preferred: str) -> str:
@@ -145,14 +143,14 @@ def get_swarm_worker_host(model_name: str) -> str:
     """
     preferred = _get_preferred_host(model_name)
 
-    if preferred == OLLAMA_HOST:
-        # Small model — can run on either host; round-robin for parallelism
-        candidates = [OLLAMA_HOST]
-        if SECONDARY_OLLAMA_HOST and SECONDARY_OLLAMA_HOST != OLLAMA_HOST:
-            candidates.append(SECONDARY_OLLAMA_HOST)
-    else:
-        # Large model — Lovelace only; no round-robin to Turing (OOM risk)
+    if preferred == SECONDARY_OLLAMA_HOST:
+        # Small model — fits on Turing; can also run on Lovelace, so round-robin for parallelism
         candidates = [SECONDARY_OLLAMA_HOST]
+        if OLLAMA_HOST and OLLAMA_HOST != SECONDARY_OLLAMA_HOST:
+            candidates.append(OLLAMA_HOST)
+    else:
+        # Large model — Lovelace only; no round-robin to Turing (OOM risk on 8 GB)
+        candidates = [OLLAMA_HOST]
 
     # Filter to healthy hosts
     try:
@@ -450,9 +448,9 @@ def warmup_omnigen():
 
 def evict_ollama():
     """Unloads active models from all Ollama hosts (primary + secondary) via keep_alive=0.
-    Both hosts must be evicted — large models run on SECONDARY_OLLAMA_HOST (Lovelace) which
-    shares physical GPUs with ComfyUI. Evicting only OLLAMA_HOST (Turing, no GPU) is a no-op.
-    Polls /api/ps after eviction to confirm VRAM is actually free before returning."""
+    Both hosts must be evicted — large models run on OLLAMA_HOST (Lovelace) which shares
+    physical GPUs with ComfyUI/Klein. Turing (SECONDARY_OLLAMA_HOST) holds safety/embedding
+    models. Polls /api/ps after eviction to confirm VRAM is free before returning."""
     hosts_to_evict = [OLLAMA_HOST]
     if SECONDARY_OLLAMA_HOST and SECONDARY_OLLAMA_HOST != OLLAMA_HOST:
         hosts_to_evict.append(SECONDARY_OLLAMA_HOST)
