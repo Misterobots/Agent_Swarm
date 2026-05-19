@@ -329,7 +329,7 @@ services:
     env_file:
       - ../network.env
     environment:
-      - OMNIGEN_MODEL_ID=${OMNIGEN_MODEL_ID:-VectorSpaceLab/OmniGen2}
+      - OMNIGEN_MODEL_ID=${OMNIGEN_MODEL_ID:-OmniGen2/OmniGen2}
       - OMNIGEN_QUANTIZATION=${OMNIGEN_QUANTIZATION:-fp8}
       - OUTPUT_DIR=/output
       - HF_HOME=/model_cache

@@ -1,0 +1,761 @@
+﻿# LOVELACE EXECUTION PLANE - PHASE 3
+# Removed: Traefik, Prometheus, Grafana, Loki, Promtail, cAdvisor, Redis monitoring
+# Kept: Compute services (Ollama, ComfyUI, BMO Voice, OpenHands, Agent Runtime, Agent UI, Ops Portal)
+# NOTE: Services are now accessed through Turing Traefik Gateway on port 80/443
+# Routing: Lovelace (192.168.2.101) <- Turing Traefik (192.168.2.103:80) <- Existing media stack
+
+services:
+  # --- Docker Sidecar Probe (read-only container metadata) ---
+  # Exposes /containers/json on :2375 so Turing's agent_runtime can probe
+  # this node's container counts for the Service Health surface.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: docker-socket-proxy-execution
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1
+      - INFO=1
+      - PING=1
+      - VERSION=1
+      - EVENTS=0
+      - POST=0
+      - AUTH=0
+      - BUILD=0
+      - IMAGES=0
+      - NETWORKS=0
+      - VOLUMES=0
+      - SYSTEM=0
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "2375:2375"
+    networks:
+      - execution_net
+
+  # SPIRE AGENT - Workload Identity Provider
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.10.1
+    container_name: spire-agent
+    hostname: spire-agent
+    volumes:
+      - ./config/spire:/etc/spire/agent
+      - spire_agent_data:/run/spire/agent
+      - spire_socket:/var/run/spire  # Shared socket for workloads
+      - //var/run/docker.sock:/var/run/docker.sock:ro
+    # pid: "host"
+    command: ["-config", "/etc/spire/agent/agent.conf"]
+    healthcheck:
+      test: ["CMD", "/opt/spire/bin/spire-agent", "healthcheck", "-socketPath", "/var/run/spire/agent.sock"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - execution_net
+    restart: unless-stopped
+
+  # OLLAMA SERVICE - GPU Accelerated Inference
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_gpu
+    # Enable GPU Support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    environment:
+      # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
+      - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
+      - OLLAMA_NUM_PARALLEL=1          # 1 slot: KV cache halved so 14B models (~14.2 GB) fit on a 16 GB GPU
+      - OLLAMA_KEEP_ALIVE=1h            # Unload after 1h idle; cold loads spike WSL2 RAM, keeping warm amortizes that cost
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: always
+    networks:
+      - execution_net
+
+  # BMO VOICE - RVC Inference Engine
+  bmo-voice:
+    build:
+      context: ../agents/bmo_voice
+      dockerfile: Dockerfile
+    container_name: bmo_voice_gpu
+    ports:
+      - "8100:8000"
+    volumes:
+      - ../agents/bmo_voice:/app
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bmo-voice.rule=PathPrefix(`/bmo`)"
+      - "traefik.http.routers.bmo-voice.entrypoints=web"
+      - "traefik.http.services.bmo-voice.loadbalancer.server.port=8000"
+
+  # VOICE ENGINE - Qwen3-TTS (1.7B)
+  voice-engine:
+    build:
+      context: ../services/voice_engine
+      dockerfile: Dockerfile
+    container_name: voice_engine_gpu
+    ports:
+      - "8020:8020"
+    volumes:
+      - ../services/voice_engine:/app
+      - bmo_models:/root/.cache/huggingface # Share cache if possible or use new volume
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.voice-engine.rule=PathPrefix(`/voice`)"
+      - "traefik.http.routers.voice-engine.entrypoints=web"
+      - "traefik.http.services.voice-engine.loadbalancer.server.port=8020"
+
+  # OPENHANDS - Sandboxed Execution Environment (Protected by Authentik SSO)
+  openhands:
+    build:
+      context: .
+      dockerfile: Dockerfile.openhands
+    image: custom-openhands:latest
+    container_name: openhands_sandbox
+    privileged: true # Required for Docker-in-Docker sandboxing
+    environment:
+      - SANDBOX_USER_ID=1000
+    ports:
+      - "3002:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../workspace:/workspace
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openhands.rule=PathPrefix(`/hands`)"
+      - "traefik.http.routers.openhands.entrypoints=web"
+      - "traefik.http.routers.openhands.middlewares=strip-hands,authentik@docker"
+      - "traefik.http.middlewares.strip-hands.stripprefix.prefixes=/hands"
+      - "traefik.http.services.openhands.loadbalancer.server.port=3000"
+
+  # DEV SANDBOX - Isolated container for browser-based terminal (Phase 1B)
+  dev-sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev-sandbox
+    image: home-ai-lab/dev-sandbox:latest
+    container_name: dev_sandbox
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    volumes:
+      - ../:/workspace  # Live repo bind mount — Dev terminal operates on real files
+    networks:
+      - execution_net
+
+  # AGENT RUNTIME - Custom Python Environment for Agno Agents
+  agent-runtime:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile
+    image: home-ai-lab/agent-runtime:latest
+    container_name: agent_runtime
+    restart: always
+    depends_on:
+      - ollama
+      - openhands
+      - comfyui
+      - spire-agent  # Wait for SPIRE Agent
+    env_file:
+      - ../network.env
+    environment:
+      # Lovelace local Ollama — 2x 5060 Ti (32GB VRAM) handles all heavy models
+      - OLLAMA_HOST=http://ollama:11434
+      # Local Ollama — BMO voice uses qwen3:14b (9.2GB VRAM, fits alongside other services)
+      - BMO_OLLAMA_HOST=http://ollama:11434
+      # Fish Audio cloud TTS for BMO voice (overrides local RVC)
+      - FISH_AUDIO_API_KEY=9c84d88f61174cdba215e69e65daff4d
+      - FISH_AUDIO_MODEL_ID=323847d4c5394c678e5909c2206725f6
+      - OPENHANDS_URL=http://openhands:3000
+      - OPENHANDS_API_KEY=sk-sandbox-local
+      - COMFYUI_HOST=http://comfyui_gpu:8188
+      - KLEIN_HOST=http://klein_service:8189
+      - "VALID_API_KEYS={\"sk-coder-identity\": \"coding_user\", \"sk-devops-identity\": \"devops_user\"}"
+      # Open Design daemon (LAN-accessible from agent_runtime on same execution_net)
+      - OPEN_DESIGN_URL=http://open_design:7456
+      # SPIFFE Workload API socket path
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
+      - PYTHONPATH=/app
+      # MemPalace API — direct to Hopper (no Turing-side gateway exists).
+      - MEMPALACE_API_URL=${MEMPALACE_API_URL:-http://192.168.2.102:8200}
+      # Agent session storage + Template registry
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}
+      # Redis GPU mutex (control plane)
+      - REDIS_HOST=192.168.2.102
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      # Home Assistant Integration
+      - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
+      # BMO Voice LLM — qwen3:14b fits in VRAM (9.2GB < 15.93GB); latency masked by async ack
+      - BMO_LLM_MODEL=qwen3:14b
+      # BMO Weather location (Open-Meteo, no API key needed)
+      - HOME_LAT=${HOME_LAT:-41.8781}
+      - HOME_LON=${HOME_LON:--87.6298}
+      - HOME_CITY=${HOME_CITY:-your area}
+      # Heavy models — all served by Lovelace Ollama (2x 5060 Ti, 32GB combined)
+      # ROUTER_MODEL uses 8b: fits alongside Klein (22GB) so routing never blocks on VRAM.
+      # All execution models (coordinator, architect, workers) use 14b after Klein is evicted.
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
+      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
+      - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
+      # Connected Accounts — external LLM providers (BYOK)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/output:/app/comfy_io/output
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/input:/app/comfy_io/input
+      - //var/run/docker.sock:/var/run/docker.sock:ro
+      - spire_socket:/var/run/spire:ro  # Mount SPIRE socket (read-only)
+    # Grant read access to Docker socket (GID 0 on Windows Docker Desktop)
+    group_add:
+      - "0"
+    command: ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
+    ports:
+      - "8008:8000"
+    networks:
+      - execution_net
+    labels:
+      # Labels for SPIRE workload attestation
+      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/runtime"
+
+  # IMAGE LORA WORKER - Dedicated queue consumer for image training prep / execution
+  image-training-worker:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile
+    image: home-ai-lab/agent-runtime:latest
+    container_name: image_training_worker
+    restart: always
+    depends_on:
+      - comfyui
+      - spire-agent
+    env_file:
+      - ../network.env
+    environment:
+      - COMFYUI_HOST=http://comfyui_gpu:8188
+      - PYTHONPATH=/app
+      - REDIS_HOST=192.168.2.102
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}
+      - TRAINING_OUTPUT_DIR=/workspace/training_output
+      - TRAINING_DATASET_DIR=/workspace/training_data
+      - IMAGE_LORA_TRAINER_COMMAND=${IMAGE_LORA_TRAINER_COMMAND:-python /app/agents/training/diffusers_lora_train.py --manifest {dataset_manifest} --output_dir {output_dir} --base_checkpoint {base_checkpoint} --trigger_word {trigger_word} --steps {steps} --lr {learning_rate}}
+      - COMFYUI_CHECKPOINT_DIR=/home/runner/ComfyUI/models/checkpoints
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/output:/app/comfy_io/output
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/models/checkpoints:/home/runner/ComfyUI/models/checkpoints:ro
+      - spire_socket:/var/run/spire:ro
+    command: ["python", "/app/agents/training/image_lora_worker.py"]
+    networks:
+      - execution_net
+    labels:
+      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/agent/image-training-worker"
+
+  # --- KLEIN INFERENCE SERVICE (FLUX.1-schnell + Kijai FP8 transformer, dual-GPU) ---
+  klein_service:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile.klein
+    image: home-ai-lab/klein-service:latest
+    container_name: klein_service
+    restart: always
+    env_file:
+      - ../network.env
+    environment:
+      - KLEIN_MODEL_ID=${KLEIN_MODEL_ID:-black-forest-labs/FLUX.1-schnell}
+      - OUTPUT_DIR=/output
+      - HF_HOME=/model_cache
+      # cuda:0 — CLIP + T5-XXL (~9.7 GB bfloat16)
+      # cuda:1 — FP8 transformer (~8.6 GB) + VAE (~0.5 GB)
+    volumes:
+      - C:/Users/panca/Documents/ComfyUI_app/output:/output:rw
+      - klein_model_cache:/model_cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0', '1']
+              capabilities: [gpu]
+    ports:
+      - "8290:8189"
+    networks:
+      execution_net:
+        aliases:
+          - klein_service
+
+  # --- COMFYUI (Creature Minsky — specialized workflows: LoRA, 3D, action figures) ---
+  comfyui:
+    image: comfyui:blackwell-sm120
+    container_name: comfyui_gpu
+    hostname: comfyui
+    restart: always
+    command: ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", "--highvram", "--disable-cuda-malloc"]
+    ports:
+      - "8188:8188"
+    volumes:
+      - C:/Users/panca/Documents/ComfyUI_app/models:/home/runner/ComfyUI/models:ro
+      - C:/Users/panca/Documents/ComfyUI_app/output:/home/runner/ComfyUI/output:rw
+      - C:/Users/panca/Documents/ComfyUI_app/input:/home/runner/ComfyUI/input:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']
+              capabilities: [gpu]
+    networks:
+      execution_net:
+        aliases:
+          - comfyui
+          - comfyui_gpu
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.comfyui.rule=PathPrefix(\\/comfy\\)"
+      - "traefik.http.routers.comfyui.entrypoints=web"
+      - "traefik.http.routers.comfyui.middlewares=strip-comfy,authentik@docker"
+      - "traefik.http.middlewares.strip-comfy.stripprefix.prefixes=/comfy"
+      - "traefik.http.services.comfyui.loadbalancer.server.port=8188"
+
+  # --- VS CODE SERVER (DevOps - Full Access, Protected by Authentik SSO) ---
+  agent_ide_devops:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: agent_ide_devops
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PASSWORD=${VSCODE_PASSWORD}
+      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
+      - DEFAULT_WORKSPACE=/config/workspace
+      - SWARM_API_KEY=sk-devops-identity
+    volumes:
+      - ../:/config/workspace
+      - vscode_config_devops:/config
+      - ./init_ide:/custom-cont-init.d:ro
+    ports:
+      - "8443:8443"
+    restart: unless-stopped
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ide-devops.rule=PathPrefix(`/devops`)"
+      - "traefik.http.routers.ide-devops.entrypoints=web"
+      - "traefik.http.routers.ide-devops.middlewares=strip-devops,authentik@docker"
+      - "traefik.http.middlewares.strip-devops.stripprefix.prefixes=/devops"
+      - "traefik.http.services.ide-devops.loadbalancer.server.port=8443"
+
+  # --- VS CODE SERVER (Coding - Restricted Sandbox, Protected by Authentik SSO) ---
+  agent_ide_coding:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: agent_ide_coding
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PASSWORD=${VSCODE_PASSWORD}
+      - SUDO_PASSWORD=${VSCODE_SUDO_PASSWORD}
+      - DEFAULT_WORKSPACE=/config/workspace
+      - SWARM_API_KEY=sk-coder-identity
+    volumes:
+      - ../user_projects:/config/workspace
+      - vscode_config_coding:/config
+      - ./init_ide:/custom-cont-init.d:ro
+    ports:
+      - "8444:8443"
+    restart: unless-stopped
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ide-coding.rule=PathPrefix(`/code`)"
+      - "traefik.http.routers.ide-coding.entrypoints=web"
+      - "traefik.http.routers.ide-coding.middlewares=strip-code,authentik@docker"
+      - "traefik.http.middlewares.strip-code.stripprefix.prefixes=/code"
+      - "traefik.http.services.ide-coding.loadbalancer.server.port=8443"
+
+  # AGENT UI - Streamlit Interface (Protected by Authentik SSO)
+  agent-ui:
+    image: home-ai-lab/agent-runtime:latest
+    container_name: agent_ui
+    depends_on:
+      - ollama
+      - agent-runtime
+      - comfyui
+    env_file:
+      - ../network.env
+    environment:
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      - OLLAMA_HOST=http://ollama:11434
+      - COMFYUI_HOST=http://comfyui_gpu:8188
+      - STREAMLIT_THEME_BASE=dark
+      - STREAMLIT_THEME_PRIMARY_COLOR=#00ffff
+      - STREAMLIT_THEME_BACKGROUND_COLOR=#0e1117
+      - STREAMLIT_THEME_SECONDARY_BACKGROUND_COLOR=#1c1c2e
+      - STREAMLIT_THEME_TEXT_COLOR=#e0e0e0
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/output:/app/comfy_io/output
+      - C:/Users/panca/Documents/ComfyUI/ComfyUI/input:/app/comfy_io/input
+    working_dir: /workspace
+    command: [ "streamlit", "run", "agents/ui.py", "--server.port=8501", "--server.address=0.0.0.0" ]
+    ports:
+      - "8501:8501"
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      # Route: /ai -> Agent UI (works from any host including Tailscale)
+      - "traefik.http.routers.agent-ui.rule=PathPrefix(`/ai`)"
+      - "traefik.http.routers.agent-ui.entrypoints=web"
+      - "traefik.http.routers.agent-ui.middlewares=strip-ai,authentik@docker"
+      - "traefik.http.middlewares.strip-ai.stripprefix.prefixes=/ai"
+      - "traefik.http.services.agent-ui.loadbalancer.server.port=8501"
+      # Authentik Forward Auth Middleware (shared by all services)
+      - "traefik.http.middlewares.authentik.forwardauth.address=http://authentik_server:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.authentik.forwardauth.trustForwardHeader=true"
+      - "traefik.http.middlewares.authentik.authResponseHeaders=X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
+
+  # OPS PORTAL - Admin Dashboard (Protected by Authentik SSO)
+  ops-portal:
+    image: home-ai-lab/agent-runtime:latest
+    container_name: ops_portal
+    user: "0"  # Run as root for Docker socket access
+    depends_on:
+      - agent-runtime
+    env_file:
+      - ../network.env
+    environment:
+      - AGNO_DB_URL=${AGNO_DB_URL}
+      # Langfuse connection now sourced from network.env
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+    volumes:
+      - ../agents:/app/agents
+      - ../docs:/app/docs
+      - ../:/workspace
+      - //var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    command: [ "streamlit", "run", "agents/ops_dashboard.py", "--server.port=8502", "--server.address=0.0.0.0" ]
+    ports:
+      - "8502:8502"
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ops-portal.rule=PathPrefix(`/ops`)"
+      - "traefik.http.routers.ops-portal.entrypoints=web"
+      - "traefik.http.routers.ops-portal.middlewares=strip-ops,authentik@docker"
+      - "traefik.http.middlewares.strip-ops.stripprefix.prefixes=/ops"
+      - "traefik.http.services.ops-portal.loadbalancer.server.port=8502"
+
+  # HIVE UI - Memex Interface (Lovelace-local, direct 2×5060Ti + live repo access)
+  hive-ui:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+      args:
+        # Bake Lovelace agent_runtime address so browser WS terminal connects directly
+        NEXT_PUBLIC_GATEWAY_URL: "http://192.168.2.101:8008"
+    image: home-ai-lab/hive-ui:latest
+    container_name: hive_ui_local
+    restart: unless-stopped
+    depends_on:
+      - agent-runtime
+    env_file:
+      - ../network.env
+    environment:
+      - API_BASE_URL=http://agent_runtime:8000
+      - MEMPALACE_BASE_URL=http://${HOPPER_IP:-192.168.2.102}:8200
+      - LANGFUSE_URL=http://${HOPPER_IP:-192.168.2.102}:3000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - HOPPER_IP=${HOPPER_IP:-192.168.2.102}
+      - NEXT_PUBLIC_GRAFANA_URL=http://${TURING_IP:-192.168.2.103}/grafana
+      - GRAFANA_INTERNAL_URL=http://${TURING_IP:-192.168.2.103}/grafana
+    extra_hosts:
+      - "${HOPPER_HOST:-hopper}:${HOPPER_IP:-192.168.2.102}"
+    volumes:
+      - ../docs:/app/docs:ro
+    ports:
+      - "3300:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hive-ui-local.rule=PathPrefix(`/hive`)"
+      - "traefik.http.routers.hive-ui-local.entrypoints=web"
+      - "traefik.http.services.hive-ui-local.loadbalancer.server.port=3000"
+
+  # --- IDENTITY - Authentik DB ---
+  authentik_db:
+    image: postgres:12-alpine
+    container_name: authentik_db
+    restart: unless-stopped
+    volumes:
+      - database_authentik:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - POSTGRES_USER=authentik
+      - POSTGRES_DB=authentik
+    networks:
+      - execution_net
+
+  # --- IDENTITY - Authentik Redis ---
+  authentik_redis:
+    image: redis:alpine
+    container_name: authentik_redis
+    command: --save 60 1 --loglevel warning
+    restart: unless-stopped
+    volumes:
+      - redis_authentik:/data
+    networks:
+      - execution_net
+
+  # --- IDENTITY - Authentik Server ---
+  authentik_server:
+    image: ghcr.io/goauthentik/server:2024.2.1
+    container_name: authentik_server
+    restart: unless-stopped
+    command: server
+    environment:
+      - AUTHENTIK_REDIS__HOST=authentik_redis
+      - AUTHENTIK_POSTGRESQL__HOST=authentik_db
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+      # CRITICAL: Tell Authentik its external-facing hostname for OIDC discovery
+      - AUTHENTIK_HOST=http://192.168.2.101:9000
+      - AUTHENTIK_HOST_BROWSER=http://192.168.2.101:9000
+    volumes:
+      - ./config/authentik/media:/media
+      - ./config/authentik/custom-templates:/templates
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    depends_on:
+      - authentik_db
+      - authentik_redis
+    networks:
+      - execution_net
+
+  # --- IDENTITY - Authentik Worker ---
+  authentik_worker:
+    image: ghcr.io/goauthentik/server:2024.2.1
+    container_name: authentik_worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      - AUTHENTIK_REDIS__HOST=authentik_redis
+      - AUTHENTIK_POSTGRESQL__HOST=authentik_db
+      - AUTHENTIK_POSTGRESQL__USER=authentik
+      - AUTHENTIK_POSTGRESQL__NAME=authentik
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+    volumes:
+      - ./config/authentik/media:/media
+      - ./config/authentik/certs:/certs
+      - ./config/authentik/custom-templates:/templates
+    depends_on:
+      - authentik_db
+      - authentik_redis
+    networks:
+      - execution_net
+
+  # ─────────────────────────────────────────────────────────────────
+  # DIAGNOSTIC TOOL — Text Generation WebUI (oobabooga)
+  # Purpose : Token inspection, logit viewer, advanced sampler controls
+  # Role    : MarsRL output debugging — NOT in the request path
+  # Start   : docker-compose --profile diagnostic up text-gen-webui -d
+  # Stop    : docker-compose --profile diagnostic stop text-gen-webui
+  # UI      : http://localhost:7860  |  Traefik: /tokenlab
+  # Backend : Connects to existing Ollama — NO model duplication
+  # ─────────────────────────────────────────────────────────────────
+  text-gen-webui:
+    image: atinoda/text-generation-webui:default-nightly
+    container_name: text_gen_webui
+    profiles:
+      - diagnostic
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CLI_ARGS=--api --listen --listen-port 7860 --api-port 5000 --extensions openai
+    volumes:
+      - tgw_models:/home/user/text-generation-webui/models
+      - tgw_loras:/home/user/text-generation-webui/loras
+      - tgw_presets:/home/user/text-generation-webui/presets
+    ports:
+      - "7860:7860"   # Web UI
+      - "5000:5000"   # OpenAI-compatible API
+    networks:
+      - execution_net
+    restart: "no"    # Diagnostic only — do not auto-restart
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tgw.rule=PathPrefix(`/tokenlab`)"
+      - "traefik.http.routers.tgw.entrypoints=web"
+      - "traefik.http.routers.tgw.middlewares=strip-tokenlab,authentik@docker"
+      - "traefik.http.middlewares.strip-tokenlab.stripprefix.prefixes=/tokenlab"
+      - "traefik.http.services.tgw.loadbalancer.server.port=7860"
+
+  # ── Container metrics for Prometheus scraping ──────────────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor-justin
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - execution_net
+    restart: unless-stopped
+
+  # TRAINING DISPATCHER — Accepts job requests from Turing, runs GRPO training on Lovelace GPUs
+  # Auth: X-Dispatcher-Key header (DISPATCHER_SECRET env var)
+  # Endpoint: http://192.168.2.101:8001
+  training-dispatcher:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile
+    image: home-ai-lab/agent-runtime:latest
+    container_name: training_dispatcher
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    env_file:
+      - ../network.env
+    environment:
+      - PYTHONPATH=/app
+      - DISPATCHER_SECRET=${DISPATCHER_SECRET}
+      - TRAINING_OUTPUT_DIR=/workspace/training_output
+      - TRAINING_DATASET_DIR=/workspace/training_data
+      - TRAINING_BASE_SOLVER=${TRAINING_BASE_SOLVER:-Qwen/Qwen3.6-27B}
+      - SECONDARY_OLLAMA_HOST=http://ollama:11434
+      - HF_TOKEN=${HF_TOKEN:-}
+      - FORCE_TRAIN=${FORCE_TRAIN:-0}
+    volumes:
+      - ../agents:/app/agents
+      - ../:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: ["uvicorn", "agents.training.dispatcher:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "info"]
+    ports:
+      - "8001:8001"
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=false"
+
+  # ─────────────────────────────────────────────────────────────────
+  # OPEN DESIGN — nexu-io/open-design daemon
+  # Purpose : Design-intent UI generation (landing pages, dashboards,
+  #           decks, prototypes) via 31 skills + 72 design systems.
+  # Daemon API : http://192.168.2.101:7456  (LAN-accessible)
+  # First build : ~10 min (clone + pnpm install + tsc build)
+  #              Set SKIP_WEB_BUILD=1 to skip the Next.js static export
+  #              and save ~4 min (no /design-studio UI, API still works).
+  # Subsequent : Only Docker layer cache misses rebuilt (~1 min).
+  # Start      : docker compose up -d open-design
+  # ─────────────────────────────────────────────────────────────────
+  open-design:
+    build:
+      context: .
+      dockerfile: Dockerfile.open-design
+      args:
+        SKIP_WEB_BUILD: "${OD_SKIP_WEB_BUILD:-0}"
+    image: home-ai-lab/open-design:latest
+    container_name: open_design
+    restart: unless-stopped
+    ports:
+      - "7456:7456"   # daemon REST + SSE API
+    volumes:
+      - open_design_data:/data
+    environment:
+      - OD_BIND_HOST=0.0.0.0
+      - OD_DATA_DIR=/data
+      - NODE_ENV=production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7456/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - execution_net
+    labels:
+      - "traefik.enable=false"
+
+networks:
+  execution_net:
+    driver: bridge
+
+volumes:
+  bmo_models:
+  ollama_models:
+  klein_model_cache:
+  vscode_config_devops:
+  vscode_config_coding:
+  database_authentik:
+  redis_authentik:
+  spire_agent_data:
+  spire_socket:
+  tgw_models:
+  open_design_data:
+  tgw_loras:
+  tgw_presets:

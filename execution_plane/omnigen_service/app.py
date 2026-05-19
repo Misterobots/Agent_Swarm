@@ -87,15 +87,16 @@ def _load_pipeline() -> None:
     t0 = time.time()
 
     from omnigen2.pipelines.omnigen2.pipeline_omnigen2 import OmniGen2Pipeline
-    from omnigen2.models.transformers.transformer_omnigen2 import OmniGen2Transformer2DModel
 
     dtype = _dtype_obj()
-    _pipeline = OmniGen2Pipeline.from_pretrained(MODEL_ID, torch_dtype=dtype, trust_remote_code=True)
-    # The reference inference loads the transformer separately so the dtype is
-    # applied to it explicitly — without this, the transformer can stay in fp32
-    # and blow the VRAM budget.
-    _pipeline.transformer = OmniGen2Transformer2DModel.from_pretrained(
-        MODEL_ID, subfolder="transformer", torch_dtype=dtype
+    # NOTE: do NOT explicitly reload pipeline.transformer afterwards. The
+    # OmniGen2 reference inference does this conditionally — but it doubles
+    # peak RAM (~25 GB), exceeds WSL2's default 24 GB limit, and triggers a
+    # class-mismatch warning between the remote-code-loaded transformer and
+    # the local-clone version. The pipeline's from_pretrained already applies
+    # torch_dtype to all components when trust_remote_code is on.
+    _pipeline = OmniGen2Pipeline.from_pretrained(
+        MODEL_ID, torch_dtype=dtype, trust_remote_code=True
     )
 
     if USE_MODEL_CPU_OFFLOAD:

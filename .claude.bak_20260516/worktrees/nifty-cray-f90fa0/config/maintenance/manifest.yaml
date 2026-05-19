@@ -1,0 +1,109 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MAINTENANCE MANIFEST — alert → action mapping
+# ─────────────────────────────────────────────────────────────────────────────
+# This file is the single source of truth for how Prometheus alerts are
+# routed by the maintenance_router service.
+#
+# Routing rules (see services/maintenance_router/classifier.py):
+#   1. The first rule whose `alert` matches the Alertmanager alert name
+#      AND whose `match` labels are all satisfied wins.
+#   2. If `agent_safe: true` AND `action` is set AND the action is not in
+#      cooldown, the alert is dispatched to the SYSTEM_ALERT Redis queue
+#      for auto_repair_daemon to execute.
+#   3. Otherwise the alert lands in the HUMAN_QUEUE for Mission Control
+#      pickup.
+#   4. An alert with no matching rule defaults to the HUMAN_QUEUE.
+#
+# Schema validation: config/maintenance/manifest.schema.json
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: 1
+
+defaults:
+  cooldown_seconds: 600   # mirrors AUTO_REPAIR_COOLDOWN in auto_repair_daemon
+  blast_radius: medium
+
+rules:
+  # ── Service availability ────────────────────────────────────────────────
+  - alert: ServiceDown
+    match: { job: postgres }
+    action: restart_container
+    action_args: { node: hopper, container: postgres }
+    agent_safe: true
+    blast_radius: low
+    cooldown_seconds: 300
+
+  - alert: ServiceDown
+    match: { job: redis }
+    action: restart_container
+    action_args: { node: hopper, container: redis }
+    agent_safe: true
+    blast_radius: low
+    cooldown_seconds: 300
+
+  - alert: ServiceDown
+    match: { job: langfuse }
+    action: restart_container
+    action_args: { node: hopper, container: langfuse }
+    agent_safe: true
+    blast_radius: low
+    cooldown_seconds: 300
+
+  # Catch-all for ServiceDown — human decision (might be a node-level issue)
+  - alert: ServiceDown
+    agent_safe: false
+    blast_radius: high
+    runbook: runbooks/service-down.md
+
+  # ── Authentik database corruption ───────────────────────────────────────
+  # auto_repair_daemon already detects this via log scraping; the manifest
+  # entry exists so the dispatcher.py SYSTEM_ALERT path can also trigger it
+  # if Prometheus ever gets a corresponding rule.
+  - alert: AuthentikDBIndexCorrupt
+    action: repair_authentik_database
+    agent_safe: true
+    blast_radius: high      # well-understood; daemon has handled it before
+    cooldown_seconds: 3600
+
+  # ── Container resources ─────────────────────────────────────────────────
+  - alert: ContainerRestarting
+    agent_safe: false       # restart loop = something deeper; human looks first
+    blast_radius: medium
+    runbook: runbooks/restart-loop.md
+
+  - alert: ContainerHighMemory
+    agent_safe: false       # restart vs. scale vs. tune is a judgment call
+    blast_radius: medium
+    runbook: runbooks/high-memory.md
+
+  - alert: ContainerHighCPU
+    agent_safe: false
+    blast_radius: low       # warning, not critical
+    runbook: runbooks/high-cpu.md
+
+  # ── GPU / inference ─────────────────────────────────────────────────────
+  - alert: OllamaDown
+    agent_safe: false       # GPU/driver issues — restart can mask root cause
+    blast_radius: high
+    runbook: runbooks/ollama-down.md
+
+  - alert: OllamaHighMemory
+    agent_safe: false
+    blast_radius: medium
+    runbook: runbooks/ollama-memory.md
+
+  - alert: OllamaSlowRequests
+    agent_safe: false
+    blast_radius: low
+    runbook: runbooks/ollama-slow.md
+
+  # ── Monitoring stack self-health ────────────────────────────────────────
+  - alert: PrometheusTargetMissing
+    agent_safe: false       # could be a real outage; don't auto-restart targets
+    blast_radius: medium
+    runbook: runbooks/target-missing.md
+
+  - alert: PrometheusTSDBCompactionsFailing
+    agent_safe: false       # disk/corruption — humans only
+    blast_radius: high
+    runbook: runbooks/prometheus-tsdb.md

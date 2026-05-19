@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-05-04T07:36:56Z",
+  "model": "qwen3.6:27b",
+  "passed": 6,
+  "warned": 1,
+  "failed": 1,
+  "avg_chat_time_s": 15.37,
+  "tests": [
+    {
+      "test": 1,
+      "label": "Health Check",
+      "status": "PASS",
+      "time_s": 0.18,
+      "content_preview": "{'status': 'online', 'system': 'Home AI Lab Swarm'}"
+    },
+    {
+      "test": 2,
+      "label": "Simple Conversation",
+      "status": "PASS",
+      "time_s": 21.31,
+      "content_preview": "I am a large language model developed by Alibaba Cloud, part of the Qwen series.Turn complete[Turn default_session-1777880154008 completed]"
+    },
+    {
+      "test": 3,
+      "label": "Python Code Generation",
+      "status": "PASS",
+      "time_s": 17.07,
+      "content_preview": "Solver starteddef sort_list(lst):\n    return sorted(lst)def sort_list(lst):\n    return sorted(lst)Loop completeArchitect response generatedTurn complete[Turn default_session-1777880175321 completed]"
+    },
+    {
+      "test": 4,
+      "label": "Reasoning / Research",
+      "status": "PASS",
+      "time_s": 8.04,
+      "content_preview": "ParisTurn complete[Turn default_session-1777880192396 completed]"
+    },
+    {
+      "test": 5,
+      "label": "Long Context / Document Summary",
+      "status": "PASS",
+      "time_s": 15.05,
+      "content_preview": "Artificial intelligence (AI) is the study of machines that demonstrate intelligent behavior, such as perceiving their environment and taking actions to achieve their goals. AI research focuses on syst"
+    },
+    {
+      "test": 6,
+      "label": "gRPC classify",
+      "status": "FAIL",
+      "time_s": 0,
+      "content_preview": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"task\"],\"msg\":\"Field required\",\"input\":{\"text\":\"Write a Python script to list all files in a directory\"}}]}"
+    },
+    {
+      "test": 7,
+      "label": "GPU VRAM",
+      "status": "WARN",
+      "time_s": 0,
+      "content_preview": "no GPU on Turing"
+    },
+    {
+      "test": 8,
+      "label": "Config PRIMARY_MODEL",
+      "status": "PASS",
+      "time_s": 0,
+      "content_preview": "# Primary model: qwen3.6:27b \u2014 27B dense hybrid-attention (Gated DeltaNet),\nPRIMARY_MODEL        = os.getenv(\"PRIMARY_MODEL\",        \"qwen3.6:27b\")\n    \"qwen3.6:27b\": 262144,"
+    }
+  ]
+}

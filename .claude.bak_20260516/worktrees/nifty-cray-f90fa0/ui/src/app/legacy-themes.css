@@ -1,0 +1,211 @@
+/* Legacy 8-theme bundle — retired in favour of Memex (single brand, two modes).
+   Hidden from the picker; only applied when the user opts in via:
+     localStorage.setItem("memex-show-legacy", "1")
+   AppShell sets [data-legacy-themes="1"] on <html>, which gates these selectors. */
+
+[data-legacy-themes="1"][data-theme="ember"] {
+  --chat-bg: #110e0c;
+  --chat-surface: #141110;
+  --chat-surface-rgb: 20, 17, 16;
+  --chat-panel: #1f1714;
+  --chat-border: #2a2220;
+  --chat-border-rgb: 42, 34, 32;
+  --chat-soft: #1a1512;
+  --chat-text: #f5e6db;
+  --chat-muted: #a8846c;
+  --chat-accent: #f97316;
+  --chat-accent-strong: #fb923c;
+  --chat-accent-2: #ef4444;
+  --chat-thinking: #f97316;
+  --chat-font: inherit;
+  --chat-radius: 0.75rem;
+  --chat-input-radius: 0.75rem;
+}
+
+/* ── Amber — refined warm-amber Memex from the v1 brand pass ─── */
+[data-legacy-themes="1"][data-theme="amber"] {
+  --chat-bg:           #0e0b09;
+  --chat-surface:      #14110e;
+  --chat-surface-rgb:  20, 17, 14;
+  --chat-panel:        #1c1815;
+  --chat-soft:         #181410;
+  --chat-border:       #2a2420;
+  --chat-border-rgb:   42, 36, 32;
+  --chat-text:         #f3e8d8;
+  --chat-muted:        #a08673;
+  --chat-accent:       #f97316;
+  --chat-accent-strong: #fb923c;
+  --chat-accent-2:     #ef4444;
+  --chat-accent-rgb:   249, 115, 22;
+  --chat-thinking:     #f97316;
+  --chat-radius:       0.5rem;
+  --chat-input-radius: 0.375rem;
+  --ring:              0 0 0 3px rgba(249, 115, 22, 0.35);
+  --hover-tint:        rgba(255, 255, 255, 0.04);
+  --press-tint:        rgba(0, 0, 0, 0.2);
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
+  --elev-2: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --elev-3: 0 12px 32px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+}
+
+[data-legacy-themes="1"][data-theme="slate"] {
+  --chat-bg: #11161d;
+  --chat-surface: #141a22;
+  --chat-surface-rgb: 20, 26, 34;
+  --chat-panel: #1a2230;
+  --chat-border: #243044;
+  --chat-border-rgb: 36, 48, 68;
+  --chat-soft: #182030;
+  --chat-text: #d4dce8;
+  --chat-muted: #6b839e;
+  --chat-accent: #4ba6c7;
+  --chat-accent-strong: #7ec8e3;
+  --chat-accent-2: #7a8ce0;
+  --chat-thinking: #4ba6c7;
+  --chat-font: inherit;
+  --chat-radius: 0.5rem;
+  --chat-input-radius: 0.5rem;
+}
+
+[data-legacy-themes="1"][data-theme="signal"] {
+  --chat-bg: #171a1b;
+  --chat-surface: #1a1d1f;
+  --chat-surface-rgb: 26, 29, 31;
+  --chat-panel: #222628;
+  --chat-border: #333839;
+  --chat-border-rgb: 51, 56, 57;
+  --chat-soft: #1e2224;
+  --chat-text: #e8dcc8;
+  --chat-muted: #8ba7b3;
+  --chat-accent: #d89a4d;
+  --chat-accent-strong: #e8b56e;
+  --chat-accent-2: #8ba7b3;
+  --chat-thinking: #d89a4d;
+  --chat-font: inherit;
+  --chat-radius: 0.375rem;
+  --chat-input-radius: 0.375rem;
+}
+
+[data-legacy-themes="1"][data-theme="office"] {
+  --chat-bg: #f8f9fa;
+  --chat-surface: #ffffff;
+  --chat-surface-rgb: 255, 255, 255;
+  --chat-panel: #e9ecef;
+  --chat-border: #ced4da;
+  --chat-border-rgb: 206, 212, 218;
+  --chat-soft: #f1f3f5;
+  --chat-text: #212529;
+  --chat-muted: #6c757d;
+  --chat-accent: #2e5090;
+  --chat-accent-strong: #1a73e8;
+  --chat-accent-2: #0d6efd;
+  --chat-thinking: #2e5090;
+  --chat-font: "Segoe UI", system-ui, sans-serif;
+  --chat-radius: 0.5rem;
+  --chat-input-radius: 0.5rem;
+}
+
+[data-legacy-themes="1"][data-theme="hacker"] {
+  --chat-bg: #000000;
+  --chat-surface: #020a02;
+  --chat-surface-rgb: 2, 10, 2;
+  --chat-panel: #041204;
+  --chat-border: #0a3a0a;
+  --chat-border-rgb: 10, 58, 10;
+  --chat-soft: #010801;
+  --chat-text: #00FF41;
+  --chat-muted: #0d7a0d;
+  --chat-accent: #00FF41;
+  --chat-accent-strong: #00ff00;
+  --chat-accent-2: #00cc44;
+  --chat-thinking: #00FF41;
+  --chat-font: "Courier New", "Fira Code", monospace;
+  --chat-radius: 0;
+  --chat-input-radius: 0;
+}
+
+[data-legacy-themes="1"][data-theme="star-trek"] {
+  --chat-bg: #000000;
+  --chat-surface: #000000;
+  --chat-surface-rgb: 0, 0, 0;
+  --chat-panel: #101010;
+  --chat-border: #cc6699;
+  --chat-border-rgb: 204, 102, 153;
+  --chat-soft: #0a0a0a;
+  --chat-text: #ff9966;
+  --chat-muted: #cc6699;
+  --chat-accent: #ff9900;
+  --chat-accent-strong: #ffcc66;
+  --chat-accent-2: #9999ff;
+  --chat-thinking: #ff9900;
+  --chat-font: "Arial Narrow", "Antonio", "Trebuchet MS", sans-serif;
+  --chat-radius: 2rem;
+  --chat-input-radius: 2rem;
+}
+
+[data-legacy-themes="1"][data-theme="cyberpunk"] {
+  --chat-bg: #0d0221;
+  --chat-surface: #120328;
+  --chat-surface-rgb: 18, 3, 40;
+  --chat-panel: #1a0540;
+  --chat-border: #3d1466;
+  --chat-border-rgb: 61, 20, 102;
+  --chat-soft: #150430;
+  --chat-text: #e0d0ff;
+  --chat-muted: #8b6cc7;
+  --chat-accent: #ff10f0;
+  --chat-accent-strong: #ff44ff;
+  --chat-accent-2: #00ffff;
+  --chat-thinking: #ff10f0;
+  --chat-font: "Rajdhani", "Share Tech Mono", monospace;
+  --chat-radius: 0.25rem;
+  --chat-input-radius: 0.25rem;
+}
+
+[data-legacy-themes="1"][data-theme="minimal"] {
+  --chat-bg: #fafafa;
+  --chat-surface: #ffffff;
+  --chat-surface-rgb: 255, 255, 255;
+  --chat-panel: #f0f0f0;
+  --chat-border: #e0e0e0;
+  --chat-border-rgb: 224, 224, 224;
+  --chat-soft: #f5f5f5;
+  --chat-text: #1a1a1a;
+  --chat-muted: #888888;
+  --chat-accent: #2c2c2c;
+  --chat-accent-strong: #000000;
+  --chat-accent-2: #666666;
+  --chat-thinking: #2c2c2c;
+  --chat-font: "Georgia", serif;
+  --chat-radius: 0.5rem;
+  --chat-input-radius: 0.5rem;
+}
+
+[data-legacy-themes="1"][data-theme="hacker"] .chat-shell {
+  text-shadow: 0 0 6px rgba(0, 255, 65, 0.35), 0 0 2px rgba(0, 255, 0, 0.15);
+  position: relative;
+}
+[data-legacy-themes="1"][data-theme="hacker"] .chat-shell::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 65, 0.025) 2px, rgba(0, 255, 65, 0.025) 4px);
+  z-index: 50;
+}
+
+[data-legacy-themes="1"][data-theme="star-trek"] .chat-shell {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+[data-legacy-themes="1"][data-theme="star-trek"] .chat-shell .lcars-sidebar { border-right: 4px solid #cc6699; }
+
+[data-legacy-themes="1"][data-theme="cyberpunk"] .chat-shell { text-shadow: 0 0 2px rgba(255, 16, 240, 0.15); }
+[data-legacy-themes="1"][data-theme="cyberpunk"] .chat-shell input,
+[data-legacy-themes="1"][data-theme="cyberpunk"] .chat-shell textarea {
+  border: 1px solid #ff10f0;
+  box-shadow: 0 0 8px rgba(255, 16, 240, 0.2), inset 0 0 8px rgba(0, 255, 255, 0.05);
+}
+
+[data-legacy-themes="1"][data-theme="minimal"] .chat-shell { line-height: 1.7; }
