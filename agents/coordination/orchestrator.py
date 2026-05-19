@@ -289,7 +289,7 @@ def coordinate_task(
         _input_lower_persp = user_input.lower()
         _is_creative_task = any(sig in _input_lower_persp for sig in _CREATIVE_SIGNALS)
 
-        if not _use_perspective_mode and not _is_creative_task:
+        if research_mode and not _use_perspective_mode and not _is_creative_task:
             yield {"type": "thought", "content": "→ Checking if topic is multi-faceted for perspective mode..."}
             _perspective_probe = _decompose_task_perspectives(user_input, history_context)
             _use_perspective_mode = _perspective_probe.get("is_multifaceted", False)
