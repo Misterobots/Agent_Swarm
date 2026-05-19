@@ -138,6 +138,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Conversation store init failed (non-fatal): {e}")
 
+        # 7b. Initialize Goals Store
+        try:
+            from goals import init_tables as _init_goals_tables
+            _init_goals_tables()
+        except Exception as e:
+            logger.warning(f"Goals store init failed (non-fatal): {e}")
+
         # 8. Clean up orphaned training runs (status='running' but server restarted)
         try:
             from config import TEMPLATE_DB_URL
@@ -185,6 +192,14 @@ async def lifespan(app: FastAPI):
 # --- App Definition ---
 app = FastAPI(lifespan=lifespan, title="Home AI Lab Swarm API")
 mcp_server = get_mcp_server()
+
+# Goals router
+try:
+    from goals.routes import router as goals_router
+    app.include_router(goals_router)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"Goals router not loaded: {_e}")
 
 # Staged rollout: parse mode logs policy mismatches without blocking,
 # soft/hard modes enforce endpoint-class policy in AuthorizationMiddleware.
