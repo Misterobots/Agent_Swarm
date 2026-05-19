@@ -400,6 +400,8 @@ export function useChatStream(options?: {
             const thought: ThoughtEvent = { content: logContent, timestamp: Date.now() };
             thoughtTraceRef.current = [...thoughtTraceRef.current, thought];
             setLatestThought(logContent);
+          } else if (event.type === "heartbeat") {
+            // SSE keep-alive from backend — no-op, just keeps the connection through proxies
           } else if (event.type === "error") {
             appendToMessage(convId!, assistantId, `\n\n*Error: ${event.content || "Stream error"}*`);
           } else {

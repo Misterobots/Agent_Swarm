@@ -12,7 +12,7 @@ Phases:
 import json
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait as futures_wait
 from typing import Generator, Optional
 
 from config import ARCHITECT_MODEL
@@ -289,7 +289,7 @@ def coordinate_task(
         _input_lower_persp = user_input.lower()
         _is_creative_task = any(sig in _input_lower_persp for sig in _CREATIVE_SIGNALS)
 
-        if not _use_perspective_mode and not _is_creative_task:
+        if research_mode and not _use_perspective_mode and not _is_creative_task:
             yield {"type": "thought", "content": "→ Checking if topic is multi-faceted for perspective mode..."}
             _perspective_probe = _decompose_task_perspectives(user_input, history_context)
             _use_perspective_mode = _perspective_probe.get("is_multifaceted", False)
@@ -374,36 +374,42 @@ def coordinate_task(
                         "content": f"Spawned {pioneer['name']} ({label})",
                     }
 
-                for future in as_completed(futures_p):
-                    worker_id, role, label = futures_p[future]
-                    try:
-                        result = future.result(timeout=180)
-                        findings_by_perspective[label] = result or ""
-                        worker = session.workers[worker_id]
-                        elapsed = (
-                            (worker.completed_at or time.time())
-                            - (worker.started_at or time.time())
-                        )
-                        pioneer = worker.pioneer
-                        yield {
-                            "type": "message",
-                            "content": f"✅ **{pioneer['name']}** ({label}) completed in {elapsed:.1f}s\n\n",
-                        }
-                        _team_store(
-                            session.coordination_id,
-                            f"perspective_{label}_{worker_id}",
-                            result[:2000] if result else "",
-                            author=role,
-                        )
-                    except Exception as e:
-                        yield {
-                            "type": "log",
-                            "content": f"[Coordinator] Perspective worker {label} failed: {e}",
-                        }
-                        yield {
-                            "type": "message",
-                            "content": f"⚠️ **{label}** worker failed: {e}\n\n",
-                        }
+                _pending_p = set(futures_p.keys())
+                while _pending_p:
+                    _done_p, _pending_p = futures_wait(_pending_p, timeout=20)
+                    if not _done_p:
+                        yield {"type": "heartbeat", "content": ""}
+                        continue
+                    for future in _done_p:
+                        worker_id, role, label = futures_p[future]
+                        try:
+                            result = future.result()
+                            findings_by_perspective[label] = result or ""
+                            worker = session.workers[worker_id]
+                            elapsed = (
+                                (worker.completed_at or time.time())
+                                - (worker.started_at or time.time())
+                            )
+                            pioneer = worker.pioneer
+                            yield {
+                                "type": "message",
+                                "content": f"✅ **{pioneer['name']}** ({label}) completed in {elapsed:.1f}s\n\n",
+                            }
+                            _team_store(
+                                session.coordination_id,
+                                f"perspective_{label}_{worker_id}",
+                                result[:2000] if result else "",
+                                author=role,
+                            )
+                        except Exception as e:
+                            yield {
+                                "type": "log",
+                                "content": f"[Coordinator] Perspective worker {label} failed: {e}",
+                            }
+                            yield {
+                                "type": "message",
+                                "content": f"⚠️ **{label}** worker failed: {e}\n\n",
+                            }
 
             yield {"type": "swarm_phase", "phase_num": 3, "phase_name": "Synthesize", "total_phases": 4}
             yield {"type": "status", "content": "🧠 Building Perspective Matrix..."}
@@ -519,81 +525,87 @@ def coordinate_task(
                     "content": "Research workers queued",
                 }
 
-                for future in as_completed(futures):
-                    worker_id, role, task_text = futures[future]
-                    try:
-                        result = future.result(timeout=180)
-                        research_results[worker_id] = result
-                        worker = session.workers[worker_id]
-                        elapsed = (
-                            (worker.completed_at or time.time())
-                            - (worker.started_at or time.time())
-                        )
-                        yield {
-                            "type": "log",
-                            "content": (
-                                f"[Coordinator] Worker {worker_id} ({role}) "
-                                f"completed in {elapsed:.1f}s"
-                            ),
-                        }
-                        pioneer = worker.pioneer
-                        yield {
-                            "type": "message",
-                            "content": f"✅ **{pioneer['name']}** ({role}) completed\n\n",
-                        }
-                        yield {
-                            "type": "swarm_task_list",
-                            "workers": [
-                                {
-                                    "worker_id": w.worker_id,
-                                    "pioneer_name": w.pioneer["name"],
-                                    "pioneer_full_name": w.pioneer["full_name"],
-                                    "pioneer_motto": w.pioneer["motto"],
-                                    "role": w.role,
-                                    "task": w.task,
-                                    "state": w.state.value,
-                                    "output": (research_results.get(w.worker_id, "") or "")[:600],
-                                }
-                                for w in session.workers.values()
-                                if w.phase == "research"
-                            ],
-                            "content": f"{pioneer['name']} completed",
-                        }
-                        _team_store(
-                            session.coordination_id,
-                            f"research_{role}_{worker_id}",
-                            result[:2000] if result else "",
-                            author=role,
-                        )
-                    except Exception as e:
-                        yield {
-                            "type": "log",
-                            "content": (
-                                f"[Coordinator] Worker {worker_id} ({role}) failed: {e}"
-                            ),
-                        }
-                        yield {
-                            "type": "message",
-                            "content": f"⚠️ Research worker **{role}** failed: {e}\n\n",
-                        }
-                        yield {
-                            "type": "swarm_task_list",
-                            "workers": [
-                                {
-                                    "worker_id": w.worker_id,
-                                    "pioneer_name": w.pioneer["name"],
-                                    "pioneer_full_name": w.pioneer["full_name"],
-                                    "pioneer_motto": w.pioneer["motto"],
-                                    "role": w.role,
-                                    "task": w.task,
-                                    "state": w.state.value,
-                                    "output": (research_results.get(w.worker_id, "") or "")[:600],
-                                }
-                                for w in session.workers.values()
-                                if w.phase == "research"
-                            ],
-                            "content": f"{role} failed",
-                        }
+                _pending_r = set(futures.keys())
+                while _pending_r:
+                    _done_r, _pending_r = futures_wait(_pending_r, timeout=20)
+                    if not _done_r:
+                        yield {"type": "heartbeat", "content": ""}
+                        continue
+                    for future in _done_r:
+                        worker_id, role, task_text = futures[future]
+                        try:
+                            result = future.result()
+                            research_results[worker_id] = result
+                            worker = session.workers[worker_id]
+                            elapsed = (
+                                (worker.completed_at or time.time())
+                                - (worker.started_at or time.time())
+                            )
+                            yield {
+                                "type": "log",
+                                "content": (
+                                    f"[Coordinator] Worker {worker_id} ({role}) "
+                                    f"completed in {elapsed:.1f}s"
+                                ),
+                            }
+                            pioneer = worker.pioneer
+                            yield {
+                                "type": "message",
+                                "content": f"✅ **{pioneer['name']}** ({role}) completed\n\n",
+                            }
+                            yield {
+                                "type": "swarm_task_list",
+                                "workers": [
+                                    {
+                                        "worker_id": w.worker_id,
+                                        "pioneer_name": w.pioneer["name"],
+                                        "pioneer_full_name": w.pioneer["full_name"],
+                                        "pioneer_motto": w.pioneer["motto"],
+                                        "role": w.role,
+                                        "task": w.task,
+                                        "state": w.state.value,
+                                        "output": (research_results.get(w.worker_id, "") or "")[:600],
+                                    }
+                                    for w in session.workers.values()
+                                    if w.phase == "research"
+                                ],
+                                "content": f"{pioneer['name']} completed",
+                            }
+                            _team_store(
+                                session.coordination_id,
+                                f"research_{role}_{worker_id}",
+                                result[:2000] if result else "",
+                                author=role,
+                            )
+                        except Exception as e:
+                            yield {
+                                "type": "log",
+                                "content": (
+                                    f"[Coordinator] Worker {worker_id} ({role}) failed: {e}"
+                                ),
+                            }
+                            yield {
+                                "type": "message",
+                                "content": f"⚠️ Research worker **{role}** failed: {e}\n\n",
+                            }
+                            yield {
+                                "type": "swarm_task_list",
+                                "workers": [
+                                    {
+                                        "worker_id": w.worker_id,
+                                        "pioneer_name": w.pioneer["name"],
+                                        "pioneer_full_name": w.pioneer["full_name"],
+                                        "pioneer_motto": w.pioneer["motto"],
+                                        "role": w.role,
+                                        "task": w.task,
+                                        "state": w.state.value,
+                                        "output": (research_results.get(w.worker_id, "") or "")[:600],
+                                    }
+                                    for w in session.workers.values()
+                                    if w.phase == "research"
+                                ],
+                                "content": f"{role} failed",
+                            }
 
         # === PHASE 3: SYNTHESIZE (LLM) ===
         yield {"type": "swarm_phase", "phase_num": 3, "phase_name": "Synthesize", "total_phases": 5}
