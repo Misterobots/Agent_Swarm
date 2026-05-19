@@ -290,7 +290,7 @@ async def get_my_identity(request: Request, auth_claims: dict = Depends(SpiffeJW
     if authentik_user:
         groups_raw = request.headers.get("X-authentik-groups", "")
         groups = [g.strip() for g in groups_raw.split("|") if g.strip()]
-        is_admin = "admins" in groups
+        is_admin = any("admin" in g.lower() for g in groups)
         caller = {
             "username": authentik_user,
             "email": request.headers.get("X-authentik-email", ""),
