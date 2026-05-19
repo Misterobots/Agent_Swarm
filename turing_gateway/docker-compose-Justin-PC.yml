@@ -576,18 +576,12 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
-      # LAN route (any host)
-      - "traefik.http.routers.openhands.rule=PathPrefix(`/hands`)"
-      - "traefik.http.routers.openhands.entrypoints=web"
-      - "traefik.http.routers.openhands.middlewares=strip-hands,authentik@file"
-      - "traefik.http.middlewares.strip-hands.stripprefix.prefixes=/hands"
-      - "traefik.http.services.openhands.loadbalancer.server.port=3000"
-      # External route: memex.shivelymedia.com/hands (CF Tunnel, priority > hive-ext-http=20)
-      - "traefik.http.routers.hands-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/hands`)"
+      # External: hands.shivelymedia.com (CF Tunnel → port 80, subdomain avoids base-path issues)
+      - "traefik.http.routers.hands-ext.rule=Host(`hands.shivelymedia.com`)"
       - "traefik.http.routers.hands-ext.entrypoints=web"
-      - "traefik.http.routers.hands-ext.priority=30"
-      - "traefik.http.routers.hands-ext.middlewares=globalHeaders@file,robotHeaders@file,strip-hands,authentik@file"
+      - "traefik.http.routers.hands-ext.middlewares=globalHeaders@file,robotHeaders@file,authentik@file"
       - "traefik.http.routers.hands-ext.service=openhands"
+      - "traefik.http.services.openhands.loadbalancer.server.port=3000"
 
   # VS CODE SERVER (DevOps - Full Access, Protected by Authentik SSO)
   agent_ide_devops:
@@ -613,18 +607,11 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
-      # LAN route (any host)
-      - "traefik.http.routers.ide-devops.rule=PathPrefix(`/devops`)"
+      # External: devops.shivelymedia.com (subdomain, no base-path stripping needed)
+      - "traefik.http.routers.ide-devops.rule=Host(`devops.shivelymedia.com`)"
       - "traefik.http.routers.ide-devops.entrypoints=web"
-      - "traefik.http.routers.ide-devops.middlewares=strip-devops,authentik@file"
-      - "traefik.http.middlewares.strip-devops.stripprefix.prefixes=/devops"
+      - "traefik.http.routers.ide-devops.middlewares=globalHeaders@file,robotHeaders@file,authentik@file"
       - "traefik.http.services.ide-devops.loadbalancer.server.port=8443"
-      # External route: memex.shivelymedia.com/devops (CF Tunnel)
-      - "traefik.http.routers.devops-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/devops`)"
-      - "traefik.http.routers.devops-ext.entrypoints=web"
-      - "traefik.http.routers.devops-ext.priority=30"
-      - "traefik.http.routers.devops-ext.middlewares=globalHeaders@file,robotHeaders@file,strip-devops,authentik@file"
-      - "traefik.http.routers.devops-ext.service=ide-devops"
 
   # VS CODE SERVER (Coding - Restricted Sandbox, Protected by Authentik SSO)
   agent_ide_coding:
@@ -650,18 +637,11 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
-      # LAN route (any host)
-      - "traefik.http.routers.ide-coding.rule=PathPrefix(`/code`)"
+      # External: code.shivelymedia.com (subdomain, no base-path stripping needed)
+      - "traefik.http.routers.ide-coding.rule=Host(`code.shivelymedia.com`)"
       - "traefik.http.routers.ide-coding.entrypoints=web"
-      - "traefik.http.routers.ide-coding.middlewares=strip-code,authentik@file"
-      - "traefik.http.middlewares.strip-code.stripprefix.prefixes=/code"
+      - "traefik.http.routers.ide-coding.middlewares=globalHeaders@file,robotHeaders@file,authentik@file"
       - "traefik.http.services.ide-coding.loadbalancer.server.port=8443"
-      # External route: memex.shivelymedia.com/code (CF Tunnel)
-      - "traefik.http.routers.code-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/code`)"
-      - "traefik.http.routers.code-ext.entrypoints=web"
-      - "traefik.http.routers.code-ext.priority=30"
-      - "traefik.http.routers.code-ext.middlewares=globalHeaders@file,robotHeaders@file,strip-code,authentik@file"
-      - "traefik.http.routers.code-ext.service=ide-coding"
 
   ntfy:
     image: binwiederhier/ntfy:latest
