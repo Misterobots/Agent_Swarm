@@ -367,14 +367,10 @@ services:
     env_file:
       - ../network.env
     environment:
-      # Ollama lives on Lovelace (2x 5060 Ti, 32 GB combined). The legacy
-      # `ollama-r730` hostname no longer resolves; pointing here avoids ~5s
-      # of failed-eviction overhead on every image-gen request. Turing's
-      # local Ollama is offline pending 3070 Ti reinstall — see project memory
-      # [Ollama-Turing pending hardware]. When it comes back, set
-      # SECONDARY_OLLAMA_HOST=http://192.168.2.103:11434 to re-enable it.
+      # Primary: Lovelace (2x RTX 5060Ti, 32GB) — task models (qwen3:14b).
+      # Secondary: Turing (RTX 3070Ti, 8GB) — safety (llama-guard3:8b) + embeddings (nomic-embed-text).
       - OLLAMA_HOST=${OLLAMA_HOST:-http://${LOVELACE_IP:-192.168.2.101}:11434}
-      - SECONDARY_OLLAMA_HOST=${SECONDARY_OLLAMA_HOST:-http://${LOVELACE_IP:-192.168.2.101}:11434}
+      - SECONDARY_OLLAMA_HOST=${SECONDARY_OLLAMA_HOST:-http://192.168.2.103:11434}
       - PYTHONPATH=/app
       - MEMPALACE_API_URL=http://mempalace:8200
       - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
