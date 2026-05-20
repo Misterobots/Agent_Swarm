@@ -413,7 +413,5 @@ function EmptyChatState({
         </div>
       </div>
     </div>
-  
-    </>
   );
 }
