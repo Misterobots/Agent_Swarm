@@ -342,6 +342,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       {/* Swarm theater drawer — sibling column, squeezes chat */}
       <SwarmDrawer />
     </div>
+  </>
   );
 }
 
