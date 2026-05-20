@@ -63,6 +63,22 @@ Workers are assigned personas from `coordination/pioneers.py` — a pool of name
 
 Additional perspective roles (`technical`, `ethical`, `economic`, `scientific`, `regulatory`, `end_user`) are used in ultraplan/perspective-matrix synthesis.
 
+### Perspective Research Mode Gate
+
+Pioneer agents (the perspective-role workers — Knuth, Weil, Keynes, etc.) are only spawned when **`research_mode=True`** is passed to `coordinate_task`. This flag maps directly to the Research toggle in the chat toolbar.
+
+**Before the fix** (historical): `_decompose_task_perspectives()` was called on any broad multi-faceted topic regardless of whether the user had enabled Research Mode, causing pioneer agent cards to appear unexpectedly.
+
+**Current behaviour** (`orchestrator.py`):
+
+```python
+# Perspective probe is now gated behind research_mode
+if research_mode and not _use_perspective_mode and not _is_creative_task:
+    _use_perspective_mode = await _decompose_task_perspectives(...)
+```
+
+If `research_mode` is `False` (Research toggle OFF), the orchestrator skips the perspective probe entirely and routes through standard linear decomposition regardless of how broad the topic is.
+
 ## Scratchpad
 
 Workers communicate via a shared scratchpad — a filesystem directory (`agents/scratchpad/`) containing intermediate artifacts:
@@ -98,6 +114,7 @@ User: *"Compare Python web frameworks for a REST API and build a prototype"*
 ## Related
 
 - [Architecture: Agent System](../architecture/agent-system.md) — routing to coordinator
-- [User Guide: Research Mode](../user-guide/research-mode.md) — user-facing guide
+- [User Guide: Research Mode](../user-guide/research-mode.md) — user-facing guide including Research toggle documentation
+- [User Guide: Goals Mode](../user-guide/goals.md) — how the coordinator populates goal plan steps
 
 

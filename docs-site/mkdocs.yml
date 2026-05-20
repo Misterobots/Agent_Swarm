@@ -153,6 +153,7 @@ nav:
     - Settings: user-guide/settings.md
     - Buddy Companion: user-guide/buddy.md
     - Plan & Think Modes: user-guide/plan-think.md
+    - Goals Mode: user-guide/goals.md
     - Grounding: user-guide/grounding.md
     - Memory Palace: user-guide/palace.md
   - Architecture:
@@ -207,6 +208,7 @@ nav:
     - Adding Agents: developer-guide/adding-agents.md
     - Adding Tools: developer-guide/adding-tools.md
     - ComfyUI Workflows: developer-guide/comfyui-workflows.md
+    - Glass Animation System: developer-guide/glass-animations.md
     - API Reference:
       - Chat Completions: developer-guide/api/chat-completions.md
       - Models: developer-guide/api/models.md
