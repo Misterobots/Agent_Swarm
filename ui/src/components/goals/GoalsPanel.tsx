@@ -77,7 +77,7 @@ export function GoalsPanel() {
           "hover:bg-[var(--surface-elevated)] text-[var(--chat-subtle)]",
           panelOpen && "right-[320px]",
         )}
-        title={panelOpen ? "Hide Goals" : "Show Goals"}
+        title={panelOpen ? "Hide Goals panel" : "Goals Mode — per-thread task tracking. Ask Memex to plan or build something and it will create a step-by-step goal here. Mark steps Start / Done to track progress."}
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16">
           <rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor" opacity="0.6" />
@@ -210,9 +210,52 @@ export function GoalsPanel() {
           )}
 
           {steps.length === 0 && (
-            <div className="py-4 text-center">
-              <p className="text-[var(--chat-subtle)] text-xs">
-                No plan steps yet. The agent will add them as work progresses.
+            <div className={cn(
+              "glass-surface rounded-xl border border-[var(--border,rgba(255,255,255,0.08))]",
+              "p-4 flex flex-col gap-3",
+            )}>
+              {/* Icon */}
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/25 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-[var(--accent)]" fill="none" viewBox="0 0 16 16">
+                    <path d="M8 1l1.8 3.8L14 5.6l-3 2.9.7 4.1L8 10.5l-3.7 2.1.7-4.1L2 5.6l4.2-.8z"
+                      stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <span className="text-[11px] font-semibold text-[var(--chat-fg,#e2e4f0)] tracking-wide">
+                  Goals Mode
+                </span>
+              </div>
+
+              {/* What it does */}
+              <p className="text-[11px] text-[var(--chat-subtle)] leading-relaxed">
+                Goals Mode turns a chat request into a tracked plan. When Memex breaks a task into steps, they appear here with{" "}
+                <span className="text-[var(--chat-fg)]">pending → in progress → completed</span>{" "}
+                status controls you can drive manually or let the agent advance automatically.
+              </p>
+
+              {/* How to trigger */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--chat-subtle)]">
+                  Try saying
+                </p>
+                {[
+                  "Plan out the implementation of X",
+                  "Build Y step by step",
+                  "Create a goal: research and summarise Z",
+                ].map((example) => (
+                  <div
+                    key={example}
+                    className="text-[10px] text-[var(--chat-subtle)] bg-[var(--border,rgba(255,255,255,0.04))] rounded-lg px-2.5 py-1.5 border border-[var(--border,rgba(255,255,255,0.06))] italic"
+                  >
+                    &ldquo;{example}&rdquo;
+                  </div>
+                ))}
+              </div>
+
+              {/* Evidence note */}
+              <p className="text-[10px] text-[var(--chat-subtle)] opacity-70 leading-relaxed border-t border-[var(--border,rgba(255,255,255,0.06))] pt-3">
+                Each step can collect <span className="not-italic font-medium text-[var(--chat-fg)]">evidence</span> — command output, file references, test results, or notes — so nothing gets lost between sessions.
               </p>
             </div>
           )}
