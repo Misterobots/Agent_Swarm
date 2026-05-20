@@ -23,6 +23,8 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import { useBuddyStore } from "@/lib/stores/buddy-store";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
+import { useAutoGoal } from "@/lib/hooks/use-goals";
+import { GoalsPanel } from "@/components/goals/GoalsPanel";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import type { FileAttachment } from "@/types/chat";
 
@@ -61,6 +63,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
 
   // Load conversations from server on mount for cross-device sync
   useConversationSync();
+  useAutoGoal();
 
   const devMode = showDevContext && agentEnabled;
 
@@ -160,6 +163,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   }, []);
 
   return (
+    <>
+    <GoalsPanel />
     <div className="chat-shell flex h-full overflow-hidden" data-route="chat">
       <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
       {/* Header */}
@@ -407,5 +412,7 @@ function EmptyChatState({
         </div>
       </div>
     </div>
+  
+    </>
   );
 }

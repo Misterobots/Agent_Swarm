@@ -55,6 +55,15 @@ The router classifies these as `RESEARCH`:
 - Multi-faceted technical questions
 - Requests explicitly asking for "research" or "deep dive"
 
+### Perspective Research Mode (Pioneer Agents)
+
+For broad, multi-faceted topics the Coordinator can engage a set of **Perspective Research** agents — named after computing pioneers (Knuth, Weil, Keynes, etc.) — each approaching the topic from a distinct lens (technical, ethical, economic, regulatory, end-user, scientific).
+
+!!! important "Research toggle required"
+    Perspective Research Mode is gated behind the **Research toggle** in the chat toolbar. If the toggle is OFF, the Coordinator uses its standard single-thread decomposition even on broad queries. Turn the Research toggle ON to unlock pioneer agent cards and the perspective-matrix synthesis.
+
+This gate was introduced to prevent pioneer agents from spawning unexpectedly on wide queries when the user has not explicitly requested deep research.
+
 ## Tips & Common Patterns
 
 !!! tip "Scope Your Query"
