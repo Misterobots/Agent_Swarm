@@ -146,17 +146,17 @@ http:
       middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
       tls:
         certResolver: cfdns
-    overseerr-web:
-      rule: "Host(`overseerr.shivelymedia.com`)"
+    seerr-web:
+      rule: "Host(`seerr.shivelymedia.com`)"
       entryPoints: [web]
       priority: 50
-      service: overseerr
+      service: seerr
       middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file]
-    overseerr-secure:
-      rule: "Host(`overseerr.shivelymedia.com`)"
+    seerr-secure:
+      rule: "Host(`seerr.shivelymedia.com`)"
       entryPoints: [websecure]
       priority: 50
-      service: overseerr
+      service: seerr
       middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
       tls:
         certResolver: cfdns
@@ -183,10 +183,10 @@ http:
       loadBalancer:
         servers:
           - url: http://sabnzbd:8080
-    overseerr:
+    seerr:
       loadBalancer:
         servers:
-          - url: http://overseerr:5055
+          - url: http://seerr:5055
     jellyfin:
       loadBalancer:
         servers:
