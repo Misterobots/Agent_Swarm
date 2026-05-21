@@ -16,6 +16,7 @@ import { GoalsToggle } from "./goals-toggle";
 import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useAccess } from "@/lib/hooks/use-access";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,6 +28,7 @@ export function ChatSettingsMenu() {
   const updateConversation = useChatStore((s) => s.updateConversation);
   const activeConv = useChatStore((s) => s.activeConversation());
 
+  const { isAdmin } = useAccess();
   const ultraplanMode = useSettingsStore((s) => s.ultraplanMode);
   const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
   const researchMode = useSettingsStore((s) => s.researchMode);
@@ -108,7 +110,7 @@ export function ChatSettingsMenu() {
           <UltrathinkToggle />
           <SwarmToggle />
           <DesignModeToggle />
-          <GoalsToggle />
+          {isAdmin && <GoalsToggle />}
         </div>
       </div>
 
