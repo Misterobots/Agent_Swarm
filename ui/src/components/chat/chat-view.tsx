@@ -164,7 +164,6 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
 
   return (
     <>
-    <GoalsPanel />
     <div className="chat-shell flex h-full overflow-hidden" data-route="chat">
       <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
       {/* Header */}
@@ -339,6 +338,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       </div>{/* end chat column */}
       {/* Preview pane — slides in as a sibling column when a build deploys a web app */}
       {showChatPreview && <ChatPreviewPane />}
+      {/* Goals panel — sibling column, sits between chat and swarm */}
+      <GoalsPanel />
       {/* Swarm theater drawer — sibling column, squeezes chat */}
       <SwarmDrawer />
     </div>

@@ -322,9 +322,13 @@ export function SwarmPanelContent({
               <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/8 border-b border-emerald-500/20 flex-shrink-0">
                 <span className="text-emerald-400 text-sm">✓</span>
                 <span className="text-[11px] text-emerald-400/80 font-semibold">
-                  All {workers.filter(w => w.state === "completed").length} pioneers complete
-                  {workers.filter(w => w.state === "failed").length > 0 &&
-                    ` · ${workers.filter(w => w.state === "failed").length} failed`}
+                  {(() => {
+                    const failed = workers.filter(w => w.state === "failed").length;
+                    // When phase is complete, treat non-failed workers as done
+                    // (state may not be individually updated before phase transitions)
+                    const complete = workers.filter(w => w.state === "completed").length || (workers.length - failed);
+                    return `All ${complete} pioneer${complete !== 1 ? "s" : ""} complete${failed > 0 ? ` · ${failed} failed` : ""}`;
+                  })()}
                 </span>
               </div>
             )}

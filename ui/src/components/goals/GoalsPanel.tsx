@@ -1,14 +1,14 @@
-﻿"use client";
+"use client";
 
 /**
- * GoalsPanel â€” Cowork-style task tracking panel.
+ * GoalsPanel — Cowork-style task tracking panel.
  *
- * Design language:
- *  - Glassomorphic: frosted-glass surface with backdrop-filter blur.
- *  - Sweep animation fires once when the panel opens (glass-panel-enter)
- *    and when individual steps change state (handled in GoalStepRow).
- *  - Slides in as a right-side drawer inside the chat layout.
- *  - Auto-opens when a goal is created for the thread.
+ * Rendered as a flex-sibling column inside chat-view (same pattern as
+ * SwarmDesktopDrawer) so it integrates cleanly with the layout and never
+ * overlaps the Swarm drawer or the chat content.
+ *
+ * Width animates between 320 px (open) and 0 (closed). A fixed toggle tab
+ * on the panel's left edge stays reachable while the panel is open.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils/cn";
 import { useGoalsStore } from "@/lib/stores/goals-store";
 import { GoalStepRow } from "./GoalStepRow";
 import type { PlanStatus } from "@/types/goals";
+
+const PANEL_W = 320;
 
 const EVIDENCE_TYPE_LABEL: Record<string, string> = {
   command_output: "Command",
@@ -25,27 +27,26 @@ const EVIDENCE_TYPE_LABEL: Record<string, string> = {
 };
 
 export function GoalsPanel() {
-  const activeGoal  = useGoalsStore((s) => s.activeGoal);
-  const steps       = useGoalsStore((s) => s.steps);
-  const evidence    = useGoalsStore((s) => s.evidence);
-  const panelOpen   = useGoalsStore((s) => s.panelOpen);
+  const activeGoal   = useGoalsStore((s) => s.activeGoal);
+  const steps        = useGoalsStore((s) => s.steps);
+  const evidence     = useGoalsStore((s) => s.evidence);
+  const panelOpen    = useGoalsStore((s) => s.panelOpen);
   const setPanelOpen = useGoalsStore((s) => s.setPanelOpen);
-  const updateStep  = useGoalsStore((s) => s.updateStep);
+  const updateStep   = useGoalsStore((s) => s.updateStep);
   const completeGoal = useGoalsStore((s) => s.completeGoal);
-  const pauseGoal   = useGoalsStore((s) => s.pauseGoal);
+  const pauseGoal    = useGoalsStore((s) => s.pauseGoal);
 
   const [showEvidence, setShowEvidence] = useState(false);
 
-  // Sweep fires once each time the panel opens
+  // Sweep animation fires once each time the panel opens
   const [panelSweeping, setPanelSweeping] = useState(false);
   const prevOpen = useRef(panelOpen);
   useEffect(() => {
-    if (!prevOpen.current && panelOpen) {
-      setPanelSweeping(true);
-    }
+    if (!prevOpen.current && panelOpen) setPanelSweeping(true);
     prevOpen.current = panelOpen;
   }, [panelOpen]);
 
+  // Nothing to show — render nothing (no toggle tab either)
   if (!activeGoal) return null;
 
   const total       = steps.length;
@@ -65,50 +66,27 @@ export function GoalsPanel() {
     : "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)]";
 
   return (
-    <>
-      {/* Toggle tab */}
-      <button
-        onClick={() => setPanelOpen(!panelOpen)}
-        className={cn(
-          "fixed right-0 top-1/2 -translate-y-1/2 z-30",
-          "flex flex-col items-center gap-1 px-1 py-3 rounded-l-lg",
-          "border border-r-0 border-[var(--border,rgba(255,255,255,0.1))]",
-          "bg-[var(--surface,#1a1b2e)] shadow-lg transition-all duration-300",
-          "hover:bg-[var(--surface-elevated)] text-[var(--chat-subtle)]",
-          panelOpen && "right-[320px]",
-        )}
-        title={panelOpen ? "Hide Goals panel" : "Goals Mode — per-thread task tracking. Ask Memex to plan or build something and it will create a step-by-step goal here. Mark steps Start / Done to track progress."}
-      >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16">
-          <rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor" opacity="0.6" />
-          <rect x="2" y="7" width="8"  height="2" rx="1" fill="currentColor" />
-          <rect x="2" y="11" width="10" height="2" rx="1" fill="currentColor" opacity="0.6" />
-        </svg>
-        <span className="text-[9px] font-semibold uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
-          Goals
-        </span>
-        {!panelOpen && steps.some((s) => s.status === "in_progress") && (
-          <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-        )}
-      </button>
-
-      {/* Panel â€” glassomorphic surface */}
+    /* Outer — manages width animation; overflow-hidden clips content during slide */
+    <div
+      style={{ transition: "width 300ms cubic-bezier(0.22,1,0.36,1)" }}
+      className={cn(
+        "flex-shrink-0 h-full overflow-hidden",
+        panelOpen ? "w-[320px]" : "w-0",
+      )}
+    >
+      {/* Inner — fixed width so text never reflows mid-animation */}
       <div
         className={cn(
-          "fixed right-0 top-0 bottom-0 z-20 w-[320px]",
-          "flex flex-col",
-          // Glass surface: frosted backdrop + subtle border
-          "glass-surface",
-          "border-l border-[var(--border,rgba(255,255,255,0.1))] shadow-2xl",
-          // Slide transition
-          "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-          panelOpen ? "translate-x-0" : "translate-x-full",
+          "h-full flex flex-col relative",
+          "bg-[var(--chat-bg,#0f1021)] border-l border-[var(--border,rgba(255,255,255,0.1))]",
+          "shadow-[-8px_0_32px_rgba(0,0,0,0.35)]",
         )}
+        style={{ width: PANEL_W }}
       >
-        {/* One-shot sweep across the full panel on open */}
+        {/* One-shot sweep on open */}
         {panelSweeping && (
           <div
-            className="absolute inset-0 overflow-hidden pointer-events-none z-10 rounded-none"
+            className="absolute inset-0 overflow-hidden pointer-events-none z-10"
             onAnimationEnd={() => setPanelSweeping(false)}
           >
             <div className="glass-sweep-shimmer" style={{ width: "70%" }} />
@@ -142,6 +120,7 @@ export function GoalsPanel() {
             <button
               onClick={() => setPanelOpen(false)}
               className="p-1 rounded hover:bg-[var(--surface-elevated)] text-[var(--chat-subtle)] transition-colors"
+              title="Collapse Goals panel"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 14 14">
                 <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -209,12 +188,12 @@ export function GoalsPanel() {
             </div>
           )}
 
+          {/* Empty state — onboarding */}
           {steps.length === 0 && (
             <div className={cn(
               "glass-surface rounded-xl border border-[var(--border,rgba(255,255,255,0.08))]",
               "p-4 flex flex-col gap-3",
             )}>
-              {/* Icon */}
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/25 flex items-center justify-center flex-shrink-0">
                   <svg className="w-4 h-4 text-[var(--accent)]" fill="none" viewBox="0 0 16 16">
@@ -227,14 +206,12 @@ export function GoalsPanel() {
                 </span>
               </div>
 
-              {/* What it does */}
               <p className="text-[11px] text-[var(--chat-subtle)] leading-relaxed">
                 Goals Mode turns a chat request into a tracked plan. When Memex breaks a task into steps, they appear here with{" "}
                 <span className="text-[var(--chat-fg)]">pending → in progress → completed</span>{" "}
                 status controls you can drive manually or let the agent advance automatically.
               </p>
 
-              {/* How to trigger */}
               <div className="flex flex-col gap-1.5">
                 <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--chat-subtle)]">
                   Try saying
@@ -253,7 +230,6 @@ export function GoalsPanel() {
                 ))}
               </div>
 
-              {/* Evidence note */}
               <p className="text-[10px] text-[var(--chat-subtle)] opacity-70 leading-relaxed border-t border-[var(--border,rgba(255,255,255,0.06))] pt-3">
                 Each step can collect <span className="not-italic font-medium text-[var(--chat-fg)]">evidence</span> — command output, file references, test results, or notes — so nothing gets lost between sessions.
               </p>
@@ -326,7 +302,7 @@ export function GoalsPanel() {
               className="flex-1 py-1.5 text-xs rounded-lg bg-green-500/15 border border-green-500/25
                          text-green-400 hover:bg-green-500/25 transition-colors font-medium"
             >
-              Complete âœ“
+              Complete ✓
             </button>
           </div>
         )}
@@ -342,6 +318,6 @@ export function GoalsPanel() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
