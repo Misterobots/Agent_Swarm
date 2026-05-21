@@ -132,6 +132,20 @@ http:
       middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
       tls:
         certResolver: cfdns
+    sabnzbd-web:
+      rule: "Host(`sabnzbd.shivelymedia.com`)"
+      entryPoints: [web]
+      priority: 50
+      service: sabnzbd
+      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file]
+    sabnzbd-secure:
+      rule: "Host(`sabnzbd.shivelymedia.com`)"
+      entryPoints: [websecure]
+      priority: 50
+      service: sabnzbd
+      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
+      tls:
+        certResolver: cfdns
     seerr-web:
       rule: "Host(`seerr.shivelymedia.com`)"
       entryPoints: [web]
@@ -165,6 +179,10 @@ http:
       loadBalancer:
         servers:
           - url: http://radarr:7878
+    sabnzbd:
+      loadBalancer:
+        servers:
+          - url: http://sabnzbd:8080
     seerr:
       loadBalancer:
         servers:
