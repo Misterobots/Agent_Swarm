@@ -6,17 +6,18 @@ import { useGoalsStore } from "@/lib/stores/goals-store";
 import { useChatStore } from "@/lib/stores/chat-store";
 
 /**
- * Auto-goal hook — call this inside ChatView.
+ * useAutoGoal — usage tracking for an explicitly-activated goal.
  *
- * Behaviour (mirrors Cowork's auto-task creation):
- *  - When a new user message is sent in a conversation, ensure an active goal
- *    exists for that thread.
- *  - Uses the first user message as the objective (truncated to 220 chars).
- *  - Only fires once per conversation — subsequent messages update usage, not goal.
+ * Goals are deliberately enabled via the GoalsToggle in Chat Settings,
+ * NOT auto-created on every message send. This hook only handles the
+ * secondary concern: updating token-usage estimates as messages arrive
+ * while Goals mode is already active.
+ *
+ * Goal creation lives in GoalsToggle → useGoalsStore.ensureGoal().
  */
 export function useAutoGoal() {
   const { activeConversationId, activeConversation } = useChatStore();
-  const { activeGoal, ensureGoal, updateUsage } = useGoalsStore();
+  const { activeGoal, updateUsage } = useGoalsStore();
   const lastConvId = useRef<string | null>(null);
   const lastMessageCount = useRef<number>(0);
 
@@ -27,30 +28,19 @@ export function useAutoGoal() {
     const userMessages = conv.messages.filter((m) => m.role === "user");
     const msgCount = userMessages.length;
 
-    // New conversation or first message sent
+    // Reset counters when the conversation changes
     if (activeConversationId !== lastConvId.current) {
       lastConvId.current = activeConversationId;
       lastMessageCount.current = msgCount;
-
-      if (msgCount > 0) {
-        const firstMsg = userMessages[0];
-        const objective =
-          typeof firstMsg.content === "string"
-            ? firstMsg.content
-            : conv.title ?? "New session";
-        ensureGoal(activeConversationId, objective).catch(() => {
-          // non-fatal — Goals backend may not be running locally
-        });
-      }
       return;
     }
 
-    // Same conversation, new messages arrived — update usage estimate
+    // If Goals is active and new messages arrived, update usage estimate
     if (msgCount > lastMessageCount.current && activeGoal) {
       const delta = msgCount - lastMessageCount.current;
       lastMessageCount.current = msgCount;
       // Rough token estimate: 50 tokens per exchange
       updateUsage(activeGoal.id, delta * 50, 0).catch(() => {});
     }
-  }, [activeConversationId, activeConversation, activeGoal, ensureGoal, updateUsage]);
+  }, [activeConversationId, activeConversation, activeGoal, updateUsage]);
 }

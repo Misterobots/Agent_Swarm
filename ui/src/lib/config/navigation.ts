@@ -4,6 +4,7 @@ import {
   BarChart3,
   BookOpen,
   Castle,
+  Code2,
   FileText,
   GraduationCap,
   Hammer,
@@ -71,6 +72,13 @@ export const primaryNavigation: NavigationItem[] = [
     href: "/palace",
     icon: Castle,
     matchPrefixes: ["/palace"],
+  },
+  {
+    label: "Dev",
+    href: "/dev",
+    icon: Code2,
+    matchPrefixes: ["/dev"],
+    adminOnly: true,
   },
 ];
 
