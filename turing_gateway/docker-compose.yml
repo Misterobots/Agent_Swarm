@@ -516,14 +516,14 @@ services:
       - "traefik.http.routers.memex-ext.tls.domains[0].sans=*.shivelymedia.com"
       - "traefik.http.routers.memex-ext.tls.options=securetls@file"
       - "traefik.http.routers.memex-ext.service=memex-ext"
-      - "traefik.http.routers.memex-ext.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@docker"
+      - "traefik.http.routers.memex-ext.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@file"
       - "traefik.http.services.memex-ext.loadbalancer.server.port=3000"
-      # External HTTP route: redirect + Authentik (Cloudflare forwards here on port 80)
+      # External HTTP route: CF tunnel delivers traffic on web entrypoint — inject X-Forwarded-Proto and authenticate
       - "traefik.http.routers.memex-ext-http.rule=Host(`memex.shivelymedia.com`)"
       - "traefik.http.routers.memex-ext-http.entrypoints=web"
       - "traefik.http.routers.memex-ext-http.priority=20"
       - "traefik.http.routers.memex-ext-http.service=memex-ext-http"
-      - "traefik.http.routers.memex-ext-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authentik@docker"
+      - "traefik.http.routers.memex-ext-http.middlewares=globalHeaders@file,cf-https-proto@file,robotHeaders@file,authentik@file"
       - "traefik.http.services.memex-ext-http.loadbalancer.server.port=3000"
       # Static asset bypass — no auth for Next.js assets to prevent post-login redirect to /manifest.json
       # Browser fetches these in the background; without bypass they hijack the Authentik redirect state
@@ -534,12 +534,11 @@ services:
       - "traefik.http.routers.memex-static.tls=true"
       - "traefik.http.routers.memex-static.service=memex-ext"
       # HTTP bypass (web): same paths on port 80 — redirect to HTTPS only, no authentik
-      # Root cause: authentik@docker fires before redirect-to-https in memex-ext-http middleware chain,
-      # so HTTP manifest.json requests get hijacked by OAuth before the HTTPS redirect runs
+      # Static HTTP bypass: inject X-Forwarded-Proto for CF tunnel, no auth gate
       - "traefik.http.routers.memex-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
       - "traefik.http.routers.memex-static-http.entrypoints=web"
       - "traefik.http.routers.memex-static-http.priority=30"
-      - "traefik.http.routers.memex-static-http.middlewares=redirect-to-https@docker"
+      - "traefik.http.routers.memex-static-http.middlewares=cf-https-proto@file"
       - "traefik.http.routers.memex-static-http.service=memex-ext-http"
       # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
       # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://memex.shivelymedia.com/ws/terminal
