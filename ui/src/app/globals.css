@@ -319,6 +319,11 @@
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 /* Horizontal scan â€” ease-in-out gives an organic drifting feel */
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
 @keyframes lcars-scan {
   0%   { transform: translateX(-110%); opacity: 0; }
   8%   { opacity: 1; }
@@ -1424,3 +1429,241 @@ main, .main-content {
 }
 
 /* Row entry fade-down
+/* ═══════════════════════════════════════════════════════════════
+   EXTENDED THEMES — from Claude Design v1 prototype
+   Translated: --bg/--surface/--accent  →  --chat-* prefix
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shadowrun (cyberpunk teal) ─────────────────────────────── */
+[data-theme="shadowrun"] {
+  --chat-bg:           #020C0A;
+  --chat-surface:      #050F0D;
+  --chat-panel:        rgba(8,20,18,0.9);
+  --chat-elevated:     #102420;
+  --chat-border:       #1A5040;
+  --chat-text:         #C8FFF0;
+  --chat-muted:        #3E8070;
+  --chat-subtle:       #225544;
+  --chat-accent:       #00DDC0;
+  --chat-accent-strong: #55FFDD;
+  --chat-accent-soft:  rgba(0,221,192,0.12);
+  --chat-accent-rgb:   0,221,192;
+  --chat-accent-2:     #CC44FF;
+  --hover-tint:        rgba(0,221,192,0.07);
+  --press-tint:        rgba(0,221,192,0.14);
+  --divider:           rgba(0,200,160,0.15);
+  --elev-1: 0 1px 4px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,200,160,0.2);
+  --elev-2: 0 4px 16px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,200,160,0.3), 0 0 20px rgba(0,200,160,0.06);
+  --elev-3: 0 8px 32px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,200,160,0.4), 0 0 40px rgba(180,0,255,0.06);
+  --inset-highlight: inset 0 1px 0 rgba(0,255,200,0.06);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(0,221,192,0.55);
+  color-scheme: dark;
+}
+
+/* ── Ops / Mission Control (tactical blue) ──────────────────── */
+[data-theme="ops"] {
+  --chat-bg:           #050C1A;
+  --chat-surface:      #0A1328;
+  --chat-panel:        #0E1B34;
+  --chat-elevated:     #142440;
+  --chat-border:       #1A2E50;
+  --chat-text:         #BED0EE;
+  --chat-muted:        #446688;
+  --chat-subtle:       #263C5C;
+  --chat-accent:       #4C9FE8;
+  --chat-accent-strong: #7EC0FF;
+  --chat-accent-soft:  rgba(76,159,232,0.13);
+  --chat-accent-rgb:   76,159,232;
+  --chat-accent-2:     #E05C4C;
+  --hover-tint:        rgba(76,159,232,0.07);
+  --press-tint:        rgba(76,159,232,0.14);
+  --divider:           rgba(76,159,232,0.11);
+  --elev-1: 0 1px 2px rgba(0,0,0,0.6), 0 0 0 1px rgba(76,159,232,0.12);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.55), 0 0 0 1px rgba(76,159,232,0.2);
+  --elev-3: 0 12px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(76,159,232,0.25);
+  --inset-highlight: inset 0 1px 0 rgba(76,159,232,0.05);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(76,159,232,0.5);
+  --backdrop-glow: radial-gradient(ellipse 900px 600px at 10% 0%, rgba(76,159,232,0.05), transparent 60%);
+  color-scheme: dark;
+}
+
+/* ── Terminal / Phosphor green ──────────────────────────────── */
+[data-theme="terminal"] {
+  --chat-bg:           #010601;
+  --chat-surface:      #020A02;
+  --chat-panel:        #030E03;
+  --chat-elevated:     #041204;
+  --chat-border:       #164416;
+  --chat-text:         #33FF66;
+  --chat-muted:        #1D8833;
+  --chat-subtle:       #125522;
+  --chat-accent:       #33FF66;
+  --chat-accent-strong: #66FF99;
+  --chat-accent-soft:  rgba(51,255,102,0.10);
+  --chat-accent-rgb:   51,255,102;
+  --chat-accent-2:     #FFAA33;
+  --hover-tint:        rgba(51,255,102,0.07);
+  --press-tint:        rgba(51,255,102,0.14);
+  --divider:           rgba(51,255,102,0.18);
+  --elev-1: 0 0 0 1px rgba(51,255,102,0.25);
+  --elev-2: 0 0 0 1px rgba(51,255,102,0.4), 0 0 10px rgba(51,255,102,0.08);
+  --elev-3: 0 0 0 1px var(--chat-accent), 0 0 20px rgba(51,255,102,0.15);
+  --inset-highlight: inset 0 1px 0 rgba(51,255,102,0.06);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(51,255,102,0.55);
+  color-scheme: dark;
+}
+
+[data-theme="terminal"] * {
+  font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+}
+
+/* ── HAL 9000 (deep red) ────────────────────────────────────── */
+[data-theme="hal9000"] {
+  --chat-bg:           #000005;
+  --chat-surface:      #05050A;
+  --chat-panel:        #080812;
+  --chat-elevated:     #0E0E1A;
+  --chat-border:       rgba(180,0,0,0.22);
+  --chat-text:         #D8D8E8;
+  --chat-muted:        #707080;
+  --chat-subtle:       #404050;
+  --chat-accent:       #CC0000;
+  --chat-accent-strong: #FF2020;
+  --chat-accent-soft:  rgba(204,0,0,0.12);
+  --chat-accent-rgb:   204,0,0;
+  --hover-tint:        rgba(255,255,255,0.04);
+  --press-tint:        rgba(0,0,0,0.3);
+  --divider:           rgba(255,255,255,0.07);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.8), 0 0 0 1px rgba(180,0,0,0.15);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.7), 0 0 0 1px rgba(180,0,0,0.2);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.85), 0 0 20px rgba(180,0,0,0.08);
+  --inset-highlight: inset 0 1px 0 rgba(255,255,255,0.03);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(204,0,0,0.5);
+  color-scheme: dark;
+}
+
+/* ── Nostromo / Alien (amber distress) ──────────────────────── */
+[data-theme="nostromo"] {
+  --chat-bg:           #060400;
+  --chat-surface:      #0C0800;
+  --chat-panel:        #140D00;
+  --chat-elevated:     #1C1200;
+  --chat-border:       rgba(200,120,0,0.25);
+  --chat-text:         #FFC870;
+  --chat-muted:        #AA6622;
+  --chat-subtle:       #664400;
+  --chat-accent:       #FF8C00;
+  --chat-accent-strong: #FFAA33;
+  --chat-accent-soft:  rgba(255,140,0,0.12);
+  --chat-accent-rgb:   255,140,0;
+  --hover-tint:        rgba(255,140,0,0.06);
+  --press-tint:        rgba(0,0,0,0.3);
+  --divider:           rgba(180,100,0,0.25);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.85), 0 0 0 1px rgba(200,120,0,0.15);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.75), 0 0 0 1px rgba(200,120,0,0.2);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.9), 0 0 20px rgba(200,120,0,0.06);
+  --inset-highlight: inset 0 1px 0 rgba(255,180,0,0.04);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(255,140,0,0.5);
+  color-scheme: dark;
+}
+
+/* ── TRON Legacy (electric cyan) ────────────────────────────── */
+[data-theme="tron"] {
+  --chat-bg:           #000008;
+  --chat-surface:      #040410;
+  --chat-panel:        #080820;
+  --chat-elevated:     #0C0C2C;
+  --chat-border:       rgba(0,200,255,0.2);
+  --chat-text:         #C8F0FF;
+  --chat-muted:        #4090AA;
+  --chat-subtle:       #204555;
+  --chat-accent:       #00C8FF;
+  --chat-accent-strong: #50E0FF;
+  --chat-accent-soft:  rgba(0,200,255,0.12);
+  --chat-accent-rgb:   0,200,255;
+  --hover-tint:        rgba(0,200,255,0.06);
+  --press-tint:        rgba(0,0,0,0.3);
+  --divider:           rgba(0,200,255,0.12);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,200,255,0.15);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,200,255,0.2), 0 0 12px rgba(0,200,255,0.05);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,200,255,0.3), 0 0 24px rgba(0,200,255,0.08);
+  --inset-highlight: inset 0 1px 0 rgba(0,200,255,0.06);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(0,200,255,0.55);
+  color-scheme: dark;
+}
+
+/* ── Blade Runner (neo-noir amber) ──────────────────────────── */
+[data-theme="bladerunner"] {
+  --chat-bg:           #060305;
+  --chat-surface:      #0C0810;
+  --chat-panel:        #120D18;
+  --chat-elevated:     #18121E;
+  --chat-border:       rgba(212,144,10,0.2);
+  --chat-text:         #E8D4A8;
+  --chat-muted:        #7A6040;
+  --chat-subtle:       #4A3828;
+  --chat-accent:       #D4900A;
+  --chat-accent-strong: #F0B040;
+  --chat-accent-soft:  rgba(212,144,10,0.12);
+  --chat-accent-rgb:   212,144,10;
+  --chat-accent-2:     #3D78FF;
+  --hover-tint:        rgba(212,144,10,0.07);
+  --press-tint:        rgba(0,0,0,0.3);
+  --divider:           rgba(180,120,20,0.18);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.85), 0 0 0 1px rgba(212,144,10,0.12);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.75), 0 0 0 1px rgba(212,144,10,0.18);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.9), 0 0 20px rgba(212,144,10,0.05);
+  --inset-highlight: inset 0 1px 0 rgba(212,144,10,0.04);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(212,144,10,0.5);
+  color-scheme: dark;
+}
+
+/* ── Dune / Arrakis (spice desert) ─────────────────────────── */
+[data-theme="dune"] {
+  --chat-bg:           #0E0700;
+  --chat-surface:      #180E00;
+  --chat-panel:        #221400;
+  --chat-elevated:     #2C1A00;
+  --chat-border:       rgba(200,130,30,0.22);
+  --chat-text:         #F0D898;
+  --chat-muted:        #A07840;
+  --chat-subtle:       #604820;
+  --chat-accent:       #E8881A;
+  --chat-accent-strong: #F0A840;
+  --chat-accent-soft:  rgba(232,136,26,0.12);
+  --chat-accent-rgb:   232,136,26;
+  --hover-tint:        rgba(232,136,26,0.07);
+  --press-tint:        rgba(0,0,0,0.3);
+  --divider:           rgba(180,110,20,0.2);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.8), 0 0 0 1px rgba(200,130,30,0.15);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,130,30,0.2);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.85), 0 0 20px rgba(200,130,30,0.06);
+  --inset-highlight: inset 0 1px 0 rgba(232,136,26,0.05);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(232,136,26,0.5);
+  color-scheme: dark;
+}
+
+/* ── Memex Archive (sepia memory) ───────────────────────────── */
+[data-theme="memex-archive"] {
+  --chat-bg:           #0E0A02;
+  --chat-surface:      #181208;
+  --chat-panel:        #201808;
+  --chat-elevated:     #281E0C;
+  --chat-border:       rgba(180,140,60,0.2);
+  --chat-text:         #E8D8A8;
+  --chat-muted:        #907848;
+  --chat-subtle:       #5A4828;
+  --chat-accent:       #C8922A;
+  --chat-accent-strong: #D4A843;
+  --chat-accent-soft:  rgba(200,146,42,0.12);
+  --chat-accent-rgb:   200,146,42;
+  --hover-tint:        rgba(200,146,42,0.07);
+  --press-tint:        rgba(0,0,0,0.3);
+  --divider:           rgba(160,120,50,0.18);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.8), 0 0 0 1px rgba(180,140,60,0.15);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.7), 0 0 0 1px rgba(180,140,60,0.2);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.85), 0 0 20px rgba(180,140,60,0.05);
+  --inset-highlight: inset 0 1px 0 rgba(200,146,42,0.05);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(200,146,42,0.5);
+  color-scheme: dark;
+}

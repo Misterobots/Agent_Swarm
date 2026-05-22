@@ -49,12 +49,19 @@ export function AppShell({ children }: AppShellProps) {
     if (legacy) root.setAttribute("data-legacy-themes", "1");
     else root.removeAttribute("data-legacy-themes");
 
-    // Named themes (e.g. "lcars") are self-contained — no mode variants.
-    const NAMED_THEMES = new Set(["lcars", "lcars-blue", "lcars-teal", "cyberpunk"]);
+    // All non-memex themes are self-contained (no light/dark mode variants).
+    const NAMED_THEMES = new Set([
+      "lcars", "lcars-blue", "lcars-teal", "cyberpunk",
+      // Extended themes from Claude Design v1
+      "shadowrun", "ops", "terminal", "hal9000", "nostromo",
+      "tron", "bladerunner", "dune", "memex-archive",
+    ]);
 
-    // Self-heal: if a stale persisted theme (legacy 8-pack) survived migration
-    // and the legacy flag isn't on, coerce back to "memex".
-    if (theme !== "memex" && !NAMED_THEMES.has(theme) && !legacy) {
+    // Legacy themes that have no CSS — coerce back to "memex".
+    const LEGACY_THEMES = new Set(["amber", "ember", "slate", "signal", "office", "hacker", "star-trek", "minimal"]);
+
+    // Self-heal: if a stale persisted legacy theme survived migration, reset.
+    if (LEGACY_THEMES.has(theme) && !legacy) {
       setTheme("memex");
       return;
     }

@@ -11,9 +11,21 @@ export type ChatTheme =
   | "lcars"
   | "lcars-blue"
   | "lcars-teal"
+  | "cyberpunk"
+  // Extended themes (Claude Design v1)
+  | "shadowrun"
+  | "ops"
+  | "terminal"
+  | "hal9000"
+  | "nostromo"
+  | "tron"
+  | "bladerunner"
+  | "dune"
+  | "memex-archive"
+  // Legacy (migration only — no CSS, coerce to "memex")
   | "amber"
   | "ember" | "slate" | "signal" | "office"
-  | "hacker" | "star-trek" | "cyberpunk" | "minimal";
+  | "hacker" | "star-trek" | "minimal";
 
 export type ThemeMode = "system" | "dark" | "light";
 
