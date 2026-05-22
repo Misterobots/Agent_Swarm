@@ -44,10 +44,10 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
-  /* Brand accent â€” restrained sky blue. Same hue in both modes; the dark-mode
+  /* Brand accent â€” Memex teal. Same hue in both modes; the dark-mode
      value is brighter for legibility on near-black, light-mode is deeper for
      AA contrast on near-white. */
-  --chat-accent-2: #14b8a6;     /* secondary accent (teal) for state colors */
+  --chat-accent-2: #9580FF;     /* secondary accent (purple) for state colors */
   --chat-thinking: var(--chat-accent);
 
   /* Typography */
@@ -69,10 +69,10 @@
   --chat-muted:        #8b8b94;
   --chat-subtle:       #5b5b66;   /* tertiary text â€” timestamps, hints */
 
-  --chat-accent:       #60a5fa;       /* blue-400 â€” clean, recognizable */
-  --chat-accent-strong: #93c5fd;      /* blue-300 */
-  --chat-accent-soft:  rgba(96, 165, 250, 0.12);   /* tinted bg for active states */
-  --chat-accent-rgb:   96, 165, 250;
+  --chat-accent:       #00CCA8;       /* Memex teal â€” brand color */
+  --chat-accent-strong: #00EED0;      /* bright teal highlight */
+  --chat-accent-soft:  rgba(0, 204, 168, 0.12);   /* tinted bg for active states */
+  --chat-accent-rgb:   0, 204, 168;
 
   /* Layered elevation â€” tighter, more believable than single big shadow */
   --elev-1:
@@ -93,12 +93,12 @@
   /* Focus ring â€” multi-layer for legibility on busy surfaces */
   --ring:
     0 0 0 2px var(--chat-bg),
-    0 0 0 4px rgba(96, 165, 250, 0.55);
+    0 0 0 4px rgba(0, 204, 168, 0.55);
 
   /* Body backdrop gradient â€” very subtle radial glow for depth */
   --backdrop-glow:
-    radial-gradient(ellipse 1200px 800px at 20% -10%, rgba(96, 165, 250, 0.04), transparent 60%),
-    radial-gradient(ellipse 800px 600px at 90% 110%, rgba(96, 165, 250, 0.025), transparent 60%);
+    radial-gradient(ellipse 1200px 800px at 20% -10%, rgba(0, 204, 168, 0.04), transparent 60%),
+    radial-gradient(ellipse 800px 600px at 90% 110%, rgba(0, 204, 168, 0.025), transparent 60%);
 
   --hover-tint: rgba(255, 255, 255, 0.04);
   --press-tint: rgba(0, 0, 0, 0.25);
@@ -121,10 +121,10 @@
   --chat-muted:        #6b6b78;
   --chat-subtle:       #9696a3;
 
-  --chat-accent:       #2563eb;       /* blue-600 â€” AA on white */
-  --chat-accent-strong: #1d4ed8;      /* blue-700 */
-  --chat-accent-soft:  rgba(37, 99, 235, 0.10);
-  --chat-accent-rgb:   37, 99, 235;
+  --chat-accent:       #009984;       /* Memex teal â€” AA on white */
+  --chat-accent-strong: #007d6b;      /* darker teal for text contrast */
+  --chat-accent-soft:  rgba(0, 153, 132, 0.10);
+  --chat-accent-rgb:   0, 153, 132;
 
   --elev-1:
     0 1px 2px rgba(15, 23, 42, 0.06),
@@ -142,11 +142,11 @@
 
   --ring:
     0 0 0 2px var(--chat-bg),
-    0 0 0 4px rgba(37, 99, 235, 0.4);
+    0 0 0 4px rgba(0, 153, 132, 0.4);
 
   --backdrop-glow:
-    radial-gradient(ellipse 1200px 800px at 20% -10%, rgba(37, 99, 235, 0.04), transparent 60%),
-    radial-gradient(ellipse 800px 600px at 90% 110%, rgba(37, 99, 235, 0.02), transparent 60%);
+    radial-gradient(ellipse 1200px 800px at 20% -10%, rgba(0, 153, 132, 0.04), transparent 60%),
+    radial-gradient(ellipse 800px 600px at 90% 110%, rgba(0, 153, 132, 0.02), transparent 60%);
 
   --hover-tint: rgba(15, 23, 42, 0.05);
   --press-tint: rgba(15, 23, 42, 0.08);
@@ -1423,7 +1423,4 @@ main, .main-content {
   animation: glass-panel-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
 }
 
-/* Row entry fade-down */
-.glass-row-enter {
-  animation: glass-row-enter 0.22s ease-out 1 both;
-}
+/* Row entry fade-down

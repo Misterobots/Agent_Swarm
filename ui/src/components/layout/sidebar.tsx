@@ -57,7 +57,7 @@ function MemexLogo() {
   );
 }
 
-export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
+export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: () => void; slim?: boolean; onExpand?: () => void } = {}) {
   const pathname = usePathname();
   const conversations = useChatStore((s) => s.conversations);
   const activeId = useChatStore((s) => s.activeConversationId);
@@ -93,6 +93,53 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
     [filteredConversations],
   );
 
+  // ── Slim (icon-only rail) mode ────────────────────────────────────────────
+  if (slim) {
+    const allNav = [...visiblePrimary, ...visibleSecondary, ...utilityNavigation];
+    return (
+      <div className="sidebar-wrapper relative flex flex-col h-full items-center py-2 gap-1">
+        {/* Logo — click to expand */}
+        <button
+          onClick={onExpand}
+          className="w-9 h-9 flex items-center justify-center rounded-md text-[var(--chat-accent)] hover:bg-[var(--hover-tint)] transition-colors mb-1"
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+        >
+          <MemexLogo />
+        </button>
+        <div className="w-8 h-px bg-[var(--divider)] mb-1" />
+        {/* Icon-only nav */}
+        <div className="flex-1 flex flex-col gap-0.5 w-full px-1 overflow-y-auto scrollbar-none">
+          {allNav.map((item) => {
+            const Icon = item.icon;
+            const active = isNavigationItemActive(item, pathname);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                aria-label={item.label}
+                className={cn(
+                  "flex items-center justify-center w-full h-9 rounded-md transition-colors",
+                  active
+                    ? "sidebar-active text-[var(--chat-accent)]"
+                    : "text-[var(--chat-muted)] hover:bg-[var(--hover-tint)] hover:text-[var(--chat-text)]"
+                )}
+              >
+                <Icon size={16} className="shrink-0" />
+              </Link>
+            );
+          })}
+        </div>
+        {/* Footer — swarm dot only */}
+        <div className="flex flex-col items-center gap-2 pb-1">
+          <div className="w-8 h-px bg-[var(--divider)]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 sidebar-status-dot" title="Swarm Online" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sidebar-wrapper relative flex flex-col h-full">
       {/* Logo */}
@@ -111,8 +158,8 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
             <button
               onClick={onCollapse}
               className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--chat-subtle)] hover:text-[var(--chat-text)] hover:bg-[var(--hover-tint)] transition-colors"
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
+              title="Slim sidebar"
+              aria-label="Slim sidebar"
             >
               <PanelLeftClose size={15} />
             </button>
