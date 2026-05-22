@@ -1428,7 +1428,6 @@ main, .main-content {
   animation: glass-panel-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
 }
 
-/* Row entry fade-down
 /* ═══════════════════════════════════════════════════════════════
    EXTENDED THEMES — from Claude Design v1 prototype
    Translated: --bg/--surface/--accent  →  --chat-* prefix
