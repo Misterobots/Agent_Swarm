@@ -6,6 +6,7 @@ import { GitHubConnect } from "@/components/settings/github-connect";
 import { ProviderKeysConnect } from "@/components/settings/provider-keys-connect";
 import { useToolsStore } from "@/lib/stores/tools-store";
 import { useMonitorStore } from "@/lib/stores/monitor-store";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 import { DASHBOARDS } from "@/components/monitor/dashboard-selector";
 import { useAccess } from "@/lib/hooks/use-access";
 import { Settings } from "lucide-react";
@@ -22,6 +23,10 @@ export default function SettingsPage() {
   const { activeTab, setActiveTab } = useToolsStore();
   const { activeDashboard, setActiveDashboard } = useMonitorStore();
   const { isAdmin, loading: accessLoading, securityLevel } = useAccess();
+  const navLayout = useSettingsStore((s) => s.navLayout);
+  const setNavLayout = useSettingsStore((s) => s.setNavLayout);
+  const themePickerMode = useSettingsStore((s) => s.themePickerMode);
+  const setThemePickerMode = useSettingsStore((s) => s.setThemePickerMode);
 
   const modelAccessMessage = accessLoading
     ? "Checking access level…"
@@ -44,6 +49,36 @@ export default function SettingsPage() {
                 Memex theme with light, dark, or system-preference modes.
               </p>
             </Field>
+            <div className="border-t border-[var(--chat-border)] pt-6 mt-6">
+              <Field label="Theme picker style">
+                <Select
+                  value={themePickerMode}
+                  onChange={(v) => setThemePickerMode(v as "popover" | "gallery")}
+                  options={[
+                    { value: "popover", label: "Popover — compact dropdown in the toolbar" },
+                    { value: "gallery", label: "Gallery — full visual gallery modal" },
+                  ]}
+                />
+                <p className="text-xs text-[var(--chat-muted)] mt-2">
+                  Controls how the theme picker opens when clicked in the chat toolbar.
+                </p>
+              </Field>
+            </div>
+            <div className="border-t border-[var(--chat-border)] pt-6 mt-6">
+              <Field label="Navigation layout">
+                <Select
+                  value={navLayout}
+                  onChange={(v) => setNavLayout(v as "sidebar" | "topbar")}
+                  options={[
+                    { value: "sidebar", label: "Sidebar — collapsible left panel" },
+                    { value: "topbar", label: "Top bar — horizontal navigation" },
+                  ]}
+                />
+                <p className="text-xs text-[var(--chat-muted)] mt-2">
+                  Switch between a left sidebar and a top navigation bar. Takes effect immediately.
+                </p>
+              </Field>
+            </div>
           </SettingsCard>
 
           <SettingsCard title="Chat">

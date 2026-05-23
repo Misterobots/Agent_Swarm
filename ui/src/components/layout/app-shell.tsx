@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Sidebar } from "./sidebar";
+import { TopBar } from "./top-bar";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { MobileDrawer } from "./mobile-drawer";
 import { cn } from "@/lib/utils/cn";
@@ -23,6 +24,7 @@ export function AppShell({ children }: AppShellProps) {
   const setPersistedSidebarOpen = useSettingsStore((s) => s.setSidebarOpen);
   const persistedSidebarSlim = useSettingsStore((s) => s.sidebarSlim);
   const setPersistedSidebarSlim = useSettingsStore((s) => s.setSidebarSlim);
+  const navLayout = useSettingsStore((s) => s.navLayout);
 
   // Effective sidebar state: persisted preference on desktop, forced closed on
   // mobile/tablet (those use the drawer). Toggling on desktop writes through
@@ -96,62 +98,66 @@ export function AppShell({ children }: AppShellProps) {
   const handleOpenDrawer = useCallback(() => setDrawerOpen(true), []);
   const handleCloseDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  return (
-    <div className="app-shell-root flex h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
-      {/* Desktop/Tablet Sidebar */}
-      {!isMobile && (
-        <div
-          className={cn(
-            "transition-all duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] flex-shrink-0 overflow-hidden",
-            sidebarOpen
-              ? sidebarSlim ? "w-14" : "w-64"
-              : "w-0"
-          )}
-        >
-          <div className={cn("h-full", sidebarSlim ? "w-14" : "w-64")}>
-            <Sidebar
-              onCollapse={() => setSidebarSlim(true)}
-              slim={sidebarSlim}
-              onExpand={() => setSidebarSlim(false)}
-            />
-          </div>
-        </div>
-      )}
+  const isTopBar = !isMobile && navLayout === "topbar";
 
-      {/* Main content */}
-      <div
-        className={cn("relative flex-1 h-full flex flex-col min-w-0 overflow-hidden", isMobile && "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]")}
-        style={{
-          // Page headers reserve this much left-padding so the floating
-          // expand handle (when sidebar is fully hidden) doesn't collide.
-          ["--sidebar-rail-pad" as string]: !isMobile && !sidebarOpen ? "2.75rem" : "0px",
-        }}
-      >
-        {/* Edge-anchored expand handle — only shows when sidebar is fully hidden (not slim) */}
-        {!isMobile && !sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="absolute top-3 left-3 z-20 inline-flex items-center justify-center w-8 h-8 rounded-md bg-[var(--chat-panel)] text-[var(--chat-muted)] border border-[var(--chat-border)] hover:text-[var(--chat-text)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_50%,var(--chat-text))] transition-colors"
-            style={{ boxShadow: "var(--elev-1), var(--inset-highlight)" }}
-            title="Expand sidebar"
-            aria-label="Expand sidebar"
+  return (
+    <div className="app-shell-root flex flex-col h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
+      {/* Top Bar layout */}
+      {isTopBar && <TopBar />}
+
+      <div className={cn("flex flex-1 min-h-0", !isTopBar && "flex-row")}>
+        {/* Desktop/Tablet Sidebar — hidden in topbar mode */}
+        {!isMobile && !isTopBar && (
+          <div
+            className={cn(
+              "transition-all duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] flex-shrink-0 overflow-hidden",
+              sidebarOpen
+                ? sidebarSlim ? "w-14" : "w-64"
+                : "w-0"
+            )}
           >
-            <PanelLeft size={15} />
-          </button>
+            <div className={cn("h-full", sidebarSlim ? "w-14" : "w-64")}>
+              <Sidebar
+                onCollapse={() => setSidebarSlim(true)}
+                slim={sidebarSlim}
+                onExpand={() => setSidebarSlim(false)}
+              />
+            </div>
+          </div>
         )}
 
-        {children}
+        {/* Main content */}
+        <div
+          className={cn(
+            "relative flex-1 flex flex-col min-w-0 overflow-hidden",
+            isMobile && "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
+          )}
+          style={{
+            ["--sidebar-rail-pad" as string]: !isMobile && !isTopBar && !sidebarOpen ? "2.75rem" : "0px",
+          }}
+        >
+          {/* Edge-anchored expand handle — sidebar mode only, when fully hidden */}
+          {!isMobile && !isTopBar && !sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="absolute top-3 left-3 z-20 inline-flex items-center justify-center w-8 h-8 rounded-md bg-[var(--chat-panel)] text-[var(--chat-muted)] border border-[var(--chat-border)] hover:text-[var(--chat-text)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_50%,var(--chat-text))] transition-colors"
+              style={{ boxShadow: "var(--elev-1), var(--inset-highlight)" }}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+            >
+              <PanelLeft size={15} />
+            </button>
+          )}
+
+          {children}
+        </div>
       </div>
 
       {/* Mobile Bottom Tab Bar */}
-      {isMobile && (
-        <BottomTabBar onMenuPress={handleOpenDrawer} />
-      )}
+      {isMobile && <BottomTabBar onMenuPress={handleOpenDrawer} />}
 
       {/* Mobile Drawer */}
-      {isMobile && (
-        <MobileDrawer open={drawerOpen} onClose={handleCloseDrawer} />
-      )}
+      {isMobile && <MobileDrawer open={drawerOpen} onClose={handleCloseDrawer} />}
     </div>
   );
 }

@@ -60,6 +60,10 @@ interface SettingsState {
   setSidebarOpen: (open: boolean) => void;
   sidebarSlim: boolean;
   setSidebarSlim: (slim: boolean) => void;
+  navLayout: "sidebar" | "topbar";
+  setNavLayout: (layout: "sidebar" | "topbar") => void;
+  themePickerMode: "popover" | "gallery";
+  setThemePickerMode: (mode: "popover" | "gallery") => void;
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
@@ -115,6 +119,10 @@ export const useSettingsStore = create<SettingsState>()(
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       sidebarSlim: false,
       setSidebarSlim: (sidebarSlim) => set({ sidebarSlim }),
+      navLayout: "sidebar",
+      setNavLayout: (navLayout) => set({ navLayout }),
+      themePickerMode: "popover",
+      setThemePickerMode: (themePickerMode) => set({ themePickerMode }),
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),
@@ -141,7 +149,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "memex-settings",
-      version: 5,
+      version: 6,
       migrate: (persisted: unknown, fromVersion: number) => {
         const state = (persisted ?? {}) as Partial<SettingsState>;
         // v1 -> v3: retired the 8 hand-curated themes plus the warm-amber
@@ -165,6 +173,11 @@ export const useSettingsStore = create<SettingsState>()(
         if (fromVersion < 5) {
           if (state.solvingVerifierNRuns === undefined) state.solvingVerifierNRuns = 1;
           if (state.solvingCorrectorNPasses === undefined) state.solvingCorrectorNPasses = 1;
+        }
+        // v5 -> v6: add navLayout and themePickerMode.
+        if (fromVersion < 6) {
+          if ((state as any).navLayout === undefined) (state as any).navLayout = "sidebar";
+          if ((state as any).themePickerMode === undefined) (state as any).themePickerMode = "popover";
         }
         return state as SettingsState;
       },

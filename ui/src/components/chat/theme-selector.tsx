@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Sun, Moon, Monitor, ChevronDown, Check } from "lucide-react";
+import { Sun, Moon, Monitor, ChevronDown, Check, Palette } from "lucide-react";
 import { useSettingsStore, type ThemeMode } from "@/lib/stores/settings-store";
+import { ThemeGallery } from "./theme-gallery";
 import { cn } from "@/lib/utils/cn";
 
 const MEMEX_MODES: Array<{ id: ThemeMode; icon: typeof Sun; label: string }> = [
@@ -42,7 +43,9 @@ export function ThemeSelector() {
   const setTheme = useSettingsStore((s) => s.setTheme);
   const themeMode = useSettingsStore((s) => s.themeMode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
+  const themePickerMode = useSettingsStore((s) => s.themePickerMode);
   const [open, setOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,6 +55,25 @@ export function ThemeSelector() {
     if (open) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
+
+  // Gallery mode — just render the trigger button + gallery modal
+  if (themePickerMode === "gallery") {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setGalleryOpen(true)}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs border border-[var(--chat-border)] bg-[var(--chat-panel)] text-[var(--chat-text)] hover:border-[var(--chat-accent)] transition-colors"
+          aria-label="Open theme gallery"
+        >
+          <Palette size={13} className="text-[var(--chat-accent)]" />
+          <span>Browse themes</span>
+          <ChevronDown size={12} className="text-[var(--chat-muted)]" />
+        </button>
+        <ThemeGallery open={galleryOpen} onClose={() => setGalleryOpen(false)} />
+      </>
+    );
+  }
 
   const isLcars = theme.startsWith("lcars");
   const isNamed = !isLcars && theme !== "memex";
