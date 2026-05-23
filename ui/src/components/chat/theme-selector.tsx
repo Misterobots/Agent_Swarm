@@ -25,12 +25,16 @@ interface NamedTheme {
 }
 
 const NAMED_THEMES: NamedTheme[] = [
-  {
-    id: "cyberpunk",
-    label: "Shadowrun",
-    desc: "AR matrix overlay — teal & magenta",
-    dots: ["#00DDC0", "#CC44FF"],
-  },
+  { id: "cyberpunk",      label: "Cyberpunk",      desc: "AR matrix overlay — teal & magenta",       dots: ["#00DDC0", "#CC44FF"] },
+  { id: "shadowrun",      label: "Shadowrun",       desc: "Decker AI running in the shadows",         dots: ["#00DDC0", "#CC44FF"] },
+  { id: "ops",            label: "Ops",             desc: "Mission control — electric blue & red",    dots: ["#4C9FE8", "#E05C4C"] },
+  { id: "terminal",       label: "Terminal",        desc: "Green phosphor on black",                  dots: ["#33FF66", "#FFAA33"] },
+  { id: "hal9000",        label: "HAL 9000",        desc: "I'm sorry Dave — deep red on void",        dots: ["#CC0000"] },
+  { id: "nostromo",       label: "Nostromo",        desc: "MU/TH/UR crew interface — amber on dark",  dots: ["#FF8C00"] },
+  { id: "tron",           label: "Tron",            desc: "On the Grid — electric cyan on black",     dots: ["#00C8FF"] },
+  { id: "bladerunner",    label: "Blade Runner",    desc: "Neon gold & blue in the rain",             dots: ["#D4900A", "#3D78FF"] },
+  { id: "dune",           label: "Dune",            desc: "Spice-gold on desert dark",                dots: ["#E8881A"] },
+  { id: "memex-archive",  label: "Memex Archive",   desc: "As we may think — sepia & amber",          dots: ["#C8922A"] },
 ];
 
 export function ThemeSelector() {
@@ -146,35 +150,37 @@ export function ThemeSelector() {
             </div>
           </div>
 
-          {/* Named single-variant themes */}
-          {NAMED_THEMES.map((t) => {
-            const active = theme === t.id;
-            return (
-              <div key={t.id} className="p-3 space-y-2 border-t border-[var(--chat-border)]">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">
-                  {t.label}
-                </div>
+          {/* Extended single-variant themes */}
+          <div className="p-3 space-y-1.5 border-t border-[var(--chat-border)]">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)] mb-2">
+              Extended
+            </div>
+            {NAMED_THEMES.map((t) => {
+              const active = theme === t.id;
+              return (
                 <button
+                  key={t.id}
                   type="button"
                   onClick={() => { setTheme(t.id as Parameters<typeof setTheme>[0]); setOpen(false); }}
                   className={cn(
-                    "w-full inline-flex items-center gap-2 px-2.5 py-2 text-[12px] rounded-sm border transition-colors",
+                    "w-full inline-flex items-center gap-2 px-2.5 py-1.5 text-[12px] rounded-sm border transition-colors",
                     active
                       ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_15%,transparent)] border-[color:color-mix(in_srgb,var(--chat-accent)_50%,var(--chat-border))] text-[var(--chat-accent-strong)]"
                       : "bg-[var(--chat-panel)] border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_60%,var(--chat-text))]"
                   )}
                 >
-                  <span className="flex gap-0.5">
+                  <span className="flex gap-0.5 flex-shrink-0">
                     {t.dots.map((d, i) => (
                       <span key={i} className="w-2.5 h-2.5 rounded-full" style={{ background: d }} />
                     ))}
                   </span>
-                  <span className="flex-1 text-left">{t.desc}</span>
-                  {active && <Check size={13} className="text-[var(--chat-accent)] flex-shrink-0" />}
+                  <span className="flex-1 text-left font-medium">{t.label}</span>
+                  <span className="text-[10px] text-[var(--chat-subtle)] text-right leading-tight max-w-[100px] truncate">{t.desc}</span>
+                  {active && <Check size={12} className="text-[var(--chat-accent)] flex-shrink-0" />}
                 </button>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

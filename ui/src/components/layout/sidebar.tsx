@@ -57,7 +57,7 @@ function MemexLogo() {
   );
 }
 
-export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
+export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: () => void; slim?: boolean; onExpand?: () => void } = {}) {
   const pathname = usePathname();
   const conversations = useChatStore((s) => s.conversations);
   const activeId = useChatStore((s) => s.activeConversationId);
@@ -93,6 +93,53 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
     [filteredConversations],
   );
 
+  // ── Slim (icon-only rail) mode ────────────────────────────────────────────
+  if (slim) {
+    const allNav = [...visiblePrimary, ...visibleSecondary, ...utilityNavigation];
+    return (
+      <div className="sidebar-wrapper relative flex flex-col h-full items-center py-2 gap-1">
+        {/* Logo — click to expand */}
+        <button
+          onClick={onExpand}
+          className="w-9 h-9 flex items-center justify-center rounded-md text-[var(--chat-accent)] hover:bg-[var(--hover-tint)] transition-colors mb-1"
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+        >
+          <MemexLogo />
+        </button>
+        <div className="w-8 h-px bg-[var(--divider)] mb-1" />
+        {/* Icon-only nav */}
+        <div className="flex-1 flex flex-col gap-0.5 w-full px-1 overflow-y-auto scrollbar-none">
+          {allNav.map((item) => {
+            const Icon = item.icon;
+            const active = isNavigationItemActive(item, pathname);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                aria-label={item.label}
+                className={cn(
+                  "flex items-center justify-center w-full h-9 rounded-md transition-colors",
+                  active
+                    ? "sidebar-active text-[var(--chat-accent)]"
+                    : "text-[var(--chat-muted)] hover:bg-[var(--hover-tint)] hover:text-[var(--chat-text)]"
+                )}
+              >
+                <Icon size={16} className="shrink-0" />
+              </Link>
+            );
+          })}
+        </div>
+        {/* Footer — swarm dot only */}
+        <div className="flex flex-col items-center gap-2 pb-1">
+          <div className="w-8 h-px bg-[var(--divider)]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 sidebar-status-dot" title="Swarm Online" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sidebar-wrapper relative flex flex-col h-full">
       {/* Logo */}
@@ -111,8 +158,8 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
             <button
               onClick={onCollapse}
               className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--chat-subtle)] hover:text-[var(--chat-text)] hover:bg-[var(--hover-tint)] transition-colors"
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
+              title="Slim sidebar"
+              aria-label="Slim sidebar"
             >
               <PanelLeftClose size={15} />
             </button>
@@ -289,10 +336,61 @@ export function Sidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
             <span>Sign in</span>
           </a>
         )}
+        {/* Theme picker strip */}
+        <ThemePickerStrip />
         <div className="flex items-center gap-1.5 text-[10px] text-[var(--chat-muted)]">
           <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
           <span>Swarm Online</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Compact theme swatch strip for sidebar footer ─────────────
+const THEME_SWATCHES = [
+  { id: "memex",          bg: "#0a0a0d",  accent: "#00CCA8", label: "Memex Dark"    },
+  { id: "lcars",          bg: "#080500",  accent: "#FFAA00", label: "LCARS Amber"   },
+  { id: "lcars-blue",     bg: "#000008",  accent: "#88AAEE", label: "LCARS TNG"     },
+  { id: "lcars-teal",     bg: "#000C0E",  accent: "#00CCDD", label: "LCARS Teal"    },
+  { id: "cyberpunk",      bg: "#07040F",  accent: "#FF2D78", label: "Cyberpunk"     },
+  { id: "shadowrun",      bg: "#020C0A",  accent: "#00DDC0", label: "Shadowrun"     },
+  { id: "ops",            bg: "#050C1A",  accent: "#4C9FE8", label: "Mission Ops"   },
+  { id: "terminal",       bg: "#010601",  accent: "#33FF66", label: "Terminal"      },
+  { id: "hal9000",        bg: "#000005",  accent: "#CC0000", label: "HAL 9000"      },
+  { id: "nostromo",       bg: "#060400",  accent: "#FF8C00", label: "Nostromo"      },
+  { id: "tron",           bg: "#000008",  accent: "#00C8FF", label: "TRON"          },
+  { id: "bladerunner",    bg: "#060305",  accent: "#D4900A", label: "Blade Runner"  },
+  { id: "dune",           bg: "#0E0700",  accent: "#E8881A", label: "Dune"          },
+  { id: "memex-archive",  bg: "#0E0A02",  accent: "#C8922A", label: "Archive"       },
+] as const;
+
+function ThemePickerStrip() {
+  const theme = useSettingsStore((s) => s.theme);
+  const setTheme = useSettingsStore((s) => s.setTheme);
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-subtle)]">Theme</p>
+      <div className="flex flex-wrap gap-1">
+        {THEME_SWATCHES.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTheme(t.id as import("@/lib/stores/settings-store").ChatTheme)}
+            title={t.label}
+            aria-label={t.label}
+            className={cn(
+              "w-4 h-4 rounded-sm transition-all",
+              theme === t.id
+                ? "ring-2 ring-offset-1 ring-offset-[var(--chat-surface)] ring-[var(--chat-accent)] scale-110"
+                : "hover:scale-110 opacity-70 hover:opacity-100"
+            )}
+            style={{
+              background: t.bg,
+              boxShadow: `inset 0 0 0 2px ${t.accent}66`,
+            }}
+          />
+        ))}
       </div>
     </div>
   );

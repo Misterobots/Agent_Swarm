@@ -21,14 +21,21 @@ export function AppShell({ children }: AppShellProps) {
   const setTheme = useSettingsStore((s) => s.setTheme);
   const persistedSidebarOpen = useSettingsStore((s) => s.sidebarOpen);
   const setPersistedSidebarOpen = useSettingsStore((s) => s.setSidebarOpen);
+  const persistedSidebarSlim = useSettingsStore((s) => s.sidebarSlim);
+  const setPersistedSidebarSlim = useSettingsStore((s) => s.setSidebarSlim);
 
   // Effective sidebar state: persisted preference on desktop, forced closed on
   // mobile/tablet (those use the drawer). Toggling on desktop writes through
   // to the store so the choice survives reloads.
   const sidebarOpen = isMobile || isTablet ? false : persistedSidebarOpen;
+  const sidebarSlim = !isMobile && !isTablet && persistedSidebarSlim;
   const setSidebarOpen = (open: boolean) => {
     if (isMobile || isTablet) return; // desktop-only preference
     setPersistedSidebarOpen(open);
+  };
+  const setSidebarSlim = (slim: boolean) => {
+    if (isMobile || isTablet) return;
+    setPersistedSidebarSlim(slim);
   };
 
   // Apply theme + mode to <html>. Mode is resolved (system -> dark|light)
@@ -42,12 +49,19 @@ export function AppShell({ children }: AppShellProps) {
     if (legacy) root.setAttribute("data-legacy-themes", "1");
     else root.removeAttribute("data-legacy-themes");
 
-    // Named themes (e.g. "lcars") are self-contained — no mode variants.
-    const NAMED_THEMES = new Set(["lcars", "lcars-blue", "lcars-teal", "cyberpunk"]);
+    // All non-memex themes are self-contained (no light/dark mode variants).
+    const NAMED_THEMES = new Set([
+      "lcars", "lcars-blue", "lcars-teal", "cyberpunk",
+      // Extended themes from Claude Design v1
+      "shadowrun", "ops", "terminal", "hal9000", "nostromo",
+      "tron", "bladerunner", "dune", "memex-archive",
+    ]);
 
-    // Self-heal: if a stale persisted theme (legacy 8-pack) survived migration
-    // and the legacy flag isn't on, coerce back to "memex".
-    if (theme !== "memex" && !NAMED_THEMES.has(theme) && !legacy) {
+    // Legacy themes that have no CSS — coerce back to "memex".
+    const LEGACY_THEMES = new Set(["amber", "ember", "slate", "signal", "office", "hacker", "star-trek", "minimal"]);
+
+    // Self-heal: if a stale persisted legacy theme survived migration, reset.
+    if (LEGACY_THEMES.has(theme) && !legacy) {
       setTheme("memex");
       return;
     }
@@ -88,12 +102,18 @@ export function AppShell({ children }: AppShellProps) {
       {!isMobile && (
         <div
           className={cn(
-            "transition-all duration-200 flex-shrink-0 overflow-hidden",
-            sidebarOpen ? "w-64" : "w-0"
+            "transition-all duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] flex-shrink-0 overflow-hidden",
+            sidebarOpen
+              ? sidebarSlim ? "w-14" : "w-64"
+              : "w-0"
           )}
         >
-          <div className="w-64 h-full">
-            <Sidebar onCollapse={() => setSidebarOpen(false)} />
+          <div className={cn("h-full", sidebarSlim ? "w-14" : "w-64")}>
+            <Sidebar
+              onCollapse={() => setSidebarSlim(true)}
+              slim={sidebarSlim}
+              onExpand={() => setSidebarSlim(false)}
+            />
           </div>
         </div>
       )}
@@ -103,11 +123,11 @@ export function AppShell({ children }: AppShellProps) {
         className={cn("relative flex-1 h-full flex flex-col min-w-0 overflow-hidden", isMobile && "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]")}
         style={{
           // Page headers reserve this much left-padding so the floating
-          // expand handle (when sidebar is collapsed) doesn't collide.
+          // expand handle (when sidebar is fully hidden) doesn't collide.
           ["--sidebar-rail-pad" as string]: !isMobile && !sidebarOpen ? "2.75rem" : "0px",
         }}
       >
-        {/* Edge-anchored expand handle — only shows when sidebar is collapsed */}
+        {/* Edge-anchored expand handle — only shows when sidebar is fully hidden (not slim) */}
         {!isMobile && !sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
