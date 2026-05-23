@@ -112,7 +112,7 @@ export function ThemeSelector() {
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-2 z-50 w-64 rounded-md border border-[var(--chat-border)] bg-[var(--chat-surface)] overflow-hidden theme-picker-enter"
+          className="absolute right-0 bottom-full mb-2 z-50 w-64 rounded-md border border-[var(--chat-border)] bg-[var(--chat-surface)] overflow-hidden theme-picker-enter"
           style={{ boxShadow: "var(--elev-3)" }}
         >
           {/* Memex family */}
