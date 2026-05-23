@@ -11,21 +11,9 @@ export type ChatTheme =
   | "lcars"
   | "lcars-blue"
   | "lcars-teal"
-  | "cyberpunk"
-  // Extended themes (Claude Design v1)
-  | "shadowrun"
-  | "ops"
-  | "terminal"
-  | "hal9000"
-  | "nostromo"
-  | "tron"
-  | "bladerunner"
-  | "dune"
-  | "memex-archive"
-  // Legacy (migration only — no CSS, coerce to "memex")
   | "amber"
   | "ember" | "slate" | "signal" | "office"
-  | "hacker" | "star-trek" | "minimal";
+  | "hacker" | "star-trek" | "cyberpunk" | "minimal";
 
 export type ThemeMode = "system" | "dark" | "light";
 
@@ -58,8 +46,6 @@ interface SettingsState {
   // Layout
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
-  sidebarSlim: boolean;
-  setSidebarSlim: (slim: boolean) => void;
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
   setTheme: (theme: ChatTheme) => void;
@@ -113,8 +99,6 @@ export const useSettingsStore = create<SettingsState>()(
       solvingCorrectorMaxTime: 0,
       sidebarOpen: true,
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
-      sidebarSlim: false,
-      setSidebarSlim: (sidebarSlim) => set({ sidebarSlim }),
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
       setTheme: (theme) => set({ theme }),

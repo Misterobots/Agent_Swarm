@@ -241,30 +241,6 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
   }, [message.thoughtTrace]);
 
   return (
-    <>
-    {/* Turn metadata row — visible above AI messages when agent/turn info is available */}
-    {!isUser && message.turnMetadata && (message.turnMetadata.agentName || message.turnMetadata.streamModes?.length > 0) && (
-      <div className="turn-meta-row flex items-center gap-1.5 px-4 md:px-6 pt-3 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-accent)] opacity-70 select-none">
-        <span className="text-[var(--chat-subtle)]">Turn</span>
-        <span>{message.turnMetadata.turnId.slice(0, 8).toUpperCase()}</span>
-        {message.turnMetadata.agentName && (
-          <>
-            <span className="text-[var(--chat-border)]">|</span>
-            <span>{message.turnMetadata.agentName.toUpperCase()}</span>
-          </>
-        )}
-        {message.turnMetadata.streamModes?.length > 0 && (
-          <>
-            <span className="text-[var(--chat-border)]">|</span>
-            <span className="text-[var(--chat-muted)]">
-              {message.turnMetadata.streamModes
-                .map((m) => m.replace(/-/g, " ").toUpperCase())
-                .join(" → ")}
-            </span>
-          </>
-        )}
-      </div>
-    )}
     <div
       className={cn(
         "group relative flex gap-4 py-5 md:py-6 px-4 md:px-6 msg-enter",
@@ -454,6 +430,5 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
         )}
       </div>
     </div>
-    </>
   );
 }

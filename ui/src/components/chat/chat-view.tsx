@@ -14,7 +14,7 @@ import { SwarmDrawer } from "@/components/swarm/swarm-drawer";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useSwarmBroadcast } from "@/lib/hooks/use-swarm-broadcast";
 import { AwaySummaryBanner, useAwaySummary } from "./away-summary";
-import { Bot, Sparkles, Code2, Search, Lightbulb, X } from "lucide-react";
+import { Bot, Sparkles, Code2, Search, Lightbulb } from "lucide-react";
 import { Card } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
@@ -168,45 +168,23 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
       {/* Header */}
       <div
-        className="relative flex items-center gap-3 bg-[var(--chat-surface)] px-3 md:px-5 py-2.5 min-w-0"
+        className="relative flex items-center justify-between bg-[var(--chat-surface)] px-3 md:px-5 py-3 min-w-0"
         style={{ paddingLeft: "calc(var(--sidebar-rail-pad, 0px) + 0.75rem)" }}
       >
-        {/* Breadcrumb + title */}
-        <div className="flex flex-col min-w-0 flex-1">
-          <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--chat-muted)] select-none">
-            <span>Chat</span>
-            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50 flex-shrink-0"><path d="M9 18l6-6-6-6"/></svg>
-            <span>Active Session</span>
-          </div>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-semibold text-[var(--chat-text)] truncate leading-tight">
-              {activeConv?.title || "New Conversation"}
-            </span>
-          </div>
-        </div>
-
-        {/* Model selector — compact */}
-        <div className="flex-shrink-0 hidden md:block">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <ModelSelector />
         </div>
-
-        {/* Right: Swarm status + token bar */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Swarm Online dot */}
-          <div className="hidden md:flex items-center gap-1.5 text-[11px] text-[var(--chat-accent)]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--chat-accent)] flex-shrink-0" style={{ animation: "pulse-dot 2.5s ease-in-out infinite" }} />
-            <span className="font-medium">Swarm Online</span>
-          </div>
-
-          {/* Token usage bar */}
+        <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
           <button
             type="button"
-            onClick={() => { void compactConversation(); }}
+            onClick={() => {
+              void compactConversation();
+            }}
             className="group flex items-center gap-2 rounded-full px-2.5 py-1 transition-colors hover:bg-[var(--hover-tint)]"
             title={`Context: ${(tokenUsage.pct * 100).toFixed(1)}% (${tokenUsage.used.toLocaleString()}/${tokenUsage.total.toLocaleString()}) — click to compact`}
           >
             <div
-              className="w-16 md:w-24 h-1.5 rounded-full overflow-hidden bg-[var(--chat-panel)] border border-[var(--chat-border)]"
+              className="w-16 md:w-32 h-1.5 rounded-full overflow-hidden bg-[var(--chat-panel)] border border-[var(--chat-border)]"
               style={{ boxShadow: "inset 0 1px 2px rgba(0,0,0,0.15)" }}
             >
               <div

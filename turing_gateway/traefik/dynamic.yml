@@ -109,13 +109,13 @@ http:
       entryPoints: [web]
       priority: 50
       service: sonarr
-      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file]
+      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file, authentik@file]
     sonarr-secure:
       rule: "Host(`sonarr.shivelymedia.com`)"
       entryPoints: [websecure]
       priority: 50
       service: sonarr
-      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
+      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file, authentik@file]
       tls:
         certResolver: cfdns
     radarr-web:
@@ -123,13 +123,13 @@ http:
       entryPoints: [web]
       priority: 50
       service: radarr
-      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file]
+      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file, authentik@file]
     radarr-secure:
       rule: "Host(`radarr.shivelymedia.com`)"
       entryPoints: [websecure]
       priority: 50
       service: radarr
-      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
+      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file, authentik@file]
       tls:
         certResolver: cfdns
     sabnzbd-web:
@@ -137,13 +137,13 @@ http:
       entryPoints: [web]
       priority: 50
       service: sabnzbd
-      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file]
+      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file, authentik@file]
     sabnzbd-secure:
       rule: "Host(`sabnzbd.shivelymedia.com`)"
       entryPoints: [websecure]
       priority: 50
       service: sabnzbd
-      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
+      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file, authentik@file]
       tls:
         certResolver: cfdns
     seerr-web:
@@ -151,13 +151,13 @@ http:
       entryPoints: [web]
       priority: 50
       service: seerr
-      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file]
+      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file, authentik@file]
     seerr-secure:
       rule: "Host(`seerr.shivelymedia.com`)"
       entryPoints: [websecure]
       priority: 50
       service: seerr
-      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
+      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file, authentik@file]
       tls:
         certResolver: cfdns
     jellyfin-local:
