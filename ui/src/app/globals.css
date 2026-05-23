@@ -949,6 +949,7 @@ h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; line-height: 1.3
   font-family: var(--chat-font);
   background: var(--chat-bg);
   color: var(--chat-text);
+  position: relative; /* required for ::before/::after theme overlays */
 }
 
 /* Subtle separator â€” gradient line, not flat 1px */
@@ -1665,4 +1666,290 @@ main, .main-content {
   --inset-highlight: inset 0 1px 0 rgba(200,146,42,0.05);
   --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(200,146,42,0.5);
   color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EXTENDED THEME EFFECTS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shared keyframes ──────────────────────────────────────────── */
+@keyframes ext-scan-h {
+  0%   { opacity: 0; transform: translateX(-110%); }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(110%); }
+}
+@keyframes ext-scan-v {
+  0%   { opacity: 0; transform: translateY(-100%); }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(120%); }
+}
+@keyframes ext-breathe {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1;   }
+}
+@keyframes ext-flicker {
+  0%, 96%, 100% { opacity: 1; }
+  97%            { opacity: 0.7; }
+  98%            { opacity: 1; }
+  99%            { opacity: 0.85; }
+}
+@keyframes ext-neon-pulse {
+  0%, 100% { text-shadow: 0 0 6px var(--chat-accent), 0 0 12px rgba(var(--chat-accent-rgb),0.4); }
+  50%      { text-shadow: 0 0 2px var(--chat-accent); }
+}
+
+/* ══════════════════════════════════════════
+   SHADOWRUN — AR matrix / neon-teal
+   ══════════════════════════════════════════ */
+
+/* CRT scanline overlay */
+[data-theme="shadowrun"] body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 3px,
+    rgba(0,221,192,0.013) 3px, rgba(0,221,192,0.013) 4px
+  );
+  pointer-events: none; z-index: 0;
+}
+/* Glass sidebar */
+[data-theme="shadowrun"] .sidebar-wrapper {
+  background: rgba(2,12,10,0.78);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-right: 1px solid rgba(0,200,160,0.22);
+  box-shadow: 2px 0 28px rgba(0,180,140,0.06);
+}
+/* Logo band sweep */
+[data-theme="shadowrun"] .sidebar-wrapper > div:first-child {
+  border-bottom: 1px solid rgba(0,200,160,0.22); position: relative; overflow: hidden;
+}
+[data-theme="shadowrun"] .sidebar-wrapper > div:first-child::after {
+  content: "";
+  position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, #00DDC0 40%, #CC44FF 70%, transparent);
+  animation: ext-scan-h 7s ease-in-out infinite; pointer-events: none;
+}
+[data-theme="shadowrun"] .thinking-dot { background: #00DDC0; }
+[data-theme="shadowrun"] .streaming-caret::after { color: #00DDC0; }
+/* Backdrop glow */
+[data-theme="shadowrun"] body {
+  background-image: radial-gradient(ellipse 800px 500px at 5% 0%, rgba(0,221,192,0.04), transparent 55%),
+                    radial-gradient(ellipse 600px 400px at 95% 100%, rgba(204,68,255,0.03), transparent 55%);
+}
+
+/* ══════════════════════════════════════════
+   OPS — Mission Control tactical blue
+   ══════════════════════════════════════════ */
+
+/* Grid overlay */
+[data-theme="ops"] .chat-shell::after {
+  content: "";
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(76,159,232,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(76,159,232,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none; z-index: 0;
+}
+/* Top scan line */
+[data-theme="ops"] .chat-shell::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(to right, transparent, rgba(76,159,232,0.7) 50%, transparent);
+  width: 40%; animation: ext-scan-h 10s ease-in-out infinite;
+  pointer-events: none; z-index: 10;
+}
+[data-theme="ops"] .sidebar-wrapper {
+  background: var(--chat-bg);
+  border-right: 1px solid rgba(76,159,232,0.15);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.4);
+}
+[data-theme="ops"] .thinking-dot { background: #4C9FE8; }
+
+/* ══════════════════════════════════════════
+   TERMINAL — phosphor green CRT
+   ══════════════════════════════════════════ */
+
+/* Green phosphor CRT scanlines */
+[data-theme="terminal"] body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(51,255,102,0.018) 2px, rgba(51,255,102,0.018) 4px
+  );
+  pointer-events: none; z-index: 0;
+}
+/* Cursor glow on headings */
+[data-theme="terminal"] h1,
+[data-theme="terminal"] h2,
+[data-theme="terminal"] h3 {
+  animation: ext-neon-pulse 3s ease-in-out infinite;
+}
+/* Sidebar: dark terminal panel */
+[data-theme="terminal"] .sidebar-wrapper {
+  background: #010601;
+  border-right: 1px solid rgba(51,255,102,0.2);
+}
+[data-theme="terminal"] .thinking-dot { background: #33FF66; }
+[data-theme="terminal"] .streaming-caret::after { color: #33FF66; }
+/* Flicker on the whole shell */
+[data-theme="terminal"] .chat-shell {
+  animation: ext-flicker 8s step-start infinite;
+}
+/* Subtle phosphor body glow */
+[data-theme="terminal"] body {
+  background-image: radial-gradient(ellipse 1200px 800px at 50% 50%, rgba(0,30,0,0.6), transparent 70%);
+}
+
+/* ══════════════════════════════════════════
+   HAL 9000 — deep red on void
+   ══════════════════════════════════════════ */
+
+/* Breathing red ambient */
+[data-theme="hal9000"] body::after {
+  content: "";
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse 700px 500px at 50% 50%, rgba(180,0,0,0.07), transparent 65%);
+  animation: ext-breathe 6s ease-in-out infinite;
+  pointer-events: none; z-index: 0;
+}
+/* Sidebar: nearly black with faint red border */
+[data-theme="hal9000"] .sidebar-wrapper {
+  background: #000003;
+  border-right: 1px solid rgba(180,0,0,0.2);
+}
+[data-theme="hal9000"] .thinking-dot { background: #CC0000; }
+[data-theme="hal9000"] .streaming-caret::after { color: #FF2020; }
+
+/* ══════════════════════════════════════════
+   NOSTROMO — amber distress / Alien
+   ══════════════════════════════════════════ */
+
+[data-theme="nostromo"] body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 3px,
+    rgba(255,140,0,0.012) 3px, rgba(255,140,0,0.012) 4px
+  );
+  pointer-events: none; z-index: 0;
+  animation: ext-flicker 12s step-start infinite;
+}
+[data-theme="nostromo"] .sidebar-wrapper {
+  background: #060400;
+  border-right: 1px solid rgba(200,120,0,0.2);
+}
+[data-theme="nostromo"] .thinking-dot { background: #FF8C00; }
+[data-theme="nostromo"] .streaming-caret::after { color: #FFAA33; }
+[data-theme="nostromo"] body {
+  background-image: radial-gradient(ellipse 1000px 600px at 30% 80%, rgba(255,100,0,0.04), transparent 60%);
+}
+
+/* ══════════════════════════════════════════
+   TRON — electric cyan Grid
+   ══════════════════════════════════════════ */
+
+/* Grid lines */
+[data-theme="tron"] body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,200,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,255,0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+/* Horizontal scan on chat shell */
+[data-theme="tron"] .chat-shell::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(to right, transparent, #00C8FF 50%, transparent);
+  width: 60%; animation: ext-scan-h 8s ease-in-out infinite;
+  pointer-events: none; z-index: 10;
+}
+/* Sidebar: glass with cyan edge */
+[data-theme="tron"] .sidebar-wrapper {
+  background: rgba(0,0,8,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(0,200,255,0.25);
+  box-shadow: 2px 0 24px rgba(0,200,255,0.06);
+}
+[data-theme="tron"] .thinking-dot { background: #00C8FF; }
+[data-theme="tron"] .streaming-caret::after { color: #50E0FF; }
+[data-theme="tron"] body {
+  background-image: radial-gradient(ellipse 900px 600px at 50% 0%, rgba(0,200,255,0.04), transparent 60%);
+}
+
+/* ══════════════════════════════════════════
+   BLADE RUNNER — neo-noir amber & blue
+   ══════════════════════════════════════════ */
+
+/* Rain / haze */
+[data-theme="bladerunner"] body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    92deg, transparent, transparent 8px,
+    rgba(212,144,10,0.015) 8px, rgba(212,144,10,0.015) 9px
+  );
+  pointer-events: none; z-index: 0;
+}
+[data-theme="bladerunner"] .sidebar-wrapper {
+  background: rgba(6,3,5,0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 1px solid rgba(212,144,10,0.18);
+}
+[data-theme="bladerunner"] .thinking-dot { background: #D4900A; }
+[data-theme="bladerunner"] body {
+  background-image:
+    radial-gradient(ellipse 800px 500px at 80% 100%, rgba(61,120,255,0.05), transparent 55%),
+    radial-gradient(ellipse 700px 400px at 10% 0%, rgba(212,144,10,0.04), transparent 55%);
+}
+
+/* ══════════════════════════════════════════
+   DUNE — spice desert gold
+   ══════════════════════════════════════════ */
+
+/* Sand grain */
+[data-theme="dune"] body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  opacity: 0.4; pointer-events: none; z-index: 0;
+}
+[data-theme="dune"] .sidebar-wrapper {
+  background: #060300;
+  border-right: 1px solid rgba(200,130,30,0.2);
+}
+[data-theme="dune"] .thinking-dot { background: #E8881A; }
+[data-theme="dune"] body {
+  background-image: radial-gradient(ellipse 1200px 600px at 50% 100%, rgba(200,100,0,0.06), transparent 60%);
+}
+
+/* ══════════════════════════════════════════
+   MEMEX ARCHIVE — sepia memory / analogue
+   ══════════════════════════════════════════ */
+
+/* Paper grain */
+[data-theme="memex-archive"] body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  opacity: 0.5; pointer-events: none; z-index: 0;
+}
+[data-theme="memex-archive"] .sidebar-wrapper {
+  background: #0A0600;
+  border-right: 1px solid rgba(180,140,60,0.18);
+}
+[data-theme="memex-archive"] .thinking-dot { background: #C8922A; }
+[data-theme="memex-archive"] body {
+  background-image: radial-gradient(ellipse 1000px 500px at 50% 0%, rgba(180,130,40,0.04), transparent 60%);
 }
