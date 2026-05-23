@@ -16,6 +16,7 @@ import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User, PanelLeftClose } from "lucide-react";
 import { BuddyWidget } from "@/components/buddy/buddy-widget";
+import { ThemeSelector } from "@/components/chat/theme-selector";
 import { useAccess } from "@/lib/hooks/use-access";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
 
@@ -336,6 +337,7 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
             <span>Sign in</span>
           </a>
         )}
+        <ThemeSelector />
         <div className="flex items-center gap-1.5 text-[10px] text-[var(--chat-muted)]">
           <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
           <span>Swarm Online</span>
