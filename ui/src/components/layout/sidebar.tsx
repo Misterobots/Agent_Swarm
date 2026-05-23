@@ -336,8 +336,6 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
             <span>Sign in</span>
           </a>
         )}
-        {/* Theme picker strip */}
-        <ThemePickerStrip />
         <div className="flex items-center gap-1.5 text-[10px] text-[var(--chat-muted)]">
           <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
           <span>Swarm Online</span>
@@ -347,54 +345,6 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
   );
 }
 
-// ── Compact theme swatch strip for sidebar footer ─────────────
-const THEME_SWATCHES = [
-  { id: "memex",          bg: "#0a0a0d",  accent: "#00CCA8", label: "Memex Dark"    },
-  { id: "lcars",          bg: "#080500",  accent: "#FFAA00", label: "LCARS Amber"   },
-  { id: "lcars-blue",     bg: "#000008",  accent: "#88AAEE", label: "LCARS TNG"     },
-  { id: "lcars-teal",     bg: "#000C0E",  accent: "#00CCDD", label: "LCARS Teal"    },
-  { id: "cyberpunk",      bg: "#07040F",  accent: "#FF2D78", label: "Cyberpunk"     },
-  { id: "shadowrun",      bg: "#020C0A",  accent: "#00DDC0", label: "Shadowrun"     },
-  { id: "ops",            bg: "#050C1A",  accent: "#4C9FE8", label: "Mission Ops"   },
-  { id: "terminal",       bg: "#010601",  accent: "#33FF66", label: "Terminal"      },
-  { id: "hal9000",        bg: "#000005",  accent: "#CC0000", label: "HAL 9000"      },
-  { id: "nostromo",       bg: "#060400",  accent: "#FF8C00", label: "Nostromo"      },
-  { id: "tron",           bg: "#000008",  accent: "#00C8FF", label: "TRON"          },
-  { id: "bladerunner",    bg: "#060305",  accent: "#D4900A", label: "Blade Runner"  },
-  { id: "dune",           bg: "#0E0700",  accent: "#E8881A", label: "Dune"          },
-  { id: "memex-archive",  bg: "#0E0A02",  accent: "#C8922A", label: "Archive"       },
-] as const;
-
-function ThemePickerStrip() {
-  const theme = useSettingsStore((s) => s.theme);
-  const setTheme = useSettingsStore((s) => s.setTheme);
-
-  return (
-    <div className="space-y-1">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-subtle)]">Theme</p>
-      <div className="flex flex-wrap gap-1">
-        {THEME_SWATCHES.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTheme(t.id as import("@/lib/stores/settings-store").ChatTheme)}
-            title={t.label}
-            aria-label={t.label}
-            className={cn(
-              "w-4 h-4 rounded-sm transition-all",
-              theme === t.id
-                ? "ring-2 ring-offset-1 ring-offset-[var(--chat-surface)] ring-[var(--chat-accent)] scale-110"
-                : "hover:scale-110 opacity-70 hover:opacity-100"
-            )}
-            style={{
-              background: t.bg,
-              boxShadow: `inset 0 0 0 2px ${t.accent}66`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
