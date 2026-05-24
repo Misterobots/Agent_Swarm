@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils/cn";
 import { PanelLeft } from "lucide-react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
+import { ThemeAmbientCanvas } from "@/components/theme/theme-ambient-canvas";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -102,6 +103,8 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="app-shell-root flex flex-col h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
+      {/* Canvas ambient effects for immersive themes */}
+      <ThemeAmbientCanvas />
       {/* Top Bar layout */}
       {isTopBar && <TopBar />}
 

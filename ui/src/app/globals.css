@@ -1765,62 +1765,114 @@ main, .main-content {
 }
 
 /* ══════════════════════════════════════════
-   SHADOWRUN — AR matrix / neon-teal
+   SHADOWRUN — AR sprawl / magic + tech
+   Canvas handles: matrix rain, rune circles, AR targeting brackets
    ══════════════════════════════════════════ */
 
-/* CRT scanline overlay */
+/* CRT scanlines: visible and alive */
 [data-theme="shadowrun"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
   background: repeating-linear-gradient(
-    0deg, transparent, transparent 3px,
-    rgba(0,221,192,0.04) 3px, rgba(0,221,192,0.04) 4px
+    0deg, transparent, transparent 2px,
+    rgba(0,230,200,0.055) 2px, rgba(0,230,200,0.055) 3px
   );
   pointer-events: none; z-index: 1;
+  animation: ext-flicker 18s step-start infinite !important;
 }
-/* Right-edge matrix data stream */
+/* Dual neon edge pulses: teal top-left, purple bottom-right */
 [data-theme="shadowrun"] .app-shell-root::after {
   content: "";
-  position: fixed; top: 0; right: 0; width: 2px; bottom: 0;
-  background: linear-gradient(to bottom,
-    transparent 0%,
-    rgba(0,221,192,0.8) 20%, rgba(0,221,192,0.4) 40%,
-    rgba(0,221,192,0.0) 60%, rgba(204,68,255,0.6) 80%,
-    transparent 100%
-  );
-  animation: ext-rain-drift 4s linear infinite !important;
-  pointer-events: none; z-index: 2;
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 900px 600px at 0% 0%,   rgba(0,240,200,0.17), transparent 55%),
+    radial-gradient(ellipse 700px 500px at 100% 100%, rgba(180,40,255,0.16), transparent 55%),
+    radial-gradient(ellipse 400px 300px at 50% 50%,  rgba(0,200,160,0.04), transparent 65%);
+  pointer-events: none; z-index: 1;
+  animation: ext-breathe 8s ease-in-out infinite !important;
 }
-/* Glass sidebar with neon border glow */
+/* AR glass sidebar — looking through the goggles */
 [data-theme="shadowrun"] .sidebar-wrapper {
-  background: rgba(2,12,10,0.78);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-right: 1px solid rgba(0,200,160,0.28);
-  box-shadow: 2px 0 28px rgba(0,180,140,0.1), 0 0 0 1px rgba(0,200,160,0.06);
-  animation: ext-neon-border 5s ease-in-out infinite !important;
+  background: rgba(0,10,8,0.86);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-right: 1px solid rgba(0,220,180,0.42);
+  box-shadow:
+    2px 0 0 0 rgba(0,240,200,0.12),
+    4px 0 40px rgba(0,200,160,0.14),
+    inset -1px 0 0 rgba(180,40,255,0.08);
+  animation: ext-neon-border 4s ease-in-out infinite !important;
 }
-/* Logo band sweep */
+/* Logo band: circuit panel with full-color sweep */
 [data-theme="shadowrun"] .sidebar-wrapper > div:first-child {
-  border-bottom: 1px solid rgba(0,200,160,0.22); position: relative; overflow: hidden;
+  background: linear-gradient(135deg, rgba(0,40,30,0.8), rgba(0,15,25,0.9)) !important;
+  border-bottom: 1px solid rgba(0,200,160,0.35) !important;
+  position: relative; overflow: hidden;
 }
 [data-theme="shadowrun"] .sidebar-wrapper > div:first-child::after {
   content: "";
-  position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, #00DDC0 40%, #CC44FF 70%, transparent);
-  animation: ext-scan-h 7s ease-in-out infinite !important; pointer-events: none;
+  position: absolute; bottom: 0; left: -100%; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,200,0.9) 45%, rgba(180,40,255,0.8) 65%, transparent);
+  animation: ext-scan-h 5s ease-in-out infinite !important; pointer-events: none;
 }
-[data-theme="shadowrun"] .thinking-dot { background: #00DDC0; }
-[data-theme="shadowrun"] .streaming-caret::after { color: #00DDC0; }
-/* Backdrop glow — dual-corner neon */
-[data-theme="shadowrun"] .app-shell-root {
-  background-image: radial-gradient(ellipse 800px 500px at 5% 0%, rgba(0,221,192,0.12), transparent 55%),
-                    radial-gradient(ellipse 600px 400px at 95% 100%, rgba(204,68,255,0.10), transparent 55%);
+/* Section titles: AR data labels */
+[data-theme="shadowrun"] .sidebar-section-title {
+  color: rgba(0,255,200,0.65);
+  letter-spacing: 0.2em;
+  font-weight: 700;
 }
-/* Active nav glows teal */
+/* Active item: full neon AR target lock */
 [data-theme="shadowrun"] .sidebar-active {
-  box-shadow: 0 0 12px rgba(0,221,192,0.3), inset 0 0 8px rgba(0,221,192,0.1) !important;
-  border-left: 2px solid #00DDC0 !important;
+  background: rgba(0,220,180,0.13) !important;
+  border-left: 2px solid rgba(0,255,200,0.95) !important;
+  box-shadow:
+    0 0 20px rgba(0,220,180,0.35),
+    0 0 6px rgba(0,220,180,0.6),
+    inset 0 0 14px rgba(0,220,180,0.1) !important;
+}
+/* Status dot: pulsing teal square (AR indicator) */
+[data-theme="shadowrun"] .sidebar-status-dot {
+  background: #00F0C8;
+  border-radius: 1px !important;
+  box-shadow: 0 0 10px rgba(0,240,200,0.9), 0 0 4px #00F0C8;
+  animation: ext-breathe 2s ease-in-out infinite !important;
+}
+[data-theme="shadowrun"] .thinking-dot { background: #00E8C0; }
+[data-theme="shadowrun"] .streaming-caret::after { color: #00FFD4; }
+/* Chat shell: dark AR display glass */
+[data-theme="shadowrun"] .chat-shell {
+  background: rgba(0,8,6,0.97);
+}
+/* Hex circuit micro-pattern on chat */
+[data-theme="shadowrun"] .chat-shell::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='32'%3E%3Cpath d='M14 2 L26 9 L26 23 L14 30 L2 23 L2 9 Z' fill='none' stroke='rgba(0,200,160,0.035)' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 28px 32px;
+  pointer-events: none; z-index: 0;
+  animation: ext-amber-drift 60s linear infinite !important;
+}
+/* Messages: faint AR panel border */
+[data-theme="shadowrun"] .msg-enter {
+  border-bottom: 1px solid rgba(0,200,160,0.06);
+}
+/* Headings: dual neon — teal with purple shadow */
+[data-theme="shadowrun"] h1,
+[data-theme="shadowrun"] h2,
+[data-theme="shadowrun"] h3 {
+  color: rgba(0,255,210,0.95) !important;
+  text-shadow:
+    0 0 8px rgba(0,220,180,0.8),
+    0 0 24px rgba(0,180,140,0.5),
+    0 0 60px rgba(180,40,255,0.2) !important;
+}
+/* App background: the sprawl at night */
+[data-theme="shadowrun"] .app-shell-root {
+  background: #00020A;
+}
+/* Dividers: teal-to-purple neon line */
+[data-theme="shadowrun"] .divider {
+  background: linear-gradient(to right, transparent, rgba(0,200,160,0.4) 40%, rgba(180,40,255,0.3) 60%, transparent) !important;
 }
 
 /* ══════════════════════════════════════════
@@ -1945,64 +1997,60 @@ main, .main-content {
 }
 
 /* ══════════════════════════════════════════
-   HAL 9000 — deep red on void
+   HAL 9000 — deep red on void (canvas handles iris)
    ══════════════════════════════════════════ */
 
-/* HAL iris — large breathing eye in the chat background */
-[data-theme="hal9000"] .chat-shell::before {
-  content: "";
-  position: absolute; left: 50%; top: 40%;
-  transform: translate(-50%, -40%);
-  width: 560px; height: 560px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%,
-    rgba(255,20,20,0.22) 0%,
-    rgba(200,0,0,0.14) 18%,
-    rgba(140,0,0,0.07) 38%,
-    rgba(80,0,0,0.03) 58%,
-    transparent 72%
-  );
-  animation: ext-hal-iris 4s ease-in-out infinite !important;
-  pointer-events: none; z-index: 0;
-}
-/* HAL iris outer ring */
-[data-theme="hal9000"] .chat-shell::after {
-  content: "";
-  position: absolute; left: 50%; top: 40%;
-  transform: translate(-50%, -40%);
-  width: 380px; height: 380px;
-  border-radius: 50%;
-  border: 1px solid rgba(200,0,0,0.18);
-  box-shadow: 0 0 60px rgba(180,0,0,0.12), inset 0 0 60px rgba(180,0,0,0.06);
-  animation: ext-hal-ring 6s ease-in-out infinite !important;
-  pointer-events: none; z-index: 0;
-}
-/* Full app breathing ambient */
+/* Deep red ambient — the lifepod glow */
 [data-theme="hal9000"] .app-shell-root::after {
   content: "";
   position: fixed; inset: 0;
-  background: radial-gradient(ellipse 700px 500px at 50% 50%, rgba(160,0,0,0.14), transparent 65%);
+  background: radial-gradient(ellipse 80% 60% at 62% 44%, rgba(120,0,0,0.12), transparent 65%);
   animation: ext-breathe 6s ease-in-out infinite !important;
   pointer-events: none; z-index: 1;
 }
-/* Cold red accent line at top of chat */
+/* Cold HAL red status line at very top of screen */
 [data-theme="hal9000"] .app-shell-root::before {
   content: "";
-  position: fixed; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(to right, transparent, rgba(204,0,0,0.6) 50%, transparent);
-  pointer-events: none; z-index: 100;
+  position: fixed; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(to right, transparent 0%, rgba(220,0,0,0.7) 40%, rgba(255,20,20,0.9) 50%, rgba(220,0,0,0.7) 60%, transparent 100%);
+  pointer-events: none; z-index: 200;
   animation: ext-breathe 4s ease-in-out infinite !important;
 }
-/* Sidebar: void black with red edge */
+/* Sidebar: pure void with red data seam */
 [data-theme="hal9000"] .sidebar-wrapper {
-  background: #000002;
-  border-right: 1px solid rgba(180,0,0,0.25);
-  box-shadow: 2px 0 20px rgba(0,0,0,0.8);
+  background: #000001;
+  border-right: 1px solid rgba(200,0,0,0.3);
+  box-shadow: 2px 0 32px rgba(0,0,0,0.95), inset -1px 0 12px rgba(140,0,0,0.08);
 }
-[data-theme="hal9000"] .sidebar-section-title { color: rgba(204,0,0,0.55); }
-[data-theme="hal9000"] .sidebar-status-dot { background: #CC0000; }
+/* Logo area: deep red tint */
+[data-theme="hal9000"] .sidebar-wrapper > div:first-child {
+  background: rgba(40,0,0,0.5) !important;
+  border-bottom: 1px solid rgba(180,0,0,0.2) !important;
+  animation: none !important;
+}
+[data-theme="hal9000"] .sidebar-section-title {
+  color: rgba(200,0,0,0.5);
+  letter-spacing: 0.2em;
+}
+[data-theme="hal9000"] .sidebar-active {
+  background: rgba(160,0,0,0.18) !important;
+  border-left: 2px solid rgba(200,0,0,0.7) !important;
+  box-shadow: 0 0 16px rgba(180,0,0,0.2) !important;
+}
+[data-theme="hal9000"] .sidebar-status-dot {
+  background: #CC0000;
+  box-shadow: 0 0 8px rgba(204,0,0,0.8);
+}
 [data-theme="hal9000"] .thinking-dot { background: #CC0000; }
 [data-theme="hal9000"] .streaming-caret::after { color: #FF2020; }
+/* Chat text: cold clinical white */
+[data-theme="hal9000"] .chat-shell {
+  background: #000002;
+}
+/* App background: pure void */
+[data-theme="hal9000"] .app-shell-root {
+  background: #000001;
+}
 
 /* ══════════════════════════════════════════
    NOSTROMO — amber distress / Alien
@@ -2059,115 +2107,160 @@ main, .main-content {
 }
 
 /* ══════════════════════════════════════════
-   TRON — electric cyan Grid
+   TRON — The Grid (canvas handles grid+streams)
    ══════════════════════════════════════════ */
 
-/* Grid lines — the Grid */
+/* App background: deep void of the Grid */
+[data-theme="tron"] .app-shell-root {
+  background: #000508;
+}
+/* Subtle top horizon glow — the sky of the Grid */
 [data-theme="tron"] .app-shell-root::before {
   content: "";
-  position: fixed; inset: 0;
-  background-image:
-    linear-gradient(rgba(0,200,255,0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,200,255,0.07) 1px, transparent 1px);
-  background-size: 48px 48px;
+  position: fixed; top: 0; left: 0; right: 0; height: 160px;
+  background: linear-gradient(to bottom, rgba(0,200,255,0.08), transparent);
   pointer-events: none; z-index: 1;
 }
-/* Circuit trace on right side of app — identity disc orbit */
+/* Bottom horizon glow */
 [data-theme="tron"] .app-shell-root::after {
   content: "";
-  position: fixed; right: 0; top: 0; width: 1px; bottom: 0;
-  background: linear-gradient(to bottom,
-    transparent 0%, rgba(0,200,255,0) 20%,
-    rgba(0,200,255,0.9) 35%, rgba(0,200,255,0.9) 36%,
-    rgba(0,200,255,0) 51%, transparent 100%
-  );
-  animation: ext-circuit-trace 5s ease-in-out infinite !important;
-  pointer-events: none; z-index: 2;
+  position: fixed; bottom: 0; left: 0; right: 0; height: 100px;
+  background: linear-gradient(to top, rgba(0,160,200,0.06), transparent);
+  pointer-events: none; z-index: 1;
+  animation: ext-breathe 6s ease-in-out infinite !important;
 }
-/* Horizontal identity disc scan */
+/* Sidebar: black ISO panel with hardlight edge */
+[data-theme="tron"] .sidebar-wrapper {
+  background: rgba(0,4,10,0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-right: 1px solid rgba(0,240,255,0.35);
+  box-shadow: 2px 0 40px rgba(0,200,255,0.1), inset -1px 0 0 rgba(0,240,255,0.06);
+}
+/* Logo area: ISO program baton panel */
+[data-theme="tron"] .sidebar-wrapper > div:first-child {
+  background: linear-gradient(135deg, rgba(0,60,80,0.6), rgba(0,20,30,0.8)) !important;
+  border-bottom: 1px solid rgba(0,240,255,0.3) !important;
+  animation: none !important;
+}
+[data-theme="tron"] .sidebar-section-title {
+  color: rgba(0,240,255,0.7);
+  letter-spacing: 0.22em;
+  font-weight: 700;
+}
+[data-theme="tron"] .sidebar-active {
+  background: rgba(0,200,255,0.15) !important;
+  border-left: 2px solid rgba(0,240,255,0.9) !important;
+  box-shadow: 0 0 18px rgba(0,200,255,0.3), inset 0 0 12px rgba(0,200,255,0.08) !important;
+}
+[data-theme="tron"] .sidebar-status-dot {
+  background: #00F0FF;
+  border-radius: 0 !important;
+  box-shadow: 0 0 8px rgba(0,240,255,0.9);
+}
+[data-theme="tron"] .thinking-dot { background: #00C8FF; }
+[data-theme="tron"] .streaming-caret::after { color: #50E0FF; }
+/* Headings: neon hardlight text */
+[data-theme="tron"] h1, [data-theme="tron"] h2, [data-theme="tron"] h3 {
+  color: rgba(0,240,255,0.95) !important;
+  text-shadow: 0 0 10px rgba(0,200,255,0.7), 0 0 30px rgba(0,200,255,0.3) !important;
+  letter-spacing: 0.06em;
+}
+/* Chat messages: ISO program display */
+[data-theme="tron"] .chat-shell {
+  background: rgba(0,4,12,0.95);
+}
+/* Horizontal disc scan across content */
 [data-theme="tron"] .chat-shell::before {
   content: "";
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(to right, transparent, rgba(0,200,255,0.9) 50%, transparent);
-  width: 60%; animation: ext-scan-h 8s ease-in-out infinite !important;
+  background: linear-gradient(to right, transparent, rgba(0,240,255,0.95) 50%, transparent);
+  width: 55%;
+  animation: ext-scan-h 7s ease-in-out infinite !important;
   pointer-events: none; z-index: 10;
 }
-/* Sidebar: glass panel with neon edge glow */
-[data-theme="tron"] .sidebar-wrapper {
-  background: rgba(0,0,8,0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(0,200,255,0.3);
-  box-shadow: 2px 0 30px rgba(0,200,255,0.08);
-  animation: ext-neon-border 6s ease-in-out infinite !important;
-}
-[data-theme="tron"] .sidebar-section-title { color: rgba(0,200,255,0.6); letter-spacing: 0.18em; }
-[data-theme="tron"] .sidebar-status-dot { background: #00C8FF; border-radius: 0 !important; }
-[data-theme="tron"] .thinking-dot { background: #00C8FF; }
-[data-theme="tron"] .streaming-caret::after { color: #50E0FF; }
-/* Heading neon pulse */
-[data-theme="tron"] h1, [data-theme="tron"] h2, [data-theme="tron"] h3 {
-  animation: ext-neon-pulse 4s ease-in-out infinite !important;
-}
-[data-theme="tron"] .app-shell-root {
-  background-image: radial-gradient(ellipse 900px 600px at 50% 0%, rgba(0,200,255,0.12), transparent 60%),
-                    radial-gradient(ellipse 600px 400px at 50% 100%, rgba(0,150,200,0.06), transparent 60%);
-}
-[data-theme="tron"] .sidebar-active {
-  box-shadow: 0 0 14px rgba(0,200,255,0.35), inset 0 0 10px rgba(0,200,255,0.1) !important;
+/* Borders pulse cyan */
+[data-theme="tron"] .divider {
+  background: linear-gradient(to right, transparent, rgba(0,200,255,0.4) 50%, transparent) !important;
 }
 
 /* ══════════════════════════════════════════
-   BLADE RUNNER — Voigt-Kampff machine / neo-noir
+   BLADE RUNNER — Voigt-Kampff machine (canvas handles iris + oscilloscope)
    ══════════════════════════════════════════ */
 
-/* Warm amber vertical rain strips — city acid rain */
+/* VK machine background — near-black with amber warmth */
+[data-theme="bladerunner"] .app-shell-root {
+  background: #050300;
+}
+/* Amber phosphor glow behind content */
 [data-theme="bladerunner"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
-  background: repeating-linear-gradient(
-    94deg,
-    transparent 0px, transparent 12px,
-    rgba(212,144,10,0.06) 12px, rgba(212,144,10,0.06) 13px,
-    transparent 13px, transparent 28px,
-    rgba(61,100,200,0.04) 28px, rgba(61,100,200,0.04) 29px
-  );
-  animation: ext-rain-drift 8s linear infinite !important;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 30%, rgba(220,148,14,0.08), transparent 60%),
+    radial-gradient(ellipse 40% 60% at 80% 80%, rgba(60,60,200,0.06), transparent 60%);
   pointer-events: none; z-index: 1;
+  animation: ext-breathe 7s ease-in-out infinite !important;
 }
-/* Bottom city glow horizon */
+/* City neon haze at the bottom */
 [data-theme="bladerunner"] .app-shell-root::after {
   content: "";
-  position: fixed; bottom: 0; left: 0; right: 0; height: 200px;
+  position: fixed; bottom: 0; left: 0; right: 0; height: 180px;
   background: linear-gradient(to top,
-    rgba(212,100,10,0.12) 0%,
-    rgba(61,60,200,0.06) 40%,
+    rgba(180,80,0,0.14) 0%,
+    rgba(80,40,200,0.05) 50%,
     transparent 100%
   );
   pointer-events: none; z-index: 1;
-  animation: ext-breathe 5s ease-in-out infinite !important;
 }
-/* Glass sidebar — detective's office window */
+/* Sidebar: VK machine chassis */
 [data-theme="bladerunner"] .sidebar-wrapper {
-  background: rgba(6,3,5,0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-right: 1px solid rgba(212,144,10,0.22);
-  box-shadow: 2px 0 24px rgba(0,0,0,0.8);
+  background: rgba(8,4,2,0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(220,148,14,0.28);
+  box-shadow: 2px 0 30px rgba(0,0,0,0.95), inset -1px 0 8px rgba(180,100,0,0.05);
 }
-/* VK readout: oscilloscope border on messages */
-[data-theme="bladerunner"] .msg-enter {
-  border-bottom: 1px solid rgba(212,144,10,0.06);
-  animation: ext-osc-wave 4s ease-in-out infinite !important, msgFadeIn 0.2s var(--ease-out) !important;
+/* Logo area: brass-amber VK data panel */
+[data-theme="bladerunner"] .sidebar-wrapper > div:first-child {
+  background: linear-gradient(150deg, rgba(80,40,0,0.6), rgba(20,10,0,0.8)) !important;
+  border-bottom: 1px solid rgba(220,148,14,0.3) !important;
+  animation: none !important;
 }
-[data-theme="bladerunner"] .sidebar-section-title { color: rgba(212,144,10,0.6); }
-[data-theme="bladerunner"] .sidebar-status-dot { background: #D4900A; }
+[data-theme="bladerunner"] .sidebar-section-title {
+  color: rgba(220,148,14,0.65);
+  letter-spacing: 0.2em;
+}
+[data-theme="bladerunner"] .sidebar-active {
+  background: rgba(200,120,0,0.14) !important;
+  border-left: 2px solid rgba(220,148,14,0.8) !important;
+  box-shadow: 0 0 14px rgba(200,120,0,0.2) !important;
+}
+[data-theme="bladerunner"] .sidebar-status-dot {
+  background: #D4900A;
+  box-shadow: 0 0 8px rgba(212,144,10,0.7);
+}
 [data-theme="bladerunner"] .thinking-dot { background: #D4900A; }
 [data-theme="bladerunner"] .streaming-caret::after { color: #E8A020; }
-[data-theme="bladerunner"] .app-shell-root {
-  background-image:
-    radial-gradient(ellipse 800px 500px at 80% 100%, rgba(61,60,200,0.12), transparent 55%),
-    radial-gradient(ellipse 700px 400px at 10% 0%, rgba(212,144,10,0.11), transparent 55%);
+/* Chat: phosphor amber overlay on messages */
+[data-theme="bladerunner"] .chat-shell {
+  background: #060301;
+}
+/* Message entries: VK test readout style */
+[data-theme="bladerunner"] .msg-enter {
+  border-bottom: 1px solid rgba(200,120,0,0.08);
+  animation: ext-osc-wave 5s ease-in-out infinite !important, msgFadeIn 0.2s var(--ease-out) !important;
+}
+/* Headings get amber phosphor glow */
+[data-theme="bladerunner"] h1,
+[data-theme="bladerunner"] h2,
+[data-theme="bladerunner"] h3 {
+  color: rgba(220,160,40,0.9) !important;
+  text-shadow: 0 0 8px rgba(200,120,0,0.5) !important;
+}
+/* Dividers: amber horizontal rules */
+[data-theme="bladerunner"] .divider {
+  background: linear-gradient(to right, transparent, rgba(200,120,0,0.35) 50%, transparent) !important;
 }
 
 /* ══════════════════════════════════════════
