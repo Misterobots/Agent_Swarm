@@ -330,6 +330,13 @@
   92%  { opacity: 1; }
   100% { transform: translateX(110%); opacity: 0; }
 }
+/* Shimmer â€” wide sweep matching design spec (wider travel = more visible) */
+@keyframes lcars-shimmer {
+  0%   { transform: translateX(-150%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(250%); opacity: 0; }
+}
 /* Vertical scan â€” slow drift down the panel */
 @keyframes lcars-scan-v {
   0%   { transform: translateY(-110%); opacity: 0; }
@@ -337,12 +344,19 @@
   92%  { opacity: 0.6; }
   100% { transform: translateY(110%); opacity: 0; }
 }
-/* Active nav glow â€” gentle, never harsh */
+/* Active nav glow â€” gentle pulse with inner highlight */
 @keyframes lcars-nav-pulse {
   0%, 100% { box-shadow: inset 0 0 0 transparent; }
-  50%       { box-shadow: inset 0 0 12px rgba(255,255,255,0.08), 0 0 14px rgba(var(--chat-accent-rgb),0.28); }
+  50%       { box-shadow: inset 0 0 14px rgba(255,255,255,0.14), 0 0 14px rgba(var(--chat-accent-rgb),0.28); }
 }
-/* System blink â€” soft fade, not a hard flash */
+/* Status dot blink â€” matches design spec exactly */
+@keyframes lcars-blink-dot {
+  0%, 74%, 100% { opacity: 1; }
+  80%           { opacity: 0.15; }
+  87%           { opacity: 0.85; }
+  93%           { opacity: 0.15; }
+}
+/* System blink â€” soft fade, not a hard flash (used for headings etc) */
 @keyframes lcars-blink {
   0%, 75%, 100% { opacity: 1; }
   82%           { opacity: 0.25; }
@@ -372,7 +386,12 @@
   78%  { width: 88%; }
   100% { width: 18%; }
 }
-/* Elbow breathe â€” subtle, long cycle */
+/* Elbow breathe â€” filter-based, matches design spec */
+@keyframes lcars-elbow-breathe {
+  0%, 100% { filter: brightness(1); }
+  50%       { filter: brightness(1.06); }
+}
+/* Legacy alias â€” keep for any references */
 @keyframes lcars-elbow-pulse {
   0%, 100% { opacity: 1; filter: brightness(1); }
   50%       { opacity: 0.88; filter: brightness(1.08); }
@@ -418,16 +437,16 @@
   box-shadow: inset 0 -2px 8px rgba(0,0,0,0.35);
   position: relative;
   overflow: hidden;
-  animation: lcars-elbow-pulse 8s ease-in-out infinite !important;
+  animation: lcars-elbow-breathe 8s ease-in-out infinite !important;
 }
-/* Scan shimmer across the elbow â€” slow drift, not a wipe */
-[data-theme^="lcars"] .sidebar-wrapper > div:first-child::after {
-  content: "";
+/* Shimmer sweep across the elbow â€” wider travel = more visible */
+[data-theme^=”lcars”] .sidebar-wrapper > div:first-child::after {
+  content: “”;
   position: absolute;
   inset: 0;
   background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
   width: 60%;
-  animation: lcars-scan 9s ease-in-out infinite !important;
+  animation: lcars-shimmer 9s ease-in-out infinite !important;
   pointer-events: none;
 }
 /* Text on elbow: dark on light bg */
@@ -528,10 +547,13 @@
 [data-theme^="lcars"] .sidebar-active::before { display: none; }
 [data-theme^="lcars"] .sidebar-active svg { color: var(--lcars-nav-text-on) !important; }
 
-/* Status dot */
+/* Status dot â€" square shape + precise design-spec blink */
 [data-theme^="lcars"] .sidebar-status-dot {
   background: var(--chat-accent);
-  animation: lcars-blink 6s ease-in-out infinite !important;
+  border-radius: 0 !important;
+  width: 8px !important;
+  height: 8px !important;
+  animation: lcars-blink-dot 5s ease-in-out infinite !important;
 }
 
 [data-theme^="lcars"] .sidebar-wrapper > div:nth-child(2) {
@@ -615,15 +637,15 @@
 }
 
 /* â”€â”€ CHAT SURFACE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* Horizontal scan line at top of content */
-[data-theme^="lcars"] .chat-shell::before {
-  content: "";
+/* Horizontal scan line at top of content â€” shimmer matches design spec */
+[data-theme^=”lcars”] .chat-shell::before {
+  content: “”;
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
   background: linear-gradient(to right, transparent 0%, rgba(var(--chat-accent-rgb),0.7) 50%, transparent 100%);
-  width: 50%;
-  animation: lcars-scan 12s ease-in-out infinite !important;
+  width: 40%;
+  animation: lcars-shimmer 11s ease-in-out infinite !important;
   pointer-events: none;
   z-index: 100;
 }
@@ -1689,6 +1711,10 @@ main, .main-content {
   0%, 100% { opacity: 0.4; }
   50%       { opacity: 1;   }
 }
+@keyframes ext-breathe-scale {
+  0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+  50%       { opacity: 1;   transform: translate(-50%, -50%) scale(1.08); }
+}
 @keyframes ext-flicker {
   0%, 96%, 100% { opacity: 1; }
   97%            { opacity: 0.7; }
@@ -1698,6 +1724,44 @@ main, .main-content {
 @keyframes ext-neon-pulse {
   0%, 100% { text-shadow: 0 0 6px var(--chat-accent), 0 0 12px rgba(var(--chat-accent-rgb),0.4); }
   50%      { text-shadow: 0 0 2px var(--chat-accent); }
+}
+@keyframes ext-neon-border {
+  0%, 100% { box-shadow: 0 0 8px rgba(var(--chat-accent-rgb),0.3), inset 0 0 8px rgba(var(--chat-accent-rgb),0.05); }
+  50%      { box-shadow: 0 0 20px rgba(var(--chat-accent-rgb),0.6), inset 0 0 16px rgba(var(--chat-accent-rgb),0.1); }
+}
+@keyframes ext-circuit-trace {
+  0%   { height: 0%; opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { height: 100%; opacity: 0; }
+}
+@keyframes ext-hal-iris {
+  0%, 100% { opacity: 0.7; transform: translate(-50%, -40%) scale(1); }
+  50%       { opacity: 1;   transform: translate(-50%, -40%) scale(1.06); }
+}
+@keyframes ext-hal-ring {
+  0%, 100% { opacity: 0.25; transform: translate(-50%, -40%) scale(1); }
+  50%       { opacity: 0.55; transform: translate(-50%, -40%) scale(1.03); }
+}
+@keyframes ext-rain-drift {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100%); }
+}
+@keyframes ext-osc-wave {
+  0%, 100% { border-bottom-color: rgba(var(--chat-accent-rgb),0.08); }
+  50%       { border-bottom-color: rgba(var(--chat-accent-rgb),0.22); }
+}
+@keyframes ext-radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes ext-vignette-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 0.9; }
+}
+@keyframes ext-amber-drift {
+  0%, 100% { background-position: 0% 0%; }
+  50%       { background-position: 100% 100%; }
 }
 
 /* ══════════════════════════════════════════
@@ -1714,13 +1778,27 @@ main, .main-content {
   );
   pointer-events: none; z-index: 1;
 }
-/* Glass sidebar */
+/* Right-edge matrix data stream */
+[data-theme="shadowrun"] .app-shell-root::after {
+  content: "";
+  position: fixed; top: 0; right: 0; width: 2px; bottom: 0;
+  background: linear-gradient(to bottom,
+    transparent 0%,
+    rgba(0,221,192,0.8) 20%, rgba(0,221,192,0.4) 40%,
+    rgba(0,221,192,0.0) 60%, rgba(204,68,255,0.6) 80%,
+    transparent 100%
+  );
+  animation: ext-rain-drift 4s linear infinite !important;
+  pointer-events: none; z-index: 2;
+}
+/* Glass sidebar with neon border glow */
 [data-theme="shadowrun"] .sidebar-wrapper {
   background: rgba(2,12,10,0.78);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border-right: 1px solid rgba(0,200,160,0.22);
-  box-shadow: 2px 0 28px rgba(0,180,140,0.06);
+  border-right: 1px solid rgba(0,200,160,0.28);
+  box-shadow: 2px 0 28px rgba(0,180,140,0.1), 0 0 0 1px rgba(0,200,160,0.06);
+  animation: ext-neon-border 5s ease-in-out infinite !important;
 }
 /* Logo band sweep */
 [data-theme="shadowrun"] .sidebar-wrapper > div:first-child {
@@ -1734,94 +1812,195 @@ main, .main-content {
 }
 [data-theme="shadowrun"] .thinking-dot { background: #00DDC0; }
 [data-theme="shadowrun"] .streaming-caret::after { color: #00DDC0; }
-/* Backdrop glow */
+/* Backdrop glow — dual-corner neon */
 [data-theme="shadowrun"] .app-shell-root {
-  background-image: radial-gradient(ellipse 800px 500px at 5% 0%, rgba(0,221,192,0.09), transparent 55%),
-                    radial-gradient(ellipse 600px 400px at 95% 100%, rgba(204,68,255,0.07), transparent 55%);
+  background-image: radial-gradient(ellipse 800px 500px at 5% 0%, rgba(0,221,192,0.12), transparent 55%),
+                    radial-gradient(ellipse 600px 400px at 95% 100%, rgba(204,68,255,0.10), transparent 55%);
+}
+/* Active nav glows teal */
+[data-theme="shadowrun"] .sidebar-active {
+  box-shadow: 0 0 12px rgba(0,221,192,0.3), inset 0 0 8px rgba(0,221,192,0.1) !important;
+  border-left: 2px solid #00DDC0 !important;
 }
 
 /* ══════════════════════════════════════════
    OPS — Mission Control tactical blue
    ══════════════════════════════════════════ */
 
-/* Grid overlay */
+/* Tactical grid overlay */
 [data-theme="ops"] .chat-shell::after {
   content: "";
   position: fixed; inset: 0;
   background-image:
-    linear-gradient(rgba(76,159,232,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(76,159,232,0.04) 1px, transparent 1px);
+    linear-gradient(rgba(76,159,232,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(76,159,232,0.05) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none; z-index: 0;
 }
-/* Top scan line */
+/* Radar sweep scan line */
 [data-theme="ops"] .chat-shell::before {
   content: "";
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(to right, transparent, rgba(76,159,232,0.7) 50%, transparent);
-  width: 40%; animation: ext-scan-h 10s ease-in-out infinite !important;
+  background: linear-gradient(to right, transparent, rgba(76,159,232,0.9) 50%, transparent);
+  width: 40%; animation: ext-scan-h 8s ease-in-out infinite !important;
   pointer-events: none; z-index: 10;
 }
+/* Sidebar: tactical dark with blue edge */
 [data-theme="ops"] .sidebar-wrapper {
   background: var(--chat-bg);
-  border-right: 1px solid rgba(76,159,232,0.15);
-  box-shadow: 2px 0 20px rgba(0,0,0,0.4);
+  border-right: 1px solid rgba(76,159,232,0.2);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.5), inset -1px 0 0 rgba(76,159,232,0.08);
+}
+/* Section titles get tactical uppercase treatment */
+[data-theme="ops"] .sidebar-section-title {
+  color: rgba(76,159,232,0.7);
+  letter-spacing: 0.2em;
+}
+/* Status dot: blue */
+[data-theme="ops"] .sidebar-status-dot { background: #4C9FE8; }
+/* Active nav: blue accent */
+[data-theme="ops"] .sidebar-active {
+  border-left: 2px solid #4C9FE8 !important;
+  background: rgba(76,159,232,0.12) !important;
 }
 [data-theme="ops"] .thinking-dot { background: #4C9FE8; }
+/* App body: subtle corner radars */
+[data-theme="ops"] .app-shell-root {
+  background-image:
+    radial-gradient(ellipse 600px 400px at 100% 0%, rgba(76,159,232,0.07), transparent 60%),
+    radial-gradient(ellipse 400px 300px at 0% 100%, rgba(76,159,232,0.05), transparent 60%);
+}
+/* Vertical scan accent on left of chat */
+[data-theme="ops"] .app-shell-root::before {
+  content: "";
+  position: fixed; left: 0; top: 0; width: 2px; bottom: 0;
+  background: linear-gradient(to bottom, transparent, rgba(76,159,232,0.5) 50%, transparent);
+  animation: ext-circuit-trace 6s ease-in-out infinite !important;
+  pointer-events: none; z-index: 2;
+}
 
 /* ══════════════════════════════════════════
    TERMINAL — phosphor green CRT
    ══════════════════════════════════════════ */
 
-/* Green phosphor CRT scanlines */
+/* Heavy phosphor CRT scanlines */
 [data-theme="terminal"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
   background: repeating-linear-gradient(
     0deg, transparent, transparent 2px,
-    rgba(51,255,102,0.05) 2px, rgba(51,255,102,0.05) 4px
+    rgba(51,255,102,0.06) 2px, rgba(51,255,102,0.06) 4px
   );
   pointer-events: none; z-index: 1;
 }
-/* Cursor glow on headings */
+/* CRT vignette — dark edges burn in */
+[data-theme="terminal"] .app-shell-root::after {
+  content: "";
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse 85% 85% at 50% 50%, transparent 50%, rgba(0,0,0,0.65) 100%);
+  pointer-events: none; z-index: 1;
+}
+/* Slow scan bar drifting down the screen */
+[data-theme="terminal"] .chat-shell::before {
+  content: "";
+  position: absolute; left: 0; right: 0; height: 3px; top: 0;
+  background: linear-gradient(to right, transparent, rgba(51,255,102,0.5) 50%, transparent);
+  width: 80%;
+  animation: ext-scan-v 12s linear infinite !important;
+  pointer-events: none; z-index: 10;
+}
+/* Cursor glow on headings — stronger phosphor */
 [data-theme="terminal"] h1,
 [data-theme="terminal"] h2,
 [data-theme="terminal"] h3 {
   animation: ext-neon-pulse 3s ease-in-out infinite !important;
+  font-family: "JetBrains Mono", "Courier New", monospace !important;
+  letter-spacing: 0.05em !important;
 }
-/* Sidebar: dark terminal panel */
+/* Sidebar: deep terminal panel */
 [data-theme="terminal"] .sidebar-wrapper {
   background: #010601;
-  border-right: 1px solid rgba(51,255,102,0.2);
+  border-right: 1px solid rgba(51,255,102,0.25);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.6);
+}
+[data-theme="terminal"] .sidebar-section-title {
+  color: rgba(51,255,102,0.6);
+  letter-spacing: 0.2em;
+  font-family: "JetBrains Mono", monospace;
 }
 [data-theme="terminal"] .thinking-dot { background: #33FF66; }
 [data-theme="terminal"] .streaming-caret::after { color: #33FF66; }
-/* Flicker on the whole shell */
+[data-theme="terminal"] .sidebar-status-dot { background: #33FF66; }
+/* Flicker on the whole shell — subtle */
 [data-theme="terminal"] .chat-shell {
-  animation: ext-flicker 8s step-start infinite !important;
+  animation: ext-flicker 10s step-start infinite !important;
 }
-/* Subtle phosphor body glow */
+/* Deep phosphor body glow */
 [data-theme="terminal"] .app-shell-root {
-  background-image: radial-gradient(ellipse 1200px 800px at 50% 50%, rgba(0,30,0,0.6), transparent 70%);
+  background-image: radial-gradient(ellipse 1200px 800px at 50% 50%, rgba(0,30,0,0.7), transparent 70%);
+}
+/* Terminal font for all text */
+[data-theme="terminal"] .chat-shell {
+  font-family: "JetBrains Mono", "Courier New", monospace !important;
 }
 
 /* ══════════════════════════════════════════
    HAL 9000 — deep red on void
    ══════════════════════════════════════════ */
 
-/* Breathing red ambient */
+/* HAL iris — large breathing eye in the chat background */
+[data-theme="hal9000"] .chat-shell::before {
+  content: "";
+  position: absolute; left: 50%; top: 40%;
+  transform: translate(-50%, -40%);
+  width: 560px; height: 560px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(255,20,20,0.22) 0%,
+    rgba(200,0,0,0.14) 18%,
+    rgba(140,0,0,0.07) 38%,
+    rgba(80,0,0,0.03) 58%,
+    transparent 72%
+  );
+  animation: ext-hal-iris 4s ease-in-out infinite !important;
+  pointer-events: none; z-index: 0;
+}
+/* HAL iris outer ring */
+[data-theme="hal9000"] .chat-shell::after {
+  content: "";
+  position: absolute; left: 50%; top: 40%;
+  transform: translate(-50%, -40%);
+  width: 380px; height: 380px;
+  border-radius: 50%;
+  border: 1px solid rgba(200,0,0,0.18);
+  box-shadow: 0 0 60px rgba(180,0,0,0.12), inset 0 0 60px rgba(180,0,0,0.06);
+  animation: ext-hal-ring 6s ease-in-out infinite !important;
+  pointer-events: none; z-index: 0;
+}
+/* Full app breathing ambient */
 [data-theme="hal9000"] .app-shell-root::after {
   content: "";
   position: fixed; inset: 0;
-  background: radial-gradient(ellipse 700px 500px at 50% 50%, rgba(180,0,0,0.18), transparent 65%);
+  background: radial-gradient(ellipse 700px 500px at 50% 50%, rgba(160,0,0,0.14), transparent 65%);
   animation: ext-breathe 6s ease-in-out infinite !important;
   pointer-events: none; z-index: 1;
 }
-/* Sidebar: nearly black with faint red border */
-[data-theme="hal9000"] .sidebar-wrapper {
-  background: #000003;
-  border-right: 1px solid rgba(180,0,0,0.2);
+/* Cold red accent line at top of chat */
+[data-theme="hal9000"] .app-shell-root::before {
+  content: "";
+  position: fixed; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(to right, transparent, rgba(204,0,0,0.6) 50%, transparent);
+  pointer-events: none; z-index: 100;
+  animation: ext-breathe 4s ease-in-out infinite !important;
 }
+/* Sidebar: void black with red edge */
+[data-theme="hal9000"] .sidebar-wrapper {
+  background: #000002;
+  border-right: 1px solid rgba(180,0,0,0.25);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.8);
+}
+[data-theme="hal9000"] .sidebar-section-title { color: rgba(204,0,0,0.55); }
+[data-theme="hal9000"] .sidebar-status-dot { background: #CC0000; }
 [data-theme="hal9000"] .thinking-dot { background: #CC0000; }
 [data-theme="hal9000"] .streaming-caret::after { color: #FF2020; }
 
@@ -1829,127 +2008,258 @@ main, .main-content {
    NOSTROMO — amber distress / Alien
    ══════════════════════════════════════════ */
 
+/* CRT amber scanlines with flicker */
 [data-theme="nostromo"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
   background: repeating-linear-gradient(
     0deg, transparent, transparent 3px,
-    rgba(255,140,0,0.04) 3px, rgba(255,140,0,0.04) 4px
+    rgba(255,140,0,0.05) 3px, rgba(255,140,0,0.05) 4px
   );
   pointer-events: none; z-index: 1;
   animation: ext-flicker 12s step-start infinite !important;
 }
+/* MU/TH/UR amber scan bar drifting down */
+[data-theme="nostromo"] .chat-shell::before {
+  content: "";
+  position: absolute; left: 0; right: 0; height: 60px; top: 0;
+  background: linear-gradient(to bottom,
+    rgba(255,140,0,0.06) 0%,
+    rgba(255,140,0,0.03) 50%,
+    transparent 100%
+  );
+  animation: ext-scan-v 18s linear infinite !important;
+  pointer-events: none; z-index: 0;
+}
+/* Warning amber border strip at top */
+[data-theme="nostromo"] .app-shell-root::after {
+  content: "";
+  position: fixed; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(to right,
+    rgba(255,100,0,0.6) 0%, rgba(255,180,0,0.8) 25%,
+    rgba(255,100,0,0.6) 50%, rgba(255,180,0,0.8) 75%,
+    rgba(255,100,0,0.6) 100%
+  );
+  animation: ext-breathe 3s ease-in-out infinite !important;
+  pointer-events: none; z-index: 100;
+}
+/* Sidebar: dark amber panel */
 [data-theme="nostromo"] .sidebar-wrapper {
   background: #060400;
-  border-right: 1px solid rgba(200,120,0,0.2);
+  border-right: 1px solid rgba(200,120,0,0.25);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.7);
 }
+[data-theme="nostromo"] .sidebar-section-title { color: rgba(255,140,0,0.55); }
+[data-theme="nostromo"] .sidebar-status-dot { background: #FF8C00; }
 [data-theme="nostromo"] .thinking-dot { background: #FF8C00; }
 [data-theme="nostromo"] .streaming-caret::after { color: #FFAA33; }
 [data-theme="nostromo"] .app-shell-root {
-  background-image: radial-gradient(ellipse 1000px 600px at 30% 80%, rgba(255,100,0,0.09), transparent 60%);
+  background-image: radial-gradient(ellipse 1000px 600px at 30% 80%, rgba(255,100,0,0.12), transparent 60%),
+                    radial-gradient(ellipse 600px 400px at 70% 20%, rgba(200,80,0,0.07), transparent 60%);
 }
 
 /* ══════════════════════════════════════════
    TRON — electric cyan Grid
    ══════════════════════════════════════════ */
 
-/* Grid lines */
+/* Grid lines — the Grid */
 [data-theme="tron"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
   background-image:
-    linear-gradient(rgba(0,200,255,0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,200,255,0.08) 1px, transparent 1px);
+    linear-gradient(rgba(0,200,255,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,255,0.07) 1px, transparent 1px);
   background-size: 48px 48px;
   pointer-events: none; z-index: 1;
 }
-/* Horizontal scan on chat shell */
+/* Circuit trace on right side of app — identity disc orbit */
+[data-theme="tron"] .app-shell-root::after {
+  content: "";
+  position: fixed; right: 0; top: 0; width: 1px; bottom: 0;
+  background: linear-gradient(to bottom,
+    transparent 0%, rgba(0,200,255,0) 20%,
+    rgba(0,200,255,0.9) 35%, rgba(0,200,255,0.9) 36%,
+    rgba(0,200,255,0) 51%, transparent 100%
+  );
+  animation: ext-circuit-trace 5s ease-in-out infinite !important;
+  pointer-events: none; z-index: 2;
+}
+/* Horizontal identity disc scan */
 [data-theme="tron"] .chat-shell::before {
   content: "";
-  position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(to right, transparent, #00C8FF 50%, transparent);
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(to right, transparent, rgba(0,200,255,0.9) 50%, transparent);
   width: 60%; animation: ext-scan-h 8s ease-in-out infinite !important;
   pointer-events: none; z-index: 10;
 }
-/* Sidebar: glass with cyan edge */
+/* Sidebar: glass panel with neon edge glow */
 [data-theme="tron"] .sidebar-wrapper {
   background: rgba(0,0,8,0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(0,200,255,0.25);
-  box-shadow: 2px 0 24px rgba(0,200,255,0.06);
+  border-right: 1px solid rgba(0,200,255,0.3);
+  box-shadow: 2px 0 30px rgba(0,200,255,0.08);
+  animation: ext-neon-border 6s ease-in-out infinite !important;
 }
+[data-theme="tron"] .sidebar-section-title { color: rgba(0,200,255,0.6); letter-spacing: 0.18em; }
+[data-theme="tron"] .sidebar-status-dot { background: #00C8FF; border-radius: 0 !important; }
 [data-theme="tron"] .thinking-dot { background: #00C8FF; }
 [data-theme="tron"] .streaming-caret::after { color: #50E0FF; }
+/* Heading neon pulse */
+[data-theme="tron"] h1, [data-theme="tron"] h2, [data-theme="tron"] h3 {
+  animation: ext-neon-pulse 4s ease-in-out infinite !important;
+}
 [data-theme="tron"] .app-shell-root {
-  background-image: radial-gradient(ellipse 900px 600px at 50% 0%, rgba(0,200,255,0.1), transparent 60%);
+  background-image: radial-gradient(ellipse 900px 600px at 50% 0%, rgba(0,200,255,0.12), transparent 60%),
+                    radial-gradient(ellipse 600px 400px at 50% 100%, rgba(0,150,200,0.06), transparent 60%);
+}
+[data-theme="tron"] .sidebar-active {
+  box-shadow: 0 0 14px rgba(0,200,255,0.35), inset 0 0 10px rgba(0,200,255,0.1) !important;
 }
 
 /* ══════════════════════════════════════════
-   BLADE RUNNER — neo-noir amber & blue
+   BLADE RUNNER — Voigt-Kampff machine / neo-noir
    ══════════════════════════════════════════ */
 
-/* Rain / haze */
+/* Warm amber vertical rain strips — city acid rain */
 [data-theme="bladerunner"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
   background: repeating-linear-gradient(
-    92deg, transparent, transparent 8px,
-    rgba(212,144,10,0.04) 8px, rgba(212,144,10,0.04) 9px
+    94deg,
+    transparent 0px, transparent 12px,
+    rgba(212,144,10,0.06) 12px, rgba(212,144,10,0.06) 13px,
+    transparent 13px, transparent 28px,
+    rgba(61,100,200,0.04) 28px, rgba(61,100,200,0.04) 29px
   );
+  animation: ext-rain-drift 8s linear infinite !important;
   pointer-events: none; z-index: 1;
 }
+/* Bottom city glow horizon */
+[data-theme="bladerunner"] .app-shell-root::after {
+  content: "";
+  position: fixed; bottom: 0; left: 0; right: 0; height: 200px;
+  background: linear-gradient(to top,
+    rgba(212,100,10,0.12) 0%,
+    rgba(61,60,200,0.06) 40%,
+    transparent 100%
+  );
+  pointer-events: none; z-index: 1;
+  animation: ext-breathe 5s ease-in-out infinite !important;
+}
+/* Glass sidebar — detective's office window */
 [data-theme="bladerunner"] .sidebar-wrapper {
   background: rgba(6,3,5,0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border-right: 1px solid rgba(212,144,10,0.18);
+  border-right: 1px solid rgba(212,144,10,0.22);
+  box-shadow: 2px 0 24px rgba(0,0,0,0.8);
 }
+/* VK readout: oscilloscope border on messages */
+[data-theme="bladerunner"] .msg-enter {
+  border-bottom: 1px solid rgba(212,144,10,0.06);
+  animation: ext-osc-wave 4s ease-in-out infinite !important, msgFadeIn 0.2s var(--ease-out) !important;
+}
+[data-theme="bladerunner"] .sidebar-section-title { color: rgba(212,144,10,0.6); }
+[data-theme="bladerunner"] .sidebar-status-dot { background: #D4900A; }
 [data-theme="bladerunner"] .thinking-dot { background: #D4900A; }
+[data-theme="bladerunner"] .streaming-caret::after { color: #E8A020; }
 [data-theme="bladerunner"] .app-shell-root {
   background-image:
-    radial-gradient(ellipse 800px 500px at 80% 100%, rgba(61,120,255,0.1), transparent 55%),
-    radial-gradient(ellipse 700px 400px at 10% 0%, rgba(212,144,10,0.09), transparent 55%);
+    radial-gradient(ellipse 800px 500px at 80% 100%, rgba(61,60,200,0.12), transparent 55%),
+    radial-gradient(ellipse 700px 400px at 10% 0%, rgba(212,144,10,0.11), transparent 55%);
 }
 
 /* ══════════════════════════════════════════
    DUNE — spice desert gold
    ══════════════════════════════════════════ */
 
-/* Sand grain */
+/* Sand grain texture */
 [data-theme="dune"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
   background-size: 200px 200px;
-  opacity: 0.7; pointer-events: none; z-index: 1;
+  opacity: 0.8; pointer-events: none; z-index: 1;
+  animation: ext-amber-drift 30s ease-in-out infinite !important;
+}
+/* Desert horizon heat shimmer at the bottom */
+[data-theme="dune"] .app-shell-root::after {
+  content: "";
+  position: fixed; bottom: 0; left: 0; right: 0; height: 300px;
+  background: linear-gradient(to top,
+    rgba(232,136,26,0.15) 0%,
+    rgba(180,90,0,0.08) 30%,
+    transparent 100%
+  );
+  animation: ext-breathe 7s ease-in-out infinite !important;
+  pointer-events: none; z-index: 1;
+}
+/* Slow spice flow scan across chat */
+[data-theme="dune"] .chat-shell::before {
+  content: "";
+  position: absolute; left: 0; right: 0; height: 100px; top: 0;
+  background: linear-gradient(to bottom,
+    rgba(232,136,26,0.05) 0%,
+    transparent 100%
+  );
+  animation: ext-scan-v 20s linear infinite !important;
+  pointer-events: none; z-index: 0;
 }
 [data-theme="dune"] .sidebar-wrapper {
   background: #060300;
-  border-right: 1px solid rgba(200,130,30,0.2);
+  border-right: 1px solid rgba(200,130,30,0.25);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.7);
 }
+[data-theme="dune"] .sidebar-section-title { color: rgba(232,136,26,0.55); }
+[data-theme="dune"] .sidebar-status-dot { background: #E8881A; }
 [data-theme="dune"] .thinking-dot { background: #E8881A; }
+[data-theme="dune"] .streaming-caret::after { color: #F09A30; }
 [data-theme="dune"] .app-shell-root {
-  background-image: radial-gradient(ellipse 1200px 600px at 50% 100%, rgba(200,100,0,0.12), transparent 60%);
+  background-image: radial-gradient(ellipse 1200px 600px at 50% 100%, rgba(200,100,0,0.16), transparent 60%),
+                    radial-gradient(ellipse 800px 400px at 50% 50%, rgba(120,60,0,0.08), transparent 70%);
 }
 
 /* ══════════════════════════════════════════
    MEMEX ARCHIVE — sepia memory / analogue
    ══════════════════════════════════════════ */
 
-/* Paper grain */
+/* Paper grain — aged document texture */
 [data-theme="memex-archive"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E");
   background-size: 200px 200px;
-  opacity: 0.8; pointer-events: none; z-index: 1;
+  opacity: 0.9; pointer-events: none; z-index: 1;
+  animation: ext-amber-drift 40s ease-in-out infinite !important;
+}
+/* Analogue film vignette */
+[data-theme="memex-archive"] .app-shell-root::after {
+  content: "";
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse 75% 75% at 50% 50%, transparent 45%, rgba(40,20,0,0.7) 100%);
+  pointer-events: none; z-index: 1;
+  animation: ext-vignette-pulse 8s ease-in-out infinite !important;
+}
+/* Memory trace scan — slow drift */
+[data-theme="memex-archive"] .chat-shell::before {
+  content: "";
+  position: absolute; left: 0; right: 0; height: 1px; top: 0;
+  background: linear-gradient(to right, transparent, rgba(200,146,42,0.4) 50%, transparent);
+  width: 70%;
+  animation: ext-scan-h 16s ease-in-out infinite !important;
+  pointer-events: none; z-index: 10;
 }
 [data-theme="memex-archive"] .sidebar-wrapper {
   background: #0A0600;
-  border-right: 1px solid rgba(180,140,60,0.18);
+  border-right: 1px solid rgba(180,140,60,0.22);
+  box-shadow: 2px 0 20px rgba(0,0,0,0.7);
 }
+[data-theme="memex-archive"] .sidebar-section-title { color: rgba(200,146,42,0.55); }
+[data-theme="memex-archive"] .sidebar-status-dot { background: #C8922A; }
 [data-theme="memex-archive"] .thinking-dot { background: #C8922A; }
+[data-theme="memex-archive"] .streaming-caret::after { color: #D4A030; }
 [data-theme="memex-archive"] .app-shell-root {
-  background-image: radial-gradient(ellipse 1000px 500px at 50% 0%, rgba(180,130,40,0.1), transparent 60%);
+  background-image: radial-gradient(ellipse 1000px 500px at 50% 0%, rgba(180,130,40,0.13), transparent 60%),
+                    radial-gradient(ellipse 800px 600px at 50% 100%, rgba(120,80,20,0.08), transparent 60%);
 }

@@ -352,7 +352,7 @@ function SidebarSection({ title, children }: { title: string; children: React.Re
   return (
     <div className="mb-4">
       <div className="px-4 pb-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--chat-subtle)]">
+        <span className="sidebar-section-title text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--chat-subtle)]">
           {title}
         </span>
       </div>

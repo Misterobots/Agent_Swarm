@@ -102,9 +102,9 @@ export function ThinkingIndicator({ statusMessage, latestThought, streamMode, sw
               Compacting context
             </span>
             <span className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:0ms]" />
-              <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:150ms]" />
-              <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:300ms]" />
+              <span className="thinking-dot w-1 h-1 rounded-full bg-[var(--chat-accent-2)]" />
+              <span className="thinking-dot w-1 h-1 rounded-full bg-[var(--chat-accent-2)]" />
+              <span className="thinking-dot w-1 h-1 rounded-full bg-[var(--chat-accent-2)]" />
             </span>
           </div>
         ) : (
@@ -131,11 +131,11 @@ export function ThinkingIndicator({ statusMessage, latestThought, streamMode, sw
               {THINKING_PHASES[thinkingPhase]}
             </span>
           )}
-          {/* Bouncing dots indicator */}
+          {/* Pulsing dots indicator */}
           <span className="flex gap-0.5">
-            <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:0ms]" />
-            <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:150ms]" />
-            <span className="w-1 h-1 rounded-full bg-[var(--chat-accent-2)] animate-bounce [animation-delay:300ms]" />
+            <span className="thinking-dot w-1 h-1 rounded-full bg-[var(--chat-accent-2)]" />
+            <span className="thinking-dot w-1 h-1 rounded-full bg-[var(--chat-accent-2)]" />
+            <span className="thinking-dot w-1 h-1 rounded-full bg-[var(--chat-accent-2)]" />
           </span>
         </div>
         {/* Line 2: Streaming thought trace */}
