@@ -204,18 +204,27 @@ function drawTron(
   const cyan = (a: number) => `rgba(0,240,255,${a})`;
   const white = (a: number) => `rgba(200,255,255,${a})`;
 
-  // ── Grid ──────────────────────────────────────────────────
+  // ── Grid ─────────────────────────────────────────────────
+  // Fade zone: grid dissolves in over 2 cells from the sidebar edge
+  const fadeW = G * 2;
   ctx.lineWidth = 0.5;
   for (let x = sidebarW; x <= w; x += G) {
+    const edgeFade = Math.min(1, (x - sidebarW) / fadeW);
+    const base = (0.055 + Math.sin(t * 0.001 + x * 0.008) * 0.015) * edgeFade;
     ctx.beginPath();
     ctx.moveTo(x, 0); ctx.lineTo(x, h);
-    ctx.strokeStyle = cyan(0.055 + Math.sin(t * 0.001 + x * 0.008) * 0.015);
+    ctx.strokeStyle = cyan(base);
     ctx.stroke();
   }
   for (let y = 0; y <= h; y += G) {
     ctx.beginPath();
+    // Horizontal lines fade in from the left using a gradient stroke
+    const hGrad = ctx.createLinearGradient(sidebarW, y, sidebarW + fadeW, y);
+    const base = 0.055 + Math.sin(t * 0.001 + y * 0.008) * 0.015;
+    hGrad.addColorStop(0, cyan(0));
+    hGrad.addColorStop(1, cyan(base));
     ctx.moveTo(sidebarW, y); ctx.lineTo(w, y);
-    ctx.strokeStyle = cyan(0.055 + Math.sin(t * 0.001 + y * 0.008) * 0.015);
+    ctx.strokeStyle = hGrad;
     ctx.stroke();
   }
 
@@ -283,19 +292,20 @@ function drawTron(
     ctx.shadowBlur = 0;
   });
 
-  // ── Sidebar edge circuit trace ────────────────────────────
+  // ── Sidebar edge circuit trace — 1px inside content area ──
   const traceY = (t * 0.08) % h;
-  const traceH = 120;
+  const traceH = 100;
+  const traceX = sidebarW + 1; // 1px into content so it doesn't bisect the sidebar border
   const traceGrad = ctx.createLinearGradient(0, traceY - traceH, 0, traceY + traceH);
-  traceGrad.addColorStop(0, cyan(0));
-  traceGrad.addColorStop(0.5, cyan(0.7));
-  traceGrad.addColorStop(1, cyan(0));
-  ctx.lineWidth = 1.5;
-  ctx.shadowBlur = 8;
+  traceGrad.addColorStop(0,   cyan(0));
+  traceGrad.addColorStop(0.5, cyan(0.55));
+  traceGrad.addColorStop(1,   cyan(0));
+  ctx.lineWidth = 1;
+  ctx.shadowBlur = 6;
   ctx.shadowColor = cyan(1);
   ctx.beginPath();
-  ctx.moveTo(sidebarW, traceY - traceH);
-  ctx.lineTo(sidebarW, traceY + traceH);
+  ctx.moveTo(traceX, traceY - traceH);
+  ctx.lineTo(traceX, traceY + traceH);
   ctx.strokeStyle = traceGrad;
   ctx.stroke();
   ctx.shadowBlur = 0;
@@ -409,15 +419,23 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   const oscH = 40;
   const points = 60;
 
-  // Faint sidebar panel border — no solid fill so text behind shows through
-  ctx.strokeStyle = amber(0.18);
+  // Hairline separator above readout — no hard rectangle border
+  const sepY = oscY - oscH - 8;
+  const sepGrad = ctx.createLinearGradient(oscX, sepY, oscX + oscW, sepY);
+  sepGrad.addColorStop(0,   amber(0));
+  sepGrad.addColorStop(0.2, amber(0.28));
+  sepGrad.addColorStop(0.8, amber(0.28));
+  sepGrad.addColorStop(1,   amber(0));
+  ctx.beginPath();
+  ctx.moveTo(oscX, sepY); ctx.lineTo(oscX + oscW, sepY);
+  ctx.strokeStyle = sepGrad;
   ctx.lineWidth = 0.75;
-  ctx.strokeRect(oscX, oscY - oscH - 6, oscW, oscH + 10);
-  // Top label
+  ctx.stroke();
+  // Labels — float freely, no enclosing box
   ctx.font = "8px 'JetBrains Mono', monospace";
   ctx.fillStyle = amber(0.38);
   ctx.fillText("EMOTIONAL RESPONSE", oscX + 4, oscY - oscH + 2);
-  ctx.fillStyle = amber(0.22);
+  ctx.fillStyle = amber(0.20);
   ctx.fillText("VK-VI REPLICANT ANALYSIS", oscX + 4, oscY - oscH + 12);
 
   // Waveform
