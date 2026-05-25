@@ -331,9 +331,9 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   [1.0, 0.82, 0.65, 0.50, 0.36, 0.24, 0.14].forEach((scale, i) => {
     ctx.beginPath();
     ctx.arc(ix, iy, iR * scale * iBreath, 0, Math.PI * 2);
-    const a = 0.12 + i * 0.08 + Math.sin(t * 0.001 + i * 0.5) * 0.03;
+    const a = 0.22 + i * 0.10 + Math.sin(t * 0.001 + i * 0.5) * 0.05;
     ctx.strokeStyle = amber(a);
-    ctx.lineWidth = i === 0 ? 1.5 : 0.75;
+    ctx.lineWidth = i === 0 ? 2 : 1;
     ctx.stroke();
     // Tick marks on outer ring
     if (i === 0) {
@@ -358,7 +358,7 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
     const r1 = iR * 0.18 * iBreath;
     const r2 = iR * 0.52 * iBreath;
     const spread = 0.18;
-    const brightness = 0.10 + Math.sin(t * 0.0018 + i * 0.9) * 0.05;
+    const brightness = 0.18 + Math.sin(t * 0.0018 + i * 0.9) * 0.08;
     ctx.beginPath();
     ctx.moveTo(ix + Math.cos(ang - spread) * r1, iy + Math.sin(ang - spread) * r1);
     ctx.lineTo(ix + Math.cos(ang) * r2, iy + Math.sin(ang) * r2);
@@ -376,8 +376,8 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   const ry2 = iy + Math.sin(reticleAngle + Math.PI) * iR * 0.72;
   ctx.beginPath();
   ctx.moveTo(rx1, ry1); ctx.lineTo(rx2, ry2);
-  ctx.strokeStyle = amber(0.35);
-  ctx.lineWidth = 0.75;
+  ctx.strokeStyle = amber(0.55);
+  ctx.lineWidth = 1;
   ctx.stroke();
   // Reticle bracket at head
   const bSize = 7;
@@ -401,24 +401,24 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // ── Phosphor readout: oscilloscope above input bar ────────
-  const oscX = sw + 20;
-  const oscW = chatW * 0.55;
-  const oscY = h - 108; // 108px from bottom keeps it above the message input
-  const oscH = 36;
-  const points = 80;
+  // ── Phosphor readout: oscilloscope in sidebar (VK readout panel) ─
+  // Sits above the user-footer in the sidebar, ~bottom 18% of height
+  const oscX = 10;
+  const oscW = sw - 20;
+  const oscY = h - 70;  // baseline: 70px from bottom (clears user footer)
+  const oscH = 40;
+  const points = 60;
 
-  // Oscilloscope background panel
-  ctx.fillStyle = "rgba(20,10,0,0.35)";
-  ctx.fillRect(oscX, oscY - oscH - 4, oscW, oscH + 8);
-  ctx.strokeStyle = amber(0.22);
-  ctx.lineWidth = 1;
-  ctx.strokeRect(oscX, oscY - oscH - 4, oscW, oscH + 8);
-
-  // Oscilloscope label
-  ctx.font = "9px 'JetBrains Mono', monospace";
-  ctx.fillStyle = amber(0.45);
-  ctx.fillText("EMOTIONAL RESPONSE / VK-VI", oscX + 4, oscY - oscH + 0);
+  // Faint sidebar panel border — no solid fill so text behind shows through
+  ctx.strokeStyle = amber(0.18);
+  ctx.lineWidth = 0.75;
+  ctx.strokeRect(oscX, oscY - oscH - 6, oscW, oscH + 10);
+  // Top label
+  ctx.font = "8px 'JetBrains Mono', monospace";
+  ctx.fillStyle = amber(0.38);
+  ctx.fillText("EMOTIONAL RESPONSE", oscX + 4, oscY - oscH + 2);
+  ctx.fillStyle = amber(0.22);
+  ctx.fillText("VK-VI REPLICANT ANALYSIS", oscX + 4, oscY - oscH + 12);
 
   // Waveform
   ctx.beginPath();
@@ -694,7 +694,7 @@ export function ThemeAmbientCanvas() {
         inset: 0,
         pointerEvents: "none",
         zIndex: 2,
-        opacity: 1,
+        mixBlendMode: "screen",
       }}
       aria-hidden="true"
     />
