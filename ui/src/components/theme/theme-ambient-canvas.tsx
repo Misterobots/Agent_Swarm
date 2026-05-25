@@ -3,6 +3,11 @@
 import { useEffect, useRef } from "react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 
+// Sidebar pixel widths — must match Tailwind classes in app-shell.tsx
+const SW_FULL  = 256; // w-64
+const SW_SLIM  =  56; // w-14
+const SW_NONE  =   0;
+
 // ─────────────────────────────────────────────────────────────
 //  Types
 // ─────────────────────────────────────────────────────────────
@@ -48,12 +53,10 @@ function mkState(): CanvasState {
 // ─────────────────────────────────────────────────────────────
 //  HAL 9000 — breathing iris with rotating petals
 // ─────────────────────────────────────────────────────────────
-function drawHAL(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
+function drawHAL(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, sw: number) {
   ctx.clearRect(0, 0, w, h);
 
-  // Position iris in the chat content area (right of sidebar ~240px)
-  const sidebarW = Math.min(w * 0.22, 260);
-  const cx = sidebarW + (w - sidebarW) * 0.5;
+  const cx = sw + (w - sw) * 0.5;
   const cy = h * 0.44;
 
   const breathe = 0.93 + Math.sin(t * 0.0007) * 0.07;
@@ -162,11 +165,10 @@ function drawHAL(ctx: CanvasRenderingContext2D, w: number, h: number, t: number)
 // ─────────────────────────────────────────────────────────────
 //  TRON — The Grid with live light-cycle data streams
 // ─────────────────────────────────────────────────────────────
-function spawnStream(w: number, h: number): Stream {
+function spawnStream(w: number, h: number, sidebarW: number): Stream {
   const dir: "h" | "v" = Math.random() > 0.5 ? "h" : "v";
   const G = 48;
   const snap = (v: number) => Math.round(v / G) * G;
-  const sidebarW = Math.min(w * 0.22, 260);
 
   if (dir === "h") {
     const forward = Math.random() > 0.5;
@@ -193,12 +195,12 @@ function spawnStream(w: number, h: number): Stream {
 
 function drawTron(
   ctx: CanvasRenderingContext2D, w: number, h: number, t: number,
-  state: CanvasState
+  state: CanvasState, sw: number
 ) {
   ctx.clearRect(0, 0, w, h);
 
   const G = 48;
-  const sidebarW = Math.min(w * 0.22, 260);
+  const sidebarW = sw;
   const cyan = (a: number) => `rgba(0,240,255,${a})`;
   const white = (a: number) => `rgba(200,255,255,${a})`;
 
@@ -233,7 +235,7 @@ function drawTron(
 
   // ── Spawn new light streams ───────────────────────────────
   if (t - state.lastStreamSpawn > 350 && state.streams.length < 16) {
-    state.streams.push(spawnStream(w, h));
+    state.streams.push(spawnStream(w, h, sidebarW));
     state.lastStreamSpawn = t;
   }
 
@@ -302,17 +304,17 @@ function drawTron(
 // ─────────────────────────────────────────────────────────────
 //  BLADE RUNNER — Voigt-Kampff iris analyzer
 // ─────────────────────────────────────────────────────────────
-function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
+function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, sw: number) {
   ctx.clearRect(0, 0, w, h);
 
-  const sidebarW = Math.min(w * 0.22, 260);
+  const chatW = w - sw;
   const amber = (a: number) => `rgba(220,148,14,${a})`;
   const dimAmber = (a: number) => `rgba(160,90,5,${a})`;
 
-  // ── VK iris in sidebar area ───────────────────────────────
-  const ix = sidebarW * 0.5;
-  const iy = h * 0.32;
-  const iR = Math.min(sidebarW * 0.38, 88);
+  // ── VK iris — centered in the chat content area ───────────
+  const ix = sw + chatW * 0.5;
+  const iy = h * 0.40;
+  const iR = Math.min(chatW * 0.32, 240);
   const iBreath = 0.95 + Math.sin(t * 0.0009) * 0.05;
   const iSpin = t * 0.00018;
 
@@ -399,10 +401,10 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // ── Phosphor readout: oscilloscope in main area ───────────
-  const oscX = sidebarW + 20;
-  const oscW = (w - sidebarW) * 0.55;
-  const oscY = h * 0.88;
+  // ── Phosphor readout: oscilloscope above input bar ────────
+  const oscX = sw + 20;
+  const oscW = chatW * 0.55;
+  const oscY = h - 108; // 108px from bottom keeps it above the message input
   const oscH = 36;
   const points = 80;
 
@@ -446,13 +448,13 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // ── Ambient city glow ─────────────────────────────────────
-  const horizon = ctx.createLinearGradient(sidebarW, h * 0.7, sidebarW, h);
+  // ── Ambient city glow at bottom ──────────────────────────
+  const horizon = ctx.createLinearGradient(sw, h * 0.7, sw, h);
   horizon.addColorStop(0, "rgba(0,0,0,0)");
   horizon.addColorStop(0.5, dimAmber(0.06));
   horizon.addColorStop(1, dimAmber(0.14));
   ctx.fillStyle = horizon;
-  ctx.fillRect(sidebarW, h * 0.7, w - sidebarW, h * 0.3);
+  ctx.fillRect(sw, h * 0.7, chatW, h * 0.3);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -461,7 +463,7 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
 const SR_GLYPHS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ01";
 const SR_RUNE_CHARS = "ᚠᚡᚢᚣᚤᚥᚦᚧᚨᚩᚪᚫᚬᚭᚮᚯᚰᚱᚲᚳᚴᚵᚶᚷᚸᚹᚺᚻᚼᚽᚾᚿᛀᛁᛂᛃᛄᛅᛆᛇᛈᛉᛊᛋᛌᛍᛎᛏᛐᛑᛒᛓ";
 
-function initShadowrunGlyphs(w: number, h: number, state: CanvasState) {
+function initShadowrunGlyphs(w: number, h: number, sw: number, state: CanvasState) {
   const cols = Math.floor(w / 14);
   state.glyphs = Array.from({ length: cols * 3 }, () => ({
     col: Math.floor(Math.random() * cols),
@@ -475,16 +477,16 @@ function initShadowrunGlyphs(w: number, h: number, state: CanvasState) {
 
 function drawShadowrun(
   ctx: CanvasRenderingContext2D, w: number, h: number, t: number,
-  state: CanvasState
+  state: CanvasState, sw: number
 ) {
   ctx.clearRect(0, 0, w, h);
 
-  const sidebarW = Math.min(w * 0.22, 260);
+  const sidebarW = sw;
   const teal = (a: number) => `rgba(0,221,192,${a})`;
   const purple = (a: number) => `rgba(180,60,255,${a})`;
 
   // ── Matrix glyph rain ────────────────────────────────────
-  if (state.glyphs.length < 40) initShadowrunGlyphs(w, h, state);
+  if (state.glyphs.length < 40) initShadowrunGlyphs(w, h, sw, state);
   const colW = 14;
 
   state.glyphs.forEach(g => {
@@ -623,10 +625,19 @@ function drawShadowrun(
 const CANVAS_THEMES = new Set(["hal9000", "tron", "bladerunner", "shadowrun"]);
 
 export function ThemeAmbientCanvas() {
-  const theme = useSettingsStore(s => s.theme);
+  const theme        = useSettingsStore(s => s.theme);
+  const sidebarOpen  = useSettingsStore(s => s.sidebarOpen);
+  const sidebarSlim  = useSettingsStore(s => s.sidebarSlim);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rafRef = useRef<number>(0);
-  const stateRef = useRef<CanvasState>(mkState());
+  const rafRef    = useRef<number>(0);
+  const stateRef  = useRef<CanvasState>(mkState());
+  // Live sidebar width — read on every frame so animations snap when sidebar toggles
+  const swRef     = useRef<number>(SW_FULL);
+
+  useEffect(() => {
+    swRef.current = !sidebarOpen ? SW_NONE : sidebarSlim ? SW_SLIM : SW_FULL;
+  }, [sidebarOpen, sidebarSlim]);
 
   useEffect(() => {
     if (!CANVAS_THEMES.has(theme)) return;
@@ -636,15 +647,13 @@ export function ThemeAmbientCanvas() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Reset per-theme state
     stateRef.current = mkState();
 
     const resize = () => {
-      canvas.width = window.innerWidth;
+      canvas.width  = window.innerWidth;
       canvas.height = window.innerHeight;
-      // Re-seed Shadowrun glyphs when canvas resizes
       if (theme === "shadowrun") {
-        initShadowrunGlyphs(canvas.width, canvas.height, stateRef.current);
+        initShadowrunGlyphs(canvas.width, canvas.height, swRef.current, stateRef.current);
       }
     };
     resize();
@@ -653,15 +662,16 @@ export function ThemeAmbientCanvas() {
     let running = true;
     const loop = (ts: number) => {
       if (!running) return;
-      const w = canvas.width;
-      const h = canvas.height;
+      const w  = canvas.width;
+      const h  = canvas.height;
+      const sw = swRef.current;
       const state = stateRef.current;
 
       switch (theme) {
-        case "hal9000":     drawHAL(ctx, w, h, ts); break;
-        case "tron":        drawTron(ctx, w, h, ts, state); break;
-        case "bladerunner": drawBladeRunner(ctx, w, h, ts); break;
-        case "shadowrun":   drawShadowrun(ctx, w, h, ts, state); break;
+        case "hal9000":     drawHAL(ctx, w, h, ts, sw); break;
+        case "tron":        drawTron(ctx, w, h, ts, state, sw); break;
+        case "bladerunner": drawBladeRunner(ctx, w, h, ts, sw); break;
+        case "shadowrun":   drawShadowrun(ctx, w, h, ts, state, sw); break;
       }
       rafRef.current = requestAnimationFrame(loop);
     };
