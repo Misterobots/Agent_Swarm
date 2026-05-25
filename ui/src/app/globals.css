@@ -1541,26 +1541,27 @@ main, .main-content {
 
 /* ── HAL 9000 (deep red) ────────────────────────────────────── */
 [data-theme="hal9000"] {
-  --chat-bg:           #000005;
-  --chat-surface:      #05050A;
-  --chat-panel:        #080812;
-  --chat-elevated:     #0E0E1A;
-  --chat-border:       rgba(180,0,0,0.22);
-  --chat-text:         #D8D8E8;
-  --chat-muted:        #707080;
-  --chat-subtle:       #404050;
+  --chat-bg:           #000001;
+  --chat-surface:      #040002;
+  --chat-panel:        #080005;
+  --chat-elevated:     #0C0008;
+  --chat-border:       rgba(180,0,0,0.32);
+  --chat-text:         #E0D8D8;
+  --chat-muted:        #6A5050;
+  --chat-subtle:       #3A1818;
   --chat-accent:       #CC0000;
   --chat-accent-strong: #FF2020;
-  --chat-accent-soft:  rgba(204,0,0,0.12);
+  --chat-accent-soft:  rgba(204,0,0,0.14);
   --chat-accent-rgb:   204,0,0;
-  --hover-tint:        rgba(255,255,255,0.04);
-  --press-tint:        rgba(0,0,0,0.3);
-  --divider:           rgba(255,255,255,0.07);
-  --elev-1: 0 1px 3px rgba(0,0,0,0.8), 0 0 0 1px rgba(180,0,0,0.15);
-  --elev-2: 0 4px 12px rgba(0,0,0,0.7), 0 0 0 1px rgba(180,0,0,0.2);
-  --elev-3: 0 8px 24px rgba(0,0,0,0.85), 0 0 20px rgba(180,0,0,0.08);
-  --inset-highlight: inset 0 1px 0 rgba(255,255,255,0.03);
-  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(204,0,0,0.5);
+  --chat-accent-2:     #880000;
+  --hover-tint:        rgba(200,0,0,0.06);
+  --press-tint:        rgba(0,0,0,0.4);
+  --divider:           rgba(180,0,0,0.18);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.92), 0 0 0 1px rgba(180,0,0,0.20);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.85), 0 0 0 1px rgba(180,0,0,0.28), 0 0 16px rgba(140,0,0,0.08);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.97), 0 0 0 1px rgba(180,0,0,0.38), 0 0 32px rgba(140,0,0,0.14);
+  --inset-highlight: inset 0 1px 0 rgba(200,0,0,0.04);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(204,0,0,0.55);
   color-scheme: dark;
 }
 
@@ -1591,52 +1592,53 @@ main, .main-content {
 
 /* ── TRON Legacy (electric cyan) ────────────────────────────── */
 [data-theme="tron"] {
-  --chat-bg:           #000008;
-  --chat-surface:      #040410;
-  --chat-panel:        #080820;
-  --chat-elevated:     #0C0C2C;
-  --chat-border:       rgba(0,200,255,0.2);
-  --chat-text:         #C8F0FF;
-  --chat-muted:        #4090AA;
-  --chat-subtle:       #204555;
-  --chat-accent:       #00C8FF;
-  --chat-accent-strong: #50E0FF;
-  --chat-accent-soft:  rgba(0,200,255,0.12);
-  --chat-accent-rgb:   0,200,255;
-  --hover-tint:        rgba(0,200,255,0.06);
-  --press-tint:        rgba(0,0,0,0.3);
-  --divider:           rgba(0,200,255,0.12);
-  --elev-1: 0 1px 3px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,200,255,0.15);
-  --elev-2: 0 4px 12px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,200,255,0.2), 0 0 12px rgba(0,200,255,0.05);
-  --elev-3: 0 8px 24px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,200,255,0.3), 0 0 24px rgba(0,200,255,0.08);
-  --inset-highlight: inset 0 1px 0 rgba(0,200,255,0.06);
-  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(0,200,255,0.55);
+  --chat-bg:           #000508;
+  --chat-surface:      #020C14;
+  --chat-panel:        #041420;
+  --chat-elevated:     #081C2C;
+  --chat-border:       rgba(0,200,255,0.32);
+  --chat-text:         #D0F0FF;
+  --chat-muted:        #3A8AAA;
+  --chat-subtle:       #183C50;
+  --chat-accent:       #00D8FF;
+  --chat-accent-strong: #60EEFF;
+  --chat-accent-soft:  rgba(0,216,255,0.14);
+  --chat-accent-rgb:   0,216,255;
+  --chat-accent-2:     #FF8C20;
+  --hover-tint:        rgba(0,216,255,0.08);
+  --press-tint:        rgba(0,0,0,0.35);
+  --divider:           rgba(0,200,255,0.22);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.88), 0 0 0 1px rgba(0,200,255,0.20);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.78), 0 0 0 1px rgba(0,200,255,0.28), 0 0 14px rgba(0,180,220,0.08);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.92), 0 0 0 1px rgba(0,200,255,0.38), 0 0 28px rgba(0,180,220,0.14);
+  --inset-highlight: inset 0 1px 0 rgba(0,200,255,0.08);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(0,216,255,0.60);
   color-scheme: dark;
 }
 
-/* ── Blade Runner (neo-noir amber) ──────────────────────────── */
+/* ── Blade Runner (Voigt-Kampff amber) ──────────────────────── */
 [data-theme="bladerunner"] {
-  --chat-bg:           #060305;
-  --chat-surface:      #0C0810;
-  --chat-panel:        #120D18;
-  --chat-elevated:     #18121E;
-  --chat-border:       rgba(212,144,10,0.2);
-  --chat-text:         #E8D4A8;
-  --chat-muted:        #7A6040;
-  --chat-subtle:       #4A3828;
-  --chat-accent:       #D4900A;
-  --chat-accent-strong: #F0B040;
-  --chat-accent-soft:  rgba(212,144,10,0.12);
-  --chat-accent-rgb:   212,144,10;
-  --chat-accent-2:     #3D78FF;
-  --hover-tint:        rgba(212,144,10,0.07);
-  --press-tint:        rgba(0,0,0,0.3);
-  --divider:           rgba(180,120,20,0.18);
-  --elev-1: 0 1px 3px rgba(0,0,0,0.85), 0 0 0 1px rgba(212,144,10,0.12);
-  --elev-2: 0 4px 12px rgba(0,0,0,0.75), 0 0 0 1px rgba(212,144,10,0.18);
-  --elev-3: 0 8px 24px rgba(0,0,0,0.9), 0 0 20px rgba(212,144,10,0.05);
-  --inset-highlight: inset 0 1px 0 rgba(212,144,10,0.04);
-  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(212,144,10,0.5);
+  --chat-bg:           #060200;
+  --chat-surface:      #0E0600;
+  --chat-panel:        #160A00;
+  --chat-elevated:     #1E0E00;
+  --chat-border:       rgba(220,148,14,0.34);
+  --chat-text:         #F0D4A0;
+  --chat-muted:        #8A6030;
+  --chat-subtle:       #5A3818;
+  --chat-accent:       #DC940E;
+  --chat-accent-strong: #FF9A20;
+  --chat-accent-soft:  rgba(220,148,14,0.14);
+  --chat-accent-rgb:   220,148,14;
+  --chat-accent-2:     #FF5E1A;
+  --hover-tint:        rgba(220,148,14,0.09);
+  --press-tint:        rgba(0,0,0,0.4);
+  --divider:           rgba(200,120,10,0.28);
+  --elev-1: 0 1px 3px rgba(0,0,0,0.92), 0 0 0 1px rgba(220,148,14,0.20);
+  --elev-2: 0 4px 12px rgba(0,0,0,0.82), 0 0 0 1px rgba(220,148,14,0.28), 0 0 16px rgba(180,90,0,0.08);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.96), 0 0 0 1px rgba(220,148,14,0.38), 0 0 32px rgba(180,90,0,0.14);
+  --inset-highlight: inset 0 1px 0 rgba(220,148,14,0.06);
+  --ring: 0 0 0 2px var(--chat-bg), 0 0 0 4px rgba(220,148,14,0.55);
   color-scheme: dark;
 }
 
@@ -1997,57 +1999,85 @@ main, .main-content {
 }
 
 /* ══════════════════════════════════════════
-   HAL 9000 — deep red on void (canvas handles iris)
+   HAL 9000 — omniscient red on absolute void (canvas handles iris)
    ══════════════════════════════════════════ */
 
-/* Deep red ambient — the lifepod glow */
+/* HAL's omnipresent gaze — breathing red awareness */
 [data-theme="hal9000"] .app-shell-root::after {
   content: "";
   position: fixed; inset: 0;
-  background: radial-gradient(ellipse 80% 60% at 62% 44%, rgba(120,0,0,0.12), transparent 65%);
-  animation: ext-breathe 6s ease-in-out infinite !important;
+  background: radial-gradient(ellipse 85% 65% at 62% 40%, rgba(160,0,0,0.16), transparent 65%),
+              radial-gradient(ellipse 40% 30% at 62% 40%, rgba(200,0,0,0.08), transparent 50%);
+  animation: ext-breathe 5s ease-in-out infinite !important;
   pointer-events: none; z-index: 1;
 }
-/* Cold HAL red status line at very top of screen */
+/* Status alert — HAL's warning strip */
 [data-theme="hal9000"] .app-shell-root::before {
   content: "";
   position: fixed; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(to right, transparent 0%, rgba(220,0,0,0.7) 40%, rgba(255,20,20,0.9) 50%, rgba(220,0,0,0.7) 60%, transparent 100%);
+  background: linear-gradient(to right, transparent 0%, rgba(220,0,0,0.8) 35%, rgba(255,30,30,1) 50%, rgba(220,0,0,0.8) 65%, transparent 100%);
   pointer-events: none; z-index: 200;
-  animation: ext-breathe 4s ease-in-out infinite !important;
+  animation: ext-breathe 3.5s ease-in-out infinite !important;
 }
-/* Sidebar: pure void with red data seam */
+/* HAL logic terminal sidebar */
 [data-theme="hal9000"] .sidebar-wrapper {
-  background: #000001;
-  border-right: 1px solid rgba(200,0,0,0.3);
-  box-shadow: 2px 0 32px rgba(0,0,0,0.95), inset -1px 0 12px rgba(140,0,0,0.08);
+  background: rgba(0,0,1,0.98);
+  border-right: 1px solid rgba(200,0,0,0.42);
+  box-shadow:
+    2px 0 0 0 rgba(180,0,0,0.14),
+    4px 0 40px rgba(0,0,0,0.99),
+    inset -1px 0 16px rgba(120,0,0,0.12);
 }
-/* Logo area: deep red tint */
+/* Mission header: AE35 unit panel */
 [data-theme="hal9000"] .sidebar-wrapper > div:first-child {
-  background: rgba(40,0,0,0.5) !important;
-  border-bottom: 1px solid rgba(180,0,0,0.2) !important;
+  background: rgba(35,0,0,0.80) !important;
+  border-bottom: 1px solid rgba(200,0,0,0.40) !important;
   animation: none !important;
 }
+/* Section labels: clinical red data tags */
 [data-theme="hal9000"] .sidebar-section-title {
-  color: rgba(200,0,0,0.5);
-  letter-spacing: 0.2em;
+  color: rgba(200,0,0,0.58);
+  letter-spacing: 0.22em;
+  font-weight: 600;
 }
+/* Active: HAL's focused attention lock */
 [data-theme="hal9000"] .sidebar-active {
-  background: rgba(160,0,0,0.18) !important;
-  border-left: 2px solid rgba(200,0,0,0.7) !important;
-  box-shadow: 0 0 16px rgba(180,0,0,0.2) !important;
+  background: rgba(160,0,0,0.22) !important;
+  border-left: 2px solid rgba(220,0,0,0.85) !important;
+  box-shadow:
+    0 0 22px rgba(160,0,0,0.32),
+    0 0 6px rgba(200,0,0,0.55),
+    inset 0 0 14px rgba(140,0,0,0.14) !important;
 }
+/* HAL's eye indicator — pulsing red */
 [data-theme="hal9000"] .sidebar-status-dot {
   background: #CC0000;
-  box-shadow: 0 0 8px rgba(204,0,0,0.8);
+  box-shadow: 0 0 12px rgba(204,0,0,1), 0 0 4px #CC0000;
+  animation: ext-breathe 2.5s ease-in-out infinite !important;
 }
 [data-theme="hal9000"] .thinking-dot { background: #CC0000; }
 [data-theme="hal9000"] .streaming-caret::after { color: #FF2020; }
-/* Chat text: cold clinical white */
-[data-theme="hal9000"] .chat-shell {
-  background: #000002;
+/* HAL display terminal — absolute void */
+[data-theme="hal9000"] .chat-shell { background: rgba(0,0,2,0.99); }
+/* Messages: hairline red system trace */
+[data-theme="hal9000"] .msg-enter {
+  border-bottom: 1px solid rgba(160,0,0,0.07);
 }
-/* App background: pure void */
+/* Headings: cold clinical white with red undertone — HAL's voice */
+[data-theme="hal9000"] h1,
+[data-theme="hal9000"] h2,
+[data-theme="hal9000"] h3 {
+  color: rgba(240,220,220,0.97) !important;
+  text-shadow:
+    0 0 6px rgba(200,0,0,0.5),
+    0 0 20px rgba(160,0,0,0.25),
+    0 0 50px rgba(120,0,0,0.12) !important;
+}
+/* Dividers: red system trace */
+[data-theme="hal9000"] .divider {
+  background: linear-gradient(to right, transparent, rgba(180,0,0,0.38) 50%, transparent) !important;
+}
+/* App background: the void */
 [data-theme="hal9000"] .app-shell-root {
   background: #000001;
 }
@@ -2107,160 +2137,197 @@ main, .main-content {
 }
 
 /* ══════════════════════════════════════════
-   TRON — The Grid (canvas handles grid+streams)
+   TRON — The Grid (canvas handles grid + light streams)
    ══════════════════════════════════════════ */
 
-/* App background: deep void of the Grid */
-[data-theme="tron"] .app-shell-root {
-  background: #000508;
-}
-/* Subtle top horizon glow — the sky of the Grid */
+[data-theme="tron"] .app-shell-root { background: #000508; }
+/* Sky of the Grid — cyan horizon */
 [data-theme="tron"] .app-shell-root::before {
   content: "";
-  position: fixed; top: 0; left: 0; right: 0; height: 160px;
-  background: linear-gradient(to bottom, rgba(0,200,255,0.08), transparent);
+  position: fixed; top: 0; left: 0; right: 0; height: 180px;
+  background: linear-gradient(to bottom, rgba(0,216,255,0.10), transparent);
   pointer-events: none; z-index: 1;
 }
-/* Bottom horizon glow */
+/* Floor horizon pulse */
 [data-theme="tron"] .app-shell-root::after {
   content: "";
-  position: fixed; bottom: 0; left: 0; right: 0; height: 100px;
-  background: linear-gradient(to top, rgba(0,160,200,0.06), transparent);
+  position: fixed; bottom: 0; left: 0; right: 0; height: 120px;
+  background: linear-gradient(to top, rgba(0,180,220,0.09), transparent);
   pointer-events: none; z-index: 1;
   animation: ext-breathe 6s ease-in-out infinite !important;
 }
-/* Sidebar: black ISO panel with hardlight edge */
+/* ISO program panel — true hardlight glass */
 [data-theme="tron"] .sidebar-wrapper {
-  background: rgba(0,4,10,0.92);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-right: 1px solid rgba(0,240,255,0.35);
-  box-shadow: 2px 0 40px rgba(0,200,255,0.1), inset -1px 0 0 rgba(0,240,255,0.06);
+  background: rgba(0,5,12,0.95);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border-right: 1px solid rgba(0,240,255,0.45);
+  box-shadow:
+    2px 0 0 0 rgba(0,240,255,0.14),
+    4px 0 40px rgba(0,200,255,0.14),
+    inset -1px 0 0 rgba(0,180,220,0.08);
+  animation: ext-neon-border 5s ease-in-out infinite !important;
 }
-/* Logo area: ISO program baton panel */
+/* Identity disc header panel */
 [data-theme="tron"] .sidebar-wrapper > div:first-child {
-  background: linear-gradient(135deg, rgba(0,60,80,0.6), rgba(0,20,30,0.8)) !important;
-  border-bottom: 1px solid rgba(0,240,255,0.3) !important;
-  animation: none !important;
+  background: linear-gradient(135deg, rgba(0,60,85,0.75), rgba(0,20,35,0.92)) !important;
+  border-bottom: 1px solid rgba(0,240,255,0.42) !important;
+  position: relative; overflow: hidden; animation: none !important;
+}
+[data-theme="tron"] .sidebar-wrapper > div:first-child::after {
+  content: "";
+  position: absolute; bottom: 0; left: -100%; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,255,0.95) 50%, rgba(255,140,0,0.5) 75%, transparent);
+  animation: ext-scan-h 6s ease-in-out infinite !important; pointer-events: none;
 }
 [data-theme="tron"] .sidebar-section-title {
-  color: rgba(0,240,255,0.7);
+  color: rgba(0,240,255,0.78);
   letter-spacing: 0.22em;
   font-weight: 700;
 }
+/* ISO program selected — disc recognition lock */
 [data-theme="tron"] .sidebar-active {
-  background: rgba(0,200,255,0.15) !important;
-  border-left: 2px solid rgba(0,240,255,0.9) !important;
-  box-shadow: 0 0 18px rgba(0,200,255,0.3), inset 0 0 12px rgba(0,200,255,0.08) !important;
+  background: rgba(0,216,255,0.18) !important;
+  border-left: 2px solid rgba(0,240,255,0.98) !important;
+  box-shadow:
+    0 0 24px rgba(0,200,255,0.45),
+    0 0 8px rgba(0,240,255,0.68),
+    inset 0 0 16px rgba(0,200,255,0.12) !important;
 }
+/* Node indicator: cyan square data bit */
 [data-theme="tron"] .sidebar-status-dot {
   background: #00F0FF;
   border-radius: 0 !important;
-  box-shadow: 0 0 8px rgba(0,240,255,0.9);
+  box-shadow: 0 0 12px rgba(0,240,255,1), 0 0 4px #00F0FF;
+  animation: ext-breathe 2s ease-in-out infinite !important;
 }
-[data-theme="tron"] .thinking-dot { background: #00C8FF; }
-[data-theme="tron"] .streaming-caret::after { color: #50E0FF; }
-/* Headings: neon hardlight text */
-[data-theme="tron"] h1, [data-theme="tron"] h2, [data-theme="tron"] h3 {
-  color: rgba(0,240,255,0.95) !important;
-  text-shadow: 0 0 10px rgba(0,200,255,0.7), 0 0 30px rgba(0,200,255,0.3) !important;
-  letter-spacing: 0.06em;
-}
-/* Chat messages: ISO program display */
-[data-theme="tron"] .chat-shell {
-  background: rgba(0,4,12,0.95);
-}
-/* Horizontal disc scan across content */
+[data-theme="tron"] .thinking-dot { background: #00D8FF; }
+[data-theme="tron"] .streaming-caret::after { color: #60EEFF; }
+/* Program memory space */
+[data-theme="tron"] .chat-shell { background: rgba(0,5,14,0.98); }
+/* Circuit trace separator */
+[data-theme="tron"] .msg-enter { border-bottom: 1px solid rgba(0,200,255,0.07); }
+/* Disc scan across content */
 [data-theme="tron"] .chat-shell::before {
   content: "";
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(to right, transparent, rgba(0,240,255,0.95) 50%, transparent);
+  background: linear-gradient(to right, transparent, rgba(0,240,255,0.98) 50%, transparent);
   width: 55%;
   animation: ext-scan-h 7s ease-in-out infinite !important;
   pointer-events: none; z-index: 10;
 }
-/* Borders pulse cyan */
+/* Headings: hardlight program identity */
+[data-theme="tron"] h1, [data-theme="tron"] h2, [data-theme="tron"] h3 {
+  color: rgba(0,240,255,0.98) !important;
+  text-shadow:
+    0 0 8px rgba(0,240,255,1),
+    0 0 24px rgba(0,200,255,0.70),
+    0 0 60px rgba(0,160,200,0.32) !important;
+  letter-spacing: 0.06em;
+}
 [data-theme="tron"] .divider {
-  background: linear-gradient(to right, transparent, rgba(0,200,255,0.4) 50%, transparent) !important;
+  background: linear-gradient(to right, transparent, rgba(0,200,255,0.44) 50%, transparent) !important;
 }
 
 /* ══════════════════════════════════════════
    BLADE RUNNER — Voigt-Kampff machine (canvas handles iris + oscilloscope)
    ══════════════════════════════════════════ */
 
-/* VK machine background — near-black with amber warmth */
-[data-theme="bladerunner"] .app-shell-root {
-  background: #050300;
-}
-/* Amber phosphor glow behind content */
+[data-theme="bladerunner"] .app-shell-root { background: #060200; }
+/* Replicant city amber glow */
 [data-theme="bladerunner"] .app-shell-root::before {
   content: "";
   position: fixed; inset: 0;
   background:
-    radial-gradient(ellipse 60% 50% at 20% 30%, rgba(220,148,14,0.08), transparent 60%),
-    radial-gradient(ellipse 40% 60% at 80% 80%, rgba(60,60,200,0.06), transparent 60%);
+    radial-gradient(ellipse 900px 700px at 20% 35%, rgba(220,148,14,0.12), transparent 60%),
+    radial-gradient(ellipse 600px 500px at 85% 75%, rgba(180,60,0,0.07), transparent 55%);
+  pointer-events: none; z-index: 1;
+  animation: ext-breathe 9s ease-in-out infinite !important;
+}
+/* City horizon neon — acid rain below */
+[data-theme="bladerunner"] .app-shell-root::after {
+  content: "";
+  position: fixed; bottom: 0; left: 0; right: 0; height: 200px;
+  background: linear-gradient(to top, rgba(180,80,0,0.16), rgba(120,40,0,0.07), transparent);
   pointer-events: none; z-index: 1;
   animation: ext-breathe 7s ease-in-out infinite !important;
 }
-/* City neon haze at the bottom */
-[data-theme="bladerunner"] .app-shell-root::after {
-  content: "";
-  position: fixed; bottom: 0; left: 0; right: 0; height: 180px;
-  background: linear-gradient(to top,
-    rgba(180,80,0,0.14) 0%,
-    rgba(80,40,200,0.05) 50%,
-    transparent 100%
-  );
-  pointer-events: none; z-index: 1;
-}
-/* Sidebar: VK machine chassis */
+/* VK machine chassis — warm brass panel */
 [data-theme="bladerunner"] .sidebar-wrapper {
-  background: rgba(8,4,2,0.92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-right: 1px solid rgba(220,148,14,0.28);
-  box-shadow: 2px 0 30px rgba(0,0,0,0.95), inset -1px 0 8px rgba(180,100,0,0.05);
+  background: rgba(10,5,0,0.95);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  border-right: 1px solid rgba(220,148,14,0.50);
+  box-shadow:
+    2px 0 0 0 rgba(220,148,14,0.16),
+    4px 0 40px rgba(160,80,0,0.20),
+    inset -1px 0 0 rgba(255,100,20,0.07);
+  animation: ext-neon-border 6s ease-in-out infinite !important;
 }
-/* Logo area: brass-amber VK data panel */
+/* Voigt-Kampff machine header */
 [data-theme="bladerunner"] .sidebar-wrapper > div:first-child {
-  background: linear-gradient(150deg, rgba(80,40,0,0.6), rgba(20,10,0,0.8)) !important;
-  border-bottom: 1px solid rgba(220,148,14,0.3) !important;
-  animation: none !important;
+  background: linear-gradient(150deg, rgba(60,28,0,0.88), rgba(20,8,0,0.96)) !important;
+  border-bottom: 1px solid rgba(220,148,14,0.50) !important;
+  position: relative; overflow: hidden; animation: none !important;
 }
+[data-theme="bladerunner"] .sidebar-wrapper > div:first-child::after {
+  content: "";
+  position: absolute; bottom: 0; left: -100%; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,160,20,0.95) 50%, rgba(255,80,20,0.6) 75%, transparent);
+  animation: ext-scan-h 8s ease-in-out infinite !important; pointer-events: none;
+}
+/* Brass typeplate section labels */
 [data-theme="bladerunner"] .sidebar-section-title {
-  color: rgba(220,148,14,0.65);
+  color: rgba(220,148,14,0.72);
   letter-spacing: 0.2em;
+  font-weight: 700;
 }
+/* VK target lock — amber reticle */
 [data-theme="bladerunner"] .sidebar-active {
-  background: rgba(200,120,0,0.14) !important;
-  border-left: 2px solid rgba(220,148,14,0.8) !important;
-  box-shadow: 0 0 14px rgba(200,120,0,0.2) !important;
+  background: rgba(200,120,10,0.18) !important;
+  border-left: 2px solid rgba(240,160,20,0.98) !important;
+  box-shadow:
+    0 0 24px rgba(200,120,10,0.42),
+    0 0 8px rgba(220,148,14,0.65),
+    inset 0 0 16px rgba(180,90,0,0.12) !important;
 }
+/* Amber indicator — pulsing */
 [data-theme="bladerunner"] .sidebar-status-dot {
-  background: #D4900A;
-  box-shadow: 0 0 8px rgba(212,144,10,0.7);
+  background: #FF8C14;
+  border-radius: 1px !important;
+  box-shadow: 0 0 12px rgba(255,140,20,0.95), 0 0 4px #FF8C14;
+  animation: ext-breathe 2.5s ease-in-out infinite !important;
 }
-[data-theme="bladerunner"] .thinking-dot { background: #D4900A; }
-[data-theme="bladerunner"] .streaming-caret::after { color: #E8A020; }
-/* Chat: phosphor amber overlay on messages */
-[data-theme="bladerunner"] .chat-shell {
-  background: #060301;
+[data-theme="bladerunner"] .thinking-dot { background: #DC940E; }
+[data-theme="bladerunner"] .streaming-caret::after { color: #FF9A20; }
+/* Replicant interview chamber — dark city glass */
+[data-theme="bladerunner"] .chat-shell { background: rgba(6,2,0,0.97); }
+/* Rain streak diagonal micro-pattern */
+[data-theme="bladerunner"] .chat-shell::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    105deg, transparent, transparent 60px,
+    rgba(220,148,14,0.010) 60px, rgba(220,148,14,0.010) 61px
+  );
+  pointer-events: none; z-index: 0;
 }
-/* Message entries: VK test readout style */
+/* Messages: VK readout separator */
 [data-theme="bladerunner"] .msg-enter {
-  border-bottom: 1px solid rgba(200,120,0,0.08);
-  animation: ext-osc-wave 5s ease-in-out infinite !important, msgFadeIn 0.2s var(--ease-out) !important;
+  border-bottom: 1px solid rgba(200,120,10,0.09);
 }
-/* Headings get amber phosphor glow */
+/* Headings: hot amber phosphor neon */
 [data-theme="bladerunner"] h1,
 [data-theme="bladerunner"] h2,
 [data-theme="bladerunner"] h3 {
-  color: rgba(220,160,40,0.9) !important;
-  text-shadow: 0 0 8px rgba(200,120,0,0.5) !important;
+  color: rgba(255,170,30,0.97) !important;
+  text-shadow:
+    0 0 8px rgba(220,148,14,0.90),
+    0 0 24px rgba(180,80,0,0.60),
+    0 0 60px rgba(255,60,0,0.20) !important;
 }
-/* Dividers: amber horizontal rules */
 [data-theme="bladerunner"] .divider {
-  background: linear-gradient(to right, transparent, rgba(200,120,0,0.35) 50%, transparent) !important;
+  background: linear-gradient(to right, transparent, rgba(200,120,10,0.45) 50%, transparent) !important;
 }
 
 /* ══════════════════════════════════════════
