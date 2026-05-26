@@ -61,6 +61,8 @@ interface CanvasState {
   lastRuneSpawn: number;
   stars: Star[];
   sand: SandParticle[];
+  mx: number;   // mouse x, normalized to [-0.5, 0.5]
+  my: number;   // mouse y, normalized to [-0.5, 0.5]
 }
 
 function mkState(): CanvasState {
@@ -70,7 +72,136 @@ function mkState(): CanvasState {
     runes: [], lastRuneSpawn: 0,
     stars: [],
     sand: [],
+    mx: 0, my: 0,
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Canvas craft helpers — pills, gradients, glow, sparklines
+// ─────────────────────────────────────────────────────────────
+
+// LCARS pill: rectangle with semicircular cap on either or both ends.
+function pillPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, leftCap = false, rightCap = true) {
+  const r = h / 2;
+  ctx.beginPath();
+  if (leftCap) {
+    ctx.moveTo(x + r, y);
+  } else {
+    ctx.moveTo(x, y);
+  }
+  ctx.lineTo(rightCap ? x + w - r : x + w, y);
+  if (rightCap) ctx.arc(x + w - r, y + r, r, -Math.PI / 2, Math.PI / 2);
+  else { ctx.lineTo(x + w, y + h); }
+  ctx.lineTo(leftCap ? x + r : x, y + h);
+  if (leftCap) ctx.arc(x + r, y + r, r, Math.PI / 2, -Math.PI / 2);
+  else { ctx.lineTo(x, y); }
+  ctx.closePath();
+}
+
+// Fill a pill with a horizontal linear gradient (dark → light or vice versa).
+function gradPillFill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c1: string, c2: string, leftCap = false, rightCap = true) {
+  pillPath(ctx, x, y, w, h, leftCap, rightCap);
+  const g = ctx.createLinearGradient(x, y, x + w, y);
+  g.addColorStop(0, c1); g.addColorStop(1, c2);
+  ctx.fillStyle = g; ctx.fill();
+}
+
+// Glow text via shadowBlur (saves/restores ctx state).
+function glowFillText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, glow: string, blur = 8) {
+  ctx.save();
+  ctx.shadowColor = glow; ctx.shadowBlur = blur;
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// Sparkline waveform: scrolls left over time, multi-harmonic sine for organic feel.
+function drawSparkline(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, t: number, seed: number, color: string, glow = 4) {
+  const samples = 56;
+  const dx = w / samples;
+  const mid = y + h / 2;
+  ctx.save();
+  ctx.shadowColor = color; ctx.shadowBlur = glow;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (let i = 0; i <= samples; i++) {
+    const phase = t * 0.0025 + seed;
+    const v =
+      Math.sin(phase + i * 0.32) * 0.40 +
+      Math.sin(phase * 1.7 + i * 0.71) * 0.26 +
+      Math.sin(phase * 2.4 + i * 0.18 + seed * 1.3) * 0.18;
+    const yp = mid - v * h * 0.38;
+    if (i === 0) ctx.moveTo(x + i * dx, yp);
+    else ctx.lineTo(x + i * dx, yp);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Progressive line drawing — animates a polyline being "drawn" by `progress` (0..1).
+function drawProgressivePath(ctx: CanvasRenderingContext2D, pts: ReadonlyArray<readonly [number, number]>, progress: number, color: string, glow?: string, lineWidth = 1.5) {
+  if (pts.length < 2) return;
+  ctx.save();
+  if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 6; }
+  ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.lineJoin = "round"; ctx.lineCap = "round";
+  let total = 0;
+  const segLens: number[] = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i][0] - pts[i-1][0], dy = pts[i][1] - pts[i-1][1];
+    total += Math.hypot(dx, dy); segLens.push(total);
+  }
+  const visible = total * Math.max(0, Math.min(1, progress));
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) {
+    if (segLens[i] <= visible) {
+      ctx.lineTo(pts[i][0], pts[i][1]);
+    } else {
+      const rem = visible - segLens[i-1];
+      const segLen = segLens[i] - segLens[i-1];
+      const k = segLen > 0 ? rem / segLen : 0;
+      ctx.lineTo(pts[i-1][0] + (pts[i][0] - pts[i-1][0]) * k, pts[i-1][1] + (pts[i][1] - pts[i-1][1]) * k);
+      break;
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Radar/sensor sweep: rings, crosshairs, rotating beam, contact pips that fade with beam pass.
+function drawRadarSweep(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, t: number, color: string, beamColor: string, contacts = 4) {
+  ctx.save();
+  // Rings
+  ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = 0.38;
+  for (const rr of [r, r * 0.66, r * 0.33]) { ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke(); }
+  // Crosshairs
+  ctx.globalAlpha = 0.28;
+  ctx.beginPath();
+  ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+  ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
+  ctx.stroke();
+  // Sweep beam (wedge gradient)
+  const angle = (t * 0.0009) % (Math.PI * 2);
+  for (let k = 0; k < 4; k++) {
+    const a0 = angle - 0.12 - k * 0.18;
+    const a1 = angle - k * 0.18;
+    ctx.globalAlpha = 0.55 * (1 - k * 0.22);
+    ctx.fillStyle = beamColor;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, a0, a1); ctx.closePath(); ctx.fill();
+  }
+  // Contacts (pseudo-stable positions, blink when beam passes)
+  ctx.globalAlpha = 1;
+  for (let i = 0; i < contacts; i++) {
+    const cAng  = (i * 1.83 + Math.sin(t * 0.00009 + i) * 0.4) % (Math.PI * 2);
+    const cDist = r * (0.30 + Math.abs(Math.sin(t * 0.00018 + i * 2.7)) * 0.62);
+    const px = cx + Math.cos(cAng) * cDist;
+    const py = cy + Math.sin(cAng) * cDist;
+    const norm = ((cAng - angle + Math.PI * 8) % (Math.PI * 2));
+    const decay = norm < 1.2 ? Math.exp(-norm * 2.5) : 0;
+    ctx.fillStyle = beamColor;
+    ctx.globalAlpha = 0.30 + decay * 0.70;
+    ctx.beginPath(); ctx.arc(px, py, 1.6 + decay * 1.2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -737,52 +868,70 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
   ctx.clearRect(0, 0, w, h);
   const cx = sw;
 
+  // Palette with paired dark variants for gradients + glow color.
   const P = theme === "lcars-blue"
-    ? { a:"#221166", b:"#3355AA", c:"#6688CC", d:"#AABBEE", e:"#4466BB" }
+    ? { a:"#221166", b:"#3355AA", c:"#6688CC", d:"#AABBEE", e:"#4466BB",
+        aDk:"#110844", bDk:"#1A2A55", cDk:"#334466", dDk:"#5566AA", eDk:"#22335A",
+        glow:"#AACCFF" }
     : theme === "lcars-teal"
-    ? { a:"#004455", b:"#007788", c:"#00AACC", d:"#44DDEE", e:"#006655" }
-    : { a:"#CC3300", b:"#FF6600", c:"#FFAA00", d:"#FFDD00", e:"#AA2200" };
+    ? { a:"#004455", b:"#007788", c:"#00AACC", d:"#44DDEE", e:"#006655",
+        aDk:"#002233", bDk:"#003344", cDk:"#005566", dDk:"#226677", eDk:"#003322",
+        glow:"#88EEFF" }
+    : { a:"#CC3300", b:"#FF6600", c:"#FFAA00", d:"#FFDD00", e:"#AA2200",
+        aDk:"#661100", bDk:"#883300", cDk:"#996600", dDk:"#997700", eDk:"#550800",
+        glow:"#FFCC66" };
 
-  const SH  = 8;    // full-width ship header bar
+  const SH  = 8;    // full-width ship header
   const TH  = 96;   // main header height
   const BH  = 44;   // bottom strip height
-  const EW  = 90;   // elbow block width
+  const EW  = 92;   // elbow block width
   const AW  = 8;    // left vertical arm width
   const R   = 52;   // concave arc radius
-  const RW  = 134;  // right panel width
+  const RW  = 142;  // right panel width
   const G   = 6;    // gap
 
-  const panelX      = w - RW;
-  const hdrY        = SH;
-  const contentTop  = SH + TH + R;
-  const contentBot  = h - BH;
+  const panelX       = w - RW;
+  const hdrY         = SH;
+  const contentTop   = SH + TH + R;
+  const contentBot   = h - BH;
   const contentLeft  = cx + EW + R + G;
   const contentRight = w - RW - G;
-  const panelTop    = contentTop + G;
-  const panelBot    = h - BH - G;
+  const panelTop     = contentTop + G;
+  const panelBot     = h - BH - G;
 
-  // ── Full-width thin ship header bar ──────────────────────────
-  ctx.fillStyle = P.b;
-  ctx.globalAlpha = 0.55;
+  const mx = state.mx ?? 0;
+  const my = state.my ?? 0;
+
+  // ── Full-width ship header bar with vertical gradient ─────────
+  const shipGrad = ctx.createLinearGradient(0, 0, 0, SH);
+  shipGrad.addColorStop(0,   P.bDk);
+  shipGrad.addColorStop(0.5, P.b);
+  shipGrad.addColorStop(1,   P.bDk);
+  ctx.globalAlpha = 0.7; ctx.fillStyle = shipGrad;
   ctx.fillRect(0, 0, w, SH);
   ctx.globalAlpha = 1;
 
-  // ── Starfield clipped to content area ────────────────────────
+  // ══ STARFIELD with mouse parallax (clipped to content) ═══════
   if (state.stars.length < 100) initStars(w, h, state);
   ctx.save();
   ctx.beginPath();
   ctx.rect(contentLeft, contentTop, contentRight - contentLeft, contentBot - contentTop);
   ctx.clip();
+  const parX = mx * 22;
+  const parY = my * 14;
   state.stars.forEach(s => {
     s.x -= s.speed;
     if (s.x < contentLeft) { s.x = contentRight - 5; s.y = Math.random() * h; }
-    const br = 0.07 + s.r * 0.18 + Math.sin(t * 0.0007 + s.x * 0.01 + s.y * 0.02) * 0.06;
-    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    const depth = s.r;
+    const sxp = s.x + parX * depth * 1.4;
+    const syp = s.y + parY * depth * 1.4;
+    const br = 0.10 + s.r * 0.24 + Math.sin(t * 0.0007 + s.x * 0.01 + s.y * 0.02) * 0.07;
+    ctx.beginPath(); ctx.arc(sxp, syp, s.r, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(255,255,255,${br.toFixed(2)})`; ctx.fill();
   });
   ctx.restore();
 
-  // ── Warp streaks ──────────────────────────────────────────────
+  // ── Warp streaks (in content area, glowing) ───────────────────
   for (let wi = 0; wi < 3; wi++) {
     const period = 8000 + wi * 2700;
     const phase  = ((t + wi * 2700) % period) / period;
@@ -796,139 +945,105 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
     const wg   = ctx.createLinearGradient(wx - wLen * 0.3, wy, wx + wLen * 0.7, wy);
     wg.addColorStop(0,   "rgba(255,255,255,0)");
     wg.addColorStop(0.3, `rgba(220,230,255,${(fade * 0.7).toFixed(2)})`);
-    wg.addColorStop(0.7, `rgba(255,255,255,${(fade * 0.8).toFixed(2)})`);
+    wg.addColorStop(0.7, `rgba(255,255,255,${(fade * 0.9).toFixed(2)})`);
     wg.addColorStop(1,   "rgba(255,255,255,0)");
-    ctx.strokeStyle = wg; ctx.lineWidth = 1.5;
-    ctx.shadowBlur = 8; ctx.shadowColor = "rgba(200,220,255,0.8)";
+    ctx.strokeStyle = wg; ctx.lineWidth = 1.6;
+    ctx.shadowBlur = 10; ctx.shadowColor = "rgba(200,220,255,0.9)";
     ctx.beginPath(); ctx.moveTo(wx - wLen * 0.3, wy); ctx.lineTo(wx + wLen * 0.7, wy);
     ctx.stroke(); ctx.shadowBlur = 0;
   }
 
-  // ══ TOP HEADER BAR ════════════════════════════════════════════
-  // Left elbow block
-  ctx.fillStyle = P.b;
+  // ══ TOP HEADER (gradient pill segments) ═══════════════════════
+  // Left elbow block — vertical gradient (lighter top, darker bottom)
+  const elbowGrad = ctx.createLinearGradient(cx, hdrY, cx, hdrY + TH);
+  elbowGrad.addColorStop(0, P.b);
+  elbowGrad.addColorStop(1, P.bDk);
+  ctx.fillStyle = elbowGrad;
   ctx.fillRect(cx, hdrY, EW, TH);
 
-  // Header segment blocks
-  const segDefs: [number, string][] = [
-    [100, P.d], [G, ""], [64, P.c], [G, ""], [140, P.b],
-    [G,  ""],   [52, P.a], [G, ""], [96, P.c], [G, ""], [72, P.d],
+  // Header segments with vertical gradients
+  const segDefs: [number, string, string][] = [
+    [108, P.d, P.dDk], [G, "", ""], [62,  P.c, P.cDk], [G, "", ""],
+    [144, P.b, P.bDk], [G, "", ""], [50,  P.a, P.aDk], [G, "", ""],
+    [94,  P.c, P.cDk], [G, "", ""], [72,  P.d, P.dDk],
   ];
   let sx = cx + EW + G;
   const segEnd = panelX - G;
-  for (const [segW, col] of segDefs) {
+  for (const [segW, col, dk] of segDefs) {
     if (!col) { sx += segW; continue; }
     const sw2 = Math.min(segW, segEnd - sx);
     if (sw2 <= 0) break;
-    ctx.fillStyle = col;
+    const g = ctx.createLinearGradient(sx, hdrY, sx, hdrY + TH);
+    g.addColorStop(0, col); g.addColorStop(1, dk);
+    ctx.fillStyle = g;
     ctx.fillRect(sx, hdrY, sw2, TH);
     sx += segW;
   }
 
-  // Right corner header block
-  ctx.fillStyle = P.c;
+  // Right corner header block — gradient
+  const rGrad = ctx.createLinearGradient(panelX, hdrY, panelX, hdrY + TH);
+  rGrad.addColorStop(0, P.c); rGrad.addColorStop(1, P.cDk);
+  ctx.fillStyle = rGrad;
   ctx.fillRect(panelX, hdrY, RW, TH);
 
-  // Concave arc stroke at top inner corner
-  ctx.strokeStyle = P.c;
-  ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.82;
+  // Concave arc with glow
+  ctx.save();
+  ctx.shadowColor = P.glow; ctx.shadowBlur = 10;
+  ctx.strokeStyle = P.c; ctx.lineWidth = 3;
+  ctx.globalAlpha = 0.9;
   ctx.beginPath();
   ctx.arc(cx + EW + R, hdrY + TH + R, R, 3 * Math.PI / 2, Math.PI, true);
   ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.restore();
 
-  // Header text
-  ctx.fillStyle = "#FFFFFF";
-  ctx.globalAlpha = 0.7;
-  ctx.font = "bold 11px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.fillText("MEMEX", cx + 8, hdrY + 28);
+  // Elbow text — MEMEX glows
+  ctx.font = "bold 14px 'Gill Sans', 'Arial Narrow', sans-serif";
+  glowFillText(ctx, "MEMEX", cx + 8, hdrY + 28, "#FFFFFF", P.glow, 10);
+  ctx.fillStyle = "#FFFFFF"; ctx.globalAlpha = 0.7;
   ctx.font = "bold 9px 'Gill Sans', 'Arial Narrow', sans-serif";
   ctx.fillText("HIVE MIND", cx + 8, hdrY + 44);
   ctx.fillText("NCC-1701", cx + 8, hdrY + 58);
-  // Large system title across the header
-  ctx.font = "bold 24px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.globalAlpha = 0.6;
-  ctx.fillText("HOLOGRAPHIC BRIDGE", cx + EW + R + G + 14, hdrY + TH * 0.67);
-  // Stardate block
-  ctx.font = "bold 9px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.globalAlpha = 0.68;
-  ctx.fillText("STARDATE", panelX + 8, hdrY + 26);
-  const sd = `${47000 + (Math.floor(t * 0.0001) % 999)}.${Math.floor(t * 0.008) % 10}`;
-  ctx.font = "bold 13px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.fillText(sd, panelX + 8, hdrY + 46);
-  ctx.font = "bold 8px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.fillText("SECTOR 001", panelX + 8, hdrY + 62);
-  ctx.fillText("FEDERATION SPACE", panelX + 8, hdrY + 76);
+  ctx.font = "8px 'JetBrains Mono', monospace";
+  ctx.globalAlpha = 0.55;
+  ctx.fillText("CALIFORNIA CLASS", cx + 8, hdrY + 74);
+  ctx.fillText("LCARS 47.3", cx + 8, hdrY + 86);
   ctx.globalAlpha = 1;
 
-  // ══ LEFT VERTICAL ARM ════════════════════════════════════════
-  ctx.fillStyle = P.b;
-  ctx.globalAlpha = 0.72;
+  // Big title with glow
+  ctx.font = "bold 30px 'Gill Sans', 'Arial Narrow', sans-serif";
+  glowFillText(ctx, "HOLOGRAPHIC BRIDGE", cx + EW + R + G + 16, hdrY + 50, "#FFFFFF", P.glow, 14);
+
+  // Subtitle telemetry strip
+  ctx.font = "9px 'JetBrains Mono', monospace";
+  ctx.globalAlpha = 0.55; ctx.fillStyle = "#FFFFFF";
+  ctx.fillText("OPERATIONS  //  ACTIVE LINK NOMINAL  //  GAMMA SHIFT", cx + EW + R + G + 16, hdrY + 72);
+  ctx.globalAlpha = 1;
+
+  // Stardate right block
+  ctx.font = "9px 'Gill Sans', 'Arial Narrow', sans-serif";
+  ctx.globalAlpha = 0.72; ctx.fillStyle = "#FFFFFF";
+  ctx.fillText("STARDATE", panelX + 10, hdrY + 22);
+  const sd = `${47000 + (Math.floor(t * 0.0001) % 999)}.${Math.floor(t * 0.008) % 10}`;
+  ctx.font = "bold 20px 'Gill Sans', 'Arial Narrow', sans-serif";
+  glowFillText(ctx, sd, panelX + 10, hdrY + 50, "#FFFFFF", P.glow, 10);
+  ctx.font = "bold 8px 'JetBrains Mono', monospace";
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillText("SECTOR 001", panelX + 10, hdrY + 70);
+  ctx.fillText("FED SPACE", panelX + 10, hdrY + 84);
+  ctx.globalAlpha = 1;
+
+  // ══ LEFT VERTICAL ARM (vertical gradient) ════════════════════
+  const armGrad = ctx.createLinearGradient(cx, hdrY + TH + R, cx, contentBot - R);
+  armGrad.addColorStop(0,   P.b);
+  armGrad.addColorStop(0.5, P.bDk);
+  armGrad.addColorStop(1,   P.b);
+  ctx.fillStyle = armGrad;
+  ctx.globalAlpha = 0.82;
   ctx.fillRect(cx, hdrY + TH + R, AW, contentBot - (hdrY + TH + R) - R);
   ctx.globalAlpha = 1;
 
-  // ══ SPINNING DIAGNOSTIC RING ══════════════════════════════════
-  const ringX = contentLeft + (contentRight - contentLeft) * 0.5;
-  const ringY = contentTop + (contentBot - contentTop) * 0.48;
-
-  // Outer ring (r=96) — slow clockwise
-  const outerSegs: [number, number, string][] = [
-    [0,    1.0, P.c], [1.15, 0.7, P.b], [2.1, 1.3, P.d],
-    [3.55, 0.5, P.a], [4.2,  0.8, P.c], [5.2, 0.6, P.b],
-  ];
-  const outerRot = t * 0.00025;
-  ctx.globalAlpha = 0.82;
-  for (const [start, len, col] of outerSegs) {
-    const a0 = start + outerRot, a1 = a0 + len;
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.arc(ringX, ringY, 96, a0, a1);
-    ctx.arc(ringX, ringY, 78, a1, a0, true);
-    ctx.closePath(); ctx.fill();
-  }
-
-  // Middle ring (r=66) — counterclockwise
-  const midSegs: [number, number, string][] = [
-    [0,   1.4, P.a], [1.6, 0.9, P.d], [2.7, 1.2, P.b],
-    [4.1, 1.6, P.c], [5.9, 0.2, P.d],
-  ];
-  const midRot = -t * 0.00032;
-  for (const [start, len, col] of midSegs) {
-    const a0 = start + midRot, a1 = a0 + len;
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.arc(ringX, ringY, 64, a0, a1);
-    ctx.arc(ringX, ringY, 50, a1, a0, true);
-    ctx.closePath(); ctx.fill();
-  }
-
-  // Inner ring (r=40) — faster clockwise
-  const innerSegs: [number, number, string][] = [
-    [0,   2.0, P.c], [2.2, 1.1, P.b], [3.5, 1.8, P.d], [5.5, 0.6, P.a],
-  ];
-  const innerRot = t * 0.00055;
-  for (const [start, len, col] of innerSegs) {
-    const a0 = start + innerRot, a1 = a0 + len;
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.arc(ringX, ringY, 38, a0, a1);
-    ctx.arc(ringX, ringY, 28, a1, a0, true);
-    ctx.closePath(); ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  // Core pulsing circles
-  const corePulse = 0.55 + Math.sin(t * 0.0015) * 0.22;
-  ctx.lineWidth = 1.5;
-  [22, 14, 8].forEach((r, i) => {
-    ctx.globalAlpha = corePulse * (1 - i * 0.22);
-    ctx.strokeStyle = i % 2 === 0 ? P.d : P.c;
-    ctx.beginPath(); ctx.arc(ringX, ringY, r, 0, Math.PI * 2); ctx.stroke();
-  });
-  ctx.globalAlpha = 1;
-
-  // ══ STATUS LOG ════════════════════════════════════════════════
+  // ══ STATUS LOG (upper-left, glowing first line) ══════════════
   const LOG = [
     "SUBSYSTEM INTEGRITY NOMINAL",
     "NEURAL LINK ACTIVE",
@@ -938,133 +1053,180 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
     "DEFENSIVE GRID ONLINE",
     "WARP CORE NOMINAL",
     "HOLODECK ONLINE",
+    "DEFLECTOR DISH ENGAGED",
+    "TRANSPORTER BUFFER CLEAR",
+    "EPS CONDUITS STABLE",
   ];
-  const logX = contentLeft + 12;
+  const logX = contentLeft + 14;
   const logY = contentTop + 22;
-  ctx.font = "9px 'Gill Sans', 'Arial Narrow', monospace";
-  for (let li = 0; li < 4; li++) {
+  ctx.font = "10px 'JetBrains Mono', monospace";
+  for (let li = 0; li < 5; li++) {
     const idx = (Math.floor(t * 0.0001 + li * 3) % LOG.length);
     const sde = 47000 + ((Math.floor(t * 0.0001) + li * 17) % 999);
-    ctx.globalAlpha = li === 0 ? 0.55 : 0.38 - li * 0.06;
-    ctx.fillStyle = li === 0 ? P.d : P.c;
-    ctx.fillText(`${sde}.${(li * 3 + Math.floor(t * 0.003)) % 10}  ${LOG[idx]}`, logX, logY + li * 14);
+    const line = `${sde}.${(li * 3 + Math.floor(t * 0.003)) % 10}   ${LOG[idx]}`;
+    if (li === 0) {
+      glowFillText(ctx, line, logX, logY + li * 15, P.d, P.d, 6);
+    } else {
+      ctx.globalAlpha = Math.max(0.12, 0.42 - li * 0.07);
+      ctx.fillStyle = P.c;
+      ctx.fillText(line, logX, logY + li * 15);
+    }
   }
   ctx.globalAlpha = 1;
 
-  // ══ LIVE CLOCK ════════════════════════════════════════════════
+  // ══ SENSOR RADAR (upper-right of content area) ════════════════
+  const radarR = 58;
+  const radarCX = contentRight - radarR - 18;
+  const radarCY = contentTop + radarR + 22;
+  drawRadarSweep(ctx, radarCX, radarCY, radarR, t, P.c, P.d, 5);
+  // Radar labels
+  ctx.font = "7px 'JetBrains Mono', monospace";
+  ctx.globalAlpha = 0.6; ctx.fillStyle = P.d;
+  ctx.fillText("LR-SENSOR", radarCX - radarR + 2, radarCY - radarR - 6);
+  ctx.fillText(`BEARING ${String(Math.floor((t * 0.05) % 360)).padStart(3, "0")}°`, radarCX - radarR + 2, radarCY + radarR + 12);
+  ctx.fillText("RANGE 4.2 PSC", radarCX - radarR + 2, radarCY + radarR + 22);
+  ctx.globalAlpha = 1;
+
+  // ══ LIVE CLOCK (bottom-left of content, glowing time) ════════
   const now = new Date();
   const hh = String(now.getHours()).padStart(2, "0");
   const mm = String(now.getMinutes()).padStart(2, "0");
   const ss = String(now.getSeconds()).padStart(2, "0");
   const MO = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
   const DA = ["SUNDAY","MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY"];
-  const dateStr = `${now.getFullYear()}.${MO[now.getMonth()]}.${String(now.getDate()).padStart(2,"0")} ${DA[now.getDay()]}`;
-  const clockX = contentLeft + 12;
-  const clockY = contentBot - 38;
-  ctx.globalAlpha = 0.82;
-  ctx.fillStyle = P.c;
-  ctx.font = "bold 28px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.fillText(`${hh}:${mm}.${ss}`, clockX, clockY);
-  ctx.font = "bold 10px 'Gill Sans', 'Arial Narrow', sans-serif";
+  const dateStr = `${now.getFullYear()}.${MO[now.getMonth()]}.${String(now.getDate()).padStart(2,"0")}  ${DA[now.getDay()]}`;
+  const clockX = contentLeft + 14;
+  const clockY = contentBot - 40;
+  ctx.font = "bold 34px 'Gill Sans', 'Arial Narrow', sans-serif";
+  glowFillText(ctx, `${hh}:${mm}.${ss}`, clockX, clockY, P.c, P.glow, 12);
+  ctx.font = "bold 11px 'Gill Sans', 'Arial Narrow', sans-serif";
   ctx.fillStyle = P.b;
-  ctx.globalAlpha = 0.62;
-  ctx.fillText(dateStr, clockX, clockY + 18);
+  ctx.globalAlpha = 0.72;
+  ctx.fillText(dateStr, clockX, clockY + 22);
   ctx.globalAlpha = 1;
 
-  // ══ RIGHT PANEL — label blocks + indicator matrix ═════════════
-  type RPanelRow = [number, string, string];
-  const rRows: RPanelRow[] = [
-    [44, P.a, "COMM"], [G, "", ""], [38, P.b, "NAV"],  [G, "", ""],
-    [32, P.c, "SCI"],  [G, "", ""], [48, P.d, "ENG"],  [G, "", ""],
-    [36, P.e, "MED"],  [G, "", ""], [40, P.a, "SEC"],  [G, "", ""],
-    [34, P.b, "OPS"],
+  // ══ RIGHT PANEL — mini telemetry panels with sparklines ══════
+  type PanelRow = { rh: number; col: string; dk: string; label: string; valSeed: number };
+  const rRows: PanelRow[] = [
+    { rh: 56, col: P.a, dk: P.aDk, label: "COMM", valSeed: 1.1 },
+    { rh: 56, col: P.b, dk: P.bDk, label: "NAV",  valSeed: 2.3 },
+    { rh: 56, col: P.c, dk: P.cDk, label: "SCI",  valSeed: 3.7 },
+    { rh: 56, col: P.d, dk: P.dDk, label: "ENG",  valSeed: 4.9 },
+    { rh: 56, col: P.e, dk: P.eDk, label: "MED",  valSeed: 5.1 },
+    { rh: 56, col: P.a, dk: P.aDk, label: "SEC",  valSeed: 6.3 },
   ];
   let ry = panelTop;
-  const matrixTop = panelBot - 74;
-  for (const [rh, col, label] of rRows) {
-    if (ry >= matrixTop) break;
-    if (!col) { ry += rh; continue; }
-    const bh = Math.min(rh, matrixTop - ry);
-    const pulse = 0.68 + Math.sin(t * 0.0009 + ry * 0.013) * 0.22;
-    ctx.globalAlpha = pulse;
-    ctx.fillStyle = col;
-    ctx.fillRect(panelX, ry, RW, bh);
-    if (bh > 14) {
-      ctx.globalAlpha = pulse * 0.85;
-      ctx.font = "bold 8px 'Gill Sans', 'Arial Narrow', monospace";
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillText(label, panelX + 6, ry + bh * 0.62 + 2);
-      const val = Math.floor(30 + Math.abs(Math.sin(t * 0.0011 + ry * 0.009)) * 65);
-      ctx.fillText(`${val}%`, panelX + RW - 32, ry + bh * 0.62 + 2);
-    }
-    ry += rh;
+  const matrixTop = panelBot - 70;
+  for (const row of rRows) {
+    if (ry + row.rh > matrixTop) break;
+    const labelH = 18;
+    // Label bar — horizontal gradient (light → dark left to right)
+    const lg = ctx.createLinearGradient(panelX, ry, panelX + RW, ry);
+    lg.addColorStop(0, row.col); lg.addColorStop(1, row.dk);
+    ctx.fillStyle = lg;
+    ctx.fillRect(panelX, ry, RW, labelH);
+    // Label text + value (value glows)
+    ctx.font = "bold 10px 'Gill Sans', 'Arial Narrow', sans-serif";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.globalAlpha = 0.92;
+    ctx.fillText(row.label, panelX + 8, ry + 13);
+    const val = Math.floor(30 + Math.abs(Math.sin(t * 0.0011 + row.valSeed)) * 65);
+    glowFillText(ctx, `${val}%`, panelX + RW - 34, ry + 13, "#FFFFFF", P.glow, 5);
+    ctx.globalAlpha = 1;
+    // Sparkline panel below
+    const sY = ry + labelH + 2;
+    const sH = row.rh - labelH - 4;
+    ctx.fillStyle = row.dk;
+    ctx.globalAlpha = 0.22;
+    ctx.fillRect(panelX, sY, RW, sH);
+    ctx.globalAlpha = 1;
+    drawSparkline(ctx, panelX + 4, sY, RW - 8, sH, t, row.valSeed, row.col, 5);
+    ry += row.rh + G;
   }
-  ctx.globalAlpha = 1;
 
-  // Indicator bar matrix (RITOS-style rows of small colored bars)
-  const BAR_W = 22, BAR_H = 8, BAR_GAP = 4, ROW_GAP = 6;
+  // Indicator bar matrix at bottom of right panel (with subtle gradients)
+  const BAR_W = 22, BAR_H = 8, BAR_GAP = 4, ROW_GAP = 5;
   const barsPerRow = Math.floor((RW - 4) / (BAR_W + BAR_GAP));
-  const barCols = [P.d, P.c, P.b, P.a, P.e, P.d, P.c, P.b];
-  for (let row = 0; row < 4; row++) {
-    for (let col2 = 0; col2 < barsPerRow; col2++) {
-      const pulse2 = 0.45 + Math.sin(t * 0.0011 + row * 1.1 + col2 * 0.7) * 0.38;
-      ctx.globalAlpha = Math.max(0.18, pulse2);
-      ctx.fillStyle = barCols[(row * barsPerRow + col2) % barCols.length];
-      ctx.fillRect(panelX + 2 + col2 * (BAR_W + BAR_GAP), matrixTop + row * (BAR_H + ROW_GAP), BAR_W, BAR_H);
+  const barCols  = [P.d, P.c, P.b, P.a, P.e, P.d, P.c, P.b];
+  const barCols2 = [P.dDk, P.cDk, P.bDk, P.aDk, P.eDk, P.dDk, P.cDk, P.bDk];
+  const matrixRows = Math.max(3, Math.floor((panelBot - matrixTop) / (BAR_H + ROW_GAP)));
+  for (let mr = 0; mr < matrixRows; mr++) {
+    for (let mc = 0; mc < barsPerRow; mc++) {
+      const idx = (mr * barsPerRow + mc) % barCols.length;
+      const pulse2 = 0.40 + Math.sin(t * 0.0012 + mr * 1.1 + mc * 0.7) * 0.42;
+      ctx.globalAlpha = Math.max(0.15, pulse2);
+      const bxp = panelX + 2 + mc * (BAR_W + BAR_GAP);
+      const byp = matrixTop + mr * (BAR_H + ROW_GAP);
+      const bg = ctx.createLinearGradient(bxp, byp, bxp, byp + BAR_H);
+      bg.addColorStop(0, barCols[idx]); bg.addColorStop(1, barCols2[idx]);
+      ctx.fillStyle = bg;
+      ctx.fillRect(bxp, byp, BAR_W, BAR_H);
     }
   }
   ctx.globalAlpha = 1;
 
-  // ══ BOTTOM STRIP ════════════════════════════════════════════
+  // ══ BOTTOM STRIP (gradient segments) ══════════════════════════
   const botY = h - BH;
 
-  ctx.fillStyle = P.b;
+  const bElbowGrad = ctx.createLinearGradient(cx, botY, cx, botY + BH);
+  bElbowGrad.addColorStop(0, P.bDk); bElbowGrad.addColorStop(1, P.b);
+  ctx.fillStyle = bElbowGrad;
   ctx.fillRect(cx, botY, EW, BH);
 
-  const botDefs: [number, string][] = [
-    [96, P.d], [G, ""], [64, P.c], [G, ""], [120, P.b],
-    [G,  ""],  [56, P.a], [G, ""], [80, P.c],
+  const botDefs: [number, string, string][] = [
+    [96,  P.d, P.dDk], [G, "", ""], [64, P.c, P.cDk], [G, "", ""],
+    [120, P.b, P.bDk], [G, "", ""], [56, P.a, P.aDk], [G, "", ""], [80, P.c, P.cDk],
   ];
   let bx = cx + EW + G;
   const botEnd = panelX - G;
-  for (const [bw, col] of botDefs) {
+  for (const [bw, col, dk] of botDefs) {
     if (!col) { bx += bw; continue; }
     const bw2 = Math.min(bw, botEnd - bx);
     if (bw2 <= 0) break;
-    ctx.fillStyle = col;
+    const g = ctx.createLinearGradient(bx, botY, bx, botY + BH);
+    g.addColorStop(0, dk); g.addColorStop(1, col);
+    ctx.fillStyle = g;
     ctx.fillRect(bx, botY, bw2, BH);
     bx += bw;
   }
-  ctx.fillStyle = P.d;
+
+  const brGrad = ctx.createLinearGradient(panelX, botY, panelX, botY + BH);
+  brGrad.addColorStop(0, P.dDk); brGrad.addColorStop(1, P.d);
+  ctx.fillStyle = brGrad;
   ctx.fillRect(panelX, botY, RW, BH);
 
-  // Model info in bottom strip
-  ctx.font = "bold 8px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.fillStyle = "#FFFFFF";
-  ctx.globalAlpha = 0.52;
-  ctx.fillText("MODEL HOME-AI-SWARM  CTX FLEET", cx + EW + G + 8, botY + BH * 0.62);
-  ctx.globalAlpha = 1;
+  // Bottom info text — glowing
+  ctx.font = "bold 9px 'Gill Sans', 'Arial Narrow', sans-serif";
+  glowFillText(ctx, "MODEL  HOME-AI-SWARM  CTX FLEET  •  LCARS 47.3", cx + EW + G + 10, botY + BH * 0.62, "#FFFFFF", P.glow, 4);
 
-  // Concave arc stroke at bottom inner corner
-  ctx.strokeStyle = P.c;
-  ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.82;
+  // Bottom concave arc with glow
+  ctx.save();
+  ctx.shadowColor = P.glow; ctx.shadowBlur = 10;
+  ctx.strokeStyle = P.c; ctx.lineWidth = 3;
+  ctx.globalAlpha = 0.9;
   ctx.beginPath();
   ctx.arc(cx + EW + R, botY - R, R, Math.PI / 2, 0, true);
   ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.restore();
 
-  // ══ HORIZONTAL SCAN LINE ═════════════════════════════════════
+  // ══ SCAN LINE with glow + gradient ════════════════════════════
   const scanPct = (t % 7000) / 7000;
-  const scanY   = contentTop + (contentBot - contentTop) * scanPct;
-  ctx.globalAlpha = 0.11 + Math.sin(scanPct * Math.PI) * 0.07;
-  ctx.strokeStyle = P.d;
+  const scanY = contentTop + (contentBot - contentTop) * scanPct;
+  const scanGrad = ctx.createLinearGradient(contentLeft, scanY, contentRight, scanY);
+  scanGrad.addColorStop(0,   "rgba(0,0,0,0)");
+  scanGrad.addColorStop(0.3, P.c);
+  scanGrad.addColorStop(0.7, P.d);
+  scanGrad.addColorStop(1,   "rgba(0,0,0,0)");
+  ctx.save();
+  ctx.shadowColor = P.glow; ctx.shadowBlur = 6;
+  ctx.strokeStyle = scanGrad;
   ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.40 + Math.sin(scanPct * Math.PI) * 0.20;
   ctx.beginPath();
   ctx.moveTo(contentLeft, scanY);
   ctx.lineTo(contentRight, scanY);
   ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1184,6 +1346,13 @@ export function ThemeAmbientCanvas() {
     resize();
     window.addEventListener("resize", resize);
 
+    // Track mouse position for parallax / interactive effects across themes.
+    const onMouseMove = (e: MouseEvent) => {
+      stateRef.current.mx = (e.clientX / window.innerWidth)  - 0.5;
+      stateRef.current.my = (e.clientY / window.innerHeight) - 0.5;
+    };
+    window.addEventListener("mousemove", onMouseMove);
+
     let running = true;
     const loop = (ts: number) => {
       if (!running) return;
@@ -1211,6 +1380,7 @@ export function ThemeAmbientCanvas() {
       running = false;
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", onMouseMove);
     };
   }, [theme]);
 
