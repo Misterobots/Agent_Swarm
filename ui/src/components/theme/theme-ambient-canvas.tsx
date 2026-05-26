@@ -1,16 +1,16 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef } from "react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 
-// Sidebar pixel widths â€" must match Tailwind classes in app-shell.tsx
+// Sidebar pixel widths — must match Tailwind classes in app-shell.tsx
 const SW_FULL  = 256; // w-64
 const SW_SLIM  =  56; // w-14
 const SW_NONE  =   0;
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
 //  Types
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
 interface Stream {
   x: number; y: number;
   dir: "h" | "v";
@@ -73,9 +73,9 @@ function mkState(): CanvasState {
   };
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  HAL 9000 â€" breathing iris with rotating petals
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
+//  HAL 9000 — breathing iris with rotating petals
+// ─────────────────────────────────────────────────────────────
 function drawHAL(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, sw: number) {
   ctx.clearRect(0, 0, w, h);
 
@@ -153,9 +153,9 @@ function drawHAL(ctx: CanvasRenderingContext2D, w: number, h: number, t: number,
   ctx.lineWidth = 2; ctx.stroke();
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  TRON â€" The Grid with live light-cycle streams
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
+//  TRON — The Grid with live light-cycle streams
+// ─────────────────────────────────────────────────────────────
 function spawnStream(w: number, h: number, sidebarW: number): Stream {
   const dir: "h" | "v" = Math.random() > 0.5 ? "h" : "v";
   const G = 48;
@@ -261,9 +261,9 @@ function drawTron(ctx: CanvasRenderingContext2D, w: number, h: number, t: number
   ctx.shadowBlur = 0;
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  BLADE RUNNER â€" Voigt-Kampff iris analyzer
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
+//  BLADE RUNNER — Voigt-Kampff iris analyzer
+// ─────────────────────────────────────────────────────────────
 function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, sw: number) {
   ctx.clearRect(0, 0, w, h);
   const chatW = w - sw;
@@ -333,7 +333,7 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   ctx.fillStyle = "rgba(0,0,0,0.9)"; ctx.fill();
   ctx.strokeStyle = amber(0.5); ctx.lineWidth = 1; ctx.stroke();
 
-  // Oscilloscope in sidebar â€" hairline separator + floating waveform
+  // Oscilloscope in sidebar — hairline separator + floating waveform
   const oscX = 10, oscW = sw - 20, oscY = h - 70, oscH = 40;
   const points = 60;
   const sepY = oscY - oscH - 8;
@@ -369,11 +369,11 @@ function drawBladeRunner(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   ctx.fillStyle = horizon; ctx.fillRect(sw, h * 0.7, chatW, h * 0.3);
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  SHADOWRUN â€" Awakened AR / matrix rain + runes
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-const SR_GLYPHS = "ï½¦ï½§ï½¨ï½©ï½ªï½«ï½¬ï½­ï½®ï½¯ï½°ï½±ï½²ï½³ï½´ï½µï½¶ï½·ï½¸ï½¹ï½ºï½»ï½¼ï½½ï½¾ï½¿ï¾€ï¾ï¾‚ï¾ƒï¾„ï¾…ï¾†ï¾‡ï¾ˆï¾‰ï¾Šï¾‹ï¾Œï¾ï¾Žï¾ï¾ï¾‘ï¾’ï¾"ï¾"ï¾•ï¾–ï¾—ï¾˜ï¾™ï¾šï¾›ï¾œï¾01";
-const SR_RUNE_CHARS = "áš áš¡áš¢áš£áš¤áš¥áš¦áš§áš¨áš©ášªáš«áš¬áš­áš®áš¯áš°áš±áš²áš³áš´ášµáš¶áš·áš¸áš¹ášºáš»áš¼áš½áš¾áš¿á›€á›á›‚á›ƒá›„á›…á›†á›‡á›ˆá›‰á›Šá›‹á›Œá›á›Žá›á›á›‘á›’á›"";
+// ─────────────────────────────────────────────────────────────
+//  SHADOWRUN — Awakened AR / matrix rain + runes
+// ─────────────────────────────────────────────────────────────
+const SR_GLYPHS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ01";
+const SR_RUNE_CHARS = "ᚠᚡᚢᚣᚤᚥᚦᚧᚨᚩᚪᚫᚬᚭᚮᚯᚰᚱᚲᚳᚴᚵᚶᚷᚸᚹᚺᚻᚼᚽᚾᚿᛀᛁᛂᛃᛄᛅᛆᛇᛈᛉᛊᛋᛌᛍᛎᛏᛐᛑᛒᛓ";
 
 function initShadowrunGlyphs(w: number, h: number, sw: number, state: CanvasState) {
   const cols = Math.floor(w / 14);
@@ -479,9 +479,9 @@ function drawShadowrun(ctx: CanvasRenderingContext2D, w: number, h: number, t: n
   ctx.stroke(); ctx.shadowBlur = 0;
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  NOSTROMO â€" MU/TH/UR motion tracker
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
+//  NOSTROMO — MU/TH/UR motion tracker
+// ─────────────────────────────────────────────────────────────
 function drawNostromo(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, sw: number) {
   ctx.clearRect(0, 0, w, h);
   const amber = (a: number) => `rgba(255,140,0,${a})`;
@@ -519,7 +519,7 @@ function drawNostromo(ctx: CanvasRenderingContext2D, w: number, h: number, t: nu
   ctx.strokeStyle = amber(0.75); ctx.lineWidth = 1.5;
   ctx.shadowBlur = 8; ctx.shadowColor = amber(1); ctx.stroke(); ctx.shadowBlur = 0;
 
-  // Blip contacts â€" fade in when sweep passes each fixed position
+  // Blip contacts — fade in when sweep passes each fixed position
   const blipAngles = [0.6, 1.8, 3.2, 4.1, 5.3];
   const blipDists  = [0.45, 0.70, 0.30, 0.62, 0.82];
   blipAngles.forEach((ba, i) => {
@@ -563,9 +563,9 @@ function drawNostromo(ctx: CanvasRenderingContext2D, w: number, h: number, t: nu
   ctx.fillStyle = scanGrad; ctx.fillRect(sw, scanY - 60, chatW, 120);
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  TERMINAL â€" phosphor CRT with ASCII rain
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
+//  TERMINAL — phosphor CRT with ASCII rain
+// ─────────────────────────────────────────────────────────────
 const TERM_GLYPHS = "0123456789ABCDEF><[]{}|/\\!@#$%^&*_+=?:;.,~`'\"";
 
 function initTerminalGlyphs(w: number, h: number, sw: number, state: CanvasState) {
@@ -634,9 +634,9 @@ function drawTerminal(ctx: CanvasRenderingContext2D, w: number, h: number, t: nu
   ctx.fillStyle = spGrad; ctx.fillRect(0, sidebarPulseY - 80, sw, 160);
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  OPS â€" Mission Control tactical scope + orbital arcs
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
+//  OPS — Mission Control tactical scope + orbital arcs
+// ─────────────────────────────────────────────────────────────
 function drawOps(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, sw: number) {
   ctx.clearRect(0, 0, w, h);
   const chatW = w - sw;
@@ -721,9 +721,9 @@ function drawOps(ctx: CanvasRenderingContext2D, w: number, h: number, t: number,
   ctx.fillText(`ALT: ${Math.floor(380 + Math.sin(t * 0.0004) * 12)}km`, rx - 26, crY + 14);
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  LCARS â€" Deep space starfield with warp streaks
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
+//  LCARS — Deep space starfield with warp streaks
+// ─────────────────────────────────────────────────────────────
 function initStars(w: number, h: number, state: CanvasState) {
   state.stars = Array.from({ length: 240 }, () => ({
     x: Math.random() * w,
@@ -735,7 +735,7 @@ function initStars(w: number, h: number, state: CanvasState) {
 
 function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, state: CanvasState, sw: number, theme: string) {
   ctx.clearRect(0, 0, w, h);
-  const cx = sw;           // chat area left edge
+  const cx = sw;
 
   const P = theme === "lcars-blue"
     ? { a:"#221166", b:"#3355AA", c:"#6688CC", d:"#AABBEE", e:"#8899DD" }
@@ -743,35 +743,35 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
     ? { a:"#004455", b:"#007788", c:"#00AACC", d:"#44DDEE", e:"#00CC77" }
     : { a:"#CC3300", b:"#FF6600", c:"#FFAA00", d:"#FFDD00", e:"#FF3366" };
 
-  const TH  = 60;   // top header height
-  const BH  = 38;   // bottom strip height
-  const EW  = 76;   // elbow block width
-  const AW  = 8;    // left vertical arm width (below header)
-  const R   = 28;   // concave elbow arc radius
-  const RW  = 120;  // right panel width
-  const G   = 6;    // gap between segments
+  const TH  = 60;
+  const BH  = 38;
+  const EW  = 76;
+  const AW  = 8;
+  const R   = 28;
+  const RW  = 120;
+  const G   = 6;
   const panelX   = w - RW;
   const panelTop = TH + G;
   const panelBot = h - BH - G;
+  const contentLeft  = cx + EW + R + G;
+  const contentRight = w - RW - G;
 
-  // â"€â"€ Starfield clipped to content area â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // ── Starfield clipped to content area ────────────────────────
   if (state.stars.length < 100) initStars(w, h, state);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(cx + EW + R + G, TH, cw - EW - R - G - RW - G, h - TH - BH);
+  ctx.rect(contentLeft, TH, contentRight - contentLeft, h - TH - BH);
   ctx.clip();
   state.stars.forEach(s => {
     s.x -= s.speed;
-    if (s.x < cx + EW + R + G) { s.x = w - RW - G - 5; s.y = Math.random() * h; }
+    if (s.x < contentLeft) { s.x = contentRight - 5; s.y = Math.random() * h; }
     const br = 0.09 + s.r * 0.22 + Math.sin(t * 0.0007 + s.x * 0.01 + s.y * 0.02) * 0.07;
     ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(255,255,255,${br.toFixed(2)})`; ctx.fill();
   });
   ctx.restore();
 
-  // â"€â"€ Warp streaks â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-  const contentLeft = cx + EW + R + G;
-  const contentRight = w - RW - G;
+  // ── Warp streaks ──────────────────────────────────────────────
   for (let wi = 0; wi < 3; wi++) {
     const period = 8000 + wi * 2700;
     const phase  = ((t + wi * 2700) % period) / period;
@@ -793,12 +793,10 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
     ctx.stroke(); ctx.shadowBlur = 0;
   }
 
-  // â•â• TOP HEADER BAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // Left elbow block
+  // ══ TOP HEADER BAR ════════════════════════════════════════════
   ctx.fillStyle = P.b;
   ctx.fillRect(cx, 0, EW, TH);
 
-  // Header segments
   const segDefs: [number, string][] = [
     [90, P.d], [G, ""], [56, P.c], [G, ""], [128, P.b],
     [G, ""],   [44, P.a], [G, ""], [84, P.c], [G, ""], [60, P.d],
@@ -814,12 +812,10 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
     sx += segW;
   }
 
-  // Right header block
   ctx.fillStyle = P.c;
   ctx.fillRect(panelX, 0, RW, TH);
 
-  // Concave arc stroke at top inner corner (elbow â†’ content transition)
-  // Arc center at (cx+EW+R, TH+R); quarter arc from west to north
+  // Concave arc stroke at top inner corner
   ctx.strokeStyle = P.c;
   ctx.lineWidth = 2.5;
   ctx.globalAlpha = 0.75;
@@ -828,7 +824,7 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Header text (white glows through screen blend)
+  // Header text
   ctx.font = "bold 9px 'Gill Sans', 'Arial Narrow', sans-serif";
   ctx.fillStyle = "#FFFFFF";
   ctx.globalAlpha = 0.6;
@@ -840,13 +836,13 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
   ctx.fillText(sd, panelX + 7, 38);
   ctx.globalAlpha = 1;
 
-  // â•â• LEFT VERTICAL ARM (below header) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══ LEFT VERTICAL ARM ════════════════════════════════════════
   ctx.fillStyle = P.b;
   ctx.globalAlpha = 0.78;
   ctx.fillRect(cx, TH + R, AW, h - TH - R - BH - R);
   ctx.globalAlpha = 1;
 
-  // â•â• RIGHT DATA PANEL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══ RIGHT DATA PANEL ════════════════════════════════════════
   type RBlock = [number, string, string];
   const rBlocks: RBlock[] = [
     [50,  P.a, "COMM"], [G,  "", ""], [66,  P.b, "NAV "],  [G,  "", ""],
@@ -875,14 +871,12 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
   }
   ctx.globalAlpha = 1;
 
-  // â•â• BOTTOM STRIP â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══ BOTTOM STRIP ════════════════════════════════════════════
   const botY = h - BH;
 
-  // Bottom left elbow
   ctx.fillStyle = P.b;
   ctx.fillRect(cx, botY, EW, BH);
 
-  // Bottom segments
   const botDefs: [number, string][] = [
     [86, P.d], [G, ""], [58, P.c], [G, ""], [108, P.b],
     [G, ""],   [50, P.a], [G, ""], [74, P.c],
@@ -909,7 +903,7 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // â•â• HORIZONTAL SCAN LINE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══ HORIZONTAL SCAN LINE ═════════════════════════════════════
   const scanY = TH + ((h - TH - BH) * ((t % 7000) / 7000));
   ctx.globalAlpha = 0.14 + Math.sin(((t % 7000) / 7000) * Math.PI) * 0.09;
   ctx.strokeStyle = P.d;
@@ -921,9 +915,9 @@ function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: numbe
   ctx.globalAlpha = 1;
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-//  DUNE â€" Arrakis sand storm + spice sonar
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
+//  DUNE — Arrakis sand storm + spice sonar
+// ─────────────────────────────────────────────────────────────
 function initSandParticles(w: number, h: number, sw: number, state: CanvasState) {
   const chatW = w - sw;
   state.sand = Array.from({ length: 140 }, () => ({
@@ -962,7 +956,7 @@ function drawDune(ctx: CanvasRenderingContext2D, w: number, h: number, t: number
     ctx.fill();
   });
 
-  // Spice sonar expansion rings â€" worm detection
+  // Spice sonar expansion rings — worm detection
   const sonarCx = sw + chatW * 0.55, sonarCy = h * 0.58;
   for (let i = 0; i < 5; i++) {
     const phase = ((t * 0.00035 + i * 0.75) % 1);
@@ -992,9 +986,9 @@ function drawDune(ctx: CanvasRenderingContext2D, w: number, h: number, t: number
   ctx.fillStyle = sideGrad; ctx.fillRect(0, h * 0.8, sw, h * 0.2);
 }
 
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
 //  Component
-// â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─────────────────────────────────────────────────────────────
 const CANVAS_THEMES = new Set([
   "hal9000", "tron", "bladerunner", "shadowrun",
   "nostromo", "terminal", "ops",
