@@ -733,49 +733,120 @@ function initStars(w: number, h: number, state: CanvasState) {
   }));
 }
 
-function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, state: CanvasState, sw: number) {
+function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, state: CanvasState, sw: number, theme: string) {
   ctx.clearRect(0, 0, w, h);
   const chatW = w - sw;
+  const BAR_H = 48; // LCARS top bar height
 
+  // Per-variant palette
+  const P = theme === "lcars-blue"
+    ? { a:"#221166", b:"#3355AA", c:"#6688CC", d:"#AABBEE", glow:"rgba(136,170,238,0.6)" }
+    : theme === "lcars-teal"
+    ? { a:"#004455", b:"#007788", c:"#00AACC", d:"#44DDEE", glow:"rgba(0,204,221,0.6)" }
+    : { a:"#CC3300", b:"#FF6600", c:"#FFAA00", d:"#FFDD00", glow:"rgba(255,170,0,0.65)" };
+
+  // ── LCARS top bar ────────────────────────────────────────────
+  // Left cap block
+  ctx.globalAlpha = 0.88; ctx.fillStyle = P.a;
+  ctx.fillRect(sw, 0, chatW * 0.17, BAR_H);
+
+  // Thin separator strip (animates opacity)
+  const sep1 = 0.55 + Math.sin(t * 0.0009 + 1) * 0.35;
+  ctx.globalAlpha = sep1; ctx.fillStyle = P.b;
+  ctx.fillRect(sw + chatW * 0.17, 0, chatW * 0.012, BAR_H);
+
+  // Main mid block
+  ctx.globalAlpha = 0.82; ctx.fillStyle = P.c;
+  ctx.fillRect(sw + chatW * 0.183, 0, chatW * 0.50, BAR_H);
+
+  // Right separator strip
+  const sep2 = 0.45 + Math.sin(t * 0.0013 + 3) * 0.4;
+  ctx.globalAlpha = sep2; ctx.fillStyle = P.d;
+  ctx.fillRect(sw + chatW * 0.684, 0, chatW * 0.01, BAR_H);
+
+  // Right blocks — three segments blinking independently
+  const rb1 = 0.55 + Math.sin(t * 0.0019 + 0.5) * 0.35;
+  ctx.globalAlpha = rb1 * 0.9; ctx.fillStyle = P.b;
+  ctx.fillRect(sw + chatW * 0.695, 0, chatW * 0.10, BAR_H);
+
+  const rb2 = 0.5 + Math.sin(t * 0.0015 + 2.1) * 0.38;
+  ctx.globalAlpha = rb2 * 0.85; ctx.fillStyle = P.d;
+  ctx.fillRect(sw + chatW * 0.796, 0, chatW * 0.10, BAR_H);
+
+  const rb3 = 0.6 + Math.sin(t * 0.0011 + 4.2) * 0.32;
+  ctx.globalAlpha = rb3 * 0.88; ctx.fillStyle = P.a;
+  ctx.fillRect(sw + chatW * 0.897, 0, chatW * 0.103, BAR_H);
+
+  // Bottom edge glow line on the bar
+  ctx.globalAlpha = 0.6 + Math.sin(t * 0.0007) * 0.25;
+  ctx.fillStyle = P.d;
+  ctx.fillRect(sw, BAR_H - 2, chatW, 2);
+
+  // ── Status indicator dots in bottom of bar ───────────────────
+  for (let i = 0; i < 6; i++) {
+    const a = 0.35 + Math.sin(t * (0.0008 + i * 0.0004) + i * 1.7) * 0.55;
+    const colors = [P.d, P.c, P.b, P.d, P.a, P.c];
+    ctx.globalAlpha = Math.max(0.05, a); ctx.fillStyle = colors[i];
+    ctx.fillRect(sw + chatW * 0.87 - i * 20, BAR_H - 14, 14, 8);
+  }
+
+  // ── Left elbow arm (vertical strip below bar) ────────────────
+  const ARM_W = 22;
+  ctx.globalAlpha = 0.88; ctx.fillStyle = P.a;
+  ctx.fillRect(sw, BAR_H, ARM_W, 110);
+
+  // Elbow corner shimmer sweep (horizontal, rides along the arm bottom edge)
+  const shimX = sw + ARM_W * Math.abs(Math.sin(t * 0.0006));
+  const shimGrad = ctx.createLinearGradient(shimX - 30, BAR_H + 108, shimX + 30, BAR_H + 110);
+  shimGrad.addColorStop(0, "rgba(255,255,255,0)");
+  shimGrad.addColorStop(0.5, P.glow);
+  shimGrad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.globalAlpha = 0.7; ctx.fillStyle = shimGrad;
+  ctx.fillRect(sw, BAR_H + 100, ARM_W + 20, 12);
+
+  ctx.globalAlpha = 1;
+
+  // ── Starfield (below bar + elbow arm in chat area) ───────────
   if (state.stars.length < 100) initStars(w, h, state);
 
-  // Drifting star field
+  const starYMin = BAR_H + 4;
   state.stars.forEach(s => {
     s.x -= s.speed;
-    if (s.x < sw - 10) { s.x = w + 5; s.y = Math.random() * h; }
-    const brightness = 0.25 + s.r * 0.6 + Math.sin(t * 0.0008 + s.x * 0.01 + s.y * 0.02) * 0.12;
+    if (s.x < sw) { s.x = w + 5; s.y = starYMin + Math.random() * (h - starYMin); }
+    if (s.y < starYMin) s.y = starYMin + Math.random() * (h - starYMin);
+    const brightness = 0.2 + s.r * 0.5 + Math.sin(t * 0.0008 + s.x * 0.01 + s.y * 0.02) * 0.1;
     ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(255,255,255,${brightness})`; ctx.fill();
   });
 
-  // Warp streaks — every ~8 seconds a streak fires
+  // ── Warp streaks ──────────────────────────────────────────────
   for (let wi = 0; wi < 3; wi++) {
     const warpPeriod = 8000 + wi * 2700;
     const phase = ((t + wi * 2700) % warpPeriod) / warpPeriod;
     if (phase > 0.12) continue;
     const progress = phase / 0.12;
     const seed = Math.floor((t + wi * 2700) / warpPeriod);
-    const wy = ((seed * 137 + wi * 53) % 100) / 100 * h * 0.7 + h * 0.15;
+    const wy = starYMin + ((seed * 137 + wi * 53) % 100) / 100 * (h - starYMin) * 0.75 + (h - starYMin) * 0.12;
     const wLen = 70 + ((seed * 73 + wi * 29) % 100);
-    const wx = sw + chatW * (0.3 + ((seed * 97 + wi * 41) % 60) / 100 * 0.5);
+    const wx = sw + ARM_W + (chatW - ARM_W) * (0.3 + ((seed * 97 + wi * 41) % 60) / 100 * 0.5);
     const brightFade = Math.sin(progress * Math.PI);
     const wg = ctx.createLinearGradient(wx - wLen * 0.3, wy, wx + wLen * 0.7, wy);
-    wg.addColorStop(0, `rgba(255,255,255,0)`);
+    wg.addColorStop(0, "rgba(255,255,255,0)");
     wg.addColorStop(0.3, `rgba(200,220,255,${brightFade * 0.85})`);
     wg.addColorStop(0.7, `rgba(255,255,255,${brightFade * 0.95})`);
-    wg.addColorStop(1, `rgba(255,255,255,0)`);
+    wg.addColorStop(1, "rgba(255,255,255,0)");
     ctx.strokeStyle = wg; ctx.lineWidth = 1.5;
     ctx.shadowBlur = 10; ctx.shadowColor = "rgba(200,220,255,0.9)";
     ctx.beginPath(); ctx.moveTo(wx - wLen * 0.3, wy); ctx.lineTo(wx + wLen * 0.7, wy);
     ctx.stroke(); ctx.shadowBlur = 0;
   }
 
-  // Faint nebula glow in chat area
-  const nebulaGrad = ctx.createRadialGradient(sw + chatW * 0.5, h * 0.4, 0, sw + chatW * 0.5, h * 0.4, chatW * 0.5);
-  nebulaGrad.addColorStop(0, `rgba(120,80,180,${0.03 + Math.sin(t * 0.0005) * 0.01})`);
-  nebulaGrad.addColorStop(0.6, `rgba(60,40,120,0.02)`);
+  // Faint nebula glow
+  const nebulaGrad = ctx.createRadialGradient(sw + chatW * 0.5, h * 0.45, 0, sw + chatW * 0.5, h * 0.45, chatW * 0.5);
+  nebulaGrad.addColorStop(0, `rgba(120,80,180,${0.025 + Math.sin(t * 0.0005) * 0.01})`);
+  nebulaGrad.addColorStop(0.6, "rgba(60,40,120,0.015)");
   nebulaGrad.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = nebulaGrad; ctx.fillRect(sw, 0, chatW, h);
+  ctx.fillStyle = nebulaGrad; ctx.fillRect(sw, starYMin, chatW, h - starYMin);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -911,7 +982,7 @@ export function ThemeAmbientCanvas() {
         case "terminal":   drawTerminal(ctx, w, h, ts, state, sw); break;
         case "ops":        drawOps(ctx, w, h, ts, sw); break;
         case "lcars": case "lcars-blue": case "lcars-teal":
-          drawLCARS(ctx, w, h, ts, state, sw); break;
+          drawLCARS(ctx, w, h, ts, state, sw, theme); break;
         case "dune":       drawDune(ctx, w, h, ts, state, sw); break;
       }
       rafRef.current = requestAnimationFrame(loop);
