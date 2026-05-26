@@ -391,6 +391,12 @@
   0%, 100% { filter: brightness(0.82) saturate(0.9); }
   50%       { filter: brightness(1.18) saturate(1.15); }
 }
+/* Individual bar breath — each nav item pulses on its own phase */
+@keyframes lcars-bar-breathe {
+  0%, 100% { filter: brightness(1.0) saturate(1.0); }
+  45%       { filter: brightness(0.58) saturate(0.75); }
+  55%       { filter: brightness(0.58) saturate(0.75); }
+}
 /* Legacy alias â€” keep for any references */
 @keyframes lcars-elbow-pulse {
   0%, 100% { opacity: 1; filter: brightness(1); }
@@ -483,62 +489,84 @@
   text-transform: uppercase;
 }
 
-/* Nav items — LCARS pill-right buttons with vivid elbow-palette colours */
+/* Nav items — LCARS pill-right buttons, vivid colour, right-edge fade, staggered breath */
 [data-theme^=”lcars”] .sidebar-wrapper a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper div.rounded-md {
   margin-left:  8px !important;
   margin-right: 8px !important;
-  border-radius: 0 2rem 2rem 0 !important;     /* LCARS pill: flat left, round right */
+  border-radius: 0 2rem 2rem 0 !important;
   background-color: color-mix(in srgb, var(--lcars-elbow-b) 22%, transparent) !important;
-  background-image: none !important;
+  /* Right-edge fade: left highlight → flat colour → darkens right → near-black at tip */
+  background-image: linear-gradient(to right,
+    rgba(255,255,255,0.12)  0%,
+    rgba(255,255,255,0.04) 30%,
+    rgba(0,0,0,0.10)       55%,
+    rgba(0,0,0,0.38)       82%,
+    rgba(0,0,0,0.60)      100%
+  ) !important;
   color: var(--lcars-nav-active) !important;
   border: none !important;
   text-transform: uppercase !important;
   letter-spacing: 0.09em !important;
   font-weight: 700 !important;
+  animation: lcars-bar-breathe 4.6s ease-in-out infinite !important;
   transition: background-color 0.15s, color 0.15s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper a.rounded-md:hover,
 [data-theme^=”lcars”] .sidebar-wrapper div.rounded-md:hover {
   background-color: color-mix(in srgb, var(--lcars-elbow-c) 50%, transparent) !important;
   color: var(--lcars-nav-text-on) !important;
+  filter: brightness(1.15) !important;
+  animation: none !important;
 }
 
-/* Graduated vivid fills — elbow palette, no dark base */
+/* Graduated vivid fills + staggered animation-delay for independent phasing */
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(1) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(1) {
   background-color: color-mix(in srgb, var(--lcars-elbow-b) 62%, transparent) !important;
   color: var(--lcars-nav-text-on) !important;
+  animation-delay: -0.0s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(2) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(2) {
   background-color: color-mix(in srgb, var(--lcars-elbow-c) 54%, transparent) !important;
   color: var(--lcars-nav-text-on) !important;
+  animation-delay: -0.85s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(3) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(3) {
   background-color: color-mix(in srgb, var(--lcars-elbow-a) 50%, transparent) !important;
   color: color-mix(in srgb, var(--lcars-nav-text-on) 70%, var(--lcars-nav-active)) !important;
+  animation-delay: -1.9s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(4) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(4) {
   background-color: color-mix(in srgb, var(--lcars-elbow-d) 46%, transparent) !important;
   color: var(--lcars-nav-text-on) !important;
+  animation-delay: -2.7s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(n+5) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(n+5) {
   background-color: color-mix(in srgb, var(--lcars-elbow-b) 36%, transparent) !important;
   color: color-mix(in srgb, var(--lcars-nav-text-on) 60%, var(--lcars-nav-active)) !important;
+  animation-delay: -3.5s !important;
 }
 
-/* Active item: full elbow-b fill, dark text, pill-right, outer glow */
+/* Active item: full accent fill, pill-right, outer glow — overrides breath */
 [data-theme^=”lcars”] .sidebar-active {
   background: var(--lcars-nav-active) !important;
+  background-image: linear-gradient(to right,
+    rgba(255,255,255,0.22)  0%,
+    rgba(255,255,255,0.06) 40%,
+    rgba(0,0,0,0.12)       72%,
+    rgba(0,0,0,0.32)      100%
+  ) !important;
   color: var(--lcars-nav-text-on) !important;
   border-radius: 0 2rem 2rem 0 !important;
   border: none !important;
-  box-shadow: inset 0 0 12px rgba(255,255,255,0.18), 0 0 12px color-mix(in srgb, var(--lcars-nav-active) 55%, transparent) !important;
-  animation: lcars-nav-pulse 6s ease-in-out infinite !important;
+  box-shadow: inset 0 0 14px rgba(255,255,255,0.18), 0 0 14px color-mix(in srgb, var(--lcars-nav-active) 55%, transparent) !important;
+  animation: lcars-nav-pulse 4.0s ease-in-out infinite !important;
+  animation-delay: 0s !important;
 }
 [data-theme^=”lcars”] .sidebar-active::before { display: none; }
 [data-theme^=”lcars”] .sidebar-active svg { color: var(--lcars-nav-text-on) !important; }
