@@ -504,20 +504,20 @@
   text-transform: uppercase;
 }
 
-/* Nav items — LCARS pill-right buttons: SOLID vivid colour + right-edge dark fade */
-[data-theme^="lcars"] .sidebar-wrapper a.rounded-md,
-[data-theme^="lcars"] .sidebar-wrapper div.rounded-md {
+/* Nav items — LCARS pill-right buttons: SOLID vivid colour + right-edge dark fade.
+   Only targets <a> nav links — history items use div.rounded-md and are excluded. */
+[data-theme^="lcars"] .sidebar-wrapper a.rounded-md {
   margin-left:  8px !important;
   margin-right: 8px !important;
   border-radius: 0 2rem 2rem 0 !important;
   background-color: var(--lcars-elbow-b) !important;
-  /* Left highlight → flat → fade to near-black at right tip (characteristic LCARS dissolve) */
+  /* Left highlight → flat → soft dark tip (characteristic LCARS dissolve, not too aggressive) */
   background-image: linear-gradient(to right,
-    rgba(255,255,255,0.14)  0%,
-    rgba(255,255,255,0.04) 35%,
-    rgba(0,0,0,0.08)       55%,
-    rgba(0,0,0,0.40)       80%,
-    rgba(0,0,0,0.72)      100%
+    rgba(255,255,255,0.16)  0%,
+    rgba(255,255,255,0.06) 40%,
+    rgba(0,0,0,0.04)       58%,
+    rgba(0,0,0,0.28)       82%,
+    rgba(0,0,0,0.52)      100%
   ) !important;
   color: var(--lcars-nav-text-on) !important;
   border: none !important;
@@ -527,8 +527,7 @@
   animation: lcars-bar-breathe 4.6s ease-in-out infinite !important;
   transition: filter 0.15s !important;
 }
-[data-theme^="lcars"] .sidebar-wrapper a.rounded-md:hover,
-[data-theme^="lcars"] .sidebar-wrapper div.rounded-md:hover {
+[data-theme^="lcars"] .sidebar-wrapper a.rounded-md:hover {
   background-color: var(--lcars-elbow-c) !important;
   color: var(--lcars-nav-text-on) !important;
   filter: brightness(1.18) !important;
