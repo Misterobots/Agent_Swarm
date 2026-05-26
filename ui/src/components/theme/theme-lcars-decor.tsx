@@ -72,7 +72,7 @@ export function ThemeLCARSDecor() {
         aria-hidden="true"
         style={{
           position:       "fixed",
-          bottom:          96,
+          bottom:          160,
           left:            10,
           width:           SW_FULL - 20,
           pointerEvents:  "none",
