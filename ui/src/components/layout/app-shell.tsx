@@ -10,6 +10,7 @@ import { PanelLeft } from "lucide-react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { ThemeAmbientCanvas } from "@/components/theme/theme-ambient-canvas";
+import { ThemeLCARSDecor }   from "@/components/theme/theme-lcars-decor";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -105,6 +106,8 @@ export function AppShell({ children }: AppShellProps) {
     <div className="app-shell-root flex flex-col h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
       {/* Canvas ambient effects for immersive themes */}
       <ThemeAmbientCanvas />
+      {/* LCARS structural chrome — left arm strip + readout bars */}
+      <ThemeLCARSDecor />
       {/* Top Bar layout */}
       {isTopBar && <TopBar />}
 

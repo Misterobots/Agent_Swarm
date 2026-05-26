@@ -483,69 +483,65 @@
   text-transform: uppercase;
 }
 
-/* Nav blocks: flat rectangles, full-width â€” Lâ†’R bevel + graduated fill */
-[data-theme^="lcars"] .sidebar-wrapper a.rounded-md,
-[data-theme^="lcars"] .sidebar-wrapper div.rounded-md {
-  margin-left: 0 !important;
-  margin-right: 6px !important;
-  border-radius: 0 !important;
-  background-color: var(--lcars-nav-dark);
-  background-image: linear-gradient(to right, rgba(255,255,255,0.07) 0%, transparent 28%, rgba(0,0,0,0.18) 100%);
-  color: var(--chat-muted);
-  border: none;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 700;
-  transition: background-color var(--dur-base), color var(--dur-base);
+/* Nav items — LCARS pill-right buttons with vivid elbow-palette colours */
+[data-theme^=”lcars”] .sidebar-wrapper a.rounded-md,
+[data-theme^=”lcars”] .sidebar-wrapper div.rounded-md {
+  margin-left:  8px !important;
+  margin-right: 8px !important;
+  border-radius: 0 2rem 2rem 0 !important;     /* LCARS pill: flat left, round right */
+  background-color: color-mix(in srgb, var(--lcars-elbow-b) 22%, transparent) !important;
+  background-image: none !important;
+  color: var(--lcars-nav-active) !important;
+  border: none !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.09em !important;
+  font-weight: 700 !important;
+  transition: background-color 0.15s, color 0.15s !important;
 }
-[data-theme^="lcars"] .sidebar-wrapper a.rounded-md:hover,
-[data-theme^="lcars"] .sidebar-wrapper div.rounded-md:hover {
-  background-color: color-mix(in srgb, var(--lcars-nav-dark) 48%, var(--chat-accent));
-  color: var(--chat-accent-strong);
-}
-
-/* â”€â”€ GRADUATED NAV STEPS â€” brightest at top, darkest at bottom â”€â”€â”€ */
-/* Two DOM patterns:
-   Workspaces: .space-y-px > div:nth-child(N) > a.rounded-md
-   Operations/Preferences: .space-y-px > a.rounded-md:nth-child(N)  */
-
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(1) > a.rounded-md,
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(1) {
-  background-color: color-mix(in srgb, var(--lcars-nav-active) 70%, var(--lcars-nav-dark));
-  color: color-mix(in srgb, var(--lcars-nav-text-on) 80%, var(--chat-muted));
-}
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(2) > a.rounded-md,
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(2) {
-  background-color: color-mix(in srgb, var(--lcars-nav-active) 50%, var(--lcars-nav-dark));
-  color: color-mix(in srgb, var(--lcars-nav-text-on) 52%, var(--chat-muted));
-}
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(3) > a.rounded-md,
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(3) {
-  background-color: color-mix(in srgb, var(--lcars-nav-active) 34%, var(--lcars-nav-dark));
-  color: color-mix(in srgb, var(--lcars-nav-active) 55%, var(--chat-muted));
-}
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(4) > a.rounded-md,
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(4) {
-  background-color: color-mix(in srgb, var(--lcars-nav-active) 22%, var(--lcars-nav-dark));
-  color: color-mix(in srgb, var(--lcars-nav-active) 38%, var(--chat-muted));
-}
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(n+5) > a.rounded-md,
-[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(n+5) {
-  background-color: color-mix(in srgb, var(--lcars-nav-active) 12%, var(--lcars-nav-dark));
-  color: color-mix(in srgb, var(--lcars-nav-active) 24%, var(--chat-muted));
+[data-theme^=”lcars”] .sidebar-wrapper a.rounded-md:hover,
+[data-theme^=”lcars”] .sidebar-wrapper div.rounded-md:hover {
+  background-color: color-mix(in srgb, var(--lcars-elbow-c) 50%, transparent) !important;
+  color: var(--lcars-nav-text-on) !important;
 }
 
-/* Active block: accent fill, dark text, soft inner glow */
-[data-theme^="lcars"] .sidebar-active {
+/* Graduated vivid fills — elbow palette, no dark base */
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(1) > a.rounded-md,
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(1) {
+  background-color: color-mix(in srgb, var(--lcars-elbow-b) 62%, transparent) !important;
+  color: var(--lcars-nav-text-on) !important;
+}
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(2) > a.rounded-md,
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(2) {
+  background-color: color-mix(in srgb, var(--lcars-elbow-c) 54%, transparent) !important;
+  color: var(--lcars-nav-text-on) !important;
+}
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(3) > a.rounded-md,
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(3) {
+  background-color: color-mix(in srgb, var(--lcars-elbow-a) 50%, transparent) !important;
+  color: color-mix(in srgb, var(--lcars-nav-text-on) 70%, var(--lcars-nav-active)) !important;
+}
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(4) > a.rounded-md,
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(4) {
+  background-color: color-mix(in srgb, var(--lcars-elbow-d) 46%, transparent) !important;
+  color: var(--lcars-nav-text-on) !important;
+}
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(n+5) > a.rounded-md,
+[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(n+5) {
+  background-color: color-mix(in srgb, var(--lcars-elbow-b) 36%, transparent) !important;
+  color: color-mix(in srgb, var(--lcars-nav-text-on) 60%, var(--lcars-nav-active)) !important;
+}
+
+/* Active item: full elbow-b fill, dark text, pill-right, outer glow */
+[data-theme^=”lcars”] .sidebar-active {
   background: var(--lcars-nav-active) !important;
   color: var(--lcars-nav-text-on) !important;
-  border-radius: 0 !important;
+  border-radius: 0 2rem 2rem 0 !important;
   border: none !important;
-  box-shadow: inset 0 0 12px rgba(255,255,255,0.12), 0 0 8px color-mix(in srgb, var(--lcars-nav-active) 40%, transparent) !important;
+  box-shadow: inset 0 0 12px rgba(255,255,255,0.18), 0 0 12px color-mix(in srgb, var(--lcars-nav-active) 55%, transparent) !important;
   animation: lcars-nav-pulse 6s ease-in-out infinite !important;
 }
-[data-theme^="lcars"] .sidebar-active::before { display: none; }
-[data-theme^="lcars"] .sidebar-active svg { color: var(--lcars-nav-text-on) !important; }
+[data-theme^=”lcars”] .sidebar-active::before { display: none; }
+[data-theme^=”lcars”] .sidebar-active svg { color: var(--lcars-nav-text-on) !important; }
 
 /* Status dot â€" square shape + precise design-spec blink */
 [data-theme^="lcars"] .sidebar-status-dot {
@@ -580,14 +576,15 @@
   padding-bottom: 1px !important;
 }
 [data-theme^="lcars"] .sidebar-new-chat .btn-secondary {
-  border-radius: 0 !important;
-  margin-right: 6px !important;
-  background-color: color-mix(in srgb, var(--lcars-nav-active) 16%, var(--lcars-nav-dark)) !important;
-  background-image: linear-gradient(to right, rgba(255,255,255,0.06) 0%, transparent 30%, rgba(0,0,0,0.15) 100%) !important;
+  border-radius: 0 2rem 2rem 0 !important;
+  margin-left: 8px !important;
+  margin-right: 8px !important;
+  background-color: color-mix(in srgb, var(--lcars-elbow-b) 28%, transparent) !important;
+  background-image: none !important;
   border: none !important;
-  color: color-mix(in srgb, var(--lcars-nav-active) 38%, var(--chat-muted)) !important;
+  color: var(--lcars-nav-text-on) !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.1em !important;
+  letter-spacing: 0.09em !important;
   font-weight: 700 !important;
 }
 
