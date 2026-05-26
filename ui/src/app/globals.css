@@ -504,66 +504,66 @@
   text-transform: uppercase;
 }
 
-/* Nav items — LCARS pill-right buttons, vivid colour, right-edge fade, staggered breath */
+/* Nav items — LCARS pill-right buttons: SOLID vivid colour + right-edge dark fade */
 [data-theme^=”lcars”] .sidebar-wrapper a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper div.rounded-md {
   margin-left:  8px !important;
   margin-right: 8px !important;
   border-radius: 0 2rem 2rem 0 !important;
-  background-color: rgba(var(--lcars-elbow-b-rgb), 0.22) !important;
-  /* Right-edge fade: left highlight → flat colour → darkens right → near-black at tip */
+  background-color: var(--lcars-elbow-b) !important;
+  /* Left highlight → flat → fade to near-black at right tip (characteristic LCARS dissolve) */
   background-image: linear-gradient(to right,
-    rgba(255,255,255,0.12)  0%,
-    rgba(255,255,255,0.04) 30%,
-    rgba(0,0,0,0.10)       55%,
-    rgba(0,0,0,0.38)       82%,
-    rgba(0,0,0,0.60)      100%
+    rgba(255,255,255,0.14)  0%,
+    rgba(255,255,255,0.04) 35%,
+    rgba(0,0,0,0.08)       55%,
+    rgba(0,0,0,0.40)       80%,
+    rgba(0,0,0,0.72)      100%
   ) !important;
-  color: var(--lcars-nav-active) !important;
+  color: var(--lcars-nav-text-on) !important;
   border: none !important;
   text-transform: uppercase !important;
   letter-spacing: 0.09em !important;
   font-weight: 700 !important;
   animation: lcars-bar-breathe 4.6s ease-in-out infinite !important;
-  transition: background-color 0.15s, color 0.15s !important;
+  transition: filter 0.15s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper a.rounded-md:hover,
 [data-theme^=”lcars”] .sidebar-wrapper div.rounded-md:hover {
-  background-color: rgba(var(--lcars-elbow-c-rgb), 0.50) !important;
+  background-color: var(--lcars-elbow-c) !important;
   color: var(--lcars-nav-text-on) !important;
-  filter: brightness(1.15) !important;
+  filter: brightness(1.18) !important;
   animation: none !important;
 }
 
-/* Graduated vivid fills + staggered animation-delay for independent phasing */
+/* Graduated colour per position + staggered animation-delay for independent phasing */
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(1) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(1) {
-  background-color: rgba(var(--lcars-elbow-b-rgb), 0.62) !important;
+  background-color: var(--lcars-elbow-b) !important;
   color: var(--lcars-nav-text-on) !important;
   animation-delay: -0.0s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(2) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(2) {
-  background-color: rgba(var(--lcars-elbow-c-rgb), 0.54) !important;
+  background-color: var(--lcars-elbow-c) !important;
   color: var(--lcars-nav-text-on) !important;
   animation-delay: -0.85s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(3) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(3) {
-  background-color: rgba(var(--lcars-elbow-a-rgb), 0.50) !important;
-  color: color-mix(in srgb, var(--lcars-nav-text-on) 70%, var(--lcars-nav-active)) !important;
+  background-color: var(--lcars-elbow-a) !important;
+  color: var(--lcars-nav-text-on) !important;
   animation-delay: -1.9s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(4) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(4) {
-  background-color: rgba(var(--lcars-elbow-d-rgb), 0.46) !important;
+  background-color: var(--lcars-elbow-d) !important;
   color: var(--lcars-nav-text-on) !important;
   animation-delay: -2.7s !important;
 }
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(n+5) > a.rounded-md,
 [data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(n+5) {
-  background-color: rgba(var(--lcars-elbow-b-rgb), 0.36) !important;
-  color: color-mix(in srgb, var(--lcars-nav-text-on) 60%, var(--lcars-nav-active)) !important;
+  background-color: var(--lcars-elbow-b) !important;
+  color: var(--lcars-nav-text-on) !important;
   animation-delay: -3.5s !important;
 }
 
@@ -622,7 +622,7 @@
   border-radius: 0 2rem 2rem 0 !important;
   margin-left: 8px !important;
   margin-right: 8px !important;
-  background-color: rgba(var(--lcars-elbow-b-rgb), 0.28) !important;
+  background-color: var(--lcars-elbow-b) !important;
   background-image: none !important;
   border: none !important;
   color: var(--lcars-nav-text-on) !important;
