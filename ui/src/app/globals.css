@@ -1,6 +1,6 @@
 ﻿@import "tailwindcss";
 
-/* Optional legacy theme bundle â€” only loaded when ?legacy=1 cookie/localStorage set
+/* Optional legacy theme bundle â€" only loaded when ?legacy=1 cookie/localStorage set
    (see app-shell.tsx). Keeps the 8 retired themes accessible behind a debug flag. */
 @import "./legacy-themes.css" layer(legacy);
 
@@ -10,7 +10,7 @@
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   MEMEX THEME â€” Single brand theme, two modes (dark + light).
+   MEMEX THEME â€" Single brand theme, two modes (dark + light).
    Both modes share the same warm-amber accent and shape language;
    only surface/text/border tokens flip.
 
@@ -18,19 +18,19 @@
    on <html>. Mode is mirrored to body for legacy components.
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* Shared design tokens â€” identical across modes */
+/* Shared design tokens â€" identical across modes */
 [data-theme="memex"] {
-  /* Radius scale â€” aligned to Tailwind defaults so utility classes compose */
-  --radius-sm: 0.375rem;   /*  6px â€” chips, badges, dense inputs (matches Tailwind rounded-md) */
-  --radius-md: 0.5rem;     /*  8px â€” buttons, panels, surfaces (matches Tailwind rounded-lg) */
-  --radius-lg: 0.75rem;    /* 12px â€” modals, large cards (matches Tailwind rounded-xl) */
+  /* Radius scale â€" aligned to Tailwind defaults so utility classes compose */
+  --radius-sm: 0.375rem;   /*  6px â€" chips, badges, dense inputs (matches Tailwind rounded-md) */
+  --radius-md: 0.5rem;     /*  8px â€" buttons, panels, surfaces (matches Tailwind rounded-lg) */
+  --radius-lg: 0.75rem;    /* 12px â€" modals, large cards (matches Tailwind rounded-xl) */
   --radius-pill: 9999px;
 
   /* Legacy aliases (kept so existing `var(--chat-radius)` callers keep working) */
   --chat-radius: var(--radius-md);
   --chat-input-radius: var(--radius-sm);
 
-  /* Spacing scale (rem), used in CSS â€” Tailwind unchanged */
+  /* Spacing scale (rem), used in CSS â€" Tailwind unchanged */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -44,7 +44,7 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
-  /* Brand accent â€” Memex teal. Same hue in both modes; the dark-mode
+  /* Brand accent â€" Memex teal. Same hue in both modes; the dark-mode
      value is brighter for legibility on near-black, light-mode is deeper for
      AA contrast on near-white. */
   --chat-accent-2: #9580FF;     /* secondary accent (purple) for state colors */
@@ -54,7 +54,7 @@
   --chat-font: var(--font-sans), "Inter", system-ui, sans-serif;
 }
 
-/* â”€â”€ DARK mode (default) â€” neutral zinc + sky accent â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ DARK mode (default) â€" neutral zinc + sky accent â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme="memex"][data-mode="dark"],
 [data-theme="memex"]:not([data-mode]) {
   --chat-bg:           #0a0a0d;
@@ -62,19 +62,19 @@
   --chat-surface-rgb:  17, 17, 20;
   --chat-panel:        #16161a;
   --chat-soft:         #131316;
-  --chat-elevated:     #1c1c21;   /* one tier above panel â€” for active rows, popovers */
+  --chat-elevated:     #1c1c21;   /* one tier above panel â€" for active rows, popovers */
   --chat-border:       #26262b;
   --chat-border-rgb:   38, 38, 43;
   --chat-text:         #ededf0;
   --chat-muted:        #8b8b94;
-  --chat-subtle:       #5b5b66;   /* tertiary text â€” timestamps, hints */
+  --chat-subtle:       #5b5b66;   /* tertiary text â€" timestamps, hints */
 
-  --chat-accent:       #00CCA8;       /* Memex teal â€” brand color */
+  --chat-accent:       #00CCA8;       /* Memex teal â€" brand color */
   --chat-accent-strong: #00EED0;      /* bright teal highlight */
   --chat-accent-soft:  rgba(0, 204, 168, 0.12);   /* tinted bg for active states */
   --chat-accent-rgb:   0, 204, 168;
 
-  /* Layered elevation â€” tighter, more believable than single big shadow */
+  /* Layered elevation â€" tighter, more believable than single big shadow */
   --elev-1:
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.02);
@@ -87,15 +87,15 @@
     0 12px 32px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(255, 255, 255, 0.04);
 
-  /* Inset highlight â€” gives panels a soft top-edge gleam */
+  /* Inset highlight â€" gives panels a soft top-edge gleam */
   --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
-  /* Focus ring â€” multi-layer for legibility on busy surfaces */
+  /* Focus ring â€" multi-layer for legibility on busy surfaces */
   --ring:
     0 0 0 2px var(--chat-bg),
     0 0 0 4px rgba(0, 204, 168, 0.55);
 
-  /* Body backdrop gradient â€” very subtle radial glow for depth */
+  /* Body backdrop gradient â€" very subtle radial glow for depth */
   --backdrop-glow:
     radial-gradient(ellipse 1200px 800px at 20% -10%, rgba(0, 204, 168, 0.04), transparent 60%),
     radial-gradient(ellipse 800px 600px at 90% 110%, rgba(0, 204, 168, 0.025), transparent 60%);
@@ -107,7 +107,7 @@
   color-scheme: dark;
 }
 
-/* â”€â”€ LIGHT mode â€” clean neutral whites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ LIGHT mode â€" clean neutral whites â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme="memex"][data-mode="light"] {
   --chat-bg:           #f8f8fa;
   --chat-surface:      #ffffff;
@@ -121,7 +121,7 @@
   --chat-muted:        #6b6b78;
   --chat-subtle:       #9696a3;
 
-  --chat-accent:       #009984;       /* Memex teal â€” AA on white */
+  --chat-accent:       #009984;       /* Memex teal â€" AA on white */
   --chat-accent-strong: #007d6b;      /* darker teal for text contrast */
   --chat-accent-soft:  rgba(0, 153, 132, 0.10);
   --chat-accent-rgb:   0, 153, 132;
@@ -156,7 +156,7 @@
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   LCARS THEME FAMILY â€” Star Trek LCARS interfaces.
+   LCARS THEME FAMILY â€" Star Trek LCARS interfaces.
    Reference: Project RITOS (USS Cerritos / California Class).
    Three variants sharing structural CSS via [data-theme^="lcars"].
 
@@ -164,10 +164,10 @@
      lcars-blue   Cold blue / TNG palette
      lcars-teal   Teal-green palette
 
-   All are always dark â€” no light/dark variant.
+   All are always dark â€" no light/dark variant.
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* â”€â”€ LCARS AMBER â€” warm Lower Decks palette (reference-accurate) â”€ */
+/* â"€â"€ LCARS AMBER â€" warm Lower Decks palette (reference-accurate) â"€ */
 /* Elbow: #CC3300 deep red-orange â†’ #FF6600 orange â†’ #FFAA00 amber â†’ #FFDD00 yellow
    Active nav: bright golden yellow #FFCC00 (top button = brightest)
    Text on buttons: near-black (dark on light bg)                               */
@@ -198,11 +198,11 @@
   --press-tint: rgba(255,180,0,0.20);
   --divider:    rgba(255,160,0,0.4);
   /* Structural colour tokens */
-  --lcars-elbow-a:     #CC3300;  /* deep red-orange â€” exact reference match */
+  --lcars-elbow-a:     #CC3300;  /* deep red-orange â€" exact reference match */
   --lcars-elbow-b:     #FF6600;  /* bright orange */
   --lcars-elbow-c:     #FFAA00;  /* warm amber */
   --lcars-elbow-d:     #FFDD00;  /* bright yellow */
-  --lcars-nav-active:  #FFAA00;  /* warm orange-amber â€” closer to reference */
+  --lcars-nav-active:  #FFAA00;  /* warm orange-amber â€" closer to reference */
   --lcars-nav-dark:    #1A1100;
   --lcars-nav-text-on: #1A0800;  /* dark warm text on bright button */
   --lcars-section-title: #FF8800;
@@ -214,9 +214,9 @@
   color-scheme: dark;
 }
 
-/* â”€â”€ LCARS BLUE â€” TNG pale blue-lavender palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ LCARS BLUE â€" TNG pale blue-lavender palette â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 /* TNG LCARS used soft, almost pastel blues and mauves on pure black.
-   Not a saturated blue â€” think slate/periwinkle with lavender accent. */
+   Not a saturated blue â€" think slate/periwinkle with lavender accent. */
 [data-theme="lcars-blue"] {
   --chat-bg:            #000008;
   --chat-surface:       #06070F;
@@ -259,9 +259,9 @@
   color-scheme: dark;
 }
 
-/* â”€â”€ LCARS TEAL â€” cyan-teal palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ LCARS TEAL â€" cyan-teal palette â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 /* True cyan-teal (blue-green), not plain green. Warm orange complement
-   from the reference grid â€” the contrast reads very tech. */
+   from the reference grid â€" the contrast reads very tech. */
 [data-theme="lcars-teal"] {
   --chat-bg:            #000C0E;
   --chat-surface:       #041214;
@@ -279,7 +279,7 @@
   --chat-accent-strong: #55EEFF;
   --chat-accent-soft:   rgba(0,204,221,0.16);
   --chat-accent-rgb:    0, 204, 221;
-  --chat-accent-2:      #FF7700; /* warm orange â€” reference complement */
+  --chat-accent-2:      #FF7700; /* warm orange â€" reference complement */
   --chat-thinking:      #55EEFF;
   --elev-1: 0 0 0 1px rgba(0,180,200,0.35);
   --elev-2: 0 0 0 2px rgba(0,180,200,0.5), 0 0 20px rgba(0,180,200,0.10);
@@ -308,7 +308,7 @@
   color-scheme: dark;
 }
 
-/* â”€â”€ SHARED RADIUS & SPACING (all variants) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ SHARED RADIUS & SPACING (all variants) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme^="lcars"] {
   --radius-sm:         999px;
   --radius-md:         999px;
@@ -320,7 +320,7 @@
   --chat-font: "Gill Sans", "Trebuchet MS", "Arial Narrow", system-ui, sans-serif;
 }
 
-/* Floating overlays must NOT inherit the pill radius â€” keep them rectangular */
+/* Floating overlays must NOT inherit the pill radius â€" keep them rectangular */
 [data-theme^="lcars"] .theme-picker-enter,
 [data-theme^="lcars"] [data-radix-popper-content-wrapper],
 [data-theme^="lcars"] [role="dialog"],
@@ -330,10 +330,10 @@
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    LCARS SHARED ANIMATIONS & STRUCTURE
-   All selectors use [data-theme^="lcars"] â€” matches all three variants.
+   All selectors use [data-theme^="lcars"] â€" matches all three variants.
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* Horizontal scan â€” ease-in-out gives an organic drifting feel */
+/* Horizontal scan â€" ease-in-out gives an organic drifting feel */
 
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
@@ -345,14 +345,14 @@
   92%  { opacity: 1; }
   100% { transform: translateX(110%); opacity: 0; }
 }
-/* Shimmer â€” wide sweep matching design spec (wider travel = more visible) */
+/* Shimmer â€" wide sweep matching design spec (wider travel = more visible) */
 @keyframes lcars-shimmer {
   0%   { transform: translateX(-150%); opacity: 0; }
   10%  { opacity: 1; }
   90%  { opacity: 1; }
   100% { transform: translateX(250%); opacity: 0; }
 }
-/* Vertical scan â€” slow drift down the panel */
+/* Vertical scan â€" slow drift down the panel */
 @keyframes lcars-scan-v {
   0%   { transform: translateY(-110%); opacity: 0; }
   8%   { opacity: 0.6; }
@@ -364,26 +364,26 @@
   0%, 100% { box-shadow: inset 0 0 6px rgba(255,255,255,0.08), 0 0 6px rgba(var(--chat-accent-rgb),0.2); }
   50%       { box-shadow: inset 0 0 18px rgba(255,255,255,0.22), 0 0 22px rgba(var(--chat-accent-rgb),0.55); }
 }
-/* Status dot blink â€” matches design spec exactly */
+/* Status dot blink â€" matches design spec exactly */
 @keyframes lcars-blink-dot {
   0%, 74%, 100% { opacity: 1; }
   80%           { opacity: 0.15; }
   87%           { opacity: 0.85; }
   93%           { opacity: 0.15; }
 }
-/* System blink â€” soft fade, not a hard flash (used for headings etc) */
+/* System blink â€" soft fade, not a hard flash (used for headings etc) */
 @keyframes lcars-blink {
   0%, 75%, 100% { opacity: 1; }
   82%           { opacity: 0.25; }
   88%           { opacity: 0.85; }
   94%           { opacity: 0.25; }
 }
-/* Sensor ring â€” constant, never jerky */
+/* Sensor ring â€" constant, never jerky */
 @keyframes lcars-rotate {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
-/* Heading glow â€” very slow, almost subliminal */
+/* Heading glow â€" very slow, almost subliminal */
 @keyframes lcars-heading-glow {
   0%, 100% { text-shadow: none; }
   50%       { text-shadow: 0 0 12px rgba(var(--chat-accent-rgb),0.4), 0 0 28px rgba(var(--chat-accent-rgb),0.15); }
@@ -393,7 +393,7 @@
   0%   { background-position: 0 0; }
   100% { background-position: 0 80px; }
 }
-/* Data bar â€” slow, organic, never snappy */
+/* Data bar â€" slow, organic, never snappy */
 @keyframes lcars-fill {
   0%   { width: 18%; }
   30%  { width: 74%; }
@@ -412,18 +412,18 @@
   45%       { filter: brightness(0.58) saturate(0.75); }
   55%       { filter: brightness(0.58) saturate(0.75); }
 }
-/* Legacy alias â€” keep for any references */
+/* Legacy alias â€" keep for any references */
 @keyframes lcars-elbow-pulse {
   0%, 100% { opacity: 1; filter: brightness(1); }
   50%       { opacity: 0.88; filter: brightness(1.08); }
 }
-/* Cursor blink â€” step-start keeps it crisp like a terminal */
+/* Cursor blink â€" step-start keeps it crisp like a terminal */
 @keyframes lcars-cursor {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
 }
 
-/* â”€â”€ BASE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ BASE â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 
 [data-theme^="lcars"] body,
 [data-theme^="lcars"] .chat-shell {
@@ -432,7 +432,7 @@
   background: var(--chat-bg);
 }
 
-/* â”€â”€ SIDEBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ SIDEBAR â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 
 [data-theme^="lcars"] .sidebar-wrapper {
   background: var(--chat-bg);
@@ -440,12 +440,12 @@
   box-shadow: none;
 }
 
-/* Right-edge strip â€” removed per user feedback (too distracting) */
+/* Right-edge strip â€" removed per user feedback (too distracting) */
 [data-theme^="lcars"] .sidebar-wrapper::after {
   display: none;
 }
 
-/* Elbow connector â€” top-left amber cap with large bottom-right curve */
+/* Elbow connector â€" top-left amber cap with large bottom-right curve */
 [data-theme^="lcars"] .sidebar-wrapper > div:first-child {
   background: linear-gradient(160deg,
     var(--lcars-elbow-a),
@@ -460,9 +460,9 @@
   overflow: hidden;
   animation: lcars-elbow-breathe 8s ease-in-out infinite !important;
 }
-/* Shimmer sweep across the elbow â€” wider travel = more visible */
-[data-theme^=”lcars”] .sidebar-wrapper > div:first-child::after {
-  content: “”;
+/* Shimmer sweep across the elbow â€" wider travel = more visible */
+[data-theme^="lcars"] .sidebar-wrapper > div:first-child::after {
+  content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
@@ -505,8 +505,8 @@
 }
 
 /* Nav items — LCARS pill-right buttons: SOLID vivid colour + right-edge dark fade */
-[data-theme^=”lcars”] .sidebar-wrapper a.rounded-md,
-[data-theme^=”lcars”] .sidebar-wrapper div.rounded-md {
+[data-theme^="lcars"] .sidebar-wrapper a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper div.rounded-md {
   margin-left:  8px !important;
   margin-right: 8px !important;
   border-radius: 0 2rem 2rem 0 !important;
@@ -527,8 +527,8 @@
   animation: lcars-bar-breathe 4.6s ease-in-out infinite !important;
   transition: filter 0.15s !important;
 }
-[data-theme^=”lcars”] .sidebar-wrapper a.rounded-md:hover,
-[data-theme^=”lcars”] .sidebar-wrapper div.rounded-md:hover {
+[data-theme^="lcars"] .sidebar-wrapper a.rounded-md:hover,
+[data-theme^="lcars"] .sidebar-wrapper div.rounded-md:hover {
   background-color: var(--lcars-elbow-c) !important;
   color: var(--lcars-nav-text-on) !important;
   filter: brightness(1.18) !important;
@@ -536,39 +536,39 @@
 }
 
 /* Graduated colour per position + staggered animation-delay for independent phasing */
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(1) > a.rounded-md,
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(1) {
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(1) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(1) {
   background-color: var(--lcars-elbow-b) !important;
   color: var(--lcars-nav-text-on) !important;
   animation-delay: -0.0s !important;
 }
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(2) > a.rounded-md,
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(2) {
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(2) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(2) {
   background-color: var(--lcars-elbow-c) !important;
   color: var(--lcars-nav-text-on) !important;
   animation-delay: -0.85s !important;
 }
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(3) > a.rounded-md,
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(3) {
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(3) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(3) {
   background-color: var(--lcars-elbow-a) !important;
   color: var(--lcars-nav-text-on) !important;
   animation-delay: -1.9s !important;
 }
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(4) > a.rounded-md,
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(4) {
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(4) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(4) {
   background-color: var(--lcars-elbow-d) !important;
   color: var(--lcars-nav-text-on) !important;
   animation-delay: -2.7s !important;
 }
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > div:nth-child(n+5) > a.rounded-md,
-[data-theme^=”lcars”] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(n+5) {
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > div:nth-child(n+5) > a.rounded-md,
+[data-theme^="lcars"] .sidebar-wrapper .space-y-px > a.rounded-md:nth-child(n+5) {
   background-color: var(--lcars-elbow-b) !important;
   color: var(--lcars-nav-text-on) !important;
   animation-delay: -3.5s !important;
 }
 
 /* Active item: full accent fill, pill-right, outer glow — overrides breath */
-[data-theme^=”lcars”] .sidebar-active {
+[data-theme^="lcars"] .sidebar-active {
   background: var(--lcars-nav-active) !important;
   background-image: linear-gradient(to right,
     rgba(255,255,255,0.22)  0%,
@@ -583,8 +583,8 @@
   animation: lcars-nav-pulse 4.0s ease-in-out infinite !important;
   animation-delay: 0s !important;
 }
-[data-theme^=”lcars”] .sidebar-active::before { display: none; }
-[data-theme^=”lcars”] .sidebar-active svg { color: var(--lcars-nav-text-on) !important; }
+[data-theme^="lcars"] .sidebar-active::before { display: none; }
+[data-theme^="lcars"] .sidebar-active svg { color: var(--lcars-nav-text-on) !important; }
 
 /* Status dot â€" square shape + precise design-spec blink */
 [data-theme^="lcars"] .sidebar-status-dot {
@@ -603,7 +603,7 @@
   margin-right: 6px;
 }
 
-/* â”€â”€ SIDEBAR ALIGNMENT FIXES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ SIDEBAR ALIGNMENT FIXES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 
 /* Section labels: reduce px-4 indent to align with nav items */
 [data-theme^="lcars"] .sidebar-wrapper .mb-4 > div:first-child,
@@ -631,7 +631,7 @@
   font-weight: 700 !important;
 }
 
-/* BMO widget: hide its top divider â€” footer already has one, two stacked = glitch */
+/* BMO widget: hide its top divider â€" footer already has one, two stacked = glitch */
 [data-theme^="lcars"] .buddy-widget-container > .divider {
   display: none !important;
 }
@@ -639,7 +639,7 @@
   border-top: none !important;
 }
 
-/* Hatch a Companion button â€” flatten to LCARS block style */
+/* Hatch a Companion button â€" flatten to LCARS block style */
 [data-theme^="lcars"] .buddy-widget-container > button {
   border-radius: 0 !important;
   margin-left: 0 !important;
@@ -655,18 +655,18 @@
   font-weight: 700 !important;
 }
 
-/* Conversation history scroll container â€” strip px-2 so items align with nav blocks */
+/* Conversation history scroll container â€" strip px-2 so items align with nav blocks */
 [data-theme^="lcars"] .sidebar-wrapper .overflow-y-auto {
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
 
-/* â”€â”€ DIVIDERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ DIVIDERS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme^="lcars"] .divider {
   background: linear-gradient(to right, transparent, var(--chat-accent) 20%, var(--chat-accent) 80%, transparent);
 }
 
-/* â”€â”€ HEADINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ HEADINGS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme^="lcars"] h1,
 [data-theme^="lcars"] h2,
 [data-theme^="lcars"] h3 {
@@ -676,10 +676,10 @@
   animation: lcars-heading-glow 10s ease-in-out infinite !important;
 }
 
-/* â”€â”€ CHAT SURFACE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* Horizontal scan line at top of content â€” shimmer matches design spec */
-[data-theme^=”lcars”] .chat-shell::before {
-  content: “”;
+/* â"€â"€ CHAT SURFACE â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
+/* Horizontal scan line at top of content â€" shimmer matches design spec */
+[data-theme^="lcars"] .chat-shell::before {
+  content: "";
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
@@ -759,7 +759,7 @@
   pointer-events: none;
 }
 
-/* â”€â”€ INPUTS & BUTTONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ INPUTS & BUTTONS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme^="lcars"] input:not([type="range"]),
 [data-theme^="lcars"] select {
   border-radius: 999px;
@@ -798,7 +798,7 @@
   color: var(--chat-accent-strong);
 }
 
-/* â”€â”€ SURFACES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ SURFACES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme^="lcars"] .surface,
 [data-theme^="lcars"] .surface-elevated {
   background: var(--chat-surface);
@@ -807,7 +807,7 @@
   box-shadow: 0 0 8px rgba(var(--chat-accent-rgb),0.06);
 }
 
-/* â”€â”€ SCROLLBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ SCROLLBAR â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme^="lcars"] { scrollbar-color: var(--chat-border) var(--chat-bg); }
 [data-theme^="lcars"] ::-webkit-scrollbar-thumb {
   background: var(--chat-border);
@@ -815,7 +815,7 @@
 }
 [data-theme^="lcars"] ::-webkit-scrollbar-track { background: var(--chat-bg); }
 
-/* â”€â”€ INDICATORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ INDICATORS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme^="lcars"] .thinking-dot { background: var(--chat-accent); }
 [data-theme^="lcars"] .streaming-caret::after { color: var(--chat-accent); }
 
@@ -875,7 +875,7 @@
     radial-gradient(ellipse 700px 600px at 105% 100%, rgba(160,0,240,0.20), transparent 55%),
     radial-gradient(ellipse 600px 500px at 40% 60%,   rgba(0,80,60,0.12),   transparent 60%);
 
-  /* Sharp â€” no rounding at all */
+  /* Sharp â€" no rounding at all */
   --radius-sm: 0px;
   --radius-md: 0px;
   --radius-lg: 0px;
@@ -885,7 +885,7 @@
   color-scheme: dark;
 }
 
-/* â”€â”€ CRT SCANLINES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ CRT SCANLINES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme="cyberpunk"] .app-shell-root::before {
   content: "";
   position: fixed;
@@ -901,7 +901,7 @@
   z-index: 1;
 }
 
-/* â”€â”€ SIDEBAR â€” AR glass panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ SIDEBAR â€" AR glass panel â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme="cyberpunk"] .sidebar-wrapper {
   background: rgba(2, 12, 10, 0.72);
   backdrop-filter: blur(20px);
@@ -910,7 +910,7 @@
   box-shadow: 2px 0 32px rgba(0, 180, 140, 0.07);
 }
 
-/* Logo band â€” tealâ†’magenta sweep on bottom edge */
+/* Logo band â€" tealâ†’magenta sweep on bottom edge */
 [data-theme="cyberpunk"] .sidebar-wrapper > div:first-child {
   border-bottom: 1px solid rgba(0, 200, 160, 0.28);
   position: relative;
@@ -926,7 +926,7 @@
   pointer-events: none;
 }
 
-/* Logo text â€” teal with AR uppercase letterform */
+/* Logo text â€" teal with AR uppercase letterform */
 [data-theme="cyberpunk"] .sidebar-wrapper > div:first-child h1 {
   color: #00DDC0;
   letter-spacing: 0.15em;
@@ -944,13 +944,13 @@
   color: #00DDC0;
 }
 
-/* Nav items â€” left teal bar on hover */
+/* Nav items â€" left teal bar on hover */
 [data-theme="cyberpunk"] nav a:hover,
 [data-theme="cyberpunk"] nav button:hover {
   box-shadow: inset 2px 0 0 #00DDC0, 0 0 12px rgba(0,221,192,0.10);
 }
 
-/* â”€â”€ FLOATING OVERLAYS â€” sharp, no radius â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ FLOATING OVERLAYS â€" sharp, no radius â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme="cyberpunk"] .theme-picker-enter,
 [data-theme="cyberpunk"] [data-radix-popper-content-wrapper],
 [data-theme="cyberpunk"] [role="dialog"],
@@ -958,11 +958,11 @@
   border-radius: 0px !important;
 }
 
-/* â”€â”€ INDICATORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ INDICATORS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 [data-theme="cyberpunk"] .thinking-dot { background: #00DDC0; }
 [data-theme="cyberpunk"] .streaming-caret::after { color: #00DDC0; }
 
-/* â”€â”€ ANIMATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€ ANIMATIONS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 @keyframes cp-scan-h {
   0%   { opacity: 0; transform: translateX(-110%); }
   10%  { opacity: 1; }
@@ -1000,7 +1000,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Typography rhythm â€” heading hierarchy with intentional weights */
+/* Typography rhythm â€" heading hierarchy with intentional weights */
 h1 { font-size: 1.5rem;   font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
 h2 { font-size: 1.125rem; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; }
 h3 { font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
@@ -1014,7 +1014,7 @@ h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; line-height: 1.3
   position: relative; /* required for ::before/::after theme overlays */
 }
 
-/* Subtle separator â€” gradient line, not flat 1px */
+/* Subtle separator â€" gradient line, not flat 1px */
 .divider {
   height: 1px;
   background: linear-gradient(to right, transparent, var(--divider), transparent);
@@ -1046,7 +1046,7 @@ h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; line-height: 1.3
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   SCROLLBARS â€” Theme-aware, thin, low-contrast
+   SCROLLBARS â€" Theme-aware, thin, low-contrast
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 * {
@@ -1199,7 +1199,7 @@ h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; line-height: 1.3
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Hover-lift utility â€” opt-in via .lift class */
+/* Hover-lift utility â€" opt-in via .lift class */
 .lift {
   transition:
     transform var(--dur-base) var(--ease-out),
@@ -1216,7 +1216,7 @@ h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; line-height: 1.3
   box-shadow: var(--elev-1);
 }
 
-/* Surface utility â€” panel with elevation + inset highlight */
+/* Surface utility â€" panel with elevation + inset highlight */
 .surface {
   background: var(--chat-surface);
   border: 1px solid var(--chat-border);
@@ -1230,7 +1230,7 @@ h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; line-height: 1.3
   box-shadow: var(--elev-2), var(--inset-highlight);
 }
 
-/* Polished input â€” soft accent glow on focus instead of hard border */
+/* Polished input â€" soft accent glow on focus instead of hard border */
 .input-field {
   background: var(--chat-panel);
   border: 1px solid var(--chat-border);
@@ -1255,7 +1255,7 @@ h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; line-height: 1.3
     var(--inset-highlight);
 }
 
-/* Refined button base â€” gradient surface + elevation on hover */
+/* Refined button base â€" gradient surface + elevation on hover */
 .btn-primary {
   background: linear-gradient(
     180deg,
@@ -1460,7 +1460,7 @@ main, .main-content {
   100% { opacity: 1; transform: translateY(0);    }
 }
 
-/* Sweep shimmer overlay â€” renders a diagonal light streak */
+/* Sweep shimmer overlay â€" renders a diagonal light streak */
 .glass-sweep-shimmer {
   position: absolute;
   inset: 0 auto 0 0;
@@ -1478,7 +1478,7 @@ main, .main-content {
   will-change: transform;
 }
 
-/* Glass surface â€” frosted panel base */
+/* Glass surface â€" frosted panel base */
 .glass-surface {
   background: rgba(255, 255, 255, 0.025);
   backdrop-filter: blur(18px) saturate(1.4);
