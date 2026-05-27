@@ -115,8 +115,9 @@ graph LR
     RT[Agent Runtime] -->|emit| D[Dispatcher]
     D -->|queue:default| W1[Chat Workers x5]
     D -->|queue:image| W2[Image Workers x2]
-    D -->|queue:3d| W3[3D Worker x1]
-    D -->|queue:action_figure| W4[AF Worker x1]
+    D -->|queue:vision| W3[Vision Workers x3]
+    D -->|queue:3d| W4[3D Worker x1]
+    D -->|queue:action_figure| W5[AF Worker x1]
 ```
 
 Queue concurrency limits prevent GPU memory exhaustion.

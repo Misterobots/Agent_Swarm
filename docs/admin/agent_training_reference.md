@@ -190,7 +190,8 @@ The dispatcher manages GPU-bound work via Redis queues with per-queue concurrenc
 |-------|----------------|-----------|
 | `queue:3d` | 1 | Protects GPU — 3D generation is VRAM-intensive |
 | `queue:action_figure` | 1 | GPU + heavy post-processing |
-| `queue:image` | 2 | Image generation is lighter than 3D |
+| `queue:image` | 2 | Diffusion image generation (ComfyUI / Klein / OmniGen) |
+| `queue:vision` | 3 | VLM analysis of existing images (lighter than diffusion) |
 | `queue:default` | 5 | Chat/code, lightweight (no GPU or minimal GPU) |
 
 Queue assignment is handled by keyword detection in `dispatcher.py` via the `detect_intent()` method. When adding a new agent that requires GPU access, add a corresponding queue entry with an appropriate concurrency limit.

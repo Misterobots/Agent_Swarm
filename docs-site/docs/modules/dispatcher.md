@@ -27,8 +27,9 @@ graph LR
     API[API Request] --> D[Dispatcher]
     D --> Q1["queue:default · 5 workers"]
     D --> Q2["queue:image · 2 workers"]
-    D --> Q3["queue:3d · 1 worker"]
-    D --> Q4["queue:action_figure · 1 worker"]
+    D --> Q3["queue:vision · 3 workers"]
+    D --> Q4["queue:3d · 1 worker"]
+    D --> Q5["queue:action_figure · 1 worker"]
 ```
 
 ## Queue Configuration
@@ -36,7 +37,8 @@ graph LR
 | Queue | Workers | Purpose |
 |-------|---------|---------|
 | `default` | 5 | Chat, code, general tasks |
-| `image` | 2 | ComfyUI image generation |
+| `image` | 2 | Diffusion image generation (ComfyUI / Klein / OmniGen) |
+| `vision` | 3 | VLM analysis of existing images (lighter than diffusion) |
 | `3d` | 1 | 3D mesh reconstruction |
 | `action_figure` | 1 | Articulated figure design |
 

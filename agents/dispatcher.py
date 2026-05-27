@@ -46,6 +46,16 @@ except ImportError:
     redis = None
     REDIS_LIB_AVAILABLE = False
 
+# Connection-error type used by the consumer loop. When the real redis lib
+# is missing we fall back to MockRedis (in-memory), which never raises a
+# connection error — but the except clause still has to reference *something*
+# importable. Using Exception as the fallback keeps the loop's contract
+# (catch transient connection issues, log, retry) without crashing on
+# `None.ConnectionError` AttributeError when the lib isn't installed.
+_RedisConnectionError: type[BaseException] = (
+    redis.ConnectionError if REDIS_LIB_AVAILABLE else ConnectionError
+)
+
 # Logging Setup
 logger = setup_logger("Dispatcher")
 
@@ -107,7 +117,19 @@ def detect_intent(input_text: str) -> str:
         return "IMAGE"
     return "DEFAULT"
 
-from gpu_allocator import GPUAllocator
+# GPUAllocator is currently disabled at the call site (see __init__ below).
+# Guard the import so a broken or absent gpu_allocator.py can't take the
+# dispatcher down on startup — the dispatcher is on the hot path for every
+# user request, while GPUAllocator hasn't been wired in for a while.
+try:
+    from gpu_allocator import GPUAllocator  # noqa: F401 (kept for re-enable)
+except Exception as _gpu_alloc_import_err:
+    GPUAllocator = None  # type: ignore[assignment,misc]
+    logger.warning(
+        f"GPUAllocator import skipped ({_gpu_alloc_import_err}). "
+        "Dispatcher will continue without dynamic GPU allocation."
+    )
+
 
 class Dispatcher:
     """
@@ -144,7 +166,10 @@ class Dispatcher:
         self.queues = {
             "queue:3d": 1,              # MAX 1 3D Job (Protect GPU)
             "queue:action_figure": 1,   # MAX 1 Action Figure Job (GPU + heavy post-processing)
-            "queue:image": 2,           # MAX 2 Image Jobs
+            "queue:image": 2,           # MAX 2 Image Jobs (diffusion: ComfyUI/Klein/OmniGen)
+            "queue:vision": 3,          # MAX 3 VLM Jobs (VLM is lighter than diffusion;
+                                        #   isolated from queue:image so VISION never waits
+                                        #   behind a slow image-generation job)
             "queue:default": 5          # Chat/Code (Lightweight)
         }
         
@@ -169,23 +194,28 @@ class Dispatcher:
             # Smart Routing
             user_input = event.payload.get("task", "")
             intent = detect_intent(user_input)
-            
-            queue_name = "queue:default"
-            
-            # Dynamic GPU Allocation (DISABLED)
-            allocated_gpu = -1
-            
-            # Inject Usage Decision into Payload
-            # if allocated_gpu != -1:
-            #     event.payload["target_device"] = f"cuda:{allocated_gpu}"
-            #     logger.info(f"--- [Dispatcher] Assigned Task to GPU {allocated_gpu} ---")
-            
-            # Use Local CPU Fallback or explicit Device
+
+            # Map intent → GPU-protected queue. Falls back to queue:default
+            # for CONVERSATION/CODE/DEFAULT (CPU- or light-LLM workloads).
+            # These queues exist so concurrency caps actually apply to
+            # GPU-heavy work (3D / image generation / posable figure).
+            _INTENT_QUEUE_MAP = {
+                "3D":            "queue:3d",
+                "ACTION_FIGURE": "queue:action_figure",
+                "IMAGE":         "queue:image",
+                "VISION":        "queue:vision",  # VLM is GPU-bound but lighter than diffusion
+            }
+            queue_name = _INTENT_QUEUE_MAP.get(intent, "queue:default")
+
+            # Dynamic GPU Allocation (DISABLED — Ollama/Klein handle GPU
+            # selection via gpu_queue.get_ollama_host()). target_device
+            # left as "cpu" for any handler that still inspects it as a
+            # vestigial field; do not rely on it for routing.
             event.payload["target_device"] = "cpu"
-            
+
             # Inject Intent for Router
             event.payload["intent"] = intent
-            
+
             logger.info(f"--- [Dispatcher] Enqueuing Task to {queue_name} (Intent: {intent}) ---")
             self.redis.rpush(queue_name, event.to_json())
         else:
@@ -210,8 +240,8 @@ class Dispatcher:
                 
                 if item:
                     _, data = item
-                    print(f"DEBUG DISPATCHER: Popped item from {queue_name}: {str(data)[:50]}...")
-                    
+                    logger.debug(f"Popped item from {queue_name}: {str(data)[:50]}...")
+
                     # Handle both bytes (Redis) and str (MockRedis)
                     if isinstance(data, bytes):
                         event = Event.from_json(data.decode('utf-8'))
@@ -220,7 +250,7 @@ class Dispatcher:
                         
                     self._dispatch_local(event)
                     
-            except redis.ConnectionError:
+            except _RedisConnectionError:
                 logger.error("Redis connection lost. Retrying...")
                 time.sleep(5)
             except Exception as e:
@@ -231,11 +261,14 @@ class Dispatcher:
 
     def _dispatch_local(self, event: Event):
         """Executes the handler locally (in the worker thread)."""
-        print(f"DEBUG _dispatch_local: event.type={event.type}, handlers registered: {list(self._handlers.keys())}")
+        logger.debug(
+            f"_dispatch_local: event.type={event.type}, "
+            f"handlers registered: {list(self._handlers.keys())}"
+        )
         if event.type in self._handlers:
             for handler in self._handlers[event.type]:
                 try:
-                    print(f"DEBUG _dispatch_local: calling handler {handler.__name__}")
+                    logger.debug(f"_dispatch_local: calling handler {handler.__name__}")
                     handler(event)
                 except Exception as e:
                     import traceback
