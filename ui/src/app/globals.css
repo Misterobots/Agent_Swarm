@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 /* Optional legacy theme bundle â€" only loaded when ?legacy=1 cookie/localStorage set
    (see app-shell.tsx). Keeps the 8 retired themes accessible behind a debug flag. */
@@ -172,43 +172,44 @@
    Active nav: bright golden yellow #FFCC00 (top button = brightest)
    Text on buttons: near-black (dark on light bg)                               */
 [data-theme="lcars"] {
-  --chat-bg:            #0A0700;
-  --chat-surface:       #120E00;
-  --chat-surface-rgb:   18, 14, 0;
-  --chat-panel:         #1E1500;
-  --chat-soft:          #160F00;
-  --chat-elevated:      #2A1C00;
-  --chat-border:        #996600;
-  --chat-border-rgb:    153, 102, 0;
-  --chat-text:          #FFDDAA;
-  --chat-muted:         #CC9944;
-  --chat-subtle:        #886633;
-  /* Accent = active nav colour = warm orange-amber (reference match) */
-  --chat-accent:        #FFAA00;
-  --chat-accent-strong: #FFCC44;
-  --chat-accent-soft:   rgba(255,170,0,0.16);
-  --chat-accent-rgb:    255, 170, 0;
-  --chat-accent-2:      #FF5500; /* deep red-orange, the elbow base */
-  --chat-thinking:      #FFBB00;
-  --elev-1: 0 0 0 1px rgba(255,150,0,0.35);
-  --elev-2: 0 0 0 2px rgba(255,150,0,0.5), 0 0 20px rgba(255,130,0,0.12);
-  --elev-3: 0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, #FFAA00 35%, transparent);
-  --ring: 0 0 0 2px #0A0700, 0 0 0 4px #FFAA00, 0 0 14px rgba(255,170,0,0.5);
-  --hover-tint: rgba(255,180,0,0.09);
-  --press-tint: rgba(255,180,0,0.20);
-  --divider:    rgba(255,160,0,0.4);
+  --chat-bg:            #090514;
+  --chat-surface:       #130a2a;
+  --chat-surface-rgb:   19, 10, 42;
+  --chat-panel:         #1d1040;
+  --chat-soft:          #180c35;
+  --chat-elevated:      #2b185c;
+  --chat-border:        #7a5cbf;
+  --chat-border-rgb:    122, 92, 191;
+  --chat-text:          #e6d9ff;
+  --chat-muted:         #b399ff;
+  --chat-subtle:        #8c66ff;
+  
+  --chat-accent:        #cc99ff;
+  --chat-accent-strong: #e6ccff;
+  --chat-accent-soft:   rgba(204,153,255,0.16);
+  --chat-accent-rgb:    204, 153, 255;
+  --chat-accent-2:      #e67399; /* Sunset Pink */
+  --chat-thinking:      #99b3ff;
+  
+  --elev-1: 0 0 0 1px rgba(204,153,255,0.35);
+  --elev-2: 0 0 0 2px rgba(204,153,255,0.5), 0 0 20px rgba(153,102,255,0.12);
+  --elev-3: 0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, #cc99ff 35%, transparent);
+  --ring: 0 0 0 2px #090514, 0 0 0 4px #cc99ff, 0 0 14px rgba(204,153,255,0.5);
+  --hover-tint: rgba(204,153,255,0.09);
+  --press-tint: rgba(204,153,255,0.20);
+  --divider:    rgba(204,153,255,0.4);
   /* Structural colour tokens */
-  --lcars-elbow-a:     #CC3300;  /* deep red-orange â€" exact reference match */
-  --lcars-elbow-b:     #FF6600;  /* bright orange */
-  --lcars-elbow-c:     #FFAA00;  /* warm amber */
-  --lcars-elbow-d:     #FFDD00;  /* bright yellow */
-  --lcars-nav-active:  #FFAA00;  /* warm orange-amber â€" closer to reference */
-  --lcars-nav-dark:    #1A1100;
-  --lcars-nav-text-on: #1A0800;  /* dark warm text on bright button */
-  --lcars-section-title: #FF8800;
-  --lcars-elbow-a-rgb: 204,51,0;
-  --lcars-elbow-b-rgb: 255,102,0;
-  --lcars-elbow-c-rgb: 255,170,0;
+  --lcars-elbow-a:      #d9b3ff; /* Lavender */
+  --lcars-elbow-b:      #b3ccff; /* Periwinkle */
+  --lcars-elbow-c:      #ff9999; /* Coral/Salmon */
+  --lcars-elbow-d:      #ffcc99; /* Peach */
+  --lcars-nav-active:   #cc99ff;
+  --lcars-nav-dark:     #1a0a33;
+  --lcars-nav-text-on:  #1a0033;
+  --lcars-section-title:#b399ff;
+  --lcars-elbow-a-rgb:  217,179,255;
+  --lcars-elbow-b-rgb:  179,204,255;
+  --lcars-elbow-c-rgb:  255,153,153;
   --lcars-elbow-d-rgb: 255,221,0;
   --lcars-nav-active-rgb: 255,170,0;
   color-scheme: dark;
@@ -455,6 +456,7 @@
   );
   border-radius: 0 0 2.5rem 0;
   margin-right: 6px;
+  margin-top: 12px !important;
   box-shadow: inset 0 -2px 8px rgba(0,0,0,0.35);
   position: relative;
   overflow: hidden;
@@ -600,6 +602,17 @@
 }
 [data-theme^="lcars"] .sidebar-wrapper > div:last-child {
   margin-right: 6px;
+  margin-bottom: 12px !important;
+}
+
+[data-theme^="lcars"] .app-shell-root {
+  background: transparent !important;
+}
+
+[data-theme^="lcars"] .app-shell-root > div.flex-1 > div.relative.flex-1 {
+  padding-top: 104px !important; 
+  padding-right: 120px !important; 
+  padding-bottom: 140px !important; 
 }
 
 /* â"€â"€ SIDEBAR ALIGNMENT FIXES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */

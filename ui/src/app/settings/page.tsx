@@ -27,6 +27,8 @@ export default function SettingsPage() {
   const setNavLayout = useSettingsStore((s) => s.setNavLayout);
   const themePickerMode = useSettingsStore((s) => s.themePickerMode);
   const setThemePickerMode = useSettingsStore((s) => s.setThemePickerMode);
+  const soundEnabled = useSettingsStore((s) => s.soundEnabled);
+  const setSoundEnabled = useSettingsStore((s) => s.setSoundEnabled);
 
   const modelAccessMessage = accessLoading
     ? "Checking access level…"
@@ -76,6 +78,21 @@ export default function SettingsPage() {
                 />
                 <p className="text-xs text-[var(--chat-muted)] mt-2">
                   Switch between a left sidebar and a top navigation bar. Takes effect immediately.
+                </p>
+              </Field>
+            </div>
+            <div className="border-t border-[var(--chat-border)] pt-6 mt-6">
+              <Field label="UI Sound Effects">
+                <Select
+                  value={soundEnabled ? "on" : "off"}
+                  onChange={(v) => setSoundEnabled(v === "on")}
+                  options={[
+                    { value: "on", label: "Enabled — Sci-Fi terminal SFX" },
+                    { value: "off", label: "Disabled — Silent interface" },
+                  ]}
+                />
+                <p className="text-xs text-[var(--chat-muted)] mt-2">
+                  Toggle the dynamic Web Audio API sound effects for button clicks, hovering, and typing.
                 </p>
               </Field>
             </div>

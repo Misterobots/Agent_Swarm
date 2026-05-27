@@ -62,6 +62,8 @@ interface SettingsState {
   setSidebarSlim: (slim: boolean) => void;
   navLayout: "sidebar" | "topbar";
   setNavLayout: (layout: "sidebar" | "topbar") => void;
+  soundEnabled: boolean;
+  setSoundEnabled: (enabled: boolean) => void;
   themePickerMode: "popover" | "gallery";
   setThemePickerMode: (mode: "popover" | "gallery") => void;
   setMode: (mode: "standard" | "developer") => void;
@@ -119,6 +121,8 @@ export const useSettingsStore = create<SettingsState>()(
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       sidebarSlim: false,
       setSidebarSlim: (sidebarSlim) => set({ sidebarSlim }),
+      soundEnabled: true,
+      setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
       navLayout: "sidebar",
       setNavLayout: (navLayout) => set({ navLayout }),
       themePickerMode: "popover",
@@ -149,7 +153,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "memex-settings",
-      version: 6,
+      version: 7,
       migrate: (persisted: unknown, fromVersion: number) => {
         const state = (persisted ?? {}) as Partial<SettingsState>;
         // v1 -> v3: retired the 8 hand-curated themes plus the warm-amber
@@ -178,6 +182,10 @@ export const useSettingsStore = create<SettingsState>()(
         if (fromVersion < 6) {
           if ((state as any).navLayout === undefined) (state as any).navLayout = "sidebar";
           if ((state as any).themePickerMode === undefined) (state as any).themePickerMode = "popover";
+        }
+        // v6 -> v7: add soundEnabled
+        if (fromVersion < 7) {
+          if ((state as any).soundEnabled === undefined) (state as any).soundEnabled = true;
         }
         return state as SettingsState;
       },

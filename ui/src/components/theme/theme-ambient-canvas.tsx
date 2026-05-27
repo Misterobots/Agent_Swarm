@@ -853,380 +853,85 @@ function drawOps(ctx: CanvasRenderingContext2D, w: number, h: number, t: number,
 }
 
 // ─────────────────────────────────────────────────────────────
-//  LCARS — Deep space starfield with warp streaks
+//  LCARS — Atmospheric terminal view
+//  Subtle deep-space starfield and scan lines behind the Okudagram frame
 // ─────────────────────────────────────────────────────────────
 function initStars(w: number, h: number, state: CanvasState) {
-  state.stars = Array.from({ length: 240 }, () => ({
+  state.stars = Array.from({ length: 200 }, () => ({
     x: Math.random() * w,
     y: Math.random() * h,
-    r: Math.random() * 0.8 + 0.1,
-    speed: Math.random() * 0.05 + 0.01,
+    r: Math.random() * 1.0 + 0.1,
+    speed: Math.random() * 0.04 + 0.005,
   }));
 }
 
 function drawLCARS(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, state: CanvasState, sw: number, theme: string) {
-  ctx.clearRect(0, 0, w, h);
-  const cx = sw;
+  // Pure black base
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, w, h);
 
-  // Palette with paired dark variants for gradients + glow color.
   const P = theme === "lcars-blue"
-    ? { a:"#221166", b:"#3355AA", c:"#6688CC", d:"#AABBEE", e:"#4466BB",
-        aDk:"#110844", bDk:"#1A2A55", cDk:"#334466", dDk:"#5566AA", eDk:"#22335A",
-        glow:"#AACCFF" }
+    ? { scan: "#6688CC", scanB: "#AABBEE", glow: "#AACCFF", starTint: [180, 200, 255] }
     : theme === "lcars-teal"
-    ? { a:"#004455", b:"#007788", c:"#00AACC", d:"#44DDEE", e:"#006655",
-        aDk:"#002233", bDk:"#003344", cDk:"#005566", dDk:"#226677", eDk:"#003322",
-        glow:"#88EEFF" }
-    : { a:"#CC3300", b:"#FF6600", c:"#FFAA00", d:"#FFDD00", e:"#AA2200",
-        aDk:"#661100", bDk:"#883300", cDk:"#996600", dDk:"#997700", eDk:"#550800",
-        glow:"#FFCC66" };
-
-  const SH  = 8;    // full-width ship header
-  const TH  = 96;   // main header height
-  const BH  = 44;   // bottom strip height
-  const EW  = 92;   // elbow block width
-  const AW  = 8;    // left vertical arm width
-  const R   = 52;   // concave arc radius
-  const RW  = 142;  // right panel width
-  const G   = 6;    // gap
-
-  const panelX       = w - RW;
-  const hdrY         = SH;
-  const contentTop   = SH + TH + R;
-  const contentBot   = h - BH;
-  const contentLeft  = cx + EW + R + G;
-  const contentRight = w - RW - G;
-  const panelTop     = contentTop + G;
-  const panelBot     = h - BH - G;
+    ? { scan: "#00AACC", scanB: "#44DDEE", glow: "#88EEFF", starTint: [150, 240, 255] }
+    : { scan: "#FFAA00", scanB: "#FFDD00", glow: "#FFCC66", starTint: [255, 220, 160] };
 
   const mx = state.mx ?? 0;
   const my = state.my ?? 0;
 
-  // ── Full-width ship header bar with vertical gradient ─────────
-  const shipGrad = ctx.createLinearGradient(0, 0, 0, SH);
-  shipGrad.addColorStop(0,   P.bDk);
-  shipGrad.addColorStop(0.5, P.b);
-  shipGrad.addColorStop(1,   P.bDk);
-  ctx.globalAlpha = 0.7; ctx.fillStyle = shipGrad;
-  ctx.fillRect(0, 0, w, SH);
-  ctx.globalAlpha = 1;
-
-  // ══ STARFIELD with mouse parallax (clipped to content) ═══════
+  // ══ STARFIELD ════════════════════════════════════════════════
   if (state.stars.length < 100) initStars(w, h, state);
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(contentLeft, contentTop, contentRight - contentLeft, contentBot - contentTop);
-  ctx.clip();
-  const parX = mx * 22;
-  const parY = my * 14;
+
+  const parX = mx * 18;
+  const parY = my * 12;
+  const [stR, stG, stB] = P.starTint;
+
   state.stars.forEach(s => {
     s.x -= s.speed;
-    if (s.x < contentLeft) { s.x = contentRight - 5; s.y = Math.random() * h; }
+    if (s.x < -4) { s.x = w + 4; s.y = Math.random() * h; }
     const depth = s.r;
-    const sxp = s.x + parX * depth * 1.4;
-    const syp = s.y + parY * depth * 1.4;
-    const br = 0.10 + s.r * 0.24 + Math.sin(t * 0.0007 + s.x * 0.01 + s.y * 0.02) * 0.07;
+    const sxp = s.x + parX * depth * 1.2;
+    const syp = s.y + parY * depth * 1.2;
+
+    const twinkle = 0.15 + s.r * 0.2 + Math.sin(t * 0.001 + s.x * 0.015) * 0.1;
+    
+    if (s.r > 0.6) {
+      ctx.beginPath(); ctx.arc(sxp, syp, s.r * 2.0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${stR},${stG},${stB},${(twinkle * 0.25).toFixed(3)})`;
+      ctx.fill();
+    }
+
     ctx.beginPath(); ctx.arc(sxp, syp, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${br.toFixed(2)})`; ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${twinkle.toFixed(3)})`;
+    ctx.fill();
   });
-  ctx.restore();
 
-  // ── Warp streaks (in content area, glowing) ───────────────────
-  for (let wi = 0; wi < 3; wi++) {
-    const period = 8000 + wi * 2700;
-    const phase  = ((t + wi * 2700) % period) / period;
-    if (phase > 0.12) continue;
-    const prog = phase / 0.12;
-    const seed = Math.floor((t + wi * 2700) / period);
-    const wy   = ((seed * 137 + wi * 53) % 100) / 100 * (contentBot - contentTop) * 0.7 + contentTop + (contentBot - contentTop) * 0.1;
-    const wLen = 60 + ((seed * 73 + wi * 29) % 90);
-    const wx   = contentLeft + (contentRight - contentLeft) * (0.2 + ((seed * 97 + wi * 41) % 60) / 100 * 0.6);
-    const fade = Math.sin(prog * Math.PI);
-    const wg   = ctx.createLinearGradient(wx - wLen * 0.3, wy, wx + wLen * 0.7, wy);
-    wg.addColorStop(0,   "rgba(255,255,255,0)");
-    wg.addColorStop(0.3, `rgba(220,230,255,${(fade * 0.7).toFixed(2)})`);
-    wg.addColorStop(0.7, `rgba(255,255,255,${(fade * 0.9).toFixed(2)})`);
-    wg.addColorStop(1,   "rgba(255,255,255,0)");
-    ctx.strokeStyle = wg; ctx.lineWidth = 1.6;
-    ctx.shadowBlur = 10; ctx.shadowColor = "rgba(200,220,255,0.9)";
-    ctx.beginPath(); ctx.moveTo(wx - wLen * 0.3, wy); ctx.lineTo(wx + wLen * 0.7, wy);
-    ctx.stroke(); ctx.shadowBlur = 0;
-  }
+  // ══ SCAN LINE ════════════════════════════════════════════════
+  const scanPeriod = 3000;
+  const scanPct = (t % scanPeriod) / scanPeriod;
+  const scanY = h * scanPct;
 
-  // ══ TOP HEADER (gradient pill segments) ═══════════════════════
-  // Left elbow block — vertical gradient (lighter top, darker bottom)
-  const elbowGrad = ctx.createLinearGradient(cx, hdrY, cx, hdrY + TH);
-  elbowGrad.addColorStop(0, P.b);
-  elbowGrad.addColorStop(1, P.bDk);
-  ctx.fillStyle = elbowGrad;
-  ctx.fillRect(cx, hdrY, EW, TH);
+  const scanGrad = ctx.createLinearGradient(0, scanY, w, scanY);
+  scanGrad.addColorStop(0,    "rgba(0,0,0,0)");
+  scanGrad.addColorStop(0.15, P.scan);
+  scanGrad.addColorStop(0.5,  P.scanB);
+  scanGrad.addColorStop(0.85, P.scan);
+  scanGrad.addColorStop(1,    "rgba(0,0,0,0)");
 
-  // Header segments with vertical gradients
-  const segDefs: [number, string, string][] = [
-    [108, P.d, P.dDk], [G, "", ""], [62,  P.c, P.cDk], [G, "", ""],
-    [144, P.b, P.bDk], [G, "", ""], [50,  P.a, P.aDk], [G, "", ""],
-    [94,  P.c, P.cDk], [G, "", ""], [72,  P.d, P.dDk],
-  ];
-  let sx = cx + EW + G;
-  const segEnd = panelX - G;
-  for (const [segW, col, dk] of segDefs) {
-    if (!col) { sx += segW; continue; }
-    const sw2 = Math.min(segW, segEnd - sx);
-    if (sw2 <= 0) break;
-    const g = ctx.createLinearGradient(sx, hdrY, sx, hdrY + TH);
-    g.addColorStop(0, col); g.addColorStop(1, dk);
-    ctx.fillStyle = g;
-    ctx.fillRect(sx, hdrY, sw2, TH);
-    sx += segW;
-  }
-
-  // Right corner header block — gradient
-  const rGrad = ctx.createLinearGradient(panelX, hdrY, panelX, hdrY + TH);
-  rGrad.addColorStop(0, P.c); rGrad.addColorStop(1, P.cDk);
-  ctx.fillStyle = rGrad;
-  ctx.fillRect(panelX, hdrY, RW, TH);
-
-  // Concave arc with glow
   ctx.save();
-  ctx.shadowColor = P.glow; ctx.shadowBlur = 10;
-  ctx.strokeStyle = P.c; ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.9;
-  ctx.beginPath();
-  ctx.arc(cx + EW + R, hdrY + TH + R, R, 3 * Math.PI / 2, Math.PI, true);
-  ctx.stroke();
-  ctx.restore();
-
-  // Elbow text — MEMEX glows
-  ctx.font = "bold 14px 'Gill Sans', 'Arial Narrow', sans-serif";
-  glowFillText(ctx, "MEMEX", cx + 8, hdrY + 28, "#FFFFFF", P.glow, 10);
-  ctx.fillStyle = "#FFFFFF"; ctx.globalAlpha = 0.7;
-  ctx.font = "bold 9px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.fillText("HIVE MIND", cx + 8, hdrY + 44);
-  ctx.fillText("NCC-1701", cx + 8, hdrY + 58);
-  ctx.font = "8px 'JetBrains Mono', monospace";
-  ctx.globalAlpha = 0.55;
-  ctx.fillText("CALIFORNIA CLASS", cx + 8, hdrY + 74);
-  ctx.fillText("LCARS 47.3", cx + 8, hdrY + 86);
-  ctx.globalAlpha = 1;
-
-  // Big title with glow
-  ctx.font = "bold 30px 'Gill Sans', 'Arial Narrow', sans-serif";
-  glowFillText(ctx, "HOLOGRAPHIC BRIDGE", cx + EW + R + G + 16, hdrY + 50, "#FFFFFF", P.glow, 14);
-
-  // Subtitle telemetry strip
-  ctx.font = "9px 'JetBrains Mono', monospace";
-  ctx.globalAlpha = 0.55; ctx.fillStyle = "#FFFFFF";
-  ctx.fillText("OPERATIONS  //  ACTIVE LINK NOMINAL  //  GAMMA SHIFT", cx + EW + R + G + 16, hdrY + 72);
-  ctx.globalAlpha = 1;
-
-  // Stardate right block
-  ctx.font = "9px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.globalAlpha = 0.72; ctx.fillStyle = "#FFFFFF";
-  ctx.fillText("STARDATE", panelX + 10, hdrY + 22);
-  const sd = `${47000 + (Math.floor(t * 0.0001) % 999)}.${Math.floor(t * 0.008) % 10}`;
-  ctx.font = "bold 20px 'Gill Sans', 'Arial Narrow', sans-serif";
-  glowFillText(ctx, sd, panelX + 10, hdrY + 50, "#FFFFFF", P.glow, 10);
-  ctx.font = "bold 8px 'JetBrains Mono', monospace";
-  ctx.globalAlpha = 0.55;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillText("SECTOR 001", panelX + 10, hdrY + 70);
-  ctx.fillText("FED SPACE", panelX + 10, hdrY + 84);
-  ctx.globalAlpha = 1;
-
-  // ══ LEFT VERTICAL ARM (vertical gradient) ════════════════════
-  const armGrad = ctx.createLinearGradient(cx, hdrY + TH + R, cx, contentBot - R);
-  armGrad.addColorStop(0,   P.b);
-  armGrad.addColorStop(0.5, P.bDk);
-  armGrad.addColorStop(1,   P.b);
-  ctx.fillStyle = armGrad;
-  ctx.globalAlpha = 0.82;
-  ctx.fillRect(cx, hdrY + TH + R, AW, contentBot - (hdrY + TH + R) - R);
-  ctx.globalAlpha = 1;
-
-  // ══ STATUS LOG (upper-left, glowing first line) ══════════════
-  const LOG = [
-    "SUBSYSTEM INTEGRITY NOMINAL",
-    "NEURAL LINK ACTIVE",
-    "MEMORY BANKS SYNCHRONIZED",
-    "COMM ARRAY ALIGNED",
-    "SENSOR SWEEP COMPLETE",
-    "DEFENSIVE GRID ONLINE",
-    "WARP CORE NOMINAL",
-    "HOLODECK ONLINE",
-    "DEFLECTOR DISH ENGAGED",
-    "TRANSPORTER BUFFER CLEAR",
-    "EPS CONDUITS STABLE",
-  ];
-  const logX = contentLeft + 14;
-  const logY = contentTop + 22;
-  ctx.font = "10px 'JetBrains Mono', monospace";
-  for (let li = 0; li < 5; li++) {
-    const idx = (Math.floor(t * 0.0001 + li * 3) % LOG.length);
-    const sde = 47000 + ((Math.floor(t * 0.0001) + li * 17) % 999);
-    const line = `${sde}.${(li * 3 + Math.floor(t * 0.003)) % 10}   ${LOG[idx]}`;
-    if (li === 0) {
-      glowFillText(ctx, line, logX, logY + li * 15, P.d, P.d, 6);
-    } else {
-      ctx.globalAlpha = Math.max(0.12, 0.42 - li * 0.07);
-      ctx.fillStyle = P.c;
-      ctx.fillText(line, logX, logY + li * 15);
-    }
-  }
-  ctx.globalAlpha = 1;
-
-  // ══ SENSOR RADAR (upper-right of content area) ════════════════
-  const radarR = 58;
-  const radarCX = contentRight - radarR - 18;
-  const radarCY = contentTop + radarR + 22;
-  drawRadarSweep(ctx, radarCX, radarCY, radarR, t, P.c, P.d, 5);
-  // Radar labels
-  ctx.font = "7px 'JetBrains Mono', monospace";
-  ctx.globalAlpha = 0.6; ctx.fillStyle = P.d;
-  ctx.fillText("LR-SENSOR", radarCX - radarR + 2, radarCY - radarR - 6);
-  ctx.fillText(`BEARING ${String(Math.floor((t * 0.05) % 360)).padStart(3, "0")}°`, radarCX - radarR + 2, radarCY + radarR + 12);
-  ctx.fillText("RANGE 4.2 PSC", radarCX - radarR + 2, radarCY + radarR + 22);
-  ctx.globalAlpha = 1;
-
-  // ══ LIVE CLOCK (bottom-left of content, glowing time) ════════
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  const ss = String(now.getSeconds()).padStart(2, "0");
-  const MO = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-  const DA = ["SUNDAY","MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY"];
-  const dateStr = `${now.getFullYear()}.${MO[now.getMonth()]}.${String(now.getDate()).padStart(2,"0")}  ${DA[now.getDay()]}`;
-  const clockX = contentLeft + 14;
-  const clockY = contentBot - 40;
-  ctx.font = "bold 34px 'Gill Sans', 'Arial Narrow', sans-serif";
-  glowFillText(ctx, `${hh}:${mm}.${ss}`, clockX, clockY, P.c, P.glow, 12);
-  ctx.font = "bold 11px 'Gill Sans', 'Arial Narrow', sans-serif";
-  ctx.fillStyle = P.b;
-  ctx.globalAlpha = 0.72;
-  ctx.fillText(dateStr, clockX, clockY + 22);
-  ctx.globalAlpha = 1;
-
-  // ══ RIGHT PANEL — mini telemetry panels with sparklines ══════
-  type PanelRow = { rh: number; col: string; dk: string; label: string; valSeed: number };
-  const rRows: PanelRow[] = [
-    { rh: 56, col: P.a, dk: P.aDk, label: "COMM", valSeed: 1.1 },
-    { rh: 56, col: P.b, dk: P.bDk, label: "NAV",  valSeed: 2.3 },
-    { rh: 56, col: P.c, dk: P.cDk, label: "SCI",  valSeed: 3.7 },
-    { rh: 56, col: P.d, dk: P.dDk, label: "ENG",  valSeed: 4.9 },
-    { rh: 56, col: P.e, dk: P.eDk, label: "MED",  valSeed: 5.1 },
-    { rh: 56, col: P.a, dk: P.aDk, label: "SEC",  valSeed: 6.3 },
-  ];
-  let ry = panelTop;
-  const matrixTop = panelBot - 70;
-  for (const row of rRows) {
-    if (ry + row.rh > matrixTop) break;
-    const labelH = 18;
-    // Label bar — horizontal gradient (light → dark left to right)
-    const lg = ctx.createLinearGradient(panelX, ry, panelX + RW, ry);
-    lg.addColorStop(0, row.col); lg.addColorStop(1, row.dk);
-    ctx.fillStyle = lg;
-    ctx.fillRect(panelX, ry, RW, labelH);
-    // Label text + value (value glows)
-    ctx.font = "bold 10px 'Gill Sans', 'Arial Narrow', sans-serif";
-    ctx.fillStyle = "#FFFFFF";
-    ctx.globalAlpha = 0.92;
-    ctx.fillText(row.label, panelX + 8, ry + 13);
-    const val = Math.floor(30 + Math.abs(Math.sin(t * 0.0011 + row.valSeed)) * 65);
-    glowFillText(ctx, `${val}%`, panelX + RW - 34, ry + 13, "#FFFFFF", P.glow, 5);
-    ctx.globalAlpha = 1;
-    // Sparkline panel below
-    const sY = ry + labelH + 2;
-    const sH = row.rh - labelH - 4;
-    ctx.fillStyle = row.dk;
-    ctx.globalAlpha = 0.22;
-    ctx.fillRect(panelX, sY, RW, sH);
-    ctx.globalAlpha = 1;
-    drawSparkline(ctx, panelX + 4, sY, RW - 8, sH, t, row.valSeed, row.col, 5);
-    ry += row.rh + G;
-  }
-
-  // Indicator bar matrix at bottom of right panel (with subtle gradients)
-  const BAR_W = 22, BAR_H = 8, BAR_GAP = 4, ROW_GAP = 5;
-  const barsPerRow = Math.floor((RW - 4) / (BAR_W + BAR_GAP));
-  const barCols  = [P.d, P.c, P.b, P.a, P.e, P.d, P.c, P.b];
-  const barCols2 = [P.dDk, P.cDk, P.bDk, P.aDk, P.eDk, P.dDk, P.cDk, P.bDk];
-  const matrixRows = Math.max(3, Math.floor((panelBot - matrixTop) / (BAR_H + ROW_GAP)));
-  for (let mr = 0; mr < matrixRows; mr++) {
-    for (let mc = 0; mc < barsPerRow; mc++) {
-      const idx = (mr * barsPerRow + mc) % barCols.length;
-      const pulse2 = 0.40 + Math.sin(t * 0.0012 + mr * 1.1 + mc * 0.7) * 0.42;
-      ctx.globalAlpha = Math.max(0.15, pulse2);
-      const bxp = panelX + 2 + mc * (BAR_W + BAR_GAP);
-      const byp = matrixTop + mr * (BAR_H + ROW_GAP);
-      const bg = ctx.createLinearGradient(bxp, byp, bxp, byp + BAR_H);
-      bg.addColorStop(0, barCols[idx]); bg.addColorStop(1, barCols2[idx]);
-      ctx.fillStyle = bg;
-      ctx.fillRect(bxp, byp, BAR_W, BAR_H);
-    }
-  }
-  ctx.globalAlpha = 1;
-
-  // ══ BOTTOM STRIP (gradient segments) ══════════════════════════
-  const botY = h - BH;
-
-  const bElbowGrad = ctx.createLinearGradient(cx, botY, cx, botY + BH);
-  bElbowGrad.addColorStop(0, P.bDk); bElbowGrad.addColorStop(1, P.b);
-  ctx.fillStyle = bElbowGrad;
-  ctx.fillRect(cx, botY, EW, BH);
-
-  const botDefs: [number, string, string][] = [
-    [96,  P.d, P.dDk], [G, "", ""], [64, P.c, P.cDk], [G, "", ""],
-    [120, P.b, P.bDk], [G, "", ""], [56, P.a, P.aDk], [G, "", ""], [80, P.c, P.cDk],
-  ];
-  let bx = cx + EW + G;
-  const botEnd = panelX - G;
-  for (const [bw, col, dk] of botDefs) {
-    if (!col) { bx += bw; continue; }
-    const bw2 = Math.min(bw, botEnd - bx);
-    if (bw2 <= 0) break;
-    const g = ctx.createLinearGradient(bx, botY, bx, botY + BH);
-    g.addColorStop(0, dk); g.addColorStop(1, col);
-    ctx.fillStyle = g;
-    ctx.fillRect(bx, botY, bw2, BH);
-    bx += bw;
-  }
-
-  const brGrad = ctx.createLinearGradient(panelX, botY, panelX, botY + BH);
-  brGrad.addColorStop(0, P.dDk); brGrad.addColorStop(1, P.d);
-  ctx.fillStyle = brGrad;
-  ctx.fillRect(panelX, botY, RW, BH);
-
-  // Bottom info text — glowing
-  ctx.font = "bold 9px 'Gill Sans', 'Arial Narrow', sans-serif";
-  glowFillText(ctx, "MODEL  HOME-AI-SWARM  CTX FLEET  •  LCARS 47.3", cx + EW + G + 10, botY + BH * 0.62, "#FFFFFF", P.glow, 4);
-
-  // Bottom concave arc with glow
-  ctx.save();
-  ctx.shadowColor = P.glow; ctx.shadowBlur = 10;
-  ctx.strokeStyle = P.c; ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.9;
-  ctx.beginPath();
-  ctx.arc(cx + EW + R, botY - R, R, Math.PI / 2, 0, true);
-  ctx.stroke();
-  ctx.restore();
-
-  // ══ SCAN LINE with glow + gradient ════════════════════════════
-  const scanPct = (t % 7000) / 7000;
-  const scanY = contentTop + (contentBot - contentTop) * scanPct;
-  const scanGrad = ctx.createLinearGradient(contentLeft, scanY, contentRight, scanY);
-  scanGrad.addColorStop(0,   "rgba(0,0,0,0)");
-  scanGrad.addColorStop(0.3, P.c);
-  scanGrad.addColorStop(0.7, P.d);
-  scanGrad.addColorStop(1,   "rgba(0,0,0,0)");
-  ctx.save();
-  ctx.shadowColor = P.glow; ctx.shadowBlur = 6;
+  ctx.shadowColor = P.glow; ctx.shadowBlur = 12;
   ctx.strokeStyle = scanGrad;
   ctx.lineWidth = 1;
-  ctx.globalAlpha = 0.40 + Math.sin(scanPct * Math.PI) * 0.20;
-  ctx.beginPath();
-  ctx.moveTo(contentLeft, scanY);
-  ctx.lineTo(contentRight, scanY);
-  ctx.stroke();
+  ctx.globalAlpha = 0.15 + Math.sin(scanPct * Math.PI) * 0.10;
+  ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(w, scanY); ctx.stroke();
   ctx.restore();
+
+  const bandH = 60;
+  const bandGrad = ctx.createLinearGradient(0, scanY - bandH, 0, scanY);
+  bandGrad.addColorStop(0, "rgba(0,0,0,0)");
+  bandGrad.addColorStop(1, `rgba(${stR},${stG},${stB},${(0.02 + Math.sin(scanPct * Math.PI) * 0.01).toFixed(3)})`);
+  ctx.fillStyle = bandGrad;
+  ctx.fillRect(0, scanY - bandH, w, bandH);
 }
 
 // ─────────────────────────────────────────────────────────────

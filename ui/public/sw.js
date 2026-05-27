@@ -1,4 +1,4 @@
-const CACHE_NAME = "hive-mind-v2";
+const CACHE_NAME = "hive-mind-v3";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [

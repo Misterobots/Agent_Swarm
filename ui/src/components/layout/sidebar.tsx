@@ -14,11 +14,23 @@ import {
 } from "@/lib/config/navigation";
 import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
-import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User, PanelLeftClose } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User, PanelLeftClose, Volume2, VolumeX } from "lucide-react";
 import { BuddyWidget } from "@/components/buddy/buddy-widget";
 import { ThemeSelector } from "@/components/chat/theme-selector";
 import { useAccess } from "@/lib/hooks/use-access";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
+import { LCARSDataStream } from "@/components/theme/lcars-data-stream";
+
+// Helper to generate a stable pseudo-random LCARS numeric prefix
+function getLcarsPrefix(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const prefix1 = Math.abs(hash % 90) + 10;
+  const prefix2 = Math.abs((hash * 7) % 900) + 100;
+  return `${prefix1}-${prefix2}`;
+}
 
 function MemexLogo() {
   return (
@@ -66,6 +78,8 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
   const createConversation = useChatStore((s) => s.createConversation);
   const { deleteConversation } = useConversationSync();
   const model = useSettingsStore((s) => s.model);
+  const soundEnabled = useSettingsStore((s) => s.soundEnabled);
+  const setSoundEnabled = useSettingsStore((s) => s.setSoundEnabled);
   const { isAdmin, authenticated, displayName } = useAccess();
   const showConversations = isConversationRoute(pathname);
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,6 +148,13 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
         </div>
         {/* Footer — swarm dot only */}
         <div className="flex flex-col items-center gap-2 pb-1">
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="w-9 h-9 flex items-center justify-center rounded-md text-[var(--chat-muted)] hover:text-[var(--chat-accent)] hover:bg-[var(--hover-tint)] transition-colors"
+            title={soundEnabled ? "Mute SFX" : "Unmute SFX"}
+          >
+            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
           <div className="w-8 h-px bg-[var(--divider)]" />
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 sidebar-status-dot" title="Swarm Online" />
         </div>
@@ -142,7 +163,7 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
   }
 
   return (
-    <div className="sidebar-wrapper relative flex flex-col h-full">
+    <div className="sidebar-wrapper   relative flex flex-col h-full">
       {/* Logo */}
       <div className="px-4 py-5 relative">
         <div className="flex items-center justify-between gap-3">
@@ -153,6 +174,9 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
                 Memex
               </h1>
               <p className="text-[10px] text-[var(--chat-subtle)] mt-1.5 tracking-wide uppercase">AI Swarm Interface</p>
+            </div>
+            <div className="ml-auto hidden [data-theme^='lcars']_&_block">
+              <LCARSDataStream lines={3} className="text-[7px]" />
             </div>
           </div>
           {onCollapse && (
@@ -338,9 +362,19 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
           </a>
         )}
         <ThemeSelector />
-        <div className="flex items-center gap-1.5 text-[10px] text-[var(--chat-muted)]">
-          <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-          <span>Swarm Online</span>
+        <div className="flex items-center justify-between mt-1">
+          <div className="flex items-center gap-1.5 text-[10px] text-[var(--chat-muted)]">
+            <span className="sidebar-status-dot w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+            <span>Swarm Online</span>
+          </div>
+          <button 
+            onClick={() => setSoundEnabled(!soundEnabled)} 
+            className="text-[var(--chat-subtle)] hover:text-[var(--chat-accent)] transition-colors"
+            title={soundEnabled ? "Mute SFX" : "Unmute SFX"}
+            aria-label="Toggle sound"
+          >
+            {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+          </button>
         </div>
       </div>
     </div>
@@ -374,19 +408,26 @@ function SidebarNavItem({
   icon: React.ComponentType<{ size?: number; className?: string }>;
   compact?: boolean;
 }) {
+  const isLcars = typeof document !== "undefined" && document.documentElement.getAttribute("data-theme")?.startsWith("lcars");
+
   return (
     <Link
       href={href}
       className={cn(
-        "relative flex items-center rounded-md transition-colors duration-150",
+        "relative flex items-center rounded-md transition-colors duration-150 overflow-hidden",
         compact ? "mx-4 gap-2 px-3 py-1.5 text-xs" : "mx-2 gap-2.5 px-3 py-2 text-sm",
         active
           ? "sidebar-active"
           : "text-[var(--chat-muted)] hover:bg-[var(--hover-tint)] hover:text-[var(--chat-text)]"
       )}
     >
-      <Icon size={compact ? 13 : 16} className={cn("shrink-0 transition-colors", active && "text-[var(--chat-accent)]")} />
-      <span className="truncate">{label}</span>
+      {isLcars && (
+        <span className="text-[10px] opacity-60 font-mono tracking-widest mr-auto tabular-nums">
+          {getLcarsPrefix(label)}
+        </span>
+      )}
+      <Icon size={compact ? 13 : 16} className={cn("shrink-0 transition-colors z-20", active && "text-[var(--chat-accent)]", isLcars && "hidden")} />
+      <span className="truncate z-20">{label}</span>
     </Link>
   );
 }
@@ -402,6 +443,8 @@ function ConversationRow({
   onClick: () => void;
   onDelete: () => void;
 }) {
+  const isLcars = typeof document !== "undefined" && document.documentElement.getAttribute("data-theme")?.startsWith("lcars");
+
   return (
     <div
       onClick={onClick}
@@ -414,29 +457,35 @@ function ConversationRow({
         }
       }}
       className={cn(
-        "group relative flex items-center gap-2 mx-2 px-3 py-2 rounded-md cursor-pointer text-[13px] transition-colors",
+        "group relative flex items-center gap-2 mx-2 px-3 py-2 rounded-md cursor-pointer text-[13px] transition-colors overflow-hidden",
         isActive
           ? "sidebar-active"
           : "text-[var(--chat-muted)] hover:bg-[var(--hover-tint)] hover:text-[var(--chat-text)]"
       )}
     >
+      {isLcars && (
+        <span className="text-[10px] opacity-60 font-mono tracking-widest mr-auto tabular-nums">
+          {getLcarsPrefix(title)}
+        </span>
+      )}
       <MessageSquare
         size={13}
         className={cn(
-          "flex-shrink-0 transition-colors",
-          isActive ? "text-[var(--chat-accent)]" : ""
+          "flex-shrink-0 transition-colors z-20",
+          isActive ? "text-[var(--chat-accent)]" : "",
+          isLcars && "hidden"
         )}
       />
-      <span className="flex-1 truncate">{title}</span>
+      <span className="flex-1 truncate z-20 text-right">{title}</span>
       <button
         onClick={(e) => {
           e.stopPropagation();
           onDelete();
         }}
-        className="opacity-0 group-hover:opacity-100 text-[var(--chat-subtle)] hover:text-red-400 transition-all"
+        className="opacity-0 group-hover:opacity-100 text-[var(--chat-subtle)] hover:text-red-400 transition-all z-20 ml-2"
         aria-label="Delete conversation"
       >
-        <Trash2 size={12} />
+        <Trash2 size={13} />
       </button>
     </div>
   );
