@@ -244,10 +244,16 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
 
     try:
         MAX_FINDING_CHARS = 6000
-        truncated_findings = {
-            label: (text[:MAX_FINDING_CHARS] + "\n[... truncated for synthesis ...]" if len(text) > MAX_FINDING_CHARS else text)
-            for label, text in findings_by_perspective.items()
-        }
+        truncated_findings = {}
+        for label, text in findings_by_perspective.items():
+            # Coerce non-string values defensively (primary fix is in executor._run_worker)
+            if not isinstance(text, str):
+                text = json.dumps(text, ensure_ascii=False) if isinstance(text, (dict, list)) else str(text)
+            truncated_findings[label] = (
+                text[:MAX_FINDING_CHARS] + "\n[... truncated for synthesis ...]"
+                if len(text) > MAX_FINDING_CHARS
+                else text
+            )
         findings_text_trunc = "\n\n".join(
             f"=== {label} ===\n{text}" for label, text in truncated_findings.items()
         )
@@ -272,6 +278,9 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
 
     table_rows = []
     for label, text in findings_by_perspective.items():
+        # Guard: text must be a str; dicts/lists can slip in if a worker returns JSON content
+        if not isinstance(text, str):
+            text = json.dumps(text, ensure_ascii=False) if isinstance(text, (dict, list)) else str(text)
         snippet = text.replace("\n", " ").strip()[:200]
         if len(text) > 200:
             snippet += "…"

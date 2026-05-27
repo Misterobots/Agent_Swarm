@@ -183,12 +183,15 @@ class SemanticRouter:
 
                 response: RunResponse = self.agent.run(prompt)
 
-                # Parse JSON
+                # Parse JSON — response.content can be a dict when phidata auto-parses
+                # JSON responses (even without json_mode=True on older builds), so handle both.
                 content = response.content
-                if "```json" in content:
-                    content = content.replace("```json", "").replace("```", "")
-
-                decision = json.loads(content.strip())
+                if isinstance(content, dict):
+                    decision = content
+                else:
+                    if "```json" in content:
+                        content = content.replace("```json", "").replace("```", "")
+                    decision = json.loads(content.strip())
                 confidence = float(decision.get("confidence", 0.0))
 
                 # Success criteria: High confidence and not explicitly ambiguous

@@ -57,7 +57,17 @@ def _run_worker(
 
         response: RunResponse = agent.run(prompt)
 
-        result = response.content if response and response.content else "No output"
+        _raw = response.content if response and response.content else "No output"
+        # response.content can be a dict when the model returns valid JSON (phidata auto-parses
+        # it even without json_mode=True).  Downstream code (synthesizer, team store, scratchpad)
+        # all expect a plain string, so coerce here at the source.
+        if isinstance(_raw, (dict, list)):
+            import json as _json
+            result = _json.dumps(_raw, indent=2, ensure_ascii=False)
+        elif not isinstance(_raw, str):
+            result = str(_raw)
+        else:
+            result = _raw
         worker.result = result
         worker.state = WorkerState.COMPLETED
         worker.completed_at = time.time()
