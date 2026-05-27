@@ -428,8 +428,10 @@ services:
     env_file:
       - ../network.env
     environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - SECONDARY_OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
+      # OLLAMA_HOST = Lovelace (2× RTX 5060 Ti, 32 GB VRAM) — primary large-model host
+      # SECONDARY_OLLAMA_HOST = Turing local ollama (RTX 3070 Ti, 8 GB) — guard + embeddings only
+      - OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
+      - SECONDARY_OLLAMA_HOST=http://ollama:11434
       - COMFYUI_HOST=http://${LOVELACE_IP:-192.168.2.101}:8188
       - PYTHONPATH=/app
       - MEMPALACE_API_URL=http://mempalace:8200
@@ -439,13 +441,21 @@ services:
       # This is the critical env var that enables cross-host GPU coordination without Redis.
       # GPU_LOCK_SECRET is injected automatically via env_file (network.env).
       - GPU_LOCK_HOST=http://${LOVELACE_IP:-192.168.2.101}:8008
-      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:8b}
+      # ── Model specialization (must match config.py defaults) ──────────────────
+      # All large models live on Lovelace; OLLAMA_HOST above routes them there.
+      # Turing local ollama only hosts llama-guard3:8b and nomic-embed-text.
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3.6:27b}
       - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
-      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:8b}
-      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:8b}
-      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:8b}
-      - CONV_MODEL=${CONV_MODEL:-qwen3:8b}
-      - SOLVER_MODEL=${SOLVER_MODEL:-qwen3:8b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-gemma4:31b}
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3-coder:30b}
+      - CODER_MODEL=${CODER_MODEL:-qwen3-coder:30b}
+      - DEVOPS_MODEL=${DEVOPS_MODEL:-qwen3-coder:30b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3.6:27b}
+      - RESEARCHER_MODEL=${RESEARCHER_MODEL:-qwen3.6:27b}
+      - ANALYST_MODEL=${ANALYST_MODEL:-qwen3.6:27b}
+      - VERIFIER_MODEL=${VERIFIER_MODEL:-qwen3:14b}
+      - CONV_MODEL=${CONV_MODEL:-qwen3.6:27b}
+      - SOLVER_MODEL=${SOLVER_MODEL:-qwen3-coder:30b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
@@ -575,11 +585,11 @@ services:
     env_file:
       - ../network.env
     environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - SECONDARY_OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
-      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:8b}
-      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:8b}
-      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-llama3.2:3b}
+      - OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
+      - SECONDARY_OLLAMA_HOST=http://ollama:11434
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3-coder:30b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-gemma4:31b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3.6:27b}
       - GRPC_PORT=50051
       - GRPC_MAX_WORKERS=4
       - GRPC_AUTH_ENABLED=${GRPC_AUTH_ENABLED:-true}
