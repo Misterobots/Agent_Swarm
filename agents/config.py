@@ -137,7 +137,10 @@ def get_ollama_options(model_name: str, **extra) -> dict:
 # ---------------------------------------------------------------------------
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")          # default local provider
 ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6-20250514")
+# Default Anthropic model — Sonnet 4.6 uses dateless ID (new convention as of
+# the 4.6 generation). Previous default "claude-sonnet-4-6-20250514" was
+# malformed and would 404 from the live API.
+ANTHROPIC_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 MCP_BRIDGE_ENABLED = os.getenv("MCP_BRIDGE_ENABLED", "false")
 MCP_SERVER_NAME    = os.getenv("MCP_SERVER_NAME", "home-ai-lab")
 MCP_BASE_URL       = os.getenv("MCP_BASE_URL", f"http://{HOPPER_IP}:8000")
@@ -186,18 +189,38 @@ GRPC_AUTH_CACHE_TTL    = int(os.getenv("GRPC_AUTH_CACHE_TTL", "300"))
 
 # Subscription-required models — users must connect their own API key to use these.
 # Admin fallback: if ANTHROPIC_API_KEY env var is set, admins can still use it.
+# Set contains current-generation IDs plus the legacy IDs we still want to
+# accept from stored user preferences (avoids breaking anyone mid-session
+# during the Anthropic deprecation window — June 15, 2026).
 ADMIN_ONLY_MODELS: set[str] = {
-    "claude-opus-4-20250514",
-    "claude-sonnet-4-6-20250514",
+    # Current
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    # Legacy / still serving
+    "claude-opus-4-6",
+    "claude-sonnet-4-5-20250929",
     "claude-haiku-3-5-20241022",
+    # Deprecated — accepted until Anthropic retires them
+    "claude-opus-4-20250514",
+    "claude-sonnet-4-20250514",
 }
 
-# Models that any user can access if they have a connected provider key
+# Models that any user can access if they have a connected provider key.
+# Mirrors ADMIN_ONLY_MODELS for Anthropic; same back-compat strategy.
 SUBSCRIPTION_MODELS: dict[str, str] = {
     # model_id -> provider name (matches provider_keys.PROVIDERS)
-    "claude-opus-4-20250514":      "anthropic",
-    "claude-sonnet-4-6-20250514":   "anthropic",
+    # ── Anthropic, current ───────────────────────────────────────────
+    "claude-opus-4-7":              "anthropic",
+    "claude-sonnet-4-6":            "anthropic",
+    "claude-haiku-4-5-20251001":    "anthropic",
+    # ── Anthropic, legacy / deprecated (accepted, encouraged to migrate) ──
+    "claude-opus-4-6":              "anthropic",
+    "claude-sonnet-4-5-20250929":   "anthropic",
     "claude-haiku-3-5-20241022":    "anthropic",
+    "claude-opus-4-20250514":       "anthropic",
+    "claude-sonnet-4-20250514":     "anthropic",
+    # ── Google ───────────────────────────────────────────────────────
     "gemini-2.0-flash":             "google",
     "gemini-2.0-pro":               "google",
 }

@@ -46,14 +46,74 @@ def _ensure_sdk():
 # Configuration
 # ---------------------------------------------------------------------------
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-ANTHROPIC_DEFAULT_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6-20250514")
-ANTHROPIC_MAX_TOKENS: int = int(os.getenv("ANTHROPIC_MAX_TOKENS", "4096"))
+# Default to Claude Sonnet 4.6 — the current production Sonnet. Starting with
+# the 4.6 generation Anthropic uses dateless IDs as pinned snapshots, so no
+# date suffix here. The previous default ("claude-sonnet-4-6-20250514") was
+# a Frankenstein ID — Sonnet 4.6 paired with Opus-4's date suffix — and
+# would 404 against the live API.
+ANTHROPIC_DEFAULT_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 
+# If ANTHROPIC_MAX_TOKENS is explicitly set in the environment we honour it
+# (operators may want a tighter cap for cost control). When unset, we DO NOT
+# fall back to a single hardcoded value — instead each call uses the
+# per-model max from SUPPORTED_MODELS so Sonnet 4.6 / Opus aren't silently
+# truncated at 4096 tokens. See _resolve_max_tokens() below.
+_ANTHROPIC_MAX_TOKENS_ENV: int | None = (
+    int(os.environ["ANTHROPIC_MAX_TOKENS"])
+    if os.environ.get("ANTHROPIC_MAX_TOKENS", "").strip()
+    else None
+)
+# Conservative floor used only when we can't resolve a per-model max
+# (e.g. caller passes an unknown model name).
+_FALLBACK_MAX_TOKENS: int = 4096
+
+# Verified against https://platform.claude.com/docs/en/docs/about-claude/models/overview
+# Naming convention notes:
+#   - Pre-4.6 generation: dated IDs ("claude-opus-4-1-20250805") + dateless aliases.
+#   - 4.6 generation onward: dateless IDs that ARE the pinned snapshot
+#     (e.g. "claude-sonnet-4-6", "claude-opus-4-7").
+#   - Haiku 4.5 still uses the dated form ("claude-haiku-4-5-20251001").
+# Legacy entries are kept so users with stored model preferences don't break;
+# they'll continue to work until Anthropic's published retirement date.
 SUPPORTED_MODELS: dict[str, dict[str, Any]] = {
-    "claude-opus-4-20250514": {"label": "Claude Opus 4", "context": 200_000, "max_output": 32_000},
-    "claude-sonnet-4-6-20250514": {"label": "Claude Sonnet 4.6", "context": 200_000, "max_output": 16_000},
-    "claude-haiku-3-5-20241022": {"label": "Claude Haiku 3.5", "context": 200_000, "max_output": 8_192},
+    # ── Current generation ─────────────────────────────────────────────
+    "claude-opus-4-7":             {"label": "Claude Opus 4.7",   "context": 1_000_000, "max_output": 128_000},
+    "claude-sonnet-4-6":           {"label": "Claude Sonnet 4.6", "context": 1_000_000, "max_output": 64_000},
+    "claude-haiku-4-5-20251001":   {"label": "Claude Haiku 4.5",  "context":   200_000, "max_output": 64_000},
+
+    # ── Legacy / still serving ─────────────────────────────────────────
+    "claude-opus-4-6":             {"label": "Claude Opus 4.6 (legacy)",   "context": 1_000_000, "max_output": 128_000},
+    "claude-sonnet-4-5-20250929":  {"label": "Claude Sonnet 4.5 (legacy)", "context":   200_000, "max_output":  64_000},
+    "claude-haiku-3-5-20241022":   {"label": "Claude Haiku 3.5 (legacy)",  "context":   200_000, "max_output":   8_192},
+
+    # ── Deprecated; retires 2026-06-15 ────────────────────────────────
+    "claude-opus-4-20250514":      {"label": "Claude Opus 4 (deprecated)", "context": 200_000, "max_output": 32_000},
+    "claude-sonnet-4-20250514":    {"label": "Claude Sonnet 4 (deprecated)", "context": 200_000, "max_output": 64_000},
 }
+
+
+def _resolve_max_tokens(model: str, explicit: int | None) -> int:
+    """Pick the right max_tokens value.
+
+    Priority:
+      1. explicit caller-supplied value (e.g. mars_loop wants a hard cap)
+      2. ANTHROPIC_MAX_TOKENS env var, if operator set one
+      3. SUPPORTED_MODELS[model]['max_output'] — the model's real ceiling
+      4. _FALLBACK_MAX_TOKENS — last resort for unknown models
+    """
+    if explicit is not None:
+        return explicit
+    if _ANTHROPIC_MAX_TOKENS_ENV is not None:
+        return _ANTHROPIC_MAX_TOKENS_ENV
+    spec = SUPPORTED_MODELS.get(model)
+    if spec and "max_output" in spec:
+        return int(spec["max_output"])
+    return _FALLBACK_MAX_TOKENS
+
+
+# Back-compat alias — some call sites import this directly. Resolves to the
+# default model's true max-output rather than a flat 4096.
+ANTHROPIC_MAX_TOKENS: int = _resolve_max_tokens(ANTHROPIC_DEFAULT_MODEL, None)
 
 
 def is_available() -> bool:
@@ -220,7 +280,10 @@ class AnthropicProvider:
         kwargs: dict[str, Any] = {
             "model": self._model,
             "messages": messages,
-            "max_tokens": max_tokens or ANTHROPIC_MAX_TOKENS,
+            # Resolves to: caller value → env override → per-model max from
+            # SUPPORTED_MODELS → conservative 4096 fallback. Avoids the old
+            # bug where Sonnet 4.6 was silently capped at 4096 of its 16K.
+            "max_tokens": _resolve_max_tokens(self._model, max_tokens),
             "temperature": temperature,
         }
         if system:
