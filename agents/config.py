@@ -65,23 +65,36 @@ OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434
 # GPU_LOCK_SECRET should be the same value on all nodes (optional but recommended).
 GPU_LOCK_HOST        = os.getenv("GPU_LOCK_HOST",        f"http://{LOVELACE_IP}:8008")
 # ---------------------------------------------------------------------------
-# Model Consolidation (TTFT Optimization)
-# Primary model: qwen3:14b — handles code, conversation, coordination,
-# research, documentation. Pinned in VRAM (keep_alive=-1) on GPU 0.
-# BMO voice: qwen2.5:3b — lightweight, on-demand.
-# Safety: llama-guard-3:8b — async on Turing.
-# Vision: moondream — on-demand.
+# Model Specialization Map
+#
+# Hardware — Lovelace: 2× RTX 5060 Ti (16 GB each, 32 GB combined)
+#            Turing:   RTX 3070 Ti (8 GB)
+#
+# Role → default model:
+#   COORDINATOR  gemma4:31b        (19 GB) — Google Gemma for synthesis/planning;
+#                                    holistic reasoning & steering questions
+#   CODER        qwen3-coder:30b   (18 GB) — Qwen3 Coder; best code generation
+#   ARCHITECT    qwen3-coder:30b   (18 GB) — same as CODER for MarsRL solver
+#   DEVOPS       qwen3-coder:30b   (18 GB) — infra scripts, Dockerfiles, YAML
+#   PRIMARY /    qwen3.6:27b       (17 GB) — general Qwen3.6; conversation,
+#   LIBRARIAN /                              research, documentation, analysis
+#   RESEARCHER /
+#   ANALYST
+#   ROUTER       qwen3:8b          (5 GB)  — lightweight; LLM router fallback
+#   VERIFIER     qwen3:14b         (9 GB)  — verification pass; balanced quality
+#
+# All defaults can be overridden per-user via Team Builder or env vars.
 # ---------------------------------------------------------------------------
-PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "qwen3:14b")
-ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         PRIMARY_MODEL)
-ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      PRIMARY_MODEL)
-COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    PRIMARY_MODEL)
+PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "qwen3.6:27b")
+ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "qwen3:8b")
+COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    "gemma4:31b")
+CODER_MODEL          = os.getenv("CODER_MODEL",          "qwen3-coder:30b")
+ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      "qwen3-coder:30b")
+DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         "qwen3-coder:30b")
 LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
-CODER_MODEL          = os.getenv("CODER_MODEL",          PRIMARY_MODEL)
-DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         PRIMARY_MODEL)
 RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     PRIMARY_MODEL)
 ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        PRIMARY_MODEL)
-VERIFIER_MODEL       = os.getenv("VERIFIER_MODEL",       PRIMARY_MODEL)
+VERIFIER_MODEL       = os.getenv("VERIFIER_MODEL",       "qwen3:14b")
 
 # ---------------------------------------------------------------------------
 # ExpertiseTemplate Database (swarm schema in langfuse DB)
@@ -115,14 +128,24 @@ TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION",
 # Context Window Management
 # ---------------------------------------------------------------------------
 CONTEXT_WINDOWS: dict[str, int] = {
+    # Gemma
+    "gemma4:31b": 32768,
+    # Qwen3 family
+    "qwen3-coder:30b": 32768,
+    "qwen3.6:27b": 32768,
     "qwen3:14b": 16384,
     "qwen3:8b": 16384,
+    # Qwen2.5 family
     "qwen2.5-coder:14b": 16384,
     "qwen2.5-coder:14b-instruct-q4_k_m": 16384,
+    "qwen2.5-coder:7b": 8192,
+    "qwen2.5:3b": 8192,
+    # Other
     "qwen3.5:9b": 16384,
     "nemotron-orchestrator:8b": 16384,
     "nemotron-mini": 4096,
-    "qwen2.5:3b": 8192,
+    "phi4-reasoning:14b": 16384,
+    "deepseek-r1:32b": 32768,
     "llama3.2:3b": 8192,
     "default": 8192,
 }

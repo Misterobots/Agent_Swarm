@@ -76,11 +76,15 @@ def _get_preferred_host(model_name: str) -> str:
     # Models confirmed to fit on Turing (≤8B params / safety / embeddings).
     # Use precise prefixes: "qwen3:1." matches "qwen3:1.7b" but NOT "qwen3:14b";
     # "qwen3:4b" matches exactly; bare "qwen3:1" would be a substring of "qwen3:14b".
+    #
+    # NOTE: gemma4:31b, qwen3-coder:30b, qwen3.6:27b, qwen3:14b, deepseek-r1:32b
+    # are all Lovelace-only (require 2× RTX 5060 Ti, 32 GB combined VRAM on Lovelace).
     turing_safe = ["llama-guard", "nomic-embed", "qwen3:0.", "qwen3:1.", "qwen3:4b", "qwen3:8b"]
 
     if any(m in model_name for m in turing_safe):
         return SECONDARY_OLLAMA_HOST  # Turing: safety + embeddings (8 GB)
-    # Everything else → Lovelace (dual 5060 Ti, 32 GB VRAM)
+    # Everything else (gemma4, qwen3-coder:30b, qwen3.6:27b, qwen3:14b, etc.)
+    # → Lovelace (dual 5060 Ti, 32 GB VRAM)
     return OLLAMA_HOST
 
 
