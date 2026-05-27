@@ -25,8 +25,9 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
     Returns dict: {"plan", "confidence", "ambiguity", "ambiguous_points",
                    "clarification_question", "suggested_answers"}
     """
-    _preferred = os.getenv("COORDINATOR_MODEL", "qwen3:14b")
-    _fallback = os.getenv("ROUTER_MODEL", "qwen3:8b")
+    from config import COORDINATOR_MODEL as _COORD_MODEL, ROUTER_MODEL as _ROUTER_MODEL
+    _preferred = os.getenv("COORDINATOR_MODEL", _COORD_MODEL)
+    _fallback = os.getenv("ROUTER_MODEL", _ROUTER_MODEL)
     # Resolve once for context-window / log purposes. The inference call
     # below uses call_with_model_fallback to retry against the chain.
     synth_model, host = select_available_model(_preferred, [_fallback, "qwen3:8b"])

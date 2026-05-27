@@ -154,6 +154,57 @@ def coordinate_task(
             }
             return
 
+        # --- NUANCE STEERING GATE ---
+        # Fires when the task is clear but has multiple meaningfully different valid directions.
+        # Unlike the ambiguity gate (missing info), this catches well-specified requests where
+        # choosing the wrong approach would waste the research team's effort.
+        # The user picks a direction; the coordinator resumes with that context via Brooks.
+        if plan.get("nuance_detected", False) and not dev_mode and not research_mode:
+            steering_q = plan.get(
+                "steering_question",
+                "Which angle would be most valuable to explore?",
+            )
+            suggested_dirs = plan.get("suggested_directions", [])
+            logger.info(
+                f"[Coordinator] Nuance detected — steering question: {steering_q!r} "
+                f"({len(suggested_dirs)} directions)"
+            )
+            try:
+                from brooks import save_pending_context as _save_ctx
+                _save_ctx(
+                    {
+                        "type": "swarm_steering",
+                        "prompt": user_input,
+                        "question": steering_q,
+                        "suggested_directions": suggested_dirs,
+                    },
+                    session_id=session_id,
+                    owner_id=owner_id,
+                )
+            except Exception as _e:
+                logger.warning(f"[Coordinator] Could not save steering context: {_e}")
+            yield {
+                "type": "clarification_card",
+                "clarification": {
+                    "question": steering_q,
+                    "context": (
+                        f"I can approach **{summary}** from several angles. "
+                        "Pointing me in the right direction will make the research team much more effective."
+                    ),
+                    "options": [
+                        {
+                            "label": d.get("label", d.get("value", "Option")),
+                            "value": d.get("value", d.get("label", "option")),
+                            "description": d.get("description", ""),
+                        }
+                        for d in suggested_dirs
+                    ],
+                    "allow_freetext": True,
+                    "card_type": "steering",
+                },
+            }
+            return
+
         # --- LOW CONFIDENCE GATE ---
         if scope == "unknown" and not dev_mode and not research_mode and not plan_mode:
             logger.info("[Coordinator] Scope unknown after decomposition — prompting user to classify intent.")

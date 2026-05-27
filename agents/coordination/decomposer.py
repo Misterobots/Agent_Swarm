@@ -20,8 +20,9 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
     Use LLM to decompose a complex task into subtasks.
     Returns dict with research_tasks, implementation_tasks, verification_criteria.
     """
-    _preferred = os.getenv("COORDINATOR_MODEL", "qwen3:14b")
-    _fallback = os.getenv("ROUTER_MODEL", "qwen3:8b")
+    from config import ROUTER_MODEL as _ROUTER_MODEL
+    _preferred = os.getenv("COORDINATOR_MODEL", COORDINATOR_MODEL)
+    _fallback = os.getenv("ROUTER_MODEL", _ROUTER_MODEL)
     # We resolve model+host once here for prompt-shaping logs etc., but the
     # actual call below uses call_with_model_fallback so it can re-select
     # if the chosen model 500s/OOMs at inference time.
@@ -36,6 +37,9 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         '  "project_type": "existing|new|unknown",\n'
         '  "clarification_needed": false,\n'
         '  "clarification_question": null,\n'
+        '  "nuance_detected": false,\n'
+        '  "steering_question": null,\n'
+        '  "suggested_directions": [],\n'
         '  "research_tasks": [\n'
         '    {"role": "researcher|architect|analyst", "task": "specific research question"}\n'
         "  ],\n"
@@ -66,7 +70,7 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "- project_type='existing': working with/inside an existing codebase\n"
         "- project_type='new': creating a brand new project/app from scratch\n"
         "- project_type='unknown': cannot determine (use only when scope='codebase')\n\n"
-        "AMBIGUITY CHECK: Be extremely conservative — the default MUST be clarification_needed=false.\n"
+        "AMBIGUITY CHECK (clarification_needed): Be extremely conservative — default MUST be false.\n"
         "Only set clarification_needed=true if ALL of the following are true:\n"
         "  1. A single CRITICAL piece of information is genuinely absent (not just nice-to-have)\n"
         "  2. Without it, research would go in the completely WRONG direction\n"
@@ -79,7 +83,28 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "  - The question would be generic (e.g. 'provide more detail', 'what do you mean', 'more context')\n"
         "If you set clarification_needed=true, the clarification_question MUST be specific and actionable\n"
         "(e.g. 'Should this target mobile browsers or desktop only?'), NOT vague (e.g. 'Can you provide more detail?').\n"
-        "Default: clarification_needed=false, clarification_question=null."
+        "Default: clarification_needed=false, clarification_question=null.\n\n"
+        "NUANCE STEERING (nuance_detected): Set nuance_detected=true when ALL of the following are true:\n"
+        "  1. The request is CLEAR (not ambiguous) but has 3+ meaningfully DIFFERENT valid approaches\n"
+        "  2. Choosing the wrong approach would send the research team in a substantially different direction\n"
+        "  3. You can offer 3-4 concrete directions that would each produce genuinely different output\n"
+        "Set nuance_detected=false for:\n"
+        "  - Simple factual or explanatory questions with a single obvious answer direction\n"
+        "  - Clear build requests where the scope is already well-defined\n"
+        "  - Creative writing with enough style/content guidance\n"
+        "  - Short conversational questions\n"
+        "  - Research where the topic itself determines the angle\n"
+        "Nuance IS appropriate for: complex system design decisions, strategic planning, architectural tradeoffs,\n"
+        "multi-stakeholder problems, optimization problems with competing constraints, open-ended 'how should I'\n"
+        "or 'what is the best way to' questions about systems or processes.\n"
+        "When nuance_detected=true:\n"
+        "  - steering_question: a single short direct question that surfaces the key fork in the road\n"
+        "    (e.g. 'Which aspect is most important to you?', 'What is the primary constraint here?')\n"
+        "    Must be answerable by choosing one of the suggested_directions.\n"
+        "  - suggested_directions: array of 3-4 objects:\n"
+        '    [{"label": "Short label", "value": "machine_key", "description": "What this direction covers"}]\n'
+        "    Each direction must lead to genuinely different research output.\n"
+        "Default: nuance_detected=false, steering_question=null, suggested_directions=[]."
     )
 
     prompt = f"{history_context}\n\nTask to decompose:\n{user_input}" if history_context else user_input
