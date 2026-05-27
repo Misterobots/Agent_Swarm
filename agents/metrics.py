@@ -164,6 +164,35 @@ REDIS_CONNECTED = Gauge(
 )
 
 # ---------------------------------------------------------------------------
+# GPU Lock / Eviction Health Metrics
+# ---------------------------------------------------------------------------
+
+GPU_LOCK_DEGRADED_TOTAL = Counter(
+    'gpu_lock_degraded_total',
+    'Times the cross-process GPU lock fell back to in-process only mode',
+    ['reason']  # e.g. redis_unavailable
+)
+
+GPU_MUTEX_HEALTHY = Gauge(
+    'gpu_mutex_healthy',
+    'Whether the cross-process GPU mutex is healthy (1=Redis-backed, 0=degraded to in-proc only)'
+)
+# Default to healthy; flipped to 0 the first time request_lock hits a Redis failure.
+GPU_MUTEX_HEALTHY.set(1)
+
+GPU_SERVICE_CIRCUIT_OPEN = Gauge(
+    'gpu_service_circuit_open',
+    'Whether the eviction/warmup circuit is open for a given service (1=open, 0=closed)',
+    ['host', 'service']
+)
+
+GPU_PEER_LOCK_DEGRADED_TOTAL = Counter(
+    'gpu_peer_lock_degraded_total',
+    'Times the peer HTTP lock also failed and request_lock fell back to in-process only',
+    ['reason']  # e.g. server_unreachable, timeout
+)
+
+# ---------------------------------------------------------------------------
 # IoT Sensitive Action Metrics
 # ---------------------------------------------------------------------------
 

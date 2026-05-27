@@ -9,7 +9,7 @@ from ollama import Client
 
 from config import COORDINATOR_MODEL
 from logger_setup import setup_logger
-from utils.gpu_queue import get_swarm_worker_host, select_available_model
+from utils.gpu_queue import call_with_model_fallback, get_swarm_worker_host, select_available_model
 from coordination.pioneers import PERSPECTIVE_TAXONOMY
 
 logger = setup_logger("Lamport")
@@ -22,6 +22,9 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
     """
     _preferred = os.getenv("COORDINATOR_MODEL", "qwen3:14b")
     _fallback = os.getenv("ROUTER_MODEL", "qwen3:8b")
+    # We resolve model+host once here for prompt-shaping logs etc., but the
+    # actual call below uses call_with_model_fallback so it can re-select
+    # if the chosen model 500s/OOMs at inference time.
     decompose_model, host = select_available_model(_preferred, [_fallback, "qwen3:8b"])
 
     system_prompt = (
@@ -81,11 +84,11 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
 
     prompt = f"{history_context}\n\nTask to decompose:\n{user_input}" if history_context else user_input
 
-    try:
-        resp = requests.post(
-            f"{host}/api/generate",
+    def _call(model_name: str, host_url: str):
+        return requests.post(
+            f"{host_url}/api/generate",
             json={
-                "model": decompose_model,
+                "model": model_name,
                 "prompt": prompt,
                 "system": system_prompt,
                 "stream": False,
@@ -95,6 +98,14 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
             },
             timeout=20,
         )
+
+    try:
+        resp = call_with_model_fallback(_preferred, [_fallback, "qwen3:8b"], _call)
+        # Track which model actually serviced the request for downstream logs.
+        try:
+            decompose_model = resp.json().get("model", decompose_model)
+        except Exception:
+            pass
 
         if resp.status_code == 200:
             raw = resp.json().get("response", "{}") or "{}"

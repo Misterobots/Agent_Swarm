@@ -60,6 +60,10 @@ MEMPALACE_URL        = os.getenv("MEMPALACE_URL",        f"http://{HOPPER_IP}:82
 HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTANT_IP}:8123")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{TURING_IP}:11434")
 OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
+# GPU peer lock server — Lovelace hosts this on its agent_runtime port (8001).
+# Turing sets GPU_LOCK_HOST=http://192.168.2.101:8001 in its docker env.
+# GPU_LOCK_SECRET should be the same value on all nodes (optional but recommended).
+GPU_LOCK_HOST        = os.getenv("GPU_LOCK_HOST",        f"http://{LOVELACE_IP}:8008")
 # ---------------------------------------------------------------------------
 # Model Consolidation (TTFT Optimization)
 # Primary model: qwen3:14b — handles code, conversation, coordination,

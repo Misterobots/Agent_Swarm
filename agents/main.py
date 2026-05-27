@@ -201,6 +201,18 @@ except Exception as _e:
     import logging as _logging
     _logging.getLogger("main").warning(f"Goals router not loaded: {_e}")
 
+# GPU peer lock router — Lovelace hosts this so all agent_runtimes (including
+# remote ones on Turing etc.) can acquire the cross-host GPU mutex even when
+# Redis is unavailable.  Mounted at /internal/gpu-lock/*.
+try:
+    from api.gpu_lock import router as gpu_lock_router
+    app.include_router(gpu_lock_router)
+    import logging as _logging
+    _logging.getLogger("main").info("GPU peer lock server active at /internal/gpu-lock/")
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"GPU lock router not loaded: {_e}")
+
 # Staged rollout: parse mode logs policy mismatches without blocking,
 # soft/hard modes enforce endpoint-class policy in AuthorizationMiddleware.
 app.add_middleware(AuthorizationMiddleware)

@@ -204,6 +204,9 @@ services:
       - REDIS_HOST=192.168.2.102
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+      # GPU peer lock server — Lovelace IS the lock server (localhost).
+      # GPU_LOCK_SECRET is injected automatically via env_file (network.env).
+      - GPU_LOCK_HOST=http://localhost:8000
       # Home Assistant Integration
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
       # BMO Voice LLM — qwen3:14b fits in VRAM (9.2GB < 15.93GB); latency masked by async ack

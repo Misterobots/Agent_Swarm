@@ -41,6 +41,7 @@ def handle_3d(user_input: str, ctx: dict):
             from specialized.forge_agent import generate_3d_model
 
             yield {"type": "log", "content": f"[Forge] Processing: {full_image_path} (High-Res Mode)"}
+            yield from pre_lock_status_events("image")
             with request_lock(context="image"):
                 forge_result = generate_3d_model(full_image_path)
             AGENT_STATE.labels(agent_name="Forge").set(1)
@@ -99,6 +100,7 @@ def handle_action_figure(user_input: str, ctx: dict):
             from specialized.action_figure_agent import generate_action_figure
 
             yield {"type": "log", "content": f"[ActionFigureForge] Processing: {full_image_path}"}
+            yield from pre_lock_status_events("image")
             with request_lock(context="image"):
                 figure_result = generate_action_figure(full_image_path)
             AGENT_STATE.labels(agent_name="ActionFigureForge").set(1)

@@ -11,6 +11,32 @@ from logger_setup import setup_logger
 
 logger = setup_logger("GPUQueue")
 
+# Prometheus metrics — degraded to no-ops if metrics module isn't importable
+# (e.g. running this file in isolation outside the agents/ sys.path).
+try:
+    from metrics import (
+        GPU_LOCK_DEGRADED_TOTAL,
+        GPU_MUTEX_HEALTHY,
+        GPU_SERVICE_CIRCUIT_OPEN,
+        GPU_PEER_LOCK_DEGRADED_TOTAL,
+    )
+except Exception:  # pragma: no cover
+    class _NoopMetric:
+        def labels(self, *a, **kw): return self
+        def inc(self, *a, **kw): pass
+        def set(self, *a, **kw): pass
+    GPU_LOCK_DEGRADED_TOTAL = _NoopMetric()
+    GPU_MUTEX_HEALTHY = _NoopMetric()
+    GPU_SERVICE_CIRCUIT_OPEN = _NoopMetric()
+    GPU_PEER_LOCK_DEGRADED_TOTAL = _NoopMetric()
+
+# In-process backstop for the cross-process Redis GPU lock. Even when Redis
+# is down and request_lock falls open at the cluster layer, a single
+# agent_runtime process must not run two GPU-heavy workloads concurrently:
+# that's how we OOM Klein on the 5060 Ti. The semaphore guarantees at most
+# one zone-switch + workload runs at a time per process.
+_INPROC_GPU_LOCK = threading.Semaphore(1)
+
 # Depending on where this script is executed, `redis` might not be installed,
 # but we assume the `agent_runtime` has it, or we'll install it.
 try:
@@ -30,6 +56,9 @@ KLEIN_HOST = os.getenv("KLEIN_HOST", "http://klein_service:8189")
 OMNIGEN_HOST = os.getenv("OMNIGEN_HOST", "http://omnigen_service:8190")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
+# GPU peer lock: Lovelace hosts the lock server on its agent_runtime port.
+# Turing (and any other host) sets GPU_LOCK_HOST=http://192.168.2.101:8001 in its env.
+GPU_LOCK_HOST = os.getenv("GPU_LOCK_HOST", "http://localhost:8000")
 TRAINING_WINDOW_START = int(os.getenv("TRAINING_WINDOW_START", "2"))   # hour (24h)
 TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (24h)
 
@@ -253,6 +282,104 @@ def select_available_model(preferred: str, fallbacks: list) -> tuple:
     return preferred, host
 
 
+class AllModelsFailedError(RuntimeError):
+    """Raised when every model in a fallback chain has failed inference."""
+
+
+def _is_retriable_inference_error(exc: Exception | None, resp_status: int | None, resp_text: str) -> bool:
+    """Decide whether an inference failure should trigger a chain-fallback retry."""
+    if exc is not None:
+        # Connection/timeout/network — definitely retriable
+        if isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+            return True
+        # Ollama Python client raises generic exceptions; sniff the text
+        msg = str(exc).lower()
+        return any(token in msg for token in (
+            "out of memory", "cuda", "oom", "500", "connection", "timeout",
+            "refused", "unavailable", "model not found", "model '",
+        ))
+    if resp_status is None:
+        return False
+    if resp_status >= 500:
+        return True
+    if resp_status == 404 and "model" in resp_text.lower():
+        # Ollama returns 404 when the requested model isn't pulled — try the next one.
+        return True
+    return False
+
+
+def call_with_model_fallback(preferred: str, fallbacks: list, call_fn, *, max_retries: int = 2):
+    """Run an inference call against a chain of models, dropping any that fail.
+
+    `call_fn(model: str, host: str) -> result` does the actual HTTP / SDK call.
+    It should raise a requests/ollama exception on failure, OR return a
+    requests.Response with status >= 500 / 404 (model-not-found) to trigger retry.
+    Any other return value is considered success and is returned as-is.
+
+    On retriable failure, the failed model is dropped from the chain and
+    select_available_model() is re-run against the remainder. Up to
+    max_retries retries (so max_retries + 1 attempts total). If every model
+    in the chain exhausts, raises AllModelsFailedError.
+    """
+    chain: list[str] = []
+    for m in [preferred] + list(fallbacks):
+        if m and m not in chain:
+            chain.append(m)
+
+    last_exc: Exception | None = None
+    last_status: int | None = None
+    last_text: str = ""
+    attempts = 0
+
+    while chain and attempts <= max_retries:
+        # Re-run selection each attempt so we get the freshest VRAM picture.
+        head, tail = chain[0], chain[1:]
+        model, host = select_available_model(head, tail)
+
+        try:
+            result = call_fn(model, host)
+            # If the callable returned a Response object, treat 500/404 as retriable
+            status = getattr(result, "status_code", None)
+            text = getattr(result, "text", "") or ""
+            if status is not None and _is_retriable_inference_error(None, status, text):
+                last_status = status
+                last_text = text
+                last_exc = None
+                logger.warning(
+                    f"[GPU Queue] Inference call to '{model}' on {host} returned "
+                    f"status {status} — dropping from chain and retrying."
+                )
+            else:
+                return result
+        except Exception as e:
+            if not _is_retriable_inference_error(e, None, ""):
+                raise
+            last_exc = e
+            last_status = None
+            last_text = ""
+            logger.warning(
+                f"[GPU Queue] Inference call to '{model}' on {host} raised "
+                f"{type(e).__name__}: {e} — dropping from chain and retrying."
+            )
+
+        # Drop the model that actually ran (may differ from head if waterfall chose a fallback)
+        chain = [m for m in chain if m != model]
+        attempts += 1
+        if chain:
+            logger.info(
+                f"[GPU Queue] Model fallback: retrying with chain {chain} "
+                f"(attempt {attempts + 1}/{max_retries + 1})."
+            )
+
+    msg = (
+        f"All models in chain [{preferred}] + {fallbacks} exhausted "
+        f"after {attempts} attempt(s)."
+    )
+    if last_exc is not None:
+        raise AllModelsFailedError(msg) from last_exc
+    raise AllModelsFailedError(f"{msg} last_status={last_status} last_text={last_text[:200]!r}")
+
+
 def is_training_window() -> bool:
     """
     Check if current time falls within the training window.
@@ -276,21 +403,146 @@ def get_redis_client():
 LOCK_KEY = "swarm_gpu_lock"
 ZONE_KEY = "swarm_gpu_zone"  # Track whether VRAM is currently dedicated to "text", "image", or "training"
 
+
+# ---------------------------------------------------------------------------
+# Circuit breaker for eviction / warmup HTTP calls.
+#
+# A flapping Klein/ComfyUI/OmniGen service that times out every call would
+# otherwise pin every GPU-using request inside a long evict→warmup→fail
+# loop, then immediately retry on the next request — itself a GPU thrash
+# path that ends in OOM. The breaker short-circuits known-bad endpoints
+# for 60s after 3 consecutive failures, then probes once (half-open).
+# ---------------------------------------------------------------------------
+class _CircuitBreaker:
+    FAIL_THRESHOLD = 3
+    FAIL_WINDOW_S = 60.0
+    OPEN_DURATION_S = 60.0
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        # key -> dict(state, failures, first_failure_at, opened_at, service, host)
+        self._circuits: dict[tuple, dict] = {}
+
+    @staticmethod
+    def _label(host: str) -> str:
+        # Strip scheme/port for tidy metric labels (e.g. http://klein_service:8189 -> klein_service)
+        try:
+            from urllib.parse import urlparse
+            netloc = urlparse(host).netloc or host
+            return netloc.split(":")[0]
+        except Exception:
+            return host
+
+    def _emit(self, key, state: str):
+        host, service = key[0], key[1]
+        try:
+            GPU_SERVICE_CIRCUIT_OPEN.labels(
+                host=self._label(host), service=service
+            ).set(1 if state == "open" else 0)
+        except Exception:
+            pass
+
+    def allow(self, host: str, service: str) -> bool:
+        """Return True if the call should proceed; False to short-circuit."""
+        key = (host, service)
+        now = time.monotonic()
+        with self._lock:
+            c = self._circuits.get(key)
+            if not c or c["state"] == "closed":
+                return True
+            if c["state"] == "open":
+                if now - c["opened_at"] >= self.OPEN_DURATION_S:
+                    c["state"] = "half_open"
+                    logger.warning(
+                        f"[GPU Queue] Circuit '{service}'@{self._label(host)} → HALF-OPEN (probing after {self.OPEN_DURATION_S:.0f}s cooldown)."
+                    )
+                    return True
+                return False
+            # half_open: only one probe allowed at a time; allow it
+            return True
+
+    def record_success(self, host: str, service: str) -> None:
+        key = (host, service)
+        with self._lock:
+            c = self._circuits.get(key)
+            if c and c["state"] != "closed":
+                logger.warning(
+                    f"[GPU Queue] Circuit '{service}'@{self._label(host)} → CLOSED (probe succeeded)."
+                )
+            self._circuits[key] = {"state": "closed", "failures": 0, "first_failure_at": 0.0, "opened_at": 0.0}
+            self._emit(key, "closed")
+
+    def record_failure(self, host: str, service: str) -> None:
+        key = (host, service)
+        now = time.monotonic()
+        with self._lock:
+            c = self._circuits.get(key) or {"state": "closed", "failures": 0, "first_failure_at": 0.0, "opened_at": 0.0}
+            if c["state"] == "half_open":
+                c["state"] = "open"
+                c["opened_at"] = now
+                self._circuits[key] = c
+                logger.warning(
+                    f"[GPU Queue] Circuit '{service}'@{self._label(host)} → OPEN again (probe failed)."
+                )
+                self._emit(key, "open")
+                return
+            # closed or already-open: count toward threshold within window
+            if now - c["first_failure_at"] > self.FAIL_WINDOW_S:
+                c["failures"] = 1
+                c["first_failure_at"] = now
+            else:
+                c["failures"] += 1
+            if c["state"] == "closed" and c["failures"] >= self.FAIL_THRESHOLD:
+                c["state"] = "open"
+                c["opened_at"] = now
+                logger.warning(
+                    f"[GPU Queue] Circuit '{service}'@{self._label(host)} → OPEN "
+                    f"({c['failures']} failures in <{self.FAIL_WINDOW_S:.0f}s; short-circuiting for {self.OPEN_DURATION_S:.0f}s)."
+                )
+                self._emit(key, "open")
+            self._circuits[key] = c
+
+
+_circuit_breaker = _CircuitBreaker()
+
+
+def _guarded_post(host: str, service: str, path: str, *, timeout: float, json_body=None):
+    """requests.post wrapper that respects the eviction circuit breaker.
+
+    Returns the requests.Response on success, or None when short-circuited
+    or on transport failure. Callers must treat None as "couldn't reach service".
+    """
+    if not _circuit_breaker.allow(host, service):
+        logger.warning(
+            f"[GPU Queue] Circuit OPEN for {service}@{host} — skipping POST {path}."
+        )
+        return None
+    try:
+        resp = requests.post(f"{host}{path}", json=json_body, timeout=timeout)
+        if 200 <= resp.status_code < 500:
+            _circuit_breaker.record_success(host, service)
+        else:
+            _circuit_breaker.record_failure(host, service)
+        return resp
+    except Exception as e:
+        _circuit_breaker.record_failure(host, service)
+        logger.warning(f"[GPU Queue] {service} POST {path} failed: {e}")
+        return None
+
 def evict_comfyui():
     """Unloads ComfyUI model weights from VRAM (unload_models=True frees the checkpoint)."""
-    try:
-        logger.info("[GPU Queue] Evicting ComfyUI model weights from VRAM...")
-        response = requests.post(
-            f"{COMFYUI_HOST}/free",
-            json={"unload_models": True, "free_memory": True},
-            timeout=10,
-        )
-        if response.status_code == 200:
-            logger.info("[GPU Queue] ComfyUI VRAM evicted successfully.")
-        else:
-            logger.warning(f"[GPU Queue] ComfyUI /free endpoint returned status {response.status_code}.")
-    except Exception as e:
-        logger.warning(f"[GPU Queue] Failed to evict ComfyUI VRAM: {e}")
+    logger.info("[GPU Queue] Evicting ComfyUI model weights from VRAM...")
+    response = _guarded_post(
+        COMFYUI_HOST, "comfyui", "/free",
+        timeout=10,
+        json_body={"unload_models": True, "free_memory": True},
+    )
+    if response is None:
+        return
+    if response.status_code == 200:
+        logger.info("[GPU Queue] ComfyUI VRAM evicted successfully.")
+    else:
+        logger.warning(f"[GPU Queue] ComfyUI /free endpoint returned status {response.status_code}.")
 
 def _restart_container(name: str) -> bool:
     """Restart a Docker container by name via the Docker Unix socket.
@@ -344,15 +596,13 @@ def evict_klein():
         this phase since they don't own the container.
     """
     # Phase 1: graceful unload — generous timeout, the actual work happens on Klein
-    try:
-        logger.info("[GPU Queue] Evicting Klein model from VRAM (graceful)...")
-        response = requests.post(f"{KLEIN_HOST}/evict", timeout=180)
+    logger.info("[GPU Queue] Evicting Klein model from VRAM (graceful)...")
+    response = _guarded_post(KLEIN_HOST, "klein", "/evict", timeout=180)
+    if response is not None:
         if response.status_code == 200:
             logger.info("[GPU Queue] Klein VRAM evicted (graceful phase complete).")
         else:
             logger.warning(f"[GPU Queue] Klein /evict returned status {response.status_code}.")
-    except Exception as e:
-        logger.warning(f"[GPU Queue] Graceful Klein eviction failed: {e}")
 
     # Phase 2: optional container restart — only on the host that owns the container
     if os.getenv("EVICT_CONTAINER_RESTART", "false").lower() not in ("true", "1", "yes"):
@@ -384,17 +634,14 @@ def warmup_klein():
     Retries once after a WDDM grace delay — if the first attempt fails (e.g.
     GPU 0 pages from a prior eviction not yet returned), wait 20s and retry."""
     for attempt in range(2):
-        try:
-            logger.info(f"[GPU Queue] Warming up Klein pipeline (attempt {attempt + 1})...")
-            # 600s: first load from HF cache takes ~400s; subsequent loads ~60s
-            response = requests.post(f"{KLEIN_HOST}/warmup", timeout=600)
+        logger.info(f"[GPU Queue] Warming up Klein pipeline (attempt {attempt + 1})...")
+        # 600s: first load from HF cache takes ~400s; subsequent loads ~60s
+        response = _guarded_post(KLEIN_HOST, "klein", "/warmup", timeout=600)
+        if response is not None:
             if response.status_code == 200:
                 logger.info("[GPU Queue] Klein pipeline warm.")
                 return
-            else:
-                logger.warning(f"[GPU Queue] Klein /warmup returned status {response.status_code}.")
-        except Exception as e:
-            logger.warning(f"[GPU Queue] Klein warmup attempt {attempt + 1} failed: {e}")
+            logger.warning(f"[GPU Queue] Klein /warmup returned status {response.status_code}.")
 
         if attempt == 0:
             logger.info("[GPU Queue] Klein warmup failed — waiting 20s for WDDM page reclaim, then retrying...")
@@ -405,15 +652,13 @@ def evict_omnigen():
     inside the image zone. Mirrors evict_klein's graceful-only approach — we
     don't restart the container because OmniGen runs on a single GPU and
     torch.cuda.empty_cache() is typically sufficient (no dual-GPU WDDM trap)."""
-    try:
-        logger.info("[GPU Queue] Evicting OmniGen2 model from VRAM (graceful)...")
-        response = requests.post(f"{OMNIGEN_HOST}/evict", timeout=180)
+    logger.info("[GPU Queue] Evicting OmniGen2 model from VRAM (graceful)...")
+    response = _guarded_post(OMNIGEN_HOST, "omnigen", "/evict", timeout=180)
+    if response is not None:
         if response.status_code == 200:
             logger.info("[GPU Queue] OmniGen2 VRAM evicted.")
         else:
             logger.warning(f"[GPU Queue] OmniGen2 /evict returned status {response.status_code}.")
-    except Exception as e:
-        logger.warning(f"[GPU Queue] OmniGen2 eviction failed (non-fatal): {e}")
 
 
 def _omnigen_is_healthy() -> bool:
@@ -433,15 +678,13 @@ def _omnigen_is_healthy() -> bool:
 def warmup_omnigen():
     """Pre-load OmniGen2 weights. First load from HF cache ~200s; warm ~30s."""
     for attempt in range(2):
-        try:
-            logger.info(f"[GPU Queue] Warming up OmniGen2 pipeline (attempt {attempt + 1})...")
-            response = requests.post(f"{OMNIGEN_HOST}/warmup", timeout=600)
+        logger.info(f"[GPU Queue] Warming up OmniGen2 pipeline (attempt {attempt + 1})...")
+        response = _guarded_post(OMNIGEN_HOST, "omnigen", "/warmup", timeout=600)
+        if response is not None:
             if response.status_code == 200:
                 logger.info("[GPU Queue] OmniGen2 pipeline warm.")
                 return
             logger.warning(f"[GPU Queue] OmniGen2 /warmup returned status {response.status_code}.")
-        except Exception as e:
-            logger.warning(f"[GPU Queue] OmniGen2 warmup attempt {attempt + 1} failed: {e}")
         if attempt == 0:
             time.sleep(20)
 
@@ -495,20 +738,115 @@ def evict_ollama():
         except Exception as e:
             logger.warning(f"[GPU Queue] Failed to evict Ollama VRAM on {host}: {e}")
 
+def _run_zone_switch(context: str, current_zone):
+    """Perform the eviction/warmup sequence for the requested zone."""
+    if current_zone == context:
+        logger.info(f"[GPU Queue] GPU is already in '{context}' zone. No eviction needed.")
+        return
+    logger.info(f"[GPU Queue] Context switch detected: '{current_zone}' -> '{context}'. Prepping VRAM...")
+    if context == "text":
+        # Switching to text -> evict image backends so Ollama can use both GPUs.
+        evict_comfyui()
+        evict_klein()
+        evict_omnigen()
+    elif context == "image":
+        # Switching to image -> evict Ollama + ComfyUI + OmniGen to clear both GPUs,
+        # then warm Klein (needs GPU 1's full 15 GiB free to load).
+        evict_ollama()
+        evict_comfyui()
+        evict_omnigen()
+        warmup_klein()
+    elif context == "compose":
+        # OmniGen2 multi-image composition zone. Mutually exclusive with Klein
+        # at the GPU layer — both target physical GPU 1.
+        evict_ollama()
+        evict_comfyui()
+        evict_klein()
+        warmup_omnigen()
+    elif context == "training":
+        # Training needs exclusive VRAM — evict everything
+        evict_ollama()
+        evict_comfyui()
+        evict_klein()
+        evict_omnigen()
+    else:
+        logger.warning(f"[GPU Queue] Unknown context '{context}'.")
+
+
 @contextmanager
 def request_lock(context: str, timeout: int = 300):
     """
     Acquires a global Mutex lock for the GPU and handles VRAM eviction for context switching.
-    context must be either "text" or "image".
-    Fail-open: if Redis is unavailable, skip the lock and run without GPU mutex.
+    context must be one of "text", "image", "compose", or "training".
+
+    Two-layer locking:
+      1. Cross-process: a Redis NX/EX mutex coordinates between agent_runtimes.
+      2. In-process: a threading.Semaphore(1) guarantees a single agent_runtime
+         process never runs two zone-switches concurrently — even when Redis
+         is unavailable. This is the backstop against single-host OOMs when
+         the cluster-wide mutex is degraded.
+
+    Degraded mode: if Redis is unavailable we still hold the in-process
+    semaphore, increment gpu_lock_degraded_total, and set gpu_mutex_healthy=0
+    so operators can alert on it.
     """
     t_total_start = time.monotonic()
+    client = None
     try:
         client = get_redis_client()
         client.ping()  # Verify connection before proceeding
+        GPU_MUTEX_HEALTHY.set(1)
     except Exception as e:
-        logger.warning(f"[GPU Queue] Redis unavailable ({e}). Running without GPU lock (fail-open).")
-        yield
+        # Tier 1 (Redis) is down.  Try Tier 2: cross-host peer HTTP lock.
+        logger.error(
+            f"[GPU Queue] Redis unavailable ({e}). Cross-process Redis GPU mutex "
+            f"is DEGRADED — trying peer HTTP lock (Tier 2)."
+        )
+        try:
+            GPU_LOCK_DEGRADED_TOTAL.labels(reason="redis_unavailable").inc()
+            GPU_MUTEX_HEALTHY.set(0)
+        except Exception:
+            pass
+
+        from utils.peer_lock import (
+            PeerLockUnavailableError,
+            PeerLockTimeoutError,
+            peer_lock,
+        )
+        try:
+            with peer_lock(context, timeout=timeout):
+                # Peer lock acquired — cross-host coordination is active.
+                logger.info(
+                    f"[GPU Queue] Peer HTTP lock acquired (Tier 2) for context='{context}'."
+                )
+                with _INPROC_GPU_LOCK:
+                    yield
+            return
+        except PeerLockUnavailableError as pl_exc:
+            # Lock server unreachable — fall all the way through to Tier 3.
+            logger.error(
+                f"[GPU Queue] Peer HTTP lock server unreachable ({pl_exc}). "
+                f"Falling back to in-process semaphore ONLY (Tier 3). "
+                f"Multi-host GPU coordination is OFF — concurrent agent_runtimes "
+                f"on different hosts can now race. Check {GPU_LOCK_HOST!r}."
+            )
+            try:
+                GPU_PEER_LOCK_DEGRADED_TOTAL.labels(reason="server_unreachable").inc()
+            except Exception:
+                pass
+        except PeerLockTimeoutError as pl_exc:
+            logger.error(
+                f"[GPU Queue] Peer HTTP lock timed out ({pl_exc}). "
+                f"Falling back to in-process semaphore ONLY (Tier 3)."
+            )
+            try:
+                GPU_PEER_LOCK_DEGRADED_TOTAL.labels(reason="timeout").inc()
+            except Exception:
+                pass
+
+        # Tier 3: in-process semaphore (only serializes within this process).
+        with _INPROC_GPU_LOCK:
+            yield
         return
 
     lock_id = os.urandom(16).hex()
@@ -523,8 +861,7 @@ def request_lock(context: str, timeout: int = 300):
     try:
         # Spin loop until lock is acquired or timeout
         while time.time() - start_time < timeout:
-            # nx=True ensures that the key is only set if it does not already exist
-            # ex=timeout ensures the lock expires even if the process crashes
+            # nx=True: only sets if key doesn't exist. ex=timeout: expires even if process crashes.
             if client.set(LOCK_KEY, lock_id, nx=True, ex=timeout):
                 acquired = True
                 t_lock_wait = time.monotonic() - t_acquire_start
@@ -535,59 +872,28 @@ def request_lock(context: str, timeout: int = 300):
         if not acquired:
             raise TimeoutError("[GPU Queue] Failed to acquire GPU lock within timeout.")
 
-        # Smart Context Switching
-        current_zone = client.get(ZONE_KEY)
-        t_evict_start = time.monotonic()
-        if current_zone != context:
-            logger.info(f"[GPU Queue] Context switch detected: '{current_zone}' -> '{context}'. Prepping VRAM...")
-            if context == "text":
-                # Switching to text -> evict image backends so Ollama can use both GPUs.
-                evict_comfyui()
-                evict_klein()
-                evict_omnigen()
-            elif context == "image":
-                # Switching to image -> evict Ollama + ComfyUI + OmniGen to clear both GPUs,
-                # then warm Klein (needs GPU 1's full 15 GiB free to load).
-                evict_ollama()
-                evict_comfyui()
-                evict_omnigen()
-                warmup_klein()
-            elif context == "compose":
-                # OmniGen2 multi-image composition zone. Mutually exclusive with Klein
-                # at the GPU layer — both target physical GPU 1. Evicts everything
-                # else (ollama, comfyui, klein) before warming OmniGen. Distinct
-                # from "image" so we don't accidentally warm Klein for a compose job
-                # or vice-versa.
-                evict_ollama()
-                evict_comfyui()
-                evict_klein()
-                warmup_omnigen()
-            elif context == "training":
-                # Training needs exclusive VRAM — evict everything
-                evict_ollama()
-                evict_comfyui()
-                evict_klein()
-                evict_omnigen()
-            else:
-                logger.warning(f"[GPU Queue] Unknown context '{context}'.")
-
-            # Update the current zone
+        # In-process backstop. Even with the Redis mutex held cluster-wide,
+        # a second thread in this process must not race the zone switch.
+        with _INPROC_GPU_LOCK:
+            current_zone = client.get(ZONE_KEY)
+            t_evict_start = time.monotonic()
+            _run_zone_switch(context, current_zone)
             client.set(ZONE_KEY, context)
-        else:
-            logger.info(f"[GPU Queue] GPU is already in '{context}' zone. No eviction needed.")
-        t_eviction = time.monotonic() - t_evict_start
+            t_eviction = time.monotonic() - t_evict_start
 
-        # Yield back to the block doing the work
-        t_work_start = time.monotonic()
-        yield
-        t_work = time.monotonic() - t_work_start
+            t_work_start = time.monotonic()
+            yield
+            t_work = time.monotonic() - t_work_start
 
     finally:
         if acquired:
             # Only release if we actually hold the lock based on lock_id
-            if client.get(LOCK_KEY) == lock_id:
-                client.delete(LOCK_KEY)
-                logger.info(f"[GPU Queue] Lock released for context: '{context}'.")
+            try:
+                if client is not None and client.get(LOCK_KEY) == lock_id:
+                    client.delete(LOCK_KEY)
+                    logger.info(f"[GPU Queue] Lock released for context: '{context}'.")
+            except Exception as e:
+                logger.warning(f"[GPU Queue] Lock release failed: {e}")
             t_total = time.monotonic() - t_total_start
             logger.info(
                 f"[Timing] context={context} lock_wait={t_lock_wait:.2f}s "

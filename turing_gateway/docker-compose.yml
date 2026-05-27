@@ -435,6 +435,10 @@ services:
       - MEMPALACE_API_URL=http://mempalace:8200
       - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
       - REDIS_PORT=6379
+      # GPU peer lock — Turing calls Lovelace's lock server when Redis is unavailable.
+      # This is the critical env var that enables cross-host GPU coordination without Redis.
+      # GPU_LOCK_SECRET is injected automatically via env_file (network.env).
+      - GPU_LOCK_HOST=http://${LOVELACE_IP:-192.168.2.101}:8008
       - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:8b}
       - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:8b}

@@ -9,7 +9,12 @@ from ollama import Client
 
 from config import COORDINATOR_MODEL, CONTEXT_WINDOWS
 from logger_setup import setup_logger
-from utils.gpu_queue import get_swarm_worker_host, request_lock, select_available_model
+from utils.gpu_queue import (
+    call_with_model_fallback,
+    get_swarm_worker_host,
+    request_lock,
+    select_available_model,
+)
 
 logger = setup_logger("Lamport")
 
@@ -22,6 +27,8 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
     """
     _preferred = os.getenv("COORDINATOR_MODEL", "qwen3:14b")
     _fallback = os.getenv("ROUTER_MODEL", "qwen3:8b")
+    # Resolve once for context-window / log purposes. The inference call
+    # below uses call_with_model_fallback to retry against the chain.
     synth_model, host = select_available_model(_preferred, [_fallback, "qwen3:8b"])
 
     system_prompt = (
@@ -57,17 +64,28 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
             "Synthesize these findings into a concrete implementation plan."
         )
 
-        resp = requests.post(
-            f"{host}/api/generate",
-            json={
-                "model": synth_model,
-                "prompt": prompt,
-                "system": system_prompt,
-                "stream": False,
-                "options": {"temperature": 0.4, "num_predict": 8192, "num_ctx": CONTEXT_WINDOWS.get(synth_model, CONTEXT_WINDOWS["default"])},
-            },
-            timeout=45,
-        )
+        def _call(model_name: str, host_url: str):
+            return requests.post(
+                f"{host_url}/api/generate",
+                json={
+                    "model": model_name,
+                    "prompt": prompt,
+                    "system": system_prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.4,
+                        "num_predict": 8192,
+                        "num_ctx": CONTEXT_WINDOWS.get(model_name, CONTEXT_WINDOWS["default"]),
+                    },
+                },
+                timeout=45,
+            )
+
+        resp = call_with_model_fallback(_preferred, [_fallback, "qwen3:8b"], _call)
+        try:
+            synth_model = resp.json().get("model", synth_model)
+        except Exception:
+            pass
         logger.info(f"[Coordinator] Synthesis HTTP {resp.status_code}, response_len={len(resp.text)}")
 
         if resp.status_code == 200:
