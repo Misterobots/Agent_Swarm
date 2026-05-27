@@ -7,7 +7,7 @@ from phi.agent import Agent
 from phi.model.ollama import Ollama
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
-from utils.gpu_queue import request_lock, get_best_host_for_model
+from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
 from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace, _langfuse_span
 
 logger = logging.getLogger("Router")
@@ -60,6 +60,8 @@ def handle_research(user_input: str, ctx: dict):
 
     full_content = ""
     try:
+        # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+        yield from pre_lock_status_events("text", resolved_model)
         with _langfuse_span("research_generation", "Librarian", resolved_model, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
             with request_lock(context="text"):
@@ -141,6 +143,8 @@ def handle_documentation(user_input: str, ctx: dict):
 
     full_content = ""
     try:
+        # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+        yield from pre_lock_status_events("text", TECH_MODEL)
         with _langfuse_span("documentation_generation", "TechnicalWriter", TECH_MODEL, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
             with request_lock(context="text"):

@@ -10,7 +10,7 @@ from phi.agent import Agent
 from phi.model.ollama import Ollama
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
-from utils.gpu_queue import request_lock, get_best_host_for_model
+from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
 from handlers.base import (
     _emit_stream_mode, _emit_turn_metadata,
     _emit_tool_start, _emit_tool_progress, _emit_tool_result,
@@ -94,6 +94,8 @@ def handle_architect(user_input: str, ctx: dict):
         )
         full_content = ""
         try:
+            # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+            yield from pre_lock_status_events("text", ARCH_MODEL, uid=uid or "")
             with _langfuse_span("architect_fast_generation", "Architect", ARCH_MODEL, final_input,
                                 langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
                 with request_lock(context="text"):
@@ -142,6 +144,8 @@ def handle_architect(user_input: str, ctx: dict):
         tool_call_id = f"tool-architect-{int(time.time()*1000)}"
         try:
             yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": intent})
+            # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+            yield from pre_lock_status_events("text", ARCH_MODEL, uid=uid or "")
             with request_lock(context="text"):
                 yield _emit_stream_mode("tool-use")
                 yield _emit_tool_progress(tool_call_id, "marsrl_loop", 20, "Solver started")

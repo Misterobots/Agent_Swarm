@@ -7,7 +7,7 @@ from phi.agent import Agent
 from phi.model.ollama import Ollama
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
-from utils.gpu_queue import request_lock, get_best_host_for_model
+from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
 from handlers.base import (
     _emit_stream_mode, _emit_turn_metadata,
     _emit_tool_start, _emit_tool_progress, _emit_tool_result,
@@ -74,6 +74,8 @@ def handle_devops(user_input: str, ctx: dict):
         )
         full_content = ""
         try:
+            # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+            yield from pre_lock_status_events("text", DEVOPS_MODEL, uid=uid or "")
             with _langfuse_span("devops_fast_generation", "DevOps", DEVOPS_MODEL, devops_input,
                                 langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
                 with request_lock(context="text"):
@@ -115,6 +117,8 @@ def handle_devops(user_input: str, ctx: dict):
         tool_call_id = f"tool-devops-{int(time.time()*1000)}"
         try:
             yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": "DEVOPS", "model": DEVOPS_MODEL})
+            # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+            yield from pre_lock_status_events("text", DEVOPS_MODEL, uid=uid or "")
             with request_lock(context="text"):
                 yield _emit_stream_mode("tool-use")
                 yield _emit_tool_progress(tool_call_id, "marsrl_loop", 25, "Initializing MarsRL loop")
@@ -179,6 +183,8 @@ def handle_data(user_input: str, ctx: dict):
 
     full_content = ""
     try:
+        # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+        yield from pre_lock_status_events("text", DATA_MODEL, uid=uid or "")
         with _langfuse_span("data_analysis_generation", "DataAnalyst", DATA_MODEL, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
             with request_lock(context="text"):

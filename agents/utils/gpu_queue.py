@@ -750,3 +750,59 @@ def get_queue_status(model_name: str, uid: str = "") -> dict:
         "alternatives": loaded_alts,
         "should_prompt": should_prompt,
     }
+
+
+def pre_lock_status_events(context: str, model_name: str = "", uid: str = ""):
+    """
+    Generator — yields SSE-style dicts describing GPU contention BEFORE
+    ``request_lock()`` is called.  Designed for: ``yield from pre_lock_status_events(...)``.
+
+    Emits up to three events (all optional):
+      {"type": "status", "content": "⏳ GPU busy — N ahead..."}
+        → when lock is currently held by another request
+      {"type": "status", "content": "⚡ Releasing <zone> context..."}
+        → when a zone switch is required (e.g. image → text)
+      {"type": "model_queue_status", ...}
+        → when the target model is not loaded in VRAM or queue_position > 0
+
+    Always non-blocking and fail-open: if Redis is unavailable, yields nothing.
+    """
+    try:
+        _client = get_redis_client()
+        _client.ping()
+    except Exception:
+        return
+
+    lock_held = bool(_client.get(LOCK_KEY))
+    current_zone = _client.get(ZONE_KEY)
+
+    if lock_held:
+        try:
+            queue_depth = _client.llen(LARGE_QUEUE_KEY)
+        except Exception:
+            queue_depth = 0
+
+        if queue_depth > 1:
+            yield {"type": "status", "content": f"⏳ GPU is busy — {queue_depth} request(s) queued ahead of you..."}
+        else:
+            yield {"type": "status", "content": "⏳ GPU is busy — queuing your request..."}
+
+    elif current_zone and current_zone != context:
+        _zone_labels = {
+            "text": "text inference",
+            "image": "image generation",
+            "compose": "image composition",
+            "training": "model training",
+        }
+        from_label = _zone_labels.get(current_zone, current_zone)
+        to_label = _zone_labels.get(context, context)
+        yield {"type": "status", "content": f"⚡ Releasing {from_label} GPU context → switching to {to_label}..."}
+
+    if model_name:
+        try:
+            qs = get_queue_status(model_name, uid)
+            # Only surface the event when there is actually something to report
+            if not qs.get("is_loaded", True) or qs.get("queue_position", 0) > 0 or qs.get("should_prompt"):
+                yield {"type": "model_queue_status", **qs}
+        except Exception:
+            pass

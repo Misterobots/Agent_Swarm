@@ -4,7 +4,7 @@ import logging
 import re
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
-from utils.gpu_queue import request_lock
+from utils.gpu_queue import request_lock, pre_lock_status_events
 
 logger = logging.getLogger("Router")
 
@@ -21,6 +21,8 @@ def handle_3d(user_input: str, ctx: dict):
     yield {"type": "log", "content": f"[CreativeStudio] Prompt Optimized: '{concept_prompt}'"}
 
     try:
+        # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+        yield from pre_lock_status_events("image")
         with request_lock(context="image"):
             img_result = generate_image(concept_prompt)
         yield {"type": "status", "content": f"🖼️ {img_result}"}
@@ -79,6 +81,8 @@ def handle_action_figure(user_input: str, ctx: dict):
     yield {"type": "log", "content": f"[ActionFigureForge] Prompt: '{concept_prompt}'"}
 
     try:
+        # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
+        yield from pre_lock_status_events("image")
         with request_lock(context="image"):
             img_result = generate_image(concept_prompt)
         yield {"type": "status", "content": f"🖼️ {img_result}"}

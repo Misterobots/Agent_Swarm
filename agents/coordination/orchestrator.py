@@ -97,22 +97,26 @@ def coordinate_task(
     )
 
     try:
-        from utils.gpu_queue import evict_klein as _ek, evict_comfyui as _ec
-        _ek()
-        _ec()
-        try:
-            from utils.gpu_queue import get_redis_client as _grc, ZONE_KEY as _ZK
-            _grc().set(_ZK, "text")
-        except Exception:
-            pass
-    except Exception as _e:
-        logger.warning(f"[Coordinator] GPU eviction skipped: {_e}")
-
-    try:
         # === PHASE 1: DECOMPOSE ===
         yield {"type": "swarm_phase", "phase_num": 1, "phase_name": "Decompose", "total_phases": 5}
         yield {"type": "status", "content": "🧩 Coordinator: Decomposing task..."}
         yield {"type": "thought", "content": "→ Phase 1/5: Task Decomposition (LLM)"}
+
+        # Zone-aware GPU prep — only evict if we're actually switching away from an
+        # image/compose context.  Runs AFTER the first yield so the client sees
+        # activity immediately instead of waiting up to 180 s in silence.
+        try:
+            from utils.gpu_queue import get_redis_client as _grc, ZONE_KEY as _ZK
+            _current_zone = _grc().get(_ZK)
+            if _current_zone and _current_zone != "text":
+                yield {"type": "status", "content": "⚡ Releasing image pipeline VRAM for text inference..."}
+                from utils.gpu_queue import evict_klein as _ek, evict_comfyui as _ec
+                _ek()
+                _ec()
+                _grc().set(_ZK, "text")
+                yield {"type": "log", "content": "[Coordinator] GPU zone → text."}
+        except Exception as _e:
+            logger.warning(f"[Coordinator] GPU zone check skipped (non-fatal): {_e}")
 
         plan = _decompose_task(user_input, history_context)
         summary = plan.get("summary", user_input[:200])
