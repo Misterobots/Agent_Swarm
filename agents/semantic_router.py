@@ -4,7 +4,7 @@ import json
 import os
 import re
 import logging
-from config import get_ollama_options
+from config import get_ollama_options, ROUTER_MODEL
 
 _router_logger = logging.getLogger("SemanticRouter")
 
@@ -53,11 +53,16 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
 class SemanticRouter:
     def __init__(self):
         # Use select_available_model so routing survives VRAM pressure.
-        # ROUTER_MODEL defaults to qwen3:8b (fits alongside Klein).
-        # Falls back to qwen3:8b explicitly if env isn't set.
+        # Source of truth for the router model is config.ROUTER_MODEL — which
+        # already honours the ROUTER_MODEL env var and falls back to
+        # PRIMARY_MODEL (qwen3:14b). Reading os.getenv here directly used to
+        # diverge from config.py when neither env var was set (config said
+        # qwen3:14b, this said qwen3:8b), silently downgrading the router.
+        # qwen3:8b is kept as the explicit fallback in select_available_model
+        # because it's the smallest model that still meets routing-quality bar
+        # and fits alongside Klein under VRAM pressure.
         from utils.gpu_queue import select_available_model
-        _preferred = os.getenv("ROUTER_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:8b"))
-        self.model_name, self.host = select_available_model(_preferred, ["qwen3:8b"])
+        self.model_name, self.host = select_available_model(ROUTER_MODEL, ["qwen3:8b"])
 
         # Self-Healing: Ensure model exists before Agent init
         self.ensure_model(self.model_name)
