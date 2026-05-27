@@ -382,30 +382,54 @@ class TriggerScheduler:
         return True
 
     def _fire(self, trigger: Trigger):
-        """Execute a trigger's handler."""
+        """Execute a trigger's handler in a background thread.
+
+        Bookkeeping (fire_count, last_fired, cron de-dup, ONCE state) is
+        applied SYNCHRONOUSLY before launching the worker thread so that:
+          - the next tick won't re-fire the same cron minute, and
+          - a ONCE trigger transitions to FIRED immediately and won't
+            re-fire on the next tick if its handler is slow.
+
+        The handler itself runs on a daemon thread so that one slow or
+        blocking handler can never stall the ticker loop. last_error is
+        populated by the worker if the handler raises.
+        """
         logger.info(f"[Scheduler] Firing trigger '{trigger.name}' ({trigger.trigger_id})")
 
-        try:
-            if trigger.remote_node and trigger.remote_task:
-                self._fire_remote(trigger)
-            else:
-                trigger.handler()
+        # Bookkeeping first — must happen before launching the worker so
+        # the scheduler's next tick sees this fire as already counted.
+        trigger.fire_count += 1
+        trigger.last_fired = time.time()
 
-            trigger.fire_count += 1
-            trigger.last_fired = time.time()
+        if trigger.trigger_type == TriggerType.CRON:
+            now = datetime.now()
+            self._cron_fired_minute[trigger.trigger_id] = now.hour * 60 + now.minute
 
-            # Track cron minute
-            if trigger.trigger_type == TriggerType.CRON:
-                now = datetime.now()
-                self._cron_fired_minute[trigger.trigger_id] = now.hour * 60 + now.minute
+        if trigger.trigger_type == TriggerType.ONCE:
+            trigger.state = TriggerState.FIRED
 
-            # Once triggers become FIRED
-            if trigger.trigger_type == TriggerType.ONCE:
-                trigger.state = TriggerState.FIRED
+        # Worker — runs the actual handler off the ticker thread.
+        def _run():
+            try:
+                if trigger.remote_node and trigger.remote_task:
+                    self._fire_remote(trigger)
+                else:
+                    trigger.handler()
+            except Exception as e:
+                trigger.last_error = str(e)
+                logger.error(f"[Scheduler] Trigger '{trigger.name}' failed: {e}")
 
-        except Exception as e:
-            trigger.last_error = str(e)
-            logger.error(f"[Scheduler] Trigger '{trigger.name}' failed: {e}")
+        threading.Thread(
+            target=_run,
+            daemon=True,
+            name=f"trigger-fire-{trigger.trigger_id}",
+        ).start()
+
+    # Bridge statuses we treat as "the remote node accepted the work".
+    # Anything else (e.g. "failed", "error", "rejected", "unknown") is
+    # treated as a failure so trigger.last_error gets populated and the
+    # operator can see the trigger isn't actually firing successfully.
+    _REMOTE_ACCEPTED_STATUSES = frozenset({"ok", "queued", "accepted", "running", "success"})
 
     def _fire_remote(self, trigger: Trigger):
         """Fire a trigger on a remote node via Bridge."""
@@ -416,14 +440,30 @@ class TriggerScheduler:
                 target_node=trigger.remote_node,
                 task=trigger.remote_task,
             )
-            logger.info(
-                f"[Scheduler] Remote trigger '{trigger.name}' → "
-                f"{trigger.remote_node}: {result.get('status', 'unknown')}"
-            )
         except ImportError:
-            logger.error("[Scheduler] Bridge not available for remote trigger")
+            # Bridge module missing — surface as failure so the caller's
+            # except clause records last_error rather than treating this
+            # as a successful fire.
+            raise RuntimeError("Bridge not available for remote trigger")
         except Exception as e:
             raise RuntimeError(f"Remote trigger failed: {e}") from e
+
+        # Bridge call returned — now check the status payload. A response
+        # without an exception does NOT necessarily mean the work was
+        # accepted; the remote may have returned {"status": "failed"}.
+        status = (result or {}).get("status", "unknown")
+        if status not in self._REMOTE_ACCEPTED_STATUSES:
+            detail = (result or {}).get("error") or (result or {}).get("message") or ""
+            raise RuntimeError(
+                f"Remote trigger '{trigger.name}' → {trigger.remote_node} "
+                f"returned non-accepted status '{status}'"
+                + (f": {detail}" if detail else "")
+            )
+
+        logger.info(
+            f"[Scheduler] Remote trigger '{trigger.name}' → "
+            f"{trigger.remote_node}: {status}"
+        )
 
 
 # ---------------------------------------------------------------------------
