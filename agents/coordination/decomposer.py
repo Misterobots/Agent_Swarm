@@ -110,6 +110,9 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
     prompt = f"{history_context}\n\nTask to decompose:\n{user_input}" if history_context else user_input
 
     def _call(model_name: str, host_url: str):
+        # Allow generous wall-clock time: small models (qwen3:8b) take ~15s warm;
+        # large models (gemma4:31b) can take 90-120s on a cold VRAM load.
+        _timeout = 120 if any(m in model_name for m in ("gemma", "31b", "27b", "30b", "14b")) else 45
         return requests.post(
             f"{host_url}/api/generate",
             json={
@@ -121,7 +124,7 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
                 "think": False,
                 "options": {"temperature": 0.3, "num_predict": 2048},
             },
-            timeout=20,
+            timeout=_timeout,
         )
 
     try:
@@ -285,7 +288,10 @@ def _decompose_task_perspectives(user_input: str, history_context: str = "") -> 
             model=COORDINATOR_MODEL,
             messages=[{"role": "user", "content": prompt}],
             format=schema,
+            # Large coordinator models (gemma4:31b, qwen3.6:27b) need up to 120s
+            # for cold VRAM load; use a generous client timeout.
             options={"temperature": 0.2, "num_predict": 1200},
+            timeout=120,
         )
         raw = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
         return json.loads(raw)

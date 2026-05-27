@@ -66,6 +66,9 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
         )
 
         def _call(model_name: str, host_url: str):
+            # Synthesis generates up to 8 192 tokens; large models (gemma4:31b,
+            # qwen3.6:27b) can need 2-5 minutes for cold VRAM load + generation.
+            _timeout = 300 if any(m in model_name for m in ("gemma", "31b", "27b", "30b")) else 120
             return requests.post(
                 f"{host_url}/api/generate",
                 json={
@@ -79,7 +82,7 @@ def _synthesize_findings(findings: str, original_task: str) -> dict:
                         "num_ctx": CONTEXT_WINDOWS.get(model_name, CONTEXT_WINDOWS["default"]),
                     },
                 },
-                timeout=45,
+                timeout=_timeout,
             )
 
         resp = call_with_model_fallback(_preferred, [_fallback, "qwen3:8b"], _call)
@@ -284,6 +287,7 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
                 messages=[{"role": "user", "content": trunc_prompt}],
                 format=schema,
                 options={"temperature": 0.3, "num_predict": 8192},
+                timeout=300,  # gemma4:31b cold-start can take 2-3 min
             )
         raw = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
         parsed = json.loads(raw)
