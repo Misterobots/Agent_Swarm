@@ -212,12 +212,12 @@ def _generate_suggested_followups(user_input: str, response_content: str, model:
         # Extract JSON array — handles stray preamble text from verbose models
         match = re.search(r"\[.*\]", raw, re.DOTALL)
         if not match:
-            logger.debug("[Conversationalist] Follow-up generation: no JSON array found in response")
+            logger.info("[Conversationalist] Follow-up generation: no JSON array found — raw: %s", raw[:200])
             return
 
         suggestions = json.loads(match.group(0))
         if not isinstance(suggestions, list) or len(suggestions) < 2:
-            logger.debug("[Conversationalist] Follow-up generation: unexpected shape %s", suggestions)
+            logger.info("[Conversationalist] Follow-up generation: unexpected shape %s", suggestions)
             return
 
         # Validate shape of each item
@@ -226,11 +226,11 @@ def _generate_suggested_followups(user_input: str, response_content: str, model:
             if isinstance(s, dict) and s.get("label") and s.get("prompt")
         ]
         if len(valid) < 2:
-            logger.debug("[Conversationalist] Follow-up generation: fewer than 2 valid items")
+            logger.info("[Conversationalist] Follow-up generation: fewer than 2 valid items")
             return
 
         yield _emit_suggested_followups(valid[:2])
-        logger.debug("[Conversationalist] Follow-up suggestions emitted: %s", [s["label"] for s in valid[:2]])
+        logger.info("[Conversationalist] Follow-up suggestions emitted: %s", [s["label"] for s in valid[:2]])
 
     except Exception as exc:
-        logger.debug("[Conversationalist] Follow-up generation failed (non-fatal): %s", exc)
+        logger.info("[Conversationalist] Follow-up generation failed (non-fatal): %s", exc)
