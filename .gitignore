@@ -47,6 +47,12 @@ execution_plane/spire_logs.txt
 # Claude Code
 .claude/
 
+# AI tool configs (local only)
+.codex/
+
+# Scratch / exploratory work
+scratch/
+
 # Context sessions (ephemeral per-session state)
 agents/swarm_context.json
 agents/context_sessions/
