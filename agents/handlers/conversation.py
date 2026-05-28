@@ -28,6 +28,7 @@ def handle_conversation(user_input: str, ctx: dict):
     constraint_context = ctx["constraint_context"]
     extracted_context = ctx["extracted_context"]
     dev_mode = ctx["dev_mode"]
+    fast_mode = ctx.get("fast_mode", False)
     lf_trace = ctx["lf_trace"]
     langfuse = ctx["langfuse"]
     use_langfuse = ctx["use_langfuse"]
@@ -44,10 +45,24 @@ def handle_conversation(user_input: str, ctx: dict):
     yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
     AGENT_STATE.labels(agent_name="Conversationalist").set(2)
 
-    CONV_MODEL = _resolve_model_for_intent(
-        "CONVERSATION",
-        os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")),
-    )
+    # Model resolution:
+    # 1. fast_mode (model="hive-fast") forces the small ROUTER_MODEL — already
+    #    hot in VRAM from the intent classifier. No GPU eviction, fastest path.
+    # 2. Otherwise, _resolve_model_for_intent reads from the template registry.
+    #    The CONVERSATION template default is qwen3:8b (same hot model).
+    # 3. Explicit ctx["model"] override wins last (unless it's the sentinel
+    #    "hive-fast", which we treat as a *flag* not a real model name).
+    if fast_mode:
+        CONV_MODEL = os.getenv("ROUTER_MODEL", "qwen3:8b")
+        yield {"type": "thought", "content": f"→ Hive Fast: conversation on {CONV_MODEL} (router model, already hot)"}
+    else:
+        CONV_MODEL = _resolve_model_for_intent(
+            "CONVERSATION",
+            os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:8b")),
+        )
+        explicit_model = ctx.get("model")
+        if explicit_model and explicit_model not in ("hive-fast", "default") and not explicit_model.startswith("swarm-"):
+            CONV_MODEL = explicit_model
     OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
 
     if is_admin:

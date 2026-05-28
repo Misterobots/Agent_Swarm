@@ -231,7 +231,13 @@ _SEED_TEMPLATES = [
         "system_prompt": None,  # Uses conversation handler's built-in instructions
         "capabilities": ["model_generate"],
         "security_level": "L1_PUBLIC",
-        "default_model": "qwen3.6:27b",
+        # qwen3:8b is the ROUTER_MODEL — already hot in VRAM on every request from
+        # the intent classifier. Reusing it for the response (and for the follow-up
+        # chip generation that runs after) means a single hot model serves the whole
+        # turn: zero eviction, zero reload, ~5-8s end-to-end for casual chat.
+        # Override via env CONV_MODEL or set the request's model to a larger one
+        # (e.g. qwen3.6:27b) when you need deep reasoning instead of conversation.
+        "default_model": "qwen3:8b",
     },
 ]
 
