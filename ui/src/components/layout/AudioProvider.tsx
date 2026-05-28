@@ -1,11 +1,30 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { playHover, playClick, playKeystroke } from "@/lib/audio/ui-sfx";
 
+/**
+ * Global UI sound provider.
+ *
+ * Listens to mouseover / mousedown / keydown at the document level (capture
+ * phase) and triggers the matching synthesized sound. The active theme is
+ * read from the settings store and passed to each play* call so the
+ * per-theme profile in `theme-sfx-profiles.ts` is applied.
+ *
+ * The active theme is held in a ref so theme changes don't tear down the
+ * event listeners on every switch.
+ */
 export function AudioProvider() {
   const soundEnabled = useSettingsStore(s => s.soundEnabled);
+  const theme = useSettingsStore(s => s.theme);
+
+  // Hold the current theme in a ref so listeners always see the latest value
+  // without re-attaching on every theme switch.
+  const themeRef = useRef(theme);
+  useEffect(() => {
+    themeRef.current = theme;
+  }, [theme]);
 
   useEffect(() => {
     if (!soundEnabled) return;
@@ -14,13 +33,13 @@ export function AudioProvider() {
     const onMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target) return;
-      
+
       // Check if target or parent is interactive
       const isInteractive = target.closest('button, a, [role="button"], [role="menuitem"]');
       if (isInteractive) {
         // Prevent spamming if already hovering inside the same button
         if (!e.relatedTarget || !isInteractive.contains(e.relatedTarget as Node)) {
-          playHover();
+          playHover(themeRef.current);
         }
       }
     };
@@ -29,10 +48,10 @@ export function AudioProvider() {
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target) return;
-      
+
       const isInteractive = target.closest('button, a, [role="button"], [role="menuitem"]');
       if (isInteractive) {
-        playClick();
+        playClick(themeRef.current);
       }
     };
 
@@ -40,13 +59,13 @@ export function AudioProvider() {
     const onKeyDown = (e: KeyboardEvent) => {
       // Ignore modifier keys
       if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
-      
+
       const target = e.target as HTMLElement;
       if (!target) return;
-      
+
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       if (isInput) {
-        playKeystroke();
+        playKeystroke(themeRef.current);
       }
     };
 
