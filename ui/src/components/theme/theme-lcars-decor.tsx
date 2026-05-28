@@ -111,7 +111,7 @@ export function ThemeLCARSDecor() {
           top: 12,
           left: metrics.sidebarWidth, // Connects perfectly to the right edge of sidebar items
           right: 90, // Leaves room for right column
-          height: metrics.topHeight, // EXACTLY matches the offsetHeight of the Logo Block dynamically
+          height: 24, // Minimal horizontal bar
           background: "var(--lcars-elbow-a)",
           zIndex: 40,
           pointerEvents: "none",
@@ -128,18 +128,18 @@ export function ThemeLCARSDecor() {
             color: "var(--lcars-nav-text-on)", 
             fontFamily: "'Antonio', 'Arial Narrow', sans-serif",
             fontWeight: 900,
-            fontSize: 18,
+            fontSize: 14,
             letterSpacing: "0.15em",
             display: "flex",
             alignItems: "center",
             gap: 16
           }}>
-            LCARS-47 <span ref={el => { textRefs.current[0] = el; }} style={{ fontSize: 14, opacity: 0.7, letterSpacing: "0.05em" }}>00000</span>
+            LCARS-47 <span ref={el => { textRefs.current[0] = el; }} style={{ fontSize: 11, opacity: 0.7, letterSpacing: "0.05em" }}>00000</span>
           </span>
           {/* Diagnostic Chaser Sequence */}
-          <div style={{ display: "flex", gap: 4, height: 12 }}>
+          <div style={{ display: "flex", gap: 4, height: 8 }}>
             {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div key={i} ref={el => { chaserRefs.current[i] = el; }} style={{ width: 16, background: "var(--lcars-elbow-b)", borderRadius: "6px" }} />
+              <div key={i} ref={el => { chaserRefs.current[i] = el; }} style={{ width: 12, background: "var(--lcars-elbow-b)", borderRadius: "4px" }} />
             ))}
           </div>
         </div>
@@ -158,7 +158,7 @@ export function ThemeLCARSDecor() {
           bottom: 12,
           left: metrics.sidebarWidth,
           right: 90,
-          height: metrics.bottomHeight, // EXACTLY matches the offsetHeight of the Footer Block dynamically
+          height: 24, // Minimal horizontal bar
           background: "var(--lcars-elbow-c)",
           zIndex: 40,
           pointerEvents: "none",
@@ -171,12 +171,12 @@ export function ThemeLCARSDecor() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 30, height: 8, background: "var(--lcars-elbow-d)", borderRadius: 4 }} />
+          <div style={{ width: 24, height: 6, background: "var(--lcars-elbow-d)", borderRadius: 3 }} />
           <span ref={el => { textRefs.current[1] = el; }} style={{ 
             color: "var(--lcars-nav-text-on)", 
             fontFamily: "'Antonio', 'Arial Narrow', sans-serif",
             fontWeight: 900,
-            fontSize: 12,
+            fontSize: 10,
             letterSpacing: "0.1em",
             opacity: 0.7
           }}>

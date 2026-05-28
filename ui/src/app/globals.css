@@ -610,9 +610,9 @@
 }
 
 [data-theme^="lcars"] .app-shell-root > div.flex-1 > div.relative.flex-1 {
-  padding-top: 104px !important; 
-  padding-right: 120px !important; 
-  padding-bottom: 140px !important; 
+  padding-top: 48px !important; 
+  padding-right: 90px !important; 
+  padding-bottom: 48px !important; 
 }
 
 /* â"€â"€ SIDEBAR ALIGNMENT FIXES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
