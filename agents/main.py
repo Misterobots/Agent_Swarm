@@ -1397,7 +1397,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "continuation", "stream_mode",
                                         "clarification_request", "clarification_card",
                                         "media_attachment", "set_preview_url",
-                                        "preview_unavailable", "design_artifact"):
+                                        "preview_unavailable", "design_artifact",
+                                        "suggested_followups"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
