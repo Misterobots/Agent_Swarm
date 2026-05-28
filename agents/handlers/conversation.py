@@ -1,13 +1,20 @@
 """handlers/conversation.py — CONVERSATION intent handler (3-tier access control)."""
 
+import json
 import logging
+import re
+
+import requests
 
 from phi.agent import Agent
 from phi.model.ollama import Ollama
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
 from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
-from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace, _langfuse_span
+from handlers.base import (
+    _emit_stream_mode, _emit_turn_metadata, _score_trace, _langfuse_span,
+    _emit_suggested_followups,
+)
 
 logger = logging.getLogger("Router")
 
@@ -150,5 +157,80 @@ def handle_conversation(user_input: str, ctx: dict):
         _score_trace(lf_trace, langfuse, 0.0, use_langfuse=use_langfuse)
         yield {"type": "error", "content": f"Conversation failed: {e}"}
 
+    # Generate 2 contextual follow-up suggestions from the completed response.
+    # Runs after the main stream — fail-silent so it never breaks the turn.
+    if full_content and len(full_content) > 50:
+        yield from _generate_suggested_followups(
+            user_input=user_input,
+            response_content=full_content,
+            model=CONV_MODEL,
+            host=OLLAMA_HOST,
+        )
+
     AGENT_STATE.labels(agent_name="Conversationalist").set(1)
     WORKFLOW_STEPS.labels(status="success", agent_type="Conversationalist").inc()
+
+
+# ---------------------------------------------------------------------------
+# Follow-up suggestion generator
+# ---------------------------------------------------------------------------
+
+def _generate_suggested_followups(user_input: str, response_content: str, model: str, host: str):
+    """Yield a single ``suggested_followups`` event with 2 contextual chips.
+
+    Uses a quick non-streaming Ollama call on the already-warm model.
+    Fails silently — never raises, never blocks the turn.
+    """
+    PROMPT = (
+        "You are generating UI chip suggestions. Given the exchange below, "
+        "return ONLY a valid JSON array of exactly 2 objects. "
+        "Each object must have:\n"
+        '  "label": a 3-5 word action phrase (e.g. "Explain the trade-offs")\n'
+        '  "prompt": the exact follow-up message to send (1-2 sentences)\n\n'
+        "Rules:\n"
+        "- Labels must be distinct and action-oriented\n"
+        "- Prompts must be self-contained questions or requests\n"
+        "- Output ONLY the JSON array — no markdown, no explanation\n\n"
+        f"User: {user_input[:400]}\n"
+        f"Assistant: {response_content[:900]}\n\n"
+        "JSON array:"
+    )
+    try:
+        resp = requests.post(
+            f"{host}/api/generate",
+            json={
+                "model": model,
+                "prompt": PROMPT,
+                "stream": False,
+                "options": {"temperature": 0.4, "num_predict": 220, "top_p": 0.9},
+            },
+            timeout=20,
+        )
+        resp.raise_for_status()
+        raw = resp.json().get("response", "").strip()
+
+        # Extract JSON array — handles stray preamble text from verbose models
+        match = re.search(r"\[.*\]", raw, re.DOTALL)
+        if not match:
+            logger.debug("[Conversationalist] Follow-up generation: no JSON array found in response")
+            return
+
+        suggestions = json.loads(match.group(0))
+        if not isinstance(suggestions, list) or len(suggestions) < 2:
+            logger.debug("[Conversationalist] Follow-up generation: unexpected shape %s", suggestions)
+            return
+
+        # Validate shape of each item
+        valid = [
+            s for s in suggestions
+            if isinstance(s, dict) and s.get("label") and s.get("prompt")
+        ]
+        if len(valid) < 2:
+            logger.debug("[Conversationalist] Follow-up generation: fewer than 2 valid items")
+            return
+
+        yield _emit_suggested_followups(valid[:2])
+        logger.debug("[Conversationalist] Follow-up suggestions emitted: %s", [s["label"] for s in valid[:2]])
+
+    except Exception as exc:
+        logger.debug("[Conversationalist] Follow-up generation failed (non-fatal): %s", exc)

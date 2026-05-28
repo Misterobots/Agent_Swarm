@@ -97,6 +97,18 @@ def _emit_continuation_hint(hint_type: str = "auto_continue", reason: str = "") 
     }
 
 
+def _emit_suggested_followups(followups: list) -> dict:
+    """Emit 2 LLM-generated contextual follow-up suggestions for the UI chip strip.
+
+    Each followup is ``{"label": str, "prompt": str}`` — label is a 3-5 word
+    action phrase; prompt is the full message to send when the chip is clicked.
+    """
+    return {
+        "type": "suggested_followups",
+        "followups": followups[:2],  # always cap at 2 contextual chips
+    }
+
+
 # ---------------------------------------------------------------------------
 # Think-tag parser
 # ---------------------------------------------------------------------------
