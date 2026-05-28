@@ -67,6 +67,13 @@ services:
             - driver: nvidia
               count: all
               capabilities: [ gpu ]
+        # Hard cap on system RAM for the Ollama container.
+        # Model weights live in VRAM; this RAM budget covers the binary,
+        # request buffering, tokeniser, and any KV-cache overflow.
+        # 6 GB is ~3× the container's observed idle RSS and gives headroom
+        # for a 128k-context KV cache spill without starving other containers.
+        limits:
+          memory: 6g
     environment:
       # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
