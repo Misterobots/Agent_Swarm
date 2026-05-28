@@ -204,9 +204,10 @@ def _generate_suggested_followups(user_input: str, response_content: str, model:
                 "model": model,
                 "prompt": PROMPT,
                 "stream": False,
+                "think": False,          # disable extended thinking — we need fast JSON, not reasoning
                 "options": {"temperature": 0.4, "num_predict": 220, "top_p": 0.9},
             },
-            timeout=20,
+            timeout=30,
         )
         resp.raise_for_status()
         raw = resp.json().get("response", "").strip()
