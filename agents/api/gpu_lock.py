@@ -52,9 +52,17 @@ def _check_auth(x_gpu_lock_secret: Optional[str]):
 # ---------------------------------------------------------------------------
 # In-memory lease state
 # ---------------------------------------------------------------------------
-# One asyncio.Lock protects all mutations.  A separate threading.Lock lets
-# the same state be read/mutated from non-async contexts if needed.
-_state_lock = asyncio.Lock()
+# One asyncio.Lock protects all mutations.
+# Created lazily (inside the running event loop) to avoid the Python 3.10+
+# DeprecationWarning / Python 3.12 RuntimeError for locks created at import time.
+_state_lock: asyncio.Lock | None = None
+
+def _get_lock() -> asyncio.Lock:
+    global _state_lock
+    if _state_lock is None:
+        _state_lock = asyncio.Lock()
+    return _state_lock
+
 
 class _LeaseState:
     __slots__ = ("lock_id", "context", "acquired_at", "ttl")
@@ -146,7 +154,7 @@ async def acquire(
     if not body.lock_id:
         raise HTTPException(status_code=400, detail="lock_id required")
 
-    async with _state_lock:
+    async with _get_lock():
         if _state.is_free():
             if _state.lock_id is not None:
                 logger.warning(
@@ -181,7 +189,7 @@ async def release(
     """
     _check_auth(x_gpu_lock_secret)
 
-    async with _state_lock:
+    async with _get_lock():
         if _state.lock_id is None or _state.is_free():
             logger.debug("[GPULockServer] release() called on free lock — no-op.")
             _state.clear()
@@ -203,7 +211,7 @@ async def release(
 @router.get("/status", response_model=StatusResponse)
 async def status():
     """Health/debug endpoint — always open, no auth."""
-    async with _state_lock:
+    async with _get_lock():
         if _state.is_free():
             return StatusResponse(
                 locked=False,
