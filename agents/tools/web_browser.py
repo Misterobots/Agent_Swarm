@@ -6,6 +6,9 @@ Security:
   - Content size limits to prevent DoS
   - No JavaScript execution (text-only extraction)
   - Timeout protection
+  - Provenance-aware content trust scanning (content_trust.py):
+    all fetched text is scanned for prompt injection / poisoning before
+    being returned to the caller.
 """
 
 from __future__ import annotations
@@ -174,10 +177,25 @@ def fetch_page(url: str) -> Dict[str, Any]:
             title = ""
             text = f"[Non-text content: {content_type}, {len(content)} bytes]"
 
+        capped_text = text[:50000]  # Cap text output
+
+        # ── Provenance-aware trust scan ──────────────────────────────────────
+        # Web content is RETRIEVED (untrusted external source). Scan before
+        # returning so callers never see unscanned remote text.
+        try:
+            from utils.content_trust import sanitize_external_content, TrustLevel
+            capped_text, is_clean = sanitize_external_content(
+                capped_text, TrustLevel.RETRIEVED, source=str(resp.url)
+            )
+            if not is_clean:
+                logger.warning(f"[WebBrowser] Content from {resp.url} redacted by trust scanner")
+        except Exception as _trust_err:
+            logger.warning(f"[WebBrowser] Trust scan unavailable ({_trust_err}) — passing content through")
+
         return {
             "url": str(resp.url),
             "title": title,
-            "text": text[:50000],  # Cap text output
+            "text": capped_text,
             "content_length": len(content),
             "error": False,
         }
@@ -224,11 +242,24 @@ def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
     links = link_pattern.findall(html)
     snippets = snippet_pattern.findall(html)
 
+    # Import trust scanner once outside the loop (fail-gracefully if unavailable)
+    try:
+        from utils.content_trust import sanitize_external_content, TrustLevel as _TL
+        _trust_scan = lambda text, url: sanitize_external_content(text, _TL.RETRIEVED, source=url)
+    except Exception:
+        _trust_scan = lambda text, url: (text, True)  # unavailable — pass through
+
     for i, (url, title) in enumerate(links[:num_results]):
         clean_title = re.sub(r"<[^>]+>", "", title).strip()
         snippet = ""
         if i < len(snippets):
             snippet = re.sub(r"<[^>]+>", "", snippets[i]).strip()
+
+        # Scan snippet before assembling into results
+        snippet, _ok = _trust_scan(snippet, url)
+        if not _ok:
+            logger.warning(f"[WebBrowser] Search snippet from {url} redacted by trust scanner")
+
         results.append({
             "title": clean_title,
             "url": url,

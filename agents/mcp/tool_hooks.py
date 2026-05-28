@@ -11,6 +11,70 @@ from tools.terminal import run_command as tool_run_command
 
 logger = setup_logger("MCPToolHooks")
 
+# ---------------------------------------------------------------------------
+# Tools whose return values cross a trust boundary and must be scanned.
+# Browser + external API results → full llama-guard scan (RETRIEVED).
+# Terminal/bash output → full scan (could contain crafted output).
+# File reads → fast regex only (user-initiated, INTERNAL trust level).
+# ---------------------------------------------------------------------------
+_EXTERNAL_TOOLS = frozenset({
+    "hive.browser.fetch",
+    "hive.browser.search",
+    "hive.terminal.run",
+    "hive.bash_exec",
+    "hive.skill_run",
+    "hive.api_call",
+})
+_FILE_TOOLS = frozenset({
+    "hive.fs.read",
+    "hive.fs.list",
+})
+
+
+def _scan_tool_result(tool_name: str, result: dict[str, Any]) -> dict[str, Any]:
+    """
+    Apply trust scanning to a tool result dict.
+    Mutates content items in-place; returns the (possibly redacted) result.
+    """
+    if result.get("isError"):
+        return result  # error payloads are system-generated, not external input
+
+    try:
+        from utils.content_trust import sanitize_external_content, TrustLevel, fast_injection_scan
+
+        if tool_name in _EXTERNAL_TOOLS:
+            trust = TrustLevel.RETRIEVED
+        elif tool_name in _FILE_TOOLS:
+            # File reads: fast regex only — user explicitly requested the file.
+            # We don't call llama-guard here to avoid penalising every file read
+            # with a GPU call, but we still catch obvious injections.
+            for item in result.get("content", []):
+                if item.get("type") == "text" and fast_injection_scan(item.get("text", "")):
+                    logger.warning(
+                        f"[MCPToolHooks] Injection pattern in file read result ({tool_name}) — redacting"
+                    )
+                    from utils.content_trust import REDACTED
+                    item["text"] = REDACTED
+            return result
+        else:
+            return result  # internal / write tools — no scan needed
+
+        for item in result.get("content", []):
+            if item.get("type") == "text":
+                clean, is_clean = sanitize_external_content(
+                    item["text"], trust, source=f"tool:{tool_name}"
+                )
+                if not is_clean:
+                    logger.warning(
+                        f"[MCPToolHooks] Content from tool {tool_name!r} redacted by trust scanner"
+                    )
+                item["text"] = clean
+
+    except Exception as _err:
+        logger.warning(f"[MCPToolHooks] Trust scan unavailable for {tool_name}: {_err}")
+
+    return result
+
 
 @dataclass
 class ToolHook:
@@ -73,6 +137,8 @@ class ToolHookRegistry:
         card = decision.card
         try:
             result = hook.handler(arguments)
+            # Scan tool results at the trust boundary before returning to the agent.
+            result = _scan_tool_result(name, result)
             if card:
                 audit.log_operation_executed(
                     agent_name=card.agent_name,

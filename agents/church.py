@@ -570,7 +570,8 @@ def chat_swarm(
             except Exception as _mp_err:
                 logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
 
-        # Web grounding
+        # Web grounding — each snippet is trust-scanned inside web_browser.web_search()
+        # before it is returned, so no additional scan is needed here.
         if grounding_web:
             try:
                 from grounding_permissions import grounding_permissions as _gp
@@ -603,6 +604,26 @@ def chat_swarm(
                 if _gp.is_permitted(owner_id or "", "docs_grounding"):
                     chunks = _retrieve_doc_context(user_input, owner_id, limit=5)
                     if chunks:
+                        # Scan each retrieved chunk for prompt injection / poisoning before injecting
+                        # into the prompt. INGESTED trust = scan once, then cache by content hash so
+                        # the same chunk is not re-scanned on subsequent retrievals.
+                        try:
+                            from utils.content_trust import sanitize_external_content, TrustLevel as _TL
+                            _safe: list[dict] = []
+                            for _c in chunks:
+                                _raw = _c.get("content", "")
+                                _clean, _ok = sanitize_external_content(
+                                    _raw, _TL.INGESTED, source=f"doc:{_c.get('source', 'unknown')}"
+                                )
+                                if not _ok:
+                                    logger.warning(
+                                        "[Router] Doc chunk from %r redacted by trust scanner",
+                                        _c.get("source"),
+                                    )
+                                _safe.append({**_c, "content": _clean})
+                            chunks = _safe
+                        except Exception as _ct_err:
+                            logger.warning("[Router] Doc trust scan unavailable (non-fatal): %s", _ct_err)
                         doc_text = "\n\n".join(f"[Source: {c.get('source','unknown')}]\n{c.get('content','')}" for c in chunks)
                         history = list(history or []) + [{"role": "system", "content": f"[Document Context]\n{doc_text}"}]
                         yield _t(f"→ Doc grounding: {len(chunks)} chunks injected")
@@ -636,6 +657,19 @@ def chat_swarm(
                                 try:
                                     with open(_fpath, "r", encoding="utf-8", errors="ignore") as _fh:
                                         _content = _fh.read(2000)
+                                    # Fast regex scan — workspace files are user-owned but could
+                                    # contain crafted injection payloads (e.g. a poisoned config).
+                                    # No GPU call; just drop the file if the pattern fires.
+                                    try:
+                                        from utils.content_trust import fast_injection_scan as _fis
+                                        if _fis(_content):
+                                            logger.warning(
+                                                "[Router] Injection pattern in workspace file %r — skipping",
+                                                _rel,
+                                            )
+                                            continue
+                                    except Exception:
+                                        pass
                                     _file_snippets.append(f"[File: {_rel}]\n{_content}")
                                     if len(_file_snippets) >= 5:
                                         break
