@@ -111,8 +111,8 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
 
     def _call(model_name: str, host_url: str):
         # Allow generous wall-clock time: small models (qwen3:8b) take ~15s warm;
-        # large models (gemma4:31b) can take 90-120s on a cold VRAM load.
-        _timeout = 120 if any(m in model_name for m in ("gemma", "31b", "27b", "30b", "14b")) else 45
+        # large models (gemma4:31b) need 2-3 min for cold VRAM load + generation.
+        _timeout = 240 if any(m in model_name for m in ("gemma", "31b", "27b", "30b", "14b")) else 45
         return requests.post(
             f"{host_url}/api/generate",
             json={
@@ -240,7 +240,10 @@ def _decompose_task_perspectives(user_input: str, history_context: str = "") -> 
         }
     """
     _host = get_swarm_worker_host(COORDINATOR_MODEL)
-    client = Client(host=_host)
+    # Pass timeout to the Client constructor — the ollama Python client does not
+    # accept timeout as a keyword argument on individual chat/generate calls.
+    # 120s gives large models (gemma4:31b, qwen3.6:27b) enough time for a cold VRAM load.
+    client = Client(host=_host, timeout=120)
 
     schema = {
         "type": "object",
@@ -288,10 +291,7 @@ def _decompose_task_perspectives(user_input: str, history_context: str = "") -> 
             model=COORDINATOR_MODEL,
             messages=[{"role": "user", "content": prompt}],
             format=schema,
-            # Large coordinator models (gemma4:31b, qwen3.6:27b) need up to 120s
-            # for cold VRAM load; use a generous client timeout.
             options={"temperature": 0.2, "num_predict": 1200},
-            timeout=120,
         )
         raw = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
         return json.loads(raw)

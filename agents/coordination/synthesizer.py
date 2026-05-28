@@ -222,7 +222,10 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
         }
     """
     _host = get_swarm_worker_host(COORDINATOR_MODEL)
-    client = Client(host=_host)
+    # timeout on Client constructor — ollama Python client does not accept timeout
+    # as a kwarg on individual .chat() calls (raises TypeError in recent versions).
+    # 300s accommodates gemma4:31b / qwen3.6:27b cold VRAM load + 8k token generation.
+    client = Client(host=_host, timeout=300)
 
     schema = {
         "type": "object",
@@ -287,7 +290,6 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
                 messages=[{"role": "user", "content": trunc_prompt}],
                 format=schema,
                 options={"temperature": 0.3, "num_predict": 8192},
-                timeout=300,  # gemma4:31b cold-start can take 2-3 min
             )
         raw = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
         parsed = json.loads(raw)
