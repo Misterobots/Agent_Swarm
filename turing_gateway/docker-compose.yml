@@ -38,6 +38,12 @@ services:
     container_name: spire-agent-turing
     hostname: spire-agent-turing
     restart: unless-stopped
+    # pid: host is required for the Docker WorkloadAttestor to resolve caller PIDs.
+    # When agent_runtime (a separate container) connects to the SPIRE socket, SO_PEERCRED
+    # returns the HOST-level PID of the calling process. Without host PID namespace access,
+    # the SPIRE agent container's /proc only sees its own PIDs and cannot look up
+    # /proc/<host_pid>/cgroup → "could not resolve caller information" error.
+    pid: host
     volumes:
       - ./config/spire:/etc/spire/agent
       - spire_agent_data:/run/spire/agent
