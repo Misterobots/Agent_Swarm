@@ -120,7 +120,7 @@ class SpiffeAuth:
             return None
             
         try:
-            jwt_svid = self._client.fetch_jwt_svid(audiences=[audience])
+            jwt_svid = self._client.fetch_jwt_svid(audience={audience})
             logger.debug(f"Fetched JWT-SVID for audience: {audience}")
             return jwt_svid.token
         except Exception as e:
@@ -146,7 +146,7 @@ class SpiffeAuth:
             bundles = self._client.fetch_jwt_bundles()
             
             # Validate and parse the JWT
-            jwt_svid = JwtSvid.parse_insecure(token, [expected_audience])
+            jwt_svid = JwtSvid.parse_insecure(token, {expected_audience})
             
             claims = {
                 "spiffe_id": str(jwt_svid.spiffe_id),
