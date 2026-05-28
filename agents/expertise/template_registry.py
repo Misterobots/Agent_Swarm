@@ -223,6 +223,16 @@ _SEED_TEMPLATES = [
         "security_level": "L3_ADMIN",
         "default_model": "qwen3.6:27b",
     },
+    {
+        "id": "conversationalist",
+        "name": "Hive Mind",
+        "description": "General-purpose conversational assistant with 3-tier access control.",
+        "intent": "CONVERSATION",
+        "system_prompt": None,  # Uses conversation handler's built-in instructions
+        "capabilities": ["model_generate"],
+        "security_level": "L1_PUBLIC",
+        "default_model": "qwen3.6:27b",
+    },
 ]
 
 

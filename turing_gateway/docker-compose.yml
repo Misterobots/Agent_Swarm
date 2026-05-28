@@ -467,6 +467,7 @@ services:
       - ../agents:/app/agents
       - ../:/workspace
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - spire_socket:/var/run/spire:ro  # SPIRE workload API socket (read-only consumer)
     command: ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
     ports:
       - "8008:8000"
