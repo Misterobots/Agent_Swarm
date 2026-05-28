@@ -158,12 +158,14 @@ def handle_conversation(user_input: str, ctx: dict):
         yield {"type": "error", "content": f"Conversation failed: {e}"}
 
     # Generate 2 contextual follow-up suggestions from the completed response.
+    # Uses ROUTER_MODEL (small, already warm in VRAM) — not the 27B conv model.
     # Runs after the main stream — fail-silent so it never breaks the turn.
     if full_content and len(full_content) > 50:
+        _router_model = os.getenv("ROUTER_MODEL", "qwen3:8b")
         yield from _generate_suggested_followups(
             user_input=user_input,
             response_content=full_content,
-            model=CONV_MODEL,
+            model=_router_model,
             host=OLLAMA_HOST,
         )
 
