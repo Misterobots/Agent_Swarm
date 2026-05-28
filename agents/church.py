@@ -956,6 +956,16 @@ def chat_swarm(
 
         # Build shared handler context
         is_admin = _is_admin_session(session_id, owner_id)
+        # Strip non-Ollama-model values from `model`. The frontend sends UI
+        # tier labels like "Home-AI-Swarm" or "default" that aren't real
+        # Ollama identifiers. Real model names always include a tag separator
+        # (e.g. "qwen3:8b", "qwen3-coder:30b"). When the frontend sends a UI
+        # label, handlers should fall back to their template/env defaults
+        # rather than try to invoke a non-existent Ollama model — which would
+        # cause Phi Agent's generator to throw "generator didn't stop after
+        # throw()" and surface a backend error in the chat UI.
+        _handler_model = model if (model and ":" in model and model != "hive-fast") else None
+
         ctx = {
             "session_id": session_id,
             "owner_id": owner_id,
@@ -965,7 +975,7 @@ def chat_swarm(
             "history_context": history_context,
             "constraint_context": constraint_context,
             "extracted_context": extracted_context,
-            "model": model,
+            "model": _handler_model,
             "ace_token": ace_token,
             "template_metadata": template_metadata,
             "lf_trace": lf_trace,
