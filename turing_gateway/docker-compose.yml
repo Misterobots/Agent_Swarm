@@ -437,10 +437,11 @@ services:
       - MEMPALACE_API_URL=http://mempalace:8200
       - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
       - REDIS_PORT=6379
-      # GPU peer lock — Turing calls Lovelace's lock server when Redis is unavailable.
-      # This is the critical env var that enables cross-host GPU coordination without Redis.
-      # GPU_LOCK_SECRET is injected automatically via env_file (network.env).
-      - GPU_LOCK_HOST=http://${LOVELACE_IP:-192.168.2.101}:8008
+      # GPU peer lock — Turing's own agent_runtime hosts /internal/gpu-lock/.
+      # localhost:8000 is correct (same container, single-node setup).  If a second
+      # agent_runtime is added on another host, point THAT host's GPU_LOCK_HOST at
+      # Turing's external port: http://${TURING_IP}:8008.  GPU_LOCK_SECRET via network.env.
+      - GPU_LOCK_HOST=http://localhost:8000
       # ── Model specialization (must match config.py defaults) ──────────────────
       # All large models live on Lovelace; OLLAMA_HOST above routes them there.
       # Turing local ollama only hosts llama-guard3:8b and nomic-embed-text.

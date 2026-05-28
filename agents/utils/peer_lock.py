@@ -12,9 +12,12 @@ used inside the existing request_lock() contextmanager without converting it
 to async.  The spin-acquire pattern mirrors the Redis spin loop.
 
 Configuration (all env vars, inherit from network.env / docker env):
-  GPU_LOCK_HOST      — base URL of the lock server
-                       Default: http://localhost:8001 (same host, production
-                       Lovelace sets this; Turing sets http://192.168.2.101:8001)
+  GPU_LOCK_HOST      — base URL of the lock server.
+                       Default: http://localhost:8000 (Turing's agent_runtime,
+                       which hosts the /internal/gpu-lock/ router on its own
+                       uvicorn process).  When a second agent_runtime is added
+                       on another host, set GPU_LOCK_HOST on that host to point
+                       at the canonical lock-server host (e.g. http://<turing-ip>:8008).
   GPU_LOCK_SECRET    — optional shared secret (must match server-side env var)
                        Default: "" (no auth, safe for single-host dev)
   GPU_LOCK_CONNECT_TIMEOUT — seconds to wait for TCP connection (default 3)

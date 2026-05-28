@@ -56,8 +56,9 @@ KLEIN_HOST = os.getenv("KLEIN_HOST", "http://klein_service:8189")
 OMNIGEN_HOST = os.getenv("OMNIGEN_HOST", "http://omnigen_service:8190")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
-# GPU peer lock: Lovelace hosts the lock server on its agent_runtime port.
-# Turing (and any other host) sets GPU_LOCK_HOST=http://192.168.2.101:8001 in its env.
+# GPU peer lock: Turing's agent_runtime hosts the lock server on its own uvicorn port.
+# Default localhost:8000 is correct for single-node (same container).  A second
+# agent_runtime on another host would set GPU_LOCK_HOST=http://<turing-ip>:8008.
 GPU_LOCK_HOST = os.getenv("GPU_LOCK_HOST", "http://localhost:8000")
 TRAINING_WINDOW_START = int(os.getenv("TRAINING_WINDOW_START", "2"))   # hour (24h)
 TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (24h)
