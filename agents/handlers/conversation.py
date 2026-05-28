@@ -157,6 +157,10 @@ def handle_conversation(user_input: str, ctx: dict):
         _score_trace(lf_trace, langfuse, 0.0, use_langfuse=use_langfuse)
         yield {"type": "error", "content": f"Conversation failed: {e}"}
 
+    # Diagnostic: confirm what full_content looks like after streaming
+    logger.info("[Conversationalist] Stream done. full_content=%d chars, preview=%r",
+                len(full_content), full_content[:80])
+
     # Generate 2 contextual follow-up suggestions from the completed response.
     # Uses ROUTER_MODEL (small, already warm in VRAM) — not the 27B conv model.
     # Runs after the main stream — fail-silent so it never breaks the turn.
