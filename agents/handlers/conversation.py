@@ -56,13 +56,15 @@ def handle_conversation(user_input: str, ctx: dict):
         CONV_MODEL = os.getenv("ROUTER_MODEL", "qwen3:8b")
         yield {"type": "thought", "content": f"→ Hive Fast: conversation on {CONV_MODEL} (router model, already hot)"}
     else:
+        # Trust the template registry (CONVERSATION default is qwen3:8b).
+        # NOTE: we deliberately do NOT honor ctx["model"] here — the frontend
+        # often sends UI tier names like "Home-AI-Swarm" that aren't real
+        # Ollama identifiers. If you want to force a specific model, set the
+        # CONV_MODEL env var or update the template registry default.
         CONV_MODEL = _resolve_model_for_intent(
             "CONVERSATION",
             os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:8b")),
         )
-        explicit_model = ctx.get("model")
-        if explicit_model and explicit_model not in ("hive-fast", "default") and not explicit_model.startswith("swarm-"):
-            CONV_MODEL = explicit_model
     OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
 
     if is_admin:
