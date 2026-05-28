@@ -280,6 +280,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                     onApprove={devMode ? handleApprove : undefined}
                     onDeny={devMode ? handleDeny : undefined}
                     onSelectClarification={(val) => sendMessage(val)}
+                    onSelectFollowup={(val) => sendMessage(val)}
                   />
                 </div>
               );

@@ -44,6 +44,7 @@ interface ChatState {
   setMessageMediaAttachments: (conversationId: string, messageId: string, attachments: MediaAttachment[]) => void;
   setMessageDesignArtifact: (conversationId: string, messageId: string, artifact: import("@/types/chat").DesignArtifact) => void;
   setMessageQueueStatus: (conversationId: string, messageId: string, status: import("@/types/chat").QueueStatus | undefined) => void;
+  setMessageSuggestedFollowups: (conversationId: string, messageId: string, followups: import("@/types/chat").SuggestedFollowup[]) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -248,6 +249,7 @@ export const useChatStore = create<ChatState>()(
               ),
             };
           }),
+        })),
 
       setMessageMediaAttachments: (conversationId, messageId, attachments) =>
         set((state) => ({
@@ -289,6 +291,19 @@ export const useChatStore = create<ChatState>()(
             };
           }),
         })),
+
+      setMessageSuggestedFollowups: (conversationId, messageId, followups) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, suggestedFollowups: followups } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
         })),
     }),
     { name: "memex-chats" }

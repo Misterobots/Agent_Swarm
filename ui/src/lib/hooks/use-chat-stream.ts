@@ -76,6 +76,7 @@ export function useChatStream(options?: {
     setMessageDesignArtifact,
     setMessagePendingClarification,
     setMessageQueueStatus,
+    setMessageSuggestedFollowups,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -329,6 +330,11 @@ export function useChatStream(options?: {
             // Handle generated design artifacts from Open Design Studio
             if (event.design) {
               setMessageDesignArtifact(convId!, assistantId, event.design);
+            }
+          } else if (event.type === "suggested_followups") {
+            // LLM-generated end-of-response chips
+            if (event.followups && event.followups.length > 0) {
+              setMessageSuggestedFollowups(convId!, assistantId, event.followups);
             }
           } else if (event.type === "set_preview_url") {
             // Agent pushes a URL into the dev workspace preview pane

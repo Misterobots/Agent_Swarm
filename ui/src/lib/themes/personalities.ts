@@ -166,6 +166,36 @@ export const THEME_AMBIENT_VERBS: Record<ChatTheme, string[]> = {
     "Cross-referencing nodes", "As we may think...",
   ],
 };
+/**
+ * Per-theme generic follow-up chip — the third option after the two
+ * LLM-generated contextual chips. Phrased in the theme's voice so the
+ * row of chips reads as one cohesive unit instead of a generic fallback.
+ */
+export const THEME_GENERIC_FOLLOWUP: Record<ChatTheme, { label: string; prompt: string }> = {
+  "lcars-blue":   { label: "Expand analysis",  prompt: "Computer, expand on that analysis with additional detail." },
+  "lcars-teal":   { label: "Expand analysis",  prompt: "Computer, expand on that analysis with additional detail." },
+  lcars:          { label: "Expand analysis",  prompt: "Computer, expand on that analysis with additional detail." },
+  memex:          { label: "Go deeper",        prompt: "Can you go deeper on this?" },
+  amber:          { label: "Forge further",    prompt: "Let's hammer this out further — tell me more." },
+  ember:          { label: "Forge further",    prompt: "Let's hammer this out further — tell me more." },
+  slate:          { label: "Refine the plan",  prompt: "Refine this — what would you adjust in the blueprint?" },
+  signal:         { label: "Decode further",   prompt: "Copy that — give me more detail on the signal." },
+  office:         { label: "Drill down",       prompt: "Can you drill down into the details on this?" },
+  hacker:         { label: "dig deeper",       prompt: "dig deeper. give me the under-the-hood detail." },
+  "star-trek":    { label: "Expand analysis",  prompt: "Computer, expand on that analysis with additional detail." },
+  cyberpunk:      { label: "Jack back in",     prompt: "Jack back in — give me the full story, choomba." },
+  minimal:        { label: "More",             prompt: "Tell me more." },
+  shadowrun:      { label: "Run deeper",       prompt: "Run this deeper, choomba — what else is on the grid?" },
+  ops:            { label: "Brief in detail",  prompt: "Provide a detailed briefing on this." },
+  terminal:       { label: "more",             prompt: "> more" },
+  hal9000:        { label: "Continue",         prompt: "Please continue with additional information, Dave." },
+  nostromo:       { label: "Continue scan",    prompt: "MU/TH/UR, continue scan — provide additional data." },
+  tron:           { label: "Continue program", prompt: "Continue the program — provide additional cycles of detail." },
+  bladerunner:    { label: "Look closer",      prompt: "Look closer at this — what are we missing?" },
+  dune:           { label: "Mentat: continue", prompt: "Mentat, continue — provide additional analysis." },
+  "memex-archive":{ label: "Follow the trail", prompt: "Follow the associative trail — what connects to this?" },
+};
+
 export const THEME_PERSONALITIES: Record<ChatTheme, ThemePersonality> = {
   "lcars-blue": {
     systemPrompt:

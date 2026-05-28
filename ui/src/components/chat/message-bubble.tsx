@@ -13,6 +13,7 @@ import { DesignArtifactCard } from "./design-artifact-card";
 import { ModelQueueCard } from "./model-queue-card";
 import { MessageActions } from "./message-actions";
 import { MediaPreview } from "./media-preview";
+import { ResponseSuggestionChips } from "./response-suggestion-chips";
 
 // ---------------------------------------------------------------------------
 // Swarm response parser — splits coordinator output into collapsible phases
@@ -181,6 +182,8 @@ interface MessageBubbleProps {
   onApprove?: (callId: string, toolName: string, scope: "once" | "session" | "workspace") => void;
   onDeny?: (callId: string) => void;
   onSelectClarification?: (value: string) => void;
+  /** Called when the user clicks an end-of-response suggestion chip or submits free text */
+  onSelectFollowup?: (value: string) => void;
   onUseAlternativeModel?: (modelName: string) => void;
 }
 
@@ -190,7 +193,7 @@ function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
 }
 
-export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny, onSelectClarification, onUseAlternativeModel }: MessageBubbleProps) {
+export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny, onSelectClarification, onSelectFollowup, onUseAlternativeModel }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -452,6 +455,19 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
         {message.designArtifact && (
           <DesignArtifactCard artifact={message.designArtifact} />
         )}
+        {/* End-of-response follow-up chips — only on the latest assistant message, after streaming */}
+        {!isUser
+          && !isStreaming
+          && isLatest
+          && message.suggestedFollowups
+          && message.suggestedFollowups.length > 0
+          && onSelectFollowup && (
+            <ResponseSuggestionChips
+              followups={message.suggestedFollowups}
+              onSelect={onSelectFollowup}
+              disabled={isStreaming}
+            />
+          )}
       </div>
     </div>
     </>

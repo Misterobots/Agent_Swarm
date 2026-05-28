@@ -179,6 +179,14 @@ export async function* streamSSE(
               design: (delta as any).content,
             };
           }
+          // End-of-response follow-up chips (LLM-generated)
+          else if (delta.type === "suggested_followups") {
+            yield {
+              type: "suggested_followups",
+              content: "",
+              followups: (delta as any).followups || [],
+            };
+          }
           // Agent pushes a URL into the preview pane
           else if (delta.type === "set_preview_url") {
             yield {
@@ -334,6 +342,12 @@ export async function* streamSSE(
               type: "design_artifact",
               content: "",
               design: (delta as any).content,
+            };
+          } else if (delta.type === "suggested_followups") {
+            yield {
+              type: "suggested_followups",
+              content: "",
+              followups: (delta as any).followups || [],
             };
           } else if (delta.type === "set_preview_url") {
             yield {

@@ -132,8 +132,18 @@ export interface QueueStatus {
   should_prompt: boolean;
 }
 
+/**
+ * LLM-generated end-of-response follow-up chip.
+ * - `label`: short action phrase shown on the chip (3-5 words)
+ * - `prompt`: the full follow-up message sent when the chip is clicked
+ */
+export interface SuggestedFollowup {
+  label: string;
+  prompt: string;
+}
+
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -180,6 +190,9 @@ export interface StreamEvent {
 
   // Model queue status
   queueStatus?: QueueStatus;
+
+  // End-of-response follow-up chips (LLM-generated)
+  followups?: SuggestedFollowup[];
 }
 
 /**
@@ -214,6 +227,8 @@ export interface ChatMessage {
   mediaAttachments?: MediaAttachment[];
   designArtifact?: DesignArtifact;
   pendingQueueStatus?: QueueStatus;
+  /** LLM-generated contextual follow-up chips shown at end of response */
+  suggestedFollowups?: SuggestedFollowup[];
 }
 
 export interface Conversation {
