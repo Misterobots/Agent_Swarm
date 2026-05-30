@@ -26,7 +26,13 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   const setModel = useSettingsStore((s) => s.setModel);
   const { isAdmin } = useAccess();
 
-  const commands = ["/clear", "/model", "/compact", "/plan", "/memory", "/help"];
+  // Claude Code commands (local handling) + Memex workflow commands (passed to backend)
+  const commands = [
+    // Local: chat & model management
+    "/clear", "/model", "/compact", "/memory", "/help",
+    // Backend: Memex workflows
+    "/workshop", "/grill", "/design", "/build", "/swarm", "/plan", "/research", "/think",
+  ];
   const isSlash = input.trimStart().startsWith("/");
   const commandQuery = input.trimStart().slice(1).toLowerCase();
   const matches = commands.filter((c) => c.slice(1).startsWith(commandQuery));
@@ -57,11 +63,12 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
         return true;
       }
       if (cmd === "/help") {
-        onSend("Available slash commands: /clear, /model <id>, /compact, /plan, /memory, /help");
+        onSend("**Local commands:** /clear, /model <id>, /compact, /memory, /help\n**Memex workflows:** /workshop [idea], /grill [idea], /design [prompt], /build [task], /swarm [task], /plan [task], /research [query], /think [question]");
         setInput("");
         return true;
       }
-      if (cmd === "/compact" || cmd === "/plan" || cmd === "/memory") {
+      // Pass through to backend: Claude Code + Memex workflow commands
+      if (["/compact", "/plan", "/memory", "/workshop", "/grill", "/design", "/build", "/swarm", "/research", "/think"].includes(cmd)) {
         onSend(raw);
         setInput("");
         return true;
