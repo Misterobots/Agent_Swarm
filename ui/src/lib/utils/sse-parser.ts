@@ -179,6 +179,14 @@ export async function* streamSSE(
               design: (delta as any).content,
             };
           }
+          // Workshop Phase-1 discovery question chips
+          else if (delta.type === "workshop_questions") {
+            yield {
+              type: "workshop_questions",
+              content: "",
+              workshopQuestions: ((delta as any).content?.questions ?? []),
+            };
+          }
           // End-of-response follow-up chips (LLM-generated)
           else if (delta.type === "suggested_followups") {
             yield {
@@ -342,6 +350,12 @@ export async function* streamSSE(
               type: "design_artifact",
               content: "",
               design: (delta as any).content,
+            };
+          } else if (delta.type === "workshop_questions") {
+            yield {
+              type: "workshop_questions",
+              content: "",
+              workshopQuestions: ((delta as any).content?.questions ?? []),
             };
           } else if (delta.type === "suggested_followups") {
             yield {

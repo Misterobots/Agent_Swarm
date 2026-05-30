@@ -24,7 +24,24 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   const deleteConversation = useChatStore((s) => s.deleteConversation);
   const model = useSettingsStore((s) => s.model);
   const setModel = useSettingsStore((s) => s.setModel);
+  const pendingInput = useSettingsStore((s) => s.pendingInput);
+  const setPendingInput = useSettingsStore((s) => s.setPendingInput);
   const { isAdmin } = useAccess();
+
+  // Consume pendingInput set by workshop question chips (or any other pre-fill source)
+  useEffect(() => {
+    if (!pendingInput) return;
+    setInput((prev) => prev + pendingInput);
+    setPendingInput("");
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }, 0);
+  }, [pendingInput, setPendingInput]);
 
   // Claude Code commands (local handling) + Memex workflow commands (passed to backend)
   const commands = [

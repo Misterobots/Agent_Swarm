@@ -46,6 +46,7 @@ interface ChatState {
   setMessageQueueStatus: (conversationId: string, messageId: string, status: import("@/types/chat").QueueStatus | undefined) => void;
   setMessageSuggestedFollowups: (conversationId: string, messageId: string, followups: import("@/types/chat").SuggestedFollowup[]) => void;
   setMessageFlaggedFollowup: (conversationId: string, messageId: string, followup: import("@/types/chat").FlaggedFollowup) => void;
+  setMessageWorkshopQuestions: (conversationId: string, messageId: string, questions: import("@/types/chat").WorkshopQuestion[]) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -315,6 +316,20 @@ export const useChatStore = create<ChatState>()(
               ...c,
               messages: c.messages.map((m) =>
                 m.id === messageId ? { ...m, flaggedFollowup: followup } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageWorkshopQuestions: (conversationId, messageId, questions) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, workshopQuestions: questions } : m
               ),
               updatedAt: Date.now(),
             };

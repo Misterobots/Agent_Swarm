@@ -35,7 +35,7 @@ targeted questions that will yield a complete Product Brief when answered.
 
 Each question must be specific to THIS idea — never generic.
 
-Cover these angles (one question each, unless the idea warrants combining):
+Cover these angles (one per question):
 1. Core value — what specific problem does it solve, and for whom exactly?
 2. Primary user journey — describe the experience from first open to "task done"
 3. MVP scope — what are the 3–5 must-have features vs. nice-to-haves?
@@ -44,9 +44,15 @@ Cover these angles (one question each, unless the idea warrants combining):
 6. Success criterion — what does "shipped and working" look like to you?
 7. Hardest part — what's the riskiest or most uncertain aspect of building this?
 
-Format: numbered list, 1–2 sentences per question.  Be direct and concrete.
+REQUIRED FORMAT — follow exactly, one question per line:
+1. **[Topic Label]**: Full question text here.
+2. **[Topic Label]**: Full question text here.
+... (continue for all 7)
 
-End with exactly this line (no variation):
+Topic Labels must be short (2–4 words), e.g. "Target User", "Interaction Flow",
+"MVP Scope", "Visual Style", "Platform & Offline", "Success Criterion", "Biggest Risk".
+
+End with exactly this line:
 "Answer any or all of these and I'll draft your Product Brief."
 """
 
@@ -193,3 +199,24 @@ def handle_workshop(user_input: str, ctx: dict):
         output=full_content[:300],
         use_langfuse=use_langfuse,
     )
+
+    # Phase 1 only: parse questions into structured chips for the UI.
+    # The streamed message text stays in history for Phase-2 context detection.
+    if not _in_answer_phase:
+        import re as _re
+        _questions = []
+        for _m in _re.finditer(
+            r'(\d+)\.\s+\*?\*?([^*:\n]+?)\*?\*?:\s*(.+?)(?=\n\d+\.\s+\*?\*?|\nAnswer any|$)',
+            full_content,
+            _re.DOTALL,
+        ):
+            _questions.append({
+                "number": int(_m.group(1)),
+                "topic": _m.group(2).strip(),
+                "text":  _m.group(3).strip().replace("\n", " "),
+            })
+        if _questions:
+            yield {
+                "type": "workshop_questions",
+                "content": {"questions": _questions},
+            }

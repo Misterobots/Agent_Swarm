@@ -77,6 +77,7 @@ export function useChatStream(options?: {
     setMessagePendingClarification,
     setMessageQueueStatus,
     setMessageSuggestedFollowups,
+    setMessageWorkshopQuestions,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -335,6 +336,11 @@ export function useChatStream(options?: {
             // Handle generated design artifacts from Open Design Studio
             if (event.design) {
               setMessageDesignArtifact(convId!, assistantId, event.design);
+            }
+          } else if (event.type === "workshop_questions") {
+            // Workshop Phase-1 discovery question chips
+            if ((event as any).workshopQuestions?.length > 0) {
+              setMessageWorkshopQuestions(convId!, assistantId, (event as any).workshopQuestions);
             }
           } else if (event.type === "suggested_followups") {
             // LLM-generated end-of-response chips

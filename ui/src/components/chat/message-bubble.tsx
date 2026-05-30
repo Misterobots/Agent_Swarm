@@ -10,6 +10,7 @@ import { ToolCallBlock } from "./tool-call-block";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { ClarificationCard } from "./clarification-card";
 import { DesignArtifactCard } from "./design-artifact-card";
+import { WorkshopQuestionsCard } from "./workshop-questions-card";
 import { ModelQueueCard } from "./model-queue-card";
 import { MessageActions } from "./message-actions";
 import { MediaPreview } from "./media-preview";
@@ -482,6 +483,10 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
         {/* Design artifact — rendered outside content conditional so it shows even when content is empty */}
         {message.designArtifact && (
           <DesignArtifactCard artifact={message.designArtifact} />
+        )}
+        {/* Workshop Phase-1 question chips — replaces the plain text list */}
+        {message.workshopQuestions && message.workshopQuestions.length > 0 && (
+          <WorkshopQuestionsCard questions={message.workshopQuestions} />
         )}
         {/* End-of-response follow-up chips — only on the latest assistant message, after streaming */}
         {!isUser
