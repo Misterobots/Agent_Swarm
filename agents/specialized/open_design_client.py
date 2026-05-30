@@ -271,3 +271,115 @@ def get_project_url(project_id: str, filename: str = "index.html") -> str:
     base = _OPEN_DESIGN_URL.rstrip("/")
     # OD web UI serves projects at /#/projects/:id (hash routing)
     return f"{base}/#/projects/{project_id}"
+
+
+# ---------------------------------------------------------------------------
+# SSE helper
+# ---------------------------------------------------------------------------
+
+def _parse_sse_event(block: str) -> Optional[dict]:
+    """Parse one SSE event block (text between double newlines) into a dict."""
+    import json as _json
+
+    data_lines: list[str] = []
+    event_type: Optional[str] = None
+    for line in block.splitlines():
+        if line.startswith("event:"):
+            event_type = line[6:].strip()
+        elif line.startswith("data:"):
+            data_lines.append(line[5:].strip())
+    if not data_lines:
+        return None
+    raw = "\n".join(data_lines)
+    try:
+        payload = _json.loads(raw)
+    except Exception:
+        payload = {"content": raw}
+    if event_type:
+        payload.setdefault("type", event_type)
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# Class-based client
+# Wraps the module-level helpers and adds run management (start_run /
+# stream_run) for the DESIGN Studio handler in handlers/design.py.
+# ---------------------------------------------------------------------------
+
+class OpenDesignClient:
+    """HTTP client for the nexu-io/open-design daemon."""
+
+    def __init__(self, base_url: str = _OPEN_DESIGN_URL):
+        self._base_url = base_url.rstrip("/")
+
+    # ------------------------------------------------------------------
+    # Project management
+    # ------------------------------------------------------------------
+
+    def create_project(self, name: str, skill_id: Optional[str] = None) -> dict:
+        """Create a project. Returns {"project": {"id": str, ...}}."""
+        payload: dict = {"name": name}
+        if skill_id:
+            payload["skillId"] = skill_id
+        with httpx.Client(base_url=self._base_url, timeout=_DEFAULT_TIMEOUT) as c:
+            r = c.post("/api/projects", json=payload)
+            r.raise_for_status()
+            data = r.json()
+        # Normalise to {"project": {"id": ...}} regardless of daemon shape.
+        if "project" not in data:
+            data = {"project": data}
+        if "id" not in data["project"]:
+            raise ValueError(f"[OpenDesignClient] create_project: no 'id' in response: {data}")
+        logger.info("[OpenDesignClient] Created project %r id=%s", name, data["project"]["id"])
+        return data
+
+    # ------------------------------------------------------------------
+    # Run management
+    # ------------------------------------------------------------------
+
+    def start_run(
+        self,
+        project_id: str,
+        message: str,
+        skill_id: Optional[str] = None,
+    ) -> dict:
+        """Start an agent run for a project. Returns {"runId": str}."""
+        payload: dict = {"message": message}
+        if skill_id:
+            payload["skillId"] = skill_id
+        with httpx.Client(base_url=self._base_url, timeout=_DEFAULT_TIMEOUT) as c:
+            r = c.post(f"/api/projects/{project_id}/runs", json=payload)
+            r.raise_for_status()
+            data = r.json()
+        if "runId" not in data:
+            run_id = data.get("id") or data.get("run_id")
+            if not run_id:
+                raise ValueError(f"[OpenDesignClient] start_run: no runId in response: {data}")
+            data = {"runId": run_id}
+        logger.info("[OpenDesignClient] Started run %s on project %s", data["runId"], project_id)
+        return data
+
+    def stream_run(self, run_id: str):
+        """Stream events for a run via SSE.
+
+        Yields dicts with at least a 'type' key.  Relevant types:
+          {"type": "text",         "content": str}
+          {"type": "artifact:end", "identifier": str, "fullContent": str}
+          {"type": "done"}
+        """
+        url = f"{self._base_url}/api/runs/{run_id}/stream"
+        try:
+            with httpx.Client(timeout=120.0) as c:
+                with c.stream("GET", url) as response:
+                    response.raise_for_status()
+                    buffer = ""
+                    for chunk in response.iter_text():
+                        buffer += chunk
+                        while "\n\n" in buffer:
+                            event_block, buffer = buffer.split("\n\n", 1)
+                            event = _parse_sse_event(event_block)
+                            if event:
+                                yield event
+        except Exception as exc:
+            logger.error("[OpenDesignClient] stream_run error for run %s: %s", run_id, exc)
+            raise
