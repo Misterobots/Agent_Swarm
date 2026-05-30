@@ -562,7 +562,7 @@ def chat_swarm(
             try:
                 import httpx as _httpx_recall
                 _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
-                with _httpx_recall.Client(timeout=10.0) as _mp_client:
+                with _httpx_recall.Client(timeout=3.0) as _mp_client:  # was 10 s; keep pre-routing fast
                     _mp_resp = _mp_client.post(f"{_mp_url}/v1/memories/search", json={"query": user_input, "owner_id": owner_id, "limit": 5})
                 if _mp_resp.status_code == 200:
                     strong = [m for m in _mp_resp.json() if (m.get("score") or 0) > 0.5]
@@ -751,15 +751,49 @@ def chat_swarm(
         # Intent routing
         # ---------------------------------------------------------------------------
         if swarm_mode:
-            # Run the router first so we can respect CREATIVE (and IMAGE/DESIGN) before forcing COORDINATE
+            # Fast keyword scan to protect media intents without a full LLM router call.
+            # The full route() call (tier-4 LLM) can take 5–30 s when qwen3:8b is cold
+            # (evicted from VRAM by a prior 30B inference).  We use two sub-millisecond
+            # tiers instead:
+            #   1. fast_classify()  — existing regex rules (VISION / ACTION_FIGURE / IOT / TRAIN)
+            #   2. Inline regex     — IMAGE / 3D / DESIGN / CREATIVE (not in fast_classify)
+            # If neither tier fires, go straight to COORDINATE — no Ollama call.
+            import re as _re_sw
+            _SWARM_MEDIA_RE = _re_sw.compile(
+                r"\b(generate|create|draw|paint|render|make)\b.{0,50}"
+                r"\b(image|photo|picture|illustration|artwork|poster)\b"
+                r"|\b(3d model|3d print|mesh|glb|obj|blender|sculpt)\b"
+                r"|\b(landing page|saas landing|pitch deck|slide deck|html prototype"
+                r"|dashboard design|mobile ui|wireframe|mockup|ui design|ux design)\b"
+                r"|\b(write|compose)\b.{0,30}\b(story|poem|fiction|roleplay|narrative|lore)\b",
+                _re_sw.I,
+            )
+            _SWARM_MEDIA_INTENT_MAP = {
+                "draw": "IMAGE", "paint": "IMAGE", "generate": "IMAGE",
+                "3d model": "3D", "3d print": "3D", "mesh": "3D", "glb": "3D",
+                "landing page": "DESIGN", "pitch deck": "DESIGN", "slide deck": "DESIGN",
+                "write": "CREATIVE", "compose": "CREATIVE",
+            }
             from semantic_router import get_semantic_router
             _pre_router = get_semantic_router()
-            _pre_decision = _pre_router.route(user_input)
-            _pre_intent = _pre_decision.get("intent", "COORDINATE")
-            if _pre_intent in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN", "CREATIVE"):
+            # Tier 1: existing fast_classify regex rules
+            _fast_pre = _pre_router.fast_classify(user_input)
+            _pre_intent = (_fast_pre or {}).get("intent", "")
+            _pre_conf = (_fast_pre or {}).get("confidence", 0.90)
+            # Tier 2: inline media regex (IMAGE / 3D / DESIGN / CREATIVE)
+            if not _pre_intent:
+                _m = _SWARM_MEDIA_RE.search(user_input)
+                if _m:
+                    _matched = _m.group(0).lower()
+                    _pre_intent = next(
+                        (v for k, v in _SWARM_MEDIA_INTENT_MAP.items() if k in _matched),
+                        "DESIGN",  # conservative fallback if regex matched but key not found
+                    )
+                    _pre_conf = 0.88
+            if _pre_intent in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN", "CREATIVE", "VISION"):
                 intent = _pre_intent
-                confidence = _pre_decision.get("confidence", 0.95)
-                reasoning = f"swarm_mode override exempted: {_pre_intent}"
+                confidence = _pre_conf
+                reasoning = f"swarm_mode override exempted: {_pre_intent} (fast-path)"
             else:
                 intent = "COORDINATE"
                 confidence = 1.0
