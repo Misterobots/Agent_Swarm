@@ -42,6 +42,7 @@ interface SettingsState {
   autoFeedPlan: boolean;
   swarmMode: boolean;
   designMode: boolean;
+  workshopMode: boolean;
   groundingWeb: boolean;
   groundingDocs: boolean;
   groundingFile: boolean;
@@ -78,6 +79,7 @@ interface SettingsState {
   setAutoFeedPlan: (on: boolean) => void;
   setSwarmMode: (on: boolean) => void;
   setDesignMode: (on: boolean) => void;
+  setWorkshopMode: (on: boolean) => void;
   setGroundingWeb: (on: boolean) => void;
   setGroundingDocs: (on: boolean) => void;
   setGroundingFile: (on: boolean) => void;
@@ -106,6 +108,7 @@ export const useSettingsStore = create<SettingsState>()(
       autoFeedPlan: false,
       swarmMode: false,
       designMode: false,
+      workshopMode: false,
       groundingWeb: false,
       groundingDocs: false,
       groundingFile: false,
@@ -139,6 +142,7 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoFeedPlan: (autoFeedPlan) => set({ autoFeedPlan }),
       setSwarmMode: (swarmMode) => set({ swarmMode }),
       setDesignMode: (designMode) => set({ designMode }),
+      setWorkshopMode: (workshopMode) => set({ workshopMode }),
       setGroundingWeb: (groundingWeb) => set({ groundingWeb }),
       setGroundingDocs: (groundingDocs) => set({ groundingDocs }),
       setGroundingFile: (groundingFile) => set({ groundingFile }),

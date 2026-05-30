@@ -453,6 +453,7 @@ class ChatRequest(BaseModel):
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
     swarm_mode: bool = False          # route through Lamport multi-agent coordinator
     design_mode: bool = False         # route through Open Design Studio
+    workshop_mode: bool = False       # route through Product Workshop (Grill Me)
     solving_max_iter: Optional[int] = None  # MarsRL max iterations (0 = unlimited, overrides config)
     solving_max_time: Optional[int] = None  # MarsRL max time in seconds (0 = unlimited, overrides config)
     # Developer-mode granular per-agent budgets. Each overrides the overall budget for that agent.
@@ -1179,6 +1180,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     grounding_file=request.grounding_file,
                     swarm_mode=request.swarm_mode,
                     design_mode=request.design_mode,
+                    workshop_mode=request.workshop_mode,
                     dev_mode=request.dev_mode,
                     solving_max_iter=request.solving_max_iter,
                     solving_max_time=request.solving_max_time,
