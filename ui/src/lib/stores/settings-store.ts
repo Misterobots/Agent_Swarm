@@ -80,6 +80,9 @@ interface SettingsState {
   setSwarmMode: (on: boolean) => void;
   setDesignMode: (on: boolean) => void;
   setWorkshopMode: (on: boolean) => void;
+  /** Pre-fills the chat input; cleared by ChatInput after consumption */
+  pendingInput: string;
+  setPendingInput: (text: string) => void;
   setGroundingWeb: (on: boolean) => void;
   setGroundingDocs: (on: boolean) => void;
   setGroundingFile: (on: boolean) => void;
@@ -143,6 +146,8 @@ export const useSettingsStore = create<SettingsState>()(
       setSwarmMode: (swarmMode) => set({ swarmMode }),
       setDesignMode: (designMode) => set({ designMode }),
       setWorkshopMode: (workshopMode) => set({ workshopMode }),
+      pendingInput: "",
+      setPendingInput: (pendingInput) => set({ pendingInput }),
       setGroundingWeb: (groundingWeb) => set({ groundingWeb }),
       setGroundingDocs: (groundingDocs) => set({ groundingDocs }),
       setGroundingFile: (groundingFile) => set({ groundingFile }),
