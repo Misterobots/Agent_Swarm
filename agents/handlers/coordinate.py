@@ -28,6 +28,7 @@ def handle_coordinate(user_input: str, ctx: dict):
     lf_trace = ctx["lf_trace"]
     langfuse = ctx["langfuse"]
     use_langfuse = ctx["use_langfuse"]
+    already_steered = ctx.get("already_steered", False)
 
     # --- DEV MODE GATE ---
     # Intercept build/project requests when dev_mode is off and not in research/plan mode.
@@ -110,6 +111,7 @@ def handle_coordinate(user_input: str, ctx: dict):
             dev_mode=dev_mode,
             plan_mode=ultraplan_mode,
             research_mode=research_mode,
+            already_steered=already_steered,
         ):
             yield update
 

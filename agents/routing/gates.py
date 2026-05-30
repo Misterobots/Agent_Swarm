@@ -87,6 +87,34 @@ def handle_pending_context(
         return  # fall through
 
     # -----------------------------------------------------------------------
+    # 3b. swarm_steering (nuance direction selection)
+    # -----------------------------------------------------------------------
+    # The orchestrator saves type="swarm_steering" when nuance_detected=True and
+    # the user is asked to pick a direction.  Reconstruct the full scoped prompt
+    # so the coordinator gets ONE combined context, then pass already_steered=True
+    # so the decomposer skips the nuance gate and goes straight to worker spawning.
+    if ctx_type == "swarm_steering":
+        original = pending_ctx.get("prompt", "")
+        question = pending_ctx.get("question", "")
+        logger.info(
+            "[Router] Resolving Swarm Steering. Original: '%s' | Q: '%s' | Answer: '%s'",
+            original[:80], question[:60], user_input[:60],
+        )
+        # Reconstruct a fully-scoped prompt for the next coordinate_task call.
+        scoped_prompt = (
+            f"{original}\n\n"
+            f"[Steering context — already answered, do NOT ask again]\n"
+            f"Question was: {question}\n"
+            f"Chosen direction: {user_input}"
+        )
+        result["user_input"] = scoped_prompt
+        result["already_steered"] = True
+        yield {"type": "log", "content": f"[Context Manager] Swarm steering resolved → '{user_input}'. Launching coordinator..."}
+        from brooks import clear_context
+        clear_context(session_id=session_id, owner_id=owner_id)
+        return  # fall through to coordinate handler
+
+    # -----------------------------------------------------------------------
     # 4. ambiguity_resolution
     # -----------------------------------------------------------------------
     if ctx_type == "ambiguity_resolution":

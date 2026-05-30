@@ -85,6 +85,7 @@ def coordinate_task(
     plan_mode: bool = False,
     research_mode: bool = False,
     skip_project_gate: bool = False,
+    already_steered: bool = False,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
@@ -118,7 +119,7 @@ def coordinate_task(
         except Exception as _e:
             logger.warning(f"[Coordinator] GPU zone check skipped (non-fatal): {_e}")
 
-        plan = _decompose_task(user_input, history_context)
+        plan = _decompose_task(user_input, history_context, already_steered=already_steered)
         summary = plan.get("summary", user_input[:200])
         research_tasks = plan.get("research_tasks", [])
         impl_tasks = plan.get("implementation_tasks", [])
@@ -159,7 +160,7 @@ def coordinate_task(
         # Unlike the ambiguity gate (missing info), this catches well-specified requests where
         # choosing the wrong approach would waste the research team's effort.
         # The user picks a direction; the coordinator resumes with that context via Brooks.
-        if plan.get("nuance_detected", False) and not dev_mode and not research_mode:
+        if plan.get("nuance_detected", False) and not dev_mode and not research_mode and not already_steered:
             steering_q = plan.get(
                 "steering_question",
                 "Which angle would be most valuable to explore?",

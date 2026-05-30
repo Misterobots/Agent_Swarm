@@ -534,6 +534,9 @@ def chat_swarm(
         if _pending_result["handled"]:
             return
         user_input = _pending_result["user_input"]
+        # Carry the already_steered flag forward so coordinate_task skips the
+        # nuance gate on the re-entry after a swarm steering answer.
+        _already_steered = _pending_result.get("already_steered", False)
 
     try:
         from handlers.base import _emit_turn_metadata, _emit_stream_mode, _emit_turn_boundary, _emit_continuation_hint
@@ -955,6 +958,10 @@ def chat_swarm(
         route_start_time = time.time()
 
         # Build shared handler context
+        # _already_steered may have been set when a swarm_steering pending context
+        # was resolved above; default False for all other paths.
+        if "_already_steered" not in dir():
+            _already_steered = False
         is_admin = _is_admin_session(session_id, owner_id)
         # Strip non-Ollama-model values from `model`. The frontend sends UI
         # tier labels like "Home-AI-Swarm" or "default" that aren't real
@@ -987,6 +994,7 @@ def chat_swarm(
             "dev_mode": dev_mode,
             "conv_storage": _conv_storage,
             "is_admin": is_admin,
+            "already_steered": _already_steered,
             "intent": intent,
             "routing_decision": routing_decision,
             "solving_max_iter": solving_max_iter,

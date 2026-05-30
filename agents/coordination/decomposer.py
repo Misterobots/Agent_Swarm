@@ -15,7 +15,7 @@ from coordination.pioneers import PERSPECTIVE_TAXONOMY
 logger = setup_logger("Lamport")
 
 
-def _decompose_task(user_input: str, history_context: str = "") -> dict:
+def _decompose_task(user_input: str, history_context: str = "", already_steered: bool = False) -> dict:
     """
     Use LLM to decompose a complex task into subtasks.
     Returns dict with research_tasks, implementation_tasks, verification_criteria.
@@ -106,6 +106,16 @@ def _decompose_task(user_input: str, history_context: str = "") -> dict:
         "    Each direction must lead to genuinely different research output.\n"
         "Default: nuance_detected=false, steering_question=null, suggested_directions=[]."
     )
+
+    # When the user has already answered a steering question, hard-forbid
+    # nuance_detected so the model doesn't ask for a second round of scoping.
+    if already_steered:
+        system_prompt += (
+            "\n\nCRITICAL OVERRIDE: The user has ALREADY answered a steering question to "
+            "scope this task. You MUST set nuance_detected=false and proceed directly to "
+            "decomposing into concrete research/implementation tasks. Do NOT ask any further "
+            "clarifying or scoping questions."
+        )
 
     prompt = f"{history_context}\n\nTask to decompose:\n{user_input}" if history_context else user_input
 
