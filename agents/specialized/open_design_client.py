@@ -219,23 +219,30 @@ def list_design_systems() -> list[dict]:
         return []
 
 
-def create_project(name: str, skill_id: Optional[str] = None) -> Optional[str]:
-    """
-    Create a new OD project and return its ID.
+def create_project(
+    name: str,
+    skill_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+) -> Optional[str]:
+    """Create a new OD project and return its ID.
 
+    The OD daemon (v0.5.0+) requires the caller to supply a ``project_id``
+    (sent as ``id`` in the body).  A UUID is generated if one is not provided.
     Returns the project ID string, or None on failure.
     """
-    payload: dict = {"name": name}
+    import uuid as _uuid
+    pid = project_id or str(_uuid.uuid4())
+    payload: dict = {"id": pid, "name": name}
     if skill_id:
         payload["skillId"] = skill_id
     try:
         with _client() as c:
             r = c.post("/api/projects", json=payload)
             r.raise_for_status()
-            project = r.json().get("project") or r.json()
-            project_id = project.get("id") if isinstance(project, dict) else None
-            logger.info("[OpenDesign] Created project %r (id=%s)", name, project_id)
-            return project_id
+            returned = r.json().get("project") or r.json()
+            returned_id = returned.get("id") if isinstance(returned, dict) else pid
+            logger.info("[OpenDesign] Created project %r (id=%s)", name, returned_id)
+            return returned_id
     except Exception as exc:
         logger.warning("[OpenDesign] create_project failed: %s", exc)
         return None
@@ -316,16 +323,26 @@ class OpenDesignClient:
     # Project management
     # ------------------------------------------------------------------
 
-    def create_project(self, name: str, skill_id: Optional[str] = None) -> dict:
-        """Create a project. Returns {"project": {"id": str, ...}}."""
-        payload: dict = {"name": name}
+    def create_project(
+        self,
+        name: str,
+        skill_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> dict:
+        """Create a project. Returns {"project": {"id": str, ...}}.
+
+        The OD daemon requires the caller to supply ``id`` in the request body.
+        A UUID is generated automatically if ``project_id`` is not given.
+        """
+        import uuid as _uuid
+        pid = project_id or str(_uuid.uuid4())
+        payload: dict = {"id": pid, "name": name}
         if skill_id:
             payload["skillId"] = skill_id
         with httpx.Client(base_url=self._base_url, timeout=_DEFAULT_TIMEOUT) as c:
             r = c.post("/api/projects", json=payload)
             r.raise_for_status()
             data = r.json()
-        # Normalise to {"project": {"id": ...}} regardless of daemon shape.
         if "project" not in data:
             data = {"project": data}
         if "id" not in data["project"]:
