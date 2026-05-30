@@ -825,14 +825,15 @@ def chat_swarm(
         # Keyword overrides — kept minimal; only genuinely unambiguous signals
         _lower = user_input.lower()
 
-        # Workshop / Grill-Me keywords — fire before any other override
-        _workshop_keywords = [
-            "grill me", "workshop:", "build brief", "product brief",
-            "ideate on", "ideate about", "help me think through",
-            "flesh out this idea", "flesh out the idea",
-        ]
-        if any(kw in _lower for kw in _workshop_keywords):
-            intent = "WORKSHOP"; confidence = 0.97; reasoning = "Keyword override: workshop/ideation trigger"
+        # Workshop slash commands: /workshop [idea]  or  /grill [idea]
+        # Strip the command prefix so the handler only sees the raw idea.
+        _WORKSHOP_CMDS = ("/workshop", "/grill")
+        if _lower.strip().startswith(_WORKSHOP_CMDS):
+            for _cmd in _WORKSHOP_CMDS:
+                if _lower.strip().startswith(_cmd):
+                    user_input = user_input.strip()[len(_cmd):].strip()
+                    break
+            intent = "WORKSHOP"; confidence = 1.0; reasoning = "Slash command: /workshop"
         # Continue workshop session when user is replying to Phase-1 questions
         elif intent not in ("WORKSHOP", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN") and history_context:
             _WORKSHOP_SENTINELS = (
