@@ -26,7 +26,8 @@ import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
 import { useAutoGoal } from "@/lib/hooks/use-goals";
 import { GoalsPanel } from "@/components/goals/GoalsPanel";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
-import type { FileAttachment } from "@/types/chat";
+import type { FileAttachment, FlaggedFollowup } from "@/types/chat";
+import { useFollowupsStore } from "@/lib/stores/followups-store";
 
 function usageBarClass(pct: number): string {
   if (pct >= 0.95) return "bg-red-500";
@@ -71,7 +72,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
     devMode,
     onToolResult: devMode ? handleToolResult : undefined,
   });
-  const { activeConversationId, activeConversation, updateConversation } = useChatStore();
+  const { activeConversationId, activeConversation, updateConversation, setMessageFlaggedFollowup } = useChatStore();
+  const addFollowup = useFollowupsStore((s) => s.addFollowup);
   const model = useSettingsStore((s) => s.model);
   const theme = useSettingsStore((s) => s.theme);
   const personality = THEME_PERSONALITIES[theme] ?? THEME_PERSONALITIES.memex;
@@ -173,6 +175,61 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       console.error("[ChatView] deny failed", e);
     }
   }, []);
+
+  /**
+   * Flag a message for follow-up.
+   * Builds the self-contained prompt from the last few messages of context,
+   * persists to the followups store (localStorage), and updates the message
+   * in-place so the FlaggedFollowupCard renders immediately.
+   */
+  const handleFlagMessage = useCallback(
+    async (messageId: string, title: string, tldr: string) => {
+      const convId = activeConversationId;
+      const conv = activeConversation();
+      if (!convId || !conv) return;
+
+      const msgIndex = conv.messages.findIndex((m) => m.id === messageId);
+      if (msgIndex === -1) return;
+
+      // Gather last N messages as context for the prompt
+      const CONTEXT_WINDOW = 5;
+      const contextMsgs = conv.messages.slice(
+        Math.max(0, msgIndex - CONTEXT_WINDOW),
+        msgIndex + 1
+      );
+      const contextText = contextMsgs
+        .map((m) => {
+          const role = m.role === "user" ? "User" : "Assistant";
+          const body = m.content.slice(0, 800);
+          return `${role}:\n${body}`;
+        })
+        .join("\n\n---\n\n");
+
+      const prompt = [
+        tldr ? `Task: ${tldr}\n` : "",
+        `Context from conversation "${conv.title}":\n\n${contextText}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const followup: FlaggedFollowup = {
+        id: crypto.randomUUID(),
+        title,
+        tldr: tldr || undefined,
+        prompt,
+        flaggedAt: Date.now(),
+        conversationId: convId,
+        messageId,
+      };
+
+      // Persist to global followups queue (localStorage via Zustand)
+      addFollowup(followup);
+
+      // Stamp the message so the card renders inline
+      setMessageFlaggedFollowup(convId, messageId, followup);
+    },
+    [activeConversationId, activeConversation, addFollowup, setMessageFlaggedFollowup]
+  );
 
   return (
     <>
@@ -293,6 +350,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
                     onDeny={devMode ? handleDeny : undefined}
                     onSelectClarification={(val) => sendMessage(val)}
                     onSelectFollowup={(val) => sendMessage(val)}
+                    onFlag={handleFlagMessage}
                   />
                 </div>
               );

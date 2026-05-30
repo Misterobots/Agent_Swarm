@@ -142,6 +142,30 @@ export interface SuggestedFollowup {
   prompt: string;
 }
 
+/**
+ * A manually flagged follow-up task created by the user from a message.
+ * Mirrors the mcp__ccd_session__spawn_task contract.
+ */
+export interface FlaggedFollowup {
+  /** Unique id for this follow-up item. */
+  id: string;
+  /** Short imperative phrase (under 60 chars) shown as the chip label. */
+  title: string;
+  /** 1-2 sentence plain-English summary shown in tooltip / card body. */
+  tldr?: string;
+  /**
+   * Self-contained brief for the spawned session — auto-populated from
+   * the flagged message content + recent conversation context.
+   */
+  prompt: string;
+  /** Unix ms timestamp of when the flag was created. */
+  flaggedAt: number;
+  /** The conversation this flag was created in. */
+  conversationId?: string;
+  /** The message id this flag was created from. */
+  messageId: string;
+}
+
 export interface StreamEvent {
   type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups";
   content?: string;
@@ -229,6 +253,8 @@ export interface ChatMessage {
   pendingQueueStatus?: QueueStatus;
   /** LLM-generated contextual follow-up chips shown at end of response */
   suggestedFollowups?: SuggestedFollowup[];
+  /** User-created follow-up flag (set when user clicks Flag on this message) */
+  flaggedFollowup?: FlaggedFollowup;
 }
 
 export interface Conversation {

@@ -14,6 +14,7 @@ import { ModelQueueCard } from "./model-queue-card";
 import { MessageActions } from "./message-actions";
 import { MediaPreview } from "./media-preview";
 import { ResponseSuggestionChips } from "./response-suggestion-chips";
+import { FlagForm, FlaggedFollowupCard } from "./flagged-followup-card";
 
 // ---------------------------------------------------------------------------
 // Swarm response parser — splits coordinator output into collapsible phases
@@ -185,6 +186,11 @@ interface MessageBubbleProps {
   /** Called when the user clicks an end-of-response suggestion chip or submits free text */
   onSelectFollowup?: (value: string) => void;
   onUseAlternativeModel?: (modelName: string) => void;
+  /**
+   * Called when the user submits a flag form on an assistant message.
+   * Receives the user-edited title and optional tldr.
+   */
+  onFlag?: (messageId: string, title: string, tldr: string) => void | Promise<void>;
 }
 
 const COLLAPSE_THRESHOLD = 1200;
@@ -193,10 +199,30 @@ function isCreativeRedirect(content: string): boolean {
   return content.includes("Creative Request Detected") || content.includes("Switch to the **Art Studio**");
 }
 
-export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny, onSelectClarification, onSelectFollowup, onUseAlternativeModel }: MessageBubbleProps) {
+/** Strip markdown tokens and return a clean first line suitable as a title. */
+function extractFlagTitle(content: string): string {
+  const clean = content
+    .replace(/```[\s\S]*?```/g, "")         // fenced code blocks
+    .replace(/`[^`]+`/g, "")                // inline code
+    .replace(/\*\*(.+?)\*\*/g, "$1")        // bold
+    .replace(/\*(.+?)\*/g, "$1")            // italic
+    .replace(/#{1,6}\s+/g, "")              // headings
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // links
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 8) ?? content.trim();
+
+  if (clean.length <= 55) return clean;
+  return clean.slice(0, 52) + "…";
+}
+
+export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEditMessage, onRetryMessage, onBranchMessage, onApprove, onDeny, onSelectClarification, onSelectFollowup, onUseAlternativeModel, onFlag }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
   const [traceOpen, setTraceOpen] = useState(false);
+
+  // Flag-for-follow-up inline form state
+  const [flagFormOpen, setFlagFormOpen] = useState(false);
 
   // Collapsible body
   const canCollapse = !isUser && message.content.length > COLLAPSE_THRESHOLD;
@@ -282,6 +308,8 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
         onEdit={isUser && onEditMessage ? () => onEditMessage(message.content) : undefined}
         onRetry={isUser && onRetryMessage ? onRetryMessage : undefined}
         onBranch={onBranchMessage}
+        onFlagClick={!isUser && onFlag && !message.flaggedFollowup ? () => setFlagFormOpen(true) : undefined}
+        flagged={!!message.flaggedFollowup}
       />
       <div
         className={cn(
@@ -468,6 +496,21 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
               disabled={isStreaming}
             />
           )}
+        {/* Flag for follow-up: inline form opens when flag button is clicked */}
+        {!isUser && flagFormOpen && !message.flaggedFollowup && (
+          <FlagForm
+            defaultTitle={extractFlagTitle(message.content)}
+            onSubmit={async (title, tldr) => {
+              setFlagFormOpen(false);
+              await onFlag?.(message.id, title, tldr);
+            }}
+            onCancel={() => setFlagFormOpen(false)}
+          />
+        )}
+        {/* Flagged follow-up confirmation card */}
+        {!isUser && message.flaggedFollowup && (
+          <FlaggedFollowupCard followup={message.flaggedFollowup} />
+        )}
       </div>
     </div>
     </>
