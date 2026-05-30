@@ -749,6 +749,36 @@ def chat_swarm(
                 return
 
         # ---------------------------------------------------------------------------
+        # Slash command dispatch
+        # Fires BEFORE the routing block so it skips the LLM router entirely.
+        # Each command strips its own prefix so handlers receive only the payload.
+        # ---------------------------------------------------------------------------
+        _sc = user_input.strip()
+        _scl = _sc.lower()
+        _research_slash = False  # sentinel: /research explicitly requested
+        _SLASH_TABLE = [
+            # (prefix,       mode_flag,      extra)
+            ("/workshop",   "workshop_mode",   None),
+            ("/grill",      "workshop_mode",   None),
+            ("/design",     "design_mode",     None),
+            ("/build",      "swarm_mode",      None),
+            ("/swarm",      "swarm_mode",      None),
+            ("/plan",       "swarm_mode",      "ultraplan"),
+            ("/research",   None,              "research"),
+            ("/think",      None,              "think"),
+        ]
+        for _sc_cmd, _sc_flag, _sc_extra in _SLASH_TABLE:
+            if _scl.startswith(_sc_cmd + " ") or _scl == _sc_cmd:
+                user_input = _sc[len(_sc_cmd):].strip()
+                if _sc_flag == "workshop_mode":  workshop_mode    = True
+                elif _sc_flag == "design_mode":  design_mode      = True
+                elif _sc_flag == "swarm_mode":   swarm_mode       = True
+                if _sc_extra == "ultraplan":     ultraplan_mode   = True
+                if _sc_extra == "think":         ultrathink_mode  = True
+                if _sc_extra == "research":      _research_slash  = True; research_mode = True
+                break
+
+        # ---------------------------------------------------------------------------
         # Intent routing
         # ---------------------------------------------------------------------------
         if swarm_mode:
@@ -810,6 +840,11 @@ def chat_swarm(
             confidence = 1.0
             reasoning = "design_mode=True bypasses neural router"
             yield {"type": "status", "content": "🎨 Design Studio: Activating..."}
+        elif _research_slash:
+            intent = "RESEARCH"
+            confidence = 1.0
+            reasoning = "Slash command: /research bypasses neural router"
+            yield {"type": "status", "content": "🔬 Research Mode: Activating..."}
         else:
             from semantic_router import get_semantic_router
             yield {"type": "status", "content": "🧠 Neural Cortex: Analyzing intent..."}
@@ -825,17 +860,8 @@ def chat_swarm(
         # Keyword overrides — kept minimal; only genuinely unambiguous signals
         _lower = user_input.lower()
 
-        # Workshop slash commands: /workshop [idea]  or  /grill [idea]
-        # Strip the command prefix so the handler only sees the raw idea.
-        _WORKSHOP_CMDS = ("/workshop", "/grill")
-        if _lower.strip().startswith(_WORKSHOP_CMDS):
-            for _cmd in _WORKSHOP_CMDS:
-                if _lower.strip().startswith(_cmd):
-                    user_input = user_input.strip()[len(_cmd):].strip()
-                    break
-            intent = "WORKSHOP"; confidence = 1.0; reasoning = "Slash command: /workshop"
-        # Continue workshop session when user is replying to Phase-1 questions
-        elif intent not in ("WORKSHOP", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN") and history_context:
+        # Workshop session continuation — auto-route Phase-2 replies
+        if intent not in ("WORKSHOP", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN", "RESEARCH") and history_context:
             _WORKSHOP_SENTINELS = (
                 "Answer any or all of these and I'll draft your Product Brief.",
                 "▶️ Design Mode Prompt",
