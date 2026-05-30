@@ -50,6 +50,7 @@ export async function* sendChatStream(
   solvingMaxIter?: number,
   solvingMaxTime?: number,
   designMode?: boolean,
+  workshopMode?: boolean,
   solvingSolverNDrafts?: number,
   solvingSolverMaxTime?: number,
   solvingVerifierNRuns?: number,
@@ -76,6 +77,7 @@ export async function* sendChatStream(
   if (groundingFile) body.grounding_file = true;
   if (swarmMode) body.swarm_mode = true;
   if (designMode) body.design_mode = true;
+  if (workshopMode) body.workshop_mode = true;
   if (solvingMaxIter !== undefined) body.solving_max_iter = solvingMaxIter;
   if (solvingMaxTime !== undefined) body.solving_max_time = solvingMaxTime;
   if (solvingSolverNDrafts !== undefined) body.solving_solver_n_drafts = solvingSolverNDrafts;

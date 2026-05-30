@@ -439,6 +439,7 @@ def chat_swarm(
     swarm_mode: bool = False,
     dev_mode: bool = False,
     design_mode: bool = False,
+    workshop_mode: bool = False,
     solving_max_iter: int | None = None,
     solving_max_time: int | None = None,
     solving_solver_n_drafts: int | None = None,
@@ -799,6 +800,11 @@ def chat_swarm(
                 confidence = 1.0
                 reasoning = "swarm_mode=True bypasses neural router"
                 yield {"type": "status", "content": "🧩 Swarm Mode: Routing directly to multi-agent coordinator..."}
+        elif workshop_mode:
+            intent = "WORKSHOP"
+            confidence = 1.0
+            reasoning = "workshop_mode=True bypasses neural router"
+            yield {"type": "status", "content": "🎯 Workshop: Starting discovery session..."}
         elif design_mode:
             intent = "DESIGN"
             confidence = 1.0
@@ -818,6 +824,24 @@ def chat_swarm(
 
         # Keyword overrides — kept minimal; only genuinely unambiguous signals
         _lower = user_input.lower()
+
+        # Workshop / Grill-Me keywords — fire before any other override
+        _workshop_keywords = [
+            "grill me", "workshop:", "build brief", "product brief",
+            "ideate on", "ideate about", "help me think through",
+            "flesh out this idea", "flesh out the idea",
+        ]
+        if any(kw in _lower for kw in _workshop_keywords):
+            intent = "WORKSHOP"; confidence = 0.97; reasoning = "Keyword override: workshop/ideation trigger"
+        # Continue workshop session when user is replying to Phase-1 questions
+        elif intent not in ("WORKSHOP", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN") and history_context:
+            _WORKSHOP_SENTINELS = (
+                "Answer any or all of these and I'll draft your Product Brief.",
+                "▶️ Design Mode Prompt",
+            )
+            if any(s in history_context for s in _WORKSHOP_SENTINELS):
+                intent = "WORKSHOP"; confidence = 0.92; reasoning = "Workshop session continuation (history)"
+
         if _is_explicit_train_request(user_input) and intent != "TRAIN":
             intent = "TRAIN"; confidence = 0.98; reasoning = "Keyword override: explicit training directive"
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
@@ -1107,6 +1131,11 @@ def chat_swarm(
         if intent == "RESEARCH":
             from handlers.research import handle_research
             yield from handle_research(user_input, ctx)
+            return
+
+        if intent == "WORKSHOP":
+            from handlers.workshop import handle_workshop
+            yield from handle_workshop(user_input, ctx)
             return
 
         if intent == "DESIGN":
