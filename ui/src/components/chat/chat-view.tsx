@@ -104,6 +104,18 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, lastMsg?.content, statusMessage]);
 
+  // Reset the swarm theater when switching conversations / starting a new chat,
+  // so a completed swarm panel (and its recall FAB) never carries into another
+  // chat. Skip the first run so a cross-window swarm restored on mount survives.
+  const didMountConvRef = useRef(false);
+  useEffect(() => {
+    if (!didMountConvRef.current) {
+      didMountConvRef.current = true;
+      return;
+    }
+    useSwarmStore.getState().reset();
+  }, [activeConversationId]);
+
   // Buddy reactions on stream events
   const prevStreamingRef = useRef(false);
   useEffect(() => {
@@ -347,14 +359,14 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         <button
           type="button"
           onClick={() => setSwarmDismissed(false)}
-          className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+8px)] right-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-[var(--chat-surface)] border border-[var(--chat-border)] text-sm font-semibold text-[var(--chat-text)] hover:text-[var(--chat-accent-strong)] active:scale-95 transition-all"
+          className="fixed top-1/2 -translate-y-1/2 right-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-[var(--chat-surface)] border border-[var(--chat-border)] text-sm font-semibold text-[var(--chat-text)] hover:text-[var(--chat-accent-strong)] active:opacity-80 transition-all"
           style={{ boxShadow: "var(--elev-2)" }}
           aria-label="Recall swarm panel"
         >
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${theaterPhase === "complete" ? "bg-emerald-400" : "bg-emerald-400 animate-pulse"}`} />
           Swarm &middot; {swarmWorkers.length} pioneer{swarmWorkers.length !== 1 ? "s" : ""}
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
       )}

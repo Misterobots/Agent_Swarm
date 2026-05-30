@@ -882,8 +882,18 @@ def request_lock(context: str, timeout: int = 300):
         if not acquired:
             raise TimeoutError("[GPU Queue] Failed to acquire GPU lock within timeout.")
 
-        # In-process backstop. Even with the Redis mutex held cluster-wide,
-        # a second thread in this process must not race the zone switch.
+        # In-process backstop. The semaphore guards ONLY the zone switch — NOT the
+        # generation yield below. Holding it across the (potentially long, often
+        # cross-host) workload caused a permanent process-wide deadlock on the
+        # remote orchestrator (Turing): when one workload stalled — e.g. a cross-
+        # host Ollama call that never returned — it held this semaphore forever,
+        # and every later GPU request blocked on it indefinitely (while the Redis
+        # mutex churned on its TTL, which is why we kept seeing "orphaned" Redis
+        # locks). The Redis mutex (held through the yield, with a TTL) already
+        # serializes workloads cluster-wide AND within this process (nx=True ⇒ a
+        # single holder), so the semaphore is redundant during the yield and only
+        # dangerous there. The degraded-mode paths above (Redis down) keep their
+        # own in-process guard around the yield as their sole serializer.
         with _INPROC_GPU_LOCK:
             current_zone = client.get(ZONE_KEY)
             t_evict_start = time.monotonic()
@@ -891,9 +901,11 @@ def request_lock(context: str, timeout: int = 300):
             client.set(ZONE_KEY, context)
             t_eviction = time.monotonic() - t_evict_start
 
-            t_work_start = time.monotonic()
-            yield
-            t_work = time.monotonic() - t_work_start
+        # Generation runs under the Redis mutex ONLY. If it stalls, the Redis lock
+        # self-heals on TTL expiry instead of wedging the process forever.
+        t_work_start = time.monotonic()
+        yield
+        t_work = time.monotonic() - t_work_start
 
     finally:
         if acquired:

@@ -35,6 +35,7 @@ services:
       - OPEN_DESIGN_URL=http://open_design:7456
       - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
       - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
       - MEMPALACE_API_URL=${MEMPALACE_API_URL:-http://192.168.2.102:8200}
       - AGNO_DB_URL=${AGNO_DB_URL}
       - TEMPLATE_DB_URL=${TEMPLATE_DB_URL}

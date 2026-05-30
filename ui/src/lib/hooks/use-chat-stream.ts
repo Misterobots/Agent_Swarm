@@ -207,11 +207,15 @@ export function useChatStream(options?: {
       setLatestThought(null);
       setStreamMode(null);
 
-      // Activate swarm theater immediately if swarm mode is on — don't wait
-      // for the first swarm_phase event, which may arrive late or be missed.
+      // Clear any prior swarm theater at the start of EVERY turn. Otherwise a
+      // completed swarm from a previous turn lingers — its panel stays open and
+      // the recall FAB keeps floating over the composer — even for plain,
+      // non-swarm conversations. Re-activate only when this turn is a swarm run.
+      const sw = useSwarmStore.getState();
+      sw.reset();
       if (swarmMode) {
-        const sw = useSwarmStore.getState();
-        sw.reset();
+        // Activate immediately — don't wait for the first swarm_phase event,
+        // which may arrive late or be missed.
         sw.setActive(true);
         sw.setTheaterPhase("decomposing");
       }

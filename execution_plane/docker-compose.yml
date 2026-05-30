@@ -617,8 +617,11 @@ services:
       - AUTHENTIK_HOST=http://192.168.2.101:9000
       - AUTHENTIK_HOST_BROWSER=http://192.168.2.101:9000
     volumes:
-      - ./config/authentik/media:/media
-      - ./config/authentik/custom-templates:/templates
+      # Named volumes (not host binds): Docker seeds an empty named volume with
+      # the image's dir ownership (UID 1000), so authentik can mkdir /media/public.
+      # Host binds inherit the host folder's perms, which broke on the OneDrive path.
+      - authentik_media:/media
+      - authentik_templates:/templates
     ports:
       - "9000:9000"
       - "9443:9443"
@@ -642,9 +645,9 @@ services:
       - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_DB_PASSWORD}
       - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
     volumes:
-      - ./config/authentik/media:/media
-      - ./config/authentik/certs:/certs
-      - ./config/authentik/custom-templates:/templates
+      - authentik_media:/media
+      - authentik_certs:/certs
+      - authentik_templates:/templates
     depends_on:
       - authentik_db
       - authentik_redis
@@ -807,6 +810,9 @@ volumes:
   vscode_config_coding:
   database_authentik:
   redis_authentik:
+  authentik_media:
+  authentik_templates:
+  authentik_certs:
   spire_agent_data:
   spire_socket:
   tgw_models:
