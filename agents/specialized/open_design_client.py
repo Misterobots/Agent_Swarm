@@ -152,8 +152,12 @@ def detect_skill_from_prompt(user_input: str) -> str:
         "monitoring", "report", "admin panel", "metrics",
     ]
     landing_keywords = [
-        "landing page", "saas", "marketing site", "hero section",
-        "conversion", "sign up page", "sales page", "product page",
+        # "landing page" alone is too generic — app screen descriptions like
+        # "Main Landing Page:" trigger it.  Require stronger saas/marketing signals.
+        "saas", "marketing site", "hero section", "conversion",
+        "sign up page", "sales page", "product page",
+        "create a landing page", "build a landing page",
+        "marketing landing", "saas landing",
     ]
     mobile_keywords = [
         "mobile app", "ios app", "android app", "mobile ui", "phone app",
