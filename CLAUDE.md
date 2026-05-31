@@ -22,7 +22,7 @@
 
 | Service | Host Port | Notes |
 |---------|-----------|-------|
-| SSH | 22 | Key auth only; password auth fails with "Too many authentication failures" |
+| SSH | 22 | `ssh -o IdentitiesOnly=yes -o IdentityAgent=none -i ~/.ssh/id_ed25519 misterobots@192.168.2.103` |
 | HTTP (Traefik) | 80 | |
 | HTTPS (Traefik) | 443 | wildcard cert via CF DNS (`*.shivelymedia.com`) |
 | Docker API | **2375** | ⚠️ Unauthenticated — use when SSH unavailable |
