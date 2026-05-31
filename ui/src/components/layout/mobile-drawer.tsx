@@ -99,11 +99,13 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
           <div className="absolute bottom-0 left-3 right-3 divider" />
         </div>
 
-        {/* Mode Switcher */}
-        <div className="relative px-3 py-3">
-          <ModeSwitcher />
-          <div className="absolute bottom-0 left-3 right-3 divider" />
-        </div>
+        {/* Mode Switcher — admin only, matches desktop sidebar behaviour */}
+        {isAdmin && (
+          <div className="relative px-3 py-3">
+            <ModeSwitcher />
+            <div className="absolute bottom-0 left-3 right-3 divider" />
+          </div>
+        )}
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin">

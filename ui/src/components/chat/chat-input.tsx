@@ -152,6 +152,11 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
           onKeyDown={handleKeyDown}
           placeholder={placeholder || "Send a message..."}
           rows={1}
+          enterKeyHint="send"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="sentences"
+          spellCheck={false}
           className={cn(
             "input-field flex-1 resize-none scrollbar-thin",
             "px-3.5 py-3 md:px-4 md:py-3.5 text-[15px] leading-[1.55]"
