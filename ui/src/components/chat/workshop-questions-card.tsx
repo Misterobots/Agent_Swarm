@@ -27,10 +27,10 @@ export function WorkshopQuestionsCard({ questions, onSend }: WorkshopQuestionsCa
   const handleAnswer = (n: number, value: string) =>
     setAnswers((prev) => ({ ...prev, [n]: value }));
 
-  const submitOne = (q: WorkshopQuestion) => {
-    const answer = (answers[q.number] ?? "").trim();
-    if (!answer || !onSend) return;
-    onSend(`Q${q.number} (${q.topic}): ${answer}`);
+  // Save & close a single chip — does NOT send to backend.
+  // Only the "Submit N answers" header button sends everything at once.
+  const saveOne = (q: WorkshopQuestion) => {
+    if (!(answers[q.number] ?? "").trim()) return;
     setExpanded(null);
   };
 
@@ -143,7 +143,7 @@ export function WorkshopQuestionsCard({ questions, onSend }: WorkshopQuestionsCa
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                         e.preventDefault();
-                        submitOne(q);
+                        saveOne(q);
                       }
                     }}
                     placeholder="Type your answer…"
@@ -155,20 +155,19 @@ export function WorkshopQuestionsCard({ questions, onSend }: WorkshopQuestionsCa
                     )}
                   />
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-[10px] text-amber-600/50">⌘↵ to submit</span>
+                    <span className="text-[10px] text-amber-600/50">⌘↵ to save &amp; close</span>
                     <button
                       type="button"
-                      onClick={() => submitOne(q)}
-                      disabled={!answer.trim() || !onSend}
+                      onClick={() => saveOne(q)}
+                      disabled={!answer.trim()}
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                        answer.trim() && onSend
+                        answer.trim()
                           ? "bg-amber-500/30 text-amber-200 hover:bg-amber-500/50 border border-amber-500/40"
                           : "bg-amber-950/30 text-amber-600/40 border border-amber-500/20 cursor-not-allowed",
                       )}
                     >
-                      <Send size={11} />
-                      Submit answer
+                      Save &amp; next
                     </button>
                   </div>
                 </div>
