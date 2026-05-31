@@ -43,6 +43,20 @@ _DEFAULT_TIMEOUT = 15.0  # seconds for metadata calls; uploads use a longer time
 # ---------------------------------------------------------------------------
 
 SKILL_SYSTEM_PROMPTS: dict[str, str] = {
+    "immersive-ui": """You are an expert cinematic UI/UX designer and front-end developer specialising in immersive, full-screen tablet and kiosk interfaces.
+Create a visually stunning, self-contained interactive interface as a single HTML file.
+
+Requirements:
+- Full-bleed layout filling the viewport (100vw × 100vh) — optimise for landscape tablet (1280×800)
+- Dark, atmospheric background — deep blacks, rich accent glows, no plain white surfaces
+- Smooth continuous animations (CSS keyframes or requestAnimationFrame) — nothing should feel static
+- Interactive navigation: tapping/clicking surfaces transitions between views without page reload
+- Embed ALL CSS and JavaScript inline — zero external CDN links or imports
+- All icons and decorative shapes must be inline SVG or pure CSS — no placeholder images
+- Typography: clear, futuristic sans-serif with text-shadow glow effects to simulate projection
+- Output must feel like a bespoke native application, not a web page
+""",
+
     "saas-landing": """You are an expert SaaS marketing designer and front-end developer.
 Create a complete, conversion-optimized SaaS landing page as a single self-contained HTML file.
 
@@ -116,8 +130,18 @@ def get_skill_system_prompt(skill_id: str) -> str:
 # Used by church.py to pick the right skill automatically.
 # ---------------------------------------------------------------------------
 def detect_skill_from_prompt(user_input: str) -> str:
-    """Heuristically map a user's design request to an OD skill ID."""
+    """Heuristically map a user's design request to an OD skill ID.
+
+    Uses whole-word / whole-phrase matching (regex \\b boundaries) to avoid
+    false positives from substrings — e.g. "graph" must not match inside
+    "typography", and "chart" must not match inside "architecture".
+    """
+    import re as _re
+
     lower = user_input.lower()
+
+    def _match(keywords: list) -> bool:
+        return any(_re.search(rf'\b{_re.escape(kw)}\b', lower) for kw in keywords)
 
     ppt_keywords = [
         "deck", "slide", "presentation", "ppt", "pitch deck", "slideshow",
@@ -135,15 +159,21 @@ def detect_skill_from_prompt(user_input: str) -> str:
         "mobile app", "ios app", "android app", "mobile ui", "phone app",
         "smartphone", "app screen", "mobile design",
     ]
+    immersive_keywords = [
+        "tablet", "kiosk", "holographic", "immersive", "sci-fi ui",
+        "cinematic ui", "full screen", "fullscreen", "prop replica",
+    ]
 
-    if any(kw in lower for kw in ppt_keywords):
+    if _match(ppt_keywords):
         return "guizang-ppt"
-    if any(kw in lower for kw in dashboard_keywords):
+    if _match(dashboard_keywords):
         return "dashboard"
-    if any(kw in lower for kw in landing_keywords):
+    if _match(landing_keywords):
         return "saas-landing"
-    if any(kw in lower for kw in mobile_keywords):
+    if _match(mobile_keywords):
         return "mobile-app"
+    if _match(immersive_keywords):
+        return "immersive-ui"
     return "web-prototype"
 
 
@@ -152,27 +182,60 @@ def detect_skill_from_prompt(user_input: str) -> str:
 # Mirrors the logic in nexu-io/open-design/apps/web/src/artifacts/parser.ts
 # ---------------------------------------------------------------------------
 def parse_artifact_html(text: str) -> Optional[str]:
-    """
-    Extract the first <artifact …>…</artifact> block from text.
+    """Extract an HTML document from model output.
 
-    Returns the HTML content string, or None if no artifact tag is found.
+    Handles four common output shapes, tried in order:
+
+    1. OD canonical  — <artifact ...>...</artifact>
+    2. Markdown fence — ```html\\n...\\n``` or ```\\n<!DOCTYPE...
+    3. Plain HTML     — output (after stripping thinking blocks) starts
+                        with <!DOCTYPE html or <html
+    4. Embedded HTML  — <!DOCTYPE html / <html appears anywhere in the
+                        output (catches models that prefix with explanation)
+
+    Thinking blocks (<thinking>…</thinking>) emitted by extended-reasoning
+    models (UltraThink) are stripped before every check so they don't
+    prevent extraction.
     """
     import re
 
-    pattern = re.compile(
+    # --- pre-processing: strip thinking / reasoning blocks -----------------
+    text = re.sub(r'<think(?:ing)?>.*?</think(?:ing)?>', '', text,
+                  flags=re.DOTALL | re.IGNORECASE).strip()
+
+    # 1. OD artifact tags ---------------------------------------------------
+    artifact_pat = re.compile(
         r'<artifact\s[^>]*>(.*?)</artifact>',
         re.DOTALL | re.IGNORECASE,
     )
-    match = pattern.search(text)
-    if match:
-        return match.group(1).strip()
+    m = artifact_pat.search(text)
+    if m:
+        return m.group(1).strip()
 
-    # Fallback: if the model output looks like a standalone HTML file
-    # (starts with <!DOCTYPE or <html>) without wrapping artifact tags,
-    # accept it directly so the design still reaches the user.
+    # 2. Markdown code fence ------------------------------------------------
+    fence_pat = re.compile(
+        r'```(?:html)?\s*\n([\s\S]*?)\n```',
+        re.IGNORECASE,
+    )
+    for fm in fence_pat.finditer(text):
+        candidate = fm.group(1).strip()
+        cl = candidate.lower()
+        if cl.startswith("<!doctype html") or cl.startswith("<html"):
+            return candidate
+
+    # 3. Output starts with HTML --------------------------------------------
     stripped = text.strip()
-    if stripped.lower().startswith("<!doctype html") or stripped.lower().startswith("<html"):
+    sl = stripped.lower()
+    if sl.startswith("<!doctype html") or sl.startswith("<html"):
         return stripped
+
+    # 4. HTML embedded after explanation text --------------------------------
+    embed_m = re.search(r'(<!DOCTYPE html[\s\S]*|<html[\s\S]*)', text,
+                        re.IGNORECASE)
+    if embed_m:
+        candidate = embed_m.group(1).strip()
+        if "</html>" in candidate.lower():
+            return candidate
 
     return None
 
