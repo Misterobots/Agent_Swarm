@@ -78,6 +78,7 @@ export function useChatStream(options?: {
     setMessageQueueStatus,
     setMessageSuggestedFollowups,
     setMessageWorkshopQuestions,
+    setMessageWorkflowNextSteps,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -341,6 +342,11 @@ export function useChatStream(options?: {
             // Workshop Phase-1 discovery question chips
             if ((event as any).workshopQuestions?.length > 0) {
               setMessageWorkshopQuestions(convId!, assistantId, (event as any).workshopQuestions);
+            }
+          } else if (event.type === "workflow_next_steps") {
+            // Workshop Phase-2 pipeline continuation buttons
+            if ((event as any).workflowNextSteps?.length > 0) {
+              setMessageWorkflowNextSteps(convId!, assistantId, (event as any).workflowNextSteps);
             }
           } else if (event.type === "suggested_followups") {
             // LLM-generated end-of-response chips

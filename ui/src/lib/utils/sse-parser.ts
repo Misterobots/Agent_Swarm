@@ -187,6 +187,14 @@ export async function* streamSSE(
               workshopQuestions: ((delta as any).content?.questions ?? []),
             };
           }
+          // Workshop Phase-2 pipeline continuation buttons
+          else if (delta.type === "workflow_next_steps") {
+            yield {
+              type: "workflow_next_steps",
+              content: "",
+              workflowNextSteps: ((delta as any).content?.steps ?? []),
+            };
+          }
           // End-of-response follow-up chips (LLM-generated)
           else if (delta.type === "suggested_followups") {
             yield {

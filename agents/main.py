@@ -1370,7 +1370,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         if msg_type in ("clarification_request", "clarification_card",
                                         "media_attachment", "set_preview_url",
                                         "preview_unavailable", "design_artifact",
-                                        "suggested_followups", "workshop_questions"):
+                                        "suggested_followups", "workshop_questions",
+                                        "workflow_next_steps"):
                             rich_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
@@ -1400,7 +1401,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "clarification_request", "clarification_card",
                                         "media_attachment", "set_preview_url",
                                         "preview_unavailable", "design_artifact",
-                                        "suggested_followups", "workshop_questions"):
+                                        "suggested_followups", "workshop_questions",
+                                        "workflow_next_steps"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
