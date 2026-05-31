@@ -132,6 +132,7 @@ extra_javascript:
 
 nav:
   - Home: index.md
+  - "🧪 User Testing Guide": uat.md
   - Getting Started:
     - getting-started/index.md
     - Overview: getting-started/overview.md

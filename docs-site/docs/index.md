@@ -1,12 +1,16 @@
----
+﻿---
 title: Home
 ---
 
+!!! example "🧪 User Acceptance Testing — open now"
+    Invited testers: follow the guide below to try Memex and share your feedback.
+    **[:octicons-arrow-right-24: Open Testing Guide](uat.md)**
+
 # Memex Documentation
 
 **A self-hosted, distributed multi-agent AI system for home automation, coding, creative media, and voice interaction.**
 
-Version {{ version }} · {{ phase }} · All inference runs on-premises  no external AI services.
+Version {{ version }} Â· {{ phase }} Â· All inference runs on-premises Â— no external AI services.
 
 ---
 
@@ -22,25 +26,25 @@ Memex (also called **Memex** or **Home AI Lab**) is a production multi-agent sys
 
 ```mermaid
 graph TB
-    subgraph Gateway["Gateway Node · Turing<br/>{{ turing_ip }}"]
+    subgraph Gateway["Gateway Node Â· Turing<br/>{{ turing_ip }}"]
         Traefik[Traefik Reverse Proxy]
         hollerith[hollerith Dashboards]
         jacquard[jacquard Metrics]
         knuth[knuth Logs]
     end
 
-    subgraph Execution["Execution Node · Lovelace<br/>{{ lovelace_ip }}"]
-        Runtime[Agent Runtime · FastAPI]
-        Ollama[Ollama · LLM Inference]
-        ComfyUI[ComfyUI · Image Gen]
-        Voice[Voice Engine · TTS]
+    subgraph Execution["Execution Node Â· Lovelace<br/>{{ lovelace_ip }}"]
+        Runtime[Agent Runtime Â· FastAPI]
+        Ollama[Ollama Â· LLM Inference]
+        ComfyUI[ComfyUI Â· Image Gen]
+        Voice[Voice Engine Â· TTS]
     end
 
     subgraph Control["Control Node<br/>{{ hopper_ip }}"]
         SPIRE[SPIRE Server]
-        Langfuse[Langfuse · Tracing]
+        Langfuse[Langfuse Â· Tracing]
         PostgreSQL[(PostgreSQL)]
-        MemPalace[MemPalace · Memory]
+        MemPalace[MemPalace Â· Memory]
     end
 
     Traefik --> Runtime
@@ -63,7 +67,7 @@ graph TB
 
     ---
 
-    Learn how to use Memex  chat, generate images, control devices, and more.
+    Learn how to use Memex Â— chat, generate images, control devices, and more.
 
     [:octicons-arrow-right-24: User Quickstart](getting-started/quickstart-user.md)
 
@@ -79,7 +83,7 @@ graph TB
 
     ---
 
-    Extend the system  add agents, tools, skills, or modify the runtime.
+    Extend the system Â— add agents, tools, skills, or modify the runtime.
 
     [:octicons-arrow-right-24: Developer Quickstart](getting-started/quickstart-developer.md)
 
