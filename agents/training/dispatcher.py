@@ -203,8 +203,9 @@ def submit_train(
             detail=f"Unknown archetype '{req.archetype}'. Valid options: {list(ARCHETYPE_TRAINING_CONFIGS.keys())}",
         )
 
+    archetype_cfg = ARCHETYPE_TRAINING_CONFIGS[req.archetype]
     job_id = str(uuid.uuid4())[:8]
-    base_model = req.base_model or TRAINING_BASE_SOLVER
+    base_model = req.base_model or archetype_cfg["base_model"]
     dataset_path = req.dataset_path or str(
         Path(TRAINING_DATASET_DIR) / "curated_latest.jsonl"
     )
@@ -254,7 +255,7 @@ def submit_train(
         sys.executable, "-m", "training.grpo_trainer",
         "--dataset", dataset_path,
         "--base-model", base_model,
-        "--archetype", req.archetype,
+        "--target", archetype_cfg["target"],
     ]
     if req.max_seq_len:
         cmd += ["--max-seq-len", str(req.max_seq_len)]

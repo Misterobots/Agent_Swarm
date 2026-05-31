@@ -123,6 +123,32 @@ TRAINING_LORA_RANK           = int(os.getenv("TRAINING_LORA_RANK",       "64"))
 TRAINING_LORA_ALPHA          = int(os.getenv("TRAINING_LORA_ALPHA",      "128"))
 TRAINING_BATCH_SIZE          = int(os.getenv("TRAINING_BATCH_SIZE",      "2"))
 TRAINING_GRADIENT_ACCUMULATION = int(os.getenv("TRAINING_GRADIENT_ACCUMULATION", "4"))
+# TRAINING_NUM_EPOCHS, TRAINING_LEARNING_RATE, TRAINING_MAX_SEQ_LEN defined below (near TRAINING_WINDOW_*)
+
+# Maps archetype name → grpo_trainer config.
+# "target" must match grpo_trainer.py --target choices: "solver" | "router".
+ARCHETYPE_TRAINING_CONFIGS: dict[str, dict] = {
+    "coder": {
+        "base_model": TRAINING_BASE_SOLVER,
+        "target": "solver",
+        "description": "Code quality and reasoning specialist (Qwen2.5-Coder)",
+    },
+    "coordinator": {
+        "base_model": TRAINING_BASE_SOLVER,
+        "target": "solver",
+        "description": "Multi-agent coordination and planning",
+    },
+    "researcher": {
+        "base_model": TRAINING_BASE_SOLVER,
+        "target": "solver",
+        "description": "Deep research and document analysis",
+    },
+    "router": {
+        "base_model": TRAINING_BASE_ROUTER,
+        "target": "router",
+        "description": "Semantic routing and intent classification (Nemotron-Mini)",
+    },
+}
 
 # ---------------------------------------------------------------------------
 # Context Window Management
