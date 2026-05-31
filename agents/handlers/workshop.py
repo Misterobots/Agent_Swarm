@@ -200,10 +200,10 @@ def handle_workshop(user_input: str, ctx: dict):
         use_langfuse=use_langfuse,
     )
 
-    # Phase 1 only: parse questions into structured chips for the UI.
-    # The streamed message text stays in history for Phase-2 context detection.
+    import re as _re
+
+    # Phase 1: parse questions into structured chips for the UI.
     if not _in_answer_phase:
-        import re as _re
         _questions = []
         for _m in _re.finditer(
             r'(\d+)\.\s+\*?\*?([^*:\n]+?)\*?\*?:\s*(.+?)(?=\n\d+\.\s+\*?\*?|\nAnswer any|$)',
@@ -220,3 +220,40 @@ def handle_workshop(user_input: str, ctx: dict):
                 "type": "workshop_questions",
                 "content": {"questions": _questions},
             }
+
+    # Phase 2: extract Design Mode and Swarm Mode prompts from the brief
+    # and emit them as one-click next-step action buttons.
+    if _in_answer_phase:
+        _steps = []
+
+        _design_m = _re.search(
+            r'Design Mode Prompt[^\n]*\n+```[^\n]*\n(.*?)```',
+            full_content, _re.DOTALL | _re.IGNORECASE,
+        )
+        if _design_m:
+            _steps.append({
+                "label": "Generate Mockup",
+                "mode":  "design",
+                "icon":  "palette",
+                "prompt": _design_m.group(1).strip(),
+            })
+
+        _swarm_m = _re.search(
+            r'(?:Swarm|Build|Coordinator)[^\n]*Prompt[^\n]*\n+```[^\n]*\n(.*?)```',
+            full_content, _re.DOTALL | _re.IGNORECASE,
+        )
+        if _swarm_m:
+            _steps.append({
+                "label": "Start Build",
+                "mode":  "swarm",
+                "icon":  "code",
+                "prompt": _swarm_m.group(1).strip(),
+            })
+
+        if _steps:
+            yield {
+                "type": "workflow_next_steps",
+                "content": {"steps": _steps},
+            }
+        else:
+            logger.warning("[Workshop] Phase 2 complete but could not parse next-step prompts from brief.")

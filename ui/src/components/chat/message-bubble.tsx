@@ -11,6 +11,7 @@ import { ToolApprovalCard } from "./tool-approval-card";
 import { ClarificationCard } from "./clarification-card";
 import { DesignArtifactCard } from "./design-artifact-card";
 import { WorkshopQuestionsCard } from "./workshop-questions-card";
+import { WorkflowActionsCard } from "./workflow-actions-card";
 import { ModelQueueCard } from "./model-queue-card";
 import { MessageActions } from "./message-actions";
 import { MediaPreview } from "./media-preview";
@@ -488,6 +489,13 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
         {message.workshopQuestions && message.workshopQuestions.length > 0 && (
           <WorkshopQuestionsCard
             questions={message.workshopQuestions}
+            onSend={onSelectFollowup}
+          />
+        )}
+        {/* Workshop Phase-2 pipeline continuation buttons */}
+        {message.workflowNextSteps && message.workflowNextSteps.length > 0 && (
+          <WorkflowActionsCard
+            steps={message.workflowNextSteps}
             onSend={onSelectFollowup}
           />
         )}

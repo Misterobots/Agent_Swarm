@@ -80,6 +80,17 @@ export interface ToolResult {
 }
 
 /**
+ * A pipeline continuation step emitted after the Workshop Product Brief.
+ * Clicking the button in the UI sets the mode and sends the prompt.
+ */
+export interface WorkflowNextStep {
+  label: string;   // "Generate Mockup" | "Start Build"
+  mode: "design" | "swarm";
+  icon: string;
+  prompt: string;
+}
+
+/**
  * A single discovery question from the Workshop Phase-1 interview.
  */
 export interface WorkshopQuestion {
@@ -176,7 +187,7 @@ export interface FlaggedFollowup {
 }
 
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups" | "workshop_questions";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -262,6 +273,8 @@ export interface ChatMessage {
   pendingQueueStatus?: QueueStatus;
   /** Workshop Phase-1 discovery questions rendered as interactive chips */
   workshopQuestions?: WorkshopQuestion[];
+  /** Workshop Phase-2 pipeline continuation buttons (Generate Mockup / Start Build) */
+  workflowNextSteps?: WorkflowNextStep[];
   /** LLM-generated contextual follow-up chips shown at end of response */
   suggestedFollowups?: SuggestedFollowup[];
   /** User-created follow-up flag (set when user clicks Flag on this message) */
