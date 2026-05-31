@@ -484,9 +484,12 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
         {message.designArtifact && (
           <DesignArtifactCard artifact={message.designArtifact} />
         )}
-        {/* Workshop Phase-1 question chips — replaces the plain text list */}
+        {/* Workshop Phase-1 question accordion — inline answer inputs */}
         {message.workshopQuestions && message.workshopQuestions.length > 0 && (
-          <WorkshopQuestionsCard questions={message.workshopQuestions} />
+          <WorkshopQuestionsCard
+            questions={message.workshopQuestions}
+            onSend={onSelectFollowup}
+          />
         )}
         {/* End-of-response follow-up chips — only on the latest assistant message, after streaming */}
         {!isUser
