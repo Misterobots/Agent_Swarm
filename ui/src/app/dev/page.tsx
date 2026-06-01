@@ -2,13 +2,11 @@
 
 import { DevWorkspace } from "@/components/dev/dev-workspace";
 import { useDevStore } from "@/lib/stores/dev-store";
-import { FolderTree, Eye, Settings, Bot, Layers } from "lucide-react";
+import { Bot } from "lucide-react";
 
 export default function DevPage() {
   const {
-    showFileTree,
     agentEnabled,
-    setShowFileTree,
     setAgentEnabled,
   } = useDevStore();
 
@@ -21,39 +19,18 @@ export default function DevPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Panel toggles */}
-          <button
-            onClick={() => setShowFileTree(!showFileTree)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${
-              showFileTree
-                ? "bg-[var(--chat-accent)] text-white"
-                : "bg-[var(--chat-input-bg)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
-            }`}
-            title="Toggle file tree"
-          >
-            <FolderTree size={14} />
-            Files
-          </button>
-
           {/* Agent mode toggle */}
           <button
             onClick={() => setAgentEnabled(!agentEnabled)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border transition-colors ${
               agentEnabled
-                ? "bg-green-600 text-white"
-                : "bg-[var(--chat-input-bg)] text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+                ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
+                : "bg-[var(--chat-input-bg)] text-[var(--chat-muted)] border-transparent hover:text-[var(--chat-text)]"
             }`}
             title="Toggle agent mode (file + terminal access)"
           >
             <Bot size={14} />
             Agent Mode
-          </button>
-
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-[var(--chat-input-bg)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
-            title="Workspace settings"
-          >
-            <Settings size={14} />
           </button>
         </div>
       </div>
