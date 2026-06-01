@@ -234,6 +234,7 @@ nav:
       - Config: modules/config.md
       - Logger: modules/logger.md
     - Specialized Agents:
+      - Design Studio: modules/design-studio.md
       - Image Agent: modules/image-agent.md
       - Voice Agent: modules/voice-agent.md
       - IoT Agent: modules/iot-agent.md
