@@ -12,9 +12,6 @@ import os
 import time
 import uuid
 
-from phi.agent import Agent
-from phi.model.ollama import Ollama
-
 from metrics import AGENT_STATE, WORKFLOW_STEPS
 from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
 from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace, _langfuse_span
@@ -78,21 +75,12 @@ def handle_design(user_input: str, ctx: dict):
     except Exception as _e:
         logger.warning("[DesignStudio] OD project creation failed (non-fatal): %s", _e)
 
-    # Generate HTML locally via Ollama
+    # Generate HTML locally via Ollama (direct chat API with assistant prefill).
+    # Prefilling the assistant turn with "<!DOCTYPE html>" forces the model to begin
+    # generating HTML immediately — no preamble, no explanation, no wasted tokens.
     skill_sys_prompt = get_skill_system_prompt(internal_skill)
     resolved_model = CODER_MODEL
     resolved_host = get_best_host_for_model(resolved_model)
-
-    designer = Agent(
-        name="Design Studio",
-        model=Ollama(
-            id=resolved_model,
-            host=resolved_host,
-            options=get_ollama_options(resolved_model),
-        ),
-        instructions=skill_sys_prompt,
-        show_tool_calls=False,
-    )
 
     # Build the final prompt: attached context doc first, then history, then user message.
     # Strip binary image data from extracted_context — the coder model is text-only;
@@ -115,15 +103,55 @@ def handle_design(user_input: str, ctx: dict):
         yield {"type": "status", "content": "🎨 Design Studio: Generating design..."}
         yield from pre_lock_status_events("text", resolved_model)
 
+        import requests as _req
+        from config import get_ollama_options
+
+        _messages = [
+            {"role": "system",    "content": skill_sys_prompt},
+            {"role": "user",      "content": final_input},
+            # ── Assistant prefill ──────────────────────────────────────────────
+            # Injecting the start of the assistant turn forces the model to
+            # continue from here rather than producing explanation text first.
+            # The model cannot write preamble because the response has already
+            # begun as valid HTML.
+            {"role": "assistant", "content": "<!DOCTYPE html>\n<html lang=\"en\">"},
+        ]
+        _opts = get_ollama_options(resolved_model)
+
         with _langfuse_span(
             "design_generation", "DesignStudio", resolved_model, final_input,
             langfuse=langfuse, use_langfuse=use_langfuse,
         ) as span_result:
             with request_lock(context="text"):
                 yield _emit_stream_mode("responding")
-                for chunk in designer.run(final_input, stream=True):
-                    if chunk.content:
-                        full_output += chunk.content
+                _resp = _req.post(
+                    f"{resolved_host}/api/chat",
+                    json={
+                        "model": resolved_model,
+                        "messages": _messages,
+                        "stream": True,
+                        "options": _opts,
+                    },
+                    stream=True,
+                    timeout=300,
+                )
+                _resp.raise_for_status()
+                # Prepend the prefill we injected so parse_artifact_html sees a
+                # complete document from the very first character.
+                full_output = "<!DOCTYPE html>\n<html lang=\"en\">"
+                import json as _json
+                for _line in _resp.iter_lines():
+                    if not _line:
+                        continue
+                    try:
+                        _evt = _json.loads(_line)
+                    except Exception:
+                        continue
+                    _token = _evt.get("message", {}).get("content", "")
+                    if _token:
+                        full_output += _token
+                    if _evt.get("done"):
+                        break
             span_result["output"] = full_output[:500]
 
     except Exception as e:
