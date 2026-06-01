@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { ChatView } from "@/components/chat/chat-view";
 import { TabbedEditor } from "./tabbed-editor";
 import { TabbedTerminal } from "./tabbed-terminal";
@@ -10,8 +10,33 @@ import { Code2, Eye, FileCode, Terminal, X, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { useDevPanelStore } from "@/lib/stores/dev-panel-store";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
+import { registerPanel, getRegisteredPanels, type PanelRegistration } from "./dev-panels-registry";
+
+// ---------------------------------------------------------------------------
+// Built-in panel registrations (Editor + Terminal)
+// These run once at module scope — duplicate calls are ignored.
+// ---------------------------------------------------------------------------
+registerPanel({
+  id: "editor",
+  title: "Code Editor",
+  position: "right",
+  toolbarOrder: 10,
+  className: "w-[50%]",
+  icon: React.createElement(FileCode, { size: 14 }),
+  component: TabbedEditor,
+});
+
+registerPanel({
+  id: "terminal",
+  title: "Terminal",
+  position: "bottom",
+  toolbarOrder: 20,
+  icon: React.createElement(Terminal, { size: 14 }),
+  component: TabbedTerminal,
+});
 
 export function DevWorkspace() {
   const { isMobile } = useIsMobile();
@@ -21,11 +46,10 @@ export function DevWorkspace() {
     setViewMode,
     showEditorPanel,
     showTerminalPanel,
-    toggleEditorPanel,
-    toggleTerminalPanel,
+    togglePanel,
     setShowEditorPanel,
     setShowTerminalPanel,
-  } = useDevStore();
+  } = useDevPanelStore();
 
   // Redirect to chat on mobile — Dev workspace is desktop-only
   useEffect(() => {
@@ -33,6 +57,18 @@ export function DevWorkspace() {
   }, [isMobile, router]);
 
   if (isMobile) return null;
+
+  const panels = getRegisteredPanels();
+
+  // Map panel id → current show state (falls back to legacy booleans for
+  // editor/terminal so they stay in sync with persisted flags).
+  function isPanelVisible(panel: PanelRegistration): boolean {
+    if (panel.id === "editor") return showEditorPanel;
+    if (panel.id === "terminal") return showTerminalPanel;
+    // For registry-only panels use the generic showPanel record
+    const panelStore = useDevPanelStore.getState();
+    return panelStore.showPanel[panel.id] ?? false;
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -44,26 +80,29 @@ export function DevWorkspace() {
         <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
 
         <div className="ml-auto flex items-center gap-1.5">
+          {/* Pioneers — not a flyout panel, kept as a hardcoded button */}
           <ToolbarButton
             onClick={() => router.push("/dev/pioneers")}
             title="Pioneer Academy — build your team"
             icon={<Users size={14} />}
             label="Pioneers"
           />
-          <ToolbarButton
-            onClick={toggleEditorPanel}
-            active={showEditorPanel}
-            title={showEditorPanel ? "Hide editor" : "Show editor"}
-            icon={<FileCode size={14} />}
-            label="Editor"
-          />
-          <ToolbarButton
-            onClick={toggleTerminalPanel}
-            active={showTerminalPanel}
-            title={showTerminalPanel ? "Hide terminal" : "Show terminal"}
-            icon={<Terminal size={14} />}
-            label="Terminal"
-          />
+
+          {/* Registry-driven panel toggle buttons */}
+          {panels.map((panel) => (
+            <ToolbarButton
+              key={panel.id}
+              onClick={() => togglePanel(panel.id)}
+              active={isPanelVisible(panel)}
+              title={
+                isPanelVisible(panel)
+                  ? `Hide ${panel.title.toLowerCase()}`
+                  : `Show ${panel.title.toLowerCase()}`
+              }
+              icon={panel.icon}
+              label={panel.title}
+            />
+          ))}
         </div>
         <div className="absolute bottom-0 left-0 right-0 divider" />
       </div>
@@ -75,31 +114,38 @@ export function DevWorkspace() {
           {viewMode === "preview" ? <PreviewCanvas /> : <ChatView showDevContext />}
         </div>
 
-        {/* Editor Flyout (right) */}
-        {showEditorPanel && (
-          <FlyoutSurface
-            position="right"
-            className="w-[50%]"
-            title="Code Editor"
-            icon={<FileCode size={14} />}
-            onClose={() => setShowEditorPanel(false)}
-          >
-            <TabbedEditor />
-          </FlyoutSurface>
-        )}
+        {/* Registry-driven flyout surfaces */}
+        {panels.map((panel) => {
+          if (!isPanelVisible(panel)) return null;
 
-        {/* Terminal Flyout (bottom) */}
-        {showTerminalPanel && (
-          <FlyoutSurface
-            position="bottom"
-            className={cn("h-[40%]", showEditorPanel && "right-[50%]")}
-            title="Terminal"
-            icon={<Terminal size={14} />}
-            onClose={() => setShowTerminalPanel(false)}
-          >
-            <TabbedTerminal />
-          </FlyoutSurface>
-        )}
+          // Terminal flyout narrows when the editor is also open
+          const extraClass =
+            panel.id === "terminal" && showEditorPanel ? "right-[50%]" : undefined;
+
+          const closePanel =
+            panel.id === "editor"
+              ? () => setShowEditorPanel(false)
+              : panel.id === "terminal"
+              ? () => setShowTerminalPanel(false)
+              : () => togglePanel(panel.id);
+
+          return (
+            <FlyoutSurface
+              key={panel.id}
+              position={panel.position}
+              className={cn(
+                panel.id === "terminal" && "h-[40%]",
+                panel.className,
+                extraClass
+              )}
+              title={panel.title}
+              icon={panel.icon}
+              onClose={closePanel}
+            >
+              <panel.component />
+            </FlyoutSurface>
+          );
+        })}
       </div>
     </div>
   );

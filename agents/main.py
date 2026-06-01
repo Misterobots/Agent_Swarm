@@ -201,6 +201,28 @@ except Exception as _e:
     import logging as _logging
     _logging.getLogger("main").warning(f"Goals router not loaded: {_e}")
 
+# Dev workspace routers (stubs — full implementations in tasks F1, F2, F3)
+try:
+    from dev_sessions.routes import router as dev_sessions_router
+    app.include_router(dev_sessions_router)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"Dev sessions router not loaded: {_e}")
+
+try:
+    from dev_files.routes import router as dev_files_router
+    app.include_router(dev_files_router)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"Dev files router not loaded: {_e}")
+
+try:
+    from dev_projects.routes import router as dev_projects_router
+    app.include_router(dev_projects_router)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"Dev projects router not loaded: {_e}")
+
 # GPU peer lock router — Lovelace hosts this so all agent_runtimes (including
 # remote ones on Turing etc.) can acquire the cross-host GPU mutex even when
 # Redis is unavailable.  Mounted at /internal/gpu-lock/*.
