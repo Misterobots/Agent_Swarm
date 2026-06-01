@@ -190,9 +190,24 @@ def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None, use_
 @contextmanager
 def _langfuse_span(name: str, agent_name: str, model_id: str, input_text: str,
                    *, langfuse=None, use_langfuse: bool = False):
-    """Create a Langfuse generation span. Yields a dict for the caller to fill 'output'."""
+    """Create a Langfuse generation span. Yields a dict for the caller to fill 'output'.
+
+    Design invariant: exactly ONE yield in every code path so that
+    @contextmanager's generator protocol is always satisfied, even when the
+    caller's with-block raises an exception.
+
+    The original implementation had the outer `except Exception` wrapping both
+    the setup *and* the inner try/yield/finally.  When an exception propagated
+    out of the yield (e.g. a streaming HTTP error during generation), the outer
+    except caught it and yielded a second time, producing:
+        RuntimeError: generator didn't stop after throw()
+    Fix: separate setup (try/except before yield) from teardown (finally after).
+    """
     result = {"output": ""}
     if use_langfuse and langfuse:
+        # ── Phase 1: setup (before yield) ─────────────────────────────────
+        # Failures here are non-fatal; we fall through to yield without a span.
+        ctx = None
         try:
             ctx = langfuse.start_as_current_observation(
                 name=name,
@@ -201,9 +216,16 @@ def _langfuse_span(name: str, agent_name: str, model_id: str, input_text: str,
                 metadata={"agent": agent_name, "model": model_id},
             )
             ctx.__enter__()
-            try:
-                yield result
-            finally:
+        except Exception as e:
+            logger.debug("[Router] Span creation failed for %s: %s", name, e)
+            ctx = None
+
+        # ── Phase 2: exactly one yield ─────────────────────────────────────
+        try:
+            yield result
+        finally:
+            # ── Phase 3: teardown (always runs, success or exception) ──────
+            if ctx is not None:
                 try:
                     langfuse.update_current_observation(
                         output={"response": result["output"][:4000]},
@@ -211,9 +233,9 @@ def _langfuse_span(name: str, agent_name: str, model_id: str, input_text: str,
                     )
                 except Exception:
                     pass
-                ctx.__exit__(None, None, None)
-        except Exception as e:
-            logger.debug("[Router] Span creation failed for %s: %s", name, e)
-            yield result
+                try:
+                    ctx.__exit__(None, None, None)
+                except Exception:
+                    pass
     else:
         yield result
