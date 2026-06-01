@@ -154,6 +154,7 @@ Workspace auto-approves are persisted server-side in `workspace_auto_approve.jso
 | D1 | Theme-reactive editor + terminal | tabbed-editor.tsx, tabbed-terminal.tsx | — |
 | D2 | Token sweep | app/dev/page.tsx | — |
 | D3 | Pioneers reskin | pioneers/page.tsx | — |
+| S1 | Per-conversation mode state | types/chat.ts, chat-store.ts, use-chat-stream.ts, all toggle components, workflow-actions-card.tsx | — |
 
 ---
 
