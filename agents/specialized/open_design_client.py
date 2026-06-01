@@ -55,6 +55,25 @@ Requirements:
 - All icons and decorative shapes must be inline SVG or pure CSS — no placeholder images
 - Typography: clear, futuristic sans-serif with text-shadow glow effects to simulate projection
 - Output must feel like a bespoke native application, not a web page
+
+Typography techniques:
+- For HOLLOW / OUTLINED letterforms where the background shows through: use CSS
+  -webkit-text-stroke with color: transparent. Example:
+    font-family: 'Courier New', monospace; font-size: 44px; font-weight: 900;
+    color: transparent; -webkit-text-stroke: 3px #1A2A35; letter-spacing: 8px;
+  Do NOT try to construct letters from individual <div> elements or tiles — the
+  result will be identical boxes for every letter. text-stroke gives real letter shapes.
+
+Layout:
+- When an absolutely-positioned chrome element (header bar, status strip) sits inside
+  a flex container, add padding equal to the chrome height to the flex container.
+  Example: header is 60px tall → add padding-top: 60px to the flex parent. Without this,
+  flex children start at y=0 and are hidden behind the header.
+
+SVG illustrations:
+- Use actual meaningful shapes — recognisable geographic outlines, real objects, distinct
+  silhouettes. Never substitute generic teardrops, blobs, or identical geometric shapes
+  for distinct subjects. Simplified-but-recognisable beats accurate-but-invisible.
 """,
 
     "saas-landing": """You are an expert SaaS marketing designer and front-end developer.
