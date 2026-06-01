@@ -105,8 +105,17 @@ export function LogViewer() {
 
         for (const line of lines) {
           if (!line.trim()) continue;
+          // Strip SSE "data: " prefix before parsing
+          const jsonStr = line.startsWith("data: ") ? line.slice(6) : line;
           try {
-            const entry: LogEntry = JSON.parse(line);
+            const raw = JSON.parse(jsonStr);
+            // Normalise: backend emits { ts, level, source, message }
+            const entry: LogEntry = {
+              timestamp: raw.ts ?? raw.timestamp ?? new Date().toISOString(),
+              level: (raw.level?.toUpperCase() ?? "INFO") as LogEntry["level"],
+              source: raw.source ?? sourceId,
+              message: raw.message ?? jsonStr,
+            };
             if (!isPaused) {
               setLogs((prev) => [...prev.slice(-999), entry]); // Keep last 1000 logs
             }
@@ -116,7 +125,7 @@ export function LogViewer() {
               timestamp: new Date().toISOString(),
               level: "INFO",
               source: sourceId,
-              message: line,
+              message: jsonStr,
             };
             if (!isPaused) {
               setLogs((prev) => [...prev.slice(-999), entry]);
