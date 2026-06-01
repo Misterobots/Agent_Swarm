@@ -50,8 +50,16 @@ def handle_design(user_input: str, ctx: dict):
     yield _emit_stream_mode("thinking")
     AGENT_STATE.labels(agent_name="DesignStudio").set(2)
 
-    # Skill detection — internal name used for system-prompt lookup
+    # Skill detection — internal name used for system-prompt lookup.
+    # If the user message alone doesn't match a specific skill (falls back to
+    # web-prototype), also scan the first 2 KB of extracted_context so that
+    # keywords inside an attached brief/document can upgrade the skill.
     internal_skill = detect_skill_from_prompt(user_input)
+    if internal_skill == "web-prototype" and extracted_context:
+        ctx_skill = detect_skill_from_prompt(extracted_context[:2000])
+        if ctx_skill != "web-prototype":
+            internal_skill = ctx_skill
+            yield {"type": "log", "content": f"[DesignStudio] Skill upgraded via context: {internal_skill}"}
     od_skill_id = _SKILL_ID_MAP.get(internal_skill, internal_skill)
     yield {"type": "log", "content": f"[DesignStudio] Skill: {od_skill_id}"}
 
