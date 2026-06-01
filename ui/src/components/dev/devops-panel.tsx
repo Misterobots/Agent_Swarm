@@ -38,11 +38,11 @@ const PIONEER_NODES: PioneerNode[] = [
 ];
 
 const SERVICES: Service[] = [
-  { name: "Agent Runtime", container: "agent_runtime", node: "Turing", status: "unknown", port: 5001 },
-  { name: "Memex UI", container: "memex_ui", node: "Turing", status: "unknown", port: 3000 },
+  { name: "Agent Runtime", container: "agent_runtime", node: "Turing", status: "unknown", port: 8008 },
+  { name: "Memex UI", container: "memex_ui", node: "Turing", status: "unknown", port: 3200 },
   { name: "PostgreSQL", container: "postgres", node: "Hopper", status: "unknown", port: 5432 },
   { name: "Redis", container: "redis", node: "Hopper", status: "unknown", port: 6379 },
-  { name: "Langfuse", container: "langfuse", node: "Hopper", status: "unknown", port: 3001 },
+  { name: "Langfuse", container: "langfuse", node: "Hopper", status: "unknown", port: 3000 },
   { name: "Ollama", container: "ollama", node: "Turing", status: "unknown", port: 11434 },
   { name: "Ollama (Lovelace)", node: "Lovelace", status: "unknown", port: 11434 },
 ];
