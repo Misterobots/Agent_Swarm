@@ -512,25 +512,40 @@ def chat_swarm(
         user_input = re.sub(r'### Task:.*?<context>.*?</context>\s*', '', user_input, flags=re.DOTALL).strip()
         yield _l(f"[Router] Intercepted RAG Context ({len(extracted_context)} chars).")
 
-    # Attachment bridge — promote image attachments into extracted_context so
-    # handle_vision (and any handler that reads extracted_context) can reach them.
-    # Non-image attachments (text/json/pdf) are appended as inline text context.
+    # Attachment bridge — promote attachments into extracted_context so every
+    # handler that reads ctx["extracted_context"] can reach them.
+    #
+    # Rules:
+    #   image/*  → appended as data-URI (handle_vision picks the first one;
+    #              design/other handlers see the placeholder text after stripping)
+    #   text/*/json/pdf → base64-decoded and appended as labelled text block
+    #   Multiple attachments are APPENDED, not overwritten.
     if attachments:
+        import base64 as _b64
+        image_count = 0
         for att in attachments:
             mime = att.get("mimeType", "")
             data = att.get("data", "")
             name = att.get("name", "file")
-            if mime.startswith("image/") and data:
-                extracted_context = f"data:{mime};base64,{data}"
-                yield _l(f"[Router] Image attachment promoted to context: {name} ({mime})")
-            elif data:
+            if not data:
+                continue
+            if mime.startswith("image/"):
+                # First image goes at the top of extracted_context (handle_vision
+                # uses the first data-URI it finds); subsequent images are appended.
+                image_uri = f"data:{mime};base64,{data}"
+                if image_count == 0 and not extracted_context:
+                    extracted_context = image_uri
+                else:
+                    extracted_context = (extracted_context + "\n" + image_uri).strip()
+                image_count += 1
+                yield _l(f"[Router] Image attachment #{image_count} promoted to context: {name} ({mime})")
+            else:
                 try:
-                    import base64 as _b64
                     decoded = _b64.b64decode(data).decode("utf-8", errors="replace")
-                    extracted_context += f"\n\n[Attached file: {name}]\n{decoded[:8000]}"
-                    yield _l(f"[Router] Text attachment injected: {name}")
-                except Exception:
-                    pass
+                    extracted_context += f"\n\n[Attached file: {name}]\n{decoded[:12000]}"
+                    yield _l(f"[Router] Text attachment injected: {name} ({len(decoded)} chars)")
+                except Exception as _ae:
+                    yield _l(f"[Router] Could not decode attachment {name}: {_ae}")
 
     # ---------------------------------------------------------------------------
     # Pending context dispatch

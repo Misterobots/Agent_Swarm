@@ -33,6 +33,7 @@ def handle_design(user_input: str, ctx: dict):
     """Generator — generate HTML via Ollama, upload project to OD, stream artifact."""
     turn_id = ctx["turn_id"]
     history_context = ctx.get("history_context", "")
+    extracted_context = ctx.get("extracted_context", "")
     lf_trace = ctx["lf_trace"]
     langfuse = ctx["langfuse"]
     use_langfuse = ctx["use_langfuse"]
@@ -85,7 +86,19 @@ def handle_design(user_input: str, ctx: dict):
         show_tool_calls=False,
     )
 
+    # Build the final prompt: attached context doc first, then history, then user message.
+    # Strip binary image data from extracted_context — the coder model is text-only;
+    # images are referenced as [image attached] placeholders so the model knows they exist.
+    import re as _re
     final_input = user_input
+    if extracted_context:
+        text_ctx = _re.sub(
+            r'data:image/[^;]+;base64,[A-Za-z0-9+/=]+',
+            '[image attached — see description in prompt]',
+            extracted_context,
+        )
+        final_input = f"[Attached context / reference material]\n{text_ctx}\n\n---\n\n{final_input}"
+        yield {"type": "log", "content": f"[DesignStudio] Context injected ({len(text_ctx)} chars)"}
     if history_context:
         final_input = f"{history_context}\n\n{final_input}"
 
