@@ -83,7 +83,18 @@ async function executeGitPush(node: string): Promise<{ stdout: string; stderr: s
   });
 }
 
+const ADMIN_GROUPS = ["memex-admin", "authentik Admins"];
+
+function isAdminRequest(request: NextRequest): boolean {
+  const groups = request.headers.get("x-authentik-groups") ?? "";
+  return ADMIN_GROUPS.some((g) => groups.includes(g));
+}
+
 export async function POST(request: NextRequest) {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const { node } = await request.json();
 

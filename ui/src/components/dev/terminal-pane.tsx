@@ -17,29 +17,40 @@ const WS_BASE = (() => {
 
 type ConnState = "connecting" | "connected" | "disconnected" | "error";
 
+function readUidCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const raw = document.cookie
+    .split("; ")
+    .find((c) => c.startsWith("authentik_uid="))
+    ?.split("=")[1];
+  return raw && raw.trim() ? raw.trim() : null;
+}
+
 export function TerminalPane() {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<import("@xterm/xterm").Terminal | null>(null);
   const fitAddonRef = useRef<import("@xterm/addon-fit").FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [connState, setConnState] = useState<ConnState>("connecting");
+  const [uidMissing, setUidMissing] = useState(false);
 
-  function buildWsUrl(): string {
+  function buildWsUrl(uid: string): string {
     // Pass uid as query param (browsers can't set custom WS headers)
-    const uid = document.cookie
-      .split("; ")
-      .find((c) => c.startsWith("authentik_uid="))
-      ?.split("=")[1] ?? "dev";
     return `${WS_BASE}/ws/terminal?uid=${encodeURIComponent(uid)}`;
   }
 
   function connectWs(term: import("@xterm/xterm").Terminal) {
+    const uid = readUidCookie();
+    if (!uid) {
+      setUidMissing(true);
+      return;
+    }
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
     setConnState("connecting");
-    const ws = new WebSocket(buildWsUrl());
+    const ws = new WebSocket(buildWsUrl(uid));
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
@@ -161,6 +172,22 @@ export function TerminalPane() {
     ) : (
       <WifiOff size={12} className="text-red-400" />
     );
+
+  if (uidMissing) {
+    return (
+      <div className="flex flex-col h-full bg-[var(--chat-bg)]">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--chat-border)] text-xs text-[var(--chat-muted)]">
+          <TerminalIcon size={13} />
+          <span>Terminal</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center px-6 text-center">
+          <p className="text-sm text-[var(--chat-muted)]">
+            Session identity not available — please reload the page.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-[var(--chat-bg)]">

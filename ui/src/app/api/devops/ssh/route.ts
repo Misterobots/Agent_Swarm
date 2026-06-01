@@ -88,7 +88,18 @@ async function executeSSH(node: string, command: string): Promise<{ stdout: stri
   });
 }
 
+const ADMIN_GROUPS = ["memex-admin", "authentik Admins"];
+
+function isAdminRequest(request: NextRequest): boolean {
+  const groups = request.headers.get("x-authentik-groups") ?? "";
+  return ADMIN_GROUPS.some((g) => groups.includes(g));
+}
+
 export async function POST(request: NextRequest) {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const { node, command } = await request.json();
 

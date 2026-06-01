@@ -2,15 +2,39 @@
 
 import { DevWorkspace } from "@/components/dev/dev-workspace";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { useAccess } from "@/lib/hooks/use-access";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { FolderTree, Eye, Settings, Bot, Layers } from "lucide-react";
 
 export default function DevPage() {
+  const { isAdmin, loading } = useAccess();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !isAdmin) {
+      router.replace("/chat");
+    }
+  }, [loading, isAdmin, router]);
+
   const {
     showFileTree,
     agentEnabled,
     setShowFileTree,
     setAgentEnabled,
   } = useDevStore();
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center text-[var(--chat-muted)] text-sm">
+        Checking access…
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
