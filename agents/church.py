@@ -512,6 +512,26 @@ def chat_swarm(
         user_input = re.sub(r'### Task:.*?<context>.*?</context>\s*', '', user_input, flags=re.DOTALL).strip()
         yield _l(f"[Router] Intercepted RAG Context ({len(extracted_context)} chars).")
 
+    # Attachment bridge — promote image attachments into extracted_context so
+    # handle_vision (and any handler that reads extracted_context) can reach them.
+    # Non-image attachments (text/json/pdf) are appended as inline text context.
+    if attachments:
+        for att in attachments:
+            mime = att.get("mimeType", "")
+            data = att.get("data", "")
+            name = att.get("name", "file")
+            if mime.startswith("image/") and data:
+                extracted_context = f"data:{mime};base64,{data}"
+                yield _l(f"[Router] Image attachment promoted to context: {name} ({mime})")
+            elif data:
+                try:
+                    import base64 as _b64
+                    decoded = _b64.b64decode(data).decode("utf-8", errors="replace")
+                    extracted_context += f"\n\n[Attached file: {name}]\n{decoded[:8000]}"
+                    yield _l(f"[Router] Text attachment injected: {name}")
+                except Exception:
+                    pass
+
     # ---------------------------------------------------------------------------
     # Pending context dispatch
     # ---------------------------------------------------------------------------

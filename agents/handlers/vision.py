@@ -22,8 +22,35 @@ def handle_vision(user_input: str, ctx: dict):
     yield {"type": "status", "content": "👁️ Vision Analyst: Analyzing image..."}
     AGENT_STATE.labels(agent_name="VisionAnalyst").set(2)
 
-    VISION_MODEL = "moondream:latest"
-    VISION_HOST = get_best_host_for_model(VISION_MODEL)
+    # Prefer purpose-built vision models; fall back to any available multimodal.
+    # Pull order of preference: minicpm-v (compact, strong UI analysis),
+    # llava:13b (general vision), llava:7b, moondream (tiny, fast).
+    _VISION_CANDIDATES = [
+        "minicpm-v:latest",
+        "llava:13b",
+        "llava:7b",
+        "llava:latest",
+        "moondream:latest",
+        "gemma4:31b",   # multimodal if the pulled variant supports vision
+    ]
+    from utils.gpu_queue import get_best_host_for_model as _best_host
+    VISION_MODEL = None
+    VISION_HOST = None
+    for _candidate in _VISION_CANDIDATES:
+        _host = _best_host(_candidate)
+        if _host:
+            VISION_MODEL = _candidate
+            VISION_HOST = _host
+            break
+    if not VISION_MODEL:
+        yield {"type": "response", "content": (
+            "👁️ **Vision Analyst**\n\n"
+            "No vision model is installed. Pull one first:\n"
+            "```\nollama pull minicpm-v\n```\n"
+            "or `ollama pull llava:7b` for a larger model."
+        )}
+        AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
+        return
 
     try:
         image_data = None
