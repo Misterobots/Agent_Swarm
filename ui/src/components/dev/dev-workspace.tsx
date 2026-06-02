@@ -1,6 +1,6 @@
 "use client";
 
-
+import type { ReactNode } from "react";
 import { ChatView } from "@/components/chat/chat-view";
 import { TabbedEditor } from "./tabbed-editor";
 import { TabbedTerminal } from "./tabbed-terminal";
@@ -14,6 +14,7 @@ import { useDevPanelStore } from "@/lib/stores/dev-panel-store";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { registerPanel, getRegisteredPanels, type PanelRegistration } from "./dev-panels-registry";
+import "./goals-panel"; // register Goals panel (side-effect)
 
 // ---------------------------------------------------------------------------
 // Built-in panel registrations (Editor + Terminal)
@@ -25,7 +26,7 @@ registerPanel({
   position: "right",
   toolbarOrder: 10,
   className: "w-[50%]",
-  icon: React.createElement(FileCode, { size: 14 }),
+  icon: <FileCode size={14} />,
   component: TabbedEditor,
 });
 
@@ -34,7 +35,7 @@ registerPanel({
   title: "Terminal",
   position: "bottom",
   toolbarOrder: 20,
-  icon: React.createElement(Terminal, { size: 14 }),
+  icon: <Terminal size={14} />,
   component: TabbedTerminal,
 });
 
@@ -203,7 +204,7 @@ function SegmentButton({
 }: {
   active: boolean;
   onClick: () => void;
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
 }) {
   return (
@@ -235,7 +236,7 @@ function ToolbarButton({
   onClick: () => void;
   active?: boolean;
   title: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
 }) {
   return (
@@ -266,9 +267,9 @@ function FlyoutSurface({
   position: "right" | "bottom";
   className?: string;
   title: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   onClose: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const base = position === "right"
     ? "absolute top-0 right-0 h-full"

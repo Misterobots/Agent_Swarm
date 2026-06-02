@@ -14,22 +14,20 @@
  * Usage in a panel file:
  * ```ts
  * import { registerPanel } from "./dev-panels-registry";
- * import React from "react";
  * import { SomeIcon } from "lucide-react";
- * import { YourPanel } from "./your-panel";
  *
  * registerPanel({
  *   id: "your-panel",
  *   title: "Your Panel",
  *   position: "right",
- *   icon: React.createElement(SomeIcon, { size: 14 }),
+ *   icon: <SomeIcon size={14} />,
  *   component: YourPanel,
  *   toolbarOrder: 40,
  * });
  * ```
  */
 
-import React from "react";
+import type { ReactNode, ComponentType } from "react";
 
 export interface PanelRegistration {
   /** Unique panel id — also used as the key in showPanel state. */
@@ -38,10 +36,10 @@ export interface PanelRegistration {
   title: string;
   /** Flyout attachment point. */
   position: "right" | "bottom";
-  /** Lucide icon element (React.createElement — not JSX, since this is a .ts file). */
-  icon: React.ReactNode;
+  /** Icon element for the toolbar button and flyout header. */
+  icon: ReactNode;
   /** The panel component to render inside the flyout. */
-  component: React.ComponentType;
+  component: ComponentType;
   /** Sort order for the toolbar. Lower = further left. */
   toolbarOrder: number;
   /** Extra CSS classes forwarded to FlyoutSurface className. */
