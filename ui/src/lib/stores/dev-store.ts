@@ -1,156 +1,73 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
+/**
+ * @deprecated Thin backwards-compatible facade over the four dev slice stores.
+ *
+ * Existing consumers that call `useDevStore((s) => s.someField)` continue to
+ * work without changes. New code should import from the specific slice directly:
+ *
+ *   import { useDevEditorStore }  from "@/lib/stores/dev-editor-store";
+ *   import { useDevAgentStore }   from "@/lib/stores/dev-agent-store";
+ *   import { useDevPanelStore }   from "@/lib/stores/dev-panel-store";
+ *   import { useDevProjectStore } from "@/lib/stores/dev-project-store";
+ */
+"use client";
 
-interface TerminalTabInfo {
-  id: string;
-  title: string;
+import { useMemo } from "react";
+import { useDevEditorStore, type DevEditorState } from "./dev-editor-store";
+import { useDevAgentStore, type DevAgentState } from "./dev-agent-store";
+import { useDevPanelStore, type DevPanelState } from "./dev-panel-store";
+import { useDevProjectStore, type DevProjectState } from "./dev-project-store";
+
+// Re-export slice types so downstream code that imported DevState from here
+// still compiles (they can use CombinedDevState or individual slice types).
+export type { DevEditorState } from "./dev-editor-store";
+export type { DevAgentState } from "./dev-agent-store";
+export type { DevPanelState } from "./dev-panel-store";
+export type { DevProjectState } from "./dev-project-store";
+
+export type CombinedDevState = DevEditorState & DevAgentState & DevPanelState & DevProjectState;
+
+/**
+ * Backwards-compatible hook.
+ *
+ * Merges all four slice stores into a single object and applies the selector.
+ * Each slice triggers its own re-render, so all four hooks run unconditionally
+ * and the result is spread together. The selector is applied to the merged object.
+ *
+ * If no selector is provided the full merged state is returned.
+ */
+export function useDevStore(): CombinedDevState;
+export function useDevStore<T>(selector: (state: CombinedDevState) => T): T;
+export function useDevStore<T>(
+  selector?: (state: CombinedDevState) => T
+): T | CombinedDevState {
+  const editor = useDevEditorStore();
+  const agent = useDevAgentStore();
+  const panel = useDevPanelStore();
+  const project = useDevProjectStore();
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const merged = useMemo<CombinedDevState>(
+    () => ({ ...editor, ...agent, ...panel, ...project }),
+    // Deliberately broad dep array — all slice states
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editor, agent, panel, project]
+  );
+
+  if (selector) return selector(merged);
+  return merged;
 }
 
-interface DevState {
-  editorContent: string;
-  editorLanguage: string;
-  activeFile: string;
-  selectedText: string;
-
-  // Phase 2: AI agentic coding settings
-  /** When true, send dev_mode=true in chat requests to enable agentic tools */
-  agentEnabled: boolean;
-  /** When true, auto-sync Monaco editor content when AI writes the active file */
-  editorSyncEnabled: boolean;
-  /** Tool names the user has auto-approved for the current session */
-  sessionAutoApprove: string[];
-  
-  // Phase 2: Terminal tabs
-  terminalTabs: TerminalTabInfo[];
-  activeTerminalId: string;
-  
-  // Phase 2: Admin features
-  selectedNode: "lovelace" | "turing" | "hopper" | "workspace";
-  gitBranch: { [node: string]: string };
-  
-  // Phase 2: Output preview
-  previewUrl: string;
-  showFileTree: boolean;
-  showOutputPreview: boolean;
-
-  // Chat preview pane (slides in on /chat when a build completes)
-  showChatPreview: boolean;
-  previewUnavailable: boolean;
-  
-  // Flyout panels (Gemini-style)
-  showEditorPanel: boolean;
-  showTerminalPanel: boolean;
-  
-  // View mode: 'preview' (live output) or 'code' (editor + file tree)
-  viewMode: "preview" | "code";
-
-  setEditorContent: (content: string) => void;
-  setEditorLanguage: (language: string) => void;
-  setActiveFile: (file: string) => void;
-  setSelectedText: (text: string) => void;
-  setAgentEnabled: (enabled: boolean) => void;
-  setEditorSyncEnabled: (enabled: boolean) => void;
-  addSessionAutoApprove: (toolName: string) => void;
-  clearSessionAutoApprove: () => void;
-  
-  // Terminal tab actions
-  addTerminalTab: (id: string, title: string) => void;
-  removeTerminalTab: (id: string) => void;
-  setActiveTerminal: (id: string) => void;
-  
-  // Admin actions
-  setSelectedNode: (node: "lovelace" | "turing" | "hopper" | "workspace") => void;
-  setGitBranch: (node: string, branch: string) => void;
-  
-  // Preview actions
-  setPreviewUrl: (url: string) => void;
-  setShowFileTree: (show: boolean) => void;
-  setShowOutputPreview: (show: boolean) => void;
-  setShowChatPreview: (show: boolean) => void;
-  setPreviewUnavailable: (unavailable: boolean) => void;
-  
-  // Flyout panel actions
-  setShowEditorPanel: (show: boolean) => void;
-  setShowTerminalPanel: (show: boolean) => void;
-  toggleEditorPanel: () => void;
-  toggleTerminalPanel: () => void;
-  setViewMode: (mode: "preview" | "code") => void;
-}
-
-export const useDevStore = create<DevState>()(
-  persist(
-    (set) => ({
-      editorContent: "# Start coding here\n",
-      editorLanguage: "python",
-      activeFile: "",
-      selectedText: "",
-      agentEnabled: true,
-      editorSyncEnabled: true,
-      sessionAutoApprove: [],
-      terminalTabs: [],
-      activeTerminalId: "",
-      selectedNode: "workspace",
-      gitBranch: {},
-      previewUrl: "",
-      showFileTree: true,
-      showOutputPreview: true,
-      showChatPreview: false,
-      previewUnavailable: false,
-      showEditorPanel: false,
-      showTerminalPanel: false,
-      viewMode: "code",
-      
-      setEditorContent: (content) => set({ editorContent: content }),
-      setEditorLanguage: (language) => set({ editorLanguage: language }),
-      setActiveFile: (file) => set({ activeFile: file }),
-      setSelectedText: (text) => set({ selectedText: text }),
-      setAgentEnabled: (enabled) => set({ agentEnabled: enabled }),
-      setEditorSyncEnabled: (enabled) => set({ editorSyncEnabled: enabled }),
-      addSessionAutoApprove: (toolName) =>
-        set((s) => ({ sessionAutoApprove: [...new Set([...s.sessionAutoApprove, toolName])] })),
-      clearSessionAutoApprove: () => set({ sessionAutoApprove: [] }),
-      
-      addTerminalTab: (id, title) =>
-        set((s) => ({ terminalTabs: [...s.terminalTabs, { id, title }] })),
-      removeTerminalTab: (id) =>
-        set((s) => ({
-          terminalTabs: s.terminalTabs.filter((t) => t.id !== id),
-          activeTerminalId: s.activeTerminalId === id ? (s.terminalTabs[0]?.id || "") : s.activeTerminalId,
-        })),
-      setActiveTerminal: (id) => set({ activeTerminalId: id }),
-      
-      setSelectedNode: (node) => set({ selectedNode: node }),
-      setGitBranch: (node, branch) =>
-        set((s) => ({ gitBranch: { ...s.gitBranch, [node]: branch } })),
-      
-      setPreviewUrl: (url) => set({ previewUrl: url, ...(url ? { showChatPreview: true, previewUnavailable: false } : {}) }),
-      setShowFileTree: (show) => set({ showFileTree: show }),
-      setShowOutputPreview: (show) => set({ showOutputPreview: show }),
-      setShowChatPreview: (show) => set({ showChatPreview: show }),
-      setPreviewUnavailable: (unavailable) => set({ previewUnavailable: unavailable }),
-      
-      setShowEditorPanel: (show) => set({ showEditorPanel: show }),
-      setShowTerminalPanel: (show) => set({ showTerminalPanel: show }),
-      toggleEditorPanel: () => set((s) => ({ showEditorPanel: !s.showEditorPanel })),
-      toggleTerminalPanel: () => set((s) => ({ showTerminalPanel: !s.showTerminalPanel })),
-      setViewMode: (mode) => set({ viewMode: mode }),
-    }),
-    {
-      name: "memex-dev-store",
-      // Persist settings and state
-      partialize: (state) => ({
-        agentEnabled: state.agentEnabled,
-        editorSyncEnabled: state.editorSyncEnabled,
-        selectedNode: state.selectedNode,
-        // previewUrl is intentionally NOT persisted — it defaults to empty so
-        // the pane shows a friendly empty state rather than loading a stale URL.
-        showFileTree: state.showFileTree,
-        showOutputPreview: state.showOutputPreview,
-        showEditorPanel: state.showEditorPanel,
-        viewMode: state.viewMode,
-        // Note: showTerminalPanel is NOT persisted - always starts closed
-      }),
-    }
-  )
-);
-
+/**
+ * Imperative getter (Zustand-compatible `.getState()` pattern).
+ *
+ * Use this only outside React render (e.g. in event handlers, async callbacks).
+ * Inside components, use the `useDevStore` hook instead.
+ */
+useDevStore.getState = function (): CombinedDevState {
+  return {
+    ...useDevEditorStore.getState(),
+    ...useDevAgentStore.getState(),
+    ...useDevPanelStore.getState(),
+    ...useDevProjectStore.getState(),
+  };
+};
