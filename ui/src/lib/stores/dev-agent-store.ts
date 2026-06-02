@@ -41,7 +41,7 @@ export const useDevAgentStore = create<DevAgentState>()(
       partialize: (state) => ({
         agentEnabled: state.agentEnabled,
         editorSyncEnabled: state.editorSyncEnabled,
-        // sessionAutoApprove is intentionally NOT persisted — resets on reload
+        sessionAutoApprove: state.sessionAutoApprove,
       }),
     }
   )
