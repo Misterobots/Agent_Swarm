@@ -14,7 +14,9 @@ import { useDevPanelStore } from "@/lib/stores/dev-panel-store";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { registerPanel, getRegisteredPanels, type PanelRegistration } from "./dev-panels-registry";
+import { ProjectSwitcher } from "./project-switcher";
 import "./goals-panel"; // register Goals panel (side-effect)
+import "./notes-panel"; // register Notes panel (side-effect)
 
 // ---------------------------------------------------------------------------
 // Built-in panel registrations (Editor + Terminal)
@@ -96,6 +98,12 @@ export function DevWorkspace() {
         <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
 
         <div className="ml-auto flex items-center gap-1.5">
+          {/* Project switcher */}
+          <ProjectSwitcher />
+
+          {/* Divider */}
+          <div className="w-px h-4 bg-[var(--chat-border)]" />
+
           {/* Pioneers — not a flyout panel, kept as a hardcoded button */}
           <ToolbarButton
             onClick={() => router.push("/dev/pioneers")}

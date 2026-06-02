@@ -3,6 +3,7 @@
 import { DevWorkspace } from "@/components/dev/dev-workspace";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useAccess } from "@/lib/hooks/use-access";
+import { useDevSessionSync } from "@/lib/hooks/use-dev-session-sync";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Bot } from "lucide-react";
@@ -10,6 +11,9 @@ import { Bot } from "lucide-react";
 export default function DevPage() {
   const { isAdmin, loading } = useAccess();
   const router = useRouter();
+
+  // Cross-device dev session sync — must be called unconditionally (React rules)
+  useDevSessionSync();
 
   useEffect(() => {
     if (!loading && !isAdmin) {
