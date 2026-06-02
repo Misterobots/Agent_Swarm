@@ -1,4 +1,6 @@
-"""agents/dev_projects package — stub (F3: CRUD + git clone pending)."""
+"""agents/dev_projects package — project CRUD and git-clone provisioning."""
+from .store import init_tables
 from .routes import router
+from . import store
 
-__all__ = ["router"]
+__all__ = ["init_tables", "router", "store"]

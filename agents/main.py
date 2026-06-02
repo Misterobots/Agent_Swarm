@@ -152,6 +152,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Dev sessions store init failed (non-fatal): {e}")
 
+        # 7d. Initialize Dev Projects Store
+        try:
+            from dev_projects import store as _dev_projects_store
+            _dev_projects_store.init_tables()
+        except Exception as e:
+            logger.warning(f"Dev projects store init failed (non-fatal): {e}")
+
         # 8. Clean up orphaned training runs (status='running' but server restarted)
         try:
             from config import TEMPLATE_DB_URL
