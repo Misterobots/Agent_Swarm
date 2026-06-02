@@ -94,15 +94,67 @@ export async function GET(request: NextRequest) {
     const node = searchParams.get("node") || "workspace";
 
     if (node === "workspace") {
-      // For workspace, return local git status
+      // Run real git status inside the dev_sandbox container
+      const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>(
+        (resolve, reject) => {
+          const proc = spawn("docker", [
+            "exec",
+            "dev_sandbox",
+            "sh",
+            "-c",
+            "cd /workspace && git status -b --porcelain",
+          ]);
+
+          let stdout = "";
+          let stderr = "";
+
+          proc.stdout.on("data", (data) => { stdout += data.toString(); });
+          proc.stderr.on("data", (data) => { stderr += data.toString(); });
+          proc.on("close", (code) => { resolve({ stdout, stderr, exitCode: code || 0 }); });
+          proc.on("error", (err) => { reject(err); });
+        }
+      );
+
+      if (result.exitCode !== 0) {
+        return NextResponse.json(
+          { error: `dev_sandbox container error: ${result.stderr || "container may not be running"}` },
+          { status: 500 }
+        );
+      }
+
+      const wsLines = result.stdout.split("\n");
+      const wsBranchLine = wsLines[0] || "";
+      const wsBranch = wsBranchLine.match(/## ([^\s.]+)/)?.[1] || "unknown";
+
+      const wsAheadMatch = wsBranchLine.match(/\[ahead (\d+)/);
+      const wsBehindMatch = wsBranchLine.match(/behind (\d+)/);
+      const wsAhead = wsAheadMatch ? parseInt(wsAheadMatch[1]) : 0;
+      const wsBehind = wsBehindMatch ? parseInt(wsBehindMatch[1]) : 0;
+
+      const wsModified: string[] = [];
+      const wsAdded: string[] = [];
+      const wsDeleted: string[] = [];
+      const wsUntracked: string[] = [];
+
+      for (let i = 1; i < wsLines.length; i++) {
+        const line = wsLines[i].trim();
+        if (!line) continue;
+        const status = line.substring(0, 2);
+        const file = line.substring(3);
+        if (status.includes("M")) wsModified.push(file);
+        if (status.includes("A")) wsAdded.push(file);
+        if (status.includes("D")) wsDeleted.push(file);
+        if (status.includes("?")) wsUntracked.push(file);
+      }
+
       return NextResponse.json({
-        branch: "main",
-        ahead: 0,
-        behind: 0,
-        modified: [],
-        added: [],
-        deleted: [],
-        untracked: [],
+        branch: wsBranch,
+        ahead: wsAhead,
+        behind: wsBehind,
+        modified: wsModified,
+        added: wsAdded,
+        deleted: wsDeleted,
+        untracked: wsUntracked,
       });
     }
 
@@ -131,10 +183,15 @@ export async function GET(request: NextRequest) {
       if (status.includes("?")) untracked.push(file);
     }
 
+    const aheadMatch = branchLine.match(/\[ahead (\d+)/);
+    const behindMatch = branchLine.match(/behind (\d+)/);
+    const ahead = aheadMatch ? parseInt(aheadMatch[1]) : 0;
+    const behind = behindMatch ? parseInt(behindMatch[1]) : 0;
+
     return NextResponse.json({
       branch,
-      ahead: 0, // TODO: Parse ahead/behind from branch line
-      behind: 0,
+      ahead,
+      behind,
       modified,
       added,
       deleted,
