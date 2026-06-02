@@ -145,6 +145,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Goals store init failed (non-fatal): {e}")
 
+        # 7c. Initialize Dev Projects Store
+        try:
+            from dev_projects import store as _dev_projects_store
+            _dev_projects_store.init_tables()
+        except Exception as e:
+            logger.warning(f"Dev projects store init failed (non-fatal): {e}")
+
         # 8. Clean up orphaned training runs (status='running' but server restarted)
         try:
             from config import TEMPLATE_DB_URL
@@ -200,6 +207,14 @@ try:
 except Exception as _e:
     import logging as _logging
     _logging.getLogger("main").warning(f"Goals router not loaded: {_e}")
+
+# Dev Projects router
+try:
+    from dev_projects.routes import router as dev_projects_router
+    app.include_router(dev_projects_router)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"Dev projects router not loaded: {_e}")
 
 # GPU peer lock router — Lovelace hosts this so all agent_runtimes (including
 # remote ones on Turing etc.) can acquire the cross-host GPU mutex even when
