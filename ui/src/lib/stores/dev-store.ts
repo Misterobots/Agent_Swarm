@@ -12,6 +12,9 @@ interface DevState {
   activeFile: string;
   selectedText: string;
 
+  // Current project for file tree / autosave
+  currentProjectId: string | null;
+
   // Phase 2: AI agentic coding settings
   /** When true, send dev_mode=true in chat requests to enable agentic tools */
   agentEnabled: boolean;
@@ -48,6 +51,7 @@ interface DevState {
   setEditorLanguage: (language: string) => void;
   setActiveFile: (file: string) => void;
   setSelectedText: (text: string) => void;
+  setCurrentProjectId: (id: string | null) => void;
   setAgentEnabled: (enabled: boolean) => void;
   setEditorSyncEnabled: (enabled: boolean) => void;
   addSessionAutoApprove: (toolName: string) => void;
@@ -84,6 +88,7 @@ export const useDevStore = create<DevState>()(
       editorLanguage: "python",
       activeFile: "",
       selectedText: "",
+      currentProjectId: null,
       agentEnabled: true,
       editorSyncEnabled: true,
       sessionAutoApprove: [],
@@ -104,6 +109,7 @@ export const useDevStore = create<DevState>()(
       setEditorLanguage: (language) => set({ editorLanguage: language }),
       setActiveFile: (file) => set({ activeFile: file }),
       setSelectedText: (text) => set({ selectedText: text }),
+      setCurrentProjectId: (id) => set({ currentProjectId: id }),
       setAgentEnabled: (enabled) => set({ agentEnabled: enabled }),
       setEditorSyncEnabled: (enabled) => set({ editorSyncEnabled: enabled }),
       addSessionAutoApprove: (toolName) =>

@@ -1,30 +1,63 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDevStore } from "@/lib/stores/dev-store";
-import { FileIcon, FolderIcon, GitBranch, ChevronRight, ChevronDown } from "lucide-react";
+import { FileIcon, FolderIcon, GitBranch, ChevronRight, ChevronDown, FolderOpen, Loader2 } from "lucide-react";
 
 interface FileNode {
   name: string;
   path: string;
   type: "file" | "directory";
+  size?: number;
   children?: FileNode[];
 }
 
+const LANG_MAP: Record<string, string> = {
+  py: "python",
+  ts: "typescript",
+  tsx: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  json: "json",
+  md: "markdown",
+  yaml: "yaml",
+  yml: "yaml",
+  sh: "shell",
+  dockerfile: "dockerfile",
+  css: "css",
+  html: "html",
+};
+
 export function FileTree() {
-  const { selectedNode, activeFile, setActiveFile, setSelectedNode, gitBranch } = useDevStore();
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(["/workspace"]));
-  const [files, setFiles] = useState<FileNode[]>([
-    {
-      name: "workspace",
-      path: "/workspace",
-      type: "directory",
-      children: [
-        { name: "README.md", path: "/workspace/README.md", type: "file" },
-        { name: "src", path: "/workspace/src", type: "directory", children: [] },
-      ],
-    },
-  ]);
+  const {
+    selectedNode,
+    activeFile,
+    setActiveFile,
+    setSelectedNode,
+    setEditorContent,
+    setEditorLanguage,
+    gitBranch,
+    currentProjectId,
+  } = useDevStore();
+
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [tree, setTree] = useState<FileNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingFile, setLoadingFile] = useState<string | null>(null);
+
+  // Fetch file tree whenever the project changes
+  useEffect(() => {
+    if (!currentProjectId) {
+      setTree([]);
+      return;
+    }
+    setLoading(true);
+    fetch(`/api/backend/v1/dev/files/tree?project_id=${currentProjectId}&depth=3`)
+      .then((r) => r.json())
+      .then((data) => setTree(data.tree ?? []))
+      .catch(() => setTree([]))
+      .finally(() => setLoading(false));
+  }, [currentProjectId]);
 
   const toggleExpand = (path: string) => {
     setExpanded((prev) => {
@@ -38,18 +71,34 @@ export function FileTree() {
     });
   };
 
-  const handleFileClick = (node: FileNode) => {
-    if (node.type === "file") {
-      setActiveFile(node.path);
-      // TODO: Load file content into editor
-    } else {
+  const handleFileClick = async (node: FileNode) => {
+    if (node.type !== "file") {
       toggleExpand(node.path);
+      return;
+    }
+    if (!currentProjectId) return;
+
+    setLoadingFile(node.path);
+    try {
+      const res = await fetch(
+        `/api/backend/v1/dev/files/content?project_id=${currentProjectId}&path=${encodeURIComponent(node.path)}`
+      );
+      if (!res.ok) return;
+      const { content, encoding } = await res.json();
+      if (encoding === "base64") return; // skip binary files silently
+      setEditorContent(content);
+      setActiveFile(node.path);
+      const ext = node.name.split(".").pop()?.toLowerCase() ?? "";
+      setEditorLanguage(LANG_MAP[ext] ?? "plaintext");
+    } finally {
+      setLoadingFile(null);
     }
   };
 
-  const renderNode = (node: FileNode, depth: number = 0) => {
+  const renderNode = (node: FileNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expanded.has(node.path);
     const isActive = node.type === "file" && node.path === activeFile;
+    const isLoadingThis = loadingFile === node.path;
 
     return (
       <div key={node.path}>
@@ -63,12 +112,23 @@ export function FileTree() {
           {node.type === "directory" ? (
             <>
               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <FolderIcon size={14} />
+              {isExpanded ? <FolderOpen size={14} className="text-[var(--chat-accent)]" /> : <FolderIcon size={14} className="text-[var(--chat-muted)]" />}
             </>
           ) : (
-            <FileIcon size={14} />
+            <>
+              {isLoadingThis ? (
+                <Loader2 size={14} className="animate-spin text-[var(--chat-muted)]" />
+              ) : (
+                <FileIcon size={14} className={isActive ? "text-[var(--chat-accent)]" : "text-[var(--chat-muted)]"} />
+              )}
+            </>
           )}
-          <span className="text-xs">{node.name}</span>
+          <span className="text-xs truncate">{node.name}</span>
+          {node.size !== undefined && node.type === "file" && (
+            <span className="ml-auto text-[10px] text-[var(--chat-muted)] shrink-0">
+              {node.size < 1024 ? `${node.size}B` : `${(node.size / 1024).toFixed(1)}K`}
+            </span>
+          )}
         </div>
         {node.type === "directory" && isExpanded && node.children && (
           <div>
@@ -105,7 +165,25 @@ export function FileTree() {
 
       {/* File Tree */}
       <div className="flex-1 overflow-y-auto">
-        {files.map((node) => renderNode(node))}
+        {!currentProjectId ? (
+          <div className="flex flex-col items-center justify-center h-full px-4 text-center gap-2">
+            <FolderIcon size={28} className="text-[var(--chat-muted)] opacity-50" />
+            <p className="text-xs text-[var(--chat-muted)]">No project open</p>
+            <p className="text-[10px] text-[var(--chat-muted)] opacity-70">Select a project to browse files</p>
+          </div>
+        ) : loading ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2">
+            <Loader2 size={20} className="animate-spin text-[var(--chat-muted)]" />
+            <p className="text-xs text-[var(--chat-muted)]">Loading files…</p>
+          </div>
+        ) : tree.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full px-4 text-center gap-2">
+            <FolderOpen size={28} className="text-[var(--chat-muted)] opacity-50" />
+            <p className="text-xs text-[var(--chat-muted)]">Project is empty</p>
+          </div>
+        ) : (
+          tree.map((node) => renderNode(node))
+        )}
       </div>
     </div>
   );
