@@ -1,9 +1,11 @@
 "use client";
 
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { FileCode2, Copy, Download, X, Plus, Save } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { useSettingsStore } from "@/lib/stores/settings-store";
+import { getMonacoThemeName, registerMonacoThemes } from "./dev-theme-map";
 
 interface EditorTab {
   id: string;
@@ -28,6 +30,23 @@ export function TabbedEditor() {
   const [activeTabId, setActiveTabId] = useState(DEFAULT_TAB.id);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const { setSelectedText } = useDevStore();
+  const { theme: themeId, themeMode } = useSettingsStore();
+  const isLight = themeMode === "light";
+  const monacoTheme = getMonacoThemeName(themeId, isLight);
+
+  // Register custom Monaco themes once on mount
+  useEffect(() => {
+    registerMonacoThemes();
+  }, []);
+
+  // Update Monaco theme when Memex theme changes
+  useEffect(() => {
+    import("@monaco-editor/react").then(({ loader }) => {
+      loader.init().then((monaco) => {
+        monaco.editor.setTheme(monacoTheme);
+      });
+    });
+  }, [monacoTheme]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
@@ -270,7 +289,7 @@ export function TabbedEditor() {
             value={activeTab.content}
             onChange={handleContentChange}
             onMount={handleMount}
-            theme="vs-dark"
+            theme={monacoTheme}
             options={{
               minimap: { enabled: true },
               fontSize: 13,

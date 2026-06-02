@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal as TerminalIcon, Plus, X, Wifi, WifiOff, RotateCcw } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { useSettingsStore } from "@/lib/stores/settings-store";
+import { getXtermTheme } from "./dev-theme-map";
 
 const WS_BASE = (() => {
   const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL || "";
@@ -30,8 +32,23 @@ export function TabbedTerminal() {
   const { terminalTabs, activeTerminalId, addTerminalTab, removeTerminalTab, setActiveTerminal } = useDevStore();
   const containerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const fitAddons = useRef<Map<string, import("@xterm/addon-fit").FitAddon>>(new Map());
-  
+  const { theme: themeId, themeMode } = useSettingsStore();
+  const isLight = themeMode === "light";
+
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
+
+  // Update all terminal themes when Memex theme changes
+  useEffect(() => {
+    const xtermTheme = getXtermTheme(themeId, isLight);
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.term) {
+          t.term.options.theme = xtermTheme;
+        }
+        return t;
+      })
+    );
+  }, [themeId, isLight]);
 
   function getUid(): string {
     if (typeof document === "undefined") return "dev";
@@ -146,32 +163,15 @@ export function TabbedTerminal() {
       import("@xterm/addon-fit").then(({ FitAddon }) => {
         import("@xterm/addon-web-links").then(({ WebLinksAddon }) => {
           const fitAddon = new FitAddon();
+          // Read current theme at construction time; the theme-change effect
+          // updates existing terminals when the Memex theme changes.
+          const currentThemeId = useSettingsStore.getState().theme;
+          const currentIsLight = useSettingsStore.getState().themeMode === "light";
           const term = new Terminal({
             cursorBlink: true,
             fontSize: 13,
             fontFamily: "'Cascadia Code', 'Fira Code', 'Consolas', monospace",
-            theme: {
-              background: "#0a0a14",
-              foreground: "#e4e4e7",
-              cursor: "#22d3ee",
-              selectionBackground: "#22d3ee33",
-              black: "#18181b",
-              red: "#ef4444",
-              green: "#10b981",
-              yellow: "#f59e0b",
-              blue: "#3b82f6",
-              magenta: "#a855f7",
-              cyan: "#22d3ee",
-              white: "#e4e4e7",
-              brightBlack: "#52525b",
-              brightRed: "#f87171",
-              brightGreen: "#34d399",
-              brightYellow: "#fbbf24",
-              brightBlue: "#60a5fa",
-              brightMagenta: "#c084fc",
-              brightCyan: "#67e8f9",
-              brightWhite: "#fafafa",
-            },
+            theme: getXtermTheme(currentThemeId, currentIsLight),
           });
 
           term.loadAddon(fitAddon);
@@ -215,7 +215,7 @@ export function TabbedTerminal() {
   const activeTab = tabs.find((t) => t.id === activeTerminalId) || tabs[0];
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a14]">
+    <div className="flex flex-col h-full bg-[var(--chat-bg)]">
       {/* Tab Bar */}
       <div className="flex items-center border-b border-[var(--chat-border)] bg-[var(--chat-bg)]">
         <div className="flex flex-1 overflow-x-auto">
@@ -224,7 +224,7 @@ export function TabbedTerminal() {
               key={tab.id}
               className={`group flex items-center gap-2 px-3 py-2 text-xs cursor-pointer transition-colors border-r border-[var(--chat-border)] ${
                 tab.id === activeTerminalId
-                  ? "text-[var(--chat-accent)] bg-[#0a0a14] border-b-2 border-[var(--chat-accent)]"
+                  ? "text-[var(--chat-accent)] bg-[var(--chat-bg)] border-b-2 border-[var(--chat-accent)]"
                   : "text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-hover)]"
               }`}
               onClick={() => setActiveTerminal(tab.id)}
