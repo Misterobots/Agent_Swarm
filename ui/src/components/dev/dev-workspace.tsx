@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ChatView } from "@/components/chat/chat-view";
 import { TabbedEditor } from "./tabbed-editor";
 import { TabbedTerminal } from "./tabbed-terminal";
 import { PreviewCanvas } from "./preview-canvas";
 import { QuickActionsToolbar } from "./quick-actions-toolbar";
-import { Code2, Eye, FileCode, Terminal, X, Users } from "lucide-react";
+import { Code2, Eye, FileCode, Terminal, X, Users, Target } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
+import { GoalsPanel } from "./goals-panel"; // register Goals panel + import component
 
 export function DevWorkspace() {
   const { isMobile } = useIsMobile();
@@ -26,6 +27,7 @@ export function DevWorkspace() {
     setShowEditorPanel,
     setShowTerminalPanel,
   } = useDevStore();
+  const [showGoalsPanel, setShowGoalsPanel] = useState(false);
 
   // Redirect to chat on mobile — Dev workspace is desktop-only
   useEffect(() => {
@@ -64,6 +66,13 @@ export function DevWorkspace() {
             icon={<Terminal size={14} />}
             label="Terminal"
           />
+          <ToolbarButton
+            onClick={() => setShowGoalsPanel((v) => !v)}
+            active={showGoalsPanel}
+            title={showGoalsPanel ? "Hide goals" : "Show goals"}
+            icon={<Target size={14} />}
+            label="Goals"
+          />
         </div>
         <div className="absolute bottom-0 left-0 right-0 divider" />
       </div>
@@ -98,6 +107,19 @@ export function DevWorkspace() {
             onClose={() => setShowTerminalPanel(false)}
           >
             <TabbedTerminal />
+          </FlyoutSurface>
+        )}
+
+        {/* Goals Flyout (right) */}
+        {showGoalsPanel && (
+          <FlyoutSurface
+            position="right"
+            className={cn("w-[380px]", showEditorPanel && "right-[50%]")}
+            title="Goals"
+            icon={<Target size={14} />}
+            onClose={() => setShowGoalsPanel(false)}
+          >
+            <GoalsPanel />
           </FlyoutSurface>
         )}
       </div>
