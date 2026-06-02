@@ -28,6 +28,8 @@ export interface ChatStreamOptions {
   solvingVerifierMaxTime?: number;
   solvingCorrectorNPasses?: number;
   solvingCorrectorMaxTime?: number;
+  currentProjectId?: string;
+  activeFile?: string;
 }
 
 export async function* sendChatStream(
@@ -57,6 +59,8 @@ export async function* sendChatStream(
   solvingVerifierMaxTime?: number,
   solvingCorrectorNPasses?: number,
   solvingCorrectorMaxTime?: number,
+  currentProjectId?: string,
+  activeFile?: string,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -86,6 +90,8 @@ export async function* sendChatStream(
   if (solvingVerifierMaxTime !== undefined) body.solving_verifier_max_time = solvingVerifierMaxTime;
   if (solvingCorrectorNPasses !== undefined) body.solving_corrector_n_passes = solvingCorrectorNPasses;
   if (solvingCorrectorMaxTime !== undefined) body.solving_corrector_max_time = solvingCorrectorMaxTime;
+  if (currentProjectId) body.current_project_id = currentProjectId;
+  if (activeFile) body.active_file = activeFile;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",

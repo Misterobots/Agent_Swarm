@@ -6,7 +6,7 @@ import { TabbedEditor } from "./tabbed-editor";
 import { TabbedTerminal } from "./tabbed-terminal";
 import { PreviewCanvas } from "./preview-canvas";
 import { QuickActionsToolbar } from "./quick-actions-toolbar";
-import { Code2, Eye, FileCode, Monitor, Terminal, X, Users } from "lucide-react";
+import { Code2, Eye, FileCode, Terminal, X, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useDevStore } from "@/lib/stores/dev-store";
@@ -15,6 +15,7 @@ import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { registerPanel, getRegisteredPanels, type PanelRegistration } from "./dev-panels-registry";
 import { ProjectSwitcher } from "./project-switcher";
+import { MobileDevView } from "./mobile-dev-view";
 import "./goals-panel"; // register Goals panel (side-effect)
 import "./notes-panel"; // register Notes panel (side-effect)
 
@@ -55,25 +56,7 @@ export function DevWorkspace() {
   } = useDevPanelStore();
 
   if (isMobile) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center gap-4 p-6 text-center">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[var(--chat-panel)] border border-[var(--chat-border)]">
-          <Monitor size={22} className="text-[var(--chat-muted)]" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-[var(--chat-text)]">Dev workspace is desktop-only</p>
-          <p className="text-xs text-[var(--chat-muted)] max-w-[260px]">
-            Open Memex on a desktop browser to use the editor, terminal, and agent tools.
-          </p>
-        </div>
-        <button
-          onClick={() => router.push("/chat")}
-          className="px-4 py-2 text-xs font-medium rounded-md bg-[var(--chat-panel)] border border-[var(--chat-border)] text-[var(--chat-text)] hover:text-[var(--chat-accent)] transition-colors"
-        >
-          Go to Chat →
-        </button>
-      </div>
-    );
+    return <MobileDevView />;
   }
 
   const panels = getRegisteredPanels();

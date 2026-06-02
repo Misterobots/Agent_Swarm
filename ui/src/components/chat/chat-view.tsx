@@ -28,6 +28,7 @@ import { GoalsPanel } from "@/components/goals/GoalsPanel";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import type { FileAttachment, FlaggedFollowup } from "@/types/chat";
 import { useFollowupsStore } from "@/lib/stores/followups-store";
+import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 
 function usageBarClass(pct: number): string {
   if (pct >= 0.95) return "bg-red-500";
@@ -74,6 +75,9 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   });
   const { activeConversationId, activeConversation, updateConversation, setMessageFlaggedFollowup } = useChatStore();
   const addFollowup = useFollowupsStore((s) => s.addFollowup);
+  const currentProjectId = useDevProjectStore((s) => s.currentProjectId);
+  const devProjects = useDevProjectStore((s) => s.projects);
+  const currentProject = devProjects.find((p) => p.id === currentProjectId);
   const model = useSettingsStore((s) => s.model);
   const theme = useSettingsStore((s) => s.theme);
   const personality = THEME_PERSONALITIES[theme] ?? THEME_PERSONALITIES.memex;
@@ -253,6 +257,23 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
             </span>
           </div>
         </div>
+
+        {/* Active project context pill */}
+        {currentProjectId && (
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border border-[var(--chat-border)] bg-[var(--chat-panel)] text-[var(--chat-muted)] flex-shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--chat-accent)] flex-shrink-0" />
+            <span className="truncate max-w-[120px]">
+              {currentProject?.name ?? "Working on project"}
+            </span>
+            <button
+              onClick={() => useDevProjectStore.getState().setCurrentProjectId(null)}
+              className="ml-0.5 hover:text-[var(--chat-text)] transition-colors leading-none"
+              title="Clear project context"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Model selector — compact */}
         <div className="flex-shrink-0 hidden md:block">

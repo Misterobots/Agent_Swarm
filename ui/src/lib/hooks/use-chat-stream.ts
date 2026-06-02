@@ -7,6 +7,7 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import type { ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 
 const MODEL_WINDOWS: Record<string, number> = {
   "qwen2.5-coder:14b": 32768,
@@ -244,7 +245,10 @@ export function useChatStream(options?: {
           const controller = new AbortController();
           abortRef.current = controller;
           try {
-            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode, workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime)) {
+            const _devProjectState = useDevProjectStore.getState();
+            const _currentProjectId = _devProjectState.currentProjectId ?? undefined;
+            const _activeFile = useDevStore.getState().activeFile ?? undefined;
+            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode, workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {

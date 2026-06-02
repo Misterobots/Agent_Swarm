@@ -500,6 +500,8 @@ class ChatRequest(BaseModel):
     solving_verifier_max_time: Optional[int] = None     # Per-call verifier wall-clock (seconds)
     solving_corrector_n_passes: Optional[int] = None    # N sequential corrector passes per round
     solving_corrector_max_time: Optional[int] = None    # Per-call corrector wall-clock (seconds)
+    current_project_id: Optional[str] = None            # Active dev project ID (injects .memex/notes.md into system prompt)
+    active_file: Optional[str] = None                   # Currently open file path in the dev workspace editor
 
 
 # ---------------------------------------------------------------------------
@@ -1227,6 +1229,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     solving_verifier_max_time=request.solving_verifier_max_time,
                     solving_corrector_n_passes=request.solving_corrector_n_passes,
                     solving_corrector_max_time=request.solving_corrector_max_time,
+                    current_project_id=request.current_project_id,
+                    active_file=request.active_file,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")

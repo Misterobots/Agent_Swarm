@@ -448,6 +448,8 @@ def chat_swarm(
     solving_verifier_max_time: int | None = None,
     solving_corrector_n_passes: int | None = None,
     solving_corrector_max_time: int | None = None,
+    current_project_id: str | None = None,
+    active_file: str | None = None,
 ):
     """Generator: yield status/message/error events for the UI."""
     AGENT_STATE.labels(agent_name="Router").set(2)
@@ -608,6 +610,34 @@ def chat_swarm(
                         yield _t(f"→ MemPalace: {len(strong)} relevant memories recalled")
             except Exception as _mp_err:
                 logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
+
+        # Dev project context injection — reads .memex/notes.md from the active project
+        # sandbox and injects it as a system message so the agent is aware of project
+        # goals, tech stack, and ongoing notes. Non-fatal: never blocks the request.
+        if current_project_id and owner_id:
+            try:
+                from dev_files.docker_exec import read_file as _read_dev_file
+                _notes = _read_dev_file(owner_id, current_project_id, ".memex/notes.md")
+                if _notes and _notes.get("encoding") == "utf8" and _notes.get("content", "").strip():
+                    _project_ctx = f"## Current project context\n{_notes['content'].strip()}"
+                    if active_file:
+                        _project_ctx += f"\n\n## Active file\n{active_file}"
+                    history = list(history or []) + [{"role": "system", "content": _project_ctx}]
+                    yield _t(f"→ Project context: injected .memex/notes.md ({len(_notes['content'])} chars)")
+                elif active_file:
+                    # No notes yet but we still know which file is open
+                    _project_ctx = f"## Active file\n{active_file}"
+                    history = list(history or []) + [{"role": "system", "content": _project_ctx}]
+                    yield _t(f"→ Project context: injected active file path only (no notes yet)")
+            except Exception as _pc_err:
+                logger.debug(f"[Router] Project context injection failed (non-fatal): {_pc_err}")
+        elif active_file:
+            # active_file can be sent without a project_id (plain dev workspace with no project selected)
+            try:
+                history = list(history or []) + [{"role": "system", "content": f"## Active file\n{active_file}"}]
+                yield _t(f"→ Project context: injected active file path (no project selected)")
+            except Exception as _af_err:
+                logger.debug(f"[Router] Active file injection failed (non-fatal): {_af_err}")
 
         # Web grounding — each snippet is trust-scanned inside web_browser.web_search()
         # before it is returned, so no additional scan is needed here.
