@@ -5,9 +5,10 @@
 # Routing: Lovelace (192.168.2.101) <- Turing Traefik (192.168.2.103:80) <- Existing media stack
 
 services:
-  # --- Docker Sidecar Probe (read-only container metadata) ---
-  # Exposes /containers/json on :2375 so Turing's agent_runtime can probe
-  # this node's container counts for the Service Health surface.
+  # Docker Socket Proxy - exposes container metadata for cross-node health checks
+  # Access restricted to Turing (192.168.2.103) via iptables DOCKER-USER rules on the host.
+  # POST=1 enables container restart/exec for management; safe only because iptables limits
+  # who can reach port 2375 to trusted nodes. Windows management: SSH to Lovelace directly.
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
     container_name: docker-socket-proxy-execution
@@ -18,7 +19,7 @@ services:
       - PING=1
       - VERSION=1
       - EVENTS=0
-      - POST=0
+      - POST=1        # Allows restart/exec; secured by host iptables allowlist
       - AUTH=0
       - BUILD=0
       - IMAGES=0
@@ -28,7 +29,7 @@ services:
     volumes:
       - //var/run/docker.sock:/var/run/docker.sock:ro
     ports:
-      - "2375:2375"
+      - "192.168.2.101:2375:2375"  # Bind to LAN IP only, not 0.0.0.0
     networks:
       - execution_net
 

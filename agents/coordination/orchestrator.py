@@ -1032,6 +1032,11 @@ def coordinate_task(
         yield {"type": "thought", "content": "→ Phase 5/5: Verification (fresh-eyes worker)"}
 
         all_work = session.get_all_scratchpad_content()
+        # Cap work product fed to verifier — qwen3:14b has a 16K context window;
+        # keeping input under ~24K chars (~6K tokens) leaves headroom for generation.
+        _MAX_VERIFY_CHARS = 24_000
+        if len(all_work) > _MAX_VERIFY_CHARS:
+            all_work = all_work[:_MAX_VERIFY_CHARS] + "\n\n[...work product truncated for context window...]"
         criteria_text = "\n".join(f"- {c}" for c in verification_criteria)
 
         verify_prompt = (

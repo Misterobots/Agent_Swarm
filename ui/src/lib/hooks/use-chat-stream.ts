@@ -10,12 +10,28 @@ import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 
 const MODEL_WINDOWS: Record<string, number> = {
-  "qwen2.5-coder:14b": 32768,
-  "qwen2.5-coder:14b-instruct-q4_k_m": 32768,
-  "qwen3.5:9b": 32768,
+  // Gemma4
+  "gemma4:31b": 32768,
+  // Qwen3 family (current production models)
+  "qwen3-coder:30b": 32768,
+  "qwen3.6:27b": 32768,
+  "qwen3:14b": 16384,
+  "qwen3:8b": 16384,
+  "qwen3:4b": 8192,
+  // Qwen2.5 family (legacy / fallback)
+  "qwen2.5-coder:14b": 16384,
+  "qwen2.5-coder:14b-instruct-q4_k_m": 16384,
+  "qwen2.5-coder:7b": 8192,
+  // Other
+  "qwen3.5:9b": 16384,
   "nemotron-mini": 4096,
+  "phi4-reasoning:14b": 16384,
+  "deepseek-r1:32b": 32768,
   "llama3.2:3b": 8192,
-  "default": 8192,
+  // memex model aliases
+  "memex": 32768,
+  "memex-fast": 16384,
+  "default": 16384,  // raised — all current models are ≥16K
 };
 
 const AUTO_COMPACT_THRESHOLD = 0.95;

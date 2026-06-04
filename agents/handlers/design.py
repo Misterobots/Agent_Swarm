@@ -82,6 +82,13 @@ def handle_design(user_input: str, ctx: dict):
     resolved_model = CODER_MODEL
     resolved_host = get_best_host_for_model(resolved_model)
 
+    # Session-scoped artifact cache — stores the most recent HTML for this session
+    # so revision prompts can inject it and the model can make targeted edits
+    # rather than generating from scratch every time.
+    session_id = ctx.get("session_id", "default_session")
+    _safe_sid = "".join(c if c.isalnum() or c in "_-" else "_" for c in session_id)
+    _artifact_cache_path = f"/workspace/delivered_artifacts/latest_{_safe_sid}.html"
+
     # Build the final prompt: attached context doc first, then history, then user message.
     # Strip binary image data from extracted_context — the coder model is text-only;
     # images are referenced as [image attached] placeholders so the model knows they exist.
@@ -95,7 +102,32 @@ def handle_design(user_input: str, ctx: dict):
         )
         final_input = f"[Attached context / reference material]\n{text_ctx}\n\n---\n\n{final_input}"
         yield {"type": "log", "content": f"[DesignStudio] Context injected ({len(text_ctx)} chars)"}
-    if history_context:
+
+    # Revision mode: inject the previous HTML so the model edits in-place instead
+    # of regenerating. Without this, the model only sees "✨ Design ready!" as prior
+    # context and cold-starts a fresh design on every revision — causing design
+    # system degradation (lost colours, typography, layout conventions).
+    _is_revision = bool(history_context) and os.path.exists(_artifact_cache_path)
+    if _is_revision:
+        try:
+            with open(_artifact_cache_path, "r", encoding="utf-8") as _fh:
+                _prev_html = _fh.read()
+            # Cap at ~32 KB (~8 K tokens at 4 chars/token).
+            # qwen3-coder:30b has 32 K context; reserving ~8 K for input HTML
+            # leaves ~24 K for system prompt + revision request + generated output.
+            if len(_prev_html) > 32_000:
+                _prev_html = _prev_html[:32_000] + "\n<!-- [truncated for context length] -->"
+            final_input = (
+                f"CURRENT DESIGN (modify this — do not start from scratch):\n"
+                f"```html\n{_prev_html}\n```\n\n"
+                f"REVISION REQUEST:\n{final_input}"
+            )
+            yield {"type": "log", "content": f"[DesignStudio] Revision mode — injecting previous artifact ({len(_prev_html)} chars)"}
+        except Exception as _re_err:
+            logger.warning("[DesignStudio] Could not load previous artifact for revision: %s", _re_err)
+    elif history_context:
+        # Fallback: no cached artifact but there is history — surface it so the model
+        # at least knows what was requested before.
         final_input = f"{history_context}\n\n{final_input}"
 
     full_output = ""
@@ -181,6 +213,14 @@ def handle_design(user_input: str, ctx: dict):
         yield {"type": "log", "content": f"[DesignStudio] Saved: {filename}"}
     except Exception as _fe:
         logger.warning("[DesignStudio] Could not save artifact file: %s", _fe)
+
+    # Update session artifact cache — subsequent revisions in this session will
+    # read this file and inject it as the "current design to revise."
+    try:
+        with open(_artifact_cache_path, "w", encoding="utf-8") as _ch:
+            _ch.write(html_content)
+    except Exception as _ce:
+        logger.warning("[DesignStudio] Could not update artifact cache: %s", _ce)
 
     AGENT_STATE.labels(agent_name="DesignStudio").set(1)
     WORKFLOW_STEPS.labels(status="success", agent_type="DesignStudio").inc()

@@ -42,13 +42,15 @@
 **Key containers on Turing:**
 ```
 agent_runtime     running   ai_lab_net
-memex_ui          running   ai_lab_net + saltbox
+memex_ui          running   ai_lab_net + saltbox   ← image: home-ai-lab/memex-ui:latest
 traefik           running   saltbox
 cloudflared       running   (CF tunnel daemon)
 ollama-turing     running
 redis-turing      running
 authentik         running   (SSO)
 ```
+
+> ⚠️ Turing uses `docker-compose-Justin-PC.yml`, not the canonical `docker-compose.yml`. Both files are in `turing_gateway/` and must be kept in sync.
 
 **Traefik auth middleware:** `authentik@file` — requests to `memex.shivelymedia.com` go through Authentik SSO.
 
@@ -249,10 +251,16 @@ Invoke-RestMethod -Uri "http://127.0.0.1:2375/containers/agent_runtime/logs?stdo
 
 ---
 
-## 📦 Pending Tasks (as of 2026-05-31)
+## 📦 Pending Tasks (as of 2026-06-04)
 
+- [ ] **Android build pipeline** — add a `./gradlew assembleRelease` step to the execution plane so Swarm-generated Kotlin projects can be compiled to an APK and sideloaded to a tablet without leaving Memex. Triggered by the Hitchhiker's Guide project.
 - [ ] **MemPalace circuit breaker** — spawned chip, awaiting user approval to start
 - [ ] **Dev workspace session continuity review** — spawned chip, awaiting approval
 - [ ] **Dev UI/UX design review** — spawned chip, awaiting approval
-- [ ] **Docker API 2375 security on Turing** — unauthenticated; restrict to LAN IPs or add TLS
+- [x] **Docker API 2375 security** — restricted to LAN IPs via iptables; ports now bound to node IP (`192.168.2.103:2375`, `192.168.2.101:2375`), not 0.0.0.0; `POST=1` enabled for management
 - [x] **`training_dispatcher` crash loop** — fixed (`ARCHETYPE_TRAINING_CONFIGS` added to config.py, `--target` flag corrected); running clean as of 2026-05-31
+- [x] **Swarm recursion crash** — fixed; implementation workers now use `worker_id` as Postgres session key instead of coordinator `session_id`, preventing phidata pydantic comparison recursion across workers (2026-06-04)
+- [x] **hive_ui → memex_ui container drift** — `docker-compose-Justin-PC.yml` on Turing was never updated by the May rename commit; fixed all `hive-*` → `memex-*` references and added missing static asset bypass routes (2026-06-04)
+- [x] **Design revision degradation** — revisions cold-started a fresh generation with no HTML context; fixed with session-scoped artifact cache (`/workspace/delivered_artifacts/latest_{session_id}.html`) injected on revision, capped at 32 KB (2026-06-04)
+- [x] **MODEL_WINDOWS stale in UI** — all current models (`gemma4:31b`, `qwen3-coder:30b`, `qwen3.6:27b`, etc.) fell through to `default: 8192`, triggering premature compaction; table updated with correct windows (2026-06-04)
+- [x] **Verifier context overflow** — `all_work` passed to verifier with no size cap; added 24 K char limit to stay within `qwen3:14b`'s 16 K context window (2026-06-04)

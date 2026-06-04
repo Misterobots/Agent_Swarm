@@ -132,6 +132,13 @@ Requirements:
 - Add tasteful micro-interactions (hover states, transitions) in vanilla JavaScript
 - NO external CDN links; no placeholder images — use CSS/SVG shapes instead
 - The prototype must look production-ready, not like a wireframe
+
+REVISION RULES (when "CURRENT DESIGN" is provided):
+- Output the COMPLETE updated HTML file — never a partial diff or snippet
+- Preserve ALL existing CSS custom properties, colour palette, typography, and layout
+- Apply ONLY the changes explicitly requested — do not redesign unrelated sections
+- Maintain design system consistency: if the existing design uses a specific accent colour,
+  border-radius, shadow style, or animation easing, carry it through into new elements
 """,
 }
 
