@@ -118,6 +118,7 @@ def handle_workshop(user_input: str, ctx: dict):
     """Generator — two-phase product discovery workshop."""
     turn_id       = ctx["turn_id"]
     history_context = ctx.get("history_context", "")
+    owner_id      = ctx.get("owner_id")
     lf_trace      = ctx["lf_trace"]
     langfuse      = ctx["langfuse"]
     use_langfuse  = ctx["use_langfuse"]
@@ -201,6 +202,16 @@ def handle_workshop(user_input: str, ctx: dict):
     )
 
     import re as _re
+
+    # Cross-session persistence ─────────────────────────────────────────────
+    # Phase 1 complete: save output owner-scoped so any device/tab can resume.
+    # Phase 2 complete: clear it — the workshop is done.
+    if owner_id:
+        from brooks import save_workshop_state, clear_workshop_state
+        if not _in_answer_phase:
+            save_workshop_state(full_content, user_input, owner_id)
+        else:
+            clear_workshop_state(owner_id)
 
     # Phase 1: parse questions into structured chips for the UI.
     if not _in_answer_phase:

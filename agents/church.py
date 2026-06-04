@@ -926,13 +926,31 @@ def chat_swarm(
         _lower = user_input.lower()
 
         # Workshop session continuation — auto-route Phase-2 replies
-        if intent not in ("WORKSHOP", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN", "RESEARCH") and history_context:
-            _WORKSHOP_SENTINELS = (
-                "Answer any or all of these and I'll draft your Product Brief.",
-                "▶️ Design Mode Prompt",
-            )
+        _WORKSHOP_SENTINELS = (
+            "Answer any or all of these and I'll draft your Product Brief.",
+            "▶️ Design Mode Prompt",
+        )
+        _non_workshop_intents = ("WORKSHOP", "IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN", "RESEARCH")
+        if intent not in _non_workshop_intents and history_context:
             if any(s in history_context for s in _WORKSHOP_SENTINELS):
                 intent = "WORKSHOP"; confidence = 0.92; reasoning = "Workshop session continuation (history)"
+
+        # Cross-session workshop restoration — new machine / fresh tab has no history.
+        # Retrieve Phase 1 output saved by handle_workshop and inject it as synthetic
+        # history_context so the Phase 2 detection inside handle_workshop works normally.
+        if intent not in _non_workshop_intents and owner_id and not any(s in history_context for s in _WORKSHOP_SENTINELS):
+            try:
+                from brooks import get_workshop_state as _get_ws
+                _ws = _get_ws(owner_id)
+                if _ws and _ws.get("type") == "workshop_phase1":
+                    _ws_out = _ws.get("output", "")
+                    if any(s in _ws_out for s in _WORKSHOP_SENTINELS):
+                        history_context = f"[Workshop session restored from previous device]\n{_ws_out}"
+                        intent = "WORKSHOP"; confidence = 0.92
+                        reasoning = "Cross-session workshop state restored"
+                        yield _l("[Router] Cross-session workshop state restored — injecting Phase 1 output")
+            except Exception as _ws_err:
+                logger.warning("[Router] Cross-session workshop check failed (non-fatal): %s", _ws_err)
 
         if _is_explicit_train_request(user_input) and intent != "TRAIN":
             intent = "TRAIN"; confidence = 0.98; reasoning = "Keyword override: explicit training directive"

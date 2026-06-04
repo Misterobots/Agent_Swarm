@@ -93,6 +93,72 @@ def clear_context(session_id: str = "default", owner_id: str | None = None):
             logger.error(f"Failed to clear context: {e}")
 
 
+# ---------------------------------------------------------------------------
+# Cross-session workshop state
+# Persists Phase 1 output keyed ONLY by owner_id (no session_id dependency)
+# so a user can resume their workshop from a different machine or browser tab.
+# TTL is 24 h — long enough for an async workshop, shorter than session context.
+# ---------------------------------------------------------------------------
+
+_WORKSHOP_TTL_SECONDS = 86_400  # 24 hours
+
+
+def _workshop_file(owner_id: str) -> str:
+    safe_owner = _safe_component(owner_id, "anonymous")
+    owner_dir = os.path.join(CONTEXT_DIR, safe_owner)
+    os.makedirs(owner_dir, exist_ok=True)
+    return os.path.join(owner_dir, "workshop_pending.json")
+
+
+def save_workshop_state(phase1_output: str, original_idea: str, owner_id: str) -> None:
+    """Persist Phase 1 workshop output cross-session for the given owner."""
+    try:
+        path = _workshop_file(owner_id)
+        with open(path, "w") as fh:
+            json.dump(
+                {
+                    "type": "workshop_phase1",
+                    "output": phase1_output,
+                    "idea": original_idea,
+                    "_saved_at": time.time(),
+                },
+                fh,
+            )
+        logger.info("[Brooks] Workshop Phase 1 saved cross-session for owner=%s", owner_id)
+    except Exception as exc:
+        logger.error("[Brooks] Failed to save workshop state: %s", exc)
+
+
+def get_workshop_state(owner_id: str) -> dict | None:
+    """Retrieve pending cross-session workshop state if it is still fresh."""
+    try:
+        path = _workshop_file(owner_id)
+        if not os.path.exists(path):
+            return None
+        with open(path) as fh:
+            data = json.load(fh)
+        saved_at = data.pop("_saved_at", None)
+        if saved_at is None or (time.time() - saved_at) > _WORKSHOP_TTL_SECONDS:
+            logger.info("[Brooks] Workshop state for owner=%s expired — discarding", owner_id)
+            os.remove(path)
+            return None
+        return data
+    except Exception as exc:
+        logger.error("[Brooks] Failed to load workshop state: %s", exc)
+        return None
+
+
+def clear_workshop_state(owner_id: str) -> None:
+    """Delete the cross-session workshop state (call after Phase 2 completes)."""
+    try:
+        path = _workshop_file(owner_id)
+        if os.path.exists(path):
+            os.remove(path)
+            logger.info("[Brooks] Workshop state cleared for owner=%s", owner_id)
+    except Exception as exc:
+        logger.error("[Brooks] Failed to clear workshop state: %s", exc)
+
+
 # --- Migration: clean up old shared context file ---
 _OLD_CONTEXT_FILE = os.path.join(os.path.dirname(__file__), "swarm_context.json")
 if os.path.exists(_OLD_CONTEXT_FILE):
