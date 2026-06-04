@@ -90,18 +90,83 @@ def handle_design(user_input: str, ctx: dict):
     _artifact_cache_path = f"/workspace/delivered_artifacts/latest_{_safe_sid}.html"
 
     # Build the final prompt: attached context doc first, then history, then user message.
-    # Strip binary image data from extracted_context — the coder model is text-only;
-    # images are referenced as [image attached] placeholders so the model knows they exist.
+    # Vision bridge: the coder model (qwen3-coder:30b) is text-only, so we pre-describe
+    # any attached images using gemma4:31b (multimodal) before passing context to the
+    # coder.  This gives the design model actual visual information — colours, layout,
+    # typography, hierarchy — rather than the useless placeholder that stripping produces.
     import re as _re
     final_input = user_input
     if extracted_context:
-        text_ctx = _re.sub(
-            r'data:image/[^;]+;base64,[A-Za-z0-9+/=]+',
-            '[image attached — see description in prompt]',
-            extracted_context,
-        )
-        final_input = f"[Attached context / reference material]\n{text_ctx}\n\n---\n\n{final_input}"
-        yield {"type": "log", "content": f"[DesignStudio] Context injected ({len(text_ctx)} chars)"}
+        from config import COORDINATOR_MODEL as _VISION_MODEL
+
+        # Extract all data-URI images from extracted_context
+        _img_pattern = _re.compile(r'data:(image/[^;]+);base64,([A-Za-z0-9+/=]+)')
+        _img_matches = _img_pattern.findall(extracted_context)
+
+        if _img_matches:
+            yield {"type": "status", "content": f"🔍 Design Studio: Analysing {len(_img_matches)} image(s)..."}
+            _vision_host = get_best_host_for_model(_VISION_MODEL)
+            _image_descriptions: list[str] = []
+
+            for _idx, (_mime, _b64) in enumerate(_img_matches):
+                try:
+                    import requests as _vreq
+                    _vision_resp = _vreq.post(
+                        f"{_vision_host}/api/chat",
+                        json={
+                            "model": _VISION_MODEL,
+                            "messages": [{
+                                "role": "user",
+                                "content": (
+                                    "You are a UI/UX design analyst. Describe this image in detail "
+                                    "for a front-end developer who will recreate or reference it:\n"
+                                    "- Colour palette (list specific hex/CSS values if visible)\n"
+                                    "- Layout and spatial structure\n"
+                                    "- Typography (fonts, sizes, weights, hierarchy)\n"
+                                    "- Visual elements (icons, images, shapes, borders, shadows)\n"
+                                    "- Interactive states visible (hover, active, etc.)\n"
+                                    "- Overall aesthetic and design language\n"
+                                    "Be precise and technical."
+                                ),
+                                "images": [_b64],
+                            }],
+                            "stream": False,
+                            "options": {"num_ctx": 8192, "temperature": 0.1},
+                        },
+                        timeout=120,
+                    )
+                    if _vision_resp.status_code == 200:
+                        _desc = _vision_resp.json().get("message", {}).get("content", "")
+                        if _desc:
+                            _image_descriptions.append(f"[Image {_idx + 1} — {_mime}]\n{_desc}")
+                            yield {"type": "log", "content": f"[DesignStudio] Vision bridge: image {_idx + 1} described ({len(_desc)} chars)"}
+                        else:
+                            _image_descriptions.append(f"[Image {_idx + 1}] (description unavailable)")
+                    else:
+                        _image_descriptions.append(f"[Image {_idx + 1}] (vision model returned {_vision_resp.status_code})")
+                        logger.warning("[DesignStudio] Vision bridge HTTP %s for image %d", _vision_resp.status_code, _idx + 1)
+                except Exception as _ve:
+                    _image_descriptions.append(f"[Image {_idx + 1}] (vision analysis failed: {_ve})")
+                    logger.warning("[DesignStudio] Vision bridge failed for image %d: %s", _idx + 1, _ve)
+
+            # Replace base64 blobs with the generated descriptions
+            _descriptions_block = "\n\n".join(_image_descriptions)
+            text_ctx = _img_pattern.sub("", extracted_context).strip()
+            if text_ctx:
+                text_ctx = f"{text_ctx}\n\n[Visual Reference Analysis]\n{_descriptions_block}"
+            else:
+                text_ctx = f"[Visual Reference Analysis]\n{_descriptions_block}"
+        else:
+            # No images — strip any stray base64 just in case and pass text through
+            text_ctx = _re.sub(
+                r'data:image/[^;]+;base64,[A-Za-z0-9+/=]+',
+                '',
+                extracted_context,
+            ).strip()
+
+        if text_ctx:
+            final_input = f"[Attached context / reference material]\n{text_ctx}\n\n---\n\n{final_input}"
+            yield {"type": "log", "content": f"[DesignStudio] Context injected ({len(text_ctx)} chars)"}
 
     # Revision mode: inject the previous HTML so the model edits in-place instead
     # of regenerating. Without this, the model only sees "✨ Design ready!" as prior
