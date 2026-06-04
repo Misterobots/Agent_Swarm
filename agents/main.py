@@ -712,15 +712,18 @@ def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optio
         logger.info(f"[owner_id] Resolved from payload: {payload_user_id}")
         return payload_user_id
 
-    # Check Authentik forward-auth headers (injected by Traefik forwardAuth middleware)
-    authentik_uid = request.headers.get("X-authentik-uid", "").strip()
-    if authentik_uid:
-        logger.info(f"[owner_id] Resolved from X-authentik-uid: {authentik_uid}")
-        return authentik_uid
+    # Check Authentik forward-auth headers (injected by Traefik forwardAuth middleware).
+    # Prefer the human-readable username over the opaque UID hash — the username is what
+    # the UI uses for ownership checks (useAccess().username) and what shows in the Palace
+    # viewer Source field.  Fall back to UID only if username is absent.
     authentik_user = request.headers.get("X-authentik-username", "").strip()
     if authentik_user:
         logger.info(f"[owner_id] Resolved from X-authentik-username: {authentik_user}")
         return authentik_user
+    authentik_uid = request.headers.get("X-authentik-uid", "").strip()
+    if authentik_uid:
+        logger.info(f"[owner_id] Resolved from X-authentik-uid: {authentik_uid}")
+        return authentik_uid
 
     agent_card = getattr(request.state, "agent_card", None)
     if not agent_card:

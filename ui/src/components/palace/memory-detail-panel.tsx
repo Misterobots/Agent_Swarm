@@ -74,6 +74,16 @@ export function MemoryDetailPanel() {
 
   const meta = selectedMemory.metadata || {};
 
+  // owner_id was historically stored as an Authentik UID hash (64 hex chars).
+  // Newer records use the human-readable username. Truncate legacy hashes so the
+  // panel doesn't display a wall of hex.
+  const displaySource = (() => {
+    const v = selectedMemory.owner_id;
+    if (!v) return null;
+    if (v.length > 32 && /^[0-9a-f]+$/i.test(v)) return v.slice(0, 8) + "…";
+    return v;
+  })();
+
   return (
     <>
       {/* Slide-in panel */}
@@ -147,10 +157,10 @@ export function MemoryDetailPanel() {
                 <span style={{ color: "var(--chat-text)" }}>{selectedMemory.agent_id}</span>
               </>
             )}
-            {selectedMemory.owner_id && (
+            {displaySource && (
               <>
-                <span style={{ color: "var(--chat-muted)" }}>Owner</span>
-                <span style={{ color: "var(--chat-text)" }}>{selectedMemory.owner_id}</span>
+                <span style={{ color: "var(--chat-muted)" }}>Source</span>
+                <span style={{ color: "var(--chat-text)" }}>{displaySource}</span>
               </>
             )}
             <span style={{ color: "var(--chat-muted)" }}>Created</span>
