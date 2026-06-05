@@ -253,10 +253,65 @@ def coordinate_task(
         )
         if _should_gate and not skip_project_gate and not plan_mode:
             logger.info(f"[Coordinator] Codebase task detected (project_type={project_type}), asking for project routing.")
+
+            # If the prompt references attached images, describe them now via the vision
+            # model and save the descriptions alongside the pending context.  The raw
+            # base64 blobs are in extracted_context for THIS request only — on re-entry
+            # (after the user answers the gate) extracted_context is empty because the
+            # button click carries no attachments.  Text descriptions survive re-entry.
+            import re as _re_gate
+            _img_pattern_gate = _re_gate.compile(r'data:(image/[^;]+);base64,([A-Za-z0-9+/=]+)')
+            _img_matches_gate = _img_pattern_gate.findall(extracted_context or "")
+            _visual_context = ""
+            if _img_matches_gate:
+                yield {"type": "status", "content": f"🔍 Describing {len(_img_matches_gate)} attached image(s) for project context..."}
+                try:
+                    import requests as _vreq_gate
+                    from config import COORDINATOR_MODEL as _VMODEL_GATE
+                    from utils.gpu_queue import get_best_host_for_model as _gbh_gate
+                    _vhost_gate = _gbh_gate(_VMODEL_GATE)
+                    _descriptions_gate = []
+                    for _idx_g, (_mime_g, _b64_g) in enumerate(_img_matches_gate):
+                        try:
+                            _vr = _vreq_gate.post(
+                                f"{_vhost_gate}/api/chat",
+                                json={
+                                    "model": _VMODEL_GATE,
+                                    "messages": [{
+                                        "role": "user",
+                                        "content": (
+                                            "Describe this image in detail for a front-end developer "
+                                            "building a UI based on it. Note: colour palette, layout, "
+                                            "typography, visual elements, any visible text, and overall style."
+                                        ),
+                                        "images": [_b64_g],
+                                    }],
+                                    "stream": False,
+                                    "options": {"num_ctx": 8192, "temperature": 0.1},
+                                },
+                                timeout=120,
+                            )
+                            if _vr.status_code == 200:
+                                _desc_g = _vr.json().get("message", {}).get("content", "")
+                                if _desc_g:
+                                    _descriptions_gate.append(f"[Attached image {_idx_g + 1}]\n{_desc_g}")
+                                    yield {"type": "log", "content": f"[Coordinator] Image {_idx_g + 1} described ({len(_desc_g)} chars)"}
+                        except Exception as _ve_g:
+                            logger.warning("[Coordinator] Vision pre-describe failed for image %d: %s", _idx_g + 1, _ve_g)
+                    if _descriptions_gate:
+                        _visual_context = "[Visual reference images — described for re-entry context]\n\n" + "\n\n".join(_descriptions_gate)
+                except Exception as _ve_outer:
+                    logger.warning("[Coordinator] Vision pre-describe batch failed: %s", _ve_outer)
+
             try:
                 from brooks import save_pending_context as _save_ctx
                 _save_ctx(
-                    {"type": "dev_project_clarification", "prompt": user_input, "summary": summary},
+                    {
+                        "type": "dev_project_clarification",
+                        "prompt": user_input,
+                        "summary": summary,
+                        "visual_context": _visual_context,
+                    },
                     session_id=session_id,
                     owner_id=owner_id,
                 )

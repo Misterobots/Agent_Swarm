@@ -214,6 +214,20 @@ def handle_pending_context(
         from brooks import clear_context
         clear_context(session_id=session_id, owner_id=owner_id)
 
+        # Restore visual context descriptions saved by the orchestrator when the gate
+        # first fired.  The second request (button click) carries no attachments, so
+        # extracted_context is empty — these saved descriptions are all that's left of
+        # the original image references.
+        _saved_visual = pending_ctx.get("visual_context", "")
+        _restored_ctx = (
+            (extracted_context + "\n\n" + _saved_visual).strip()
+            if _saved_visual
+            else extracted_context
+        )
+        if _saved_visual:
+            logger.info("[Router] Restored %d chars of visual context from pending store", len(_saved_visual))
+            yield {"type": "log", "content": f"[Context Manager] Visual context restored ({len(_saved_visual)} chars)"}
+
         if user_input.startswith("existing_project"):
             logger.info("[Router] Dev project: routing as existing codebase task.")
             yield {"type": "log", "content": "[Context Manager] Routing to existing project coordinator..."}
@@ -224,7 +238,7 @@ def handle_pending_context(
                 session_id=session_id,
                 owner_id=owner_id,
                 history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                extracted_context=extracted_context,
+                extracted_context=_restored_ctx,
                 ace_token=ace_token,
                 ultraplan_mode=ultraplan_mode,
                 dev_mode=dev_mode,
@@ -244,7 +258,7 @@ def handle_pending_context(
                 session_id=session_id,
                 owner_id=owner_id,
                 history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                extracted_context=extracted_context,
+                extracted_context=_restored_ctx,
                 ace_token=ace_token,
                 ultraplan_mode=ultraplan_mode,
                 dev_mode=True,
