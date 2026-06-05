@@ -483,7 +483,10 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
         )}
         {/* Design artifact — rendered outside content conditional so it shows even when content is empty */}
         {message.designArtifact && (
-          <DesignArtifactCard artifact={message.designArtifact} />
+          <DesignArtifactCard
+            artifact={message.designArtifact}
+            onSend={onSelectFollowup}
+          />
         )}
         {/* Workshop Phase-1 question accordion — inline answer inputs */}
         {message.workshopQuestions && message.workshopQuestions.length > 0 && (
