@@ -36,15 +36,15 @@ export function DesignArtifactCard({ artifact, onSend }: DesignArtifactCardProps
 
     const filename = artifact.filename ?? `design_${artifact.project_id}.html`;
     const prompt = [
-      `Build this project using the approved design as the visual specification.`,
+      `Implement this project as a complete, fully working application.`,
       ``,
-      `Approved design file: /workspace/delivered_artifacts/${filename}`,
+      `Approved UI reference: /workspace/delivered_artifacts/${filename}`,
       ``,
-      `Instructions:`,
-      `1. Read the design file first with read_file() to understand the full visual spec`,
-      `2. Implement all screens, navigation flows, and interactions shown in the design`,
-      `3. Match the colour palette, typography, and layout exactly`,
-      `4. Produce a fully working application — not a re-implementation of the static HTML`,
+      `Steps:`,
+      `1. Load the reference file with read_file() — it is the approved UI specification`,
+      `2. Implement all screens, navigation flows, and interactions from the reference`,
+      `3. Match colours, typography, and layout from the reference file exactly`,
+      `4. Ship a fully functional application — not another static HTML file`,
     ].join("\n");
 
     onSend(prompt);

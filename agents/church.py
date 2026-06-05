@@ -876,6 +876,14 @@ def chat_swarm(
             _fast_pre = _pre_router.fast_classify(user_input)
             _pre_intent = (_fast_pre or {}).get("intent", "")
             _pre_conf = (_fast_pre or {}).get("confidence", 0.90)
+            # When swarm_mode is explicitly set, suppress fast_classify DESIGN matches.
+            # fast_classify uses a broad pattern that triggers on the word "design" alone —
+            # which fires on prompts like "implement from the approved UI reference" that
+            # reference a file called design_*.html.  The inline _SWARM_MEDIA_RE (Tier 2)
+            # uses precise keywords (landing page, mockup, wireframe, etc.) and is the
+            # correct gate for legitimate design-in-swarm-mode requests.
+            if _pre_intent == "DESIGN":
+                _pre_intent = ""
             # Tier 2: inline media regex (IMAGE / 3D / DESIGN / CREATIVE)
             if not _pre_intent:
                 _m = _SWARM_MEDIA_RE.search(user_input)
