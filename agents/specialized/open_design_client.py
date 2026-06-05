@@ -139,6 +139,13 @@ REVISION RULES (when "CURRENT DESIGN" is provided):
 - Apply ONLY the changes explicitly requested — do not redesign unrelated sections
 - Maintain design system consistency: if the existing design uses a specific accent colour,
   border-radius, shadow style, or animation easing, carry it through into new elements
+
+CSS COORDINATE CONVENTIONS — check the sign before writing any directional code:
+- translateY(+n) moves DOWN the screen; translateY(-n) moves UP (Y increases downward in CSS)
+- translateX(+n) moves RIGHT; translateX(-n) moves LEFT
+- "slide down", "move down", "drop" → positive translateY values
+- "slide up", "move up", "rise" → negative translateY values
+- Same rule applies to top/bottom positioning and margin/padding direction
 """,
 }
 
