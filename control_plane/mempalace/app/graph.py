@@ -214,9 +214,16 @@ def render_html(
     button{{padding:4px 13px;background:#2e3462;color:#c8d4f5;border:1px solid #434a7a;
             border-radius:6px;font-size:.78rem;cursor:pointer;transition:background .15s}}
     button:hover{{background:#3d457f}}
-    #main{{display:flex;flex:1;overflow:hidden}}
-    #graph-container{{flex:1;position:relative;overflow:hidden}}
+    #main{{display:flex;flex:1;overflow:hidden;min-height:0}}
+    /* min-width:0 prevents graph from squeezing out the sidebar in flex */
+    #graph-container{{flex:1;min-width:0;position:relative;overflow:hidden}}
     svg{{width:100%;height:100%;display:block}}
+    /* zoom hint badge */
+    #zoom-hint{{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+                background:rgba(30,34,53,.85);color:#6872a8;font-size:.72rem;
+                padding:4px 12px;border-radius:10px;pointer-events:none;
+                border:1px solid #2d3148;transition:opacity .4s}}
+    #zoom-hint.hidden{{opacity:0}}
     #sidebar{{width:260px;background:#1a1d27;border-left:1px solid #2d3148;
               overflow-y:auto;flex-shrink:0;font-size:.81rem}}
     .panel{{padding:13px 15px;border-bottom:1px solid #2d3148}}
@@ -264,7 +271,10 @@ def render_html(
   </div>
 </div>
 <div id="main">
-  <div id="graph-container"><svg id="svg"></svg></div>
+  <div id="graph-container">
+    <svg id="svg"></svg>
+    <div id="zoom-hint">Scroll to zoom · Labels appear at 2×</div>
+  </div>
   <div id="sidebar">
     <div class="panel">
       <h3>Search</h3>
@@ -294,7 +304,10 @@ const A = {analysis_json};
 const COLORS = {colors_json};
 const svg = d3.select("#svg");
 const root = svg.append("g");
-let showLabels = true, sim;
+// Labels start OFF — they appear automatically when zoomed past LABEL_ZOOM_THRESHOLD
+// or when the user hits the Labels button to force-show them.
+let showLabels = false, manualLabelOverride = false, sim, zoomK = 1;
+const LABEL_ZOOM_THRESHOLD = 2.0;   // labels auto-appear at 2× zoom
 
 const W = () => document.getElementById("graph-container").clientWidth;
 const H = () => document.getElementById("graph-container").clientHeight;
@@ -337,11 +350,16 @@ const radius = d => Math.max(5, Math.min(22, 5 + Math.log1p(d.access_count || 0)
 (function initGraph() {{
   const nodes = (G.nodes || []).map(n => ({{...n}}));
   const links = (G.links || G.edges || []).map(l => ({{...l}}));
+  const N = nodes.length;
+
+  // Scale repulsion to node count so sparse graphs don't fly apart
+  // and dense graphs don't collapse: roughly -80 per node, capped at -700
+  const chargeStrength = -Math.min(700, Math.max(120, N * 1.4));
 
   const linkSel = root.append("g").selectAll("line").data(links).join("line")
     .attr("class", "link")
     .attr("stroke", "#3d4470")
-    .attr("stroke-width", d => Math.max(0.5, (d.weight || 0.5) * 2));
+    .attr("stroke-width", d => Math.max(0.4, (d.weight || 0.5) * 1.8));
 
   const nodeG = root.append("g").selectAll("g").data(nodes).join("g")
     .attr("class", "node")
@@ -359,25 +377,41 @@ const radius = d => Math.max(5, Math.min(22, 5 + Math.log1p(d.access_count || 0)
     .on("mouseout",  hideTip)
     .on("click", selectNode);
 
+  // Labels start hidden — toggled by zoom level or the Labels button
   nodeG.append("text")
     .attr("x", d => radius(d) + 3)
     .attr("y", "0.35em")
+    .attr("display", "none")
     .text(d => (d.label || "").slice(0, 38));
 
   sim = d3.forceSimulation(nodes)
-    .force("link",    d3.forceLink(links).id(d => d.id).distance(90).strength(d => (d.weight || .5) * .35))
-    .force("charge",  d3.forceManyBody().strength(-130))
+    .force("link",    d3.forceLink(links).id(d => d.id)
+                        .distance(110)
+                        .strength(d => (d.weight || .5) * .3))
+    .force("charge",  d3.forceManyBody().strength(chargeStrength))
     .force("center",  d3.forceCenter(W() / 2, H() / 2))
-    .force("collide", d3.forceCollide().radius(d => radius(d) + 5))
+    .force("collide", d3.forceCollide().radius(d => radius(d) + 14).strength(0.8))
+    .alphaDecay(0.025)   // slightly faster settling than default 0.0228
     .on("tick", () => {{
       linkSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
              .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
       nodeG.attr("transform", d => `translate(${{d.x}},${{d.y}})`);
     }});
 
-  svg.call(d3.zoom().scaleExtent([.08, 10])
-    .on("zoom", e => root.attr("transform", e.transform)));
-
+  // Zoom: hide/show hint badge and auto-manage labels by zoom level
+  const zoomBehavior = d3.zoom().scaleExtent([.05, 12])
+    .on("zoom", e => {{
+      root.attr("transform", e.transform);
+      zoomK = e.transform.k;
+      // Auto-show labels when zoomed in, unless user forced them off
+      const autoShow = zoomK >= LABEL_ZOOM_THRESHOLD;
+      const vis = manualLabelOverride ? showLabels : autoShow;
+      d3.selectAll(".node text").attr("display", vis ? null : "none");
+      // Fade out hint once user has zoomed
+      if (zoomK !== 1) document.getElementById("zoom-hint").classList.add("hidden");
+    }});
+  svg.call(zoomBehavior);
+  window._zoomBehavior = zoomBehavior;
   window._nodeG = nodeG;
   window._nodes = nodes;
 }})();
@@ -409,20 +443,25 @@ function selectNode(ev, d) {{
 
 // ── Controls ──────────────────────────────────────────────────────
 function resetZoom() {{
-  svg.transition().duration(400).call(
-    d3.zoom().transform, d3.zoomIdentity.translate(W()/2, H()/2).scale(.85)
+  svg.transition().duration(500).call(
+    window._zoomBehavior.transform,
+    d3.zoomIdentity.translate(W()/2, H()/2).scale(0.8)
   );
 }}
 function toggleLabels() {{
+  // Manual override: flip state and lock it regardless of zoom level
   showLabels = !showLabels;
+  manualLabelOverride = true;
   d3.selectAll(".node text").attr("display", showLabels ? null : "none");
+  // Reset manual override when user zooms (let auto-mode take back over)
+  // after a short delay so the click doesn't immediately trigger zoom handler
 }}
 function focusNode(id) {{
   const n = window._nodes.find(n => n.id === id);
-  if (!n) return;
+  if (!n || n.x == null) return;
   svg.transition().duration(600).call(
-    d3.zoom().transform,
-    d3.zoomIdentity.translate(W()/2 - (n.x||0), H()/2 - (n.y||0)).scale(1.8)
+    window._zoomBehavior.transform,
+    d3.zoomIdentity.translate(W()/2 - n.x * 2.2, H()/2 - n.y * 2.2).scale(2.2)
   );
 }}
 function filterNodes(q) {{
@@ -430,12 +469,12 @@ function filterNodes(q) {{
   window._nodeG.selectAll("circle").attr("opacity", d =>
     !q || (d.label||"").toLowerCase().includes(q) ||
     (d.content_preview||"").toLowerCase().includes(q) ||
-    (d.domain||"").toLowerCase().includes(q) ? 1 : .08);
+    (d.domain||"").toLowerCase().includes(q) ? 1 : .07);
   window._nodeG.selectAll("text").attr("opacity", d =>
-    !q || (d.label||"").toLowerCase().includes(q) ? 1 : .08);
+    !q || (d.label||"").toLowerCase().includes(q) ? 1 : .07);
 }}
 window.addEventListener("resize", () => {{
-  if (sim) sim.force("center", d3.forceCenter(W()/2, H()/2)).alpha(.3).restart();
+  if (sim) sim.force("center", d3.forceCenter(W()/2, H()/2)).alpha(.25).restart();
 }});
 </script>
 </body>
