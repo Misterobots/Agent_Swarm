@@ -177,7 +177,7 @@ def detect_skill_from_prompt(user_input: str) -> str:
         return any(_re.search(rf'\b{_re.escape(kw)}\b', lower) for kw in keywords)
 
     ppt_keywords = [
-        "deck", "slide", "presentation", "ppt", "pitch deck", "slideshow",
+        "deck", "slides", "presentation", "ppt", "pitch deck", "slideshow",
         "keynote", "powerpoint",
     ]
     dashboard_keywords = [

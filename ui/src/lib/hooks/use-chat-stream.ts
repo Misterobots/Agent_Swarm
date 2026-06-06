@@ -172,6 +172,15 @@ export function useChatStream(options?: {
     async (content: string, attachments?: FileAttachment[]) => {
       if (!content.trim() || isStreaming) return;
 
+      // Read mode flags at call-time from the store rather than relying on the
+      // closure snapshot.  WorkflowActionsCard calls setDesignMode/setWorkshopMode
+      // synchronously before invoking sendMessage, but the useCallback closure was
+      // created on the previous render and still carries the old flag values.
+      const _liveSettings = useSettingsStore.getState();
+      const _swarmMode   = _liveSettings.swarmMode;
+      const _designMode  = _liveSettings.designMode;
+      const _workshopMode = _liveSettings.workshopMode;
+
       // Ensure we have an active conversation
       let convId = activeConversationId;
       if (!convId) {
@@ -233,7 +242,7 @@ export function useChatStream(options?: {
       // non-swarm conversations. Re-activate only when this turn is a swarm run.
       const sw = useSwarmStore.getState();
       sw.reset();
-      if (swarmMode) {
+      if (_swarmMode) {
         // Activate immediately — don't wait for the first swarm_phase event,
         // which may arrive late or be missed.
         sw.setActive(true);
@@ -264,7 +273,7 @@ export function useChatStream(options?: {
             const _devProjectState = useDevProjectStore.getState();
             const _currentProjectId = _devProjectState.currentProjectId ?? undefined;
             const _activeFile = useDevStore.getState().activeFile ?? undefined;
-            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, swarmMode, solvingMaxIter, solvingMaxTime, designMode, workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile)) {
+            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, _swarmMode, solvingMaxIter, solvingMaxTime, _designMode, _workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
