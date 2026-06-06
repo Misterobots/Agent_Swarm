@@ -14,7 +14,8 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel, Field
@@ -24,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .database import async_session, init_db, Memory, AgentSnapshot, TeamMemory, MemoryAuditLog, ExtractionLog
 from .embeddings import embed_text, embed_texts, extract_memories, close_client
+from . import graph as graph_lib
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -865,6 +867,154 @@ async def extract_from_conversation_mcp(
 
 
 app.mount("/mcp", _mcp.streamable_http_app())
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Palace Graph — knowledge graph from vector similarity
+# ═══════════════════════════════════════════════════════════════════════════
+
+_GRAPH_NODE_HARD_MAX = 2_000  # absolute safety cap for browser + query cost
+
+
+@app.get("/v1/palace/graph")
+async def palace_graph(
+    owner_id: Optional[str] = Query(None, description="Scope to a single owner"),
+    agent_id: Optional[str] = Query(None, description="Further narrow to one agent"),
+    threshold: float = Query(0.35, ge=0.0, le=2.0,
+                             description="Cosine *distance* cutoff for edges (lower = stricter)"),
+    top_k: int = Query(5, ge=1, le=20,
+                       description="Max neighbours per node"),
+    limit: int = Query(300, ge=1, le=_GRAPH_NODE_HARD_MAX,
+                       description="Max nodes (ordered by access_count desc)"),
+    fmt: str = Query("json", alias="format",
+                     description="'json' for node-link JSON, 'html' for standalone D3 page"),
+):
+    """Build an interactive knowledge graph from MemPalace memories.
+
+    Nodes = memories, edges = semantic similarity (cosine distance < threshold).
+    Communities are detected automatically and shown as colour clusters.
+
+    Returns either:
+      - application/json  — graphify-compatible node-link JSON + GRAPH_REPORT section
+      - text/html         — self-contained D3 v7 force-directed page (format=html)
+    """
+    async with async_session() as session:
+        # ── 1. Fetch nodes (ordered by hottest memories first) ──────────────
+        node_stmt = (
+            select(
+                Memory.id,
+                Memory.content,
+                Memory.memory_type,
+                Memory.domain,
+                Memory.agent_id,
+                Memory.owner_id,
+                Memory.access_count,
+                Memory.created_at,
+            )
+            .order_by(Memory.access_count.desc(), Memory.created_at.desc())
+            .limit(min(limit, _GRAPH_NODE_HARD_MAX))
+        )
+        if owner_id:
+            node_stmt = node_stmt.where(Memory.owner_id == owner_id)
+        if agent_id:
+            node_stmt = node_stmt.where(Memory.agent_id == agent_id)
+
+        node_rows = (await session.execute(node_stmt)).all()
+
+    if not node_rows:
+        empty_graph = {"directed": False, "multigraph": False, "graph": {},
+                       "nodes": [], "links": []}
+        empty_analysis = {"god_nodes": [], "bridges": [], "communities": [],
+                          "stats": {"node_count": 0, "edge_count": 0,
+                                    "community_count": 0, "density": 0.0}}
+        if fmt == "html":
+            return HTMLResponse(graph_lib.render_html(empty_graph, empty_analysis))
+        return {"graph": empty_graph, "analysis": empty_analysis}
+
+    node_ids = [str(row.id) for row in node_rows]
+
+    # ── 2. Derive edges via pgvector self-join ─────────────────────────────
+    # Use a plain-text query: join the scoped set against itself, keep pairs
+    # below the distance threshold, then apply per-node top_k in Python.
+    # The IVFFlat index is not invoked here (self-join), but at N<=2000 the
+    # sequential pairwise scan is fast enough (~50-200 ms on Hopper).
+    async with async_session() as session:
+        edge_sql = text("""
+            SELECT
+                a.id::text           AS src,
+                b.id::text           AS tgt,
+                ROUND(
+                    (1.0 - (a.embedding <=> b.embedding))::numeric, 4
+                )                    AS weight,
+                (a.embedding <=> b.embedding) AS dist
+            FROM mempalace.memories a
+            JOIN mempalace.memories b ON b.id > a.id
+            WHERE a.id  = ANY(:ids)
+              AND b.id  = ANY(:ids)
+              AND (a.embedding <=> b.embedding) < :threshold
+            ORDER BY a.id, (a.embedding <=> b.embedding)
+        """)
+        edge_rows = (
+            await session.execute(
+                edge_sql,
+                {"ids": node_ids, "threshold": threshold},
+            )
+        ).all()
+
+    # ── 3. Apply per-node top_k cap in Python ─────────────────────────────
+    neighbour_count: dict[str, int] = {}
+    edges: list[dict] = []
+    for row in edge_rows:
+        src, tgt = row.src, row.tgt
+        cnt_s = neighbour_count.get(src, 0)
+        cnt_t = neighbour_count.get(tgt, 0)
+        if cnt_s >= top_k and cnt_t >= top_k:
+            continue
+        edges.append({"source": src, "target": tgt, "weight": float(row.weight)})
+        neighbour_count[src] = cnt_s + 1
+        neighbour_count[tgt] = cnt_t + 1
+
+    # ── 4. Build node dicts ────────────────────────────────────────────────
+    nodes = [
+        {
+            "id": str(row.id),
+            # Short label: first ~50 chars (readable in graph)
+            "label": (row.content or "")[:50].replace("\n", " ").strip(),
+            # Full preview for tooltip / selected panel
+            "content_preview": (row.content or "")[:250].replace("\n", " ").strip(),
+            "memory_type": row.memory_type or "semantic",
+            "domain": row.domain or "general",
+            "agent_id": row.agent_id,
+            "owner_id": row.owner_id,
+            "access_count": row.access_count or 0,
+            "created_at": row.created_at.isoformat() if row.created_at else "",
+        }
+        for row in node_rows
+    ]
+
+    # ── 5. Build graph, detect communities, analyse ────────────────────────
+    G = graph_lib.build_graph(nodes, edges)
+    graph_lib.detect_communities(G)
+
+    # Propagate community attr back onto node dicts (for JSON export)
+    for n in nodes:
+        n["community"] = G.nodes[n["id"]].get("community", 0)
+
+    analysis = graph_lib.analyze(G)
+    graph_json = graph_lib.to_node_link_json(G)
+
+    logger.info(
+        "Graph built: %d nodes, %d edges, %d communities (owner=%s, agent=%s, threshold=%.2f)",
+        G.number_of_nodes(), G.number_of_edges(),
+        analysis["stats"]["community_count"], owner_id, agent_id, threshold,
+    )
+
+    # ── 6. Return ──────────────────────────────────────────────────────────
+    if fmt == "html":
+        html = graph_lib.render_html(graph_json, analysis)
+        return HTMLResponse(content=html, media_type="text/html; charset=utf-8")
+
+    return {"graph": graph_json, "analysis": analysis}
 
 
 @app.get("/v1/palace/room", response_model=list[MemoryOut])

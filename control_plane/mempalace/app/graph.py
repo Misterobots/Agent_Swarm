@@ -1,0 +1,442 @@
+"""MemPalace graph helpers — pure functions, no DB coupling.
+
+Pipeline:
+    build_graph(nodes, edges) -> nx.Graph
+    detect_communities(G)     -> G (community attr added in-place)
+    analyze(G)                -> dict (god nodes, bridges, community summary)
+    to_node_link_json(G)      -> dict (graphify-compatible node-link format)
+    render_html(graph_json, analysis, title) -> str (self-contained D3 page)
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import networkx as nx
+
+
+# ── Community detection ────────────────────────────────────────────────────
+
+def detect_communities(G: nx.Graph) -> nx.Graph:
+    """Assign an integer 'community' attr to every node in-place.
+
+    Uses NetworkX greedy_modularity_communities — no extra deps required.
+    Falls back to one community per connected component when the graph is
+    very sparse (< 3 nodes or no edges).
+    Returns G for chaining.
+    """
+    if len(G) == 0:
+        return G
+
+    if G.number_of_edges() == 0:
+        # No edges: assign each node its own community (sparse forest)
+        for i, n in enumerate(G.nodes()):
+            G.nodes[n]["community"] = i
+        return G
+
+    communities = list(
+        nx.community.greedy_modularity_communities(G, weight="weight")
+    )
+    for cid, members in enumerate(communities):
+        for node in members:
+            G.nodes[node]["community"] = cid
+
+    return G
+
+
+# ── Graph builder ──────────────────────────────────────────────────────────
+
+def build_graph(
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+) -> nx.Graph:
+    """Build a weighted undirected NetworkX graph.
+
+    Node dicts must have 'id' plus any attrs you want on the node.
+    Edge dicts must have 'source', 'target', and optionally 'weight'.
+    """
+    G = nx.Graph()
+    for n in nodes:
+        nid = n["id"]
+        attrs = {k: v for k, v in n.items() if k != "id"}
+        G.add_node(nid, **attrs)
+    for e in edges:
+        G.add_edge(e["source"], e["target"], weight=e.get("weight", 1.0))
+    return G
+
+
+# ── Analysis ───────────────────────────────────────────────────────────────
+
+def analyze(G: nx.Graph) -> dict[str, Any]:
+    """Return analysis dict mirroring graphify's analyze.py output shape.
+
+    Sections:
+        god_nodes  — top-10 nodes by weighted degree
+        bridges    — top-5 nodes by betweenness centrality (cross-cluster)
+        communities — per-cluster summary (dominant domain / type / size)
+        stats      — aggregate graph metrics
+    """
+    if len(G) == 0:
+        return {
+            "god_nodes": [],
+            "bridges": [],
+            "communities": [],
+            "stats": {"node_count": 0, "edge_count": 0,
+                      "community_count": 0, "density": 0.0},
+        }
+
+    # Weighted degree
+    degree = dict(G.degree(weight="weight"))
+    top_degree = sorted(degree.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    # Betweenness centrality — O(V·E) but fine at our scale (< 2000 nodes)
+    betweenness = nx.betweenness_centrality(G, weight="weight", normalized=True)
+    top_between = sorted(
+        betweenness.items(), key=lambda x: x[1], reverse=True
+    )[:5]
+
+    # Community summary
+    communities: dict[int, list[str]] = {}
+    for node in G.nodes():
+        cid = G.nodes[node].get("community", 0)
+        communities.setdefault(cid, []).append(node)
+
+    community_list = [
+        {
+            "id": cid,
+            "size": len(members),
+            "dominant_domain": _dominant_attr(G, members, "domain"),
+            "dominant_type": _dominant_attr(G, members, "memory_type"),
+        }
+        for cid, members in sorted(communities.items())
+    ]
+
+    god_nodes = [
+        {
+            "id": nid,
+            "label": G.nodes[nid].get("label", nid),
+            "degree": round(deg, 3),
+            "community": G.nodes[nid].get("community", 0),
+        }
+        for nid, deg in top_degree
+    ]
+
+    bridge_nodes = [
+        {
+            "id": nid,
+            "label": G.nodes[nid].get("label", nid),
+            "betweenness": round(score, 4),
+            "community": G.nodes[nid].get("community", 0),
+        }
+        for nid, score in top_between
+    ]
+
+    return {
+        "god_nodes": god_nodes,
+        "bridges": bridge_nodes,
+        "communities": community_list,
+        "stats": {
+            "node_count": G.number_of_nodes(),
+            "edge_count": G.number_of_edges(),
+            "community_count": len(communities),
+            "density": round(nx.density(G), 4),
+        },
+    }
+
+
+def _dominant_attr(G: nx.Graph, node_ids: list[str], attr: str) -> str:
+    counts: dict[str, int] = {}
+    for nid in node_ids:
+        val = G.nodes[nid].get(attr) or "unknown"
+        counts[val] = counts.get(val, 0) + 1
+    return max(counts, key=lambda k: counts[k]) if counts else "unknown"
+
+
+# ── Export ─────────────────────────────────────────────────────────────────
+
+def to_node_link_json(G: nx.Graph) -> dict[str, Any]:
+    """Export as graphify-compatible node-link JSON.
+
+    NetworkX node_link_data returns {directed, multigraph, graph, nodes, links}.
+    The 'links' key contains {source, target, weight}.
+    """
+    return nx.node_link_data(G)
+
+
+# ── HTML visualisation ─────────────────────────────────────────────────────
+
+# 20-colour palette (Tableau-inspired, dark-background friendly)
+_COMMUNITY_COLORS = [
+    "#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f",
+    "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac",
+    "#86bcb6", "#f1ce63", "#499894", "#fabfd2", "#b6992d",
+    "#d37295", "#bcbd22", "#17becf", "#aec7e8", "#ffbb78",
+]
+
+
+def render_html(
+    graph_json: dict[str, Any],
+    analysis: dict[str, Any],
+    title: str = "MemPalace Knowledge Graph",
+) -> str:
+    """Return a self-contained D3 v7 force-directed page.
+
+    Features:
+      - Nodes sized by access_count, coloured by community
+      - Hover tooltip shows full content_preview
+      - Click-to-select panel in sidebar
+      - Text search filter (dims non-matching nodes)
+      - Drag, pan, zoom
+      - God-node and community legend in sidebar
+    """
+    data_json = json.dumps(graph_json)
+    analysis_json = json.dumps(analysis)
+    colors_json = json.dumps(_COMMUNITY_COLORS)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
+         background:#0f1117;color:#e0e0e0;height:100vh;overflow:hidden;
+         display:flex;flex-direction:column}}
+    #header{{padding:10px 18px;background:#1a1d27;border-bottom:1px solid #2d3148;
+             display:flex;align-items:center;gap:12px;flex-shrink:0}}
+    #header h1{{font-size:1rem;font-weight:600;color:#c8d4f5;letter-spacing:.02em}}
+    .chip{{font-size:.72rem;background:#252840;color:#9ba3c8;padding:3px 9px;
+           border-radius:11px;border:1px solid #353a5e;white-space:nowrap}}
+    #controls{{margin-left:auto;display:flex;gap:7px}}
+    button{{padding:4px 13px;background:#2e3462;color:#c8d4f5;border:1px solid #434a7a;
+            border-radius:6px;font-size:.78rem;cursor:pointer;transition:background .15s}}
+    button:hover{{background:#3d457f}}
+    #main{{display:flex;flex:1;overflow:hidden}}
+    #graph-container{{flex:1;position:relative;overflow:hidden}}
+    svg{{width:100%;height:100%;display:block}}
+    #sidebar{{width:260px;background:#1a1d27;border-left:1px solid #2d3148;
+              overflow-y:auto;flex-shrink:0;font-size:.81rem}}
+    .panel{{padding:13px 15px;border-bottom:1px solid #2d3148}}
+    .panel h3{{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;
+               color:#6872a8;margin-bottom:9px}}
+    .god-item{{display:flex;align-items:center;gap:7px;margin-bottom:5px;
+               cursor:pointer;border-radius:5px;padding:2px 4px}}
+    .god-item:hover{{background:#252840}}
+    .rank{{font-size:.66rem;color:#4e5582;width:15px;flex-shrink:0}}
+    .node-label{{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c8d4f5}}
+    .deg{{font-size:.66rem;color:#6872a8;flex-shrink:0}}
+    .comm-item{{display:flex;align-items:center;gap:7px;margin-bottom:4px}}
+    .dot{{width:9px;height:9px;border-radius:50%;flex-shrink:0}}
+    .comm-label{{flex:1;color:#a0a8cc;white-space:nowrap;overflow:hidden;
+                 text-overflow:ellipsis;font-size:.76rem}}
+    .comm-size{{color:#4e5582;font-size:.66rem}}
+    #tooltip{{position:fixed;background:#1e2235;border:1px solid #3d4470;
+              border-radius:8px;padding:9px 13px;max-width:300px;
+              pointer-events:none;opacity:0;transition:opacity .15s;
+              font-size:.79rem;z-index:100;box-shadow:0 4px 18px rgba(0,0,0,.5)}}
+    #tooltip.vis{{opacity:1}}
+    .tt-meta{{font-size:.68rem;color:#6872a8;margin-bottom:3px}}
+    .tt-body{{color:#c8d4f5;line-height:1.45}}
+    .link{{stroke-opacity:.3}}
+    .node circle{{stroke-width:1.5px}}
+    .node text{{font-size:9px;fill:#8890b8;pointer-events:none;user-select:none}}
+    #search{{width:100%;padding:5px 9px;background:#252840;border:1px solid #353a5e;
+             border-radius:5px;color:#c8d4f5;font-size:.78rem;margin-bottom:9px}}
+    #search::placeholder{{color:#4e5582}}
+    #search:focus{{outline:none;border-color:#5566aa}}
+    #sel-panel{{display:none}}
+    #sel-meta{{font-size:.69rem;color:#6872a8;margin-bottom:5px}}
+    #sel-body{{color:#c8d4f5;line-height:1.5;word-break:break-word}}
+  </style>
+</head>
+<body>
+<div id="header">
+  <h1>🧠 {title}</h1>
+  <span class="chip" id="c-nodes">—</span>
+  <span class="chip" id="c-edges">—</span>
+  <span class="chip" id="c-comm">—</span>
+  <div id="controls">
+    <button onclick="resetZoom()">Reset</button>
+    <button onclick="toggleLabels()">Labels</button>
+  </div>
+</div>
+<div id="main">
+  <div id="graph-container"><svg id="svg"></svg></div>
+  <div id="sidebar">
+    <div class="panel">
+      <h3>Search</h3>
+      <input type="text" id="search" placeholder="Filter by content, domain…" oninput="filterNodes(this.value)">
+    </div>
+    <div class="panel">
+      <h3>God Nodes</h3>
+      <div id="god-list"></div>
+    </div>
+    <div class="panel">
+      <h3>Communities</h3>
+      <div id="comm-list"></div>
+    </div>
+    <div class="panel" id="sel-panel">
+      <h3>Selected</h3>
+      <div id="sel-meta"></div>
+      <div id="sel-body"></div>
+    </div>
+  </div>
+</div>
+<div id="tooltip"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+const G = {data_json};
+const A = {analysis_json};
+const COLORS = {colors_json};
+const svg = d3.select("#svg");
+const root = svg.append("g");
+let showLabels = true, sim;
+
+const W = () => document.getElementById("graph-container").clientWidth;
+const H = () => document.getElementById("graph-container").clientHeight;
+const color = c => COLORS[(c || 0) % COLORS.length];
+const radius = d => Math.max(5, Math.min(22, 5 + Math.log1p(d.access_count || 0) * 1.8));
+
+// ── Sidebar ───────────────────────────────────────────────────────
+(function buildSidebar() {{
+  const s = A.stats || {{}};
+  document.getElementById("c-nodes").textContent = (s.node_count || 0) + " nodes";
+  document.getElementById("c-edges").textContent = (s.edge_count || 0) + " edges";
+  document.getElementById("c-comm").textContent  = (s.community_count || 0) + " clusters";
+
+  const gl = document.getElementById("god-list");
+  (A.god_nodes || []).slice(0, 8).forEach((n, i) => {{
+    const d = document.createElement("div");
+    d.className = "god-item";
+    d.innerHTML = `<span class="rank">#${{i+1}}</span>
+                   <span class="node-label" title="${{n.label}}">${{n.label}}</span>
+                   <span class="deg">${{n.degree.toFixed(2)}}</span>`;
+    d.onclick = () => focusNode(n.id);
+    gl.appendChild(d);
+  }});
+
+  const cl = document.getElementById("comm-list");
+  (A.communities || []).forEach(c => {{
+    const lbl = (c.dominant_domain && c.dominant_domain !== "unknown")
+      ? c.dominant_domain + " / " + c.dominant_type
+      : "Community " + c.id;
+    const d = document.createElement("div");
+    d.className = "comm-item";
+    d.innerHTML = `<span class="dot" style="background:${{color(c.id)}}"></span>
+                   <span class="comm-label" title="${{lbl}}">${{lbl}}</span>
+                   <span class="comm-size">${{c.size}}</span>`;
+    cl.appendChild(d);
+  }});
+}})();
+
+// ── Graph ─────────────────────────────────────────────────────────
+(function initGraph() {{
+  const nodes = (G.nodes || []).map(n => ({{...n}}));
+  const links = (G.links || G.edges || []).map(l => ({{...l}}));
+
+  const linkSel = root.append("g").selectAll("line").data(links).join("line")
+    .attr("class", "link")
+    .attr("stroke", "#3d4470")
+    .attr("stroke-width", d => Math.max(0.5, (d.weight || 0.5) * 2));
+
+  const nodeG = root.append("g").selectAll("g").data(nodes).join("g")
+    .attr("class", "node")
+    .call(d3.drag()
+      .on("start", (e, d) => {{ if (!e.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; }})
+      .on("drag",  (e, d) => {{ d.fx=e.x; d.fy=e.y; }})
+      .on("end",   (e, d) => {{ if (!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }}));
+
+  nodeG.append("circle")
+    .attr("r", radius)
+    .attr("fill", d => color(d.community))
+    .attr("stroke", d => d3.color(color(d.community)).darker(.6))
+    .on("mouseover", showTip)
+    .on("mousemove", moveTip)
+    .on("mouseout",  hideTip)
+    .on("click", selectNode);
+
+  nodeG.append("text")
+    .attr("x", d => radius(d) + 3)
+    .attr("y", "0.35em")
+    .text(d => (d.label || "").slice(0, 38));
+
+  sim = d3.forceSimulation(nodes)
+    .force("link",    d3.forceLink(links).id(d => d.id).distance(90).strength(d => (d.weight || .5) * .35))
+    .force("charge",  d3.forceManyBody().strength(-130))
+    .force("center",  d3.forceCenter(W() / 2, H() / 2))
+    .force("collide", d3.forceCollide().radius(d => radius(d) + 5))
+    .on("tick", () => {{
+      linkSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+             .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      nodeG.attr("transform", d => `translate(${{d.x}},${{d.y}})`);
+    }});
+
+  svg.call(d3.zoom().scaleExtent([.08, 10])
+    .on("zoom", e => root.attr("transform", e.transform)));
+
+  window._nodeG = nodeG;
+  window._nodes = nodes;
+}})();
+
+// ── Tooltip ───────────────────────────────────────────────────────
+const tip = document.getElementById("tooltip");
+function showTip(ev, d) {{
+  tip.innerHTML = `<div class="tt-meta">${{d.memory_type||""}} · ${{d.domain||""}}</div>
+                   <div class="tt-body">${{(d.content_preview||d.label||"").slice(0,220)}}</div>`;
+  tip.classList.add("vis"); moveTip(ev);
+}}
+function moveTip(ev) {{
+  tip.style.left = Math.min(ev.clientX+14, window.innerWidth-315) + "px";
+  tip.style.top  = Math.min(ev.clientY-8,  window.innerHeight-110) + "px";
+}}
+function hideTip() {{ tip.classList.remove("vis"); }}
+
+function selectNode(ev, d) {{
+  document.getElementById("sel-panel").style.display = "block";
+  document.getElementById("sel-meta").textContent =
+    `${{d.memory_type}} · ${{d.domain}} · accessed ${{d.access_count||0}}×`;
+  document.getElementById("sel-body").textContent = d.content_preview || d.label || "";
+  window._nodeG.selectAll("circle")
+    .attr("stroke-width", n => n.id === d.id ? 3 : 1.5)
+    .attr("stroke", n => n.id === d.id
+      ? "#ffffff"
+      : d3.color(COLORS[(n.community||0) % COLORS.length]).darker(.6));
+}}
+
+// ── Controls ──────────────────────────────────────────────────────
+function resetZoom() {{
+  svg.transition().duration(400).call(
+    d3.zoom().transform, d3.zoomIdentity.translate(W()/2, H()/2).scale(.85)
+  );
+}}
+function toggleLabels() {{
+  showLabels = !showLabels;
+  d3.selectAll(".node text").attr("display", showLabels ? null : "none");
+}}
+function focusNode(id) {{
+  const n = window._nodes.find(n => n.id === id);
+  if (!n) return;
+  svg.transition().duration(600).call(
+    d3.zoom().transform,
+    d3.zoomIdentity.translate(W()/2 - (n.x||0), H()/2 - (n.y||0)).scale(1.8)
+  );
+}}
+function filterNodes(q) {{
+  q = q.toLowerCase().trim();
+  window._nodeG.selectAll("circle").attr("opacity", d =>
+    !q || (d.label||"").toLowerCase().includes(q) ||
+    (d.content_preview||"").toLowerCase().includes(q) ||
+    (d.domain||"").toLowerCase().includes(q) ? 1 : .08);
+  window._nodeG.selectAll("text").attr("opacity", d =>
+    !q || (d.label||"").toLowerCase().includes(q) ? 1 : .08);
+}}
+window.addEventListener("resize", () => {{
+  if (sim) sim.force("center", d3.forceCenter(W()/2, H()/2)).alpha(.3).restart();
+}});
+</script>
+</body>
+</html>"""
