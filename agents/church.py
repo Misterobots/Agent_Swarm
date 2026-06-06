@@ -903,16 +903,16 @@ def chat_swarm(
                 confidence = 1.0
                 reasoning = "swarm_mode=True bypasses neural router"
                 yield {"type": "status", "content": "🧩 Swarm Mode: Routing directly to multi-agent coordinator..."}
-        elif workshop_mode:
-            intent = "WORKSHOP"
-            confidence = 1.0
-            reasoning = "workshop_mode=True bypasses neural router"
-            yield {"type": "status", "content": "🎯 Workshop: Starting discovery session..."}
         elif design_mode:
             intent = "DESIGN"
             confidence = 1.0
             reasoning = "design_mode=True bypasses neural router"
             yield {"type": "status", "content": "🎨 Design Studio: Activating..."}
+        elif workshop_mode:
+            intent = "WORKSHOP"
+            confidence = 1.0
+            reasoning = "workshop_mode=True bypasses neural router"
+            yield {"type": "status", "content": "🎯 Workshop: Starting discovery session..."}
         elif _research_slash:
             intent = "RESEARCH"
             confidence = 1.0
