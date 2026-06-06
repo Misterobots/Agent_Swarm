@@ -835,9 +835,9 @@ def chat_swarm(
         for _sc_cmd, _sc_flag, _sc_extra in _SLASH_TABLE:
             if _scl.startswith(_sc_cmd + " ") or _scl == _sc_cmd:
                 user_input = _sc[len(_sc_cmd):].strip()
-                if _sc_flag == "workshop_mode":  workshop_mode    = True
-                elif _sc_flag == "design_mode":  design_mode      = True
-                elif _sc_flag == "swarm_mode":   swarm_mode       = True
+                if _sc_flag == "workshop_mode":  workshop_mode = True
+                elif _sc_flag == "design_mode":  design_mode = True;  workshop_mode = False
+                elif _sc_flag == "swarm_mode":   swarm_mode = True;   workshop_mode = False;  design_mode = False
                 if _sc_extra == "ultraplan":     ultraplan_mode   = True
                 if _sc_extra == "think":         ultrathink_mode  = True
                 if _sc_extra == "research":      _research_slash  = True; research_mode = True
