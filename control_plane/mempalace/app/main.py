@@ -1012,7 +1012,11 @@ async def palace_graph(
     # ── 6. Return ──────────────────────────────────────────────────────────
     if fmt == "html":
         html = graph_lib.render_html(graph_json, analysis)
-        return HTMLResponse(content=html, media_type="text/html; charset=utf-8")
+        return HTMLResponse(
+            content=html,
+            media_type="text/html; charset=utf-8",
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        )
 
     return {"graph": graph_json, "analysis": analysis}
 
