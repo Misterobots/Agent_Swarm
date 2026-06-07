@@ -9,7 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import (
-    Column, String, Text, Integer, Float, DateTime, Index,
+    Boolean, Column, String, Text, Integer, Float, DateTime, Index,
     ForeignKey, UniqueConstraint, text, func,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -89,6 +89,7 @@ class Memory(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     access_count = Column(Integer, default=0)
     relevance_decay = Column(Float, default=1.0)
+    entity_extracted = Column(Boolean, default=False, server_default="false")
 
 
 class AgentSnapshot(Base):
@@ -150,6 +151,67 @@ class MemoryAuditLog(Base):
     previous_content = Column(Text)
     new_content = Column(Text)
     changed_fields = Column(JSONB, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Entity(Base):
+    """Named entity extracted from memories.
+
+    entity_type is one of: technology | project | person | concept | decision | tool
+    memory_count tracks how many memories have referenced this entity (incremented
+    on each extraction run that finds it).
+    """
+
+    __tablename__ = "entities"
+    __table_args__ = (
+        Index("ix_entities_owner", "owner_id"),
+        # The (owner_id, lower(label)) unique index is created by the Alembic
+        # migration — SQLAlchemy ORM definitions don't support functional indexes
+        # so dedup is handled at the application level via SELECT-first.
+        {"schema": "mempalace"},
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    label = Column(String(200), nullable=False)
+    entity_type = Column(String(50), nullable=False)
+    description = Column(Text)
+    owner_id = Column(String(100))
+    memory_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class EntityRelation(Base):
+    """Typed directed relationship between two entities.
+
+    evidence_memory_ids (JSONB array of UUID strings) records which memories
+    gave rise to this relation — useful for tracing why the edge exists.
+    """
+
+    __tablename__ = "entity_relations"
+    __table_args__ = (
+        Index("ix_entity_rel_source", "source_id"),
+        Index("ix_entity_rel_target", "target_id"),
+        Index("ix_entity_rel_owner", "owner_id"),
+        UniqueConstraint("source_id", "target_id", "relation_type", name="uq_entity_rel"),
+        {"schema": "mempalace"},
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    source_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("mempalace.entities.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    target_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("mempalace.entities.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    relation_type = Column(String(100), nullable=False)
+    confidence = Column(Float, default=1.0, nullable=False)
+    evidence_memory_ids = Column(JSONB, default=list, server_default="'[]'::jsonb")
+    owner_id = Column(String(100))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

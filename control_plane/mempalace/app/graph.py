@@ -1,11 +1,18 @@
 """MemPalace graph helpers — pure functions, no DB coupling.
 
-Pipeline:
-    build_graph(nodes, edges) -> nx.Graph
-    detect_communities(G)     -> G (community attr added in-place)
-    analyze(G)                -> dict (god nodes, bridges, community summary)
-    to_node_link_json(G)      -> dict (graphify-compatible node-link format)
-    render_html(graph_json, analysis, title) -> str (self-contained D3 page)
+Similarity graph pipeline (memory nodes, cosine-similarity edges):
+    build_graph(nodes, edges)        -> nx.Graph
+    detect_communities(G)            -> G  (community attr added in-place)
+    analyze(G)                       -> dict
+    to_node_link_json(G)             -> dict  (graphify-compatible)
+    render_html(graph_json, analysis, title)  -> str  (D3 force page)
+
+Entity graph pipeline (entity nodes, typed-relation edges):
+    build_entity_graph(entities, relations) -> nx.Graph
+    detect_communities(G)                   -> G  (same function, reused)
+    analyze(G)                              -> dict  (same function, auto-detects mode)
+    to_node_link_json(G)                    -> dict  (same function)
+    render_entity_html(graph_json, analysis, title) -> str  (D3 entity page)
 """
 
 from __future__ import annotations
@@ -102,12 +109,16 @@ def analyze(G: nx.Graph) -> dict[str, Any]:
         cid = G.nodes[node].get("community", 0)
         communities.setdefault(cid, []).append(node)
 
+    entity_mode = _is_entity_graph(G)
+    domain_attr = "entity_type" if entity_mode else "domain"
+    type_attr   = "entity_type" if entity_mode else "memory_type"
+
     community_list = [
         {
             "id": cid,
             "size": len(members),
-            "dominant_domain": _dominant_attr(G, members, "domain"),
-            "dominant_type": _dominant_attr(G, members, "memory_type"),
+            "dominant_domain": _dominant_attr(G, members, domain_attr),
+            "dominant_type":   _dominant_attr(G, members, type_attr),
         }
         for cid, members in sorted(communities.items())
     ]
@@ -151,6 +162,12 @@ def _dominant_attr(G: nx.Graph, node_ids: list[str], attr: str) -> str:
         val = G.nodes[nid].get(attr) or "unknown"
         counts[val] = counts.get(val, 0) + 1
     return max(counts, key=lambda k: counts[k]) if counts else "unknown"
+
+
+def _is_entity_graph(G: nx.Graph) -> bool:
+    """True when the graph holds entity nodes (not memory similarity nodes)."""
+    sample = next(iter(G.nodes()), None)
+    return bool(sample and G.nodes[sample].get("entity_type") is not None)
 
 
 # ── Export ─────────────────────────────────────────────────────────────────
@@ -472,6 +489,388 @@ function filterNodes(q) {{
     (d.domain||"").toLowerCase().includes(q) ? 1 : .07);
   window._nodeG.selectAll("text").attr("opacity", d =>
     !q || (d.label||"").toLowerCase().includes(q) ? 1 : .07);
+}}
+window.addEventListener("resize", () => {{
+  if (sim) sim.force("center", d3.forceCenter(W()/2, H()/2)).alpha(.25).restart();
+}});
+</script>
+</body>
+</html>"""
+
+
+# ── Entity graph builder ───────────────────────────────────────────────────
+
+def build_entity_graph(
+    entities: list[dict[str, Any]],
+    relations: list[dict[str, Any]],
+) -> nx.Graph:
+    """Build a weighted undirected graph from extracted entities and typed relations.
+
+    Entity dicts must have 'id' plus optional attrs:
+        label, entity_type, memory_count, owner_id
+    Relation dicts must have 'source_id', 'target_id', and optionally:
+        relation_type, confidence (used as edge weight)
+    """
+    G = nx.Graph()
+    for e in entities:
+        eid = e["id"]
+        attrs = {k: v for k, v in e.items() if k != "id"}
+        G.add_node(eid, **attrs)
+    for r in relations:
+        src = r.get("source_id") or r.get("source")
+        tgt = r.get("target_id") or r.get("target")
+        if src and tgt and src in G and tgt in G:
+            G.add_edge(
+                src, tgt,
+                relation_type=r.get("relation_type", "related-to"),
+                weight=float(r.get("confidence", 1.0)),
+            )
+    return G
+
+
+# ── Entity graph HTML renderer ─────────────────────────────────────────────
+
+# Fixed color palette keyed by entity_type
+_ENTITY_TYPE_COLORS: dict[str, str] = {
+    "technology": "#4e79a7",   # blue
+    "project":    "#f28e2b",   # orange
+    "person":     "#59a14f",   # green
+    "concept":    "#b07aa1",   # purple
+    "decision":   "#edc948",   # yellow
+    "tool":       "#76b7b2",   # teal
+}
+_ENTITY_TYPE_COLORS_JSON = json.dumps(_ENTITY_TYPE_COLORS)
+
+
+def render_entity_html(
+    graph_json: dict[str, Any],
+    analysis: dict[str, Any],
+    title: str = "MemPalace Knowledge Graph",
+) -> str:
+    """Return a self-contained D3 v7 force-directed entity graph page.
+
+    Differences from render_html (similarity graph):
+      - Nodes coloured by entity_type (fixed palette), not community
+      - Node labels always visible (entity names are short)
+      - Edges carry relation_type; tooltip on hover shows 'A → uses → B'
+      - Node tooltip lists outgoing/incoming relations
+      - Sidebar legend shows entity-type breakdown
+    """
+    data_json      = json.dumps(graph_json)
+    analysis_json  = json.dumps(analysis)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
+         background:#0f1117;color:#e0e0e0;height:100vh;overflow:hidden;
+         display:flex;flex-direction:column}}
+    #header{{padding:10px 18px;background:#1a1d27;border-bottom:1px solid #2d3148;
+             display:flex;align-items:center;gap:12px;flex-shrink:0}}
+    #header h1{{font-size:1rem;font-weight:600;color:#c8d4f5;letter-spacing:.02em}}
+    .chip{{font-size:.72rem;background:#252840;color:#9ba3c8;padding:3px 9px;
+           border-radius:11px;border:1px solid #353a5e;white-space:nowrap}}
+    #controls{{margin-left:auto;display:flex;gap:7px}}
+    button{{padding:4px 13px;background:#2e3462;color:#c8d4f5;border:1px solid #434a7a;
+            border-radius:6px;font-size:.78rem;cursor:pointer;transition:background .15s}}
+    button:hover{{background:#3d457f}}
+    #main{{display:flex;flex:1;overflow:hidden;min-height:0}}
+    #graph-container{{flex:1;min-width:0;position:relative;overflow:hidden}}
+    svg{{width:100%;height:100%;display:block}}
+    #sidebar{{width:270px;background:#1a1d27;border-left:1px solid #2d3148;
+              overflow-y:auto;flex-shrink:0;font-size:.81rem}}
+    .panel{{padding:13px 15px;border-bottom:1px solid #2d3148}}
+    .panel h3{{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;
+               color:#6872a8;margin-bottom:9px}}
+    .god-item{{display:flex;align-items:center;gap:7px;margin-bottom:5px;
+               cursor:pointer;border-radius:5px;padding:2px 4px}}
+    .god-item:hover{{background:#252840}}
+    .rank{{font-size:.66rem;color:#4e5582;width:15px;flex-shrink:0}}
+    .node-label{{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c8d4f5}}
+    .deg{{font-size:.66rem;color:#6872a8;flex-shrink:0}}
+    .type-item{{display:flex;align-items:center;gap:8px;margin-bottom:5px}}
+    .dot{{width:10px;height:10px;border-radius:50%;flex-shrink:0}}
+    .type-label{{flex:1;color:#a0a8cc;font-size:.77rem;text-transform:capitalize}}
+    .type-count{{color:#4e5582;font-size:.68rem}}
+    #tooltip{{position:fixed;background:#1e2235;border:1px solid #3d4470;
+              border-radius:8px;padding:9px 13px;max-width:320px;
+              pointer-events:none;opacity:0;transition:opacity .15s;
+              font-size:.79rem;z-index:100;box-shadow:0 4px 18px rgba(0,0,0,.5)}}
+    #tooltip.vis{{opacity:1}}
+    .tt-meta{{font-size:.68rem;color:#6872a8;margin-bottom:3px}}
+    .tt-body{{color:#c8d4f5;line-height:1.45}}
+    .tt-rel{{font-size:.69rem;color:#7880aa;margin-top:4px;line-height:1.6}}
+    .link{{stroke-opacity:.45}}
+    .node circle{{stroke-width:1.5px;cursor:pointer}}
+    .node text{{font-size:10px;fill:#c8d4f5;pointer-events:none;user-select:none;
+                text-shadow:0 1px 3px #0f1117,0 -1px 3px #0f1117,
+                            1px 0 3px #0f1117,-1px 0 3px #0f1117}}
+    #search{{width:100%;padding:5px 9px;background:#252840;border:1px solid #353a5e;
+             border-radius:5px;color:#c8d4f5;font-size:.78rem;margin-bottom:9px}}
+    #search::placeholder{{color:#4e5582}}
+    #search:focus{{outline:none;border-color:#5566aa}}
+    #sel-panel{{display:none}}
+    #sel-meta{{font-size:.69rem;color:#6872a8;margin-bottom:5px}}
+    #sel-body{{color:#c8d4f5;line-height:1.5;word-break:break-word}}
+    #sel-rels{{margin-top:8px;font-size:.72rem;color:#7880aa;line-height:1.7}}
+  </style>
+</head>
+<body>
+<div id="header">
+  <h1>🧠 {title}</h1>
+  <span class="chip" id="c-nodes">—</span>
+  <span class="chip" id="c-edges">—</span>
+  <span class="chip" id="c-comm">—</span>
+  <div id="controls">
+    <button onclick="resetZoom()">Reset</button>
+  </div>
+</div>
+<div id="main">
+  <div id="graph-container">
+    <svg id="svg"></svg>
+  </div>
+  <div id="sidebar">
+    <div class="panel">
+      <h3>Search</h3>
+      <input type="text" id="search" placeholder="Filter by name or type…"
+             oninput="filterNodes(this.value)">
+    </div>
+    <div class="panel">
+      <h3>Entity Types</h3>
+      <div id="type-legend"></div>
+    </div>
+    <div class="panel">
+      <h3>Hub Entities</h3>
+      <div id="god-list"></div>
+    </div>
+    <div class="panel" id="sel-panel">
+      <h3>Selected</h3>
+      <div id="sel-meta"></div>
+      <div id="sel-body"></div>
+      <div id="sel-rels"></div>
+    </div>
+  </div>
+</div>
+<div id="tooltip"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+const G = {data_json};
+const A = {analysis_json};
+const ENTITY_COLORS = {_ENTITY_TYPE_COLORS_JSON};
+const DEFAULT_COLOR = "#9b9b9b";
+
+const svg = d3.select("#svg");
+const root = svg.append("g");
+let sim, zoomK = 1;
+
+const W = () => document.getElementById("graph-container").clientWidth;
+const H = () => document.getElementById("graph-container").clientHeight;
+const color = d => ENTITY_COLORS[d.entity_type] || DEFAULT_COLOR;
+const radius = d => Math.max(6, Math.min(26, 6 + Math.log1p(d.memory_count || 0) * 3.0));
+
+// ── Stats chips ───────────────────────────────────────────────────
+(function updateChips() {{
+  const s = A.stats || {{}};
+  document.getElementById("c-nodes").textContent = (s.node_count  || 0) + " entities";
+  document.getElementById("c-edges").textContent = (s.edge_count  || 0) + " relations";
+  document.getElementById("c-comm").textContent  = (s.community_count || 0) + " clusters";
+}})();
+
+// ── Entity type legend ────────────────────────────────────────────
+(function buildLegend() {{
+  const nodes = G.nodes || [];
+  const typeCounts = {{}};
+  nodes.forEach(n => {{ typeCounts[n.entity_type] = (typeCounts[n.entity_type] || 0) + 1; }});
+  const tl = document.getElementById("type-legend");
+  Object.entries(typeCounts).sort((a,b) => b[1]-a[1]).forEach(([t, cnt]) => {{
+    const d = document.createElement("div");
+    d.className = "type-item";
+    d.innerHTML = `<span class="dot" style="background:${{ENTITY_COLORS[t]||DEFAULT_COLOR}}"></span>
+                   <span class="type-label">${{t}}</span>
+                   <span class="type-count">${{cnt}}</span>`;
+    tl.appendChild(d);
+  }});
+}})();
+
+// ── Hub entities (god nodes) ──────────────────────────────────────
+(function buildGodList() {{
+  const gl = document.getElementById("god-list");
+  (A.god_nodes || []).slice(0, 8).forEach((n, i) => {{
+    const d = document.createElement("div");
+    d.className = "god-item";
+    d.innerHTML = `<span class="rank">#${{i+1}}</span>
+                   <span class="node-label" title="${{n.label}}">${{n.label}}</span>
+                   <span class="deg">${{n.degree.toFixed(1)}}</span>`;
+    d.onclick = () => focusNode(n.id);
+    gl.appendChild(d);
+  }});
+}})();
+
+// ── Graph simulation ──────────────────────────────────────────────
+(function initGraph() {{
+  const nodes = (G.nodes || []).map(n => ({{...n}}));
+  const links = (G.links || G.edges || []).map(l => ({{...l}}));
+  const N = nodes.length;
+
+  const chargeStrength = -Math.min(900, Math.max(250, N * 3.0));
+
+  // Visible edges
+  const linkSel = root.append("g").selectAll("line").data(links).join("line")
+    .attr("class", "link")
+    .attr("stroke", "#4e5582")
+    .attr("stroke-width", 1.5);
+
+  // Transparent wider hit area for edge tooltip
+  const linkHit = root.append("g").selectAll("line").data(links).join("line")
+    .attr("stroke", "transparent")
+    .attr("stroke-width", 14)
+    .on("mouseover", (ev, d) => showEdgeTip(ev, d, nodes))
+    .on("mousemove", moveTip)
+    .on("mouseout",  hideTip);
+
+  // Node groups
+  const nodeG = root.append("g").selectAll("g").data(nodes).join("g")
+    .attr("class", "node")
+    .call(d3.drag()
+      .on("start", (e, d) => {{ if (!e.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; }})
+      .on("drag",  (e, d) => {{ d.fx=e.x; d.fy=e.y; }})
+      .on("end",   (e, d) => {{ if (!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }}));
+
+  nodeG.append("circle")
+    .attr("r", radius)
+    .attr("fill", color)
+    .attr("stroke", d => d3.color(color(d)).darker(.5))
+    .on("mouseover", (ev, d) => showNodeTip(ev, d, links, nodes))
+    .on("mousemove", moveTip)
+    .on("mouseout",  hideTip)
+    .on("click",     (ev, d) => selectNode(ev, d, links, nodes, nodeG));
+
+  // Entity labels always visible (names are short)
+  nodeG.append("text")
+    .attr("x", d => radius(d) + 5)
+    .attr("y", "0.35em")
+    .text(d => d.label || "");
+
+  sim = d3.forceSimulation(nodes)
+    .force("link",    d3.forceLink(links).id(d => d.id).distance(130).strength(0.4))
+    .force("charge",  d3.forceManyBody().strength(chargeStrength))
+    .force("center",  d3.forceCenter(W() / 2, H() / 2))
+    .force("collide", d3.forceCollide().radius(d => radius(d) + 20).strength(0.9))
+    .alphaDecay(0.022)
+    .on("tick", () => {{
+      linkSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+             .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      linkHit.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+             .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      nodeG.attr("transform", d => `translate(${{d.x}},${{d.y}})`);
+    }});
+
+  const zoomBehavior = d3.zoom().scaleExtent([.04, 15])
+    .on("zoom", e => {{
+      root.attr("transform", e.transform);
+      zoomK = e.transform.k;
+    }});
+  svg.call(zoomBehavior);
+  window._zoomBehavior = zoomBehavior;
+  window._nodeG = nodeG;
+  window._nodes = nodes;
+  window._links = links;
+}})();
+
+// ── Tooltips ──────────────────────────────────────────────────────
+const tip = document.getElementById("tooltip");
+function moveTip(ev) {{
+  tip.style.left = Math.min(ev.clientX + 14, window.innerWidth  - 340) + "px";
+  tip.style.top  = Math.min(ev.clientY -  8, window.innerHeight - 140) + "px";
+}}
+function hideTip() {{ tip.classList.remove("vis"); }}
+
+function showEdgeTip(ev, d, nodes) {{
+  const src = nodes.find(n => n.id === (d.source.id !== undefined ? d.source.id : d.source));
+  const tgt = nodes.find(n => n.id === (d.target.id !== undefined ? d.target.id : d.target));
+  tip.innerHTML = `<div class="tt-meta">Relation</div>
+    <div class="tt-body">
+      <b>${{src ? src.label : "?"}}</b>
+      <span style="color:#6872a8"> → ${{d.relation_type || "related-to"}} → </span>
+      <b>${{tgt ? tgt.label : "?"}}</b>
+    </div>`;
+  tip.classList.add("vis"); moveTip(ev);
+}}
+
+function showNodeTip(ev, d, links, nodes) {{
+  const outgoing = links
+    .filter(l => (l.source.id !== undefined ? l.source.id : l.source) === d.id)
+    .map(l => {{
+      const tgt = nodes.find(n => n.id === (l.target.id !== undefined ? l.target.id : l.target));
+      return `→ ${{l.relation_type || "?"}} → ${{tgt ? tgt.label : "?"}}`;
+    }});
+  const incoming = links
+    .filter(l => (l.target.id !== undefined ? l.target.id : l.target) === d.id)
+    .map(l => {{
+      const src = nodes.find(n => n.id === (l.source.id !== undefined ? l.source.id : l.source));
+      return `← ${{l.relation_type || "?"}} ← ${{src ? src.label : "?"}}`;
+    }});
+  const rels = [...outgoing, ...incoming].slice(0, 6).join("<br>");
+  tip.innerHTML = `<div class="tt-meta">[${{d.entity_type || "unknown"}}] · ${{d.memory_count || 0}} memories</div>
+    <div class="tt-body"><b>${{d.label}}</b>${{rels ? '<div class="tt-rel">' + rels + '</div>' : ''}}</div>`;
+  tip.classList.add("vis"); moveTip(ev);
+}}
+
+// ── Selection ─────────────────────────────────────────────────────
+function selectNode(ev, d, links, nodes, nodeG) {{
+  document.getElementById("sel-panel").style.display = "block";
+  document.getElementById("sel-meta").textContent =
+    `[${{d.entity_type || "unknown"}}] · ${{d.memory_count || 0}} memories`;
+  document.getElementById("sel-body").textContent = d.label || "";
+
+  const outgoing = links
+    .filter(l => (l.source.id !== undefined ? l.source.id : l.source) === d.id)
+    .map(l => {{
+      const tgt = nodes.find(n => n.id === (l.target.id !== undefined ? l.target.id : l.target));
+      return `→ ${{l.relation_type}} → ${{tgt ? tgt.label : "?"}}`;
+    }});
+  const incoming = links
+    .filter(l => (l.target.id !== undefined ? l.target.id : l.target) === d.id)
+    .map(l => {{
+      const src = nodes.find(n => n.id === (l.source.id !== undefined ? l.source.id : l.source));
+      return `← ${{l.relation_type}} ← ${{src ? src.label : "?"}}`;
+    }});
+  document.getElementById("sel-rels").innerHTML = [...outgoing, ...incoming].join("<br>") || "(no relations)";
+
+  nodeG.selectAll("circle")
+    .attr("stroke-width", n => n.id === d.id ? 3 : 1.5)
+    .attr("stroke", n => n.id === d.id ? "#ffffff"
+      : d3.color(ENTITY_COLORS[n.entity_type] || DEFAULT_COLOR).darker(.5));
+}}
+
+// ── Controls ──────────────────────────────────────────────────────
+function resetZoom() {{
+  svg.transition().duration(500).call(
+    window._zoomBehavior.transform,
+    d3.zoomIdentity.translate(W()/2, H()/2).scale(0.85)
+  );
+}}
+function focusNode(id) {{
+  const n = window._nodes.find(n => n.id === id);
+  if (!n || n.x == null) return;
+  svg.transition().duration(600).call(
+    window._zoomBehavior.transform,
+    d3.zoomIdentity.translate(W()/2 - n.x * 2.5, H()/2 - n.y * 2.5).scale(2.5)
+  );
+}}
+function filterNodes(q) {{
+  q = q.toLowerCase().trim();
+  window._nodeG.selectAll("circle").attr("opacity", d =>
+    !q || (d.label || "").toLowerCase().includes(q) ||
+    (d.entity_type || "").toLowerCase().includes(q) ? 1 : .07);
+  window._nodeG.selectAll("text").attr("opacity", d =>
+    !q || (d.label || "").toLowerCase().includes(q) ? 1 : .07);
 }}
 window.addEventListener("resize", () => {{
   if (sim) sim.force("center", d3.forceCenter(W()/2, H()/2)).alpha(.25).restart();

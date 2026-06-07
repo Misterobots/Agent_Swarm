@@ -23,8 +23,13 @@ from sqlalchemy import select, delete, func, update, text, case
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
-from .database import async_session, init_db, Memory, AgentSnapshot, TeamMemory, MemoryAuditLog, ExtractionLog
+from .database import (
+    async_session, init_db,
+    Memory, AgentSnapshot, TeamMemory, MemoryAuditLog, ExtractionLog,
+    Entity, EntityRelation,
+)
 from .embeddings import embed_text, embed_texts, extract_memories, close_client
+from .entity_extractor import run_entity_extraction
 from . import graph as graph_lib
 
 logging.basicConfig(
@@ -870,36 +875,166 @@ app.mount("/mcp", _mcp.streamable_http_app())
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Palace Graph — knowledge graph from vector similarity
+# Palace Graph — entity knowledge graph + legacy similarity graph
 # ═══════════════════════════════════════════════════════════════════════════
 
 _GRAPH_NODE_HARD_MAX = 2_000  # absolute safety cap for browser + query cost
+
+_EMPTY_GRAPH     = {"directed": False, "multigraph": False, "graph": {},
+                    "nodes": [], "links": []}
+_EMPTY_ANALYSIS  = {"god_nodes": [], "bridges": [], "communities": [],
+                    "stats": {"node_count": 0, "edge_count": 0,
+                              "community_count": 0, "density": 0.0}}
 
 
 @app.get("/v1/palace/graph")
 async def palace_graph(
     owner_id: Optional[str] = Query(None, description="Scope to a single owner"),
-    agent_id: Optional[str] = Query(None, description="Further narrow to one agent"),
+    agent_id: Optional[str] = Query(None, description="Further narrow to one agent (similarity mode only)"),
+    mode: str = Query(
+        "auto",
+        description=(
+            "'entity' — entity-relationship graph (requires prior /v1/entities/extract). "
+            "'similarity' — cosine-similarity memory cloud (legacy). "
+            "'auto' — entity if entities exist, else similarity."
+        ),
+    ),
+    # ── similarity-mode params ───────────────────────────────────────────
     threshold: float = Query(0.35, ge=0.0, le=2.0,
-                             description="Cosine *distance* cutoff for edges (lower = stricter)"),
+                             description="[similarity] Cosine distance cutoff for edges"),
     top_k: int = Query(5, ge=1, le=20,
-                       description="Max neighbours per node"),
+                       description="[similarity] Max neighbours per node"),
     limit: int = Query(300, ge=1, le=_GRAPH_NODE_HARD_MAX,
-                       description="Max nodes (ordered by access_count desc)"),
+                       description="[similarity] Max memory nodes"),
     fmt: str = Query("json", alias="format",
                      description="'json' for node-link JSON, 'html' for standalone D3 page"),
 ):
-    """Build an interactive knowledge graph from MemPalace memories.
+    """Interactive knowledge graph for MemPalace.
 
-    Nodes = memories, edges = semantic similarity (cosine distance < threshold).
-    Communities are detected automatically and shown as colour clusters.
+    **Entity mode** (recommended): nodes = named entities extracted from memories,
+    edges = typed relations (uses, depends-on, decided-to …).  Run
+    ``POST /v1/entities/extract?owner_id=X`` first to populate entities.
 
-    Returns either:
-      - application/json  — graphify-compatible node-link JSON + GRAPH_REPORT section
-      - text/html         — self-contained D3 v7 force-directed page (format=html)
+    **Similarity mode** (legacy): nodes = raw memories, edges = cosine similarity.
+
+    Returns application/json or text/html depending on ``format``.
     """
+    # ── Resolve 'auto' mode ────────────────────────────────────────────────
+    effective_mode = mode
+    if mode == "auto":
+        if owner_id:
+            async with async_session() as session:
+                count = (await session.execute(
+                    select(func.count(Entity.id)).where(Entity.owner_id == owner_id)
+                )).scalar_one()
+            effective_mode = "entity" if count > 0 else "similarity"
+        else:
+            effective_mode = "similarity"
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # ENTITY GRAPH
+    # ═══════════════════════════════════════════════════════════════════════
+    if effective_mode == "entity":
+        async with async_session() as session:
+            # Fetch entities for owner
+            entity_stmt = select(
+                Entity.id,
+                Entity.label,
+                Entity.entity_type,
+                Entity.memory_count,
+                Entity.owner_id,
+            )
+            if owner_id:
+                entity_stmt = entity_stmt.where(Entity.owner_id == owner_id)
+            entity_stmt = entity_stmt.order_by(Entity.memory_count.desc())
+            entity_rows = (await session.execute(entity_stmt)).all()
+
+            if not entity_rows:
+                msg = (
+                    "No entities found. Run POST /v1/entities/extract"
+                    + (f"?owner_id={owner_id}" if owner_id else "")
+                    + " first."
+                )
+                if fmt == "html":
+                    return HTMLResponse(
+                        content=graph_lib.render_entity_html(
+                            _EMPTY_GRAPH, _EMPTY_ANALYSIS,
+                            title="MemPalace — No Entities Yet",
+                        ),
+                        media_type="text/html; charset=utf-8",
+                        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+                    )
+                return {"mode": "entity", "message": msg,
+                        "graph": _EMPTY_GRAPH, "analysis": _EMPTY_ANALYSIS}
+
+            entity_ids = [row.id for row in entity_rows]
+
+            # Fetch relations
+            rel_stmt = select(
+                EntityRelation.source_id,
+                EntityRelation.target_id,
+                EntityRelation.relation_type,
+                EntityRelation.confidence,
+            ).where(
+                EntityRelation.source_id.in_(entity_ids),
+                EntityRelation.target_id.in_(entity_ids),
+            )
+            if owner_id:
+                rel_stmt = rel_stmt.where(EntityRelation.owner_id == owner_id)
+            rel_rows = (await session.execute(rel_stmt)).all()
+
+        # Build node dicts
+        entity_nodes = [
+            {
+                "id": str(row.id),
+                "label": row.label,
+                "entity_type": row.entity_type,
+                "memory_count": row.memory_count or 0,
+                "owner_id": row.owner_id,
+            }
+            for row in entity_rows
+        ]
+
+        # Build relation dicts
+        entity_relations = [
+            {
+                "source_id": str(row.source_id),
+                "target_id": str(row.target_id),
+                "relation_type": row.relation_type,
+                "confidence": row.confidence,
+            }
+            for row in rel_rows
+        ]
+
+        G = graph_lib.build_entity_graph(entity_nodes, entity_relations)
+        graph_lib.detect_communities(G)
+
+        # Propagate community back onto node dicts
+        for n in entity_nodes:
+            n["community"] = G.nodes[n["id"]].get("community", 0)
+
+        analysis   = graph_lib.analyze(G)
+        graph_json = graph_lib.to_node_link_json(G)
+
+        logger.info(
+            "Entity graph: %d entities, %d relations, %d communities (owner=%s)",
+            G.number_of_nodes(), G.number_of_edges(),
+            analysis["stats"]["community_count"], owner_id,
+        )
+
+        if fmt == "html":
+            html = graph_lib.render_entity_html(graph_json, analysis)
+            return HTMLResponse(
+                content=html,
+                media_type="text/html; charset=utf-8",
+                headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+            )
+        return {"mode": "entity", "graph": graph_json, "analysis": analysis}
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SIMILARITY GRAPH (legacy)
+    # ═══════════════════════════════════════════════════════════════════════
     async with async_session() as session:
-        # ── 1. Fetch nodes (ordered by hottest memories first) ──────────────
         node_stmt = (
             select(
                 Memory.id,
@@ -922,46 +1057,29 @@ async def palace_graph(
         node_rows = (await session.execute(node_stmt)).all()
 
     if not node_rows:
-        empty_graph = {"directed": False, "multigraph": False, "graph": {},
-                       "nodes": [], "links": []}
-        empty_analysis = {"god_nodes": [], "bridges": [], "communities": [],
-                          "stats": {"node_count": 0, "edge_count": 0,
-                                    "community_count": 0, "density": 0.0}}
         if fmt == "html":
-            return HTMLResponse(graph_lib.render_html(empty_graph, empty_analysis))
-        return {"graph": empty_graph, "analysis": empty_analysis}
+            return HTMLResponse(graph_lib.render_html(_EMPTY_GRAPH, _EMPTY_ANALYSIS))
+        return {"mode": "similarity", "graph": _EMPTY_GRAPH, "analysis": _EMPTY_ANALYSIS}
 
     node_ids = [str(row.id) for row in node_rows]
 
-    # ── 2. Derive edges via pgvector self-join ─────────────────────────────
-    # Use a plain-text query: join the scoped set against itself, keep pairs
-    # below the distance threshold, then apply per-node top_k in Python.
-    # The IVFFlat index is not invoked here (self-join), but at N<=2000 the
-    # sequential pairwise scan is fast enough (~50-200 ms on Hopper).
     async with async_session() as session:
         edge_sql = text("""
             SELECT
-                a.id::text           AS src,
-                b.id::text           AS tgt,
-                ROUND(
-                    (1.0 - (a.embedding <=> b.embedding))::numeric, 4
-                )                    AS weight,
+                a.id::text  AS src,
+                b.id::text  AS tgt,
+                ROUND((1.0 - (a.embedding <=> b.embedding))::numeric, 4) AS weight,
                 (a.embedding <=> b.embedding) AS dist
             FROM mempalace.memories a
             JOIN mempalace.memories b ON b.id > a.id
-            WHERE a.id  = ANY(:ids)
-              AND b.id  = ANY(:ids)
+            WHERE a.id = ANY(:ids) AND b.id = ANY(:ids)
               AND (a.embedding <=> b.embedding) < :threshold
             ORDER BY a.id, (a.embedding <=> b.embedding)
         """)
         edge_rows = (
-            await session.execute(
-                edge_sql,
-                {"ids": node_ids, "threshold": threshold},
-            )
+            await session.execute(edge_sql, {"ids": node_ids, "threshold": threshold})
         ).all()
 
-    # ── 3. Apply per-node top_k cap in Python ─────────────────────────────
     neighbour_count: dict[str, int] = {}
     edges: list[dict] = []
     for row in edge_rows:
@@ -974,13 +1092,10 @@ async def palace_graph(
         neighbour_count[src] = cnt_s + 1
         neighbour_count[tgt] = cnt_t + 1
 
-    # ── 4. Build node dicts ────────────────────────────────────────────────
     nodes = [
         {
             "id": str(row.id),
-            # Short label: first ~50 chars (readable in graph)
             "label": (row.content or "")[:50].replace("\n", " ").strip(),
-            # Full preview for tooltip / selected panel
             "content_preview": (row.content or "")[:250].replace("\n", " ").strip(),
             "memory_type": row.memory_type or "semantic",
             "domain": row.domain or "general",
@@ -992,24 +1107,19 @@ async def palace_graph(
         for row in node_rows
     ]
 
-    # ── 5. Build graph, detect communities, analyse ────────────────────────
     G = graph_lib.build_graph(nodes, edges)
     graph_lib.detect_communities(G)
-
-    # Propagate community attr back onto node dicts (for JSON export)
     for n in nodes:
         n["community"] = G.nodes[n["id"]].get("community", 0)
 
-    analysis = graph_lib.analyze(G)
+    analysis   = graph_lib.analyze(G)
     graph_json = graph_lib.to_node_link_json(G)
 
     logger.info(
-        "Graph built: %d nodes, %d edges, %d communities (owner=%s, agent=%s, threshold=%.2f)",
-        G.number_of_nodes(), G.number_of_edges(),
-        analysis["stats"]["community_count"], owner_id, agent_id, threshold,
+        "Similarity graph: %d nodes, %d edges (owner=%s, threshold=%.2f)",
+        G.number_of_nodes(), G.number_of_edges(), owner_id, threshold,
     )
 
-    # ── 6. Return ──────────────────────────────────────────────────────────
     if fmt == "html":
         html = graph_lib.render_html(graph_json, analysis)
         return HTMLResponse(
@@ -1017,8 +1127,74 @@ async def palace_graph(
             media_type="text/html; charset=utf-8",
             headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
+    return {"mode": "similarity", "graph": graph_json, "analysis": analysis}
 
-    return {"graph": graph_json, "analysis": analysis}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Entity Extraction — trigger & list
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.post("/v1/entities/extract")
+async def trigger_entity_extraction(
+    owner_id: str = Query(..., description="Owner whose memories to process"),
+    batch_size: int = Query(5, ge=1, le=20,
+                            description="Memories per LLM call (more = richer context, slower)"),
+    max_memories: int = Query(200, ge=1, le=1000,
+                              description="Cap on unprocessed memories to consume"),
+):
+    """Extract entities and typed relations from stored memories using LLM.
+
+    Idempotent — memories already processed (entity_extracted=True) are skipped.
+    Returns extraction stats.  Safe to call repeatedly as new memories arrive.
+    """
+    if not owner_id.strip():
+        raise HTTPException(400, "owner_id is required")
+
+    stats = await run_entity_extraction(
+        owner_id=owner_id.strip(),
+        batch_size=batch_size,
+        max_memories=max_memories,
+    )
+    logger.info("Entity extraction triggered (owner=%s): %s", owner_id, stats)
+    return {"owner_id": owner_id, **stats}
+
+
+@app.get("/v1/entities")
+async def list_entities(
+    owner_id: Optional[str] = Query(None, description="Filter by owner"),
+    entity_type: Optional[str] = Query(None, description="Filter by type (technology, project, …)"),
+    limit: int = Query(200, ge=1, le=2000),
+):
+    """List extracted entities with their relation counts."""
+    async with async_session() as session:
+        stmt = select(
+            Entity.id,
+            Entity.label,
+            Entity.entity_type,
+            Entity.memory_count,
+            Entity.owner_id,
+            Entity.created_at,
+        ).order_by(Entity.memory_count.desc(), Entity.label)
+
+        if owner_id:
+            stmt = stmt.where(Entity.owner_id == owner_id)
+        if entity_type:
+            stmt = stmt.where(Entity.entity_type == entity_type.lower())
+        stmt = stmt.limit(limit)
+
+        rows = (await session.execute(stmt)).all()
+
+    return [
+        {
+            "id": str(row.id),
+            "label": row.label,
+            "entity_type": row.entity_type,
+            "memory_count": row.memory_count,
+            "owner_id": row.owner_id,
+            "created_at": row.created_at.isoformat() if row.created_at else "",
+        }
+        for row in rows
+    ]
 
 
 @app.get("/v1/palace/room", response_model=list[MemoryOut])
