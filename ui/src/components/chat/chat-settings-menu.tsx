@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Settings2, Brain } from "lucide-react";
+import { Settings2, Brain, Activity } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ResearchToggle } from "./research-toggle";
 import { UltraplanToggle } from "./ultraplan-toggle";
@@ -38,6 +38,8 @@ export function ChatSettingsMenu() {
   const groundingDocs = useSettingsStore((s) => s.groundingDocs);
   const groundingFile = useSettingsStore((s) => s.groundingFile);
   const anyModeActive = ultraplanMode || ultrathinkMode || researchMode || swarmMode || groundingWeb || groundingDocs || groundingFile;
+  const agentTransparency = useSettingsStore((s) => s.agentTransparency);
+  const setAgentTransparency = useSettingsStore((s) => s.setAgentTransparency);
 
   const updatePos = useCallback(() => {
     if (!btnRef.current) return;
@@ -130,6 +132,33 @@ export function ChatSettingsMenu() {
       <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
         <label className="text-xs text-[var(--chat-muted)]">Quality & Effort</label>
         <QualitySettingsPanel />
+      </div>
+
+      {/* Agent Transparency */}
+      <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
+        <label className="text-xs text-[var(--chat-muted)]">Agent Stream</label>
+        <div className="grid grid-cols-3 gap-1">
+          {(["off", "status", "full"] as const).map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => setAgentTransparency(level)}
+              className={cn(
+                "px-2 py-1.5 rounded-md text-[11px] border transition-colors capitalize",
+                agentTransparency === level
+                  ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_18%,transparent)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
+                  : "bg-[var(--chat-panel)] text-[var(--chat-muted)] border-[var(--chat-border)] hover:text-[var(--chat-text)]"
+              )}
+              title={
+                level === "off" ? "Hide agent activity" :
+                level === "status" ? "Show collapsed trace after response" :
+                "Auto-expand and stream live"
+              }
+            >
+              {level}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Memory toggle */}

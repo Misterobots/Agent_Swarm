@@ -187,7 +187,7 @@ export interface FlaggedFollowup {
 }
 
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps" | "agent_event" | "set_preview_url" | "preview_unavailable" | "heartbeat";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -222,6 +222,16 @@ export interface StreamEvent {
   // Error details
   errorCode?: string;
   errorDetails?: string;
+
+  // Structured agent trace event (agent_event SSE type)
+  agentEvent?: AgentTraceEvent;
+
+  // Workshop questions / workflow steps (direct fields on StreamEvent, not nested)
+  workshopQuestions?: WorkshopQuestion[];
+  workflowNextSteps?: WorkflowNextStep[];
+
+  // Preview URL pushed by agent into the dev workspace pane
+  url?: string;
 
   // Clarification card
   clarification?: ClarificationCard;
@@ -279,6 +289,8 @@ export interface ChatMessage {
   suggestedFollowups?: SuggestedFollowup[];
   /** User-created follow-up flag (set when user clicks Flag on this message) */
   flaggedFollowup?: FlaggedFollowup;
+  /** Structured agent trace — one entry per agent_event SSE event (coordinator, workers, etc.) */
+  agentTrace?: AgentTraceEvent[];
 }
 
 export interface Conversation {
@@ -348,6 +360,22 @@ export interface ToolApprovalEvent {
 export interface ThoughtEvent {
   content: string;
   timestamp: number;
+}
+
+/**
+ * A single structured event from an agent — emitted as an SSE `agent_event`.
+ * Richer than ThoughtEvent: carries the originating agent name and a typed
+ * event kind so the UI can render it as an expandable trace (Claude Code style).
+ */
+export interface AgentTraceEvent {
+  /** Which agent emitted this — e.g. "Coordinator", "Planner", "Worker-1", "Verifier" */
+  agent: string;
+  /** Semantic category of the event */
+  eventType: "thought" | "status" | "tool_call" | "tool_result" | "handoff" | "spawned" | "log" | "output";
+  /** Human-readable content string */
+  content: string;
+  timestamp: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface NodeHealth {

@@ -10,7 +10,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list";
+      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat";
       // Swarm theater fields
       phase_num?: number;
       phase_name?: string;
@@ -203,6 +203,19 @@ export async function* streamSSE(
               followups: (delta as any).followups || [],
             };
           }
+          // Structured agent trace event — coordinator / worker / verifier communication
+          else if (delta.type === "agent_event") {
+            yield {
+              type: "agent_event",
+              content: (delta as any).content || "",
+              agentEvent: {
+                agent: (delta as any).agent_name || "Agent",
+                eventType: (delta as any).event_type || "status",
+                content: (delta as any).content || "",
+                timestamp: Date.now(),
+              },
+            };
+          }
           // Agent pushes a URL into the preview pane
           else if (delta.type === "set_preview_url") {
             yield {
@@ -370,6 +383,17 @@ export async function* streamSSE(
               type: "suggested_followups",
               content: "",
               followups: (delta as any).followups || [],
+            };
+          } else if (delta.type === "agent_event") {
+            yield {
+              type: "agent_event",
+              content: (delta as any).content || "",
+              agentEvent: {
+                agent: (delta as any).agent_name || "Agent",
+                eventType: (delta as any).event_type || "status",
+                content: (delta as any).content || "",
+                timestamp: Date.now(),
+              },
             };
           } else if (delta.type === "set_preview_url") {
             yield {

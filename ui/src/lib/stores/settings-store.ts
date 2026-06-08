@@ -56,6 +56,11 @@ interface SettingsState {
   solvingVerifierMaxTime: number;     // Per-call verifier wall-clock (seconds, 0 = none)
   solvingCorrectorNPasses: number;    // N sequential corrector passes per round (1–3 in UI)
   solvingCorrectorMaxTime: number;    // Per-call corrector wall-clock (seconds, 0 = none)
+  // Agent transparency — controls what internal agent activity is visible
+  // "off": hidden entirely; "status": collapsed trace after response; "full": live-expanding during stream
+  agentTransparency: "off" | "status" | "full";
+  setAgentTransparency: (level: "off" | "status" | "full") => void;
+
   // Layout
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -123,6 +128,8 @@ export const useSettingsStore = create<SettingsState>()(
       solvingVerifierMaxTime: 0,
       solvingCorrectorNPasses: 1,   // Default: single corrector pass
       solvingCorrectorMaxTime: 0,
+      agentTransparency: "status",
+      setAgentTransparency: (agentTransparency) => set({ agentTransparency }),
       sidebarOpen: true,
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       sidebarSlim: false,
@@ -162,7 +169,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "memex-settings",
-      version: 7,
+      version: 8,
       migrate: (persisted: unknown, fromVersion: number) => {
         const state = (persisted ?? {}) as Partial<SettingsState>;
         // v1 -> v3: retired the 8 hand-curated themes plus the warm-amber
@@ -195,6 +202,10 @@ export const useSettingsStore = create<SettingsState>()(
         // v6 -> v7: add soundEnabled
         if (fromVersion < 7) {
           if ((state as any).soundEnabled === undefined) (state as any).soundEnabled = true;
+        }
+        // v7 -> v8: add agentTransparency
+        if (fromVersion < 8) {
+          if ((state as any).agentTransparency === undefined) (state as any).agentTransparency = "status";
         }
         return state as SettingsState;
       },

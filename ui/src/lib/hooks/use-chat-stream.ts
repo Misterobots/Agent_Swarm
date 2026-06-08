@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
+import type { AgentTraceEvent, ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
@@ -74,6 +74,7 @@ export function useChatStream(options?: {
   const turnMetadataRef = useRef<TurnMetadata | null>(null);
   const continuationHintRef = useRef<"auto_continue" | "await_user" | "compacting" | null>(null);
   const mediaAttachmentsRef = useRef<MediaAttachment[]>([]);
+  const agentTraceRef = useRef<AgentTraceEvent[]>([]);
 
   const {
     conversations,
@@ -96,6 +97,7 @@ export function useChatStream(options?: {
     setMessageSuggestedFollowups,
     setMessageWorkshopQuestions,
     setMessageWorkflowNextSteps,
+    setMessageAgentTrace,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -258,6 +260,7 @@ export function useChatStream(options?: {
       turnMetadataRef.current = null;
       continuationHintRef.current = null;
       mediaAttachmentsRef.current = [];
+      agentTraceRef.current = [];
       
       const MAX_RETRIES = 3;
       let retryCount = 0;
@@ -381,6 +384,13 @@ export function useChatStream(options?: {
             // LLM-generated end-of-response chips
             if (event.followups && event.followups.length > 0) {
               setMessageSuggestedFollowups(convId!, assistantId, event.followups);
+            }
+          } else if (event.type === "agent_event") {
+            // Structured agent trace — coordinator/worker communication stream
+            if (event.agentEvent) {
+              agentTraceRef.current = [...agentTraceRef.current, event.agentEvent];
+              // Live-update message so trace builds in real time while streaming
+              setMessageAgentTrace(convId!, assistantId, agentTraceRef.current);
             }
           } else if (event.type === "set_preview_url") {
             // Agent pushes a URL into the dev workspace preview pane
@@ -514,6 +524,9 @@ export function useChatStream(options?: {
           setMessagePendingApprovals(convId!, assistantId, []);
           pendingApprovalsRef.current = [];
         }
+        if (agentTraceRef.current.length > 0) {
+          setMessageAgentTrace(convId!, assistantId, agentTraceRef.current);
+        }
 
         setIsStreaming(false);
         setStatusMessage(null);
@@ -541,6 +554,7 @@ export function useChatStream(options?: {
         streamModesRef.current = [];
         turnMetadataRef.current = null;
         continuationHintRef.current = null;
+        agentTraceRef.current = [];
         abortRef.current = null;
       }
     },

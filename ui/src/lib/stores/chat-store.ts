@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
+  AgentTraceEvent,
   ChatMessage,
   ClarificationCard,
   Conversation,
@@ -48,6 +49,7 @@ interface ChatState {
   setMessageFlaggedFollowup: (conversationId: string, messageId: string, followup: import("@/types/chat").FlaggedFollowup) => void;
   setMessageWorkshopQuestions: (conversationId: string, messageId: string, questions: import("@/types/chat").WorkshopQuestion[]) => void;
   setMessageWorkflowNextSteps: (conversationId: string, messageId: string, steps: import("@/types/chat").WorkflowNextStep[]) => void;
+  setMessageAgentTrace: (conversationId: string, messageId: string, events: AgentTraceEvent[]) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -345,6 +347,20 @@ export const useChatStore = create<ChatState>()(
               ...c,
               messages: c.messages.map((m) =>
                 m.id === messageId ? { ...m, workflowNextSteps: steps } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageAgentTrace: (conversationId, messageId, events) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, agentTrace: events } : m
               ),
               updatedAt: Date.now(),
             };

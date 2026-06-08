@@ -17,6 +17,8 @@ import { MessageActions } from "./message-actions";
 import { MediaPreview } from "./media-preview";
 import { ResponseSuggestionChips } from "./response-suggestion-chips";
 import { FlagForm, FlaggedFollowupCard } from "./flagged-followup-card";
+import { AgentTraceCard } from "./agent-trace-card";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // ---------------------------------------------------------------------------
 // Swarm response parser — splits coordinator output into collapsible phases
@@ -222,6 +224,7 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
   const isUser = message.role === "user";
   const showArtButton = !isUser && message.content && isCreativeRedirect(message.content);
   const [traceOpen, setTraceOpen] = useState(false);
+  const agentTransparency = useSettingsStore((s) => s.agentTransparency);
 
   // Flag-for-follow-up inline form state
   const [flagFormOpen, setFlagFormOpen] = useState(false);
@@ -401,7 +404,16 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
                 ))}
               </div>
             )}
-            {(!!message.thoughtTrace?.length || message.turnMetadata) && (
+            {/* Structured agent trace (new) — coordinator / worker / verifier stream */}
+            {!!message.agentTrace?.length && (
+              <AgentTraceCard
+                events={message.agentTrace}
+                isStreaming={isStreaming}
+                transparency={agentTransparency}
+              />
+            )}
+            {/* Legacy thought trace — shown when no structured agentTrace but thoughtTrace exists */}
+            {!message.agentTrace?.length && (!!message.thoughtTrace?.length || message.turnMetadata) && (
               <div className="mt-3 border border-[var(--chat-border)] rounded-lg overflow-hidden">
                 <button
                   type="button"

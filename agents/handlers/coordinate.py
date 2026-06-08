@@ -114,6 +114,41 @@ def handle_coordinate(user_input: str, ctx: dict):
             already_steered=already_steered,
         ):
             yield update
+            # Mirror key events as structured agent_event so the UI can render
+            # the agent communication stream in real-time (Claude Code style trace).
+            utype = update.get("type", "")
+            ucontent = update.get("content", "")
+            if not ucontent:
+                continue
+            if utype == "thought":
+                yield {
+                    "type": "agent_event",
+                    "agent_name": update.get("agent_name") or update.get("pioneer_name") or "Coordinator",
+                    "event_type": "thought",
+                    "content": ucontent,
+                }
+            elif utype == "status":
+                yield {
+                    "type": "agent_event",
+                    "agent_name": update.get("agent_name") or "Coordinator",
+                    "event_type": "status",
+                    "content": ucontent,
+                }
+            elif utype == "log":
+                yield {
+                    "type": "agent_event",
+                    "agent_name": update.get("agent_name") or "System",
+                    "event_type": "log",
+                    "content": ucontent,
+                }
+            elif utype == "swarm_worker_created":
+                worker_name = update.get("pioneer_name") or update.get("worker_id") or "Worker"
+                yield {
+                    "type": "agent_event",
+                    "agent_name": "Coordinator",
+                    "event_type": "spawned",
+                    "content": f"Spawned {worker_name}: {update.get('task', '')[:120]}",
+                }
 
         yield _emit_tool_result(tool_call_id, "coordinate_task", "Coordination complete", True)
         _score_trace(lf_trace, langfuse, 0.9, use_langfuse=use_langfuse)

@@ -1415,7 +1415,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "media_attachment", "set_preview_url",
                                         "preview_unavailable", "design_artifact",
                                         "suggested_followups", "workshop_questions",
-                                        "workflow_next_steps"):
+                                        "workflow_next_steps", "agent_event"):
                             rich_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
@@ -1446,7 +1446,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "media_attachment", "set_preview_url",
                                         "preview_unavailable", "design_artifact",
                                         "suggested_followups", "workshop_questions",
-                                        "workflow_next_steps"):
+                                        "workflow_next_steps", "agent_event"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
