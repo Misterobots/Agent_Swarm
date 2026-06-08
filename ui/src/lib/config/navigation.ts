@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   Mic2,
+  Network,
   Paintbrush,
   Radar,
   Settings,
@@ -71,7 +72,15 @@ export const primaryNavigation: NavigationItem[] = [
     label: "Palace",
     href: "/palace",
     icon: Castle,
-    matchPrefixes: ["/palace"],
+    matchPrefixes: ["/palace", "/graph"],
+    children: [
+      {
+        label: "Memory Graph",
+        href: "/graph",
+        icon: Network,
+        matchPrefixes: ["/graph"],
+      },
+    ],
   },
   {
     label: "Dev",
