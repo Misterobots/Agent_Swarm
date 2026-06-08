@@ -384,6 +384,11 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
+      # Web grounding — Google Custom Search (fallback after DDG)
+      # Get key: console.developers.google.com → Custom Search JSON API
+      # Get CX:  programmablesearchengine.google.com → Search engine ID
+      - GOOGLE_CSE_API_KEY=${GOOGLE_CSE_API_KEY:-}
+      - GOOGLE_CSE_ID=${GOOGLE_CSE_ID:-}
       - 'VALID_API_KEYS={"sk-coder-identity":"memex_ui","sk-devops-identity":"devops_agent"}'
       # Image generation backends live on Lovelace (GPU host); Turing's agent_runtime
       # calls out via LAN. Without these, KLEIN_HOST defaults to docker DNS
@@ -440,10 +445,9 @@ services:
       start_period: 30s
     networks:
       - ai_lab_net
-      - saltbox
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=saltbox"
+      - "traefik.docker.network=ai_lab_net"
       # Internal LAN route (with Authentik auth)
       - "traefik.http.routers.memex-ui.rule=PathPrefix(`/memex`)"
       - "traefik.http.routers.memex-ui.entrypoints=web"
@@ -710,10 +714,9 @@ services:
     restart: unless-stopped
     networks:
       - ai_lab_net
-      - saltbox
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=saltbox"
+      - "traefik.docker.network=ai_lab_net"
       # LAN route
       - "traefik.http.routers.docs.rule=PathPrefix(`/docs-site`)"
       - "traefik.http.routers.docs.entrypoints=web"

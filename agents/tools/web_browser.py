@@ -206,110 +206,101 @@ def fetch_page(url: str) -> Dict[str, Any]:
 
 
 def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
-    """Search the web using the duckduckgo-search library (no API key required).
+    """Search the web.
 
-    Primary path: duckduckgo_search.DDGS — uses DDG's real API, not the HTML
-    scraper, so it is not affected by bot-detection or HTML format changes.
-    Fallback: HTML scraping of lite.duckduckgo.com (kept for environments where
-    the library is not installed).
+    Provider chain (in order):
+    1. DuckDuckGo — via the duckduckgo-search library (no key required).
+       Calls DDG's internal API; unaffected by HTML-scraper bot-detection.
+    2. Google Custom Search — requires GOOGLE_CSE_API_KEY and GOOGLE_CSE_ID
+       env vars (100 free queries/day at console.developers.google.com).
 
     Returns a list of {"title": ..., "url": ..., "snippet": ...} dicts.
+    An empty list is returned only if both providers fail or are unavailable.
     """
-    # Import trust scanner once (fail-gracefully if unavailable)
+    # Trust scanner applied to all external content (fail-gracefully)
     try:
         from utils.content_trust import sanitize_external_content, TrustLevel as _TL
         _trust_scan = lambda text, url: sanitize_external_content(text, _TL.RETRIEVED, source=url)
     except Exception:
-        _trust_scan = lambda text, url: (text, True)  # unavailable — pass through
+        _trust_scan = lambda text, url: (text, True)
 
-    # ── Primary: duckduckgo-search / ddgs package ─────────────────────────────
-    # The duckduckgo-search package (pip install duckduckgo-search, or the newer
-    # rename pip install ddgs) is installed in agent_runtime Dockerfile.  It
-    # calls DDG's internal API, bypassing the HTML Lite scraper that bot-detects.
+    def _scan(snippet: str, url: str) -> str:
+        scanned, ok = _trust_scan(snippet, url)
+        if not ok:
+            logger.warning(f"[WebBrowser] Snippet from {url} redacted by trust scanner")
+        return scanned
+
+    # ── 1. DuckDuckGo ─────────────────────────────────────────────────────────
     try:
         try:
-            from ddgs import DDGS  # type: ignore[import]       # new package name
+            from ddgs import DDGS  # type: ignore[import]          # new package name (ddgs)
         except ImportError:
-            from duckduckgo_search import DDGS  # type: ignore[import]  # old name
+            from duckduckgo_search import DDGS  # type: ignore[import]   # legacy name
 
         raw = DDGS().text(query, max_results=num_results)
-        results: List[Dict[str, str]] = []
+        ddg_results: List[Dict[str, str]] = []
         for item in raw or []:
             url = item.get("href", item.get("url", ""))
-            title = item.get("title", "")
-            snippet = item.get("body", item.get("snippet", ""))
-            snippet, _ok = _trust_scan(snippet, url)
-            if not _ok:
-                logger.warning(f"[WebBrowser] Search snippet from {url} redacted by trust scanner")
-            results.append({"title": title, "url": url, "snippet": snippet})
+            ddg_results.append({
+                "title": item.get("title", ""),
+                "url": url,
+                "snippet": _scan(item.get("body", item.get("snippet", "")), url),
+            })
 
-        if results:
-            logger.debug(f"[WebBrowser] DDGS returned {len(results)} results for: {query[:80]}")
-            return results
-        logger.warning("[WebBrowser] DDGS returned empty results — trying HTML fallback")
+        if ddg_results:
+            logger.debug(f"[WebBrowser] DDG returned {len(ddg_results)} results")
+            return ddg_results
+
+        logger.warning("[WebBrowser] DDG returned empty results — trying Google CSE")
     except ImportError:
-        logger.warning("[WebBrowser] duckduckgo-search not installed — falling back to HTML scrape")
+        logger.warning("[WebBrowser] duckduckgo-search library not installed — trying Google CSE")
     except Exception as e:
-        logger.warning(f"[WebBrowser] DDGS failed ({e}) — falling back to HTML scrape")
+        logger.warning(f"[WebBrowser] DDG failed ({e}) — trying Google CSE")
 
-    # ── Fallback: DuckDuckGo HTML Lite scrape ─────────────────────────────────
+    # ── 2. Google Custom Search API ───────────────────────────────────────────
+    # Requires: GOOGLE_CSE_API_KEY (API key) and GOOGLE_CSE_ID (Search Engine ID)
+    # Free tier: 100 queries/day — https://console.developers.google.com/
+    google_api_key = os.getenv("GOOGLE_CSE_API_KEY", "")
+    google_cse_id = os.getenv("GOOGLE_CSE_ID", "")
+
+    if not google_api_key or not google_cse_id:
+        logger.warning(
+            "[WebBrowser] Google CSE unavailable — set GOOGLE_CSE_API_KEY and "
+            "GOOGLE_CSE_ID env vars to enable it"
+        )
+        return []
+
     import requests
 
-    search_url = "https://lite.duckduckgo.com/lite/"
-    _browser_ua = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    )
     try:
-        resp = requests.post(
-            search_url,
-            data={"q": query},
-            headers={
-                "User-Agent": _browser_ua,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
-                "Content-Type": "application/x-www-form-urlencoded",
+        resp = requests.get(
+            "https://www.googleapis.com/customsearch/v1",
+            params={
+                "key": google_api_key,
+                "cx": google_cse_id,
+                "q": query,
+                "num": min(num_results, 10),  # Google CSE max is 10 per call
             },
             timeout=REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
-        html = resp.text
+        data = resp.json()
     except Exception as e:
-        logger.error(f"[WebBrowser] HTML fallback search failed: {e}")
+        logger.error(f"[WebBrowser] Google CSE request failed: {e}")
         return []
 
-    # Two-step parsing so <a> attribute ordering doesn't matter.
-    a_tag_pattern = re.compile(
-        r'<a\b[^>]*\bclass=["\']result-link["\'][^>]*>(.*?)</a>',
-        re.DOTALL | re.IGNORECASE,
-    )
-    snippet_pattern = re.compile(
-        r'<td\b[^>]*\bclass=["\']result-snippet["\'][^>]*>(.*?)</td>',
-        re.DOTALL | re.IGNORECASE,
-    )
-    a_tags = list(a_tag_pattern.finditer(html))
-    snippets = snippet_pattern.findall(html)
+    google_results: List[Dict[str, str]] = []
+    for item in data.get("items", []):
+        url = item.get("link", "")
+        google_results.append({
+            "title": item.get("title", ""),
+            "url": url,
+            "snippet": _scan(item.get("snippet", ""), url),
+        })
 
-    if not a_tags:
-        logger.warning(
-            f"[WebBrowser] No result-link anchors in DDG HTML response "
-            f"(len={len(html)}). Head: {html[:400]}"
-        )
+    if google_results:
+        logger.debug(f"[WebBrowser] Google CSE returned {len(google_results)} results")
+    else:
+        logger.warning("[WebBrowser] Google CSE returned no items")
 
-    fallback_results: List[Dict[str, str]] = []
-    for i, a_match in enumerate(a_tags[:num_results]):
-        full_tag = a_match.group(0)
-        title_html = a_match.group(1)
-        href_m = re.search(r'\bhref=["\']([^"\']+)["\']', full_tag, re.IGNORECASE)
-        if not href_m:
-            continue
-        url = href_m.group(1)
-        clean_title = re.sub(r"<[^>]+>", "", title_html).strip()
-        snippet = re.sub(r"<[^>]+>", "", snippets[i]).strip() if i < len(snippets) else ""
-        snippet, _ok = _trust_scan(snippet, url)
-        if not _ok:
-            logger.warning(f"[WebBrowser] Search snippet from {url} redacted by trust scanner")
-        fallback_results.append({"title": clean_title, "url": url, "snippet": snippet})
-
-    return fallback_results
+    return google_results
