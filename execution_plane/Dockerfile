@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir \
     openai \
     anthropic \
     packaging \
-    duckduckgo-search \
+    ddgs \
     fastapi \
     uvicorn \
     prometheus_client \
