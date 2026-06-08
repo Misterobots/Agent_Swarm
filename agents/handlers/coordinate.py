@@ -32,6 +32,8 @@ def handle_coordinate(user_input: str, ctx: dict):
 
     # --- DEV MODE GATE ---
     # Intercept build/project requests when dev_mode is off and not in research/plan mode.
+    # Bypass for explicit swarm invocations — the user already chose to run the swarm.
+    swarm_mode = ctx.get("swarm_mode", False)
     _build_keywords = (
         "build", "create", "make", "develop", "implement", "write a ",
         "code ", "design a", "design an", "generate a", "generate an",
@@ -40,7 +42,7 @@ def handle_coordinate(user_input: str, ctx: dict):
     _is_build_request = any(kw in user_input.lower() for kw in _build_keywords)
     _research_only = research_mode or ultraplan_mode
 
-    if not dev_mode and _is_build_request and not _research_only:
+    if not dev_mode and _is_build_request and not _research_only and not swarm_mode:
         logger.info("[Router] Coding/project request detected in standard mode — showing dev mode gate.")
         try:
             from brooks import save_pending_context as _save_ctx

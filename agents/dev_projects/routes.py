@@ -31,11 +31,17 @@ router = APIRouter(prefix="/v1/dev/projects", tags=["dev-projects"])
 # ---------------------------------------------------------------------------
 
 def _owner(request: Request) -> str:
-    """Best-effort: pull owner uid from Authentik forward-auth headers."""
+    """Pull owner uid from Authentik forward-auth headers, falling back to 'local'.
+
+    Authentik headers are only present when requests flow through Traefik's
+    forward-auth middleware (i.e. via memex.shivelymedia.com). Local dev access
+    (hive_ui_dev on :3301, direct agent_runtime on :8009) has no such headers
+    and falls back to the 'local' bucket so dev workflows aren't blocked.
+    """
     return (
         request.headers.get("x-authentik-username")
         or request.headers.get("x-authentik-uid")
-        or ""
+        or "local"
     )
 
 
@@ -62,8 +68,6 @@ async def list_projects(request: Request):
     Returns: {"projects": [...]}
     """
     uid = _owner(request)
-    if not uid:
-        raise HTTPException(status_code=400, detail="Cannot determine owner: no auth header")
     projects = store.list_projects(uid)
     return {"projects": projects}
 
@@ -79,8 +83,6 @@ async def create_project(body: CreateProjectRequest, request: Request):
     Returns the created project record.
     """
     uid = _owner(request)
-    if not uid:
-        raise HTTPException(status_code=400, detail="Cannot determine owner: no auth header")
 
     # --- Validate name ---
     name = body.name.strip()
@@ -152,9 +154,6 @@ async def delete_project(project_id: str, request: Request):
     Returns 204 No Content on success, 404 if not found or uid mismatch.
     """
     uid = _owner(request)
-    if not uid:
-        raise HTTPException(status_code=400, detail="Cannot determine owner: no auth header")
-
     proj = store.get_project(project_id, uid)
     if proj is None:
         raise HTTPException(status_code=404, detail="Project not found")

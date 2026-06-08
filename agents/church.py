@@ -31,7 +31,7 @@ import requests
 from pathlib import Path
 from dispatcher import Event, EventType
 from logger_setup import setup_logger
-from utils.gpu_queue import request_lock, get_best_host_for_model
+from utils.gpu_queue import request_lock, get_best_host_for_model, _CircuitBreaker
 from phi.storage.agent.postgres import PgAgentStorage
 from role_model_resolver import get_model_for_role
 from config import (
@@ -42,6 +42,11 @@ from config import (
 
 logger = setup_logger("Router")
 security_audit_logger = setup_logger("SecurityAudit")
+
+# Circuit breaker scoped to MemPalace pre-routing recall.
+# 3 consecutive timeouts/errors → open for 60 s, then probe once (half-open).
+# Isolated from the GPU-queue breaker so a flapping MemPalace never stalls GPU ops.
+_mp_breaker = _CircuitBreaker()
 
 # --- Anthropic Provider (admin-only) ---
 try:
@@ -595,20 +600,27 @@ def chat_swarm(
             except Exception as _mem_err:
                 logger.debug(f"[Router] Memory recall failed (non-fatal): {_mem_err}")
 
-        # MemPalace semantic recall
-        if memory_enabled:
+        # MemPalace semantic recall — guarded by circuit breaker.
+        # If MemPalace is flapping (3 consecutive failures), the breaker opens
+        # for 60 s and short-circuits here, keeping pre-routing latency tight.
+        if memory_enabled and _mp_breaker.allow("mempalace", "recall"):
             try:
                 import httpx as _httpx_recall
                 _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
                 with _httpx_recall.Client(timeout=3.0) as _mp_client:  # was 10 s; keep pre-routing fast
                     _mp_resp = _mp_client.post(f"{_mp_url}/v1/memories/search", json={"query": user_input, "owner_id": owner_id, "limit": 5})
                 if _mp_resp.status_code == 200:
+                    _mp_breaker.record_success("mempalace", "recall")
                     strong = [m for m in _mp_resp.json() if (m.get("score") or 0) > 0.5]
                     if strong:
                         mp_msg = {"role": "system", "content": f"[Relevant Memories]\n" + "\n".join(f"- {m['content']}" for m in strong)}
                         history = list(history) + [mp_msg] if history else [mp_msg]
                         yield _t(f"→ MemPalace: {len(strong)} relevant memories recalled")
+                else:
+                    _mp_breaker.record_failure("mempalace", "recall")
+                    logger.debug(f"[Router] MemPalace recall HTTP {_mp_resp.status_code}")
             except Exception as _mp_err:
+                _mp_breaker.record_failure("mempalace", "recall")
                 logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
 
         # Dev project context injection — reads .memex/notes.md from the active project
@@ -1181,6 +1193,7 @@ def chat_swarm(
             "solving_verifier_max_time": solving_verifier_max_time,
             "solving_corrector_n_passes": solving_corrector_n_passes,
             "solving_corrector_max_time": solving_corrector_max_time,
+            "swarm_mode": swarm_mode,
         }
 
         # ---------------------------------------------------------------------------
