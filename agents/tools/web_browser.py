@@ -206,64 +206,110 @@ def fetch_page(url: str) -> Dict[str, Any]:
 
 
 def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
-    """Search the web using DuckDuckGo Lite (no API key required).
+    """Search the web using the duckduckgo-search library (no API key required).
+
+    Primary path: duckduckgo_search.DDGS — uses DDG's real API, not the HTML
+    scraper, so it is not affected by bot-detection or HTML format changes.
+    Fallback: HTML scraping of lite.duckduckgo.com (kept for environments where
+    the library is not installed).
 
     Returns a list of {"title": ..., "url": ..., "snippet": ...} dicts.
     """
-    import requests
-
-    # DuckDuckGo HTML Lite — privacy-respecting, no API key needed
-    search_url = "https://lite.duckduckgo.com/lite/"
-    try:
-        resp = requests.post(
-            search_url,
-            data={"q": query},
-            headers={"User-Agent": USER_AGENT},
-            timeout=REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        html = resp.text
-    except Exception as e:
-        logger.error(f"[WebBrowser] Search failed: {e}")
-        return []
-
-    # Parse DuckDuckGo Lite results (table-based HTML)
-    # DDG Lite uses single-quoted class attributes: class='result-link' / class='result-snippet'
-    results = []
-    link_pattern = re.compile(
-        r'<a[^>]+href="([^"]+)"[^>]+class=["\']result-link["\'][^>]*>(.*?)</a>',
-        re.DOTALL | re.IGNORECASE,
-    )
-    snippet_pattern = re.compile(
-        r'<td[^>]+class=["\']result-snippet["\'][^>]*>(.*?)</td>',
-        re.DOTALL | re.IGNORECASE,
-    )
-
-    links = link_pattern.findall(html)
-    snippets = snippet_pattern.findall(html)
-
-    # Import trust scanner once outside the loop (fail-gracefully if unavailable)
+    # Import trust scanner once (fail-gracefully if unavailable)
     try:
         from utils.content_trust import sanitize_external_content, TrustLevel as _TL
         _trust_scan = lambda text, url: sanitize_external_content(text, _TL.RETRIEVED, source=url)
     except Exception:
         _trust_scan = lambda text, url: (text, True)  # unavailable — pass through
 
-    for i, (url, title) in enumerate(links[:num_results]):
-        clean_title = re.sub(r"<[^>]+>", "", title).strip()
-        snippet = ""
-        if i < len(snippets):
-            snippet = re.sub(r"<[^>]+>", "", snippets[i]).strip()
+    # ── Primary: duckduckgo-search / ddgs package ─────────────────────────────
+    # The duckduckgo-search package (pip install duckduckgo-search, or the newer
+    # rename pip install ddgs) is installed in agent_runtime Dockerfile.  It
+    # calls DDG's internal API, bypassing the HTML Lite scraper that bot-detects.
+    try:
+        try:
+            from ddgs import DDGS  # type: ignore[import]       # new package name
+        except ImportError:
+            from duckduckgo_search import DDGS  # type: ignore[import]  # old name
 
-        # Scan snippet before assembling into results
+        raw = DDGS().text(query, max_results=num_results)
+        results: List[Dict[str, str]] = []
+        for item in raw or []:
+            url = item.get("href", item.get("url", ""))
+            title = item.get("title", "")
+            snippet = item.get("body", item.get("snippet", ""))
+            snippet, _ok = _trust_scan(snippet, url)
+            if not _ok:
+                logger.warning(f"[WebBrowser] Search snippet from {url} redacted by trust scanner")
+            results.append({"title": title, "url": url, "snippet": snippet})
+
+        if results:
+            logger.debug(f"[WebBrowser] DDGS returned {len(results)} results for: {query[:80]}")
+            return results
+        logger.warning("[WebBrowser] DDGS returned empty results — trying HTML fallback")
+    except ImportError:
+        logger.warning("[WebBrowser] duckduckgo-search not installed — falling back to HTML scrape")
+    except Exception as e:
+        logger.warning(f"[WebBrowser] DDGS failed ({e}) — falling back to HTML scrape")
+
+    # ── Fallback: DuckDuckGo HTML Lite scrape ─────────────────────────────────
+    import requests
+
+    search_url = "https://lite.duckduckgo.com/lite/"
+    _browser_ua = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    )
+    try:
+        resp = requests.post(
+            search_url,
+            data={"q": query},
+            headers={
+                "User-Agent": _browser_ua,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            timeout=REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        html = resp.text
+    except Exception as e:
+        logger.error(f"[WebBrowser] HTML fallback search failed: {e}")
+        return []
+
+    # Two-step parsing so <a> attribute ordering doesn't matter.
+    a_tag_pattern = re.compile(
+        r'<a\b[^>]*\bclass=["\']result-link["\'][^>]*>(.*?)</a>',
+        re.DOTALL | re.IGNORECASE,
+    )
+    snippet_pattern = re.compile(
+        r'<td\b[^>]*\bclass=["\']result-snippet["\'][^>]*>(.*?)</td>',
+        re.DOTALL | re.IGNORECASE,
+    )
+    a_tags = list(a_tag_pattern.finditer(html))
+    snippets = snippet_pattern.findall(html)
+
+    if not a_tags:
+        logger.warning(
+            f"[WebBrowser] No result-link anchors in DDG HTML response "
+            f"(len={len(html)}). Head: {html[:400]}"
+        )
+
+    fallback_results: List[Dict[str, str]] = []
+    for i, a_match in enumerate(a_tags[:num_results]):
+        full_tag = a_match.group(0)
+        title_html = a_match.group(1)
+        href_m = re.search(r'\bhref=["\']([^"\']+)["\']', full_tag, re.IGNORECASE)
+        if not href_m:
+            continue
+        url = href_m.group(1)
+        clean_title = re.sub(r"<[^>]+>", "", title_html).strip()
+        snippet = re.sub(r"<[^>]+>", "", snippets[i]).strip() if i < len(snippets) else ""
         snippet, _ok = _trust_scan(snippet, url)
         if not _ok:
             logger.warning(f"[WebBrowser] Search snippet from {url} redacted by trust scanner")
+        fallback_results.append({"title": clean_title, "url": url, "snippet": snippet})
 
-        results.append({
-            "title": clean_title,
-            "url": url,
-            "snippet": snippet,
-        })
-
-    return results
+    return fallback_results
