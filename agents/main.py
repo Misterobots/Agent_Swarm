@@ -2069,7 +2069,12 @@ async def buddy_get_achievements():
 # Override via env var for alternate paths or cross-repo graphs.
 _GRAPHIFY_GRAPH_DIR = Path(os.environ.get(
     "GRAPHIFY_GRAPH_DIR",
-    Path(__file__).parent.parent / "graphify-out",
+    # In the container: full repo is mounted at /workspace; agents dir at /app/agents.
+    # Walk up from agents → repo root → graphify-out.
+    # /workspace/graphify-out is tried first; fall back to sibling of agents dir.
+    Path("/workspace/graphify-out")
+    if Path("/workspace/graphify-out").exists() or Path("/workspace").exists()
+    else Path(__file__).parent.parent / "graphify-out",
 ))
 
 _GRAPH_NOT_READY_HTML = """<!DOCTYPE html>
