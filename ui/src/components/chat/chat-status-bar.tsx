@@ -1,15 +1,15 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
+import { ModelSelector } from "./model-selector";
 
 interface ChatStatusBarProps {
-  model: string;
   tokenPct: number;
   isStreaming: boolean;
   latestThought: string | null;
 }
 
-export function ChatStatusBar({ model, tokenPct, isStreaming, latestThought }: ChatStatusBarProps) {
+export function ChatStatusBar({ tokenPct, isStreaming, latestThought }: ChatStatusBarProps) {
   const ctxClass =
     tokenPct >= 95
       ? "text-red-400"
@@ -20,7 +20,7 @@ export function ChatStatusBar({ model, tokenPct, isStreaming, latestThought }: C
   return (
     <div className="hidden md:flex border-t border-[var(--chat-border)] bg-[var(--chat-surface)] px-4 py-1.5 text-[11px] items-center justify-between gap-3">
       <div className="flex items-center gap-3 min-w-0">
-        <StatusField label="Model" value={<span className="font-medium text-[var(--chat-text)] truncate">{model}</span>} />
+        <StatusField label="Model" value={<ModelSelector compact />} />
         <span className="h-3 w-px bg-[var(--chat-border)]" />
         <StatusField
           label="Ctx"

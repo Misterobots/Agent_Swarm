@@ -8,7 +8,6 @@ import { MessageBubble } from "./message-bubble";
 import { ThinkingIndicator } from "./thinking-indicator";
 import { BuddyComment } from "@/components/buddy/buddy-comment";
 import { ChatInput } from "./chat-input";
-import { ModelSelector } from "./model-selector";
 import { InputToolbar } from "./input-toolbar";
 import { SwarmDrawer } from "@/components/swarm/swarm-drawer";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
@@ -275,11 +274,6 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           </div>
         )}
 
-        {/* Model selector — compact */}
-        <div className="flex-shrink-0 hidden md:block">
-          <ModelSelector />
-        </div>
-
         {/* Right: Swarm status + token bar */}
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Swarm Online dot */}
@@ -428,7 +422,6 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         isStreaming={isStreaming}
       />
       <ChatStatusBar
-        model={activeConv?.model || model}
         tokenPct={tokenUsage.pct * 100}
         isStreaming={isStreaming}
         latestThought={latestThought}

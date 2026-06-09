@@ -44,7 +44,7 @@ function groupModels(models: Model[]): ModelGroup[] {
   }));
 }
 
-export function ModelSelector() {
+export function ModelSelector({ compact = false }: { compact?: boolean }) {
   const model    = useSettingsStore((s) => s.model);
   const setModel = useSettingsStore((s) => s.setModel);
   const [allModels, setAllModels] = useState<Model[]>(LOCAL_FALLBACK);
@@ -87,7 +87,11 @@ export function ModelSelector() {
         value={model}
         onChange={(e) => setModel(e.target.value)}
         title={displayLabel}
-        className="appearance-none bg-[var(--chat-panel)] text-[var(--chat-text)] text-[13px] font-medium border border-[var(--chat-border)] rounded-md pl-3 pr-9 py-1.5 hover:border-[color:color-mix(in_srgb,var(--chat-border)_50%,var(--chat-text))] focus:outline-none cursor-pointer max-w-[160px] md:max-w-none transition-colors"
+        className={
+          compact
+            ? "appearance-none bg-transparent text-[var(--chat-text)] text-[11px] font-medium border-0 pl-0 pr-5 py-0 focus:outline-none cursor-pointer transition-colors hover:text-[var(--chat-accent)]"
+            : "appearance-none bg-[var(--chat-panel)] text-[var(--chat-text)] text-[13px] font-medium border border-[var(--chat-border)] rounded-md pl-3 pr-9 py-1.5 hover:border-[color:color-mix(in_srgb,var(--chat-border)_50%,var(--chat-text))] focus:outline-none cursor-pointer max-w-[160px] md:max-w-none transition-colors"
+        }
       >
         {groups.map(({ owner, groupLabel, models }) =>
           useOptGroups ? (
