@@ -258,8 +258,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           </div>
         </div>
 
-        {/* Active project context pill */}
-        {currentProjectId && (
+        {/* Active project context pill — hidden in dev workspace (ProjectSwitcher in toolbar is canonical there) */}
+        {currentProjectId && !showDevContext && (
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border border-[var(--chat-border)] bg-[var(--chat-panel)] text-[var(--chat-muted)] flex-shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--chat-accent)] flex-shrink-0" />
             <span className="truncate max-w-[120px]">

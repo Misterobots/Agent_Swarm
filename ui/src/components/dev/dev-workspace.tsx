@@ -24,7 +24,7 @@ import "./notes-panel"; // register Notes panel (side-effect)
 // ---------------------------------------------------------------------------
 registerPanel({
   id: "editor",
-  title: "Code Editor",
+  title: "Editor",
   position: "right",
   toolbarOrder: 10,
   className: "w-[50%]",
@@ -171,7 +171,7 @@ function ViewModeToggle({
         active={viewMode === "code"}
         onClick={() => onChange("code")}
         icon={<Code2 size={13} />}
-        label="Code"
+        label="Chat"
       />
       <SegmentButton
         active={viewMode === "preview"}
