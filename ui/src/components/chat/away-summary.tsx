@@ -69,7 +69,7 @@ export function AwaySummaryBanner({
   if (errorCount > 0) parts.push(`${errorCount} error${errorCount > 1 ? "s" : ""}`);
 
   return (
-    <div className="mx-auto max-w-3xl mt-3 px-4 away-banner-enter">
+    <div className="mx-auto max-w-5xl mt-3 px-4 away-banner-enter">
       <div className="flex items-center gap-3 rounded-md border border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))] bg-[color:color-mix(in_srgb,var(--chat-accent)_8%,transparent)] px-3 py-2">
         <Eye size={14} className="text-[var(--chat-accent)] flex-shrink-0" />
         <div className="flex-1 min-w-0">

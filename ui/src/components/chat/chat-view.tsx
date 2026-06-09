@@ -312,7 +312,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
       {/* Messages */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         {tokenUsage.pct >= 0.95 && (
-          <div className="mx-auto max-w-3xl mt-3 px-3 md:px-4">
+          <div className="mx-auto max-w-5xl mt-3 px-3 md:px-4">
             <div className="rounded-md border border-[color:color-mix(in_srgb,var(--chat-accent-2)_50%,var(--chat-border))] bg-[color:color-mix(in_srgb,var(--chat-accent-2)_10%,transparent)] px-3 py-2 text-xs text-[var(--chat-text)]">
               Context is near capacity. Compact now to preserve response quality.
             </div>
@@ -328,7 +328,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
             }}
           />
         ) : (
-          <div className="max-w-3xl mx-auto px-3 md:px-0">
+          <div className="max-w-5xl mx-auto px-3 md:px-0">
             {messages.map((msg, idx) => {
               // Don't render an empty assistant placeholder while ThinkingIndicator is visible —
               // it would show a lone blinking cursor on its own row.

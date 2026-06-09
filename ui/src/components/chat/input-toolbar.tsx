@@ -70,7 +70,7 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
   ];
 
   return (
-    <div className="flex flex-col gap-1 max-w-3xl mx-auto w-full">
+    <div className="flex flex-col gap-1 max-w-5xl mx-auto w-full">
       {/* Attachment chips */}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-4 pt-2">
