@@ -151,13 +151,18 @@ interface AgentTraceCardProps {
   transparency?: "off" | "status" | "full";
 }
 
+const VISIBLE_LIMIT = 5;
+
 export function AgentTraceCard({ events, isStreaming, transparency = "status" }: AgentTraceCardProps) {
-  const [open, setOpen] = useState(transparency === "full");
+  const [open, setOpen] = useState(true);
+  const [showAll, setShowAll] = useState(false);
 
   if (transparency === "off" || events.length === 0) return null;
 
   const agents = uniqueAgents(events);
   const agentSummary = agents.length <= 3 ? agents.join(", ") : `${agents.slice(0, 2).join(", ")} +${agents.length - 2}`;
+  const visibleEvents = showAll || events.length <= VISIBLE_LIMIT ? events : events.slice(-VISIBLE_LIMIT);
+  const hasMore = !showAll && events.length > VISIBLE_LIMIT;
 
   return (
     <div className="mt-3 rounded-lg border border-[var(--chat-border)] overflow-hidden text-[12px]">
@@ -197,7 +202,16 @@ export function AgentTraceCard({ events, isStreaming, transparency = "status" }:
       {/* Trace rows */}
       {open && (
         <div className="px-3 py-2 bg-[var(--chat-soft)] border-t border-[var(--chat-border)] space-y-0 max-h-[420px] overflow-y-auto">
-          {events.map((event, idx) => (
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="w-full text-center py-1 text-[10px] text-[var(--chat-muted)] hover:text-[var(--chat-accent)] transition-colors border-b border-[var(--chat-border)] mb-1"
+            >
+              ↑ Show all {events.length} events
+            </button>
+          )}
+          {visibleEvents.map((event, idx) => (
             <TraceRow key={`${event.timestamp}-${idx}`} event={event} />
           ))}
           {isStreaming && (
@@ -205,6 +219,15 @@ export function AgentTraceCard({ events, isStreaming, transparency = "status" }:
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--chat-accent)] animate-pulse" />
               streaming…
             </div>
+          )}
+          {showAll && events.length > VISIBLE_LIMIT && (
+            <button
+              type="button"
+              onClick={() => setShowAll(false)}
+              className="w-full text-center py-1 text-[10px] text-[var(--chat-muted)] hover:text-[var(--chat-accent)] transition-colors border-t border-[var(--chat-border)] mt-1"
+            >
+              ↓ Show fewer
+            </button>
           )}
         </div>
       )}

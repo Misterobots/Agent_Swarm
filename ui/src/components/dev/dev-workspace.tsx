@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevPanelStore } from "@/lib/stores/dev-panel-store";
+import { useChatStore } from "@/lib/stores/chat-store";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { registerPanel, getRegisteredPanels, type PanelRegistration } from "./dev-panels-registry";
@@ -53,6 +54,19 @@ export function DevWorkspace() {
     setShowEditorPanel,
     setShowTerminalPanel,
   } = useDevPanelStore();
+
+  // Count unique file paths changed in the active conversation
+  const sessionFileChangeCount = useChatStore((s) => {
+    const conv = s.conversations.find((c) => c.id === s.activeConversationId);
+    if (!conv) return 0;
+    const paths = new Set<string>();
+    for (const msg of conv.messages) {
+      for (const fc of msg.fileChanges ?? []) {
+        paths.add(fc.path);
+      }
+    }
+    return paths.size;
+  });
 
   if (isMobile) {
     return <MobileDevView />;
@@ -104,6 +118,7 @@ export function DevWorkspace() {
               }
               icon={panel.icon}
               label={panel.title}
+              badge={panel.id === "editor" && sessionFileChangeCount > 0 ? sessionFileChangeCount : undefined}
             />
           ))}
         </div>
@@ -219,19 +234,21 @@ function ToolbarButton({
   title,
   icon,
   label,
+  badge,
 }: {
   onClick: () => void;
   active?: boolean;
   title: string;
   icon: ReactNode;
   label: string;
+  badge?: number;
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium rounded-md transition-colors border",
+        "relative inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium rounded-md transition-colors border",
         active
           ? "bg-[var(--chat-accent-soft)] text-[var(--chat-accent-strong)] border-[color:color-mix(in_srgb,var(--chat-accent)_40%,var(--chat-border))]"
           : "bg-[var(--chat-panel)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] border-[var(--chat-border)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_50%,var(--chat-text))]"
@@ -239,6 +256,11 @@ function ToolbarButton({
     >
       <span className={active ? "text-[var(--chat-accent)]" : ""}>{icon}</span>
       {label}
+      {badge !== undefined && (
+        <span className="ml-0.5 inline-flex items-center justify-center min-w-[16px] h-4 rounded-full bg-[var(--chat-accent)] text-[var(--chat-bg)] text-[9px] font-bold px-1 leading-none">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </button>
   );
 }

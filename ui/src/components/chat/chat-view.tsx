@@ -238,8 +238,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
     <>
     <div className="chat-shell flex h-full overflow-hidden" data-route="chat">
       <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
-      {/* Header */}
-      <div
+      {/* Header — hidden in dev workspace (DevWorkspace toolbar is canonical there) */}
+      {!showDevContext && <div
         className="relative flex items-center gap-3 bg-[var(--chat-surface)] px-3 md:px-5 py-2.5 min-w-0"
         style={{ paddingLeft: "calc(var(--sidebar-rail-pad, 0px) + 0.75rem)" }}
       >
@@ -301,7 +301,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           </button>
         </div>
         <div className="absolute bottom-0 left-0 right-0 divider" />
-      </div>
+      </div>}
 
       {/* Messages */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">

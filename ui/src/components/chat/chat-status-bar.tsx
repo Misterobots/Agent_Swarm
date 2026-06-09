@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { ModelSelector } from "./model-selector";
 
@@ -39,8 +40,17 @@ export function ChatStatusBar({ tokenPct, isStreaming, latestThought }: ChatStat
           <span className="text-[var(--chat-muted)]">{isStreaming ? "Working" : "Swarm Online"}</span>
         </div>
       </div>
-      <div className="truncate max-w-[55%] text-right text-[var(--chat-subtle)] italic">
-        {isStreaming ? latestThought || "" : ""}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="truncate max-w-[45%] text-right text-[var(--chat-subtle)] italic">
+          {isStreaming ? latestThought || "" : ""}
+        </div>
+        <Link
+          href="/mission-control"
+          className="flex-shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-subtle)] hover:text-[var(--chat-accent)] transition-colors"
+          title="Mission Control"
+        >
+          Mission Control
+        </Link>
       </div>
     </div>
   );
