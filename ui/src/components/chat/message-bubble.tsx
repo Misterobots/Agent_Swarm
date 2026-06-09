@@ -514,6 +514,34 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
             onSend={onSelectFollowup}
           />
         )}
+        {/* Fallback: brief finished but buttons weren't parsed — give manual escape hatch */}
+        {!isUser && !isStreaming && isLatest &&
+         (!message.workflowNextSteps || message.workflowNextSteps.length === 0) &&
+         message.content?.includes("Design Mode Prompt") &&
+         message.content?.includes("Swarm Mode") &&
+         onSelectFollowup && (
+          <div
+            className="mt-2 px-3 py-2 rounded-md text-[11px] flex flex-wrap items-center gap-x-2 gap-y-1"
+            style={{ background: "var(--chat-surface)", border: "1px solid var(--chat-border)", color: "var(--chat-muted)" }}
+          >
+            <span>Continue manually:</span>
+            <button
+              className="underline hover:opacity-80 transition-opacity"
+              style={{ color: "var(--chat-accent-strong)" }}
+              onClick={() => onSelectFollowup("/design")}
+            >
+              /design
+            </button>
+            <span>or</span>
+            <button
+              className="underline hover:opacity-80 transition-opacity"
+              style={{ color: "var(--chat-accent-strong)" }}
+              onClick={() => onSelectFollowup("/swarm")}
+            >
+              /swarm
+            </button>
+          </div>
+        )}
         {/* End-of-response follow-up chips — only on the latest assistant message, after streaming */}
         {!isUser
           && !isStreaming

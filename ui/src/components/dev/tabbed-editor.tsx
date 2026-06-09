@@ -4,6 +4,7 @@ import { useRef, useCallback, useState, useEffect } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { FileCode2, Copy, Download, X, Plus, Save } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { useDevEditorStore } from "@/lib/stores/dev-editor-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { getMonacoThemeName, registerMonacoThemes } from "./dev-theme-map";
 
@@ -30,6 +31,7 @@ export function TabbedEditor() {
   const [activeTabId, setActiveTabId] = useState(DEFAULT_TAB.id);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const { setSelectedText } = useDevStore();
+  const { setHasUnsavedChanges } = useDevEditorStore();
   const { theme: themeId, themeMode } = useSettingsStore();
   const isLight = themeMode === "light";
   const monacoTheme = getMonacoThemeName(themeId, isLight);
@@ -47,6 +49,11 @@ export function TabbedEditor() {
       });
     });
   }, [monacoTheme]);
+
+  // Keep the shared store in sync so ProjectSwitcher can warn before discarding changes
+  useEffect(() => {
+    setHasUnsavedChanges(tabs.some((t) => t.modified));
+  }, [tabs, setHasUnsavedChanges]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 

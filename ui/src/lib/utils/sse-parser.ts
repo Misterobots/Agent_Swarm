@@ -378,6 +378,12 @@ export async function* streamSSE(
               content: "",
               workshopQuestions: ((delta as any).content?.questions ?? []),
             };
+          } else if (delta.type === "workflow_next_steps") {
+            yield {
+              type: "workflow_next_steps",
+              content: "",
+              workflowNextSteps: ((delta as any).content?.steps ?? []),
+            };
           } else if (delta.type === "suggested_followups") {
             yield {
               type: "suggested_followups",

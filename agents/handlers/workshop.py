@@ -237,28 +237,48 @@ def handle_workshop(user_input: str, ctx: dict):
     if _in_answer_phase:
         _steps = []
 
-        _design_m = _re.search(
-            r'Design Mode Prompt[^\n]*\n+```[^\n]*\n(.*?)```',
-            full_content, _re.DOTALL | _re.IGNORECASE,
+        def _extract_prompt(heading_pat: str, stop_pat: str) -> str | None:
+            """Extract a prompt block from the brief, with and without code fences."""
+            # Primary: code-fenced block (as instructed in the system prompt)
+            m = _re.search(
+                heading_pat + r'[^\n]*\n+```[^\n]*\n(.*?)```',
+                full_content, _re.DOTALL | _re.IGNORECASE,
+            )
+            if m:
+                return m.group(1).strip()
+            # Fallback: grab section text until the next heading or document end
+            m = _re.search(
+                heading_pat + r'[^\n]*\n+(.*?)(?=' + stop_pat + r'|\Z)',
+                full_content, _re.DOTALL | _re.IGNORECASE,
+            )
+            if m:
+                # Strip any orphaned backticks left by a partial code fence
+                text = m.group(1).strip().strip('`').strip()
+                return text if text else None
+            return None
+
+        _design_prompt = _extract_prompt(
+            r'Design Mode Prompt',
+            r'\n#{1,4}\s|\n\*\*(?:Swarm|Build|⚙)',
         )
-        if _design_m:
+        if _design_prompt:
             _steps.append({
                 "label": "Generate Mockup",
                 "mode":  "design",
                 "icon":  "palette",
-                "prompt": _design_m.group(1).strip(),
+                "prompt": _design_prompt,
             })
 
-        _swarm_m = _re.search(
-            r'(?:Swarm|Build|Coordinator)[^\n]*Prompt[^\n]*\n+```[^\n]*\n(.*?)```',
-            full_content, _re.DOTALL | _re.IGNORECASE,
+        _swarm_prompt = _extract_prompt(
+            r'(?:Swarm|Build|Coordinator)[^\n]*Prompt',
+            r'\n#{1,4}\s',
         )
-        if _swarm_m:
+        if _swarm_prompt:
             _steps.append({
                 "label": "Start Build",
                 "mode":  "swarm",
                 "icon":  "code",
-                "prompt": _swarm_m.group(1).strip(),
+                "prompt": _swarm_prompt,
             })
 
         if _steps:

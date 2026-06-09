@@ -31,11 +31,17 @@ router = APIRouter(prefix="/v1/dev/files", tags=["dev-files"])
 # ---------------------------------------------------------------------------
 
 def _owner(request: Request) -> str:
-    """Best-effort: pull owner from Authentik forward-auth header."""
+    """Pull owner uid from Authentik forward-auth headers, falling back to 'local'.
+
+    Authentik headers are only present when requests flow through Traefik's
+    forward-auth middleware. Local dev access has no such headers and falls back
+    to the 'local' bucket so projects created via dev_projects (also 'local')
+    remain readable.
+    """
     return (
         request.headers.get("x-authentik-username")
         or request.headers.get("x-authentik-uid")
-        or ""
+        or "local"
     )
 
 

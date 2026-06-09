@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Plus, Trash2, MoreHorizontal, GitBranch, FileCode, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useDevProjectStore, type DevProject } from "@/lib/stores/dev-project-store";
+import { useDevEditorStore } from "@/lib/stores/dev-editor-store";
 
 // ---------------------------------------------------------------------------
 // Types matching the backend API response
@@ -258,14 +259,18 @@ interface DeleteConfirmProps {
   onConfirm: () => void;
   onCancel: () => void;
   deleting: boolean;
+  error?: string | null;
 }
 
-function DeleteConfirm({ project, onConfirm, onCancel, deleting }: DeleteConfirmProps) {
+function DeleteConfirm({ project, onConfirm, onCancel, deleting, error }: DeleteConfirmProps) {
   return (
     <div className="p-3 flex flex-col gap-2.5">
       <p className="text-[12px] text-[var(--chat-text)]">
         Delete project <strong>{project.name}</strong>? This will remove all files.
       </p>
+      {error && (
+        <p className="text-[11px] text-red-400">{error}</p>
+      )}
       <div className="flex items-center gap-2">
         <button
           onClick={onConfirm}
@@ -379,6 +384,7 @@ function ProjectRow({ project, isActive, onSelect, onDeleteRequest }: ProjectRow
 export function ProjectSwitcher() {
   const { currentProjectId, projects, setCurrentProjectId, setProjects, addProject, removeProject } =
     useDevProjectStore();
+  const { hasUnsavedChanges } = useDevEditorStore();
 
   const [open, setOpen] = useState(false);
   const [apiProjects, setApiProjects] = useState<ApiProject[]>([]);
@@ -386,6 +392,7 @@ export function ProjectSwitcher() {
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ApiProject | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const currentProject = apiProjects.find((p) => p.id === currentProjectId);
@@ -440,6 +447,13 @@ export function ProjectSwitcher() {
   }
 
   function handleSelect(project: ApiProject) {
+    if (
+      project.id !== currentProjectId &&
+      hasUnsavedChanges &&
+      !window.confirm("You have unsaved changes in the editor. Switch project and discard them?")
+    ) {
+      return;
+    }
     setCurrentProjectId(project.id);
     setOpen(false);
     setShowCreate(false);
@@ -449,6 +463,7 @@ export function ProjectSwitcher() {
   async function handleDeleteConfirm() {
     if (!deleteTarget) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
       const res = await fetch(`/api/backend/v1/dev/projects/${deleteTarget.id}`, {
         method: "DELETE",
@@ -456,12 +471,15 @@ export function ProjectSwitcher() {
       if (res.ok || res.status === 204) {
         removeProject(deleteTarget.id);
         setApiProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+        setDeleteTarget(null);
+      } else {
+        const text = await res.text().catch(() => "");
+        setDeleteError(`Delete failed (${res.status})${text ? `: ${text}` : ""}`);
       }
-    } catch {
-      // silently ignore
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Network error");
     } finally {
       setDeleting(false);
-      setDeleteTarget(null);
     }
   }
 
@@ -518,8 +536,9 @@ export function ProjectSwitcher() {
             <DeleteConfirm
               project={deleteTarget}
               onConfirm={handleDeleteConfirm}
-              onCancel={() => setDeleteTarget(null)}
+              onCancel={() => { setDeleteTarget(null); setDeleteError(null); }}
               deleting={deleting}
+              error={deleteError}
             />
           ) : showCreate ? (
             <CreateForm
