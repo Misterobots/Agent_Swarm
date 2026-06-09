@@ -402,7 +402,9 @@ services:
     volumes:
       - ../agents:/app/agents
       - ../:/workspace
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock  # rw required; docker SDK needs write access
+    group_add:
+      - "988"  # docker GID on Turing — lets non-root 'app' user connect to the socket
     command: ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
     ports:
       - "8008:8000"
