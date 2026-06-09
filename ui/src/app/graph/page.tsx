@@ -43,8 +43,9 @@ export default function GraphPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { uid, username } = useAccess();
 
-  // Use uid if available, fall back to username
-  const ownerId = uid || username;
+  // Use username (matches how backend stores entities via X-authentik-username),
+  // fall back to uid hash only if username is absent.
+  const ownerId = username || uid;
 
   const activeTabDef = TABS.find((t) => t.id === activeTab)!;
   const iframeUrl = activeTabDef.getUrl(ownerId);
