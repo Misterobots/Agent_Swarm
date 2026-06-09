@@ -21,6 +21,40 @@ import { AgentTraceCard } from "./agent-trace-card";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // ---------------------------------------------------------------------------
+// Agent status whisper — maps stream-mode machine labels to human-readable text
+// ---------------------------------------------------------------------------
+
+const STREAM_MODE_LABELS: Record<string, string> = {
+  thinking:   "Thinking...",
+  responding: "Composing response...",
+  "tool-use": "Using tools...",
+  requesting: "Fetching information...",
+  compacting: "Compressing context...",
+};
+
+const AGENT_NAME_LABELS: Record<string, string> = {
+  coordinator: "Planning your implementation",
+  architect:   "Designing the solution",
+  researcher:  "Researching",
+  implementer: "Writing code",
+  verifier:    "Verifying results",
+  synthesizer: "Synthesizing findings",
+};
+
+/** Returns a single human-readable phrase for a turn's last stream mode. */
+function turnStatusWhisper(agentName: string | undefined, streamModes: string[]): string {
+  const lastMode = streamModes[streamModes.length - 1];
+  if (lastMode && STREAM_MODE_LABELS[lastMode]) {
+    return STREAM_MODE_LABELS[lastMode];
+  }
+  if (agentName) {
+    const key = agentName.toLowerCase();
+    if (AGENT_NAME_LABELS[key]) return AGENT_NAME_LABELS[key] + "...";
+  }
+  return "Working...";
+}
+
+// ---------------------------------------------------------------------------
 // Swarm response parser — splits coordinator output into collapsible phases
 // ---------------------------------------------------------------------------
 
@@ -276,27 +310,57 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
 
   return (
     <>
-    {/* Turn metadata row — visible above AI messages when agent/turn info is available */}
+    {/* Agent status whisper — human-readable status above AI messages; raw debug data hidden in <details> */}
     {!isUser && message.turnMetadata && (message.turnMetadata.agentName || message.turnMetadata.streamModes?.length > 0) && (
-      <div className="turn-meta-row flex items-center gap-1.5 px-4 md:px-6 pt-3 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--chat-accent)] opacity-70 select-none">
-        <span className="text-[var(--chat-subtle)]">Turn</span>
-        <span>{message.turnMetadata.turnId.slice(0, 8).toUpperCase()}</span>
-        {message.turnMetadata.agentName && (
-          <>
-            <span className="text-[var(--chat-border)]">|</span>
-            <span>{message.turnMetadata.agentName.toUpperCase()}</span>
-          </>
-        )}
-        {message.turnMetadata.streamModes?.length > 0 && (
-          <>
-            <span className="text-[var(--chat-border)]">|</span>
-            <span className="text-[var(--chat-muted)]">
-              {message.turnMetadata.streamModes
-                .map((m) => m.replace(/-/g, " ").toUpperCase())
-                .join(" → ")}
+      <div className="turn-meta-row px-4 md:px-6 pt-3 pb-0.5 select-none">
+        <details className="group/turndbg">
+          <summary className="list-none cursor-default">
+            <span
+              className="text-[11px] italic"
+              style={{ color: "var(--chat-subtle)", opacity: 0.7 }}
+            >
+              {"→ "}
+              {turnStatusWhisper(
+                message.turnMetadata.agentName,
+                message.turnMetadata.streamModes ?? []
+              )}
             </span>
-          </>
-        )}
+            {/* Tiny "trace" toggle — only visible on hover */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                const det = e.currentTarget.closest("details");
+                if (det) det.open = !det.open;
+              }}
+              className="ml-2 text-[9px] opacity-0 group-hover/turndbg:opacity-40 hover:!opacity-70 transition-opacity"
+              style={{ color: "var(--chat-muted)" }}
+              title="Toggle raw agent trace"
+            >
+              trace
+            </button>
+          </summary>
+          {/* Raw syslog data — visible only when expanded */}
+          <div className="mt-0.5 flex items-center flex-wrap gap-1 text-[9px] font-mono" style={{ color: "var(--chat-muted)", opacity: 0.5 }}>
+            <span>TURN {message.turnMetadata.turnId.slice(0, 8).toUpperCase()}</span>
+            {message.turnMetadata.agentName && (
+              <>
+                <span>|</span>
+                <span>{message.turnMetadata.agentName.toUpperCase()}</span>
+              </>
+            )}
+            {message.turnMetadata.streamModes?.length > 0 && (
+              <>
+                <span>|</span>
+                <span>
+                  {message.turnMetadata.streamModes
+                    .map((m) => m.replace(/-/g, " ").toUpperCase())
+                    .join(" → ")}
+                </span>
+              </>
+            )}
+          </div>
+        </details>
       </div>
     )}
     <div
