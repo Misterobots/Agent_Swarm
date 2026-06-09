@@ -397,6 +397,8 @@ services:
       # generation fails with "checkpoints: none".
       - KLEIN_HOST=${KLEIN_HOST:-http://${LOVELACE_IP:-192.168.2.101}:8290}
       - COMFYUI_HOST=${COMFYUI_HOST:-http://${LOVELACE_IP:-192.168.2.101}:8188}
+      # Graphify codebase knowledge graph — repo is mounted at /workspace, agents subdir has the graph
+      - GRAPHIFY_GRAPH_DIR=/workspace/agents/graphify-out
     volumes:
       - ../agents:/app/agents
       - ../:/workspace

@@ -43,7 +43,8 @@ RUN pip install --no-cache-dir \
     opencv-python-headless \
     streamlit-monaco \
     redis \
-    mempalace
+    mempalace \
+    graphifyy
 
 # Install SPIFFE SDK, Langfuse, and JWT-ACE dependencies
 RUN pip install --no-cache-dir \
@@ -97,6 +98,10 @@ RUN useradd -m -u 1000 app
 # Copy the agent code
 COPY agents /app/agents
 
+# Startup entrypoint — runs graphify update before uvicorn
+COPY execution_plane/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Patch phidata bug: KeyError 'type' when Ollama returns a list for the type field
 # See: phi/model/ollama/chat.py line ~140
 RUN sed -i 's/if isinstance(obj\["type"\], list):/if "type" in obj and isinstance(obj["type"], list):/' \
@@ -111,5 +116,6 @@ USER app
 # Fix Git "dubious ownership" for mounted volumes
 RUN git config --global --add safe.directory /workspace
 
-# Default command matches docker-compose
-CMD ["python", "agents/main.py"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+# Default command — overridden by docker-compose; passed as args to entrypoint.sh
+CMD ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
