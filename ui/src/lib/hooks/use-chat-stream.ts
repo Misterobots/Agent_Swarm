@@ -96,6 +96,7 @@ export function useChatStream(options?: {
     setMessageQueueStatus,
     setMessageSuggestedFollowups,
     setMessageWorkshopQuestions,
+    setWorkshopQuestionsLoading,
     setMessageWorkflowNextSteps,
     setMessageAgentTrace,
   } = useChatStore();
@@ -372,8 +373,12 @@ export function useChatStream(options?: {
             }
           } else if (event.type === "workshop_questions") {
             // Workshop Phase-1 discovery question chips
-            if ((event as any).workshopQuestions?.length > 0) {
-              setMessageWorkshopQuestions(convId!, assistantId, (event as any).workshopQuestions);
+            const qs = (event as any).workshopQuestions ?? [];
+            const loading = (event as any).workshopQuestionsLoading ?? false;
+            if (loading) {
+              setWorkshopQuestionsLoading(convId!, assistantId, true);
+            } else if (qs.length > 0) {
+              setMessageWorkshopQuestions(convId!, assistantId, qs);
             }
           } else if (event.type === "workflow_next_steps") {
             // Workshop Phase-2 pipeline continuation buttons

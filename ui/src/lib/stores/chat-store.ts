@@ -48,6 +48,7 @@ interface ChatState {
   setMessageSuggestedFollowups: (conversationId: string, messageId: string, followups: import("@/types/chat").SuggestedFollowup[]) => void;
   setMessageFlaggedFollowup: (conversationId: string, messageId: string, followup: import("@/types/chat").FlaggedFollowup) => void;
   setMessageWorkshopQuestions: (conversationId: string, messageId: string, questions: import("@/types/chat").WorkshopQuestion[]) => void;
+  setWorkshopQuestionsLoading: (conversationId: string, messageId: string, loading: boolean) => void;
   setMessageWorkflowNextSteps: (conversationId: string, messageId: string, steps: import("@/types/chat").WorkflowNextStep[]) => void;
   setMessageAgentTrace: (conversationId: string, messageId: string, events: AgentTraceEvent[]) => void;
 }
@@ -332,7 +333,23 @@ export const useChatStore = create<ChatState>()(
             return {
               ...c,
               messages: c.messages.map((m) =>
-                m.id === messageId ? { ...m, workshopQuestions: questions } : m
+                m.id === messageId
+                  ? { ...m, workshopQuestions: questions, workshopQuestionsLoading: false }
+                  : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setWorkshopQuestionsLoading: (conversationId, messageId, loading) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, workshopQuestionsLoading: loading } : m
               ),
               updatedAt: Date.now(),
             };

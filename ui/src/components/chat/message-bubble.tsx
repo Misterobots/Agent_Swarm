@@ -500,6 +500,23 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
             onSend={onSelectFollowup}
           />
         )}
+        {/* Workshop Phase-1 loading skeleton — shown while questions generate */}
+        {message.workshopQuestionsLoading && !message.workshopQuestions?.length && (
+          <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-950/10 overflow-hidden animate-pulse">
+            <div className="px-3 py-2 border-b border-amber-500/20 flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-amber-500/30" />
+              <div className="h-3 w-36 rounded bg-amber-500/20" />
+            </div>
+            <div className="p-3 space-y-2">
+              {[62, 48, 70, 54, 66, 44, 58].map((w, i) => (
+                <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-amber-500/10">
+                  <div className="h-2.5 w-3 rounded bg-amber-500/15 shrink-0" />
+                  <div className={`h-2.5 rounded bg-amber-500/15`} style={{ width: `${w}%` }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Workshop Phase-1 question accordion — inline answer inputs */}
         {message.workshopQuestions && message.workshopQuestions.length > 0 && (
           <WorkshopQuestionsCard

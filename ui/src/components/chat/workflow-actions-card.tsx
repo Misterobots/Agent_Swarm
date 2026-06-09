@@ -1,6 +1,7 @@
 "use client";
 
-import { Palette, Code2, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { Palette, Code2, ArrowRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import type { WorkflowNextStep } from "@/types/chat";
@@ -26,12 +27,14 @@ const STEP_CONFIG: Record<string, { icon: React.ReactNode; accent: string; bg: s
 };
 
 export function WorkflowActionsCard({ steps, onSend }: WorkflowActionsCardProps) {
+  const [pendingMode, setPendingMode] = useState<string | null>(null);
   const setDesignMode  = useSettingsStore((s) => s.setDesignMode);
   const setSwarmMode   = useSettingsStore((s) => s.setSwarmMode);
   const setWorkshopMode = useSettingsStore((s) => s.setWorkshopMode);
 
   const handleStep = (step: WorkflowNextStep) => {
-    if (!onSend) return;
+    if (!onSend || pendingMode) return;
+    setPendingMode(step.mode);
     // Switch to the right mode and clear workshop mode
     setWorkshopMode(false);
     if (step.mode === "design") {
@@ -65,22 +68,26 @@ export function WorkflowActionsCard({ steps, onSend }: WorkflowActionsCardProps)
               key={step.mode}
               type="button"
               onClick={() => handleStep(step)}
-              disabled={!onSend}
+              disabled={!onSend || pendingMode !== null}
               className={cn(
-                "group flex items-center gap-3 w-full rounded-md border px-4 py-3 transition-all text-left",
+                "group flex items-center gap-3 w-full rounded-md border px-4 py-3 transition-all text-left disabled:opacity-60 disabled:cursor-not-allowed",
                 cfg.bg, cfg.border,
               )}
             >
-              <span className={cn("shrink-0", cfg.accent)}>{cfg.icon}</span>
+              <span className={cn("shrink-0", cfg.accent)}>
+                {pendingMode === step.mode ? <Loader2 size={16} className="animate-spin" /> : cfg.icon}
+              </span>
               <span className="flex-1 min-w-0">
                 <span className={cn("block text-sm font-semibold", cfg.accent)}>
-                  {step.label}
+                  {pendingMode === step.mode ? "Sending…" : step.label}
                 </span>
                 <span className="block text-[11px] text-[var(--chat-muted)] truncate mt-0.5">
                   {step.mode === "design" ? "Generate a visual mockup" : "Multi-agent implementation"}
                 </span>
               </span>
-              <ArrowRight size={14} className={cn("shrink-0 opacity-40 group-hover:opacity-100 transition-opacity", cfg.accent)} />
+              {pendingMode !== step.mode && (
+                <ArrowRight size={14} className={cn("shrink-0 opacity-40 group-hover:opacity-100 transition-opacity", cfg.accent)} />
+              )}
             </button>
           );
         })}

@@ -185,6 +185,7 @@ export async function* streamSSE(
               type: "workshop_questions",
               content: "",
               workshopQuestions: ((delta as any).content?.questions ?? []),
+              workshopQuestionsLoading: (delta as any).content?.loading ?? false,
             };
           }
           // Workshop Phase-2 pipeline continuation buttons
@@ -377,6 +378,7 @@ export async function* streamSSE(
               type: "workshop_questions",
               content: "",
               workshopQuestions: ((delta as any).content?.questions ?? []),
+              workshopQuestionsLoading: (delta as any).content?.loading ?? false,
             };
           } else if (delta.type === "workflow_next_steps") {
             yield {

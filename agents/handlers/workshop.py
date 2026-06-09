@@ -170,6 +170,14 @@ def handle_workshop(user_input: str, ctx: dict):
         show_tool_calls=False,
     )
 
+    # Phase 1: emit loading skeleton immediately so the UI shows a placeholder
+    # while the model is warming up and generating questions.
+    if not _in_answer_phase:
+        yield {
+            "type": "workshop_questions",
+            "content": {"questions": [], "loading": True},
+        }
+
     full_content = ""
     try:
         yield from pre_lock_status_events("text", resolved_model)

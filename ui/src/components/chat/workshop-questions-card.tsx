@@ -55,7 +55,7 @@ export function WorkshopQuestionsCard({ questions, onSend }: WorkshopQuestionsCa
         <span className="text-xs font-medium text-amber-300">
           {questions.length} Discovery Questions
         </span>
-        <span className="text-xs text-amber-500/60 ml-1">— click any to answer</span>
+        <span className="text-xs text-amber-500/60 ml-1">— all optional, click to answer</span>
         {answeredCount > 0 && (
           <button
             type="button"

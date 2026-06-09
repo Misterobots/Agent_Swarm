@@ -228,6 +228,7 @@ export interface StreamEvent {
 
   // Workshop questions / workflow steps (direct fields on StreamEvent, not nested)
   workshopQuestions?: WorkshopQuestion[];
+  workshopQuestionsLoading?: boolean;
   workflowNextSteps?: WorkflowNextStep[];
 
   // Preview URL pushed by agent into the dev workspace pane
@@ -283,6 +284,8 @@ export interface ChatMessage {
   pendingQueueStatus?: QueueStatus;
   /** Workshop Phase-1 discovery questions rendered as interactive chips */
   workshopQuestions?: WorkshopQuestion[];
+  /** True while Phase-1 questions are generating — shows skeleton in UI */
+  workshopQuestionsLoading?: boolean;
   /** Workshop Phase-2 pipeline continuation buttons (Generate Mockup / Start Build) */
   workflowNextSteps?: WorkflowNextStep[];
   /** LLM-generated contextual follow-up chips shown at end of response */
