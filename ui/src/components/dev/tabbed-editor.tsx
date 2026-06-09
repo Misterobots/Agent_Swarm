@@ -2,9 +2,10 @@
 
 import { useRef, useCallback, useState, useEffect } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { FileCode2, Copy, Download, X, Plus, Save } from "lucide-react";
+import { FileCode2, Copy, Download, X, Plus, Save, Loader2 } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevEditorStore } from "@/lib/stores/dev-editor-store";
+import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { getMonacoThemeName, registerMonacoThemes } from "./dev-theme-map";
 
@@ -26,166 +27,244 @@ const DEFAULT_TAB: EditorTab = {
   modified: false,
 };
 
+const LANG_MAP: Record<string, string> = {
+  py: "python", ts: "typescript", tsx: "typescript",
+  js: "javascript", jsx: "javascript", json: "json",
+  md: "markdown", yaml: "yaml", yml: "yaml",
+  sh: "shell", css: "css", html: "html", sql: "sql",
+  dockerfile: "dockerfile",
+};
+
+function detectLanguage(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return LANG_MAP[ext] || "plaintext";
+}
+
 export function TabbedEditor() {
   const [tabs, setTabs] = useState<EditorTab[]>([DEFAULT_TAB]);
   const [activeTabId, setActiveTabId] = useState(DEFAULT_TAB.id);
+  const [saving, setSaving] = useState(false);
+
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  // Always-current ref to saveFile so the Monaco Ctrl+S command never closes over a stale version
+  const saveFileRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  // Mirror of tabs for use inside effects without adding to dependency arrays
+  const tabsRef = useRef(tabs);
+  useEffect(() => { tabsRef.current = tabs; });
+
+  const didRestoreRef = useRef(false);
+  const prevActiveFileRef = useRef("");
+
   const { setSelectedText } = useDevStore();
-  const { setHasUnsavedChanges } = useDevEditorStore();
+  const {
+    activeFile, editorContent, editorLanguage,
+    setHasUnsavedChanges,
+    openTabMeta, activeTabPath,
+    setOpenTabMeta, setActiveTabPath,
+  } = useDevEditorStore();
+  const { currentProjectId } = useDevProjectStore();
   const { theme: themeId, themeMode } = useSettingsStore();
   const isLight = themeMode === "light";
   const monacoTheme = getMonacoThemeName(themeId, isLight);
 
-  // Register custom Monaco themes once on mount
+  // ── Monaco theme setup ────────────────────────────────────────────────────
+  useEffect(() => { registerMonacoThemes(); }, []);
   useEffect(() => {
-    registerMonacoThemes();
-  }, []);
-
-  // Update Monaco theme when Memex theme changes
-  useEffect(() => {
-    import("@monaco-editor/react").then(({ loader }) => {
-      loader.init().then((monaco) => {
-        monaco.editor.setTheme(monacoTheme);
-      });
-    });
+    import("@monaco-editor/react").then(({ loader }) =>
+      loader.init().then((monaco) => monaco.editor.setTheme(monacoTheme))
+    );
   }, [monacoTheme]);
 
-  // Keep the shared store in sync so ProjectSwitcher can warn before discarding changes
+  // ── Sync unsaved-changes flag to store (for ProjectSwitcher guard) ─────────
   useEffect(() => {
     setHasUnsavedChanges(tabs.some((t) => t.modified));
   }, [tabs, setHasUnsavedChanges]);
 
+  // ── Persist open tab metadata for session restoration ─────────────────────
+  useEffect(() => {
+    const meta = tabs
+      .filter((t) => t.path)
+      .map(({ path, filename, language }) => ({ path, filename, language }));
+    setOpenTabMeta(meta);
+  }, [tabs, setOpenTabMeta]);
+
+  useEffect(() => {
+    const active = tabs.find((t) => t.id === activeTabId);
+    setActiveTabPath(active?.path ?? null);
+  }, [activeTabId, tabs, setActiveTabPath]);
+
+  // ── Session restoration — re-fetch previously open files on mount ──────────
+  useEffect(() => {
+    if (didRestoreRef.current || !currentProjectId || openTabMeta.length === 0) return;
+    didRestoreRef.current = true;
+
+    Promise.all(
+      openTabMeta.map(async (meta) => {
+        try {
+          const res = await fetch(
+            `/api/backend/v1/dev/files/content?project_id=${currentProjectId}&path=${encodeURIComponent(meta.path)}`
+          );
+          if (!res.ok) return null;
+          const { content, encoding } = await res.json();
+          if (encoding === "base64") return null;
+          return { ...meta, content } as EditorTab & { content: string };
+        } catch {
+          return null;
+        }
+      })
+    ).then((results) => {
+      const valid = results.filter(Boolean) as (typeof results[number] & object)[];
+      if (valid.length === 0) return;
+      const restoredTabs: EditorTab[] = (valid as NonNullable<typeof valid[number]>[]).map((m) => ({
+        id: (m as { path: string }).path,
+        path: (m as { path: string }).path,
+        filename: (m as { filename: string }).filename,
+        language: (m as { language: string }).language,
+        content: (m as { content: string }).content,
+        modified: false,
+      }));
+      setTabs(restoredTabs);
+      const targetId = activeTabPath
+        ? (restoredTabs.find((t) => t.path === activeTabPath)?.id ?? restoredTabs[0].id)
+        : restoredTabs[0].id;
+      setActiveTabId(targetId);
+      prevActiveFileRef.current = targetId;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProjectId]);
+
+  // ── React to file-tree clicks: open or switch to the file ─────────────────
+  useEffect(() => {
+    if (!activeFile || activeFile === prevActiveFileRef.current) return;
+    prevActiveFileRef.current = activeFile;
+
+    const existing = tabsRef.current.find((t) => t.path === activeFile);
+    if (existing) {
+      setActiveTabId(existing.id);
+      return;
+    }
+
+    // Get the latest content from the store imperatively (avoids stale closure)
+    const store = useDevEditorStore.getState();
+    const content = store.editorContent ?? "";
+    const lang = store.editorLanguage || detectLanguage(activeFile);
+    const filename = activeFile.split("/").pop() || activeFile;
+
+    const newTab: EditorTab = {
+      id: activeFile,
+      path: activeFile,
+      filename,
+      language: lang,
+      content,
+      modified: false,
+    };
+
+    setTabs((prev) => {
+      // Replace the sole default empty tab if it's unmodified
+      if (prev.length === 1 && !prev[0].path && !prev[0].modified) return [newTab];
+      return [...prev, newTab];
+    });
+    setActiveTabId(activeFile);
+  }, [activeFile]);
+
+  // ── Derived active tab ────────────────────────────────────────────────────
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
-  const handleMount: OnMount = (editor) => {
+  // ── Save to disk ──────────────────────────────────────────────────────────
+  const saveFile = useCallback(async () => {
+    if (!activeTab?.path || !currentProjectId || saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/backend/v1/dev/files/content?project_id=${currentProjectId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: activeTab.path, content: activeTab.content, encoding: "utf8" }),
+        }
+      );
+      if (res.ok || res.status === 204) {
+        setTabs((prev) =>
+          prev.map((tab) => (tab.id === activeTab.id ? { ...tab, modified: false } : tab))
+        );
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+    } finally {
+      setSaving(false);
+    }
+  }, [activeTab, currentProjectId, saving]);
+
+  // Keep the ref always current so the Monaco Ctrl+S command is never stale
+  useEffect(() => { saveFileRef.current = saveFile; });
+
+  // ── Monaco mount ──────────────────────────────────────────────────────────
+  const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     editor.focus();
+
+    // Ctrl+S / Cmd+S → save
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      saveFileRef.current();
+    });
+
     editor.onDidChangeCursorSelection(() => {
       const selection = editor.getSelection();
       if (selection && !selection.isEmpty()) {
-        const text = editor.getModel()?.getValueInRange(selection) ?? "";
-        setSelectedText(text);
+        setSelectedText(editor.getModel()?.getValueInRange(selection) ?? "");
       } else {
         setSelectedText("");
       }
     });
   };
 
+  // ── Tab management ────────────────────────────────────────────────────────
   const handleContentChange = (value: string | undefined) => {
     if (value === undefined) return;
     setTabs((prev) =>
-      prev.map((tab) =>
-        tab.id === activeTabId
-          ? { ...tab, content: value, modified: true }
-          : tab
-      )
+      prev.map((tab) => (tab.id === activeTabId ? { ...tab, content: value, modified: true } : tab))
     );
   };
 
   const createNewTab = () => {
     const newId = `untitled-${Date.now()}`;
-    const newTab: EditorTab = {
-      id: newId,
-      path: "",
-      filename: `Untitled ${tabs.length + 1}`,
-      language: "python",
-      content: "# Start coding here\n",
-      modified: false,
-    };
-    setTabs((prev) => [...prev, newTab]);
+    setTabs((prev) => [
+      ...prev,
+      { id: newId, path: "", filename: `Untitled ${prev.length + 1}`, language: "python", content: "# Start coding here\n", modified: false },
+    ]);
     setActiveTabId(newId);
   };
 
   const closeTab = (tabId: string) => {
     const tab = tabs.find((t) => t.id === tabId);
-    if (tab?.modified) {
-      if (!confirm(`${tab.filename} has unsaved changes. Close anyway?`)) {
-        return;
-      }
-    }
-
+    if (tab?.modified && !confirm(`${tab.filename} has unsaved changes. Close anyway?`)) return;
     setTabs((prev) => {
       const filtered = prev.filter((t) => t.id !== tabId);
-      if (filtered.length === 0) {
-        // Keep at least one tab
-        return [DEFAULT_TAB];
-      }
+      if (filtered.length === 0) return [DEFAULT_TAB];
       if (tabId === activeTabId) {
-        const currentIndex = prev.findIndex((t) => t.id === tabId);
-        const nextTab = filtered[currentIndex] || filtered[currentIndex - 1] || filtered[0];
-        setActiveTabId(nextTab.id);
+        const idx = prev.findIndex((t) => t.id === tabId);
+        const next = filtered[idx] ?? filtered[idx - 1] ?? filtered[0];
+        setActiveTabId(next.id);
       }
       return filtered;
     });
   };
 
-  const saveFile = async () => {
-    if (!activeTab) return;
-    
-    try {
-      const response = await fetch("/api/devops/files/write", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: activeTab.path || `/workspace/${activeTab.filename}`,
-          content: activeTab.content,
-        }),
-      });
-
-      if (response.ok) {
-        setTabs((prev) =>
-          prev.map((tab) =>
-            tab.id === activeTabId ? { ...tab, modified: false } : tab
-          )
-        );
-      }
-    } catch (error) {
-      console.error("Failed to save file:", error);
-    }
-  };
-
+  // ── Toolbar actions ───────────────────────────────────────────────────────
   const handleCopy = useCallback(() => {
-    if (editorRef.current) {
-      const value = editorRef.current.getValue();
-      navigator.clipboard.writeText(value);
-    }
+    if (editorRef.current) navigator.clipboard.writeText(editorRef.current.getValue());
   }, []);
 
   const handleDownload = useCallback(() => {
-    if (editorRef.current && activeTab) {
-      const value = editorRef.current.getValue();
-      const blob = new Blob([value], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = activeTab.filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    if (!editorRef.current || !activeTab) return;
+    const blob = new Blob([editorRef.current.getValue()], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement("a"), { href: url, download: activeTab.filename });
+    a.click();
+    URL.revokeObjectURL(url);
   }, [activeTab]);
 
-  const detectLanguage = (filename: string): string => {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    const langMap: Record<string, string> = {
-      py: "python",
-      js: "javascript",
-      ts: "typescript",
-      tsx: "typescript",
-      jsx: "javascript",
-      json: "json",
-      yaml: "yaml",
-      yml: "yaml",
-      md: "markdown",
-      sh: "shell",
-      bash: "shell",
-      dockerfile: "dockerfile",
-      css: "css",
-      html: "html",
-      sql: "sql",
-    };
-    return langMap[ext || ""] || "plaintext";
-  };
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-[var(--chat-bg)]">
       {/* Tab Bar */}
@@ -204,13 +283,8 @@ export function TabbedEditor() {
               <FileCode2 size={14} />
               <span>{tab.filename}</span>
               {tab.modified && <span className="text-[var(--chat-accent)]">●</span>}
-              
-              {/* Close button */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeTab(tab.id);
-                }}
+                onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
                 className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
               >
                 <X size={14} />
@@ -218,8 +292,6 @@ export function TabbedEditor() {
             </div>
           ))}
         </div>
-
-        {/* Add new tab button */}
         <button
           onClick={createNewTab}
           className="px-3 py-2 text-[var(--chat-muted)] hover:text-[var(--chat-accent)] transition-colors"
@@ -236,51 +308,31 @@ export function TabbedEditor() {
             value={activeTab?.language || "python"}
             onChange={(e) =>
               setTabs((prev) =>
-                prev.map((tab) =>
-                  tab.id === activeTabId
-                    ? { ...tab, language: e.target.value }
-                    : tab
-                )
+                prev.map((tab) => (tab.id === activeTabId ? { ...tab, language: e.target.value } : tab))
               )
             }
             className="bg-[var(--chat-panel)] border border-[var(--chat-border)] rounded px-2 py-0.5 text-xs text-[var(--chat-muted)] focus:outline-none focus:border-[var(--chat-accent)]/40"
           >
-            <option value="python">Python</option>
-            <option value="typescript">TypeScript</option>
-            <option value="javascript">JavaScript</option>
-            <option value="json">JSON</option>
-            <option value="yaml">YAML</option>
-            <option value="markdown">Markdown</option>
-            <option value="shell">Shell</option>
-            <option value="dockerfile">Dockerfile</option>
-            <option value="css">CSS</option>
-            <option value="html">HTML</option>
-            <option value="sql">SQL</option>
+            {["python","typescript","javascript","json","yaml","markdown","shell","dockerfile","css","html","sql"].map((l) => (
+              <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
+            ))}
           </select>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={saveFile}
-            disabled={!activeTab?.modified}
+            disabled={!activeTab?.modified || !activeTab?.path || !currentProjectId || saving}
             className="flex items-center gap-1 px-2 py-1 text-xs rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Save file (Ctrl+S)"
           >
-            <Save size={13} />
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
             Save
           </button>
           <div className="w-px h-4 bg-[var(--chat-border)]" />
-          <button
-            onClick={handleCopy}
-            className="p-1.5 rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)] transition-colors"
-            title="Copy to clipboard"
-          >
+          <button onClick={handleCopy} className="p-1.5 rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)] transition-colors" title="Copy to clipboard">
             <Copy size={13} />
           </button>
-          <button
-            onClick={handleDownload}
-            className="p-1.5 rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)] transition-colors"
-            title="Download file"
-          >
+          <button onClick={handleDownload} className="p-1.5 rounded text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)] transition-colors" title="Download file">
             <Download size={13} />
           </button>
         </div>
@@ -311,10 +363,7 @@ export function TabbedEditor() {
               smoothScrolling: true,
               formatOnPaste: true,
               formatOnType: true,
-              suggest: {
-                showKeywords: true,
-                showSnippets: true,
-              },
+              suggest: { showKeywords: true, showSnippets: true },
             }}
           />
         )}

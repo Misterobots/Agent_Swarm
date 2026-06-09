@@ -420,7 +420,7 @@ export function ProjectSwitcher() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Close on outside click
+  // Close on outside click or Escape key
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent) {
@@ -430,8 +430,19 @@ export function ProjectSwitcher() {
         setDeleteTarget(null);
       }
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setShowCreate(false);
+        setDeleteTarget(null);
+      }
+    }
     document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   function handleOpen() {

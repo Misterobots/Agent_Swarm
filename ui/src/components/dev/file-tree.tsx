@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDevStore } from "@/lib/stores/dev-store";
-import { FileIcon, FolderIcon, GitBranch, ChevronRight, ChevronDown, FolderOpen, Loader2 } from "lucide-react";
+import { FileIcon, FolderIcon, GitBranch, ChevronRight, ChevronDown, FolderOpen, Loader2, Search, X } from "lucide-react";
 
 interface FileNode {
   name: string;
@@ -44,6 +44,7 @@ export function FileTree() {
   const [tree, setTree] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   // Fetch file tree whenever the project changes
   useEffect(() => {
@@ -94,6 +95,25 @@ export function FileTree() {
       setLoadingFile(null);
     }
   };
+
+  // Recursive filter — keeps a node if its name matches OR any descendant matches
+  const filterTree = (nodes: FileNode[], q: string): FileNode[] => {
+    if (!q) return nodes;
+    const lower = q.toLowerCase();
+    return nodes.reduce<FileNode[]>((acc, node) => {
+      if (node.type === "file") {
+        if (node.name.toLowerCase().includes(lower)) acc.push(node);
+      } else {
+        const filteredChildren = filterTree(node.children ?? [], q);
+        if (filteredChildren.length > 0 || node.name.toLowerCase().includes(lower)) {
+          acc.push({ ...node, children: filteredChildren });
+        }
+      }
+      return acc;
+    }, []);
+  };
+
+  const visibleTree = filterTree(tree, search);
 
   const renderNode = (node: FileNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expanded.has(node.path);
@@ -163,6 +183,48 @@ export function FileTree() {
         </div>
       )}
 
+      {/* File search */}
+      {currentProjectId && (
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--chat-border)]">
+          <Search size={12} className="text-[var(--chat-muted)] shrink-0" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Filter files…"
+            className="flex-1 bg-transparent text-xs text-[var(--chat-text)] placeholder:text-[var(--chat-muted)] focus:outline-none"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="text-[var(--chat-muted)] hover:text-[var(--chat-text)]">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Active file breadcrumb */}
+      {activeFile && !search && (
+        <div
+          className="flex items-center px-2 py-1 border-b border-[var(--chat-border)] overflow-x-auto"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {activeFile.replace(/^\//, "").split("/").map((seg, i, arr) => (
+            <span key={i} className="flex items-center shrink-0">
+              {i > 0 && <ChevronRight size={10} className="opacity-30 mx-0.5" />}
+              <span
+                className={`text-[10px] ${
+                  i === arr.length - 1
+                    ? "text-[var(--chat-accent)]"
+                    : "text-[var(--chat-muted)]"
+                }`}
+              >
+                {seg}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* File Tree */}
       <div className="flex-1 overflow-y-auto">
         {!currentProjectId ? (
@@ -181,8 +243,13 @@ export function FileTree() {
             <FolderOpen size={28} className="text-[var(--chat-muted)] opacity-50" />
             <p className="text-xs text-[var(--chat-muted)]">Project is empty</p>
           </div>
+        ) : visibleTree.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full px-4 text-center gap-2">
+            <Search size={24} className="text-[var(--chat-muted)] opacity-40" />
+            <p className="text-xs text-[var(--chat-muted)]">No files match &ldquo;{search}&rdquo;</p>
+          </div>
         ) : (
-          tree.map((node) => renderNode(node))
+          visibleTree.map((node) => renderNode(node))
         )}
       </div>
     </div>
