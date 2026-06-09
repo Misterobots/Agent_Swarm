@@ -30,7 +30,7 @@ const TABS: TabDef[] = [
     label: "Codebase Graph",
     icon: Network,
     description: "Code structure, documentation concepts, and cross-file relationships",
-    getUrl: () => `/api/backend/v1/graph/codebase?format=html`,
+    getUrl: () => `/api/backend/v1/graph/codebase?fmt=html`,
   },
 ];
 
