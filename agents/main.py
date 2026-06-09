@@ -1415,7 +1415,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "media_attachment", "set_preview_url",
                                         "preview_unavailable", "design_artifact",
                                         "suggested_followups", "workshop_questions",
-                                        "workflow_next_steps", "agent_event"):
+                                        "workflow_next_steps", "agent_event",
+                                        "file_change"):
                             rich_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
@@ -1446,7 +1447,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "media_attachment", "set_preview_url",
                                         "preview_unavailable", "design_artifact",
                                         "suggested_followups", "workshop_questions",
-                                        "workflow_next_steps", "agent_event"):
+                                        "workflow_next_steps", "agent_event",
+                                        "file_change"):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
@@ -2101,7 +2103,8 @@ _GRAPH_NOT_READY_HTML = """<!DOCTYPE html>
 
 @app.get("/v1/graph/codebase")
 async def graph_codebase(
-    fmt: str = "json",
+    format: str = "json",   # noqa: A002 — shadows builtin intentionally for URL param
+    fmt: str = "",          # legacy alias kept for backward compatibility
 ):
     """Serve the graphify codebase knowledge graph.
 
@@ -2112,13 +2115,22 @@ async def graph_codebase(
     (default: <repo-root>/graphify-out). Set the GRAPHIFY_GRAPH_DIR env var to
     override, e.g. to point at a global or merged cross-repo graph.
     """
+    # Normalise: accept both ?format= and legacy ?fmt=
+    resolved_fmt = format or fmt or "json"
+
     graph_dir = _GRAPHIFY_GRAPH_DIR
     html_path = graph_dir / "graph.html"
     json_path = graph_dir / "graph.json"
 
-    if fmt == "html":
+    if resolved_fmt == "html":
         if html_path.exists():
-            return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+            # Stream the (large) HTML file rather than reading it all into memory
+            from fastapi.responses import FileResponse
+            return FileResponse(
+                path=str(html_path),
+                media_type="text/html",
+                headers={"Content-Disposition": "inline"},
+            )
         return HTMLResponse(content=_GRAPH_NOT_READY_HTML, status_code=202)
 
     if not json_path.exists():

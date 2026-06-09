@@ -531,6 +531,31 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
             onSend={onSelectFollowup}
           />
         )}
+        {/* File-change activity chips — inline signals from swarm worker file writes */}
+        {!isUser && message.fileChanges && message.fileChanges.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {message.fileChanges.map((fc, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono"
+                style={{
+                  background: "var(--chat-surface)",
+                  border: "1px solid var(--chat-border)",
+                  color: "var(--chat-muted)",
+                }}
+                title={fc.path}
+              >
+                <span>{fc.op === "created" ? "📄" : fc.op === "deleted" ? "🗑️" : "✏️"}</span>
+                <span>{fc.path.split("/").pop()}</span>
+                {fc.size != null && (
+                  <span style={{ opacity: 0.5 }}>
+                    {fc.size < 1024 ? `${fc.size}B` : `${(fc.size / 1024).toFixed(1)}K`}
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
         {/* Fallback: brief finished but buttons weren't parsed — give manual escape hatch */}
         {!isUser && !isStreaming && isLatest &&
          (!message.workflowNextSteps || message.workflowNextSteps.length === 0) &&

@@ -10,7 +10,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat";
+      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change";
       // Swarm theater fields
       phase_num?: number;
       phase_name?: string;
@@ -260,6 +260,14 @@ export async function* streamSSE(
               workers: delta.workers as any,
             };
           }
+          // File-system activity chips from swarm workers
+          else if (delta.type === "file_change") {
+            yield {
+              type: "file_change",
+              content: "",
+              fileChange: (delta as any).content as import("@/types/chat").FileChange,
+            };
+          }
           // Legacy tool call format (backward compatible)
           else if (delta.type === "tool_call") {
             yield {
@@ -414,6 +422,12 @@ export async function* streamSSE(
               type: "model_queue_status",
               content: "",
               queueStatus: (delta as any).content,
+            };
+          } else if (delta.type === "file_change") {
+            yield {
+              type: "file_change",
+              content: "",
+              fileChange: (delta as any).content as import("@/types/chat").FileChange,
             };
           } else if (delta.type === "tool_call") {
             yield {

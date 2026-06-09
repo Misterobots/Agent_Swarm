@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { AgentTraceEvent, ClarificationCard, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
+import type { AgentTraceEvent, ClarificationCard, FileChange, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
@@ -99,6 +99,7 @@ export function useChatStream(options?: {
     setWorkshopQuestionsLoading,
     setMessageWorkflowNextSteps,
     setMessageAgentTrace,
+    appendFileChange,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -469,6 +470,12 @@ export function useChatStream(options?: {
             setLatestThought(logContent);
           } else if (event.type === "heartbeat") {
             // SSE keep-alive from backend — no-op, just keeps the connection through proxies
+          } else if (event.type === "file_change") {
+            // File-system activity chip from a swarm worker
+            const fc = (event as any).fileChange as FileChange | undefined;
+            if (fc) {
+              appendFileChange(convId!, assistantId, fc);
+            }
           } else if (event.type === "error") {
             appendToMessage(convId!, assistantId, `\n\n*Error: ${event.content || "Stream error"}*`);
           } else {

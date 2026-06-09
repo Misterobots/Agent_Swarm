@@ -111,6 +111,16 @@ export interface DesignArtifact {
 }
 
 /**
+ * A single file-system activity event emitted by a swarm worker.
+ * Rendered as an inline chip in the message bubble.
+ */
+export interface FileChange {
+  op: "created" | "modified" | "deleted";
+  path: string;
+  size?: number;
+}
+
+/**
  * Enriched stream event supporting tool lifecycle, continuity, and UI state.
  */
 /** Worker info emitted by the Lamport coordinator. */
@@ -187,7 +197,7 @@ export interface FlaggedFollowup {
 }
 
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps" | "agent_event" | "set_preview_url" | "preview_unavailable" | "heartbeat";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps" | "agent_event" | "set_preview_url" | "preview_unavailable" | "heartbeat" | "file_change";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -248,6 +258,9 @@ export interface StreamEvent {
 
   // End-of-response follow-up chips (LLM-generated)
   followups?: SuggestedFollowup[];
+
+  // File-system activity chip emitted by swarm workers
+  fileChange?: FileChange;
 }
 
 /**
@@ -294,6 +307,8 @@ export interface ChatMessage {
   flaggedFollowup?: FlaggedFollowup;
   /** Structured agent trace — one entry per agent_event SSE event (coordinator, workers, etc.) */
   agentTrace?: AgentTraceEvent[];
+  /** File-system activity chips from swarm workers — accumulated during the stream */
+  fileChanges?: FileChange[];
 }
 
 export interface Conversation {

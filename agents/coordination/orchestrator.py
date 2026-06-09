@@ -32,6 +32,24 @@ from coordination.synthesizer import (
 logger = setup_logger("Lamport")
 
 
+def _drain_file_changes(session) -> list[dict]:
+    """Drain all pending file_change events from the session queue.
+
+    Returns a list of SSE event dicts ready to yield.  Safe to call from the
+    main generator thread at any yield point — the queue is thread-safe.
+    """
+    events = []
+    q = getattr(session, "file_change_queue", None)
+    if q is None:
+        return events
+    while True:
+        try:
+            events.append(q.get_nowait())
+        except Exception:
+            break
+    return events
+
+
 def coordinate_project_onboarding(
     original_prompt: str,
     session_id: str = "default_session",
@@ -512,6 +530,9 @@ def coordinate_task(
                                 result[:2000] if result else "",
                                 author=role,
                             )
+                            # Drain any file_change events emitted by this perspective worker
+                            for _fc in _drain_file_changes(session):
+                                yield _fc
                         except Exception as e:
                             yield {
                                 "type": "log",
@@ -521,6 +542,9 @@ def coordinate_task(
                                 "type": "message",
                                 "content": f"⚠️ **{label}** worker failed: {e}\n\n",
                             }
+                            # Drain any file_change events emitted by this perspective worker (even on failure)
+                            for _fc in _drain_file_changes(session):
+                                yield _fc
 
             yield {"type": "swarm_phase", "phase_num": 3, "phase_name": "Synthesize", "total_phases": 4}
             yield {"type": "status", "content": "🧠 Building Perspective Matrix..."}
@@ -688,6 +712,9 @@ def coordinate_task(
                                 result[:2000] if result else "",
                                 author=role,
                             )
+                            # Drain any file_change events emitted by this worker
+                            for _fc in _drain_file_changes(session):
+                                yield _fc
                         except Exception as e:
                             yield {
                                 "type": "log",
@@ -717,6 +744,9 @@ def coordinate_task(
                                 ],
                                 "content": f"{role} failed",
                             }
+                            # Drain any file_change events emitted by this worker (even on failure)
+                            for _fc in _drain_file_changes(session):
+                                yield _fc
 
         # === PHASE 3: SYNTHESIZE (LLM) ===
         yield {"type": "swarm_phase", "phase_num": 3, "phase_name": "Synthesize", "total_phases": 5}
@@ -1031,6 +1061,9 @@ def coordinate_task(
                 ],
                 "content": f"Implementation step {i+1} done",
             }
+            # Drain file_change events emitted during this implementation step
+            for _fc in _drain_file_changes(session):
+                yield _fc
 
         if execute_code:
             import re as _re

@@ -1,5 +1,6 @@
 """CoordinatorSession and worker lifecycle tracking."""
 
+import queue
 import threading
 import time
 import uuid
@@ -52,6 +53,10 @@ class CoordinatorSession:
         self.scratchpad_dir = SCRATCHPAD_ROOT / session_id / self.coordination_id
         self.scratchpad_dir.mkdir(parents=True, exist_ok=True)
         self.created_at = time.time()
+        # Thread-safe queue for file_change events emitted by worker threads.
+        # The SSE generator drains this between future-wait timeouts so chips
+        # appear in the UI as files are written, not just at the end of a phase.
+        self.file_change_queue: queue.Queue = queue.Queue()
 
     def register_worker(self, role: str, task: str, phase: str) -> str:
         worker_id = f"w-{uuid.uuid4().hex[:6]}"

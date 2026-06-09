@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   ClarificationCard,
   Conversation,
+  FileChange,
   MediaAttachment,
   ThoughtEvent,
   ToolCallEvent,
@@ -51,6 +52,7 @@ interface ChatState {
   setWorkshopQuestionsLoading: (conversationId: string, messageId: string, loading: boolean) => void;
   setMessageWorkflowNextSteps: (conversationId: string, messageId: string, steps: import("@/types/chat").WorkflowNextStep[]) => void;
   setMessageAgentTrace: (conversationId: string, messageId: string, events: AgentTraceEvent[]) => void;
+  appendFileChange: (conversationId: string, messageId: string, change: FileChange) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -378,6 +380,22 @@ export const useChatStore = create<ChatState>()(
               ...c,
               messages: c.messages.map((m) =>
                 m.id === messageId ? { ...m, agentTrace: events } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      appendFileChange: (conversationId, messageId, change) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId
+                  ? { ...m, fileChanges: [...(m.fileChanges ?? []), change] }
+                  : m
               ),
               updatedAt: Date.now(),
             };

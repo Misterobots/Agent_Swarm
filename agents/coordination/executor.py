@@ -50,6 +50,14 @@ def _run_worker(
     if child_token and _JWT_AVAILABLE:
         set_current_token(child_token)
 
+    # Register a file_change sink so write_file() emits activity chips into the
+    # SSE stream.  The sink is thread-local; the main generator drains the queue.
+    try:
+        from tools.file_ops import set_file_change_sink
+        set_file_change_sink(session.file_change_queue.put_nowait)
+    except Exception:
+        pass
+
     try:
         if worker.cancel_flag.is_set():
             worker.state = WorkerState.CANCELLED
@@ -86,6 +94,14 @@ def _run_worker(
         worker.completed_at = time.time()
         logger.error(f"[Coordinator] Worker {worker_id} ({worker.role}) failed: {e}")
         return f"ERROR: {e}"
+    finally:
+        # Always clear the thread-local sink so stale callbacks don't leak into
+        # any future work that reuses this thread from the pool.
+        try:
+            from tools.file_ops import set_file_change_sink
+            set_file_change_sink(None)
+        except Exception:
+            pass
 
 
 def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown") -> Agent:
