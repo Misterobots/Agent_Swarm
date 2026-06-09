@@ -410,6 +410,25 @@ services:
       - ai_lab_net
 
   # ═══════════════════════════════════════════════════════════════════════════════
+  # DEV SANDBOX (coding environment for agent_runtime project workflows)
+  # agent_runtime reaches this via docker.from_env() + container.exec_run()
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  dev-sandbox:
+    build:
+      context: ..
+      dockerfile: execution_plane/Dockerfile.dev-sandbox
+    image: home-ai-lab/dev-sandbox:latest
+    container_name: dev_sandbox
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    volumes:
+      - ../:/workspace  # same workspace mount as agent_runtime
+    networks:
+      - ai_lab_net
+
+  # ═══════════════════════════════════════════════════════════════════════════════
   # UNIFIED UI (Hive Mind — Next.js)
   # ═══════════════════════════════════════════════════════════════════════════════
 

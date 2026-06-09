@@ -33,6 +33,7 @@ RUN pip install --no-cache-dir \
     psycopg2-binary \
     aiohttp \
     requests \
+    docker \
     streamlit \
     watchdog \
     plotly \
