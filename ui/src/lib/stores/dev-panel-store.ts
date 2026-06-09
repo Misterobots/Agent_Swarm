@@ -18,6 +18,8 @@ export interface DevPanelState {
   showTerminalPanel: boolean;
   /** Generic panel show state keyed by panel id — used by panel registry */
   showPanel: Record<string, boolean>;
+  /** Whether each panel is docked (inline layout) vs floating (overlay). Default: true (docked). */
+  panelDocked: Record<string, boolean>;
 
   // View mode: 'preview' (live output) or 'code' (editor + file tree)
   viewMode: "preview" | "code";
@@ -46,6 +48,8 @@ export interface DevPanelState {
   toggleTerminalPanel: () => void;
   /** Toggle any panel by id — works for both built-in and registry panels */
   togglePanel: (id: string) => void;
+  /** Set whether a panel is docked (inline) or floating (overlay) */
+  setPanelDocked: (id: string, docked: boolean) => void;
   setViewMode: (mode: "preview" | "code") => void;
 
   // Terminal tab actions
@@ -71,6 +75,7 @@ export const useDevPanelStore = create<DevPanelState>()(
       showEditorPanel: false,
       showTerminalPanel: false,
       showPanel: {},
+      panelDocked: {},   // empty = "use default" → all panels default to docked (true)
       viewMode: "code",
       terminalTabs: [],
       activeTerminalId: "",
@@ -104,6 +109,8 @@ export const useDevPanelStore = create<DevPanelState>()(
           if (id === "terminal") update.showTerminalPanel = next;
           return update;
         }),
+      setPanelDocked: (id, docked) =>
+        set((s) => ({ panelDocked: { ...s.panelDocked, [id]: docked } })),
       setViewMode: (mode) => set({ viewMode: mode }),
 
       addTerminalTab: (id, title) =>
@@ -138,6 +145,7 @@ export const useDevPanelStore = create<DevPanelState>()(
         // showTerminalPanel is intentionally NOT persisted — always starts closed
         // showPanel keys are persisted so registry panels survive reloads
         showPanel: state.showPanel,
+        panelDocked: state.panelDocked,
       }),
     }
   )
