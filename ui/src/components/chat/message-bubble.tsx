@@ -314,7 +314,10 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
     {!isUser && message.turnMetadata && (message.turnMetadata.agentName || message.turnMetadata.streamModes?.length > 0) && (
       <div className="turn-meta-row px-4 md:px-6 pt-3 pb-0.5 select-none">
         <details className="group/turndbg">
-          <summary className="list-none cursor-default">
+          <summary
+            className="cursor-default [&::-webkit-details-marker]:hidden [&::marker]:hidden"
+            onClick={(e) => e.preventDefault()}
+          >
             <span
               className="text-[11px] italic"
               style={{ color: "var(--chat-subtle)", opacity: 0.7 }}
