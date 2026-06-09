@@ -5,7 +5,6 @@ import { ChatView } from "@/components/chat/chat-view";
 import { TabbedEditor } from "./tabbed-editor";
 import { TabbedTerminal } from "./tabbed-terminal";
 import { PreviewCanvas } from "./preview-canvas";
-import { QuickActionsToolbar } from "./quick-actions-toolbar";
 import { Code2, Eye, FileCode, Terminal, X, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
@@ -73,9 +72,6 @@ export function DevWorkspace() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Quick Actions Toolbar */}
-      <QuickActionsToolbar />
-
       {/* View Mode + Panel Controls */}
       <div className="relative flex items-center gap-3 bg-[var(--chat-surface)] px-4 py-2">
         <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
