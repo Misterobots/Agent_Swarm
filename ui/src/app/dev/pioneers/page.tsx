@@ -41,7 +41,7 @@ export default function PioneersPage() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold text-[var(--chat-text)]">
-                  Pioneer Academy
+                  Agent Team
                 </h1>
                 <Sparkles size={20} className="text-[var(--chat-accent)]" />
               </div>

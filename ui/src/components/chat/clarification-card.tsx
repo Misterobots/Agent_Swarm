@@ -114,18 +114,17 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
                 disabled={!!(disabled || selected)}
                 onClick={() => handleOption(opt.value, opt.redirect)}
                 className={cn(
-                  "px-3 py-1.5 text-xs rounded-full border transition-colors",
+                  "px-3 py-2 text-xs rounded-md border transition-colors text-left",
                   selected === opt.value
                     ? selectedStyle
                     : "border-[var(--chat-border)] text-[var(--chat-muted)] bg-[var(--chat-panel)]",
                   !(disabled || selected) && optionHover,
                   (disabled || (selected && selected !== opt.value)) && "opacity-40 cursor-default"
                 )}
-                title={opt.description}
               >
-                {opt.label}
+                <span className="block font-medium leading-snug">{opt.label}</span>
                 {opt.description && (
-                  <span className="ml-1.5 opacity-60 text-[10px]">{opt.description}</span>
+                  <span className="block mt-0.5 text-[10px] opacity-60 font-normal leading-snug">{opt.description}</span>
                 )}
               </button>
             ))}

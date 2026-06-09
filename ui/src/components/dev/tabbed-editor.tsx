@@ -2,11 +2,13 @@
 
 import { useRef, useCallback, useState, useEffect } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { FileCode2, Copy, Download, X, Plus, Save, Loader2 } from "lucide-react";
+import { FileCode2, Copy, Download, X, Plus, Save, Loader2, PanelLeft } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevEditorStore } from "@/lib/stores/dev-editor-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useDevPanelStore } from "@/lib/stores/dev-panel-store";
+import { FileTree } from "./file-tree";
 import { getMonacoThemeName, registerMonacoThemes } from "./dev-theme-map";
 
 interface EditorTab {
@@ -64,6 +66,7 @@ export function TabbedEditor() {
   } = useDevEditorStore();
   const { currentProjectId } = useDevProjectStore();
   const { theme: themeId, themeMode } = useSettingsStore();
+  const { showFileTree, setShowFileTree } = useDevPanelStore();
   const isLight = themeMode === "light";
   const monacoTheme = getMonacoThemeName(themeId, isLight);
 
@@ -266,7 +269,16 @@ export function TabbedEditor() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full bg-[var(--chat-bg)]">
+    <div className="flex h-full bg-[var(--chat-bg)]">
+      {/* File tree sidebar */}
+      {showFileTree && (
+        <div className="w-48 flex-shrink-0 overflow-hidden">
+          <FileTree />
+        </div>
+      )}
+
+      {/* Editor column */}
+      <div className="flex flex-col flex-1 min-w-0 h-full bg-[var(--chat-bg)]">
       {/* Tab Bar */}
       <div className="flex items-center border-b border-[var(--chat-border)] bg-[var(--chat-bg)]">
         <div className="flex flex-1 overflow-x-auto">
@@ -304,6 +316,14 @@ export function TabbedEditor() {
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--chat-border)]">
         <div className="flex items-center gap-2 text-xs text-[var(--chat-muted)]">
+          <button
+            onClick={() => setShowFileTree(!showFileTree)}
+            className={`p-1.5 rounded transition-colors ${showFileTree ? "text-[var(--chat-accent)] bg-[var(--chat-accent-soft)]" : "text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:bg-[var(--chat-surface)]"}`}
+            title={showFileTree ? "Hide file tree" : "Show file tree"}
+          >
+            <PanelLeft size={13} />
+          </button>
+          <div className="w-px h-4 bg-[var(--chat-border)]" />
           <select
             value={activeTab?.language || "python"}
             onChange={(e) =>
@@ -339,7 +359,7 @@ export function TabbedEditor() {
       </div>
 
       {/* Monaco Editor */}
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         {activeTab && (
           <Editor
             key={activeTab.id}
@@ -368,6 +388,7 @@ export function TabbedEditor() {
           />
         )}
       </div>
+      </div>{/* end editor column */}
     </div>
   );
 }

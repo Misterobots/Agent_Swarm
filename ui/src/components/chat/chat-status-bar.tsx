@@ -36,7 +36,7 @@ export function ChatStatusBar({ tokenPct, isStreaming, latestThought }: ChatStat
               isStreaming ? "bg-[var(--chat-accent)] animate-pulse" : "bg-emerald-400"
             )}
           />
-          <span className="text-[var(--chat-muted)]">{isStreaming ? "Thinking" : "Ready"}</span>
+          <span className="text-[var(--chat-muted)]">{isStreaming ? "Working" : "Swarm Online"}</span>
         </div>
       </div>
       <div className="truncate max-w-[55%] text-right text-[var(--chat-subtle)] italic">

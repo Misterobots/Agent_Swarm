@@ -274,14 +274,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
           </div>
         )}
 
-        {/* Right: Swarm status + token bar */}
+        {/* Right: token bar */}
         <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Swarm Online dot */}
-          <div className="hidden md:flex items-center gap-1.5 text-[11px] text-[var(--chat-accent)]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--chat-accent)] flex-shrink-0" style={{ animation: "pulse-dot 2.5s ease-in-out infinite" }} />
-            <span className="font-medium">Swarm Online</span>
-          </div>
-
           {/* Token usage bar */}
           <button
             type="button"

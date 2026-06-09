@@ -5,7 +5,7 @@ import { ChatView } from "@/components/chat/chat-view";
 import { TabbedEditor } from "./tabbed-editor";
 import { TabbedTerminal } from "./tabbed-terminal";
 import { PreviewCanvas } from "./preview-canvas";
-import { Code2, Eye, FileCode, Terminal, X, Users } from "lucide-react";
+import { Code2, Eye, FileCode, Terminal, X, Users2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useDevStore } from "@/lib/stores/dev-store";
@@ -76,20 +76,20 @@ export function DevWorkspace() {
       <div className="relative flex items-center gap-3 bg-[var(--chat-surface)] px-4 py-2">
         <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
 
+        {/* Agent Team — navigation link, separated from panel toggles */}
+        <ToolbarButton
+          onClick={() => router.push("/dev/pioneers")}
+          title="Agent Team — manage your pioneer agents"
+          icon={<Users2 size={14} />}
+          label="Agent Team"
+        />
+
         <div className="ml-auto flex items-center gap-1.5">
           {/* Project switcher */}
           <ProjectSwitcher />
 
           {/* Divider */}
           <div className="w-px h-4 bg-[var(--chat-border)]" />
-
-          {/* Pioneers — not a flyout panel, kept as a hardcoded button */}
-          <ToolbarButton
-            onClick={() => router.push("/dev/pioneers")}
-            title="Pioneer Academy — build your team"
-            icon={<Users size={14} />}
-            label="Pioneers"
-          />
 
           {/* Registry-driven panel toggle buttons */}
           {panels.map((panel) => (
