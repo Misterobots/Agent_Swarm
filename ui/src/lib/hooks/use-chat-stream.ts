@@ -100,6 +100,7 @@ export function useChatStream(options?: {
     setMessageWorkflowNextSteps,
     setMessageAgentTrace,
     appendFileChange,
+    setMessageTodos,
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
@@ -471,10 +472,16 @@ export function useChatStream(options?: {
           } else if (event.type === "heartbeat") {
             // SSE keep-alive from backend — no-op, just keeps the connection through proxies
           } else if (event.type === "file_change") {
-            // File-system activity chip from a swarm worker
+            // File-system activity chip from a swarm worker / dev harness
             const fc = (event as any).fileChange as FileChange | undefined;
             if (fc) {
               appendFileChange(convId!, assistantId, fc);
+            }
+          } else if (event.type === "todo") {
+            // Agent todo list (TodoWrite) — replace the message's todo list
+            const todos = (event as any).todos as import("@/types/chat").TodoItem[] | undefined;
+            if (todos) {
+              setMessageTodos(convId!, assistantId, todos);
             }
           } else if (event.type === "error") {
             appendToMessage(convId!, assistantId, `\n\n*Error: ${event.content || "Stream error"}*`);

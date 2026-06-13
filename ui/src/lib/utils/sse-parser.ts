@@ -10,7 +10,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change";
+      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "todo";
       // Swarm theater fields
       phase_num?: number;
       phase_name?: string;
@@ -268,6 +268,14 @@ export async function* streamSSE(
               fileChange: (delta as any).content as import("@/types/chat").FileChange,
             };
           }
+          // Agent todo list (TodoWrite) — full list each update
+          else if (delta.type === "todo") {
+            yield {
+              type: "todo",
+              content: "",
+              todos: ((delta as any).content?.todos ?? []),
+            };
+          }
           // Legacy tool call format (backward compatible)
           else if (delta.type === "tool_call") {
             yield {
@@ -428,6 +436,12 @@ export async function* streamSSE(
               type: "file_change",
               content: "",
               fileChange: (delta as any).content as import("@/types/chat").FileChange,
+            };
+          } else if (delta.type === "todo") {
+            yield {
+              type: "todo",
+              content: "",
+              todos: ((delta as any).content?.todos ?? []),
             };
           } else if (delta.type === "tool_call") {
             yield {

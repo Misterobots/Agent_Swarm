@@ -18,6 +18,7 @@ import { MediaPreview } from "./media-preview";
 import { ResponseSuggestionChips } from "./response-suggestion-chips";
 import { FlagForm, FlaggedFollowupCard } from "./flagged-followup-card";
 import { AgentTraceCard } from "./agent-trace-card";
+import { TodoCard } from "./todo-card";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // ---------------------------------------------------------------------------
@@ -598,7 +599,9 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
             onSend={onSelectFollowup}
           />
         )}
-        {/* File-change activity chips — inline signals from swarm worker file writes */}
+        {/* Agent plan (TodoWrite) */}
+        {!isUser && !!message.todos?.length && <TodoCard todos={message.todos} />}
+        {/* File-change activity chips — inline signals from file writes/edits */}
         {!isUser && message.fileChanges && message.fileChanges.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {message.fileChanges.map((fc, i) => (
@@ -620,6 +623,42 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
                   </span>
                 )}
               </span>
+            ))}
+          </div>
+        )}
+        {/* Unified diffs for edits that produced one (edit_file) */}
+        {!isUser && message.fileChanges?.some((fc) => fc.diff) && (
+          <div className="mt-2 space-y-1.5">
+            {message.fileChanges.filter((fc) => fc.diff).map((fc, i) => (
+              <details
+                key={i}
+                className="rounded-md overflow-hidden text-xs"
+                style={{ border: "1px solid var(--chat-border)" }}
+              >
+                <summary
+                  className="px-2 py-1 cursor-pointer font-mono"
+                  style={{ background: "var(--chat-surface)", color: "var(--chat-muted)" }}
+                >
+                  ✏️ {fc.path}
+                </summary>
+                <pre className="px-2 py-1.5 overflow-x-auto m-0 text-xs" style={{ lineHeight: 1.4 }}>
+                  {fc.diff!.split("\n").map((line, j) => {
+                    const color =
+                      line.startsWith("+") && !line.startsWith("+++")
+                        ? "var(--chat-diff-add, #22c55e)"
+                        : line.startsWith("-") && !line.startsWith("---")
+                        ? "var(--chat-diff-del, #ef4444)"
+                        : line.startsWith("@@")
+                        ? "var(--chat-accent-strong)"
+                        : "var(--chat-muted)";
+                    return (
+                      <div key={j} style={{ color, whiteSpace: "pre", fontFamily: "monospace" }}>
+                        {line || " "}
+                      </div>
+                    );
+                  })}
+                </pre>
+              </details>
             ))}
           </div>
         )}

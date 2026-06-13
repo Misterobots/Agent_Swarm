@@ -118,6 +118,16 @@ export interface FileChange {
   op: "created" | "modified" | "deleted";
   path: string;
   size?: number;
+  /** Unified diff of the change (edit_file supplies this; write_file does not). */
+  diff?: string;
+}
+
+/** A single task in the agent's TodoWrite list. */
+export interface TodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  /** Present-continuous label shown while the step is in progress. */
+  activeForm?: string;
 }
 
 /**
@@ -197,7 +207,7 @@ export interface FlaggedFollowup {
 }
 
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps" | "agent_event" | "set_preview_url" | "preview_unavailable" | "heartbeat" | "file_change";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps" | "agent_event" | "set_preview_url" | "preview_unavailable" | "heartbeat" | "file_change" | "todo";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -261,6 +271,9 @@ export interface StreamEvent {
 
   // File-system activity chip emitted by swarm workers
   fileChange?: FileChange;
+
+  // Agent todo list (TodoWrite) — the full list on each update
+  todos?: TodoItem[];
 }
 
 /**
@@ -309,6 +322,8 @@ export interface ChatMessage {
   agentTrace?: AgentTraceEvent[];
   /** File-system activity chips from swarm workers — accumulated during the stream */
   fileChanges?: FileChange[];
+  /** Agent todo list (TodoWrite) — replaced on each update */
+  todos?: TodoItem[];
 }
 
 export interface Conversation {

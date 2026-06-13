@@ -53,6 +53,7 @@ interface ChatState {
   setMessageWorkflowNextSteps: (conversationId: string, messageId: string, steps: import("@/types/chat").WorkflowNextStep[]) => void;
   setMessageAgentTrace: (conversationId: string, messageId: string, events: AgentTraceEvent[]) => void;
   appendFileChange: (conversationId: string, messageId: string, change: FileChange) => void;
+  setMessageTodos: (conversationId: string, messageId: string, todos: import("@/types/chat").TodoItem[]) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -396,6 +397,21 @@ export const useChatStore = create<ChatState>()(
                 m.id === messageId
                   ? { ...m, fileChanges: [...(m.fileChanges ?? []), change] }
                   : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      // TodoWrite sends the full list each update — replace, don't append.
+      setMessageTodos: (conversationId, messageId, todos) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, todos } : m
               ),
               updatedAt: Date.now(),
             };

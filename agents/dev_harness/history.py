@@ -78,13 +78,17 @@ Turn = Union[UserMessage, AssistantMessage, ToolResults]
 
 @dataclass
 class StreamChunk:
-    type: str = "content"  # content|tool_start|tool_result|agent_event|error|status
+    type: str = "content"  # content|tool_start|tool_result|tool_approval_needed|todo|agent_event|error|status
     content: str = ""
     tool_name: str | None = None
     tool_input: dict[str, Any] | None = None
     tool_call_id: str | None = None
     agent_name: str | None = None
     event_type: str | None = None
+    # Structured payload for events whose `content` is an object (e.g. `todo`,
+    # whose delta.content carries {"todos": [...]}).  When set, the SSE
+    # serialiser uses this as delta["content"] instead of the string content.
+    data: Any = None
 
 
 # ---------------------------------------------------------------------------

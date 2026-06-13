@@ -42,6 +42,7 @@ class DevHarness:
         tool_executor: ToolExecutor,
         router,
         approval=None,
+        gate=None,
     ):
         """Async generator yielding StreamChunk objects (caller serialises to SSE).
 
@@ -50,6 +51,13 @@ class DevHarness:
             async wait(call_id) -> "approved" | "denied" | "timeout"
         The loop *yields* the approval request before awaiting the decision, so
         the client receives the approval card immediately (no deadlock).
+
+        `gate`, if given, is a PermissionGate whose check(tool_name) -> (allowed,
+        reason) enforces plan mode (read-only) before approval/execution.
+
+        `tool_executor` returns either a result string, or a (string, [extra
+        StreamChunks]) tuple for harness tools that also emit UI events
+        (e.g. TodoWrite emits a `todo` event alongside its result).
         """
         from dev_harness.router import HarnessState
 
@@ -94,6 +102,19 @@ class DevHarness:
                     tool_call_id=call.call_id,
                 )
 
+                # Permission gate (e.g. plan mode blocks mutating tools).
+                if gate is not None:
+                    allowed, reason = gate.check(call.name)
+                    if not allowed:
+                        yield StreamChunk(
+                            type="tool_result", content=reason,
+                            tool_name=call.name, tool_call_id=call.call_id,
+                        )
+                        tool_results.append(
+                            ToolResult(call_id=call.call_id, name=call.name, output=reason, is_error=True)
+                        )
+                        continue
+
                 # Approval gate: yield the request FIRST (so the client shows the
                 # approve/deny card), THEN await the decision.  Never block before
                 # yielding, or the event can't reach the client.
@@ -123,7 +144,15 @@ class DevHarness:
                         )
                         continue
 
-                output = await tool_executor(call.call_id, call.name, call.args)
+                # tool_executor returns a str, or (str, [extra StreamChunks]) for
+                # harness tools that also emit UI events (e.g. TodoWrite -> todo).
+                raw = await tool_executor(call.call_id, call.name, call.args)
+                if isinstance(raw, tuple):
+                    output, extra_chunks = raw
+                else:
+                    output, extra_chunks = raw, ()
+                for ec in extra_chunks:
+                    yield ec
                 yield StreamChunk(
                     type="tool_result",
                     content=output,

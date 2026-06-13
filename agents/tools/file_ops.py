@@ -1,36 +1,13 @@
 import os
-import threading
 from pathlib import Path
-from typing import Callable, Optional
+
+# Shared with sandbox_ops: the file_change SSE sink and the MAESTRO blacklist.
+# set_file_change_sink is re-exported here for existing callers (e.g. the
+# coordination executor); _emit_file_change keeps the legacy name used below.
+from tools.file_change_sink import set_file_change_sink, emit_file_change as _emit_file_change
+from tools.maestro_guard import is_protected_path
 
 WORKSPACE_ROOT = Path("/workspace").resolve()
-
-# ---------------------------------------------------------------------------
-# file_change SSE sink
-# Thread-local callable set by the SSE coordinator loop before invoking the
-# agent tool.  When set, write_file() emits a file_change event into the
-# active stream so the UI can show inline activity chips.
-# ---------------------------------------------------------------------------
-_file_change_sink: threading.local = threading.local()
-
-
-def set_file_change_sink(sink: Optional[Callable[[dict], None]]) -> None:
-    """Register a callable that receives file_change event dicts.
-
-    Call with ``None`` to clear.  The sink must be non-blocking (e.g. it
-    should put() onto a queue, not yield directly).
-    """
-    _file_change_sink.callback = sink
-
-
-def _emit_file_change(op: str, path: str, size: int) -> None:
-    """Fire a file_change event if a sink is registered for this thread."""
-    cb = getattr(_file_change_sink, "callback", None)
-    if callable(cb):
-        try:
-            cb({"type": "file_change", "content": {"op": op, "path": path, "size": size}})
-        except Exception:
-            pass  # sink errors must never break the tool call
 
 
 def _resolve_in_workspace(path: str) -> Path:
@@ -53,13 +30,8 @@ def read_file(path: str) -> str:
 def write_file(path: str, content: str) -> str:
     """Writes content to a file in the workspace."""
     # --- MAESTRO LAYER 6 SECURITY: TOOL GUARDRAILS ---
-    protected_files = [".env", "docker-compose.yml", "agents/security_agent.py"]
-
-    # Normalize path for check
     clean_path = path.lstrip("/").replace("\\", "/")
-
-    # CHECK 1: Explicit Blacklist
-    if any(clean_path.endswith(f) for f in protected_files):
+    if is_protected_path(path):
         return f"🔒 SECURITY BLOCK: Access to {clean_path} is RESTRICTED by Layer 6 Policy."
 
     try:

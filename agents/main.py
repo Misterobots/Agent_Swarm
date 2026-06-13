@@ -485,6 +485,7 @@ class ChatRequest(BaseModel):
     ultrathink_mode: bool = False      # deep reasoning with visible chain-of-thought
     attachments: Optional[List[dict]] = None  # file attachments [{name, mimeType, data, size}]
     dev_mode: bool = False            # Phase 2: enable AI agentic coding tools in dev workspace
+    dev_permission_mode: Optional[str] = None  # dev harness gate: default|plan|acceptEdits|bypass (plan = read-only until approved)
     grounding_web: bool = False       # inject live web search results (requires governance permission)
     grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
@@ -692,6 +693,111 @@ DEV_TOOL_DEFINITIONS = [
                     },
                 },
                 "required": ["command"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_file",
+            "description": (
+                "Make a precise edit to an EXISTING file by replacing an exact string. "
+                "Prefer this over write_file for changes to existing files. old_string must "
+                "match exactly (including whitespace/indentation) and be unique unless "
+                "replace_all is true. Returns a unified diff of the change."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path relative to /workspace"},
+                    "old_string": {"type": "string", "description": "Exact text to replace (unique unless replace_all)"},
+                    "new_string": {"type": "string", "description": "Replacement text"},
+                    "replace_all": {"type": "boolean", "description": "Replace all occurrences (default false)"},
+                },
+                "required": ["path", "old_string", "new_string"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "glob",
+            "description": "Find files by glob pattern (e.g. '**/*.py', 'src/*.ts'). Returns matching paths; respects .gitignore.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Glob pattern, e.g. '**/*.py'"},
+                },
+                "required": ["pattern"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "grep",
+            "description": "Search file contents for a regex (ripgrep). Returns matching lines as file:line: text.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Regex pattern to search for"},
+                    "path": {"type": "string", "description": "File or dir to search (default: whole workspace)"},
+                    "ignore_case": {"type": "boolean", "description": "Case-insensitive (default false)"},
+                    "glob": {"type": "string", "description": "Only search files matching this glob, e.g. '*.py'"},
+                },
+                "required": ["pattern"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git",
+            "description": (
+                "Run a git command in the workspace. command is one of: status, diff, log, add, "
+                "commit, branch, show, init. Supply 'message' for commit; optionally 'paths' for add/diff."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "status|diff|log|add|commit|branch|show|init"},
+                    "message": {"type": "string", "description": "Commit message (required for commit)"},
+                    "paths": {"type": "array", "items": {"type": "string"}, "description": "File paths for add/diff"},
+                },
+                "required": ["command"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "TodoWrite",
+            "description": (
+                "Record or update your task list for the current request. Use it to plan multi-step "
+                "work and to mark steps in_progress/completed as you go. Pass the FULL list each time."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "todos": {
+                        "type": "array",
+                        "description": "The complete, current todo list",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "content": {"type": "string", "description": "What the step does"},
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["pending", "in_progress", "completed"],
+                                    "description": "Step status",
+                                },
+                                "activeForm": {"type": "string", "description": "Present-continuous label shown while in progress"},
+                            },
+                            "required": ["content", "status"],
+                        },
+                    },
+                },
+                "required": ["todos"],
             },
         },
     },
@@ -996,6 +1102,42 @@ def _dev_sse(model: str, delta: dict) -> str:
     }) + "\n\n"
 
 
+def _normalize_todos(raw) -> list[dict]:
+    """Coerce model-supplied todos to [{content, status[, activeForm]}]."""
+    valid = {"pending", "in_progress", "completed"}
+    out: list[dict] = []
+    for item in (raw or []):
+        if isinstance(item, str):
+            if item.strip():
+                out.append({"content": item.strip(), "status": "pending"})
+            continue
+        if not isinstance(item, dict):
+            continue
+        content = str(item.get("content") or item.get("task") or item.get("title") or "").strip()
+        if not content:
+            continue
+        status = str(item.get("status") or "pending").strip().lower()
+        if status not in valid:
+            status = "pending"
+        todo = {"content": content, "status": status}
+        if item.get("activeForm"):
+            todo["activeForm"] = str(item["activeForm"])
+        out.append(todo)
+    return out
+
+
+def _handle_todowrite(args: dict):
+    """Harness tool: record a todo list and emit a `todo` SSE event.
+
+    Returns (result_str, [StreamChunk]) — the loop yields the extra chunk.
+    """
+    from dev_harness.history import StreamChunk
+    todos = _normalize_todos(args.get("todos"))
+    done = sum(1 for t in todos if t["status"] == "completed")
+    chunk = StreamChunk(type="todo", content="", data={"todos": todos})
+    return f"Updated todo list ({done}/{len(todos)} complete).", [chunk]
+
+
 def _try_make_dev_github(uid: str, model: str | None):
     """GitHub provider adapter if the user has a connected token, else None."""
     try:
@@ -1073,6 +1215,9 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
     class _Approval:
         """Bridges the loop's approval gate to the existing uid-keyed store."""
         def needs(self, tool_name: str) -> bool:
+            # Harness meta tools (planning/coordination) never need approval.
+            if tool_name in ("TodoWrite", "Task"):
+                return False
             return not _is_auto_approved(uid, tool_name)
 
         async def wait(self, call_id: str) -> str:
@@ -1085,13 +1230,20 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
                 return "timeout"
             return "approved" if _approval_decisions.pop(call_id, False) else "denied"
 
-    async def _tool_executor(call_id: str, tool_name: str, args: dict) -> str:
+    async def _tool_executor(call_id: str, tool_name: str, args: dict):
+        # Harness meta tool — handled here, not dispatched to the sandbox.
+        if tool_name == "TodoWrite":
+            return _handle_todowrite(args)
         loop = _asyncio.get_event_loop()
         return await loop.run_in_executor(None, _sandbox_execute, tool_name, args)
 
+    from dev_harness.permissions import PermissionGate
+    gate = PermissionGate(mode=(request.dev_permission_mode or "default"))
+
     try:
         async for chunk in DevHarness().run(
-            history, DEV_TOOL_DEFINITIONS, _tool_executor, router, approval=_Approval()
+            history, DEV_TOOL_DEFINITIONS, _tool_executor, router,
+            approval=_Approval(), gate=gate,
         ):
             delta: dict = {"type": chunk.type, "content": chunk.content}
             if chunk.tool_name:
@@ -1106,6 +1258,8 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
                 delta["agent_name"] = chunk.agent_name
             if chunk.event_type:
                 delta["event_type"] = chunk.event_type
+            if chunk.data is not None:
+                delta["content"] = chunk.data  # structured payload (e.g. todo)
             yield _dev_sse(request.model, delta)
     except Exception as e:
         logger.error(f"[dev_harness] stream error: {e}", exc_info=True)
