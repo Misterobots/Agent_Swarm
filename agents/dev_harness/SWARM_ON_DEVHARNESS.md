@@ -82,8 +82,10 @@ Replace the worker *construction* and *execution*, keep everything else:
 
 ## Migration phases (incremental, flagged, reversible)
 
-- **Phase A — coder/devops on the sandbox (highest payoff).** Extract `coordination/devharness_worker.py` from `_run_subagent`. Behind a flag (`SWARM_DEVHARNESS_WORKERS=true`), route `scope==codebase` coder/devops workers through it; everything else stays phidata. Add `kb_search` (host-side). Keep the flag **off by default** until Phase B lands (sandbox output breaks artifacts cache + Android build).
-- **Phase B — substrate reconciliation (prerequisite to enabling Phase A in prod).** Repoint the design-revision artifact cache (`/workspace/delivered_artifacts/latest_{session_id}.html`) to a sandbox-relative path (or an explicit host-mount). Wire the Android build pipeline to pull compiled output from the sandbox. Only after both consumers are repointed: flip `SWARM_DEVHARNESS_WORKERS=true` as the default.
+- **Phase A — coder/devops on the sandbox (highest payoff). ✅ DONE (d67c865)**
+  Extracted `coordination/devharness_worker.py`. Flag `SWARM_DEVHARNESS_WORKERS` added to executor; all 5 `_run_worker` call sites pass `role=`/`scope=`. `kb_search` host-side tool added. `DEV_TOOL_DEFINITIONS` moved to `dev_harness/tool_defs.py` (shared). Flag default = false; enabled in compose.
+- **Phase B — substrate reconciliation. ✅ DONE (no code change needed)**
+  Audit finding: `dev_sandbox` and `agent_runtime` both mount `../:/workspace` from the same host bind path, and both run as UID 1000. Files written by DevHarness workers to `/workspace/delivered_artifacts/` inside dev_sandbox are immediately visible in agent_runtime (same inode). The design-revision artifact cache and static file serve work unchanged. Android build pipeline is a future pending task with no existing code to audit. `SWARM_DEVHARNESS_WORKERS=true` is now the default in `execution_plane/docker-compose.yml`.
 - **Phase C — research/analyst lenses.** Move pioneer-lensed research + analyst to DevHarness (web + read-only or `tools=[]`). Keep `pioneers.py` personas as system prompts.
 - **Phase D — retire phidata workers.** Remove `_get_agent_for_role` / `leibniz_agent` once all roles are across. Keep `decomposer`/`synthesizer`/`orchestrator`/`session`/`pioneers`/`team_builder`.
 - **Phase E (optional) — unify SSE + extend durability** to swarm workers (Phase 3 of the dev-harness plan).

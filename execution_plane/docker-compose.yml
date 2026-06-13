@@ -232,6 +232,12 @@ services:
       - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
       - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
       - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
+      # Swarm-on-DevHarness: route coder/architect/devops workers through DevHarness
+      # on dev_sandbox instead of phidata Agents on host /workspace.  Safe because
+      # both containers share the same ../:/workspace bind mount (same host path,
+      # UID 1000 in both), so delivered_artifacts and any other host-fs consumers
+      # see sandbox writes immediately.
+      - SWARM_DEVHARNESS_WORKERS=true
       # Connected Accounts — external LLM providers (BYOK)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
