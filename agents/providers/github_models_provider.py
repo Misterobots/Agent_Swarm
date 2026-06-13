@@ -289,3 +289,63 @@ class GitHubModelsProvider:
             type="error",
             content=f"Agentic loop exceeded {max_iterations} iterations — stopping.",
         )
+
+
+# ---------------------------------------------------------------------------
+# Dev-harness adapter — single-turn tool call over the neutral history.
+# Used as a selectable provider and as the first escalation target (gpt-4o is a
+# reliable tool-caller, so validating the harness against it isolates harness
+# bugs from local-model weakness).  Reuses GitHubModelsProvider for token/headers.
+# ---------------------------------------------------------------------------
+
+class GitHubProvider:
+    """Provider-protocol adapter: one non-streaming tools call, neutral in/out."""
+
+    name = "github"
+
+    def __init__(self, user_id: str, model: str):
+        self._inner = GitHubModelsProvider(user_id=user_id, model=model)
+        self.model = model
+
+    def chat_with_tools(self, history, tools: list[dict]):
+        import urllib.request
+        import uuid as _uuid
+        from dev_harness.base import ProviderResult
+        from dev_harness.history import ToolCall
+        from dev_harness.arg_repair import parse_tool_args
+
+        payload: dict = {
+            "model": self.model,
+            "messages": history.to_openai_messages(args_as_string=True),
+            "tools": tools,
+            "tool_choice": "auto",
+            "max_tokens": 4096,
+            "temperature": 0.2,
+            "stream": False,
+        }
+        req = urllib.request.Request(
+            f"{INFERENCE_BASE}/chat/completions",
+            data=json.dumps(payload).encode(),
+            headers=self._inner._headers(),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            body = json.loads(resp.read())
+
+        message = body["choices"][0].get("message", {})
+        text = message.get("content") or ""
+        calls: list = []
+        malformed = False
+        for tc in message.get("tool_calls") or []:
+            fn = tc.get("function", {}) or {}
+            args, ok = parse_tool_args(fn.get("arguments"))  # GitHub sends a JSON string
+            if not ok:
+                malformed = True
+            calls.append(
+                ToolCall(
+                    call_id=tc.get("id") or f"call_{_uuid.uuid4().hex[:8]}",
+                    name=fn.get("name", ""),
+                    args=args,
+                )
+            )
+        return ProviderResult(text=text, tool_calls=calls, malformed_args=malformed)

@@ -977,6 +977,142 @@ async def team_builder_delete_config(request: Request):
     return {"status": "reset", "was_configured": deleted}
 
 
+# ---------------------------------------------------------------------------
+# Dev workspace agentic harness (Phase 0) — provider-neutral coding loop.
+# Replaces the bespoke dev branch inside github_stream(); handles dev_mode for
+# ANY model (local Ollama default, with GitHub/Claude escalation).
+# ---------------------------------------------------------------------------
+
+def _dev_sse(model: str, delta: dict) -> str:
+    """Frame a delta as an OpenAI chat.completion.chunk SSE line (the shape the
+    UI's sse-parser/use-chat-stream already understands)."""
+    import json as _json
+    return "data: " + _json.dumps({
+        "id": "chatcmpl-dev",
+        "object": "chat.completion.chunk",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
+    }) + "\n\n"
+
+
+def _try_make_dev_github(uid: str, model: str | None):
+    """GitHub provider adapter if the user has a connected token, else None."""
+    try:
+        from github_oauth import get_token
+        if not get_token(uid):
+            return None
+        from providers.github_models_provider import GitHubProvider, GITHUB_MODELS
+        return GitHubProvider(user_id=uid, model=model or GITHUB_MODELS[0]["id"])
+    except Exception as e:
+        logger.warning(f"[dev_harness] GitHub provider unavailable: {e}")
+        return None
+
+
+def _try_make_dev_anthropic(model: str | None):
+    """Anthropic provider adapter if the SDK + key are present, else None."""
+    try:
+        from providers.anthropic_provider import AnthropicProvider, is_available
+        if not is_available():
+            return None
+        return AnthropicProvider(model=model)  # None -> ANTHROPIC_MODEL default
+    except Exception as e:
+        logger.warning(f"[dev_harness] Anthropic provider unavailable: {e}")
+        return None
+
+
+def _build_dev_providers(model: str, uid: str):
+    """Resolve (primary, [escalation_targets]) for a dev request.
+
+    Primary follows the selected model: a GitHub/Anthropic model selects that
+    cloud provider; anything else (incl. local Ollama models, which resolve to
+    provider=None) uses the local Ollama adapter.  Escalation targets are the
+    available cloud providers, excluding the primary.
+    """
+    from providers.registry import provider_for
+    _p = provider_for(model)
+
+    github = _try_make_dev_github(uid, model if _p == "github" else None)
+    anthropic = _try_make_dev_anthropic(model if _p == "anthropic" else None)
+
+    if _p == "github" and github is not None:
+        return github, [t for t in (anthropic,) if t]
+    if _p == "anthropic" and anthropic is not None:
+        return anthropic, [t for t in (github,) if t]
+
+    from providers.ollama_provider import OllamaProvider
+    primary = OllamaProvider(model=model)
+    return primary, [t for t in (github, anthropic) if t]
+
+
+async def _dev_harness_stream(request: "ChatRequest", uid: str):
+    """SSE generator wrapping DevHarness.run(); reuses the existing approval store."""
+    from prompts.hivecode import HIVECODE_SYSTEM_PROMPT
+    from tools.sandbox_ops import execute_tool as _sandbox_execute
+    from dev_harness.history import History
+    from dev_harness.loop import DevHarness
+    from dev_harness.router import ModelRouter
+
+    msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+    history = History.from_openai_messages(msgs, system=HIVECODE_SYSTEM_PROMPT)
+
+    try:
+        primary, targets = _build_dev_providers(request.model, uid)
+    except Exception as e:
+        logger.error(f"[dev_harness] provider init failed: {e}", exc_info=True)
+        yield _dev_sse(request.model, {"type": "error", "content": f"Dev harness init failed: {e}"})
+        yield "data: [DONE]\n\n"
+        return
+
+    router = ModelRouter(primary=primary, escalation_targets=targets)
+    logger.info(
+        f"[dev_harness] uid={uid} model={request.model} primary={primary.name} "
+        f"targets={[t.name for t in targets]}"
+    )
+
+    class _Approval:
+        """Bridges the loop's approval gate to the existing uid-keyed store."""
+        def needs(self, tool_name: str) -> bool:
+            return not _is_auto_approved(uid, tool_name)
+
+        async def wait(self, call_id: str) -> str:
+            event = _asyncio.Event()
+            _approval_events[call_id] = event
+            try:
+                await _asyncio.wait_for(event.wait(), timeout=120.0)
+            except _asyncio.TimeoutError:
+                _approval_decisions.pop(call_id, None)
+                return "timeout"
+            return "approved" if _approval_decisions.pop(call_id, False) else "denied"
+
+    async def _tool_executor(call_id: str, tool_name: str, args: dict) -> str:
+        loop = _asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _sandbox_execute, tool_name, args)
+
+    try:
+        async for chunk in DevHarness().run(
+            history, DEV_TOOL_DEFINITIONS, _tool_executor, router, approval=_Approval()
+        ):
+            delta: dict = {"type": chunk.type, "content": chunk.content}
+            if chunk.tool_name:
+                delta["tool_name"] = chunk.tool_name
+            if chunk.tool_input is not None:
+                delta["tool_input"] = chunk.tool_input
+            if chunk.tool_call_id:
+                delta["tool_call_id"] = chunk.tool_call_id
+            if chunk.type == "tool_result":
+                delta["tool_output"] = chunk.content
+            if chunk.agent_name:
+                delta["agent_name"] = chunk.agent_name
+            if chunk.event_type:
+                delta["event_type"] = chunk.event_type
+            yield _dev_sse(request.model, delta)
+    except Exception as e:
+        logger.error(f"[dev_harness] stream error: {e}", exc_info=True)
+        yield _dev_sse(request.model, {"type": "error", "content": f"Dev harness error: {e}"})
+    yield "data: [DONE]\n\n"
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest, http_request: Request):
     """
@@ -986,6 +1122,16 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     from church import chat_swarm
     import json
     import asyncio
+
+    # --- Dev workspace agentic harness (handles dev_mode for ANY model) ---
+    # Must precede the provider_for() dispatch below: local Ollama models resolve
+    # to provider=None and would otherwise fall through to the swarm path, never
+    # reaching the coding loop.  DevHarness picks Ollama/GitHub/Anthropic itself.
+    if request.dev_mode and request.stream:
+        _dev_uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+        return StreamingResponse(
+            _dev_harness_stream(request, _dev_uid), media_type="text/event-stream"
+        )
 
     # Route GitHub Models requests directly to the GitHubModelsProvider
     from providers.registry import provider_for
@@ -1006,91 +1152,9 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             async def github_stream():
                 import time
 
-                # --- Phase 2: agentic dev mode ---
-                if request.dev_mode:
-                    from prompts.hivecode import HIVECODE_SYSTEM_PROMPT
-                    from tools.sandbox_ops import execute_tool as _sandbox_execute
-
-                    # Prepend HiveCode system prompt
-                    dev_msgs = [{"role": "system", "content": HIVECODE_SYSTEM_PROMPT}] + msgs
-
-                    async def _tool_executor(call_id: str, tool_name: str, args: dict) -> str:
-                        """Wraps sandbox execution with optional approval gate."""
-                        if not _is_auto_approved(uid, tool_name):
-                            # Emit approval-needed event first
-                            approval_event = {
-                                "id": "chatcmpl-github",
-                                "object": "chat.completion.chunk",
-                                "created": int(time.time()),
-                                "model": request.model,
-                                "choices": [{
-                                    "index": 0,
-                                    "delta": {
-                                        "type": "tool_approval_needed",
-                                        "tool_call_id": call_id,
-                                        "tool_name": tool_name,
-                                        "tool_input": args,
-                                        "content": f"Approval required: {tool_name}",
-                                    },
-                                    "finish_reason": None,
-                                }],
-                            }
-                            # We can't yield from a non-generator coroutine, so we
-                            # store the event data for the outer loop to pick up.
-                            _pending_tool_approvals[call_id] = approval_event
-                            # Create an asyncio.Event for this call
-                            event = _asyncio.Event()
-                            _approval_events[call_id] = event
-                            try:
-                                await _asyncio.wait_for(event.wait(), timeout=120.0)
-                            except _asyncio.TimeoutError:
-                                _approval_decisions.pop(call_id, None)
-                                return f"Tool {tool_name!r} approval timed out after 120 s — skipped."
-                            approved = _approval_decisions.pop(call_id, False)
-                            if not approved:
-                                return f"Tool {tool_name!r} was denied by the user."
-                        # Execute in thread executor to avoid blocking the event loop
-                        import asyncio as _aio
-                        loop = _aio.get_event_loop()
-                        result = await loop.run_in_executor(None, _sandbox_execute, tool_name, args)
-                        return result
-
-                    # Dict for the outer generator to flush approval-needed events before waiting
-                    _pending_tool_approvals: dict[str, dict] = {}
-
-                    async for chunk in provider.generate_stream_with_tools(
-                        dev_msgs, DEV_TOOL_DEFINITIONS, _tool_executor
-                    ):
-                        # First flush any pending approval event for the same call_id
-                        if chunk.type == "tool_start" and chunk.tool_call_id in _pending_tool_approvals:
-                            # Not needed yet — approval events are emitted from within _tool_executor
-                            pass
-                        # Flush stored approval-needed event if present
-                        for pending_id, pending_sse in list(_pending_tool_approvals.items()):
-                            yield f"data: {json.dumps(pending_sse)}\n\n"
-                            del _pending_tool_approvals[pending_id]
-
-                        # Build SSE for this chunk
-                        delta: dict = {"type": chunk.type, "content": chunk.content}
-                        if chunk.tool_name:
-                            delta["tool_name"] = chunk.tool_name
-                        if chunk.tool_input is not None:
-                            delta["tool_input"] = chunk.tool_input
-                        if chunk.tool_call_id:
-                            delta["tool_call_id"] = chunk.tool_call_id
-                        if chunk.type == "tool_result":
-                            delta["tool_output"] = chunk.content
-
-                        sse = {
-                            "id": "chatcmpl-github",
-                            "object": "chat.completion.chunk",
-                            "created": int(time.time()),
-                            "model": request.model,
-                            "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
-                        }
-                        yield f"data: {json.dumps(sse)}\n\n"
-                    yield "data: [DONE]\n\n"
-                    return
+                # NOTE: dev_mode (agentic coding) is handled upstream by
+                # _dev_harness_stream() before the provider dispatch, so this
+                # branch only serves non-agentic GitHub Models chat.
 
                 # --- Standard (non-agentic) GitHub Models streaming ---
                 for chunk in provider.generate_stream(msgs):

@@ -92,9 +92,27 @@ class StreamChunk:
 # ---------------------------------------------------------------------------
 # Client wrapper
 # ---------------------------------------------------------------------------
+def _openai_tools_to_anthropic(tools: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Convert OpenAI-style `{"type":"function","function":{...}}` tool defs to
+    Anthropic's `{"name","description","input_schema"}` shape."""
+    out: list[dict[str, Any]] = []
+    for t in tools or []:
+        fn = t.get("function", t) if isinstance(t, dict) else {}
+        out.append(
+            {
+                "name": fn.get("name", ""),
+                "description": fn.get("description", ""),
+                "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+            }
+        )
+    return out
+
+
 class AnthropicProvider:
     """Thin wrapper that presents the same generate() interface used by
     the Ollama code path so the rest of the swarm stays LLM-agnostic."""
+
+    name = "anthropic"  # dev-harness Provider-protocol id
 
     def __init__(self, api_key: str | None = None, model: str | None = None):
         sdk = _ensure_sdk()
@@ -103,6 +121,53 @@ class AnthropicProvider:
             raise ValueError("ANTHROPIC_API_KEY is not set")
         self._model = model or ANTHROPIC_DEFAULT_MODEL
         self._client = sdk.Anthropic(api_key=self._api_key)
+
+    @property
+    def model(self) -> str:
+        """Dev-harness Provider protocol expects a public `.model`."""
+        return self._model
+
+    # ------------------------------------------------------------------ #
+    # Dev-harness adapter — single-turn tool call over the neutral history
+    # ------------------------------------------------------------------ #
+    def chat_with_tools(self, history, tools: list[dict[str, Any]]):
+        """One non-streaming Messages call; returns a neutral ProviderResult.
+
+        Anthropic already hands back tool args as a dict (tool_use.input) and
+        text/tool_use as separate content blocks, so no arg repair is needed.
+        """
+        from dev_harness.base import ProviderResult
+        from dev_harness.history import ToolCall
+
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "messages": history.to_anthropic_messages(),
+            "max_tokens": ANTHROPIC_MAX_TOKENS,
+            "temperature": 0.2,
+        }
+        if history.system:
+            kwargs["system"] = history.system
+        anth_tools = _openai_tools_to_anthropic(tools)
+        if anth_tools:
+            kwargs["tools"] = anth_tools
+
+        response = self._client.messages.create(**kwargs)
+
+        text_parts: list[str] = []
+        calls: list[ToolCall] = []
+        for block in getattr(response, "content", []):
+            btype = getattr(block, "type", "")
+            if btype == "text":
+                text_parts.append(getattr(block, "text", ""))
+            elif btype == "tool_use":
+                calls.append(
+                    ToolCall(
+                        call_id=getattr(block, "id", "") or "",
+                        name=getattr(block, "name", "") or "",
+                        args=getattr(block, "input", {}) or {},
+                    )
+                )
+        return ProviderResult(text="".join(text_parts), tool_calls=calls, malformed_args=False)
 
     # ------------------------------------------------------------------ #
     # Non-streaming
