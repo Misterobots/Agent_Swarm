@@ -6,6 +6,14 @@ import time
 from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
 
+# When true, route eligible Swarm roles through DevHarness on dev_sandbox
+# instead of phidata Agents on host /workspace.
+# OFF by default — flip to "true" after Phase B (substrate reconciliation)
+# repoints the artifacts cache and Android build pipeline to the sandbox.
+SWARM_DEVHARNESS_WORKERS = os.getenv("SWARM_DEVHARNESS_WORKERS", "").lower() in ("1", "true", "yes")
+
+from coordination.devharness_worker import DEVHARNESS_ELIGIBLE_ROLES
+
 from config import ARCHITECT_MODEL
 from logger_setup import setup_logger
 from utils.gpu_queue import get_swarm_worker_host
@@ -38,11 +46,25 @@ def _run_worker(
     agent: Agent,
     prompt: str,
     child_token: str | None = None,
+    role: str | None = None,
+    scope: str | None = None,
 ) -> str:
     """
     Execute a single worker agent synchronously.
     Called from thread pool for parallel execution.
+
+    When SWARM_DEVHARNESS_WORKERS is true and the role is DevHarness-eligible,
+    delegates to devharness_worker.run_devharness_worker() instead of the
+    phidata agent.run() path.  The phidata `agent` argument is ignored in that
+    branch — it is still constructed by the caller (for the flag=off fallback).
     """
+    if SWARM_DEVHARNESS_WORKERS and role and role.lower() in DEVHARNESS_ELIGIBLE_ROLES:
+        from coordination.devharness_worker import run_devharness_worker
+        from dev_harness.tool_defs import DEV_TOOL_DEFINITIONS
+        return run_devharness_worker(
+            session, worker_id, role, scope or "unknown", prompt, DEV_TOOL_DEFINITIONS
+        )
+
     worker = session.workers[worker_id]
     worker.state = WorkerState.RUNNING
     worker.started_at = time.time()

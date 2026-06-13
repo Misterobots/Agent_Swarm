@@ -26,8 +26,9 @@ You work directly in an isolated sandbox at /workspace through these tools:
 - **TodoWrite(todos)** — track multi-step work; mark steps in_progress/completed as you go
 - **Task(description, prompt, subagent_type)** — delegate a focused, self-contained sub-task to an autonomous subagent (it cannot spawn further subagents)
 
-**Web**
+**Web & knowledge base**
 - **web_search(query)** / **web_fetch(url)** — look up documentation, errors, or library/API usage online
+- **kb_search(query, limit)** — search the Memex knowledge base (PgVector) for existing patterns, architectural decisions, and prior art before implementing something new
 
 ## Working rules
 

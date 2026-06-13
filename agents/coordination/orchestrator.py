@@ -487,7 +487,7 @@ def coordinate_task(
 
                     future = pool.submit(
                         _run_worker, session, worker_id, agent, persp_prompt,
-                        child_token=child_token,
+                        child_token=child_token, role=role, scope="research",
                     )
                     futures_p[future] = (worker_id, role, label)
                     pioneer = session.workers[worker_id].pioneer
@@ -621,7 +621,7 @@ def coordinate_task(
 
                     future = pool.submit(
                         _run_worker, session, worker_id, agent, worker_prompt,
-                        child_token=child_token,
+                        child_token=child_token, role=role, scope=scope,
                     )
                     futures[future] = (worker_id, role, task_text)
                     pioneer = session.workers[worker_id].pioneer
@@ -1024,6 +1024,7 @@ def coordinate_task(
             result = _run_worker(
                 session, worker_id, agent, impl_prompt,
                 child_token=_derive_worker_token(ace_token, role, task_text),
+                role=role, scope=scope,
             )
             impl_results[worker_id] = result
 
@@ -1152,6 +1153,7 @@ def coordinate_task(
         verify_result = _run_worker(
             session, verify_worker_id, verifier, verify_prompt,
             child_token=_derive_worker_token(ace_token, "verifier", "Final verification"),
+            role="verifier", scope=scope,
         )
 
         session.write_to_scratchpad("99_verification.md", f"# Verification\n\n{verify_result}")
@@ -1202,6 +1204,7 @@ def coordinate_task(
                 retry_result = _run_worker(
                     session, retry_worker_id, retry_agent, retry_prompt,
                     child_token=_derive_worker_token(ace_token, role, task_text),
+                    role=role, scope="codebase",
                 )
                 yield {
                     "type": "message",
