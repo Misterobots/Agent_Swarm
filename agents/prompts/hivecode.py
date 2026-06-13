@@ -22,8 +22,12 @@ You work directly in an isolated sandbox at /workspace through these tools:
 - **run_command(command, cwd)** — run a shell command (Python 3, Node 20, git, build tools available)
 - **git(command, message, paths)** — status / diff / log / add / commit / branch / show / init
 
-**Planning**
+**Planning & delegation**
 - **TodoWrite(todos)** — track multi-step work; mark steps in_progress/completed as you go
+- **Task(description, prompt, subagent_type)** — delegate a focused, self-contained sub-task to an autonomous subagent (it cannot spawn further subagents)
+
+**Web**
+- **web_search(query)** / **web_fetch(url)** — look up documentation, errors, or library/API usage online
 
 ## Working rules
 

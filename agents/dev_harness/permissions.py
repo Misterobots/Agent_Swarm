@@ -13,10 +13,15 @@ that so the wiring doesn't change.
 
 from __future__ import annotations
 
-# Tools that never mutate state — always allowed, even in plan mode.
-READ_ONLY_TOOLS = frozenset({"read_file", "list_directory", "glob", "grep"})
-# Harness meta tools — planning/coordination, not sandbox mutations.
-META_TOOLS = frozenset({"TodoWrite", "Task"})
+# Tools that never mutate the workspace — always allowed, even in plan mode
+# (incl. web research, which is read-only with respect to /workspace).
+READ_ONLY_TOOLS = frozenset({
+    "read_file", "list_directory", "glob", "grep", "web_search", "web_fetch",
+})
+# Harness meta tools always allowed in plan mode (pure planning, no mutations).
+# NOTE: Task is intentionally NOT here — a subagent can make changes, so plan
+# mode must block it too.
+META_TOOLS = frozenset({"TodoWrite"})
 
 _VALID_MODES = ("default", "plan", "acceptEdits", "bypass")
 

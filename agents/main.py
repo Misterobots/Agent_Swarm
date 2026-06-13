@@ -801,6 +801,51 @@ DEV_TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "Task",
+            "description": (
+                "Delegate a focused, self-contained sub-task to an autonomous subagent that has the "
+                "same sandbox tools. Use for well-scoped work (e.g. 'investigate and summarize how X "
+                "works', 'implement and test module Y'). The subagent runs to completion and returns a "
+                "summary; it cannot spawn further subagents. Spawning requires user approval."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {"type": "string", "description": "Short label for the sub-task"},
+                    "prompt": {"type": "string", "description": "The full, self-contained instruction for the subagent"},
+                    "subagent_type": {"type": "string", "description": "Kind of subagent, e.g. 'general', 'researcher', 'coder'"},
+                },
+                "required": ["description", "prompt"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the web; returns top results (title, url, snippet). Use to look up docs, errors, or library/API usage.",
+            "parameters": {
+                "type": "object",
+                "properties": {"query": {"type": "string", "description": "Search query"}},
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_fetch",
+            "description": "Fetch and read a web page as text (e.g. a documentation page). Provide the full URL.",
+            "parameters": {
+                "type": "object",
+                "properties": {"url": {"type": "string", "description": "Full URL to fetch"}},
+                "required": ["url"],
+            },
+        },
+    },
 ]
 
 
@@ -1138,6 +1183,158 @@ def _handle_todowrite(args: dict):
     return f"Updated todo list ({done}/{len(todos)} complete).", [chunk]
 
 
+def _exec_with_sink(tool_name: str, args: dict):
+    """Run a sandbox tool with a thread-local file_change sink so writes/edits
+    surface as file_change events. Runs on the executor thread (where the
+    thread-local sink must live). Returns (result_str, [file_change event dicts])."""
+    from tools.sandbox_ops import execute_tool as _sandbox_execute
+    from tools.file_change_sink import set_file_change_sink
+    collected: list[dict] = []
+    set_file_change_sink(collected.append)
+    try:
+        result = _sandbox_execute(tool_name, args)
+    finally:
+        set_file_change_sink(None)
+    return result, collected
+
+
+_SUBAGENT_SYSTEM = """\
+You are a HiveCode subagent ({subagent_type}). You have the same sandbox tools \
+(read_file, write_file, edit_file, list_directory, glob, grep, run_command, git, \
+TodoWrite) scoped to /workspace. Complete the delegated task autonomously, then \
+end with a concise summary of what you did and any findings the parent agent \
+needs. You cannot spawn further subagents."""
+
+_MAX_SUBAGENT_ITERS = 12
+
+
+def _brief(obj, n: int = 80) -> str:
+    s = str(obj)
+    return s if len(s) <= n else s[: n] + "…"
+
+
+async def _run_subagent(uid: str, model: str, description: str, prompt: str,
+                        subagent_type: str, gate):
+    """Spawn a child DevHarness for a delegated task.
+
+    Returns (summary, [chunks]) where chunks are the agent_event trace plus
+    forwarded file_change events.  The child runs autonomously (no interactive
+    approval — the user already approved the Task spawn) but still under the
+    permission gate + MAESTRO guard, and cannot spawn further subagents.
+    """
+    from dev_harness.history import History, UserMessage, StreamChunk
+    from dev_harness.loop import DevHarness
+    from dev_harness.router import ModelRouter
+
+    sub_type = subagent_type or "general"
+    sys = _SUBAGENT_SYSTEM.format(subagent_type=sub_type)
+    child_history = History(system=sys, turns=[UserMessage(prompt or description or "")])
+
+    try:
+        primary, targets = _build_dev_providers(model, uid)
+    except Exception as e:
+        return f"Subagent could not start: {e}", []
+    child_router = ModelRouter(primary=primary, escalation_targets=targets)
+    # No Task tool for the child — hard depth cap of 1.
+    child_tools = [t for t in DEV_TOOL_DEFINITIONS if t["function"]["name"] != "Task"]
+
+    async def _child_exec(cid, tname, targs):
+        if tname == "TodoWrite":
+            res, _ = _handle_todowrite(targs)
+            return res
+        loop = _asyncio.get_event_loop()
+        result, fcs = await loop.run_in_executor(None, _exec_with_sink, tname, targs)
+        if fcs:
+            return result, [StreamChunk(type="file_change", data=e["content"]) for e in fcs]
+        return result
+
+    agent = f"subagent:{sub_type}"
+    emitted: list = [StreamChunk(type="agent_event",
+                                 content=f"Started: {_brief(description or prompt, 120)}",
+                                 agent_name=agent, event_type="status")]
+    parts: list[str] = []
+    try:
+        async for ch in DevHarness(max_iterations=_MAX_SUBAGENT_ITERS).run(
+            child_history, child_tools, _child_exec, child_router, gate=gate
+        ):
+            if ch.type == "content":
+                parts.append(ch.content)
+            elif ch.type == "tool_start":
+                emitted.append(StreamChunk(type="agent_event",
+                                           content=f"{ch.tool_name}({_brief(ch.tool_input)})",
+                                           agent_name=agent, event_type="tool"))
+            elif ch.type == "tool_result":
+                emitted.append(StreamChunk(type="agent_event", content=_brief(ch.content, 200),
+                                           agent_name=agent, event_type="tool_result"))
+            elif ch.type == "file_change":
+                emitted.append(ch)  # forward edits so diffs/chips render in parent
+            elif ch.type == "agent_event":
+                emitted.append(ch)  # child escalation notices
+    except Exception as e:
+        logger.error(f"[dev_harness] subagent failed: {e}", exc_info=True)
+        emitted.append(StreamChunk(type="agent_event", content=f"Subagent error: {e}",
+                                   agent_name=agent, event_type="error"))
+        return f"Subagent ({sub_type}) failed: {e}", emitted
+
+    summary = "".join(parts).strip() or "(subagent produced no summary)"
+    emitted.append(StreamChunk(type="agent_event", content="Finished.",
+                               agent_name=agent, event_type="status"))
+    return summary, emitted
+
+
+# ---------------------------------------------------------------------------
+# Mounted MCP (non-fs) tools — reuse the ToolHookRegistry safety stack
+# (capability check + content_trust scan + audit) under a minted dev card.
+# Dev fs/terminal tools stay on the sandbox substrate; only non-fs tools mount.
+# All imports are lazy so a missing dep (jwt/web_browser) never breaks startup.
+# ---------------------------------------------------------------------------
+
+# dev tool name -> (ToolHookRegistry name, required capability)
+_DEV_MCP_TOOLS = {
+    "web_search": ("hive.browser.search", "browser_search"),
+    "web_fetch": ("hive.browser.fetch", "browser_fetch"),
+}
+
+
+def _dev_mcp_registry():
+    """Lazily build + cache one ToolHookRegistry for mounted dev MCP tools."""
+    reg = getattr(_dev_mcp_registry, "_reg", None)
+    if reg is None:
+        from mcp.tool_hooks import ToolHookRegistry
+        reg = ToolHookRegistry()
+        _dev_mcp_registry._reg = reg
+    return reg
+
+
+def _run_mcp_tool(uid: str, dev_name: str, args: dict) -> str:
+    """Execute a mounted MCP tool via ToolHookRegistry under a minted dev card.
+
+    Reuses the registry's capability enforcement + content_trust scan + audit.
+    Lazy imports + broad except: a missing dep or runtime error returns a clean
+    error string rather than breaking the harness.
+    """
+    mapping = _DEV_MCP_TOOLS.get(dev_name)
+    if not mapping:
+        return f"Unknown MCP tool: {dev_name}"
+    hive_name, _cap = mapping
+    try:
+        from security.token_issuer import EphemeralAgentCard, get_token_issuer
+        caps = sorted({c for (_n, c) in _DEV_MCP_TOOLS.values()})
+        card = EphemeralAgentCard(
+            template_id="hivecode_dev", template_version="1.0",
+            agent_name=f"HiveCode_{uid}", activated_capabilities=caps,
+            security_level="L2_USER", user_id=uid, session_id=uid, expiry_hours=2,
+        )
+        token = get_token_issuer().issue_token(card)
+        result = _dev_mcp_registry().execute(hive_name, args, f"Bearer {token}")
+        texts = [c.get("text", "") for c in result.get("content", []) if c.get("type") == "text"]
+        body = "\n".join(t for t in texts if t) or "(no output)"
+        return ("Error: " + body) if result.get("isError") else body
+    except Exception as e:
+        logger.error(f"[dev_harness] MCP tool {dev_name} failed: {e}", exc_info=True)
+        return f"MCP tool error: {e}"
+
+
 def _try_make_dev_github(uid: str, model: str | None):
     """GitHub provider adapter if the user has a connected token, else None."""
     try:
@@ -1190,12 +1387,22 @@ def _build_dev_providers(model: str, uid: str):
 async def _dev_harness_stream(request: "ChatRequest", uid: str):
     """SSE generator wrapping DevHarness.run(); reuses the existing approval store."""
     from prompts.hivecode import HIVECODE_SYSTEM_PROMPT
-    from tools.sandbox_ops import execute_tool as _sandbox_execute
-    from dev_harness.history import History
+    from dev_harness.history import History, StreamChunk
     from dev_harness.loop import DevHarness
     from dev_harness.router import ModelRouter
+    from dev_harness.permissions import PermissionGate
 
     msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+
+    # Slash command: /plan in the latest user message activates plan mode for
+    # this turn (strip the prefix before the model sees it).
+    perm_mode = request.dev_permission_mode or "default"
+    if msgs and msgs[-1].get("role") == "user":
+        _last = (msgs[-1].get("content") or "").lstrip()
+        if _last.startswith("/plan"):
+            perm_mode = "plan"
+            msgs[-1]["content"] = _last[len("/plan"):].lstrip() or "Investigate the request and propose a plan."
+
     history = History.from_openai_messages(msgs, system=HIVECODE_SYSTEM_PROMPT)
 
     try:
@@ -1215,8 +1422,9 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
     class _Approval:
         """Bridges the loop's approval gate to the existing uid-keyed store."""
         def needs(self, tool_name: str) -> bool:
-            # Harness meta tools (planning/coordination) never need approval.
-            if tool_name in ("TodoWrite", "Task"):
+            # TodoWrite is pure planning — never needs approval.  Task DOES
+            # (spawning an autonomous subagent is a significant action).
+            if tool_name == "TodoWrite":
                 return False
             return not _is_auto_approved(uid, tool_name)
 
@@ -1230,15 +1438,25 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
                 return "timeout"
             return "approved" if _approval_decisions.pop(call_id, False) else "denied"
 
+    gate = PermissionGate(mode=perm_mode)
+
     async def _tool_executor(call_id: str, tool_name: str, args: dict):
-        # Harness meta tool — handled here, not dispatched to the sandbox.
+        # Harness meta tools — handled here, not dispatched to the sandbox.
         if tool_name == "TodoWrite":
             return _handle_todowrite(args)
+        if tool_name == "Task":
+            return await _run_subagent(
+                uid, request.model, args.get("description", ""),
+                args.get("prompt", ""), args.get("subagent_type", "general"), gate,
+            )
+        if tool_name in _DEV_MCP_TOOLS:
+            loop = _asyncio.get_event_loop()
+            return await loop.run_in_executor(None, _run_mcp_tool, uid, tool_name, args)
         loop = _asyncio.get_event_loop()
-        return await loop.run_in_executor(None, _sandbox_execute, tool_name, args)
-
-    from dev_harness.permissions import PermissionGate
-    gate = PermissionGate(mode=(request.dev_permission_mode or "default"))
+        result, fcs = await loop.run_in_executor(None, _exec_with_sink, tool_name, args)
+        if fcs:
+            return result, [StreamChunk(type="file_change", data=e["content"]) for e in fcs]
+        return result
 
     try:
         async for chunk in DevHarness().run(
