@@ -86,7 +86,8 @@ Replace the worker *construction* and *execution*, keep everything else:
   Extracted `coordination/devharness_worker.py`. Flag `SWARM_DEVHARNESS_WORKERS` added to executor; all 5 `_run_worker` call sites pass `role=`/`scope=`. `kb_search` host-side tool added. `DEV_TOOL_DEFINITIONS` moved to `dev_harness/tool_defs.py` (shared). Flag default = false; enabled in compose.
 - **Phase B — substrate reconciliation. ✅ DONE (no code change needed)**
   Audit finding: `dev_sandbox` and `agent_runtime` both mount `../:/workspace` from the same host bind path, and both run as UID 1000. Files written by DevHarness workers to `/workspace/delivered_artifacts/` inside dev_sandbox are immediately visible in agent_runtime (same inode). The design-revision artifact cache and static file serve work unchanged. Android build pipeline is a future pending task with no existing code to audit. `SWARM_DEVHARNESS_WORKERS=true` is now the default in `execution_plane/docker-compose.yml`.
-- **Phase C — research/analyst lenses.** Move pioneer-lensed research + analyst to DevHarness (web + read-only or `tools=[]`). Keep `pioneers.py` personas as system prompts.
+- **Phase C — research/analyst lenses. ✅ DONE (ecbf2d9 + this session)**
+  All 6 roles now in `DEVHARNESS_ELIGIBLE_ROLES`. `_ROLE_ALLOWED_TOOLS` restricts researcher to `web + read-only`, analyst to `read-only`, verifier to `glob/grep/read/list`. Pioneer persona (`full_name`, `motto`) prepended to every worker's system prompt inside `_run_async` so the lens is fully embodied. Lens content (`label`, `lens_desc`) carried in `persp_prompt` as the user message — unchanged from the phidata path.
 - **Phase D — retire phidata workers.** Remove `_get_agent_for_role` / `leibniz_agent` once all roles are across. Keep `decomposer`/`synthesizer`/`orchestrator`/`session`/`pioneers`/`team_builder`.
 - **Phase E (optional) — unify SSE + extend durability** to swarm workers (Phase 3 of the dev-harness plan).
 

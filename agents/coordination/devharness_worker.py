@@ -225,6 +225,7 @@ async def _run_async(
     model: str,
     tool_defs: list,
     prompt: str,
+    pioneer: dict | None = None,
 ):
     """Async core: runs the DevHarness loop and returns (summary_text, [dict_events])."""
     from dev_harness.history import History, UserMessage, StreamChunk
@@ -232,6 +233,11 @@ async def _run_async(
     from dev_harness.router import ModelRouter
     from providers.ollama_provider import OllamaProvider
 
+    if pioneer:
+        system_prompt = (
+            f"You embody the spirit of {pioneer['full_name']} — {pioneer['motto']}.\n\n"
+            + system_prompt
+        )
     history = History(system=system_prompt, turns=[UserMessage(prompt)])
     primary = OllamaProvider(model=model)
     # Workers don't escalate — the coordinator assigns their model, not the harness.
@@ -331,6 +337,7 @@ def run_devharness_worker(
             model,
             tool_defs,
             prompt,
+            pioneer=worker.pioneer,
         ))
 
         # Push non-file_change events (agent_event, todo) collected during the run.
