@@ -42,11 +42,14 @@ DESC = {
     "turing": "Alan Turing, young man, short side-parted brown hair, tweed jacket, open-collar shirt",
     "liskov": "Barbara Liskov, older woman computer scientist, short greying hair, rectangular glasses, blazer",
 }
-STYLE = ("flat vector illustration, head and shoulders avatar, centered, facing forward, plain pastel background, "
-         "bold clean outlines, flat cel shading, limited color palette, corporate memphis editorial style, "
-         "warm friendly approachable expression, gentle pleasant smile, kind eyes, dignified")
+STYLE = ("flat vector illustration, head and shoulders avatar, front-facing, looking straight at the viewer, "
+         "face centered in the upper half with even headroom above the hair, symmetrical clean well-defined facial features, "
+         "plain pastel background, bold clean outlines, flat cel shading, limited color palette, "
+         "corporate memphis editorial style, warm friendly approachable expression, gentle pleasant smile, kind eyes, dignified")
 NEG = ("photograph, photo, realistic, 3d render, cgi, text, watermark, signature, blurry, deformed, extra faces, nsfw, "
-       "stern, frowning, scowling, grim, angry, furrowed brow, severe, unhappy, mugshot")
+       "stern, frowning, scowling, grim, angry, furrowed brow, severe, unhappy, mugshot, "
+       "decorative border, ornate frame, picture frame, vignette, cropped head, head touching top edge, "
+       "asymmetric face, lopsided eyes, uneven eyes, distorted features, three-quarter view, profile")
 
 
 def workflow(prompt, seed):
@@ -56,7 +59,7 @@ def workflow(prompt, seed):
         "3": {"class_type": "CLIPTextEncode", "inputs": {"text": NEG, "clip": ["1", 1]}},
         "4": {"class_type": "EmptyLatentImage", "inputs": {"width": 640, "height": 768, "batch_size": 1}},
         "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0],
-              "latent_image": ["4", 0], "seed": seed, "steps": 8, "cfg": 2.0,
+              "latent_image": ["4", 0], "seed": seed, "steps": 10, "cfg": 2.0,
               "sampler_name": "euler_ancestral", "scheduler": "normal", "denoise": 1.0}},
         "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
         "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "pio"}},
