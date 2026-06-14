@@ -156,22 +156,21 @@ ARCHETYPE_TRAINING_CONFIGS: dict[str, dict] = {
 CONTEXT_WINDOWS: dict[str, int] = {
     # Gemma
     "gemma4:31b": 32768,
+    "gemma4:26b": 32768,
     # Qwen3 family
     "qwen3-coder:30b": 32768,
     "qwen3.6:27b": 32768,
+    "qwen3.5:9b": 16384,
     "qwen3:14b": 16384,
     "qwen3:8b": 16384,
     # Qwen2.5 family
     "qwen2.5-coder:14b": 16384,
     "qwen2.5-coder:14b-instruct-q4_k_m": 16384,
     "qwen2.5-coder:7b": 8192,
-    "qwen2.5:3b": 8192,
-    # Other
-    "qwen3.5:9b": 16384,
-    "nemotron-orchestrator:8b": 16384,
-    "nemotron-mini": 4096,
+    # Reasoning / other
     "phi4-reasoning:14b": 16384,
     "deepseek-r1:32b": 32768,
+    "minicpm-v:latest": 8192,
     "llama3.2:3b": 8192,
     "default": 8192,
 }
