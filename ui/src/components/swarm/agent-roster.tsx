@@ -13,17 +13,36 @@ const ROLE_THEME: Record<string, { text: string; bg: string; border: string; str
   devops:     { text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30", stripe: "bg-emerald-400", accent: "#10b981" },
   analyst:    { text: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/30",    stripe: "bg-cyan-400",    accent: "#06b6d4" },
   verifier:   { text: "text-rose-400",    bg: "bg-rose-500/10",    border: "border-rose-500/30",    stripe: "bg-rose-400",    accent: "#f43f5e" },
+  // ── Perspective lenses ─────────────────────────────────────────────────────
+  technical:     { text: "text-indigo-400",  bg: "bg-indigo-500/10",  border: "border-indigo-500/30",  stripe: "bg-indigo-400",  accent: "#6366f1" },
+  ethical:       { text: "text-teal-400",    bg: "bg-teal-500/10",    border: "border-teal-500/30",    stripe: "bg-teal-400",    accent: "#14b8a6" },
+  economic:      { text: "text-yellow-400",  bg: "bg-yellow-500/10",  border: "border-yellow-500/30",  stripe: "bg-yellow-400",  accent: "#eab308" },
+  scientific:    { text: "text-sky-400",     bg: "bg-sky-500/10",     border: "border-sky-500/30",     stripe: "bg-sky-400",     accent: "#0ea5e9" },
+  regulatory:    { text: "text-red-400",     bg: "bg-red-500/10",     border: "border-red-500/30",     stripe: "bg-red-400",     accent: "#ef4444" },
+  end_user:      { text: "text-pink-400",    bg: "bg-pink-500/10",    border: "border-pink-500/30",    stripe: "bg-pink-400",    accent: "#ec4899" },
+  historical:    { text: "text-fuchsia-400", bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/30", stripe: "bg-fuchsia-400", accent: "#d946ef" },
+  policy:        { text: "text-lime-400",    bg: "bg-lime-500/10",    border: "border-lime-500/30",    stripe: "bg-lime-400",    accent: "#84cc16" },
+  environmental: { text: "text-green-400",   bg: "bg-green-500/10",   border: "border-green-500/30",   stripe: "bg-green-400",   accent: "#22c55e" },
+  social:        { text: "text-orange-400",  bg: "bg-orange-500/10",  border: "border-orange-500/30",  stripe: "bg-orange-400",  accent: "#f97316" },
 };
 const DEFAULT_THEME = { text: "text-[var(--chat-muted)]", bg: "bg-[var(--chat-soft)]", border: "border-[var(--chat-border)]", stripe: "bg-[var(--chat-muted)]", accent: "" };
 
 const ROLE_VERB: Record<string, string> = {
   researcher: "Researching", architect: "Designing", coder: "Coding",
   devops: "Deploying", analyst: "Analyzing", verifier: "Verifying",
+  technical: "Analyzing", ethical: "Weighing", economic: "Modeling",
+  scientific: "Testing", regulatory: "Auditing", end_user: "Advocating",
+  historical: "Contextualizing", policy: "Evaluating", environmental: "Assessing",
+  social: "Examining",
 };
 
 const ROLE_CLEARANCE: Record<string, string> = {
   researcher: "LEVEL 3", architect: "LEVEL 4", coder: "LEVEL 3",
   devops: "LEVEL 5", analyst: "LEVEL 3", verifier: "LEVEL 5",
+  technical: "ADVISORY", ethical: "ADVISORY", economic: "ADVISORY",
+  scientific: "ADVISORY", regulatory: "ADVISORY", end_user: "ADVISORY",
+  historical: "ADVISORY", policy: "ADVISORY", environmental: "ADVISORY",
+  social: "ADVISORY",
 };
 
 // PIONEER_BIOS imported from @/lib/data/pioneer-bios
@@ -117,7 +136,7 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
             <div
               key={w.worker_id}
               className={cn(
-                "flex flex-col rounded-lg overflow-hidden border transition-all",
+                "relative flex flex-col rounded-lg overflow-hidden border transition-all",
                 "bg-[var(--chat-panel)]",
                 isGhost
                   ? "opacity-20 border-[var(--chat-border)]"
@@ -163,7 +182,7 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
                     )}
                     style={{ boxShadow: `0 0 8px ${theme.accent}25` }}
                   >
-                    <PioneerPortrait role={role} />
+                    <PioneerPortrait name={w.pioneer_name} role={role} />
                   </div>
 
                   {/* Info column */}
@@ -227,6 +246,22 @@ export function AgentRoster({ workers, revealedIds }: AgentRosterProps) {
                   <div className={cn("flex items-center", theme.text)}>
                     <MiniBarcode seed={badgeNum} />
                   </div>
+                </div>
+              )}
+
+              {/* Completion stamp — diagonal "Complete" / "Aborted" overlay */}
+              {!isGhost && (w.state === "completed" || w.state === "failed") && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span
+                    className="text-[7px] font-black tracking-[0.18em] uppercase px-1.5 py-0.5 rounded-sm -rotate-[14deg]"
+                    style={{
+                      color: w.state === "completed" ? "#34d399" : "#fb7185",
+                      border: `1.5px solid ${w.state === "completed" ? "#34d39990" : "#fb718590"}`,
+                      background: w.state === "completed" ? "rgba(12,42,32,0.78)" : "rgba(42,15,20,0.78)",
+                    }}
+                  >
+                    {w.state === "completed" ? "Complete" : "Aborted"}
+                  </span>
                 </div>
               )}
             </div>

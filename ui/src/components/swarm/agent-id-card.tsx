@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import type { SwarmWorker } from "@/types/chat";
 import { PioneerPortrait } from "./pioneer-portrait";
+import { PIONEER_BIOS } from "@/lib/data/pioneer-bios";
 
 const ROLE_THEME: Record<string, { accent: string; header: string; avatar: string; text: string; clearance: string }> = {
   researcher: { accent: "#f59e0b", header: "from-amber-900/80 to-amber-800/60",  avatar: "bg-amber-500/10 border-amber-400/60",    text: "text-amber-400",   clearance: "LEVEL 3" },
@@ -12,6 +13,17 @@ const ROLE_THEME: Record<string, { accent: string; header: string; avatar: strin
   devops:     { accent: "#10b981", header: "from-emerald-900/80 to-emerald-800/60",avatar: "bg-emerald-500/10 border-emerald-400/60",text: "text-emerald-400", clearance: "LEVEL 5" },
   analyst:    { accent: "#06b6d4", header: "from-cyan-900/80 to-cyan-800/60",    avatar: "bg-cyan-500/10 border-cyan-400/60",      text: "text-cyan-400",    clearance: "LEVEL 3" },
   verifier:   { accent: "#f43f5e", header: "from-rose-900/80 to-rose-800/60",    avatar: "bg-rose-500/10 border-rose-400/60",      text: "text-rose-400",    clearance: "LEVEL 5" },
+  // ── Perspective lenses (pioneers.py PERSPECTIVE_TAXONOMY) ──────────────────
+  technical:     { accent: "#6366f1", header: "from-indigo-900/80 to-indigo-800/60",   avatar: "bg-indigo-500/10 border-indigo-400/60",   text: "text-indigo-400",   clearance: "ADVISORY" },
+  ethical:       { accent: "#14b8a6", header: "from-teal-900/80 to-teal-800/60",       avatar: "bg-teal-500/10 border-teal-400/60",       text: "text-teal-400",     clearance: "ADVISORY" },
+  economic:      { accent: "#eab308", header: "from-yellow-900/80 to-yellow-800/60",   avatar: "bg-yellow-500/10 border-yellow-400/60",   text: "text-yellow-400",   clearance: "ADVISORY" },
+  scientific:    { accent: "#0ea5e9", header: "from-sky-900/80 to-sky-800/60",         avatar: "bg-sky-500/10 border-sky-400/60",         text: "text-sky-400",      clearance: "ADVISORY" },
+  regulatory:    { accent: "#ef4444", header: "from-red-900/80 to-red-800/60",         avatar: "bg-red-500/10 border-red-400/60",         text: "text-red-400",      clearance: "ADVISORY" },
+  end_user:      { accent: "#ec4899", header: "from-pink-900/80 to-pink-800/60",       avatar: "bg-pink-500/10 border-pink-400/60",       text: "text-pink-400",     clearance: "ADVISORY" },
+  historical:    { accent: "#d946ef", header: "from-fuchsia-900/80 to-fuchsia-800/60", avatar: "bg-fuchsia-500/10 border-fuchsia-400/60", text: "text-fuchsia-400",  clearance: "ADVISORY" },
+  policy:        { accent: "#84cc16", header: "from-lime-900/80 to-lime-800/60",       avatar: "bg-lime-500/10 border-lime-400/60",       text: "text-lime-400",     clearance: "ADVISORY" },
+  environmental: { accent: "#22c55e", header: "from-green-900/80 to-green-800/60",     avatar: "bg-green-500/10 border-green-400/60",     text: "text-green-400",    clearance: "ADVISORY" },
+  social:        { accent: "#f97316", header: "from-orange-900/80 to-orange-800/60",   avatar: "bg-orange-500/10 border-orange-400/60",   text: "text-orange-400",   clearance: "ADVISORY" },
 };
 
 const DEFAULT_THEME = {
@@ -57,6 +69,7 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
   useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
   const role = worker.role?.toLowerCase() ?? "";
   const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
+  const bio = PIONEER_BIOS[worker.pioneer_name ?? ""];
   const badgeNum = (worker.worker_id ?? "").replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase().padStart(6, "0");
 
   useEffect(() => {
@@ -156,7 +169,7 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
                 style={{ boxShadow: `0 0 16px ${theme.accent}30` }}
               >
                 <div className={cn("w-full h-full", theme.text)}>
-                  <PioneerPortrait role={role} />
+                  <PioneerPortrait name={worker.pioneer_name} role={role} />
                 </div>
                 {/* Live indicator dot */}
                 <span
@@ -179,6 +192,11 @@ export function AgentIdCard({ worker, onDone }: AgentIdCardProps) {
                     ? worker.pioneer_full_name
                     : ""}
                 </p>
+                {bio?.cs_role && (
+                  <p className="text-[8px] font-mono leading-tight truncate mt-0.5" style={{ color: `${theme.accent}cc` }}>
+                    {bio.cs_role}
+                  </p>
+                )}
               </div>
 
               {/* Role badge */}
