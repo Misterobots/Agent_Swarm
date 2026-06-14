@@ -21,11 +21,33 @@
 
 import * as React from "react";
 
+/**
+ * Renders the generated portrait (ComfyUI flat-vector bust, /public/pioneers/*.png)
+ * for the pioneer, falling back to the hand-drawn SVG bust if the image is missing
+ * or fails to load (offline / not-yet-generated perspective figures).
+ */
 export function PioneerPortrait({ name, role }: { name?: string; role?: string }) {
   const key = name?.toLowerCase().replace(/-\d+$/, "") ?? "";
+  const roleKey = ROLE_DEFAULT_NAME[(role ?? "").toLowerCase()];
+  // The generated PNG to try: the named pioneer's, else the role's primary.
+  const imgKey = BY_NAME[key] ? key : roleKey;
+  const [imgFailed, setImgFailed] = React.useState(false);
+
+  if (imgKey && !imgFailed) {
+    return (
+      <img
+        src={`/pioneers/${imgKey}.png`}
+        alt={name ?? role ?? "pioneer"}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        draggable={false}
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+  // SVG fallback
   if (BY_NAME[key]) return BY_NAME[key];
-  const fallbackName = ROLE_DEFAULT_NAME[(role ?? "").toLowerCase()];
-  return BY_NAME[fallbackName] ?? GENERIC;
+  return BY_NAME[roleKey] ?? GENERIC;
 }
 
 /** Role → its primary pioneer, so role-only calls still get a face. */
