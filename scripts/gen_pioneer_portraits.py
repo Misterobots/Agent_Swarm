@@ -42,12 +42,11 @@ DESC = {
     "turing": "Alan Turing, young man, short side-parted brown hair, tweed jacket, open-collar shirt",
     "liskov": "Barbara Liskov, older woman computer scientist, short greying hair, rectangular glasses, blazer",
 }
-STYLE = ("flat vector illustration, head and shoulders avatar, front-facing, looking straight at the viewer, "
-         "face centered in the upper half with even headroom above the hair, symmetrical clean well-defined facial features, "
-         "anatomically correct natural proportions, head resting naturally on the shoulders, "
-         "neck of normal length and width, plain pastel background, bold clean outlines, flat cel shading, "
-         "limited color palette, corporate memphis editorial style, warm friendly approachable expression, "
-         "gentle pleasant smile, kind eyes, dignified")
+STYLE = ("flat vector illustration, tight head and shoulders close-up, front-facing, looking straight at the viewer, "
+         "face large and filling most of the frame, chin close to a high collar, very short neck barely visible, "
+         "anatomically correct proportions, symmetrical clean well-defined facial features, "
+         "plain pastel background, bold clean outlines, flat cel shading, limited color palette, "
+         "corporate memphis editorial style, warm friendly approachable expression, gentle pleasant smile, kind eyes, dignified")
 NEG = ("photograph, photo, realistic, 3d render, cgi, text, watermark, signature, blurry, deformed, extra faces, nsfw, "
        "stern, frowning, scowling, grim, angry, furrowed brow, severe, unhappy, mugshot, "
        "decorative border, ornate frame, picture frame, vignette, cropped head, head touching top edge, "
