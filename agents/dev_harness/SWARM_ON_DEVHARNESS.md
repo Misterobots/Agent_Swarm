@@ -86,8 +86,28 @@ Replace the worker *construction* and *execution*, keep everything else:
   Extracted `coordination/devharness_worker.py`. Flag `SWARM_DEVHARNESS_WORKERS` added to executor; all 5 `_run_worker` call sites pass `role=`/`scope=`. `kb_search` host-side tool added. `DEV_TOOL_DEFINITIONS` moved to `dev_harness/tool_defs.py` (shared). Flag default = false; enabled in compose.
 - **Phase B — substrate reconciliation. ✅ DONE (no code change needed)**
   Audit finding: `dev_sandbox` and `agent_runtime` both mount `../:/workspace` from the same host bind path, and both run as UID 1000. Files written by DevHarness workers to `/workspace/delivered_artifacts/` inside dev_sandbox are immediately visible in agent_runtime (same inode). The design-revision artifact cache and static file serve work unchanged. Android build pipeline is a future pending task with no existing code to audit. `SWARM_DEVHARNESS_WORKERS=true` is now the default in `execution_plane/docker-compose.yml`.
-- **Phase C — research/analyst lenses. ✅ DONE (ecbf2d9 + this session)**
+- **Phase C — research/analyst lenses. ✅ DONE + VERIFIED (ecbf2d9, 1c974a8)**
   All 6 roles now in `DEVHARNESS_ELIGIBLE_ROLES`. `_ROLE_ALLOWED_TOOLS` restricts researcher to `web + read-only`, analyst to `read-only`, verifier to `glob/grep/read/list`. Pioneer persona (`full_name`, `motto`) prepended to every worker's system prompt inside `_run_async` so the lens is fully embodied. Lens content (`label`, `lens_desc`) carried in `persp_prompt` as the user message — unchanged from the phidata path.
+
+  **Integration fixes landed in 1c974a8:**
+  - `_safe_posix_path` double-prefix bug: `/workspace/fib.py` was expanding to `/workspace/workspace/fib.py`; fixed by stripping existing `SANDBOX_WORKSPACE` prefix before re-joining.
+  - `executor.py` scope-based role normalization: `orchestrator.py` LLM-decomposes research tasks into perspective roles (`"technical"`, `"ethical"`, `"mathematical"`) that are not in `DEVHARNESS_ELIGIBLE_ROLES`; fixed by mapping `scope=="research"` → `dh_role="researcher"` and `scope=="codebase"` → `dh_role="coder"` before the eligibility check.
+  - `devharness_worker.py` logging: switched from bare `logging.getLogger` (no handlers, silenced at WARNING) to `setup_logger` (INFO level + stdout StreamHandler); added pioneer startup log.
+
+  **Live E2E verification log (2026-06-13, `/swarm fibonacci research`):**
+  ```
+  devharness_worker - INFO - [devharness_worker] w-f29a8b (researcher, qwen3:14b) → Claude Shannon
+  devharness_worker - INFO - [devharness_worker] w-0442db (researcher, qwen3:14b) → Marvin Minsky
+  devharness_worker - INFO - [devharness_worker] w-bfcb85 (analyst, qwen3:14b) → Edgar Codd
+  devharness_worker - INFO - [devharness_worker] w-a00499 (researcher, qwen3:14b) → Katherine Johnson
+  ```
+  All 4 workers route to DevHarness (`qwen3:14b`) instead of phidata (`gemma4:31b`). Pioneer names confirmed injected. SSE swarm-theater events (`swarm_worker_created`, `swarm_phase`, `swarm_task_list`) all present in stream.
+
+  **Dev mode (HiveCode) baseline verified same session:**
+  - `write_file`, `run_command`, `edit_file`, `TodoWrite`, `file_change` SSE events all working
+  - `write_file(fib.py)` → `run_command(python3 fib.py)` → `fib(10)=55` ✅
+  - `todo`/`file_change` SSE events parse correctly in `sse-parser.ts`
+  - Path fix confirmed: `write_file("/workspace/fib.py")` lands at `/workspace/fib.py` (not double-prefixed)
 - **Phase D — retire phidata workers.** Remove `_get_agent_for_role` / `leibniz_agent` once all roles are across. Keep `decomposer`/`synthesizer`/`orchestrator`/`session`/`pioneers`/`team_builder`.
 - **Phase E (optional) — unify SSE + extend durability** to swarm workers (Phase 3 of the dev-harness plan).
 

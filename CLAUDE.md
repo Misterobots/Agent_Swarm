@@ -251,12 +251,17 @@ Invoke-RestMethod -Uri "http://127.0.0.1:2375/containers/agent_runtime/logs?stdo
 
 ---
 
-## 📦 Pending Tasks (as of 2026-06-04)
+## 📦 Pending Tasks (as of 2026-06-13)
 
 - [ ] **Android build pipeline** — add a `./gradlew assembleRelease` step to the execution plane so Swarm-generated Kotlin projects can be compiled to an APK and sideloaded to a tablet without leaving Memex. Triggered by the Hitchhiker's Guide project.
 - [ ] **MemPalace circuit breaker** — spawned chip, awaiting user approval to start
 - [ ] **Dev workspace session continuity review** — spawned chip, awaiting approval
 - [ ] **Dev UI/UX design review** — spawned chip, awaiting approval
+- [ ] **Visual UI testing of dev workspace** — `/dev` page blocked by Authentik admin gate locally; needs SSO login or local auth bypass to verify TodoCard rendering, diff chips, pioneer academy cards, and agent trace rendering end-to-end
+- [ ] **Swarm-on-DevHarness Phase D** — retire `_get_agent_for_role` / `leibniz_agent` fallback once all roles confirmed stable on DevHarness for a run period
+- [x] **Swarm-on-DevHarness Phase C — pioneer injection + all roles** — all 6 roles in `DEVHARNESS_ELIGIBLE_ROLES`; scope-based normalization for perspective roles (`technical`/`ethical` → `researcher`); sandbox path double-prefix fix; `setup_logger` fix in devharness_worker. E2E verified 2026-06-13: workers Shannon/Minsky/Codd/Johnson all route to `qwen3:14b` DevHarness with pioneer names in logs (commit 1c974a8)
+- [x] **Swarm-on-DevHarness Phase B** — substrate reconciliation; `SWARM_DEVHARNESS_WORKERS=true` default in compose (ecbf2d9)
+- [x] **Swarm-on-DevHarness Phase A** — coder/devops on sandbox, `devharness_worker.py` extracted (d67c865)
 - [x] **Docker API 2375 security** — restricted to LAN IPs via iptables; ports now bound to node IP (`192.168.2.103:2375`, `192.168.2.101:2375`), not 0.0.0.0; `POST=1` enabled for management
 - [x] **`training_dispatcher` crash loop** — fixed (`ARCHETYPE_TRAINING_CONFIGS` added to config.py, `--target` flag corrected); running clean as of 2026-05-31
 - [x] **Swarm recursion crash** — fixed; implementation workers now use `worker_id` as Postgres session key instead of coordinator `session_id`, preventing phidata pydantic comparison recursion across workers (2026-06-04)
