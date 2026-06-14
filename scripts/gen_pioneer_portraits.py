@@ -30,17 +30,17 @@ DESC = {
     "dijkstra": "Edsger Dijkstra, lean older European man, longish swept-back greying hair, no glasses, casual shirt",
     "hamilton": "Margaret Hamilton, 1960s woman software engineer, long dark straight hair, glasses, light blouse",
     "knuth": "Donald Knuth, older man, bald on top with grey hair at the sides, round glasses, white beard, sweater",
-    "lovelace": "Ada Lovelace, Victorian noblewoman, dark center-parted hair with side ringlets, white lace collar, deep blue period dress",
+    "lovelace": "Ada Lovelace, Victorian noblewoman, dark center-parted hair with side ringlets, high white lace collar up to the chin, deep blue period dress",
     "ritchie": "Dennis Ritchie, 1970s man, medium brown hair, full brown beard and moustache, casual shirt",
     "cerf": "Vint Cerf, distinguished older man, grey hair, full neat grey beard, three-piece suit and tie",
     "torvalds": "Linus Torvalds, middle-aged man, short brown hair, oval wire glasses, casual collared shirt",
-    "perlman": "Radia Perlman, woman engineer, shoulder-length brown wavy hair, glasses, blouse",
+    "perlman": "Radia Perlman, woman engineer, shoulder-length brown wavy hair, glasses, high-collared blouse buttoned to the neck",
     "codd": "Edgar Codd, older British man, greying side-parted hair, rectangular glasses, shirt and tie",
-    "hopper": "Grace Hopper, woman United States naval officer, navy dress uniform with peaked officer cap and gold insignia",
+    "hopper": "Grace Hopper, woman United States naval officer, navy dress uniform with peaked officer cap and gold insignia, high collar buttoned to the chin",
     "boole": "George Boole, Victorian gentleman, dark hair, side whiskers, cravat and high collar, dark coat",
     "hoare": "Tony Hoare, distinguished older man, silver grey hair, rectangular glasses, jacket and shirt",
     "turing": "Alan Turing, young man, short side-parted brown hair, tweed jacket, open-collar shirt",
-    "liskov": "Barbara Liskov, older woman computer scientist, short greying hair, rectangular glasses, blazer",
+    "liskov": "Barbara Liskov, older woman computer scientist, short greying hair, rectangular glasses, high-collared shirt buttoned to the neck under a blazer",
 }
 STYLE = ("flat vector illustration, tight head and shoulders close-up, front-facing, looking straight at the viewer, "
          "face large and filling most of the frame, chin close to a high collar, very short neck barely visible, "
@@ -107,16 +107,43 @@ def generate(name):
     return True
 
 
+def _remove_bg(im):
+    """Flat-illustration background removal: flood-fill the solid background from
+    top/side seeds (the figure's bold outline stops the fill, so collars/hair are
+    kept) and return a transparent RGBA. Portraits are used in the UI cards, so
+    they must have no background."""
+    from PIL import Image, ImageDraw
+    import numpy as np
+    W, H = im.size
+    work = im.copy()
+    S = (0, 255, 1)  # sentinel unlikely to occur in the art
+    # Seed from the top corners/edge and upper sides only (never the bottom,
+    # where the shoulders/clothing reach the frame edge).
+    seeds = [(1, 1), (W - 2, 1), (W // 2, 1),
+             (1, int(H * 0.15)), (W - 2, int(H * 0.15)),
+             (1, int(H * 0.33)), (W - 2, int(H * 0.33))]
+    for s in seeds:
+        try:
+            ImageDraw.floodfill(work, s, S, thresh=50)
+        except Exception:
+            pass
+    arr = np.array(work)
+    mask = (arr[:, :, 0] == 0) & (arr[:, :, 1] == 255) & (arr[:, :, 2] == 1)
+    alpha = np.where(mask, 0, 255).astype("uint8")
+    return Image.fromarray(np.dstack([np.array(im), alpha]), "RGBA")
+
+
 def optimize():
-    """Downscale to 384w + palette-quantize for a small repo footprint."""
+    """Downscale to 384w, palette-quantize, and remove the background (transparent)."""
     from PIL import Image
     for f in sorted(glob.glob(os.path.join(OUT, "*.png"))):
         im = Image.open(f).convert("RGB")
         w, h = im.size
         im = im.resize((384, int(h * 384 / w)), Image.LANCZOS)
-        im = im.quantize(colors=128, method=Image.FASTOCTREE, dither=Image.Dither.NONE)
+        im = im.quantize(colors=128, method=Image.FASTOCTREE, dither=Image.Dither.NONE).convert("RGB")
+        im = _remove_bg(im)
         im.save(f, "PNG", optimize=True)
-    print("optimized", len(glob.glob(os.path.join(OUT, "*.png"))), "files")
+    print("optimized+transparent", len(glob.glob(os.path.join(OUT, "*.png"))), "files")
 
 
 if __name__ == "__main__":
