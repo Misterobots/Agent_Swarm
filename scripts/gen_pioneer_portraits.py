@@ -43,8 +43,10 @@ DESC = {
     "liskov": "Barbara Liskov, older woman computer scientist, short greying hair, rectangular glasses, blazer",
 }
 STYLE = ("flat vector illustration, head and shoulders avatar, centered, facing forward, plain pastel background, "
-         "bold clean outlines, flat cel shading, limited color palette, corporate memphis editorial style, dignified")
-NEG = "photograph, photo, realistic, 3d render, cgi, text, watermark, signature, blurry, deformed, extra faces, nsfw"
+         "bold clean outlines, flat cel shading, limited color palette, corporate memphis editorial style, "
+         "warm friendly approachable expression, gentle pleasant smile, kind eyes, dignified")
+NEG = ("photograph, photo, realistic, 3d render, cgi, text, watermark, signature, blurry, deformed, extra faces, nsfw, "
+       "stern, frowning, scowling, grim, angry, furrowed brow, severe, unhappy, mugshot")
 
 
 def workflow(prompt, seed):
