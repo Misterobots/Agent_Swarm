@@ -44,12 +44,16 @@ DESC = {
 }
 STYLE = ("flat vector illustration, head and shoulders avatar, front-facing, looking straight at the viewer, "
          "face centered in the upper half with even headroom above the hair, symmetrical clean well-defined facial features, "
-         "plain pastel background, bold clean outlines, flat cel shading, limited color palette, "
-         "corporate memphis editorial style, warm friendly approachable expression, gentle pleasant smile, kind eyes, dignified")
+         "anatomically correct natural proportions, head resting naturally on the shoulders, "
+         "neck of normal length and width, plain pastel background, bold clean outlines, flat cel shading, "
+         "limited color palette, corporate memphis editorial style, warm friendly approachable expression, "
+         "gentle pleasant smile, kind eyes, dignified")
 NEG = ("photograph, photo, realistic, 3d render, cgi, text, watermark, signature, blurry, deformed, extra faces, nsfw, "
        "stern, frowning, scowling, grim, angry, furrowed brow, severe, unhappy, mugshot, "
        "decorative border, ornate frame, picture frame, vignette, cropped head, head touching top edge, "
-       "asymmetric face, lopsided eyes, uneven eyes, distorted features, three-quarter view, profile")
+       "asymmetric face, lopsided eyes, uneven eyes, distorted features, three-quarter view, profile, "
+       "long neck, elongated neck, swan neck, thick neck, no neck, distorted neck, deformed neck, twisted neck, "
+       "anatomical errors, malformed anatomy, disproportionate, extra head, two heads, sagging jowls")
 
 
 def workflow(prompt, seed):
