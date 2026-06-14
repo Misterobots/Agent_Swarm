@@ -25,13 +25,15 @@ import asyncio
 import logging
 import time
 
+from logger_setup import setup_logger
+
 from config import (
     ARCHITECT_MODEL, ANALYST_MODEL, CODER_MODEL,
     DEVOPS_MODEL, RESEARCHER_MODEL, VERIFIER_MODEL,
 )
 from coordination.session import CoordinatorSession, WorkerState
 
-logger = logging.getLogger("devharness_worker")
+logger = setup_logger("devharness_worker")
 
 # Roles that can be run as DevHarness workers.  Phase A focuses on
 # coder/devops/architect; researcher/analyst/verifier added in Phase C.
@@ -325,6 +327,11 @@ def run_devharness_worker(
     tool_defs = [t for t in all_tool_defs if t["function"]["name"] in allowed]
 
     try:
+        pioneer_name = worker.pioneer.get("full_name", "") if worker.pioneer else ""
+        logger.info(
+            "[devharness_worker] %s (%s, %s) → %s",
+            worker_id, role_lower, model, pioneer_name or "no pioneer",
+        )
         if worker.cancel_flag.is_set():
             worker.state = WorkerState.CANCELLED
             return ""

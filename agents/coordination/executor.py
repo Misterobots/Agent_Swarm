@@ -58,12 +58,21 @@ def _run_worker(
     phidata agent.run() path.  The phidata `agent` argument is ignored in that
     branch — it is still constructed by the caller (for the flag=off fallback).
     """
-    if SWARM_DEVHARNESS_WORKERS and role and role.lower() in DEVHARNESS_ELIGIBLE_ROLES:
-        from coordination.devharness_worker import run_devharness_worker
-        from dev_harness.tool_defs import DEV_TOOL_DEFINITIONS
-        return run_devharness_worker(
-            session, worker_id, role, scope or "unknown", prompt, DEV_TOOL_DEFINITIONS
-        )
+    if SWARM_DEVHARNESS_WORKERS and role:
+        # Normalize non-standard perspective roles (e.g. "technical", "ethical")
+        # to their canonical DevHarness equivalent using scope as the hint.
+        dh_role = role.lower()
+        if dh_role not in DEVHARNESS_ELIGIBLE_ROLES:
+            if scope == "research":
+                dh_role = "researcher"
+            elif scope == "codebase":
+                dh_role = "coder"
+        if dh_role in DEVHARNESS_ELIGIBLE_ROLES:
+            from coordination.devharness_worker import run_devharness_worker
+            from dev_harness.tool_defs import DEV_TOOL_DEFINITIONS
+            return run_devharness_worker(
+                session, worker_id, dh_role, scope or "unknown", prompt, DEV_TOOL_DEFINITIONS
+            )
 
     worker = session.workers[worker_id]
     worker.state = WorkerState.RUNNING

@@ -39,10 +39,19 @@ def _safe_posix_path(path: str) -> str:
     Resolve a user-supplied path against /workspace, reject traversal.
     Returns an absolute POSIX path guaranteed to be under /workspace.
     Raises ValueError on traversal or empty input.
+
+    Handles paths that already start with /workspace/ (e.g. /workspace/foo.py)
+    by stripping the prefix before re-joining — avoiding /workspace/workspace/foo.py.
     """
     if not path or not path.strip():
         raise ValueError("Path must not be empty")
-    clean = PurePosixPath(path.lstrip("/"))
+    p = path.strip()
+    # Strip existing /workspace prefix so "/workspace/foo.py" → "foo.py" before joining.
+    if p == SANDBOX_WORKSPACE:
+        return SANDBOX_WORKSPACE
+    if p.startswith(SANDBOX_WORKSPACE + "/"):
+        p = p[len(SANDBOX_WORKSPACE):]  # → "/foo.py"
+    clean = PurePosixPath(p.lstrip("/"))
     resolved = PurePosixPath(SANDBOX_WORKSPACE) / clean
     parts: list[str] = []
     for part in resolved.parts:
