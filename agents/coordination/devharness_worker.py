@@ -28,8 +28,8 @@ import time
 from logger_setup import setup_logger
 
 from config import (
-    ARCHITECT_MODEL, ANALYST_MODEL, CODER_MODEL,
-    DEVOPS_MODEL, RESEARCHER_MODEL, VERIFIER_MODEL,
+    ANALYST_MODEL, CODER_MODEL, DEVOPS_MODEL,
+    RESEARCHER_MODEL, VERIFIER_MODEL, SWARM_ARCHITECT_MODEL,
 )
 from coordination.session import CoordinatorSession, WorkerState
 
@@ -41,9 +41,12 @@ DEVHARNESS_ELIGIBLE_ROLES = frozenset({
     "architect", "coder", "devops", "researcher", "analyst", "verifier",
 })
 
+# Swarm architect is a design/planning role → reasoning model
+# (SWARM_ARCHITECT_MODEL), decoupled from the code-solver ARCHITECT_MODEL the
+# MarsRL chat path uses.  See config.py for the rationale.
 _ROLE_MODELS: dict[str, str] = {
     "coder": CODER_MODEL,
-    "architect": ARCHITECT_MODEL,
+    "architect": SWARM_ARCHITECT_MODEL,
     "devops": DEVOPS_MODEL,
     "researcher": RESEARCHER_MODEL,
     "analyst": ANALYST_MODEL,
@@ -321,7 +324,7 @@ def run_devharness_worker(
     worker.started_at = time.time()
 
     role_lower = role.lower()
-    model = _ROLE_MODELS.get(role_lower, ARCHITECT_MODEL)
+    model = _ROLE_MODELS.get(role_lower, SWARM_ARCHITECT_MODEL)
     system_prompt = _ROLE_SYSTEM.get(role_lower, _ROLE_SYSTEM["coder"])
     allowed = _ROLE_ALLOWED_TOOLS.get(role_lower, _ROLE_ALLOWED_TOOLS["coder"])
     tool_defs = [t for t in all_tool_defs if t["function"]["name"] in allowed]
