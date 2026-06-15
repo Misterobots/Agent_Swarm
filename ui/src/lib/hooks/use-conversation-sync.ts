@@ -26,6 +26,7 @@ const USER_SCOPED_KEYS = [
   "memex-buddy",
   "memex-dev",
   "memex-monitor",
+  "memex-onboarding",
 ];
 
 function clearUserScopedStorage() {

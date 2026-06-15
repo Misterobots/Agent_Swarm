@@ -22,6 +22,9 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import { useBuddyStore } from "@/lib/stores/buddy-store";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
+import { useOnboardingSync } from "@/lib/hooks/use-onboarding-sync";
+import { useIsNewUser, useFeatureSpotlight } from "@/lib/hooks/use-feature-callout";
+import { WelcomeCard } from "@/components/onboarding/WelcomeCard";
 import { useAutoGoal } from "@/lib/hooks/use-goals";
 import { GoalsPanel } from "@/components/goals/GoalsPanel";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
@@ -64,6 +67,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
 
   // Load conversations from server on mount for cross-device sync
   useConversationSync();
+  useOnboardingSync();
+  useFeatureSpotlight();
   useAutoGoal();
 
   const devMode = showDevContext && agentEnabled;
@@ -464,6 +469,7 @@ function EmptyChatState({
   subtitle: string;
   onPrompt: (prompt: string) => void;
 }) {
+  const isNewUser = useIsNewUser();
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 py-12">
       <div className="w-full max-w-xl flex flex-col items-center text-center">
@@ -488,31 +494,35 @@ function EmptyChatState({
         </h1>
         <p className="text-[15px] text-[var(--chat-muted)] mb-8">{subtitle}</p>
 
-        <div className="w-full grid grid-cols-2 gap-2.5">
-          {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }) => (
-            <Card
-              key={label}
-              as="div"
-              role="button"
-              tabIndex={0}
-              padding="none"
-              interactive
-              onClick={() => onPrompt(prompt)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onPrompt(prompt);
-                }
-              }}
-              className="group flex items-center gap-3 px-4 py-3 text-left"
-            >
-              <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 bg-[var(--chat-panel)] border border-[var(--chat-border)] group-hover:border-[var(--chat-accent)] group-hover:text-[var(--chat-accent)] transition-colors text-[var(--chat-muted)]">
-                <Icon size={15} />
-              </div>
-              <span className="text-sm font-medium text-[var(--chat-text)]">{label}</span>
-            </Card>
-          ))}
-        </div>
+        {isNewUser ? (
+          <WelcomeCard onPrompt={onPrompt} />
+        ) : (
+          <div className="w-full grid grid-cols-2 gap-2.5">
+            {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }) => (
+              <Card
+                key={label}
+                as="div"
+                role="button"
+                tabIndex={0}
+                padding="none"
+                interactive
+                onClick={() => onPrompt(prompt)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onPrompt(prompt);
+                  }
+                }}
+                className="group flex items-center gap-3 px-4 py-3 text-left"
+              >
+                <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 bg-[var(--chat-panel)] border border-[var(--chat-border)] group-hover:border-[var(--chat-accent)] group-hover:text-[var(--chat-accent)] transition-colors text-[var(--chat-muted)]">
+                  <Icon size={15} />
+                </div>
+                <span className="text-sm font-medium text-[var(--chat-text)]">{label}</span>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
