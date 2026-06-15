@@ -50,7 +50,7 @@ function WorkerDetailContent({ worker, onClose }: { worker: SwarmWorker; onClose
             "w-14 h-14 rounded-full border-2 overflow-hidden flex-shrink-0",
             theme.border, theme.text,
           )}>
-            <PioneerPortrait role={role} />
+            <PioneerPortrait name={worker.pioneer_name} role={role} />
           </div>
           <div className="text-center min-w-0 w-full">
             <p className="font-black text-[var(--chat-text)] text-[13px] leading-tight truncate px-1">
