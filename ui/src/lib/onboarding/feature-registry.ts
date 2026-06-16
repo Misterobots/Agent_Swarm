@@ -55,9 +55,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureMeta> = {
   },
   swarm_v1: {
     key: "swarm_v1",
-    title: "Swarm mode",
+    title: "Build with AI agents",
     description:
-      "Route a task through the multi-agent coordinator. A team of specialist agents plans, builds, and verifies the work together.",
+      "Describe a project and a team of specialist AI agents will plan, build, and check the work — together.",
     icon: Network,
     tryItPrompt: "Build me a small CLI todo app in Python with tests",
     badge: true,
@@ -66,9 +66,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureMeta> = {
   },
   research_v1: {
     key: "research_v1",
-    title: "Research mode",
+    title: "Research anything",
     description:
-      "Deep web and document research. The agent gathers sources, cross-checks them, and synthesizes a grounded answer.",
+      "Ask a question and Memex searches the web, checks its sources, and gives you a clear, grounded answer.",
     icon: Search,
     tryItPrompt: "Research the current state of local-first sync engines",
     badge: true,
@@ -77,9 +77,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureMeta> = {
   },
   workshop_v1: {
     key: "workshop_v1",
-    title: "Workshop mode",
+    title: "Turn ideas into plans",
     description:
-      "Turn a rough idea into a product brief. Workshop asks sharp questions, then hands off to Design and Swarm to build it.",
+      "Have a rough idea? Answer a few questions and get a full brief — ready to hand off to Design or Build.",
     icon: Hammer,
     tryItPrompt: "/workshop a habit-tracking app for families",
     badge: true,
@@ -87,9 +87,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureMeta> = {
   },
   design_v1: {
     key: "design_v1",
-    title: "Design mode",
+    title: "Mockup in seconds",
     description:
-      "Generate a self-contained UI mockup you can preview and open in the studio — no build step required.",
+      "Describe what you want and get a live visual mockup instantly — no coding needed.",
     icon: Palette,
     tryItPrompt: "/design a clean dashboard for a home energy monitor",
     badge: true,
@@ -99,7 +99,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureMeta> = {
     key: "pioneer_academy_v1",
     title: "Meet the pioneers",
     description:
-      "Each swarm worker is a computing pioneer with their own portrait and specialty. Watch them collaborate live on the swarm panel.",
+      "Each agent is a computing pioneer with their own portrait and specialty. Tap any to see their bio and findings.",
     icon: Users,
     badge: true,
     anchor: "Swarm drawer (first completed run)",

@@ -46,55 +46,59 @@ export function AgentDock({ workers, onSelect }: AgentDockProps) {
   if (display.length === 0) return null;
 
   return (
-    <div className="flex items-center justify-center gap-4 w-full py-4 px-3 flex-wrap">
-      {display.map((w, i) => {
-        const isRunning = w.state === "running";
-        const role = w.role?.toLowerCase() ?? "";
-        const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
-        const actions = ROLE_ACTIONS[role] ?? FALLBACK_ACTIONS;
-        const status = isRunning ? actions[(tick + i) % actions.length] : "Queued";
+    /* On mobile: horizontal scrollable strip so cards never wrap and steal vertical space.
+       On sm+: centered flex-wrap layout (existing behavior). */
+    <div className="w-full overflow-x-auto flex-shrink-0 scrollbar-none">
+      <div className="flex items-center justify-start sm:justify-center gap-3 sm:gap-4 py-3 sm:py-4 px-4 sm:px-3 w-max sm:w-full sm:flex-wrap">
+        {display.map((w, i) => {
+          const isRunning = w.state === "running";
+          const role = w.role?.toLowerCase() ?? "";
+          const theme = ROLE_THEME[role] ?? DEFAULT_THEME;
+          const actions = ROLE_ACTIONS[role] ?? FALLBACK_ACTIONS;
+          const status = isRunning ? actions[(tick + i) % actions.length] : "Queued";
 
-        return (
-          <div
-            key={w.worker_id}
-            onClick={() => onSelect?.(w.worker_id)}
-            className={cn(
-              "flex flex-col items-center gap-2 px-5 py-4 rounded-2xl transition-all min-w-[6rem]",
-              "border",
-              onSelect && "cursor-pointer",
-              isRunning
-                ? cn(theme.bg, theme.border, onSelect && "hover:brightness-110")
-                : cn("bg-[var(--chat-soft)]/40 border-[var(--chat-border)]", onSelect && "hover:bg-[var(--chat-soft)]"),
-            )}
-          >
-            {/* Portrait — always full role color; pending state shown by card bg */}
-            <div className={cn(
-              "relative w-12 h-12 rounded-full flex items-center justify-center border-2 overflow-hidden",
-              theme.bg, theme.border, theme.text,
-            )}>
-              <PioneerPortrait role={role} />
-              {isRunning && (
-                <span className={cn(
-                  "absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--chat-bg)] animate-pulse",
-                  theme.stripe,
-                )} />
-              )}
-            </div>
-
-            <p className="text-[11px] font-semibold text-[var(--chat-text)] text-center leading-none">{w.pioneer_name}</p>
-            <p className={cn("text-[9px] font-bold capitalize tracking-wide", theme.text)}>{w.role}</p>
-            <p
-              key={status}
+          return (
+            <div
+              key={w.worker_id}
+              onClick={() => onSelect?.(w.worker_id)}
               className={cn(
-                "text-[9px] font-bold tracking-wider transition-all duration-300 uppercase",
-                isRunning ? theme.text : "text-[var(--chat-muted)]",
+                "flex flex-col items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-3 sm:py-4 rounded-2xl transition-all min-w-[5rem] sm:min-w-[6rem]",
+                "border",
+                onSelect && "cursor-pointer",
+                isRunning
+                  ? cn(theme.bg, theme.border, onSelect && "hover:brightness-110")
+                  : cn("bg-[var(--chat-soft)]/40 border-[var(--chat-border)]", onSelect && "hover:bg-[var(--chat-soft)]"),
               )}
             >
-              {status}
-            </p>
-          </div>
-        );
-      })}
+              {/* Portrait */}
+              <div className={cn(
+                "relative w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center border-2 overflow-hidden",
+                theme.bg, theme.border, theme.text,
+              )}>
+                <PioneerPortrait role={role} />
+                {isRunning && (
+                  <span className={cn(
+                    "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-[var(--chat-bg)] animate-pulse",
+                    theme.stripe,
+                  )} />
+                )}
+              </div>
+
+              <p className="text-[10px] sm:text-[11px] font-semibold text-[var(--chat-text)] text-center leading-none">{w.pioneer_name}</p>
+              <p className={cn("text-[9px] font-bold capitalize tracking-wide", theme.text)}>{w.role}</p>
+              <p
+                key={status}
+                className={cn(
+                  "text-[9px] font-bold tracking-wider transition-all duration-300 uppercase",
+                  isRunning ? theme.text : "text-[var(--chat-muted)]",
+                )}
+              >
+                {status}
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

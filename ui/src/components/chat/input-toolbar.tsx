@@ -124,13 +124,13 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
               disabled={disabled}
               onClick={onToggle}
               className={cn(
-                "inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all",
+                "inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 sm:py-0.5 rounded-full border transition-all",
                 active
                   ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_15%,transparent)] border-[color:color-mix(in_srgb,var(--chat-accent)_50%,transparent)] text-[var(--chat-accent)]"
                   : "border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_80%,var(--chat-text))]"
               )}
             >
-              <Icon size={10} />
+              <Icon size={12} />
               {label}
             </button>
           );

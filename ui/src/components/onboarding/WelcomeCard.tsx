@@ -46,13 +46,14 @@ export function WelcomeCard({ onPrompt }: { onPrompt: (prompt: string) => void }
         <button
           type="button"
           onClick={dismiss}
-          className="text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors"
+          className="text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors py-2 px-1"
         >
           Skip for now
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      {/* Mobile: single column with horizontal card layout. sm+: 2-column vertical. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {WELCOME_FEATURE_KEYS.map((key) => {
           const meta = FEATURE_REGISTRY[key];
           const Icon = meta.icon;
@@ -71,19 +72,19 @@ export function WelcomeCard({ onPrompt }: { onPrompt: (prompt: string) => void }
                   handleTry(meta.tryItPrompt!);
                 }
               }}
-              className="group flex flex-col gap-1.5 px-4 py-3 text-left"
+              className="group flex flex-col gap-2 px-4 py-3.5 text-left"
             >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 bg-[var(--chat-panel)] border border-[var(--chat-border)] group-hover:border-[var(--chat-accent)] group-hover:text-[var(--chat-accent)] transition-colors text-[var(--chat-muted)]">
-                  <Icon size={15} />
-                </div>
-                <span className="text-sm font-semibold text-[var(--chat-text)]">
+              <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 bg-[var(--chat-panel)] border border-[var(--chat-border)] group-hover:border-[var(--chat-accent)] group-hover:text-[var(--chat-accent)] transition-colors text-[var(--chat-muted)]">
+                <Icon size={15} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-semibold text-[var(--chat-text)] leading-tight">
                   {meta.title}
                 </span>
+                <span className="text-xs text-[var(--chat-muted)] leading-snug">
+                  {meta.description}
+                </span>
               </div>
-              <span className="text-xs text-[var(--chat-muted)] leading-snug">
-                {meta.description}
-              </span>
             </Card>
           );
         })}

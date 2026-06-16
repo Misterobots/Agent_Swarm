@@ -231,6 +231,7 @@ export function SwarmPanelContent({
   selectedWorkerId, onCardDone, onSelectWorker, onPhaseChange,
 }: SwarmPanelContentProps) {
   const selectedWorker = selectedWorkerId ? workers.find((w) => w.worker_id === selectedWorkerId) : null;
+  const { isMobile } = useIsMobile();
   const revealedWorkerIds = useSwarmStore((s) => s.revealedWorkerIds);
   const badgeQueue = useSwarmStore((s) => s.badgeQueue);
   const phaseNameMap = useSwarmStore((s) => s.phaseNameMap);
@@ -354,10 +355,13 @@ export function SwarmPanelContent({
               </>
             )}
 
-            {/* Horizontal split: list left, detail right */}
+            {/* Worker list + detail — side-by-side on desktop, full-screen on mobile */}
             <div className="flex-1 flex flex-row overflow-hidden">
-              {/* Worker list — grouped by phase with timeline dividers */}
-              <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
+              {/* Worker list — hidden on mobile when detail is open */}
+              <div className={cn(
+                "min-w-0 min-h-0 overflow-y-auto transition-all duration-300",
+                isMobile && selectedWorkerId ? "w-0 overflow-hidden" : "flex-1",
+              )}>
                 {showPhaseDividers ? (
                   sortedPhaseKeys.map((phaseKey) => {
                     const group = phaseGroups[phaseKey];
@@ -379,7 +383,7 @@ export function SwarmPanelContent({
                           <div key={w.worker_id} className="border-b border-[var(--chat-border)]">
                             <WorkerRow
                               worker={w}
-                              expanded={selectedWorkerId === w.worker_id}
+                              expanded={!isMobile && selectedWorkerId === w.worker_id}
                               onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
                             />
                           </div>
@@ -392,7 +396,7 @@ export function SwarmPanelContent({
                     <div key={w.worker_id} className="border-b border-[var(--chat-border)]">
                       <WorkerRow
                         worker={w}
-                        expanded={selectedWorkerId === w.worker_id}
+                        expanded={!isMobile && selectedWorkerId === w.worker_id}
                         onClick={() => onSelectWorker(selectedWorkerId === w.worker_id ? null : w.worker_id)}
                       />
                     </div>
@@ -400,15 +404,22 @@ export function SwarmPanelContent({
                 )}
               </div>
 
-              {/* Detail panel — outer div animates width; inner keeps content from reflowing */}
+              {/* Detail panel:
+                  - Desktop: side-by-side 55% width column with animated slide-in
+                  - Mobile: full-width overlay (replaces the list) */}
               <div
                 style={{ transition: "width 400ms cubic-bezier(.32,1.4,.64,1)" }}
                 className={cn(
                   "flex-shrink-0 h-full overflow-hidden border-l border-[var(--chat-border)]",
-                  selectedWorkerId ? "w-[55%]" : "w-0",
+                  selectedWorkerId
+                    ? isMobile ? "w-full border-l-0" : "w-[55%]"
+                    : "w-0",
                 )}
               >
-                <div className="w-[55vw] max-w-[300px] min-w-[220px] h-full">
+                <div className={cn(
+                  "h-full",
+                  isMobile ? "w-full" : "w-[55vw] max-w-[300px] min-w-[220px]",
+                )}>
                   {selectedWorker && (
                     <WorkerDetailContent
                       worker={selectedWorker}
