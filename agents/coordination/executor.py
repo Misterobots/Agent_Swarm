@@ -43,7 +43,7 @@ _ROLE_CAPS: dict[str, list[str]] = {
 def _run_worker(
     session: CoordinatorSession,
     worker_id: str,
-    agent: Agent,
+    agent: "Agent | None",
     prompt: str,
     child_token: str | None = None,
     role: str | None = None,
@@ -94,6 +94,11 @@ def _run_worker(
             worker.state = WorkerState.CANCELLED
             return ""
 
+        if agent is None:
+            raise RuntimeError(
+                f"No agent for worker {worker_id} (role={role!r}) — DevHarness did not route it. "
+                "Add the role to DEVHARNESS_ELIGIBLE_ROLES or pass a phidata Agent."
+            )
         response: RunResponse = agent.run(prompt)
 
         _raw = response.content if response and response.content else "No output"
@@ -200,8 +205,20 @@ def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown
         )
 
     else:
-        from leibniz_agent import get_architect_agent
-        return get_architect_agent(session_id=session_id)
+        # All production roles are in DEVHARNESS_ELIGIBLE_ROLES; reaching here
+        # with SWARM_DEVHARNESS_WORKERS=True is a bug (DevHarness would have
+        # handled it).  With DevHarness off, return a minimal text-only agent
+        # so the worker fails loudly rather than silently gaining file access.
+        host = get_swarm_worker_host(ARCHITECT_MODEL)
+        return Agent(
+            name=f"{role.title()} Worker (unknown role)",
+            model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
+            instructions=[
+                f"You are a {role_lower} worker. Produce a detailed written analysis.",
+                "Do NOT attempt to access files or execute commands.",
+            ],
+            show_tool_calls=False,
+        )
 
 
 def _derive_worker_token(parent_token: str | None, role: str, task_description: str) -> str | None:
