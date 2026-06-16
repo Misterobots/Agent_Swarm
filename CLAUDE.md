@@ -251,14 +251,14 @@ Invoke-RestMethod -Uri "http://127.0.0.1:2375/containers/agent_runtime/logs?stdo
 
 ---
 
-## 📦 Pending Tasks (as of 2026-06-13)
+## 📦 Pending Tasks (as of 2026-06-15)
 
 - [ ] **Android build pipeline** — add a `./gradlew assembleRelease` step to the execution plane so Swarm-generated Kotlin projects can be compiled to an APK and sideloaded to a tablet without leaving Memex. Triggered by the Hitchhiker's Guide project.
-- [ ] **MemPalace circuit breaker** — spawned chip, awaiting user approval to start
 - [ ] **Dev workspace session continuity review** — spawned chip, awaiting approval
 - [ ] **Dev UI/UX design review** — spawned chip, awaiting approval
 - [ ] **Visual UI testing of dev workspace** — `/dev` page blocked by Authentik admin gate locally; needs SSO login or local auth bypass to verify TodoCard rendering, diff chips, pioneer academy cards, and agent trace rendering end-to-end
-- [ ] **Swarm-on-DevHarness Phase D** — retire `_get_agent_for_role` / `leibniz_agent` fallback once all roles confirmed stable on DevHarness for a run period
+- [x] **MemPalace circuit breaker** — already implemented in church.py (`_mp_breaker = _CircuitBreaker()` from gpu_queue.py); 3-failure threshold → 60s open → half-open probe. Chip was stale.
+- [x] **Swarm-on-DevHarness Phase D** — retired leibniz fallback for unknown roles in executor.py; `_run_worker` agent param is now `Agent | None` with clear RuntimeError guard; unknown roles get a minimal text-only agent instead of silently gaining file access (640263b)
 - [x] **Swarm-on-DevHarness Phase C — pioneer injection + all roles** — all 6 roles in `DEVHARNESS_ELIGIBLE_ROLES`; scope-based normalization for perspective roles (`technical`/`ethical` → `researcher`); sandbox path double-prefix fix; `setup_logger` fix in devharness_worker. E2E verified 2026-06-13: workers Shannon/Minsky/Codd/Johnson all route to `qwen3:14b` DevHarness with pioneer names in logs (commit 1c974a8)
 - [x] **Swarm-on-DevHarness Phase B** — substrate reconciliation; `SWARM_DEVHARNESS_WORKERS=true` default in compose (ecbf2d9)
 - [x] **Swarm-on-DevHarness Phase A** — coder/devops on sandbox, `devharness_worker.py` extracted (d67c865)

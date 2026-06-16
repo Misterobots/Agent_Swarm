@@ -1438,7 +1438,6 @@ main, .main-content {
 }
 
 @media (max-width: 768px) {
-  .flex-row { flex-direction: column; }
   nav, [role="navigation"] { width: 100%; }
   .chat-shell .flex.items-center.gap-2,
   .chat-shell .flex.items-center.gap-3 { gap: 0.25rem; }

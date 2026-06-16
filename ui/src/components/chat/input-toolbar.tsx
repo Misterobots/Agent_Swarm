@@ -2,9 +2,11 @@
 
 import type { FileAttachment } from "@/types/chat";
 import { Paperclip, X, Brain, Search, Zap } from "lucide-react";
-import { useRef } from "react";
+import { Fragment, useRef } from "react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { cn } from "@/lib/utils/cn";
+import { FeatureCalloutBadge } from "@/components/onboarding/FeatureCalloutBadge";
+import type { FeatureKey } from "@/lib/onboarding/feature-registry";
 
 interface InputToolbarProps {
   attachments: FileAttachment[];
@@ -45,7 +47,14 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
     onAttachmentsChange(attachments.filter((a) => a.name !== name));
   };
 
-  const chips = [
+  const chips: Array<{
+    key: string;
+    label: string;
+    icon: typeof Brain;
+    active: boolean;
+    onToggle: () => void;
+    feature?: FeatureKey;
+  }> = [
     {
       key: "memory",
       label: "Memory",
@@ -59,6 +68,7 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
       icon: Search,
       active: researchMode,
       onToggle: () => setResearchMode(!researchMode),
+      feature: "research_v1",
     },
     {
       key: "swarm",
@@ -66,6 +76,7 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
       icon: Zap,
       active: swarmMode,
       onToggle: () => setSwarmMode(!swarmMode),
+      feature: "swarm_v1",
     },
   ];
 
@@ -106,23 +117,31 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
         <div className="w-px h-4 bg-[var(--chat-border)] mx-0.5" />
 
         {/* Mode chips */}
-        {chips.map(({ key, label, icon: Icon, active, onToggle }) => (
-          <button
-            key={key}
-            type="button"
-            disabled={disabled}
-            onClick={onToggle}
-            className={cn(
-              "inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all",
-              active
-                ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_15%,transparent)] border-[color:color-mix(in_srgb,var(--chat-accent)_50%,transparent)] text-[var(--chat-accent)]"
-                : "border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_80%,var(--chat-text))]"
-            )}
-          >
-            <Icon size={10} />
-            {label}
-          </button>
-        ))}
+        {chips.map(({ key, label, icon: Icon, active, onToggle, feature }) => {
+          const button = (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onToggle}
+              className={cn(
+                "inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 sm:py-0.5 rounded-full border transition-all",
+                active
+                  ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_15%,transparent)] border-[color:color-mix(in_srgb,var(--chat-accent)_50%,transparent)] text-[var(--chat-accent)]"
+                  : "border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_80%,var(--chat-text))]"
+              )}
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          );
+          return feature ? (
+            <FeatureCalloutBadge key={key} feature={feature}>
+              {button}
+            </FeatureCalloutBadge>
+          ) : (
+            <Fragment key={key}>{button}</Fragment>
+          );
+        })}
       </div>
     </div>
   );

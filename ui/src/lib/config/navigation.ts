@@ -175,11 +175,13 @@ export const utilityNavigation: NavigationItem[] = [
   },
 ];
 
-export function isConversationRoute(pathname: string): boolean {
+export function isConversationRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
   return pathname === "/chat" || pathname.startsWith("/dev");
 }
 
-export function isNavigationItemActive(item: NavigationItem, pathname: string): boolean {
+export function isNavigationItemActive(item: NavigationItem, pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
   const prefixes = item.matchPrefixes ?? [item.href];
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }

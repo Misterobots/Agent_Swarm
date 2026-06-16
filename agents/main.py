@@ -145,6 +145,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Goals store init failed (non-fatal): {e}")
 
+        # 7e. Initialize User Prefs Store (cross-device onboarding/prefs sync)
+        try:
+            from prefs_store import init_table as _init_prefs_table
+            _init_prefs_table()
+        except Exception as e:
+            logger.warning(f"Prefs store init failed (non-fatal): {e}")
+
         # 7c. Initialize Dev Sessions Store
         try:
             from dev_sessions import store as _dev_sessions_store
@@ -2407,6 +2414,41 @@ async def conv_delete(conv_id: str, request: Request):
         return {"ok": True}
     except Exception as exc:
         logger.error(f"[ConvSync] delete failed for {owner_id}/{conv_id}: {exc}")
+        return {"ok": False, "error": str(exc)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# User preference sync (cross-device) — onboarding callouts, etc.
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/v1/prefs/onboarding")
+async def prefs_onboarding_get(request: Request):
+    """Return the feature-callout keys this user has dismissed."""
+    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    try:
+        from prefs_store import get_prefs
+        data = get_prefs(owner_id, "onboarding")
+        return {"seenFeatures": data.get("seenFeatures", [])}
+    except Exception as exc:
+        logger.error(f"[Prefs] onboarding get failed for {owner_id}: {exc}")
+        return {"seenFeatures": [], "error": str(exc)}
+
+
+@app.put("/v1/prefs/onboarding")
+async def prefs_onboarding_put(request: Request):
+    """Union the incoming seen set with the stored one (monotonic, never shrinks)."""
+    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    try:
+        import time
+        from prefs_store import get_prefs, save_prefs
+        body = await request.json()
+        incoming = set(body.get("seenFeatures", []))
+        existing = set(get_prefs(owner_id, "onboarding").get("seenFeatures", []))
+        merged = sorted(existing | incoming)
+        save_prefs(owner_id, "onboarding", {"seenFeatures": merged}, int(time.time() * 1000))
+        return {"ok": True, "seenFeatures": merged}
+    except Exception as exc:
+        logger.error(f"[Prefs] onboarding put failed for {owner_id}: {exc}")
         return {"ok": False, "error": str(exc)}
 
 

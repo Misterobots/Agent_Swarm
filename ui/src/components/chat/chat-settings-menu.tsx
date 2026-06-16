@@ -18,6 +18,8 @@ import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useAccess } from "@/lib/hooks/use-access";
+import { useOnboardingStore } from "@/lib/stores/onboarding-store";
+import { FeatureCalloutBadge } from "@/components/onboarding/FeatureCalloutBadge";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -30,6 +32,12 @@ export function ChatSettingsMenu() {
   const activeConv = useChatStore((s) => s.activeConversation());
 
   const { isAdmin } = useAccess();
+  const hasNewMenuFeatures = useOnboardingStore((s) =>
+    s.hydrated && (
+      !s.seenFeatures.includes("workshop_v1") ||
+      !s.seenFeatures.includes("design_v1")
+    )
+  );
   const ultraplanMode = useSettingsStore((s) => s.ultraplanMode);
   const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
   const researchMode = useSettingsStore((s) => s.researchMode);
@@ -112,8 +120,12 @@ export function ChatSettingsMenu() {
           <UltraplanToggle />
           <UltrathinkToggle />
           <SwarmToggle />
-          <DesignModeToggle />
-          <WorkshopToggle />
+          <FeatureCalloutBadge feature="design_v1">
+            <DesignModeToggle />
+          </FeatureCalloutBadge>
+          <FeatureCalloutBadge feature="workshop_v1">
+            <WorkshopToggle />
+          </FeatureCalloutBadge>
           {isAdmin && <GoalsToggle />}
         </div>
       </div>
@@ -207,8 +219,11 @@ export function ChatSettingsMenu() {
         title={anyModeActive ? "Chat settings (modes active)" : "Chat settings"}
       >
         <Settings2 size={16} />
-        {anyModeActive && !isOpen && (
-          <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--chat-accent-2)]" />
+        {!isOpen && (anyModeActive || hasNewMenuFeatures) && (
+          <span className={cn(
+            "absolute top-0.5 right-0.5 w-2 h-2 rounded-full",
+            anyModeActive ? "bg-[var(--chat-accent-2)]" : "bg-[var(--chat-accent)] animate-pulse"
+          )} />
         )}
       </button>
 
