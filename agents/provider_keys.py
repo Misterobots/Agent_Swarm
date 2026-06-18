@@ -70,6 +70,16 @@ PROVIDERS: dict[str, dict] = {
         "validate_url": "https://integrate.api.nvidia.com/v1/models",
         "key_prefix": "nvapi-",
     },
+    "glm": {
+        "label": "Z.ai (GLM)",
+        # Z.ai International (OpenAI-compatible). glm_provider honours
+        # GLM_INFERENCE_BASE to switch to the mainland-China endpoint.
+        "models": [
+            {"id": "glm-5.2", "label": "GLM-5.2", "context": 200_000},
+        ],
+        "validate_url": "https://api.z.ai/api/paas/v4/chat/completions",
+        "key_prefix": "",  # Z.ai keys have no stable public prefix
+    },
 }
 
 

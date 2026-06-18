@@ -1370,6 +1370,43 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 "choices": [{"index": 0, "message": {"role": "assistant", "content": chunk.content}, "finish_reason": "stop"}],
             }
 
+    # Route Z.ai GLM requests directly to the GLMProvider
+    if _provider == "glm":
+        uid = http_request.headers.get("X-authentik-uid", "").strip()
+        if not uid:
+            raise HTTPException(status_code=401, detail="GLM requires an authenticated session")
+        try:
+            from providers.glm_provider import GLMProvider
+        except ImportError as e:
+            raise HTTPException(status_code=503, detail=f"GLM provider unavailable: {e}")
+
+        msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+        provider = GLMProvider(user_id=uid, model=request.model)
+
+        if request.stream:
+            async def glm_stream():
+                import time
+                for chunk in provider.generate_stream(msgs):
+                    sse = {
+                        "id": "chatcmpl-glm",
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": request.model,
+                        "choices": [{"index": 0, "delta": {"content": chunk.content, "type": chunk.type}, "finish_reason": None}],
+                    }
+                    yield f"data: {json.dumps(sse)}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(glm_stream(), media_type="text/event-stream")
+        else:
+            chunk = provider.generate(msgs)
+            return {
+                "id": "chatcmpl-glm",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": chunk.content}, "finish_reason": "stop"}],
+            }
+
     # Route Google Gemini requests directly to the GoogleProvider
     if request.model.startswith("gemini-"):
         uid = http_request.headers.get("X-authentik-uid", "").strip()

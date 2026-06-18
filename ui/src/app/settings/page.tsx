@@ -116,7 +116,7 @@ export default function SettingsPage() {
               <Field label="Provider API keys">
                 <ProviderKeysConnect />
                 <p className="text-xs text-[var(--chat-muted)] mt-2">
-                  Bring your own keys for Anthropic, Google Gemini, and NVIDIA NIM.
+                  Bring your own keys for Anthropic, Google Gemini, NVIDIA NIM, and Z.ai GLM.
                 </p>
               </Field>
             </div>
