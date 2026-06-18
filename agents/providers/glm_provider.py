@@ -85,6 +85,7 @@ class GLMProvider:
         **kwargs: Any,
     ) -> StreamChunk:
         """Non-streaming completion — returns a single StreamChunk."""
+        import urllib.error
         import urllib.request
 
         payload = {
@@ -106,6 +107,10 @@ class GLMProvider:
                 body = json.loads(resp.read())
             content = body["choices"][0]["message"]["content"]
             return StreamChunk(type="content", content=content)
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")
+            logger.error(f"glm generate HTTP {e.code}: {detail}", exc_info=True)
+            return StreamChunk(type="error", content=f"GLM API error {e.code}: {detail}")
         except Exception as e:
             logger.error(f"glm generate error: {e}", exc_info=True)
             return StreamChunk(type="error", content=f"GLM API error: {e}")
@@ -118,6 +123,7 @@ class GLMProvider:
         **kwargs: Any,
     ) -> Generator[StreamChunk, None, None]:
         """SSE streaming completion — yields StreamChunk objects."""
+        import urllib.error
         import urllib.request
 
         payload = {
@@ -151,6 +157,10 @@ class GLMProvider:
                             yield StreamChunk(type="content", content=text)
                     except (json.JSONDecodeError, KeyError, IndexError):
                         continue
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")
+            logger.error(f"glm stream HTTP {e.code}: {detail}", exc_info=True)
+            yield StreamChunk(type="error", content=f"GLM API error {e.code}: {detail}")
         except Exception as e:
             logger.error(f"glm stream error: {e}", exc_info=True)
             yield StreamChunk(type="error", content=f"GLM API error: {e}")
