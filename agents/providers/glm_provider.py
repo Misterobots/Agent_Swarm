@@ -152,6 +152,15 @@ class GLMProvider:
                     try:
                         chunk = json.loads(data_str)
                         delta = chunk["choices"][0].get("delta", {})
+                        # GLM-5.2 is a reasoning model: it streams a long burst of
+                        # `reasoning_content` (the chain-of-thought) BEFORE any
+                        # `content`. Forward it as "thought" chunks so (a) bytes keep
+                        # flowing through proxies during the think phase — otherwise
+                        # the idle SSE connection gets killed before the answer starts
+                        # — and (b) the UI renders it live in the thinking panel.
+                        reasoning = delta.get("reasoning_content")
+                        if reasoning:
+                            yield StreamChunk(type="thought", content=reasoning)
                         text = delta.get("content") or ""
                         if text:
                             yield StreamChunk(type="content", content=text)
