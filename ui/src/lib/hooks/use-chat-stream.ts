@@ -284,8 +284,19 @@ export function useChatStream(options?: {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
             const thoughtContent = event.content || "";
-            const thought: ThoughtEvent = { content: thoughtContent, timestamp: Date.now() };
-            thoughtTraceRef.current = [...thoughtTraceRef.current, thought];
+            // Accumulate reasoning tokens into the last entry rather than one entry
+            // per token — GLM-5.2 streams hundreds of tiny chunks which would create
+            // hundreds of timestamped trace lines otherwise.
+            const prev = thoughtTraceRef.current;
+            if (prev.length > 0 && Date.now() - prev[prev.length - 1].timestamp < 10000) {
+              const last = prev[prev.length - 1];
+              thoughtTraceRef.current = [
+                ...prev.slice(0, -1),
+                { content: last.content + thoughtContent, timestamp: last.timestamp },
+              ];
+            } else {
+              thoughtTraceRef.current = [...prev, { content: thoughtContent, timestamp: Date.now() }];
+            }
             setLatestThought(thoughtContent);
           } else if (event.type === "plan") {
             // Plan mode: stream plan content as visible message text

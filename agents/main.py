@@ -1268,6 +1268,56 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
     yield "data: [DONE]\n\n"
 
 
+async def _apply_grounding(request: "ChatRequest", uid: str) -> tuple[list[dict], list[dict]]:
+    """Run web/doc grounding for cloud-provider paths that bypass church.py.
+
+    Returns (grounded_messages, status_chunks) where status_chunks are SSE-ready
+    dicts the caller can yield before the model response.
+    """
+    msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+    status: list[dict] = []
+    if not (request.grounding_web or request.grounding_docs):
+        return msgs, status
+
+    user_input = request.messages[-1].content if request.messages else ""
+
+    if request.grounding_web:
+        try:
+            from grounding_permissions import grounding_permissions as _gp
+            from handlers.base import _needs_web_grounding
+            if _gp.is_permitted(uid, "web_grounding"):
+                if _needs_web_grounding(user_input):
+                    from tools.web_browser import web_search as _web_search
+                    status.append({"type": "status", "content": "🌐 Web Grounding: Searching..."})
+                    results = _web_search(user_input, num_results=5)
+                    if results:
+                        snippets = "\n".join(
+                            f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('snippet','')}"
+                            for i, r in enumerate(results)
+                        )
+                        msgs = msgs + [{"role": "system", "content": f"[Web Grounding Context — today's date is {__import__('datetime').date.today()}]\n{snippets}"}]
+                        status.append({"type": "status", "content": f"→ Web grounding: {len(results)} results injected"})
+                    else:
+                        status.append({"type": "status", "content": "→ Web grounding: no results returned"})
+        except Exception as _e:
+            logger.warning(f"[grounding] web grounding failed: {_e}")
+
+    if request.grounding_docs:
+        try:
+            from grounding_permissions import grounding_permissions as _gp
+            from handlers.base import _retrieve_doc_context
+            if _gp.is_permitted(uid, "docs_grounding"):
+                chunks = _retrieve_doc_context(user_input, uid, limit=5)
+                if chunks:
+                    doc_ctx = "\n\n".join(c.get("content", "") for c in chunks)
+                    msgs = msgs + [{"role": "system", "content": f"[Document Grounding Context]\n{doc_ctx}"}]
+                    status.append({"type": "status", "content": f"→ Doc grounding: {len(chunks)} chunks injected"})
+        except Exception as _e:
+            logger.warning(f"[grounding] doc grounding failed: {_e}")
+
+    return msgs, status
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest, http_request: Request):
     """
@@ -1380,12 +1430,21 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         except ImportError as e:
             raise HTTPException(status_code=503, detail=f"GLM provider unavailable: {e}")
 
-        msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+        msgs, grounding_status = await _apply_grounding(request, uid)
         provider = GLMProvider(user_id=uid, model=request.model)
 
         if request.stream:
             async def glm_stream():
                 import time
+                for status_chunk in grounding_status:
+                    sse = {
+                        "id": "chatcmpl-glm",
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": request.model,
+                        "choices": [{"index": 0, "delta": status_chunk, "finish_reason": None}],
+                    }
+                    yield f"data: {json.dumps(sse)}\n\n"
                 for chunk in provider.generate_stream(msgs):
                     sse = {
                         "id": "chatcmpl-glm",
