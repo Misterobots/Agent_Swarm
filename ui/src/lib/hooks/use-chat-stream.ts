@@ -284,20 +284,24 @@ export function useChatStream(options?: {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
             const thoughtContent = event.content || "";
-            // Accumulate reasoning tokens into the last entry rather than one entry
-            // per token — GLM-5.2 streams hundreds of tiny chunks which would create
-            // hundreds of timestamped trace lines otherwise.
+            // Accumulate reasoning tokens into the last trace entry rather than one
+            // entry per token — GLM-5.2 streams hundreds of tiny chunks which would
+            // otherwise create hundreds of timestamped trace lines.
             const prev = thoughtTraceRef.current;
+            let accumulated = thoughtContent;
             if (prev.length > 0 && Date.now() - prev[prev.length - 1].timestamp < 10000) {
               const last = prev[prev.length - 1];
+              accumulated = last.content + thoughtContent;
               thoughtTraceRef.current = [
                 ...prev.slice(0, -1),
-                { content: last.content + thoughtContent, timestamp: last.timestamp },
+                { content: accumulated, timestamp: last.timestamp },
               ];
             } else {
-              thoughtTraceRef.current = [...prev, { content: thoughtContent, timestamp: Date.now() }];
+              thoughtTraceRef.current = [...prev, { content: accumulated, timestamp: Date.now() }];
             }
-            setLatestThought(thoughtContent);
+            // Pass the accumulated text so the live indicator shows a readable
+            // growing sentence rather than a single word fragment.
+            setLatestThought(accumulated);
           } else if (event.type === "plan") {
             // Plan mode: stream plan content as visible message text
             setStatusMessage(null);

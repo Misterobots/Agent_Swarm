@@ -138,9 +138,12 @@ export function ThinkingIndicator({ statusMessage, latestThought, streamMode, sw
             <span className="thinking-dot w-1 h-1 rounded-full bg-[var(--chat-accent-2)]" />
           </span>
         </div>
-        {/* Line 2: Streaming thought trace */}
+        {/* Line 2: Streaming thought trace — show trailing ~120 chars so it reads
+            as a growing sentence rather than a single token fragment. */}
         {latestThought && (
-          <p className="text-xs text-[var(--chat-accent-strong)] font-mono mb-1.5 thought-stream-text streaming-caret">{latestThought}</p>
+          <p className="text-xs text-[var(--chat-muted)] font-mono mb-1.5 thought-stream-text streaming-caret">
+            {latestThought.length > 120 ? "…" + latestThought.slice(-120) : latestThought}
+          </p>
         )}
         {/* Line 3: Theme-flavored ambient verb */}
         <div className="flex items-center gap-2">

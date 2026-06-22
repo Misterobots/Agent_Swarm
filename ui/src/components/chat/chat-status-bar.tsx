@@ -42,7 +42,7 @@ export function ChatStatusBar({ tokenPct, isStreaming, latestThought }: ChatStat
       </div>
       <div className="flex items-center gap-3 min-w-0">
         <div className="truncate max-w-[45%] text-right text-[var(--chat-subtle)] italic">
-          {isStreaming ? latestThought || "" : ""}
+          {isStreaming && latestThought ? (latestThought.length > 80 ? "…" + latestThought.slice(-80) : latestThought) : ""}
         </div>
         <Link
           href="/mission-control"
