@@ -781,7 +781,7 @@ def chat_swarm(
             yield {"type": "error", "content": f"🚫 BLOCKED: {security_check.content}"}
             WORKFLOW_STEPS.labels(status="blocked", agent_type="Security").inc()
             return
-        yield {"type": "status", "content": "✅ Security Agent: Input Cleared."}
+        yield {"type": "status", "content": "Security Agent: Input cleared."}
         yield _t("→ Security: PASS")
         WORKFLOW_STEPS.labels(status="success", agent_type="Security").inc()
 
@@ -805,7 +805,7 @@ def chat_swarm(
                 yield {"type": "error", "content": "🔑 No Anthropic API key found. Add your key in **Settings → Provider API Keys** to use Claude models."}
                 model = None
             else:
-                yield {"type": "status", "content": f"☁️ Claude ({model}): Generating..."}
+                yield {"type": "status", "content": f"Claude ({model}): Generating..."}
                 yield _t(f"→ Provider: Anthropic ({model}) [{_key_source}]")
                 try:
                     provider = AnthropicProvider(api_key=_resolved_key, model=model)
@@ -1050,7 +1050,7 @@ def chat_swarm(
         if ultraplan_mode:
             yield _emit_turn_metadata(turn_id, "Planner", ["thinking", "responding"])
             yield _emit_stream_mode("thinking")
-            yield {"type": "status", "content": "📋 Planner: Decomposing task..."}
+            yield {"type": "status", "content": "Planner: Decomposing task..."}
             yield _t("→ UltraPlan mode: generating plan only (no execution)")
 
             PLAN_MODEL = _resolve_model_for_intent("CONVERSATION", os.getenv("PLAN_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:14b")))

@@ -23,7 +23,7 @@ def _deliver_image(filename: str, source_path: str, ctx: dict):
     user_input = ctx.get("_image_user_input", "")
 
     # QC inspection (non-blocking)
-    yield {"type": "status", "content": "🔍 Quality Control: Inspecting image..."}
+    yield {"type": "status", "content": "Quality Control: Inspecting image..."}
     try:
         from specialized.quality_control_agent import inspect_generated_image
         qc_result = inspect_generated_image(source_path, user_input)
@@ -37,12 +37,12 @@ def _deliver_image(filename: str, source_path: str, ctx: dict):
                 if issues and issues[0].lower() != "none"
                 else "Minor quality concerns"
             )
-            yield {"type": "log", "content": f"⚠️ Quality Check: {overall_score:.1f}/10 - {issue_text}"}
+            yield {"type": "log", "content": f"Quality check: {overall_score:.1f}/10 — {issue_text}"}
         else:
             yield {"type": "log", "content": f"✓ Quality Check: {overall_score:.1f}/10 - Excellent!"}
     except Exception as qc_err:
         logger.warning("[QualityControl] Inspection failed, proceeding: %s", qc_err)
-        yield {"type": "log", "content": "⚠️ Quality inspection unavailable, proceeding..."}
+        yield {"type": "log", "content": "Quality inspection unavailable, proceeding..."}
 
     # Delivery
     delivery_dir = "/workspace/delivered_artifacts"
@@ -62,7 +62,7 @@ def _deliver_image(filename: str, source_path: str, ctx: dict):
             )
             if media_meta:
                 yield {"type": "media_attachment", "content": media_meta}
-                yield {"type": "response", "content": f"✨ Image generated: {filename}"}
+                yield {"type": "response", "content": f"Image generated: {filename}"}
                 WORKFLOW_STEPS.labels(status="success", agent_type="CreativeStudio").inc()
             else:
                 yield {"type": "error", "content": "Failed to create media metadata"}
@@ -86,7 +86,7 @@ def handle_image(user_input: str, ctx: dict):
     from config import ARCHITECT_MODEL
     from role_model_resolver import get_model_for_role
 
-    yield {"type": "status", "content": "🎨 Art Director: Reviewing your vision..."}
+    yield {"type": "status", "content": "Art Director: Reviewing your vision..."}
     AGENT_STATE.labels(agent_name="ArtDirector").set(2)
 
     MODEL_NAME = get_model_for_role(uid, "architect", default=ARCHITECT_MODEL)
@@ -131,7 +131,7 @@ def handle_image(user_input: str, ctx: dict):
     yield {"type": "log", "content": "[Art Director] Prompt approved for Execution."}
     AGENT_STATE.labels(agent_name="ArtDirector").set(1)
 
-    yield {"type": "status", "content": "🎨 Creative Studio: Spinning up..."}
+    yield {"type": "status", "content": "Creative Studio: Spinning up..."}
     AGENT_STATE.labels(agent_name="CreativeStudio").set(2)
 
     from agents.specialized.image_gen import generate_image

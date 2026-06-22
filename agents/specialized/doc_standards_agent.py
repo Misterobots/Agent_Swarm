@@ -526,7 +526,7 @@ def standardize_document(
 
     # --- Step 5: Full Rewrite or Incremental Enhancement ---
     if full_rewrite:
-        yield {"type": "status", "content": "✍️ Full document rewrite in progress..."}
+        yield {"type": "status", "content": "Full document rewrite in progress..."}
         from prompts.doc_standards_prompt import FULL_STANDARDIZE_PROMPT, SECTION_GEN_SYSTEM_PROMPT
         full_content = content
         if external_context:
@@ -542,7 +542,7 @@ def standardize_document(
         result = inject_doc_id_badge(result, doc_id, source_ref or "Internal", category=category)
     else:
         # Incremental: keep existing content, generate and inject missing sections
-        yield {"type": "status", "content": "🔧 Enhancing document incrementally..."}
+        yield {"type": "status", "content": "Enhancing document incrementally..."}
         result = content
 
         # 5a. Fix frontmatter
@@ -563,7 +563,7 @@ def standardize_document(
             gen_content += external_context
 
         for section in analysis["sections_missing"]:
-            yield {"type": "status", "content": f"✍️ Generating: {section.title()}..."}
+            yield {"type": "status", "content": f"Generating: {section.title()}..."}
             generated = generate_section(section, gen_content, model=model)
             if generated and not generated.startswith("<!-- Section"):
                 # Find appropriate insertion point

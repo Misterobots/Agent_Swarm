@@ -16,6 +16,7 @@ from handlers.base import (
     _emit_tool_start, _emit_tool_progress, _emit_tool_result,
     _score_trace, _langfuse_span,
 )
+from prompts import apply_style_policy
 
 logger = logging.getLogger("Router")
 
@@ -74,7 +75,7 @@ def handle_architect(user_input: str, ctx: dict):
     if fast_mode:
         yield _emit_turn_metadata(turn_id, "Architect (Fast)", ["thinking", "responding"])
         yield _emit_stream_mode("thinking")
-        yield {"type": "status", "content": "⚡ Architect (Fast): Generating..."}
+        yield {"type": "status", "content": "Architect (Fast): Generating..."}
         AGENT_STATE.labels(agent_name="Architect").set(2)
         yield {"type": "thought", "content": f"→ Hive Fast: single-pass Architect ({ARCH_MODEL})"}
 
@@ -85,7 +86,7 @@ def handle_architect(user_input: str, ctx: dict):
             session_id=session_id,
             add_history_to_messages=True,
             num_history_responses=10,
-            instructions=(
+            instructions=apply_style_policy(
                 "You are the Hive Mind Architect, an expert software engineer and system designer.\n"
                 "Write clean, correct, production-quality code. Explain your reasoning concisely.\n"
                 "You run on local hardware in a self-hosted home lab."
@@ -113,7 +114,7 @@ def handle_architect(user_input: str, ctx: dict):
     else:
         yield _emit_turn_metadata(turn_id, "Architect", ["thinking", "tool-use", "responding"])
         yield _emit_stream_mode("thinking")
-        yield {"type": "status", "content": "🏗️ MarsRL: Solver → Verifier → Corrector..."}
+        yield {"type": "status", "content": "MarsRL: Solver → Verifier → Corrector..."}
         AGENT_STATE.labels(agent_name="Architect").set(2)
 
         solver = get_architect_agent(session_id=session_id)

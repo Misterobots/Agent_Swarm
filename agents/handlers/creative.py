@@ -8,6 +8,7 @@ from phi.model.ollama import Ollama
 from metrics import AGENT_STATE, WORKFLOW_STEPS
 from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
 from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace, _langfuse_span
+from prompts import apply_style_policy
 
 logger = logging.getLogger("Router")
 
@@ -27,7 +28,7 @@ def handle_creative(user_input: str, ctx: dict):
 
     yield _emit_turn_metadata(turn_id, "Creative Writer", ["thinking", "responding"])
     yield _emit_stream_mode("thinking")
-    yield {"type": "status", "content": "✍️ Creative Writer: Composing..."}
+    yield {"type": "status", "content": "Creative Writer: Composing..."}
     AGENT_STATE.labels(agent_name="CreativeWriter").set(2)
 
     resolved_model = _resolve_model_for_intent("CREATIVE", LIBRARIAN_MODEL)
@@ -36,7 +37,7 @@ def handle_creative(user_input: str, ctx: dict):
     writer = Agent(
         name="Creative Writer",
         model=Ollama(id=resolved_model, host=resolved_host, options=get_ollama_options(resolved_model)),
-        instructions=(
+        instructions=apply_style_policy(
             "You are a professional Creative Writer and worldbuilder.\n"
             "Your goal is to produce vivid, immersive, richly detailed creative writing: "
             "scene descriptions, stories, narratives, character sketches, lore, poetry, "
@@ -72,7 +73,7 @@ def handle_creative(user_input: str, ctx: dict):
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
             with request_lock(context="text"):
                 response_stream = writer.run(final_input, stream=True)
-                yield {"type": "status", "content": "✍️ Creative Writer: Writing..."}
+                yield {"type": "status", "content": "Creative Writer: Writing..."}
                 for chunk in response_stream:
                     if chunk.content:
                         yield _emit_stream_mode("responding")

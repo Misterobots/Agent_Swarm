@@ -104,7 +104,7 @@ def handle_design(user_input: str, ctx: dict):
         _img_matches = _img_pattern.findall(extracted_context)
 
         if _img_matches:
-            yield {"type": "status", "content": f"🔍 Design Studio: Analysing {len(_img_matches)} image(s)..."}
+            yield {"type": "status", "content": f"Design Studio: Analysing {len(_img_matches)} image(s)..."}
             _vision_host = get_best_host_for_model(_VISION_MODEL)
             _image_descriptions: list[str] = []
 
@@ -169,7 +169,7 @@ def handle_design(user_input: str, ctx: dict):
             yield {"type": "log", "content": f"[DesignStudio] Context injected ({len(text_ctx)} chars)"}
 
     # Revision mode: inject the previous HTML so the model edits in-place instead
-    # of regenerating. Without this, the model only sees "✨ Design ready!" as prior
+    # of regenerating. Without this, the model only sees "Design ready." as prior
     # context and cold-starts a fresh design on every revision — causing design
     # system degradation (lost colours, typography, layout conventions).
     _is_revision = bool(history_context) and os.path.exists(_artifact_cache_path)
@@ -300,7 +300,7 @@ def handle_design(user_input: str, ctx: dict):
             "skill": od_skill_id,
         },
     }
-    yield {"type": "response", "content": "✨ Design ready!"}
+    yield {"type": "response", "content": "Design ready."}
     _score_trace(
         lf_trace, langfuse, 0.9,
         output=f"design_artifact:{filename}",

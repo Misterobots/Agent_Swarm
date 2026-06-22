@@ -64,9 +64,9 @@ You are a senior product architect writing a structured Product Brief from a
 discovery session.  Given the original idea and the user's answers, produce a
 complete, actionable brief.
 
-Use exactly these headers (keep the emoji):
+Use exactly these headers:
 
-## 🚀 Product Brief: [Product Name]
+## Product Brief: [Product Name]
 
 ### Vision
 [2–3 sentences — what it is, who it's for, core value proposition]
@@ -86,7 +86,7 @@ colour palette direction]
 [How the pieces connect — 4–6 bullet points, concrete enough to scaffold from]
 
 ---
-### ▶️ Design Mode Prompt
+### Design Mode Prompt
 ```
 [A rich, copy-paste-ready prompt for Design Mode.  Must include: platform,
 visual style, key screens/states, interaction patterns, colour/typography
@@ -94,14 +94,14 @@ direction.  Make it specific enough that the Design Studio generates
 something immediately useful, not generic.]
 ```
 
-### ⚙️ Swarm Mode Prompt
+### Swarm Mode Prompt
 ```
 [A copy-paste-ready prompt for Swarm Mode, scoped to MVP only.
 Must include: tech stack, 3–5 concrete deliverables, file structure hints,
 success criterion, and one sentence on each of the trickiest parts.]
 ```
 
-### ⚠️ Watch Points
+### Watch Points
 [2–3 specific risks or hard problems worth tackling early — not generic
 "make sure to test" advice, but actual project-specific concerns.]
 
@@ -129,7 +129,7 @@ def handle_workshop(user_input: str, ctx: dict):
     # Phase detection — are we generating questions or a Product Brief?
     # ------------------------------------------------------------------
     _PHASE1_SENTINEL = "Answer any or all of these and I'll draft your Product Brief."
-    _PHASE2_SENTINEL = "▶️ Design Mode Prompt"
+    _PHASE2_SENTINEL = "Design Mode Prompt"
 
     _in_answer_phase = bool(history_context) and (
         _PHASE1_SENTINEL in history_context

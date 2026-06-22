@@ -13,6 +13,7 @@ from handlers.base import (
     _emit_tool_start, _emit_tool_progress, _emit_tool_result,
     _score_trace, _langfuse_span,
 )
+from prompts import apply_style_policy
 
 logger = logging.getLogger("Router")
 
@@ -69,7 +70,7 @@ def handle_devops(user_input: str, ctx: dict):
             session_id=session_id,
             add_history_to_messages=True,
             num_history_responses=10,
-            instructions="You are a DevOps engineer in a self-hosted home lab. Help with infrastructure, Docker, networking, and system administration tasks.",
+            instructions=apply_style_policy("You are a DevOps engineer in a self-hosted home lab. Help with infrastructure, Docker, networking, and system administration tasks."),
             show_tool_calls=False,
         )
         full_content = ""
@@ -152,7 +153,7 @@ def handle_data(user_input: str, ctx: dict):
 
     yield _emit_turn_metadata(turn_id, "Data Analyst", ["thinking", "responding"])
     yield _emit_stream_mode("thinking")
-    yield {"type": "status", "content": "📊 Data Analyst: Processing your data request..."}
+    yield {"type": "status", "content": "Data Analyst: Processing your data request..."}
 
     DATA_MODEL = get_model_for_role(uid, "analyst", default=_ANALYST_MODEL_DEFAULT)
     DATA_MODEL = _resolve_model_for_intent("DATA", DATA_MODEL)
@@ -189,7 +190,7 @@ def handle_data(user_input: str, ctx: dict):
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
             with request_lock(context="text"):
                 response_stream = data_agent.run(final_input, stream=True)
-                yield {"type": "status", "content": "📊 Data Analyst: Generating analysis..."}
+                yield {"type": "status", "content": "Data Analyst: Generating analysis..."}
                 for chunk in response_stream:
                     if chunk.content:
                         yield _emit_stream_mode("responding")

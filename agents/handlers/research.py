@@ -9,6 +9,7 @@ from phi.model.ollama import Ollama
 from metrics import AGENT_STATE, WORKFLOW_STEPS
 from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
 from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace, _langfuse_span
+from prompts import apply_style_policy
 
 logger = logging.getLogger("Router")
 
@@ -98,7 +99,7 @@ def handle_documentation(user_input: str, ctx: dict):
 
     yield _emit_turn_metadata(turn_id, "Technical Writer", ["thinking", "responding"])
     yield _emit_stream_mode("thinking")
-    yield {"type": "status", "content": "📝 Technical Writer: Reviewing document structure..."}
+    yield {"type": "status", "content": "Technical Writer: Reviewing document structure..."}
     AGENT_STATE.labels(agent_name="TechnicalWriter").set(2)
 
     TECH_MODEL = _resolve_model_for_intent(
@@ -110,7 +111,7 @@ def handle_documentation(user_input: str, ctx: dict):
     tech_writer = Agent(
         name="Technical Writer",
         model=Ollama(id=TECH_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 300.0}, options=_get_ollama_options(TECH_MODEL)),
-        instructions=(
+        instructions=apply_style_policy(
             "You are a Staff-Level Technical Writer.\n"
             "Your goal is to rewrite, format, and organize documentation into professional, polished markdown.\n"
             "If provided with large context files, synthesize the information accurately.\n"
@@ -149,7 +150,7 @@ def handle_documentation(user_input: str, ctx: dict):
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
             with request_lock(context="text"):
                 response_stream = tech_writer.run(final_input, stream=True)
-                yield {"type": "status", "content": "📝 Technical Writer: Generating document..."}
+                yield {"type": "status", "content": "Technical Writer: Generating document..."}
                 for chunk in response_stream:
                     if chunk.content:
                         yield _emit_stream_mode("responding")

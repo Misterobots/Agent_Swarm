@@ -299,8 +299,6 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
     except Exception as e:
         logger.warning(f"[Coordinator] _synthesize_perspective_matrix failed: {e}")
 
-    controversy_emoji = {"low": "🟢", "medium": "🟡", "high": "🔴"}.get(result["controversy_level"], "🟡")
-
     table_rows = []
     for label, text in findings_by_perspective.items():
         # Guard: text must be a str; dicts/lists can slip in if a worker returns JSON content
@@ -329,20 +327,20 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
     controversy_alert = ""
     if result["controversy_level"] == "high":
         controversy_alert = (
-            f"> **⚠️ Controversy Alert** — Perspectives significantly disagree on this topic. "
+            f"> **Controversy Alert** — Perspectives significantly disagree on this topic. "
             f"Consider which lens is most relevant to your context before acting on any single viewpoint.\n\n"
         )
 
     matrix_md = (
-        f"## 🔬 Perspective Research Matrix\n\n"
+        f"## Perspective Research Matrix\n\n"
         f"{table_md}\n\n"
-        f"### ✅ Convergent Points _(broad agreement across perspectives)_\n\n"
+        f"### Convergent Points _(broad agreement across perspectives)_\n\n"
         f"{convergent_md}\n\n"
-        f"### ⚠️ Divergent Points _(conflicting views or contested territory)_\n\n"
+        f"### Divergent Points _(conflicting views or contested territory)_\n\n"
         f"{controversy_alert}"
         f"{divergent_md}\n\n"
-        f"**Controversy Level:** {controversy_emoji} {result['controversy_level'].capitalize()}\n\n"
-        f"### 📊 Synthesis\n\n"
+        f"**Controversy Level:** {result['controversy_level'].capitalize()}\n\n"
+        f"### Synthesis\n\n"
         f"{result['synthesis_narrative']}\n"
     )
 
