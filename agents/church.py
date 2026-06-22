@@ -813,6 +813,22 @@ def chat_swarm(
                     if history:
                         api_messages = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in history]
                         api_messages.append({"role": "user", "content": user_input})
+                    # Apply web/doc grounding before sending to Claude — injects
+                    # search results as a system message so Claude has live context.
+                    if grounding_web:
+                        try:
+                            from grounding_permissions import grounding_permissions as _gp
+                            from handlers.base import _needs_web_grounding
+                            if _gp.is_permitted(owner_id or "", "web_grounding") and _needs_web_grounding(user_input):
+                                from tools.web_browser import web_search as _web_search
+                                yield {"type": "status", "content": "🌐 Web Grounding: Searching..."}
+                                _results = _web_search(user_input, num_results=5)
+                                if _results:
+                                    _snippets = "\n".join(f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('snippet','')}" for i, r in enumerate(_results))
+                                    api_messages = [{"role": "user", "content": f"[Web Grounding Context]\n{_snippets}"}] + api_messages
+                                    yield _t(f"→ Web grounding: {len(_results)} results injected")
+                        except Exception as _wg_err:
+                            logger.warning(f"[Router] Anthropic web grounding failed: {_wg_err}")
                     for chunk in provider.generate_stream(prompt=user_input, messages=api_messages, system="You are Hive Mind, a helpful AI assistant in a self-hosted home lab."):
                         yield chunk.as_dict()
                     _score_trace(lf_trace, langfuse, 0.9, output="[anthropic stream]")

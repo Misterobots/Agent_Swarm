@@ -120,19 +120,28 @@ class GLMProvider:
         messages: list[dict[str, str]],
         max_tokens: int = 8192,
         temperature: float = 0.7,
+        grounding_web: bool = False,
         **kwargs: Any,
     ) -> Generator[StreamChunk, None, None]:
-        """SSE streaming completion — yields StreamChunk objects."""
+        """SSE streaming completion — yields StreamChunk objects.
+
+        When grounding_web=True, GLM's native web_search tool is enabled so the
+        model decides when to search and integrates results itself, rather than
+        doing RAG pre-injection on our side.
+        """
         import urllib.error
         import urllib.request
 
-        payload = {
+        payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
             "stream": True,
         }
+
+        if grounding_web:
+            payload["tools"] = [{"type": "web_search", "web_search": {"enable": True}}]
 
         req = urllib.request.Request(
             f"{INFERENCE_BASE}/chat/completions",

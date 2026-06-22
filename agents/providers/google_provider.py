@@ -100,6 +100,10 @@ class GoogleProvider:
                 body = json.loads(resp.read())
             content = body["choices"][0]["message"]["content"]
             return StreamChunk(type="content", content=content)
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")
+            logger.error(f"google generate HTTP {e.code}: {detail}", exc_info=True)
+            return StreamChunk(type="error", content=f"Google API error {e.code}: {detail}")
         except Exception as e:
             logger.error(f"google generate error: {e}", exc_info=True)
             return StreamChunk(type="error", content=f"Google API error: {e}")
@@ -112,6 +116,7 @@ class GoogleProvider:
         **kwargs: Any,
     ) -> Generator[StreamChunk, None, None]:
         """SSE streaming completion — yields StreamChunk objects."""
+        import urllib.error
         import urllib.request
 
         payload = {
@@ -145,6 +150,10 @@ class GoogleProvider:
                             yield StreamChunk(type="content", content=text)
                     except (json.JSONDecodeError, KeyError, IndexError):
                         continue
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")
+            logger.error(f"google stream HTTP {e.code}: {detail}", exc_info=True)
+            yield StreamChunk(type="error", content=f"Google API error {e.code}: {detail}")
         except Exception as e:
             logger.error(f"google stream error: {e}", exc_info=True)
             yield StreamChunk(type="error", content=f"Google API error: {e}")

@@ -1430,22 +1430,15 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         except ImportError as e:
             raise HTTPException(status_code=503, detail=f"GLM provider unavailable: {e}")
 
-        msgs, grounding_status = await _apply_grounding(request, uid)
+        # GLM handles web grounding natively via its web_search tool — pass the
+        # flag through to the provider instead of doing RAG pre-injection.
+        msgs = [{"role": m.role, "content": m.content} for m in request.messages]
         provider = GLMProvider(user_id=uid, model=request.model)
 
         if request.stream:
             async def glm_stream():
                 import time
-                for status_chunk in grounding_status:
-                    sse = {
-                        "id": "chatcmpl-glm",
-                        "object": "chat.completion.chunk",
-                        "created": int(time.time()),
-                        "model": request.model,
-                        "choices": [{"index": 0, "delta": status_chunk, "finish_reason": None}],
-                    }
-                    yield f"data: {json.dumps(sse)}\n\n"
-                for chunk in provider.generate_stream(msgs):
+                for chunk in provider.generate_stream(msgs, grounding_web=request.grounding_web):
                     sse = {
                         "id": "chatcmpl-glm",
                         "object": "chat.completion.chunk",
