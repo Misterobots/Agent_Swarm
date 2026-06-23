@@ -441,6 +441,7 @@ def chat_swarm(
     grounding_web: bool = False,
     grounding_docs: bool = False,
     grounding_file: bool = False,
+    already_steered: bool = False,
     swarm_mode: bool = False,
     dev_mode: bool = False,
     design_mode: bool = False,
@@ -1147,9 +1148,10 @@ def chat_swarm(
 
         # Build shared handler context
         # _already_steered may have been set when a swarm_steering pending context
-        # was resolved above; default False for all other paths.
+        # was resolved above, or passed in directly (e.g. from external MCP callers
+        # that should never hit the nuance gate).
         if "_already_steered" not in dir():
-            _already_steered = False
+            _already_steered = already_steered
         is_admin = _is_admin_session(session_id, owner_id)
         # Strip non-Ollama-model values from `model`. The frontend sends UI
         # tier labels like "Home-AI-Swarm" or "default" that aren't real

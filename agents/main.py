@@ -496,6 +496,7 @@ class ChatRequest(BaseModel):
     grounding_web: bool = False       # inject live web search results (requires governance permission)
     grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
+    already_steered: bool = False     # skip nuance gate (set by external callers like MCP tools)
     swarm_mode: bool = False          # route through Lamport multi-agent coordinator
     design_mode: bool = False         # route through Open Design Studio
     workshop_mode: bool = False       # route through Product Workshop (Grill Me)
@@ -1439,6 +1440,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     grounding_web=request.grounding_web,
                     grounding_docs=request.grounding_docs,
                     grounding_file=request.grounding_file,
+                    already_steered=request.already_steered,
                     swarm_mode=request.swarm_mode,
                     design_mode=request.design_mode,
                     workshop_mode=request.workshop_mode,
