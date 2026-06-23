@@ -178,6 +178,22 @@ def coordinate_task(
         # Unlike the ambiguity gate (missing info), this catches well-specified requests where
         # choosing the wrong approach would waste the research team's effort.
         # The user picks a direction; the coordinator resumes with that context via Brooks.
+        if plan.get("nuance_detected", False) and not dev_mode and not research_mode and already_steered:
+            # External caller (e.g. MCP tool) — cannot pause to ask. Auto-select the first
+            # suggested direction and emit it as a visible assumption so the caller can
+            # relay it to the user before the swarm spends time going the wrong way.
+            steering_q = plan.get("steering_question", "Which angle to pursue?")
+            suggested_dirs = plan.get("suggested_directions", [])
+            chosen = suggested_dirs[0].get("label", "best judgment") if suggested_dirs else "best judgment"
+            logger.info(f"[Coordinator] Nuance detected (already_steered) — auto-selecting: {chosen!r}")
+            yield {
+                "type": "thought",
+                "content": (
+                    f"Ambiguity detected: {steering_q} "
+                    f"Auto-selecting: '{chosen}'. If this is wrong, re-invoke with a more specific prompt."
+                ),
+            }
+
         if plan.get("nuance_detected", False) and not dev_mode and not research_mode and not already_steered:
             steering_q = plan.get(
                 "steering_question",
