@@ -1043,7 +1043,7 @@ def chat_swarm(
 
         if research_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN"):
             intent = "RESEARCH"; yield _t("→ Research mode activated: forcing RESEARCH intent")
-        if swarm_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN", "CREATIVE"):
+        if swarm_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN"):
             intent = "COORDINATE"; yield _t("→ Swarm Mode: routing to multi-agent coordinator")
 
         # UltraPlan mode (plan only)
