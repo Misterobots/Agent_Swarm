@@ -496,7 +496,7 @@ class ChatRequest(BaseModel):
     grounding_web: bool = False       # inject live web search results (requires governance permission)
     grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
-    already_steered: bool = False     # skip nuance gate (set by external callers like MCP tools)
+    already_steered: bool = False     # skip nuance gate (True when user has already answered a steering question)
     swarm_mode: bool = False          # route through Lamport multi-agent coordinator
     design_mode: bool = False         # route through Open Design Studio
     workshop_mode: bool = False       # route through Product Workshop (Grill Me)
