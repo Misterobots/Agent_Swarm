@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { BottomTabBar } from "./bottom-tab-bar";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils/cn";
 import { PanelLeft } from "lucide-react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
+import { useDesktop } from "@/lib/hooks/use-desktop";
 import { ThemeAmbientCanvas } from "@/components/theme/theme-ambient-canvas";
 import { ThemeLCARSDecor }   from "@/components/theme/theme-lcars-decor";
 import { AudioProvider } from "./AudioProvider";
@@ -19,6 +21,9 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { isMobile, isTablet } = useIsMobile();
+  const { inDesktop, bridge } = useDesktop();
+  const setDesktopLocalPath = useSettingsStore((s) => s.setDesktopLocalPath);
+  const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const theme = useSettingsStore((s) => s.theme);
   const themeMode = useSettingsStore((s) => s.themeMode);
@@ -96,6 +101,23 @@ export function AppShell({ children }: AppShellProps) {
     apply(themeMode);
   }, [theme, themeMode, setTheme]);
 
+  // Desktop bridge — register native handlers when running in Memex Desktop app.
+  // Mirrors the pattern claude.ai uses to detect window.claude.
+  useEffect(() => {
+    if (!inDesktop || !bridge) return;
+
+    // Quick Entry window → pre-fill chat input and focus it
+    bridge.onQuickSubmit((text) => {
+      window.dispatchEvent(new CustomEvent("chat:prefill", { detail: text }));
+    });
+
+    // File/folder drag-drop from OS → set local path + navigate to dev workspace
+    bridge.onOpenPath((path) => {
+      setDesktopLocalPath(path);
+      router.push("/dev");
+    });
+  }, [inDesktop, bridge, router]);
+
   // Stable callbacks — must not recreate on every render or MobileDrawer's
   // useEffect([pathname, onClose]) will fire and immediately close the drawer.
   const handleOpenDrawer = useCallback(() => setDrawerOpen(true), []);
@@ -104,7 +126,10 @@ export function AppShell({ children }: AppShellProps) {
   const isTopBar = !isMobile && navLayout === "topbar";
 
   return (
-    <div className="app-shell-root flex flex-col h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]">
+    <div
+      className="app-shell-root flex flex-col h-dvh bg-[var(--chat-bg,#0e1117)] text-[var(--chat-text,#e4e4e7)]"
+      style={inDesktop ? { paddingTop: "40px" } : undefined}
+    >
       {/* Ambient backgrounds & UI audio (Canvas + DOM overlays + SFX) */}
       <ThemeAmbientCanvas />
       {/* LCARS structural chrome — left arm strip + readout bars */}

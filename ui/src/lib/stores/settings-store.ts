@@ -88,6 +88,9 @@ interface SettingsState {
   /** Pre-fills the chat input; cleared by ChatInput after consumption */
   pendingInput: string;
   setPendingInput: (text: string) => void;
+  /** Local filesystem path set by the Desktop app (drag-drop or openFolder) */
+  desktopLocalPath: string;
+  setDesktopLocalPath: (path: string) => void;
   setGroundingWeb: (on: boolean) => void;
   setGroundingDocs: (on: boolean) => void;
   setGroundingFile: (on: boolean) => void;
@@ -155,6 +158,8 @@ export const useSettingsStore = create<SettingsState>()(
       setWorkshopMode: (workshopMode) => set({ workshopMode }),
       pendingInput: "",
       setPendingInput: (pendingInput) => set({ pendingInput }),
+      desktopLocalPath: "",
+      setDesktopLocalPath: (desktopLocalPath) => set({ desktopLocalPath }),
       setGroundingWeb: (groundingWeb) => set({ groundingWeb }),
       setGroundingDocs: (groundingDocs) => set({ groundingDocs }),
       setGroundingFile: (groundingFile) => set({ groundingFile }),
