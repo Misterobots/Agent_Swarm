@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ModelSelector } from "@/components/chat/model-selector";
 import { ThemeSelector } from "@/components/chat/theme-selector";
 import { GitHubConnect } from "@/components/settings/github-connect";
@@ -9,7 +10,8 @@ import { useMonitorStore } from "@/lib/stores/monitor-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { DASHBOARDS } from "@/components/monitor/dashboard-selector";
 import { useAccess } from "@/lib/hooks/use-access";
-import { Settings } from "lucide-react";
+import { useDesktop } from "@/lib/hooks/use-desktop";
+import { Settings, Monitor } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui";
 
 const TOOL_OPTIONS = [
@@ -29,6 +31,24 @@ export default function SettingsPage() {
   const setThemePickerMode = useSettingsStore((s) => s.setThemePickerMode);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const setSoundEnabled = useSettingsStore((s) => s.setSoundEnabled);
+
+  const { inDesktop, bridge } = useDesktop();
+  const [autoStart, setAutoStartState] = useState(false);
+  const [autoStartLoading, setAutoStartLoading] = useState(false);
+
+  useEffect(() => {
+    if (!inDesktop || !bridge) return;
+    bridge.autoStart.get().then(setAutoStartState);
+  }, [inDesktop, bridge]);
+
+  const toggleAutoStart = async () => {
+    if (!bridge) return;
+    setAutoStartLoading(true);
+    const next = !autoStart;
+    await bridge.autoStart.set(next);
+    setAutoStartState(next);
+    setAutoStartLoading(false);
+  };
 
   const modelAccessMessage = accessLoading
     ? "Checking access level…"
@@ -140,6 +160,48 @@ export default function SettingsPage() {
               </Field>
             </div>
           </SettingsCard>
+
+          {inDesktop && (
+            <SettingsCard title="Desktop app">
+              <Field label="Launch at login">
+                <div className="flex items-center gap-3">
+                  <button
+                    role="switch"
+                    aria-checked={autoStart}
+                    onClick={toggleAutoStart}
+                    disabled={autoStartLoading}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                      autoStart ? "bg-[var(--chat-accent)]" : "bg-[var(--chat-border)]"
+                    }`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                      autoStart ? "translate-x-4" : "translate-x-0.5"
+                    }`} />
+                  </button>
+                  <span className="text-sm text-[var(--chat-text)]">
+                    {autoStart ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--chat-muted)] mt-2">
+                  Start Memex Desktop minimized to the system tray when you log in.
+                </p>
+              </Field>
+              <div className="border-t border-[var(--chat-border)] pt-5 mt-5">
+                <Field label="Quick entry shortcut">
+                  <p className="text-sm text-[var(--chat-text)] font-mono">Ctrl + Shift + Space</p>
+                  <p className="text-xs text-[var(--chat-muted)] mt-1">
+                    Open the floating prompt from anywhere on your desktop.
+                  </p>
+                </Field>
+              </div>
+              <div className="border-t border-[var(--chat-border)] pt-5 mt-5">
+                <div className="flex items-center gap-2 text-xs text-[var(--chat-muted)]">
+                  <Monitor size={13} />
+                  <span>Running as Memex Desktop v{typeof window !== "undefined" && (window as any).memex ? "native" : "—"}</span>
+                </div>
+              </div>
+            </SettingsCard>
+          )}
 
           <SettingsCard title="About">
             <div className="space-y-1 text-sm text-[var(--chat-muted)]">

@@ -37,6 +37,11 @@ export interface MemexDesktopBridge {
 
   onQuickSubmit: (cb: (text: string) => void) => void;
   onOpenPath:    (cb: (path: string) => void) => void;
+
+  autoStart: {
+    get: () => Promise<boolean>;
+    set: (enable: boolean) => Promise<boolean>;
+  };
 }
 
 declare global {
