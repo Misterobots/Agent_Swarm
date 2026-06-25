@@ -113,6 +113,12 @@ export function AppShell({ children }: AppShellProps) {
       window.dispatchEvent(new CustomEvent("chat:prefill", { detail: text }));
     });
 
+    // File type handler: .memex / .claude skill import
+    (window as any).__memexImportFile = (filePath: string) => {
+      window.dispatchEvent(new CustomEvent("memex:importFile", { detail: filePath }));
+      router.push("/settings"); // navigate to settings where skills are managed
+    };
+
     // Global shortcut: new conversation
     (window as any).__memexNewConversation = () => {
       const { createConversation, setActiveConversation } = useChatStore.getState();
