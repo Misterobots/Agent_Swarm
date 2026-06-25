@@ -42,6 +42,14 @@ export interface MemexDesktopBridge {
     get: () => Promise<boolean>;
     set: (enable: boolean) => Promise<boolean>;
   };
+
+  permissions: {
+    request: (opts: {
+      toolName:  string;
+      toolInput: Record<string, unknown>;
+      callId:    string;
+    }) => Promise<{ approved: boolean; scope: "once" | "session" | "workspace" }>;
+  };
 }
 
 declare global {

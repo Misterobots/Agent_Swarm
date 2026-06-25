@@ -8,6 +8,7 @@ import type { AgentTraceEvent, ClarificationCard, FileChange, ThoughtEvent, Tool
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
+import { desktop } from "@/lib/desktop";
 
 const MODEL_WINDOWS: Record<string, number> = {
   // Gemma4
@@ -348,16 +349,36 @@ export function useChatStream(options?: {
               setMessagePendingApprovals(convId!, assistantId, pendingApprovalsRef.current);
             }
           } else if (event.type === "tool_approval_needed") {
-            // Live-update the message with new pending approval so the UI can
-            // show the Approve/Deny card immediately while streaming is paused.
-            const approval = {
-              tool_call_id: event.tool_call_id || "",
-              tool_name: event.tool_name || "tool",
-              tool_input: event.tool_input,
-              timestamp: Date.now(),
-            } satisfies ToolApprovalEvent;
-            pendingApprovalsRef.current = [...pendingApprovalsRef.current, approval];
-            setMessagePendingApprovals(convId!, assistantId, pendingApprovalsRef.current);
+            const callId   = event.tool_call_id || "";
+            const toolName = event.tool_name || "tool";
+            const toolInput = event.tool_input ?? {};
+
+            const bridge = desktop();
+            if (bridge) {
+              // Desktop: native OS dialog — grabs focus, resolves without UI card
+              bridge.permissions.request({ toolName, toolInput, callId })
+                .then(async ({ approved, scope }) => {
+                  const endpoint = approved
+                    ? `/api/backend/api/v1/dev/approve/${callId}`
+                    : `/api/backend/api/v1/dev/deny/${callId}`;
+                  await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: approved ? JSON.stringify({ scope }) : undefined,
+                  }).catch(() => {});
+                })
+                .catch(() => {});
+            } else {
+              // Browser: render the in-chat approval card as before
+              const approval = {
+                tool_call_id: callId,
+                tool_name:    toolName,
+                tool_input:   toolInput,
+                timestamp:    Date.now(),
+              } satisfies ToolApprovalEvent;
+              pendingApprovalsRef.current = [...pendingApprovalsRef.current, approval];
+              setMessagePendingApprovals(convId!, assistantId, pendingApprovalsRef.current);
+            }
           } else if (event.type === "clarification_card") {
             if (event.clarification) {
               setMessagePendingClarification(convId!, assistantId, event.clarification as ClarificationCard);
