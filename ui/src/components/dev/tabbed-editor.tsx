@@ -10,6 +10,7 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useDevPanelStore } from "@/lib/stores/dev-panel-store";
 import { FileTree } from "./file-tree";
 import { getMonacoThemeName, registerMonacoThemes } from "./dev-theme-map";
+import { NotebookViewer } from "./notebook-viewer";
 
 interface EditorTab {
   id: string;
@@ -116,16 +117,28 @@ export function TabbedEditor() {
         }
       })
     ).then((results) => {
-      const valid = results.filter(Boolean) as (typeof results[number] & object)[];
-      if (valid.length === 0) return;
-      const restoredTabs: EditorTab[] = (valid as NonNullable<typeof valid[number]>[]).map((m) => ({
-        id: (m as { path: string }).path,
-        path: (m as { path: string }).path,
-        filename: (m as { filename: string }).filename,
-        language: (m as { language: string }).language,
-        content: (m as { content: string }).content,
-        modified: false,
-      }));
+      const restoredTabs: EditorTab[] = results.map((m, i) => {
+        if (m) {
+          return {
+            id: m.path,
+            path: m.path,
+            filename: m.filename,
+            language: m.language,
+            content: m.content,
+            modified: false,
+          };
+        }
+        // File couldn't be fetched (cross-host project, deleted, etc.) — show placeholder
+        const meta = openTabMeta[i];
+        return {
+          id: meta.path,
+          path: meta.path,
+          filename: meta.filename,
+          language: "plaintext",
+          content: `# ${meta.filename} is not available on this host.\n# Re-open it from the file tree once the project is synced.\n`,
+          modified: false,
+        };
+      });
       setTabs(restoredTabs);
       const targetId = activeTabPath
         ? (restoredTabs.find((t) => t.path === activeTabPath)?.id ?? restoredTabs[0].id)
@@ -358,9 +371,18 @@ export function TabbedEditor() {
         </div>
       </div>
 
-      {/* Monaco Editor */}
+      {/* Editor — Notebook viewer for .ipynb, Monaco for everything else */}
       <div className="flex-1 min-h-0">
-        {activeTab && (
+        {activeTab?.path?.endsWith(".ipynb") ? (
+          <NotebookViewer
+            key={activeTab.id}
+            path={activeTab.path}
+            onClose={() => {
+              setTabs((prev) => prev.filter((t) => t.id !== activeTab.id));
+              setActiveTabId(tabs.find((t) => t.id !== activeTab.id)?.id ?? DEFAULT_TAB.id);
+            }}
+          />
+        ) : activeTab && (
           <Editor
             key={activeTab.id}
             height="100%"
