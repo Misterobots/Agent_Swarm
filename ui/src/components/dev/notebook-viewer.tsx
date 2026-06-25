@@ -5,7 +5,6 @@ import { desktop } from "@/lib/desktop";
 import { MarkdownRenderer } from "@/components/shared/markdown-renderer";
 import Editor from "@monaco-editor/react";
 import { Play, Plus, Trash2, ChevronUp, ChevronDown, Code2, FileText } from "lucide-react";
-import { desktop } from "@/lib/desktop";
 
 // ---------------------------------------------------------------------------
 // nbformat types (subset)
