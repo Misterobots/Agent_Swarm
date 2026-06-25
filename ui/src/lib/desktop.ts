@@ -51,6 +51,11 @@ export interface MemexDesktopBridge {
     }) => Promise<{ approved: boolean; scope: "once" | "session" | "workspace" }>;
   };
 
+  browser: {
+    send:      (msg: Record<string, unknown>) => Promise<void>;
+    onMessage: (cb: (msg: Record<string, unknown>) => void) => () => void;
+  };
+
   lsp: {
     start:   (ext: string, rootUri: string) => Promise<boolean>;
     request: (lang: string, rootUri: string, method: string, params: unknown) => Promise<unknown>;
