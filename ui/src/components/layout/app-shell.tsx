@@ -12,6 +12,7 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useDesktop } from "@/lib/hooks/use-desktop";
 import { UpdateBanner } from "./update-banner";
+import { useChatStore } from "@/lib/stores/chat-store";
 import { ThemeAmbientCanvas } from "@/components/theme/theme-ambient-canvas";
 import { ThemeLCARSDecor }   from "@/components/theme/theme-lcars-decor";
 import { AudioProvider } from "./AudioProvider";
@@ -111,6 +112,14 @@ export function AppShell({ children }: AppShellProps) {
     bridge.onQuickSubmit((text) => {
       window.dispatchEvent(new CustomEvent("chat:prefill", { detail: text }));
     });
+
+    // Global shortcut: new conversation
+    (window as any).__memexNewConversation = () => {
+      const { createConversation, setActiveConversation } = useChatStore.getState();
+      const id = createConversation();
+      setActiveConversation(id);
+      router.push("/chat");
+    };
 
     // File/folder drag-drop from OS → set local path + navigate to dev workspace
     bridge.onOpenPath((path) => {
