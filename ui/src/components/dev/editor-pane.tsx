@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useCallback, useState } from "react";
-import Editor, { type OnMount } from "@monaco-editor/react";
+import { useRef, useCallback, useState, useEffect } from "react";
+import Editor, { type OnMount, useMonaco } from "@monaco-editor/react";
 import { FileCode2, Copy, Download, Bot, CheckCircle2, Circle } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useModels } from "@/lib/hooks/use-models";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useLsp } from "@/lib/hooks/use-lsp";
 
 type SaveStatus = "saved" | "unsaved" | "idle";
 
@@ -16,6 +17,30 @@ export function EditorPane() {
   const { models, loading: modelsLoading } = useModels();
   const model = useSettingsStore((s) => s.model);
   const setModel = useSettingsStore((s) => s.setModel);
+  const monaco = useMonaco();
+
+  // LSP diagnostics — only active in Memex Desktop (no-op in browser)
+  const { diagnostics, syncContent } = useLsp(activeFile ?? null, editorContent ?? "");
+
+  // Push diagnostics into Monaco as model markers
+  useEffect(() => {
+    if (!monaco || !editorRef.current) return;
+    const monacoModel = editorRef.current.getModel();
+    if (!monacoModel) return;
+    const markers = diagnostics.map((d) => ({
+      severity:        d.severity === 1 ? monaco.MarkerSeverity.Error
+                     : d.severity === 2 ? monaco.MarkerSeverity.Warning
+                     : d.severity === 3 ? monaco.MarkerSeverity.Info
+                     :                    monaco.MarkerSeverity.Hint,
+      startLineNumber: d.range.start.line + 1,
+      startColumn:     d.range.start.character + 1,
+      endLineNumber:   d.range.end.line + 1,
+      endColumn:       d.range.end.character + 1,
+      message:         d.message,
+      source:          d.source,
+    }));
+    monaco.editor.setModelMarkers(monacoModel, "lsp", markers);
+  }, [diagnostics, monaco]);
 
   // Autosave state
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -52,6 +77,7 @@ export function EditorPane() {
   const handleChange = useCallback((value: string | undefined) => {
     const content = value ?? "";
     setEditorContent(content);
+    syncContent(content);
 
     // Only trigger autosave when a file is open and a project is loaded
     if (!activeFile || !currentProjectId) return;

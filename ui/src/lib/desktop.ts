@@ -51,6 +51,13 @@ export interface MemexDesktopBridge {
     }) => Promise<{ approved: boolean; scope: "once" | "session" | "workspace" }>;
   };
 
+  lsp: {
+    start:   (ext: string, rootUri: string) => Promise<boolean>;
+    request: (lang: string, rootUri: string, method: string, params: unknown) => Promise<unknown>;
+    notify:  (lang: string, rootUri: string, method: string, params: unknown) => void;
+    onNotification: (cb: (data: { lang: string; method: string; params: unknown }) => void) => () => void;
+  };
+
   updater: {
     onStatus: (cb: (status: {
       state: "checking" | "available" | "downloading" | "ready" | "current" | "error";
