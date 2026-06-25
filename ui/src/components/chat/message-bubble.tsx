@@ -10,6 +10,7 @@ import { ToolCallBlock } from "./tool-call-block";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { ClarificationCard } from "./clarification-card";
 import { DesignArtifactCard } from "./design-artifact-card";
+import { DiffViewer } from "./diff-viewer";
 import { WorkshopQuestionsCard } from "./workshop-questions-card";
 import { WorkflowActionsCard } from "./workflow-actions-card";
 import { ModelQueueCard } from "./model-queue-card";
@@ -626,39 +627,11 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
             ))}
           </div>
         )}
-        {/* Unified diffs for edits that produced one (edit_file) */}
-        {!isUser && message.fileChanges?.some((fc) => fc.diff) && (
+        {/* File change diffs — proper viewer with line numbers + color backgrounds */}
+        {!isUser && message.fileChanges && message.fileChanges.length > 0 && (
           <div className="mt-2 space-y-1.5">
-            {message.fileChanges.filter((fc) => fc.diff).map((fc, i) => (
-              <details
-                key={i}
-                className="rounded-md overflow-hidden text-xs"
-                style={{ border: "1px solid var(--chat-border)" }}
-              >
-                <summary
-                  className="px-2 py-1 cursor-pointer font-mono"
-                  style={{ background: "var(--chat-surface)", color: "var(--chat-muted)" }}
-                >
-                  ✏️ {fc.path}
-                </summary>
-                <pre className="px-2 py-1.5 overflow-x-auto m-0 text-xs" style={{ lineHeight: 1.4 }}>
-                  {fc.diff!.split("\n").map((line, j) => {
-                    const color =
-                      line.startsWith("+") && !line.startsWith("+++")
-                        ? "var(--chat-diff-add, #22c55e)"
-                        : line.startsWith("-") && !line.startsWith("---")
-                        ? "var(--chat-diff-del, #ef4444)"
-                        : line.startsWith("@@")
-                        ? "var(--chat-accent-strong)"
-                        : "var(--chat-muted)";
-                    return (
-                      <div key={j} style={{ color, whiteSpace: "pre", fontFamily: "monospace" }}>
-                        {line || " "}
-                      </div>
-                    );
-                  })}
-                </pre>
-              </details>
+            {message.fileChanges.map((fc, i) => (
+              <DiffViewer key={i} fileChange={fc} />
             ))}
           </div>
         )}

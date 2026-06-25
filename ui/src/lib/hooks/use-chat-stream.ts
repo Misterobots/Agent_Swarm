@@ -506,7 +506,7 @@ export function useChatStream(options?: {
               setMessageTodos(convId!, assistantId, todos);
             }
           } else if (event.type === "usage") {
-            // Server-side token usage — update session stats
+            // Server-side token usage — update session stats AND context bar
             const u = (event as any).usage as { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined;
             if (u) {
               setSessionUsage({
@@ -514,6 +514,12 @@ export function useChatStream(options?: {
                 completionTokens: u.completion_tokens,
                 totalTokens:      u.total_tokens,
               });
+              // Update context window bar with real server-reported prompt tokens
+              setTokenUsage((prev) => ({
+                ...prev,
+                used: u.prompt_tokens,
+                pct:  prev.total > 0 ? u.prompt_tokens / prev.total : 0,
+              }));
             }
           } else if (event.type === "error") {
             appendToMessage(convId!, assistantId, `\n\n*Error: ${event.content || "Stream error"}*`);
