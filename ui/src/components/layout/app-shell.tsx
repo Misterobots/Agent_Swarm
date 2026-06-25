@@ -11,6 +11,7 @@ import { PanelLeft } from "lucide-react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useDesktop } from "@/lib/hooks/use-desktop";
+import { UpdateBanner } from "./update-banner";
 import { ThemeAmbientCanvas } from "@/components/theme/theme-ambient-canvas";
 import { ThemeLCARSDecor }   from "@/components/theme/theme-lcars-decor";
 import { AudioProvider } from "./AudioProvider";
@@ -135,6 +136,9 @@ export function AppShell({ children }: AppShellProps) {
       {/* LCARS structural chrome — left arm strip + readout bars */}
       <ThemeLCARSDecor />
       <AudioProvider />
+      {/* Desktop update banner — only visible when an update is ready */}
+      <UpdateBanner />
+
       {/* Top Bar layout */}
       {isTopBar && <TopBar />}
 

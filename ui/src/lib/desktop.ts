@@ -50,6 +50,16 @@ export interface MemexDesktopBridge {
       callId:    string;
     }) => Promise<{ approved: boolean; scope: "once" | "session" | "workspace" }>;
   };
+
+  updater: {
+    onStatus: (cb: (status: {
+      state: "checking" | "available" | "downloading" | "ready" | "current" | "error";
+      version?: string;
+      percent?: number;
+      message?: string;
+    }) => void) => () => void;
+    install: () => void;
+  };
 }
 
 declare global {

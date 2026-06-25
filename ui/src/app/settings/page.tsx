@@ -35,10 +35,17 @@ export default function SettingsPage() {
   const { inDesktop, bridge } = useDesktop();
   const [autoStart, setAutoStartState] = useState(false);
   const [autoStartLoading, setAutoStartLoading] = useState(false);
+  const [updateState, setUpdateState] = useState<string>("current");
+  const [updateVersion, setUpdateVersion] = useState<string | undefined>();
 
   useEffect(() => {
     if (!inDesktop || !bridge) return;
     bridge.autoStart.get().then(setAutoStartState);
+    const off = bridge.updater.onStatus(({ state, version }) => {
+      setUpdateState(state);
+      if (version) setUpdateVersion(version);
+    });
+    return off;
   }, [inDesktop, bridge]);
 
   const toggleAutoStart = async () => {
@@ -195,9 +202,31 @@ export default function SettingsPage() {
                 </Field>
               </div>
               <div className="border-t border-[var(--chat-border)] pt-5 mt-5">
+                <Field label="Updates">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-[var(--chat-muted)]">
+                      {updateState === "current"     && "Up to date"}
+                      {updateState === "checking"    && "Checking for updates…"}
+                      {updateState === "available"   && `Downloading ${updateVersion}…`}
+                      {updateState === "downloading" && `Downloading ${updateVersion}…`}
+                      {updateState === "ready"       && `${updateVersion} ready to install`}
+                      {updateState === "error"       && "Update check failed"}
+                    </span>
+                    {updateState === "ready" && (
+                      <button
+                        onClick={() => bridge?.updater.install()}
+                        className="px-3 py-1 text-xs rounded-md bg-[var(--chat-accent)] text-canvas font-medium hover:opacity-90"
+                      >
+                        Restart &amp; update
+                      </button>
+                    )}
+                  </div>
+                </Field>
+              </div>
+              <div className="border-t border-[var(--chat-border)] pt-5 mt-5">
                 <div className="flex items-center gap-2 text-xs text-[var(--chat-muted)]">
                   <Monitor size={13} />
-                  <span>Running as Memex Desktop v{typeof window !== "undefined" && (window as any).memex ? "native" : "—"}</span>
+                  <span>Memex Desktop</span>
                 </div>
               </div>
             </SettingsCard>
