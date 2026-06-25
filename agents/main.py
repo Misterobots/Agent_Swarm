@@ -1465,6 +1465,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             update_count = 0
             response_parts = []  # Collect response text for memory extraction
             _in_think_block = False  # Track <think> tag state across chunks
+            _input_chars  = sum(len(m.get("content") or "") for m in history or []) + len(last_msg)
+            _output_chars = 0
 
             # Run church.py's synchronous generator in a background thread so the
             # asyncio event loop stays free during long LLM calls.  Without this,
@@ -1688,9 +1690,10 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         # Strip heartbeat if it leaks through
                         content = content.replace("\u200B", "")
 
-                        # Collect response text for memory extraction
+                        # Collect response text for memory extraction + token tracking
                         if msg_type in ("response", "message"):
                             response_parts.append(raw_content)
+                            _output_chars += len(raw_content)
 
                         chunk = {
                             "id": "chatcmpl-swarm",
@@ -1721,6 +1724,24 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     _aio_sg.get_running_loop().create_task(_bg_extract(conversation[:8000], owner_id))
                 except Exception as e:
                     logger.warning(f"[MemPalace] Failed to schedule extraction: {e}")
+
+            # Emit usage stats before closing the stream
+            # Token estimates: ~4 chars per token (rough heuristic for mixed LLM output)
+            _usage_chunk = {
+                "id": "chatcmpl-usage",
+                "object": "chat.completion.chunk",
+                "created": 0,
+                "model": request.model,
+                "choices": [{"index": 0, "delta": {"content": "", "type": "usage"}, "finish_reason": "stop"}],
+                "usage": {
+                    "prompt_tokens":     max(1, _input_chars  // 4),
+                    "completion_tokens": max(0, _output_chars // 4),
+                    "total_tokens":      max(1, (_input_chars + _output_chars) // 4),
+                    "prompt_chars":      _input_chars,
+                    "completion_chars":  _output_chars,
+                },
+            }
+            yield f"data: {json.dumps(_usage_chunk)}\n\n"
 
             # Finish
             yield "data: [DONE]\n\n"

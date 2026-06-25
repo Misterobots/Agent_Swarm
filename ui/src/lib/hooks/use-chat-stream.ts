@@ -64,6 +64,7 @@ export function useChatStream(options?: {
   const [latestThought, setLatestThought] = useState<string | null>(null);
   const [streamMode, setStreamMode] = useState<StreamMode | null>(null);
   const [tokenUsage, setTokenUsage] = useState({ used: 0, total: MODEL_WINDOWS.default, pct: 0 });
+  const [sessionUsage, setSessionUsage] = useState<{ promptTokens: number; completionTokens: number; totalTokens: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const thoughtTraceRef = useRef<ThoughtEvent[]>([]);
   const toolCallTraceRef = useRef<ToolCallEvent[]>([]);
@@ -483,6 +484,16 @@ export function useChatStream(options?: {
             if (todos) {
               setMessageTodos(convId!, assistantId, todos);
             }
+          } else if (event.type === "usage") {
+            // Server-side token usage — update session stats
+            const u = (event as any).usage as { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined;
+            if (u) {
+              setSessionUsage({
+                promptTokens:     u.prompt_tokens,
+                completionTokens: u.completion_tokens,
+                totalTokens:      u.total_tokens,
+              });
+            }
           } else if (event.type === "error") {
             appendToMessage(convId!, assistantId, `\n\n*Error: ${event.content || "Stream error"}*`);
           } else {
@@ -612,6 +623,7 @@ export function useChatStream(options?: {
     latestThought,
     streamMode,
     tokenUsage,
+    sessionUsage,
     sendMessage,
     compactConversation,
     stopGeneration,

@@ -73,7 +73,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
 
   const devMode = showDevContext && agentEnabled;
 
-  const { messages, isStreaming, statusMessage, latestThought, streamMode, tokenUsage, sendMessage, compactConversation, stopGeneration } = useChatStream({
+  const { messages, isStreaming, statusMessage, latestThought, streamMode, tokenUsage, sessionUsage, sendMessage, compactConversation, stopGeneration } = useChatStream({
     devMode,
     onToolResult: devMode ? handleToolResult : undefined,
   });
@@ -304,6 +304,17 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
               {(tokenUsage.pct * 100).toFixed(0)}%
             </span>
           </button>
+
+          {/* Session token / cost display — shown after first completed turn */}
+          {sessionUsage && !isStreaming && (
+            <div
+              className="hidden md:flex items-center gap-1 text-[11px] text-[var(--chat-muted)] tabular-nums"
+              title={`Prompt: ${sessionUsage.promptTokens.toLocaleString()} tokens  ·  Output: ${sessionUsage.completionTokens.toLocaleString()} tokens`}
+            >
+              <span>{sessionUsage.totalTokens.toLocaleString()}</span>
+              <span className="opacity-50">tok</span>
+            </div>
+          )}
         </div>
         <div className="absolute bottom-0 left-0 right-0 divider" />
       </div>}

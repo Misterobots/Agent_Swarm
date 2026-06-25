@@ -10,7 +10,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "todo";
+      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "todo" | "usage";
       // Swarm theater fields
       phase_num?: number;
       phase_name?: string;
@@ -38,6 +38,13 @@ export interface ChatCompletionChunk {
     };
     finish_reason: string | null;
   }[];
+  usage?: {
+    prompt_tokens:     number;
+    completion_tokens: number;
+    total_tokens:      number;
+    prompt_chars:      number;
+    completion_chars:  number;
+  };
 }
 /**
  * Parse an SSE line from the OpenAI-compatible streaming API.
