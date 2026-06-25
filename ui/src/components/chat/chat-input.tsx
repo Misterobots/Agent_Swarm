@@ -27,15 +27,9 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   const setModel = useSettingsStore((s) => s.setModel);
   const { isAdmin } = useAccess();
   const vimMode = useSettingsStore((s) => s.vimMode);
-
-  const handleSend = useCallback(() => {
-    const trimmed = input.trim();
-    if (!trimmed || isStreaming) return;
-    onSend(trimmed);
-    setInput("");
-  }, [input, isStreaming, onSend]);
-
-  const vim = useVimInput(textareaRef as React.RefObject<HTMLTextAreaElement>, handleSend);
+  // vim hook initialized with a stable ref; actual handleSend assigned after its definition
+  const vimHandleSendRef = useRef<() => void>(() => {});
+  const vim = useVimInput(textareaRef as React.RefObject<HTMLTextAreaElement>, () => vimHandleSendRef.current());
 
   // Claude Code commands (local handling) + Memex workflow commands (passed to backend)
   const commands = [
@@ -101,6 +95,9 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
       textareaRef.current.style.height = "auto";
     }
   }, [input, isStreaming, onSend]);
+
+  // Keep the vim hook's submit ref in sync with the real handleSend
+  vimHandleSendRef.current = handleSend;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
