@@ -9,6 +9,7 @@ import { useAccess } from "@/lib/hooks/use-access";
 import { canSelectModel } from "@/lib/utils/model-access";
 import { ChatSettingsMenu } from "./chat-settings-menu";
 import { IconButton } from "@/components/ui";
+import { useVimInput } from "@/lib/hooks/use-vim-input";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -25,6 +26,16 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   const model = useSettingsStore((s) => s.model);
   const setModel = useSettingsStore((s) => s.setModel);
   const { isAdmin } = useAccess();
+  const vimMode = useSettingsStore((s) => s.vimMode);
+
+  const handleSend = useCallback(() => {
+    const trimmed = input.trim();
+    if (!trimmed || isStreaming) return;
+    onSend(trimmed);
+    setInput("");
+  }, [input, isStreaming, onSend]);
+
+  const vim = useVimInput(textareaRef as React.RefObject<HTMLTextAreaElement>, handleSend);
 
   // Claude Code commands (local handling) + Memex workflow commands (passed to backend)
   const commands = [
@@ -145,21 +156,29 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
             ))}
           </div>
         )}
+        {/* Vim mode indicator */}
+        {vimMode && (
+          <div className="absolute bottom-full left-0 mb-1 px-2 py-0.5 text-[10px] font-mono rounded bg-[var(--chat-surface)] border border-[var(--chat-border)] text-[var(--chat-accent)]">
+            -- {vim.mode.toUpperCase()} --
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           value={input}
           onChange={handleInput}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder || "Send a message..."}
+          onKeyDown={vimMode ? vim.onKeyDown : handleKeyDown}
+          onKeyUp={vimMode ? vim.onKeyUp : undefined}
+          placeholder={vimMode && vim.mode === "normal" ? "NORMAL — press i to insert" : (placeholder || "Send a message...")}
           rows={1}
           enterKeyHint="send"
           autoComplete="off"
           autoCorrect="off"
-          autoCapitalize="sentences"
+          autoCapitalize={vimMode ? "off" : "sentences"}
           spellCheck={false}
           className={cn(
             "input-field flex-1 resize-none scrollbar-thin",
-            "px-3.5 py-3 md:px-4 md:py-3.5 text-[15px] leading-[1.55]"
+            "px-3.5 py-3 md:px-4 md:py-3.5 text-[15px] leading-[1.55]",
+            vimMode && vim.mode === "normal" && "caret-transparent"
           )}
         />
         {isStreaming ? (

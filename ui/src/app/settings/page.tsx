@@ -31,6 +31,8 @@ export default function SettingsPage() {
   const setThemePickerMode = useSettingsStore((s) => s.setThemePickerMode);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const setSoundEnabled = useSettingsStore((s) => s.setSoundEnabled);
+  const vimMode = useSettingsStore((s) => s.vimMode);
+  const setVimMode = useSettingsStore((s) => s.setVimMode);
 
   const { inDesktop, bridge } = useDesktop();
   const [autoStart, setAutoStartState] = useState(false);
@@ -123,6 +125,29 @@ export default function SettingsPage() {
                 </p>
               </Field>
             </div>
+          </SettingsCard>
+
+          <SettingsCard title="Editor">
+            <Field label="Vim mode">
+              <div className="flex items-center gap-3">
+                <button
+                  role="switch"
+                  aria-checked={vimMode}
+                  onClick={() => setVimMode(!vimMode)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    vimMode ? "bg-[var(--chat-accent)]" : "bg-[var(--chat-border)]"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                    vimMode ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+                <span className="text-sm text-[var(--chat-text)]">{vimMode ? "On" : "Off"}</span>
+              </div>
+              <p className="text-xs text-[var(--chat-muted)] mt-2">
+                Modal editing in the chat input. Press <kbd className="font-mono px-1 py-0.5 rounded bg-[var(--chat-surface)] border border-[var(--chat-border)]">Esc</kbd> for normal mode, <kbd className="font-mono px-1 py-0.5 rounded bg-[var(--chat-surface)] border border-[var(--chat-border)]">i</kbd> to insert.
+              </p>
+            </Field>
           </SettingsCard>
 
           <SettingsCard title="Chat">

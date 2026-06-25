@@ -91,6 +91,8 @@ interface SettingsState {
   /** Local filesystem path set by the Desktop app (drag-drop or openFolder) */
   desktopLocalPath: string;
   setDesktopLocalPath: (path: string) => void;
+  vimMode: boolean;
+  setVimMode: (on: boolean) => void;
   setGroundingWeb: (on: boolean) => void;
   setGroundingDocs: (on: boolean) => void;
   setGroundingFile: (on: boolean) => void;
@@ -160,6 +162,8 @@ export const useSettingsStore = create<SettingsState>()(
       setPendingInput: (pendingInput) => set({ pendingInput }),
       desktopLocalPath: "",
       setDesktopLocalPath: (desktopLocalPath) => set({ desktopLocalPath }),
+      vimMode: false,
+      setVimMode: (vimMode) => set({ vimMode }),
       setGroundingWeb: (groundingWeb) => set({ groundingWeb }),
       setGroundingDocs: (groundingDocs) => set({ groundingDocs }),
       setGroundingFile: (groundingFile) => set({ groundingFile }),
