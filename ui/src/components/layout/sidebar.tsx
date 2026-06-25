@@ -14,12 +14,13 @@ import {
 } from "@/lib/config/navigation";
 import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
-import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User, PanelLeftClose, Volume2, VolumeX } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User, PanelLeftClose, Volume2, VolumeX, Link2 } from "lucide-react";
 import { BuddyWidget } from "@/components/buddy/buddy-widget";
 import { ThemeSelector } from "@/components/chat/theme-selector";
 import { useAccess } from "@/lib/hooks/use-access";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
 import { LCARSDataStream } from "@/components/theme/lcars-data-stream";
+import { PairingPanel } from "@/components/shared/pairing-panel";
 
 // Helper to generate a stable pseudo-random LCARS numeric prefix
 function getLcarsPrefix(str: string): string {
@@ -83,6 +84,7 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
   const { isAdmin, authenticated, displayName } = useAccess();
   const showConversations = isConversationRoute(pathname);
   const [searchQuery, setSearchQuery] = useState("");
+  const [pairingOpen, setPairingOpen] = useState(false);
 
   const visiblePrimary = useMemo(() =>
     primaryNavigation.filter((item) => !item.adminOnly || isAdmin),
@@ -320,6 +322,12 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
       {/* User & status footer */}
       <div className="px-4 py-3 relative space-y-2">
         <div className="absolute top-0 left-3 right-3 divider" />
+        {/* Remote pairing */}
+        {pairingOpen && (
+          <div className="mb-2 rounded-lg border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-lg">
+            <PairingPanel onClose={() => setPairingOpen(false)} />
+          </div>
+        )}
         {authenticated ? (
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -342,14 +350,28 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
                 )}
               </div>
             </div>
-            <a
-              href="https://auth.shivelymedia.com/if/flow/default-invalidation-flow/"
-              className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--chat-subtle)] hover:text-[var(--chat-text)] hover:bg-[var(--hover-tint)] transition-colors"
-              title="Sign out"
-              aria-label="Sign out"
-            >
-              <LogOut size={13} />
-            </a>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPairingOpen((v) => !v)}
+                className={`flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md transition-colors ${
+                  pairingOpen
+                    ? "text-[var(--chat-accent)] bg-[var(--chat-accent-soft)]"
+                    : "text-[var(--chat-subtle)] hover:text-[var(--chat-text)] hover:bg-[var(--hover-tint)]"
+                }`}
+                title="Remote pairing"
+                aria-label="Remote pairing"
+              >
+                <Link2 size={13} />
+              </button>
+              <a
+                href="https://auth.shivelymedia.com/if/flow/default-invalidation-flow/"
+                className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--chat-subtle)] hover:text-[var(--chat-text)] hover:bg-[var(--hover-tint)] transition-colors"
+                title="Sign out"
+                aria-label="Sign out"
+              >
+                <LogOut size={13} />
+              </a>
+            </div>
           </div>
         ) : (
           <a

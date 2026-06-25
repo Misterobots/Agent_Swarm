@@ -245,6 +245,14 @@ except Exception as _e:
     _logging.getLogger("main").warning(f"Dev projects router not loaded: {_e}")
 
 
+# Remote pairing — WebSocket relay for cross-instance session sharing
+try:
+    from pairing.routes import router as pairing_router
+    app.include_router(pairing_router)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"Pairing router not loaded: {_e}")
+
 # GPU peer lock router — Lovelace hosts this so all agent_runtimes (including
 # remote ones on Turing etc.) can acquire the cross-host GPU mutex even when
 # Redis is unavailable.  Mounted at /internal/gpu-lock/*.
