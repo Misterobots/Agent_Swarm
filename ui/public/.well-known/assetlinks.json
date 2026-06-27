@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.shivelymedia.memex",
+      "sha256_cert_fingerprints": ["CF:1A:1C:C3:A8:84:7D:0E:82:84:5B:42:EE:D7:B8:6D:B7:30:0B:AF:05:99:27:F7:63:0C:87:03:D6:5A:EE:90"]
+    }
+  }
+]
