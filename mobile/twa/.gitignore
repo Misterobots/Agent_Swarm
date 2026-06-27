@@ -1,0 +1,8 @@
+output/
+keystore/
+serve/
+app/
+.gradle/
+*.apk
+*.aab
+*.keystore
