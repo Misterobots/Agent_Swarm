@@ -585,6 +585,53 @@ services:
       - "traefik.http.routers.terminal-ws-ext.middlewares=globalHeaders@file,authentik@docker"
 
   # ═══════════════════════════════════════════════════════════════════════════════
+  # MEMEX MOBILE — Desktop renderer as a phone web app (mxmobile.shivelymedia.com)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  mxmobile:
+    build:
+      context: ../mobile/web
+      dockerfile: Dockerfile
+    image: memex-mxmobile:latest
+    container_name: mxmobile
+    restart: unless-stopped
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=ai_lab_net"
+      # External HTTPS: mxmobile.shivelymedia.com (behind Authentik)
+      - "traefik.http.routers.mxmobile.rule=Host(`mxmobile.shivelymedia.com`)"
+      - "traefik.http.routers.mxmobile.entrypoints=websecure"
+      - "traefik.http.routers.mxmobile.priority=20"
+      - "traefik.http.routers.mxmobile.tls=true"
+      - "traefik.http.routers.mxmobile.tls.certresolver=cfdns"
+      - "traefik.http.routers.mxmobile.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.mxmobile.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.mxmobile.tls.options=securetls@file"
+      - "traefik.http.routers.mxmobile.service=mxmobile"
+      - "traefik.http.routers.mxmobile.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@file"
+      - "traefik.http.services.mxmobile.loadbalancer.server.port=3000"
+      # External HTTP (CF tunnel delivers on the web entrypoint)
+      - "traefik.http.routers.mxmobile-http.rule=Host(`mxmobile.shivelymedia.com`)"
+      - "traefik.http.routers.mxmobile-http.entrypoints=web"
+      - "traefik.http.routers.mxmobile-http.priority=20"
+      - "traefik.http.routers.mxmobile-http.service=mxmobile-http"
+      - "traefik.http.routers.mxmobile-http.middlewares=globalHeaders@file,cf-https-proto@file,robotHeaders@file,authentik@file"
+      - "traefik.http.services.mxmobile-http.loadbalancer.server.port=3000"
+      # Asset-links bypass (no auth) so Android can verify the TWA
+      - "traefik.http.routers.mxmobile-wk.rule=Host(`mxmobile.shivelymedia.com`) && PathPrefix(`/.well-known/`)"
+      - "traefik.http.routers.mxmobile-wk.entrypoints=websecure"
+      - "traefik.http.routers.mxmobile-wk.priority=30"
+      - "traefik.http.routers.mxmobile-wk.tls=true"
+      - "traefik.http.routers.mxmobile-wk.service=mxmobile"
+      - "traefik.http.routers.mxmobile-wk-http.rule=Host(`mxmobile.shivelymedia.com`) && PathPrefix(`/.well-known/`)"
+      - "traefik.http.routers.mxmobile-wk-http.entrypoints=web"
+      - "traefik.http.routers.mxmobile-wk-http.priority=30"
+      - "traefik.http.routers.mxmobile-wk-http.middlewares=cf-https-proto@file"
+      - "traefik.http.routers.mxmobile-wk-http.service=mxmobile-http"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
   # OPENCLAUDE gRPC INFERENCE GATEWAY (Phase 6)
   # ═══════════════════════════════════════════════════════════════════════════════
 
