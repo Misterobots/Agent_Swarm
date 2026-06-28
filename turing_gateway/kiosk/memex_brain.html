@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Memex Brain</title>
+<style>
+  html,body{margin:0;padding:0;background:#0a0a0d;overflow:hidden;height:100%}
+  canvas{display:block}
+  #hint{position:fixed;left:12px;bottom:10px;font:12px/1.4 system-ui,sans-serif;color:#5b5b66;user-select:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">Memex Brain · 22s loop · faux neural activity (no telemetry)</div>
+<script>
+// ── Memex Brain ───────────────────────────────────────────────────────────
+// The Memex logo (hexagonal node-graph) rendered as a living neural network:
+// signals travel the edges, nodes fire as thoughts arrive, a thought-wave
+// ripples out from the hub. Pure function of `phase` ∈ [0,1); every time term
+// is an integer multiple of 2π·phase (or frac of integer·phase), so it loops
+// seamlessly. Works two ways:
+//   • ?frame=K&total=N&w=W&h=H  → renders ONE frame headlessly (for encoding)
+//   • no params                 → live, window-filling, rAF preview
+const PARAMS = new URLSearchParams(location.search);
+const HEADLESS = PARAMS.has('frame');
+const PERIOD = 22000;                         // ms (live) ; matches 660f@30fps
+const TAU = Math.PI * 2;
+const frac = x => x - Math.floor(x);
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W, H, cx, cy, U;                           // U = scale unit (px per 1080 of short side)
+
+function setSize(w, h, dpr){
+  W = cv.width = w; H = cv.height = h;
+  cv.style.width = (w/dpr) + 'px'; cv.style.height = (h/dpr) + 'px';
+  cx = W/2; cy = H/2; U = Math.min(W,H)/1080;
+}
+if (HEADLESS){
+  document.getElementById('hint').style.display='none';
+  const w = parseInt(PARAMS.get('w')||'1440'), h = parseInt(PARAMS.get('h')||'2560');
+  setSize(w, h, 1);
+} else {
+  const fit = () => { const d = Math.min(window.devicePixelRatio||1, 2);
+    setSize(Math.floor(innerWidth*d), Math.floor(innerHeight*d), d); };
+  addEventListener('resize', fit); fit();
+}
+
+// ── palette (faithful to the amber Memex mark) ────────────────────────────
+const AMBER   = [251,146,60];    // #fb923c
+const AMBER_DP= [249,115,22];    // #f97316
+const HOT     = [255,224,178];   // signal head / hot core
+// GAIN lifts every translucent element so it survives the tinted-acrylic rack
+// door (which dims + mutes everything behind it). Tune 1.0 (clear glass) ‑ 1.7.
+const GAIN = 1.45;
+const rgba=(c,a)=>`rgba(${c[0]},${c[1]},${c[2]},${Math.min(1, a*GAIN)})`;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function mul32(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+// ── graph geometry (built once, in unit space relative to short side) ─────
+// pointy-top hexagon: vertex directions at -90°,-30°,30°,90°,150°,210°
+function buildGraph(){
+  const dirs = [];
+  for (let k=0;k<6;k++){ const a=(-90+60*k)*Math.PI/180; dirs.push([Math.cos(a),Math.sin(a)]); }
+  const Ro = 0.30, Ri = 0.186;                 // outer / inner hex radius (× short side)
+  const nodes = [{x:0,y:0,r:0.026,tier:0}];    // 0 = hub
+  for (let k=0;k<6;k++) nodes.push({x:dirs[k][0]*Ri, y:dirs[k][1]*Ri, r:0.013, tier:1});
+  for (let k=0;k<6;k++) nodes.push({x:dirs[k][0]*Ro, y:dirs[k][1]*Ro, r:0.009, tier:2});
+  const edges = [];
+  const E=(a,b,kind,speed)=>edges.push({a,b,kind,speed});
+  for (let k=0;k<6;k++){
+    E(0, 1+k, 'spoke', 1+(k%2));               // hub → inner vertex
+    E(1+k, 1+(k+1)%6, 'inner', 1);             // inner perimeter
+    E(1+k, 7+k, 'radial', 2);                  // inner → outer
+    E(7+k, 7+(k+1)%6, 'outer', 1);             // outer perimeter (faint)
+  }
+  // surrounding faint "memory web" — sparse distant nodes wired to outer ring
+  const rnd = mul32(20260628);
+  const wStart = nodes.length;
+  const NW = 16;
+  for (let i=0;i<NW;i++){
+    const a = rnd()*TAU, rr = 0.40 + rnd()*0.34;
+    nodes.push({x:Math.cos(a)*rr, y:Math.sin(a)*rr*0.85, r:0.004+rnd()*0.004, tier:3});
+  }
+  for (let i=0;i<NW;i++){
+    const oi = 7 + (i % 6);                     // tie each web node to an outer vertex
+    E(oi, wStart+i, 'web', 1+Math.floor(rnd()*3));
+  }
+  // give every edge a small set of signals (direction, integer speed, phase offset)
+  for (const e of edges){
+    const r = mul32(e.a*131 + e.b*977 + (e.kind.length));
+    const nSig = e.kind==='spoke' ? 2 : (e.kind==='web' ? 1 : (r()<0.5?1:2));
+    e.sig = [];
+    for (let s=0;s<nSig;s++) e.sig.push({ dir: r()<0.5?1:-1, off: r(), spd: e.speed });
+  }
+  return {nodes, edges};
+}
+const G = buildGraph();
+
+// ── nebula gas clouds + dust haze (soft, slow-drifting, seamless) ──────────
+const EMBER = [196, 88, 52];     // warm ember wisp
+const DUSK  = [150, 96, 150];    // faint cool counter-hue for depth
+const NEB = (function(){
+  const r = mul32(424242);
+  const cols = [AMBER, AMBER_DP, EMBER, EMBER, DUSK];
+  const b=[];
+  for (let i=0;i<11;i++) b.push({
+    bx:(r()*2-1)*0.42, by:(r()*2-1)*0.36, rad:0.20+r()*0.32,
+    col:cols[Math.floor(r()*cols.length)],
+    dax:0.03+r()*0.06, day:0.03+r()*0.06, fx:1+Math.floor(r()*2), fy:1+Math.floor(r()*2),
+    phx:r()*TAU, phy:r()*TAU, ob:0.075+r()*0.07, fo:1+Math.floor(r()*2), pho:r()*TAU,
+    fr:1, phr:r()*TAU });
+  return b;
+})();
+function drawNebula(phase){
+  ctx.globalCompositeOperation='lighter';
+  const S=Math.max(W,H);   // spread across the long axis so gas fills a portrait frame
+  for (const b of NEB){
+    const x=cx+(b.bx+b.dax*Math.cos(TAU*phase*b.fx+b.phx))*S;
+    const y=cy+(b.by+b.day*Math.sin(TAU*phase*b.fy+b.phy))*S;
+    const rad=b.rad*(1+0.18*Math.sin(TAU*phase*b.fr+b.phr))*S;
+    const op=b.ob*(0.55+0.45*Math.sin(TAU*phase*b.fo+b.pho));
+    const g=ctx.createRadialGradient(x,y,0,x,y,rad);
+    g.addColorStop(0,rgba(b.col,op)); g.addColorStop(0.5,rgba(b.col,op*0.32)); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,rad,0,TAU); ctx.fill();
+  }
+}
+const DUST=(function(){
+  const r=mul32(99173); const a=[];
+  for(let i=0;i<340;i++) a.push({x:r(),y:r(),sz:0.5+r()*1.4,
+    fx:1+Math.floor(r()*2),fy:1+Math.floor(r()*2),ph:r()*TAU,da:0.01+r()*0.03,
+    tw:1+Math.floor(r()*2),tph:r()*TAU,warm:r()});
+  return a;
+})();
+function drawDust(phase){
+  ctx.globalCompositeOperation='lighter';
+  for(const d of DUST){
+    const x=(d.x + d.da*Math.cos(TAU*phase*d.fx+d.ph))*W;
+    const y=(d.y + d.da*Math.sin(TAU*phase*d.fy+d.ph))*H;
+    const tw=0.3+0.7*(0.5+0.5*Math.sin(TAU*phase*d.tw+d.tph));
+    const rr=d.sz*U*1.6;
+    const g=ctx.createRadialGradient(x,y,0,x,y,rr);
+    g.addColorStop(0,rgba(d.warm>0.5?HOT:AMBER, 0.07*tw)); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,rr,0,TAU); ctx.fill();
+  }
+}
+
+// map unit-space (short-side fractions, origin = centre) → pixels
+const px = p => cx + p*Math.min(W,H);
+const py = p => cy + p*Math.min(W,H);
+
+function clear(){
+  ctx.globalCompositeOperation='source-over';
+  ctx.fillStyle='#0a0a0d'; ctx.fillRect(0,0,W,H);
+  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)*0.62);
+  g.addColorStop(0,rgba(AMBER,0.07)); g.addColorStop(0.45,rgba(AMBER,0.018)); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+}
+
+function hexOutline(R, col, a, w){
+  ctx.strokeStyle=rgba(col,a); ctx.lineWidth=w*U; ctx.beginPath();
+  for (let k=0;k<6;k++){ const an=(-90+60*k)*Math.PI/180;
+    const x=px(Math.cos(an)*R), y=py(Math.sin(an)*R);
+    k?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+  ctx.closePath(); ctx.stroke();
+}
+
+function drawFrame(phase){
+  clear();
+  drawNebula(phase);                 // volumetric gas behind the structure
+  ctx.globalCompositeOperation='lighter';
+
+  // breathing of the whole structure
+  const breath = 0.5 + 0.5*Math.sin(TAU*phase*1);
+
+  // nested hex vessels (the logo's shells)
+  hexOutline(0.30, AMBER_DP, 0.16+0.06*breath, 2.0);
+  hexOutline(0.186, AMBER_DP, 0.22+0.08*breath, 1.4);
+
+  // thought-wave: expanding ring from hub, twice per loop, fades at both ends
+  const waves = 2;
+  const lp = frac(phase*waves);
+  const waveR = lp * 0.62;                       // in short-side units
+  const waveA = Math.sin(Math.PI*lp);            // 0 at ends → seamless
+  if (waveA > 0.001){
+    ctx.strokeStyle=rgba(HOT, 0.10*waveA); ctx.lineWidth=2.2*U;
+    ctx.beginPath(); ctx.arc(cx,cy, waveR*Math.min(W,H), 0, TAU); ctx.stroke();
+  }
+  // node activation accumulator (per-node glow), seeded by wave proximity
+  const act = new Float32Array(G.nodes.length);
+  for (let i=0;i<G.nodes.length;i++){
+    const n=G.nodes[i]; const d=Math.hypot(n.x,n.y);
+    const prox = Math.exp(-Math.pow((d-waveR)/0.05,2));
+    act[i] += prox * waveA * 0.9;
+  }
+
+  // ── edges + travelling signals ──────────────────────────────────────────
+  const edgeBase = { spoke:0.32, inner:0.20, radial:0.16, outer:0.10, web:0.06 };
+  for (const e of G.edges){
+    const A=G.nodes[e.a], B=G.nodes[e.b];
+    const ax=px(A.x), ay=py(A.y), bx=px(B.x), by=py(B.y);
+    // static edge line
+    ctx.strokeStyle=rgba(AMBER_DP, edgeBase[e.kind]*(0.7+0.3*breath));
+    ctx.lineWidth=(e.kind==='spoke'?1.8:e.kind==='web'?0.7:1.1)*U;
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+    // signals
+    for (const s of e.sig){
+      let p = frac(s.off + s.dir*phase*s.spd);
+      // signal arriving at an endpoint fires that node
+      if (p < 0.14) act[s.dir>0?e.a:e.b] += (0.14-p)/0.14 * 0.8;
+      if (p > 0.86) act[s.dir>0?e.b:e.a] += (p-0.86)/0.14 * 0.8;
+      const hx=lerp(ax,bx,p), hy=lerp(ay,by,p);
+      const headR=(e.kind==='spoke'?5:e.kind==='web'?2.2:3.5)*U;
+      // short comet trail
+      for (let t=0;t<5;t++){
+        const tp = p - s.dir*0.018*t; if (tp<0||tp>1) continue;
+        const tx=lerp(ax,bx,tp), ty=lerp(ay,by,tp);
+        const fade=(1-t/5), rr=headR*(1-t*0.13);
+        const g=ctx.createRadialGradient(tx,ty,0,tx,ty,rr*2.4);
+        g.addColorStop(0, rgba(HOT, 0.55*fade)); g.addColorStop(0.5, rgba(AMBER,0.22*fade)); g.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(tx,ty,rr*2.4,0,TAU); ctx.fill();
+      }
+    }
+  }
+
+  // ── nodes (glow scales with activation) ───────────────────────────────────
+  for (let i=0;i<G.nodes.length;i++){
+    const n=G.nodes[i]; const x=px(n.x), y=py(n.y);
+    const idle = n.tier===0 ? (0.55+0.45*breath) : 0.25 + 0.2*Math.sin(TAU*phase*1 + i);
+    const a = Math.min(1, idle + act[i]);
+    const baseR = n.r*Math.min(W,H);
+    const glowR = baseR * (2.2 + 3.0*act[i]) * (n.tier===0?1.6:1);
+    let g=ctx.createRadialGradient(x,y,0,x,y,glowR);
+    g.addColorStop(0, rgba(n.tier===0?HOT:AMBER, 0.5*a)); g.addColorStop(0.4, rgba(AMBER,0.16*a)); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,glowR,0,TAU); ctx.fill();
+    // solid core
+    g=ctx.createRadialGradient(x,y,0,x,y,baseR);
+    g.addColorStop(0, rgba(HOT, Math.min(1,0.7+act[i]))); g.addColorStop(0.6, rgba(AMBER,0.8*a)); g.addColorStop(1,rgba(AMBER_DP,0));
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,baseR,0,TAU); ctx.fill();
+  }
+
+  // hub super-core
+  const hubR = 0.026*Math.min(W,H)*(1+0.10*Math.sin(TAU*phase*1));
+  let g=ctx.createRadialGradient(cx,cy,0,cx,cy,hubR*3.2);
+  g.addColorStop(0, rgba(HOT,0.6)); g.addColorStop(0.3, rgba(AMBER,0.28)); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,hubR*3.2,0,TAU); ctx.fill();
+
+  // dust haze drifting in front for depth
+  drawDust(phase);
+
+  // film grain
+  ctx.globalCompositeOperation='overlay';
+  const gr = mul32(7777 + Math.floor(phase*100000));
+  const gn = Math.floor(1200*U);
+  for (let i=0;i<gn;i++){ const x=gr()*W,y=gr()*H,v=gr();
+    ctx.fillStyle=`rgba(${v*255|0},${v*255|0},${v*255|0},0.03)`; ctx.fillRect(x,y,1,1); }
+}
+
+if (HEADLESS){
+  const frame=parseInt(PARAMS.get('frame')||'0'), total=parseInt(PARAMS.get('total')||'660');
+  drawFrame((frame%total)/total);
+  window.__READY__=true; document.title='READY';
+} else {
+  const loop = now => { drawFrame(frac((now%PERIOD)/PERIOD)); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
