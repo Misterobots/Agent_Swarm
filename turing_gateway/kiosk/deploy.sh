@@ -28,7 +28,11 @@ echo "==> Pre-flight"
 command -v nvidia-smi >/dev/null && nvidia-smi -L || echo "  ! nvidia-smi not found — is the NVIDIA driver installed?"
 
 echo "==> Installing mpv"
-apt-get update -qq && apt-get install -y -qq mpv
+# update is best-effort: a broken third-party repo (e.g. dell/hwraid) must not
+# abort the whole deploy, and must not skip the install via a failed && chain.
+apt-get update -qq || echo "  (apt update had warnings — continuing; usually a broken 3rd-party repo)"
+apt-get install -y mpv || { echo "  retrying with 'universe' enabled"; add-apt-repository -y universe && apt-get install -y mpv; }
+command -v mpv >/dev/null || { echo "ERROR: mpv still not installed — fix apt connectivity, then re-run." >&2; exit 1; }
 
 echo "==> Placing animation in ${KIOSK_DIR}"
 install -d "$KIOSK_DIR"
