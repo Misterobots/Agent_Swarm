@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
-const W = 1440, H = 2560, TOTAL = 660;          // 660 frames @ 30fps = 22s loop — PORTRAIT (1440×2560)
+const W = 1080, H = 1920, TOTAL = 660;          // 660 frames @ 30fps = 22s loop — PORTRAIT (1080×1920, native)
 const FRAMES_DIR = path.join(DIR, 'frames');
 
 // Point CHROME_PATH at a Chromium/Chrome binary, or leave unset to let

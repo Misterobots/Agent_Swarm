@@ -14,7 +14,7 @@ swaps to a login terminal.
 |------|---------|
 | `memex_brain.html` | The animation. One file, two modes: open bare in a browser → live preview; pass `?frame=K&total=N&w=W&h=H` → renders one deterministic frame (used by the renderer). |
 | `render.mjs` | Headless Playwright renderer — captures 660 frames (30 fps × 22 s). |
-| `memex_brain_portrait.webm` | Pre-rendered loop, **1440×2560 portrait**, VP8. This is what plays on the monitor. |
+| `memex_brain_portrait.webm` | Pre-rendered loop, **1080×1920 portrait (native)**, VP8. This is what plays on the monitor. |
 
 ## Display facts (Turing)
 
@@ -104,12 +104,12 @@ the top of the script), then:
 ```bash
 npm install playwright          # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if Chromium already present
 # CHROME_PATH=/path/to/chrome   # optional: reuse an existing Chromium
-node render.mjs                 # writes frames/f0000.jpg … (1440×2560, 660 frames)
+node render.mjs                 # writes frames/f0000.jpg … (1080×1920, 660 frames)
 
 # encode a seamless VP8 loop (any ffmpeg with libvpx works):
 cat $(ls frames/f*.jpg | sort) | ffmpeg -f image2pipe -vcodec mjpeg -framerate 30 -i pipe:0 \
   -c:v libvpx -b:v 14M -crf 8 -pix_fmt yuv420p -auto-alt-ref 0 memex_brain_portrait.webm
 ```
 Change `W`/`H` in `render.mjs` for a different resolution (e.g. `2160×3840` for a
-4K portrait panel). The loop stays seamless because every animated term is a
-whole-number multiple of the loop phase.
+4K portrait panel, or `1440×2560` for 1440p). The loop stays seamless because
+every animated term is a whole-number multiple of the loop phase.

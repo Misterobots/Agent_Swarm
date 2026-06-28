@@ -38,7 +38,7 @@ function setSize(w, h, dpr){
 }
 if (HEADLESS){
   document.getElementById('hint').style.display='none';
-  const w = parseInt(PARAMS.get('w')||'1440'), h = parseInt(PARAMS.get('h')||'2560');
+  const w = parseInt(PARAMS.get('w')||'1080'), h = parseInt(PARAMS.get('h')||'1920');
   setSize(w, h, 1);
 } else {
   const fit = () => { const d = Math.min(window.devicePixelRatio||1, 2);
