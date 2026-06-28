@@ -1,6 +1,6 @@
 {
   "packageId": "com.shivelymedia.memex",
-  "host": "memex.shivelymedia.com",
+  "host": "mxmobile.shivelymedia.com",
   "name": "Memex",
   "launcherName": "Memex",
   "display": "standalone",
@@ -13,7 +13,7 @@
   "navigationDividerColorDark": "#0e1117",
   "backgroundColor": "#0e1117",
   "enableNotifications": true,
-  "startUrl": "/chat",
+  "startUrl": "/",
   "iconUrl": "http://127.0.0.1:8088/icon-512.png",
   "maskableIconUrl": "http://127.0.0.1:8088/icon-maskable-512.png",
   "webManifestUrl": "http://127.0.0.1:8088/manifest.json",
@@ -26,7 +26,7 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://memex.shivelymedia.com/",
+  "fullScopeUrl": "https://mxmobile.shivelymedia.com/",
   "minSdkVersion": 23,
   "signingKey": {
     "path": "/twa/keystore/memex.keystore",
