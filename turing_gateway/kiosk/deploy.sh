@@ -54,7 +54,8 @@ update-grub
 update-initramfs -u
 
 echo "==> Creating kiosk user + tty1 autologin"
-id kiosk &>/dev/null || useradd -m kiosk
+id kiosk &>/dev/null || useradd -m -s /bin/bash kiosk
+usermod -s /bin/bash kiosk          # force bash so ~/.bash_profile is read (not dash/.profile)
 usermod -aG video,render kiosk
 install -d /etc/systemd/system/getty@tty1.service.d
 cat > /etc/systemd/system/getty@tty1.service.d/override.conf <<EOF
@@ -68,11 +69,13 @@ cat > /home/kiosk/.bash_profile <<EOF
 if [ "\$(tty)" = "/dev/tty1" ]; then
   CARD=\$(for d in /dev/dri/card*; do n=\${d##*/}; \\
     [ "\$(cat /sys/class/drm/\$n/device/vendor 2>/dev/null)" = "0x10de" ] && echo "\$d" && break; done)
-  exec mpv --really-quiet --no-config --fs --loop-file=inf --no-audio \\
+  echo "kiosk: launching mpv on \${CARD:-<no NVIDIA DRM card found>} (connector ${CONNECTOR})"
+  mpv --no-config --fs --loop-file=inf --no-audio \\
     --no-input-default-bindings --cursor-autohide=always \\
     --gpu-context=drm --drm-connector=${CONNECTOR} \${CARD:+--drm-device=\$CARD} \\
     --video-rotate=${ROTATE_MPV} \\
     ${KIOSK_DIR}/${ASSET}
+  echo "kiosk: mpv exited \$? — leaving you on a shell so the error is visible"
 fi
 EOF
 chown kiosk:kiosk /home/kiosk/.bash_profile
