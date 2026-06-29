@@ -624,6 +624,35 @@ def chat_swarm(
                 _mp_breaker.record_failure("mempalace", "recall")
                 logger.debug(f"[Router] MemPalace recall failed (non-fatal): {_mp_err}")
 
+        # Optional personal-vault recall — federate to a per-user MemPalace instance.
+        # Entirely opt-in and OFF by default: inert unless MEMPALACE_VAULT_URL,
+        # MEMPALACE_VAULT_OWNER and MEMPALACE_VAULT_FOR are all configured (no defaults).
+        # Consulted ONLY for owners listed in MEMPALACE_VAULT_FOR, so a user's private
+        # memory never bleeds into other users' sessions. Non-fatal; shares the MemPalace
+        # circuit breaker under its own "vault" key.
+        _vault_url = os.getenv("MEMPALACE_VAULT_URL", "")
+        _vault_owner = os.getenv("MEMPALACE_VAULT_OWNER", "")
+        _vault_for = {x.strip() for x in os.getenv("MEMPALACE_VAULT_FOR", "").split(",") if x.strip()}
+        if (memory_enabled and _vault_url and _vault_owner and owner_id in _vault_for
+                and _mp_breaker.allow("vault", "recall")):
+            try:
+                import httpx as _httpx_vault
+                with _httpx_vault.Client(timeout=3.0) as _v_client:
+                    _v_resp = _v_client.post(f"{_vault_url}/v1/memories/search", json={"query": user_input, "owner_id": _vault_owner, "limit": 5})
+                if _v_resp.status_code == 200:
+                    _mp_breaker.record_success("vault", "recall")
+                    _vstrong = [m for m in _v_resp.json() if (m.get("score") or 0) > 0.5]
+                    if _vstrong:
+                        _v_msg = {"role": "system", "content": "[Personal Vault]\n" + "\n".join(f"- {m['content']}" for m in _vstrong)}
+                        history = list(history) + [_v_msg] if history else [_v_msg]
+                        yield _t(f"→ Vault: {len(_vstrong)} personal memories recalled")
+                else:
+                    _mp_breaker.record_failure("vault", "recall")
+                    logger.debug(f"[Router] Vault recall HTTP {_v_resp.status_code}")
+            except Exception as _v_err:
+                _mp_breaker.record_failure("vault", "recall")
+                logger.debug(f"[Router] Vault recall failed (non-fatal): {_v_err}")
+
         # Dev project context injection — reads .memex/notes.md from the active project
         # sandbox and injects it as a system message so the agent is aware of project
         # goals, tech stack, and ongoing notes. Non-fatal: never blocks the request.

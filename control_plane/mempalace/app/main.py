@@ -44,11 +44,19 @@ logger = logging.getLogger("mempalace")
 # Tool implementations are registered further down once the ORM models and
 # helpers are in scope. Mounted onto the FastAPI app at the bottom of the file.
 # ---------------------------------------------------------------------------
+# allowed_hosts is env-configurable so each deployment can whitelist its own host
+# via MEMPALACE_MCP_ALLOWED_HOSTS (the default below preserves the original hosts).
+_mcp_allowed_hosts = [
+    h.strip() for h in os.getenv(
+        "MEMPALACE_MCP_ALLOWED_HOSTS",
+        "192.168.2.102:*,localhost:*,127.0.0.1:*,hopper:*",
+    ).split(",") if h.strip()
+]
 _mcp = FastMCP(
     "MemPalace",
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
-        allowed_hosts=["192.168.2.102:*", "localhost:*", "127.0.0.1:*", "hopper:*"],
+        allowed_hosts=_mcp_allowed_hosts,
     ),
 )
 
