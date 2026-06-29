@@ -53,7 +53,23 @@ const HOT     = [255,224,178];   // signal head / hot core
 // GAIN lifts every translucent element so it survives the tinted-acrylic rack
 // door (which dims + mutes everything behind it). Tune 1.0 (clear glass) ‑ 1.7.
 const GAIN = 1.45;
-const rgba=(c,a)=>`rgba(${c[0]},${c[1]},${c[2]},${Math.min(1, a*GAIN)})`;
+// Slow warm color drift: a small hue rotation that eases back and forth over
+// the loop (seamless — one cycle). Applied centrally in rgba() so every glow
+// shifts together. HUE_AMP in degrees; keep small for "very slight".
+const HUE_AMP = 7;
+let _hm = null;                                   // per-frame hue matrix (null = identity)
+function setHue(deg){
+  if (Math.abs(deg) < 0.01){ _hm = null; return; }
+  const a=deg*Math.PI/180, c=Math.cos(a), s=Math.sin(a);
+  _hm=[0.213+c*0.787-s*0.213, 0.715-c*0.715-s*0.715, 0.072-c*0.072+s*0.928,
+       0.213-c*0.213+s*0.143, 0.715+c*0.285+s*0.140, 0.072-c*0.072-s*0.283,
+       0.213-c*0.213-s*0.787, 0.715-c*0.715+s*0.715, 0.072+c*0.928+s*0.072];
+}
+const _clamp=v=>v<0?0:v>255?255:v|0;
+function _sh(c){ if(!_hm) return c; const m=_hm,r=c[0],g=c[1],b=c[2];
+  return [r*m[0]+g*m[1]+b*m[2], r*m[3]+g*m[4]+b*m[5], r*m[6]+g*m[7]+b*m[8]]; }
+const rgba=(c,a)=>{ const d=_sh(c);
+  return `rgba(${_clamp(d[0])},${_clamp(d[1])},${_clamp(d[2])},${Math.min(1, a*GAIN)})`; };
 const lerp=(a,b,t)=>a+(b-a)*t;
 function mul32(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 
@@ -107,7 +123,7 @@ const NEB = (function(){
   for (let i=0;i<11;i++) b.push({
     bx:(r()*2-1)*0.42, by:(r()*2-1)*0.36, rad:0.20+r()*0.32,
     col:cols[Math.floor(r()*cols.length)],
-    dax:0.03+r()*0.06, day:0.03+r()*0.06, fx:1+Math.floor(r()*2), fy:1+Math.floor(r()*2),
+    dax:0.05+r()*0.08, day:0.05+r()*0.08, fx:1+Math.floor(r()*2), fy:1+Math.floor(r()*2),
     phx:r()*TAU, phy:r()*TAU, ob:0.075+r()*0.07, fo:1+Math.floor(r()*2), pho:r()*TAU,
     fr:1, phr:r()*TAU });
   return b;
@@ -128,7 +144,7 @@ function drawNebula(phase){
 const DUST=(function(){
   const r=mul32(99173); const a=[];
   for(let i=0;i<340;i++) a.push({x:r(),y:r(),sz:0.5+r()*1.4,
-    fx:1+Math.floor(r()*2),fy:1+Math.floor(r()*2),ph:r()*TAU,da:0.01+r()*0.03,
+    fx:1+Math.floor(r()*2),fy:1+Math.floor(r()*2),ph:r()*TAU,da:0.02+r()*0.04,
     tw:1+Math.floor(r()*2),tph:r()*TAU,warm:r()});
   return a;
 })();
@@ -166,6 +182,7 @@ function hexOutline(R, col, a, w){
 }
 
 function drawFrame(phase){
+  setHue(HUE_AMP * Math.sin(TAU*phase*1));   // slow warm color drift
   clear();
   drawNebula(phase);                 // volumetric gas behind the structure
   ctx.globalCompositeOperation='lighter';
@@ -173,12 +190,19 @@ function drawFrame(phase){
   // breathing of the whole structure
   const breath = 0.5 + 0.5*Math.sin(TAU*phase*1);
 
+  // slowly-revolving outer "memory web" — one gentle turn per loop (seamless).
+  // Only the tier-3 web nodes orbit; the logo itself stays put.
+  const wc=Math.cos(TAU*phase), ws=Math.sin(TAU*phase);
+  const P = G.nodes.map(n => n.tier===3
+    ? {x:n.x*wc - n.y*ws, y:n.x*ws + n.y*wc, r:n.r, tier:n.tier}
+    : n);
+
   // nested hex vessels (the logo's shells)
   hexOutline(0.30, AMBER_DP, 0.16+0.06*breath, 2.0);
   hexOutline(0.186, AMBER_DP, 0.22+0.08*breath, 1.4);
 
-  // thought-wave: expanding ring from hub, twice per loop, fades at both ends
-  const waves = 2;
+  // thought-wave: expanding ring from hub, fades at both ends
+  const waves = 3;
   const lp = frac(phase*waves);
   const waveR = lp * 0.62;                       // in short-side units
   const waveA = Math.sin(Math.PI*lp);            // 0 at ends → seamless
@@ -188,8 +212,8 @@ function drawFrame(phase){
   }
   // node activation accumulator (per-node glow), seeded by wave proximity
   const act = new Float32Array(G.nodes.length);
-  for (let i=0;i<G.nodes.length;i++){
-    const n=G.nodes[i]; const d=Math.hypot(n.x,n.y);
+  for (let i=0;i<P.length;i++){
+    const n=P[i]; const d=Math.hypot(n.x,n.y);
     const prox = Math.exp(-Math.pow((d-waveR)/0.05,2));
     act[i] += prox * waveA * 0.9;
   }
@@ -197,7 +221,7 @@ function drawFrame(phase){
   // ── edges + travelling signals ──────────────────────────────────────────
   const edgeBase = { spoke:0.32, inner:0.20, radial:0.16, outer:0.10, web:0.06 };
   for (const e of G.edges){
-    const A=G.nodes[e.a], B=G.nodes[e.b];
+    const A=P[e.a], B=P[e.b];
     const ax=px(A.x), ay=py(A.y), bx=px(B.x), by=py(B.y);
     // static edge line
     ctx.strokeStyle=rgba(AMBER_DP, edgeBase[e.kind]*(0.7+0.3*breath));
@@ -224,8 +248,8 @@ function drawFrame(phase){
   }
 
   // ── nodes (glow scales with activation) ───────────────────────────────────
-  for (let i=0;i<G.nodes.length;i++){
-    const n=G.nodes[i]; const x=px(n.x), y=py(n.y);
+  for (let i=0;i<P.length;i++){
+    const n=P[i]; const x=px(n.x), y=py(n.y);
     const idle = n.tier===0 ? (0.55+0.45*breath) : 0.25 + 0.2*Math.sin(TAU*phase*1 + i);
     const a = Math.min(1, idle + act[i]);
     const baseR = n.r*Math.min(W,H);
