@@ -2436,6 +2436,35 @@ async def get_task_diff(coordination_id: str, request: Request):
     }
 
 
+@app.post("/v1/tasks/{coordination_id}/approve")
+async def approve_task(coordination_id: str, request: Request):
+    """Record acceptance of a run's result from the phone.
+
+    v1 is POST-HOC: swarm runs auto-execute and have no coordinator approval
+    gate, so this records 'I accept this diff' — it does NOT pause/release a
+    build. set_approval is owner-scoped, so a foreign owner gets 404.
+    """
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    if not swarm_run_store.set_approval(coordination_id, owner_id, "approved"):
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"ok": True, "approval_state": "approved"}
+
+
+@app.post("/v1/tasks/{coordination_id}/deny")
+async def deny_task(coordination_id: str, request: Request):
+    """Record rejection of a run's result from the phone (post-hoc, owner-scoped)."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    if not swarm_run_store.set_approval(coordination_id, owner_id, "denied"):
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"ok": True, "approval_state": "denied"}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Conversation sync endpoints (cross-device persistence)
 # ═══════════════════════════════════════════════════════════════════════════
