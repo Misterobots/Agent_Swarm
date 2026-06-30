@@ -57,6 +57,9 @@ class CoordinatorSession:
         # The SSE generator drains this between future-wait timeouts so chips
         # appear in the UI as files are written, not just at the end of a phase.
         self.file_change_queue: queue.Queue = queue.Queue()
+        # Accumulated file_change payloads ({op, path, size, diff?}) across all
+        # phases — joined into the run's aggregate diff for the mobile task board.
+        self.file_changes: list[dict] = []
 
     def register_worker(self, role: str, task: str, phase: str) -> str:
         worker_id = f"w-{uuid.uuid4().hex[:6]}"

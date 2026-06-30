@@ -2413,6 +2413,29 @@ async def get_task(coordination_id: str, request: Request):
     return {"run": run, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
 
 
+@app.get("/v1/tasks/{coordination_id}/diff")
+async def get_task_diff(coordination_id: str, request: Request):
+    """Aggregated unified diff for a completed run, for mobile review."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if run.get("status") == "running":
+        raise HTTPException(status_code=409, detail="Run still in progress")
+    diff_text = swarm_run_store.get_diff(coordination_id, owner_id)
+    if not diff_text:
+        raise HTTPException(status_code=404, detail="No diff for this run")
+    return {
+        "coordination_id": coordination_id,
+        "scope": run.get("scope"),
+        "diff_text": diff_text,
+        "truncated": "[...diff truncated...]" in diff_text,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Conversation sync endpoints (cross-device persistence)
 # ═══════════════════════════════════════════════════════════════════════════

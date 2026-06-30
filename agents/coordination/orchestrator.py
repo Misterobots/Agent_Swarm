@@ -48,7 +48,39 @@ def _drain_file_changes(session) -> list[dict]:
             events.append(q.get_nowait())
         except Exception:
             break
+    # Accumulate file_change payloads for the run's aggregate diff (task board).
+    # Per-run by construction — only this session's drained changes land here.
+    try:
+        acc = getattr(session, "file_changes", None)
+        if acc is not None:
+            for ev in events:
+                if isinstance(ev, dict) and ev.get("type") == "file_change":
+                    content = ev.get("content")
+                    if isinstance(content, dict):
+                        acc.append(content)
+    except Exception:
+        pass
     return events
+
+
+def _build_run_diff(changes: list[dict]) -> str:
+    """Join accumulated file_change payloads into one reviewable diff string.
+
+    Sandbox edits carry a unified `diff`; creates/writes carry only op/path/size,
+    so those become a one-line header. Bounded later by swarm_run_store.set_diff.
+    """
+    if not changes:
+        return ""
+    parts: list[str] = []
+    for c in changes:
+        op = c.get("op", "changed")
+        path = c.get("path", "?")
+        diff = c.get("diff")
+        if diff:
+            parts.append(f"### {op}: {path}\n{diff}")
+        else:
+            parts.append(f"### {op}: {path} ({c.get('size', 0)} bytes)")
+    return "\n\n".join(parts)
 
 
 def coordinate_project_onboarding(
@@ -1283,6 +1315,9 @@ def coordinate_task(
             f"[Coordinator] Coordination {session.coordination_id} complete: "
             f"{completed}/{total_workers} workers, {total_time:.1f}s"
         )
+        run_diff = _build_run_diff(getattr(session, "file_changes", []))
+        if run_diff:
+            swarm_run_store.set_diff(session.coordination_id, run_diff)
         swarm_run_store.finish_run(
             session.coordination_id, status="completed",
             workers_total=total_workers, workers_completed=completed,
