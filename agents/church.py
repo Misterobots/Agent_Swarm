@@ -633,15 +633,19 @@ def chat_swarm(
         _vault_url = os.getenv("MEMPALACE_VAULT_URL", "")
         _vault_owner = os.getenv("MEMPALACE_VAULT_OWNER", "")
         _vault_for = {x.strip() for x in os.getenv("MEMPALACE_VAULT_FOR", "").split(",") if x.strip()}
+        # The vault search embeds the query (Ollama) then runs pgvector — slower than the
+        # local MemPalace recall, so it gets its own (longer, configurable) timeout. 3s was
+        # too tight and silently ReadTimeout'd every call.
+        _vault_timeout = float(os.getenv("MEMPALACE_VAULT_TIMEOUT", "10"))
         if (memory_enabled and _vault_url and _vault_owner and owner_id in _vault_for
                 and _mp_breaker.allow("vault", "recall")):
             try:
                 import httpx as _httpx_vault
-                with _httpx_vault.Client(timeout=3.0) as _v_client:
+                with _httpx_vault.Client(timeout=_vault_timeout) as _v_client:
                     _v_resp = _v_client.post(f"{_vault_url}/v1/memories/search", json={"query": user_input, "owner_id": _vault_owner, "limit": 5})
                 if _v_resp.status_code == 200:
                     _mp_breaker.record_success("vault", "recall")
-                    _vstrong = [m for m in _v_resp.json() if (m.get("score") or 0) > 0.5]
+                    _vstrong = [m for m in _v_resp.json() if float(m.get("score") or 0) > 0.5]
                     if _vstrong:
                         _v_msg = {"role": "system", "content": "[Personal Vault]\n" + "\n".join(f"- {m['content']}" for m in _vstrong)}
                         history = list(history) + [_v_msg] if history else [_v_msg]
@@ -1023,6 +1027,13 @@ def chat_swarm(
             intent = "CONVERSATION"; confidence = max(confidence, 0.75)
 
         yield _t(f"→ Intent: {intent} ({confidence * 100:.0f}% confidence)")
+
+        # Assist/voice mode: a "general" skill hint means the caller (e.g. the BMO voice
+        # bridge) wants a plain conversational answer and cannot tap a clarification card.
+        # Force CONVERSATION so the confidence gate below is skipped (CONVERSATION is exempt).
+        if skill == "general" and intent != "CONVERSATION":
+            yield _t(f"→ Assist mode: forcing CONVERSATION (was {intent})")
+            intent = "CONVERSATION"; confidence = max(confidence, 0.95)
 
         # ---------------------------------------------------------------------------
         # Confidence gate — when the router isn't sure, ask rather than guess wrong.

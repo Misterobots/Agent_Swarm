@@ -134,6 +134,27 @@ services:
       - "traefik.http.routers.voice-engine.entrypoints=web"
       - "traefik.http.services.voice-engine.loadbalancer.server.port=8020"
 
+  # BMO BRAIN - OpenAI-compatible Tier-1 vault-RAG conversational assistant.
+  # Recalls personal-vault memories, injects them as context, and answers in BMO's persona
+  # via the LLM. Serves HA's OpenAI-Conversation agent AND the BMO Pi's bmo_driver.chat()
+  # (which targets :8000/v1). Personal vault values live in execution_plane/.env (gitignored);
+  # vault recall is inert unless BMO_VAULT_URL + BMO_VAULT_OWNER are set there.
+  bmo-brain:
+    build:
+      context: ../services/bmo_brain
+      dockerfile: Dockerfile
+    container_name: bmo_brain
+    ports:
+      - "8000:8000"
+    environment:
+      - VAULT_URL=${BMO_VAULT_URL}
+      - VAULT_OWNER=${BMO_VAULT_OWNER}
+      - OLLAMA_URL=${BMO_OLLAMA_URL:-http://192.168.2.101:11434}
+      - BMO_MODEL=${BMO_MODEL:-qwen3:8b}
+    restart: unless-stopped
+    networks:
+      - execution_net
+
   # OPENHANDS - Sandboxed Execution Environment (Protected by Authentik SSO)
   openhands:
     build:
