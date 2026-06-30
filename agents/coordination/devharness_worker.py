@@ -322,6 +322,15 @@ def run_devharness_worker(
     worker = session.workers[worker_id]
     worker.state = WorkerState.RUNNING
     worker.started_at = time.time()
+    try:
+        import swarm_run_store
+        swarm_run_store.upsert_worker(
+            session.coordination_id, worker_id, worker.role, worker.task,
+            worker.phase, (worker.pioneer or {}).get("name"), status="running",
+            started_at=worker.started_at,
+        )
+    except Exception:
+        pass
 
     role_lower = role.lower()
     model = _ROLE_MODELS.get(role_lower, SWARM_ARCHITECT_MODEL)
@@ -362,6 +371,14 @@ def run_devharness_worker(
         worker.result = summary
         worker.state = WorkerState.COMPLETED
         worker.completed_at = time.time()
+        try:
+            swarm_run_store.upsert_worker(
+                session.coordination_id, worker_id, worker.role, worker.task,
+                worker.phase, (worker.pioneer or {}).get("name"), status="completed",
+                output=summary, completed_at=worker.completed_at,
+            )
+        except Exception:
+            pass
 
         safe_role = "".join(c if c.isalnum() or c in "_-" else "_" for c in role_lower)
         filename = f"{worker.phase}_{safe_role}_{worker_id}.md"
@@ -373,6 +390,14 @@ def run_devharness_worker(
         worker.state = WorkerState.FAILED
         worker.error = str(e)
         worker.completed_at = time.time()
+        try:
+            swarm_run_store.upsert_worker(
+                session.coordination_id, worker_id, worker.role, worker.task,
+                worker.phase, (worker.pioneer or {}).get("name"), status="failed",
+                output=worker.error, completed_at=worker.completed_at,
+            )
+        except Exception:
+            pass
         logger.error(
             f"[devharness_worker] worker {worker_id} ({role}) failed: {e}", exc_info=True
         )

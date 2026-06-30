@@ -166,6 +166,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Dev projects store init failed (non-fatal): {e}")
 
+        # 7f. Initialize Swarm Run Store (mobile task-board history)
+        try:
+            from swarm_run_store import init_table as _init_swarm_run_table
+            _init_swarm_run_table()
+        except Exception as e:
+            logger.warning(f"Swarm run store init failed (non-fatal): {e}")
+
         # 8. Clean up orphaned training runs (status='running' but server restarted)
         try:
             from config import TEMPLATE_DB_URL
