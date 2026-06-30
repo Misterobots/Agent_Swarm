@@ -2380,6 +2380,40 @@ async def graph_report():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Task board endpoints (mobile Codex loop — swarm run history)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/v1/tasks")
+async def list_tasks(request: Request, status: str = "all", limit: int = 50):
+    """List the authenticated user's swarm runs for the mobile task board.
+
+    Owner is resolved with _resolve_owner_id — the SAME resolution the swarm
+    dispatch uses on the write path — so the board sees the rows it recorded
+    (raw X-authentik-uid would miss username-keyed rows; the critic's blocker #1).
+    """
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        return {"runs": []}
+    import swarm_run_store
+    return {"runs": swarm_run_store.list_runs(
+        owner_id, limit=min(max(int(limit), 1), 200), running_only=(status == "running")
+    )}
+
+
+@app.get("/v1/tasks/{coordination_id}")
+async def get_task(coordination_id: str, request: Request):
+    """Run detail + per-worker (pioneer) status for the board drill-down."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"run": run, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Conversation sync endpoints (cross-device persistence)
 # ═══════════════════════════════════════════════════════════════════════════
 
