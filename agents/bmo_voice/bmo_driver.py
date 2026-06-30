@@ -252,7 +252,7 @@ class BMODriver:
         
         try:
             t0 = time.time()
-            resp = requests.post(url, params=params, timeout=10)
+            resp = requests.post(url, params=params, timeout=90)
             t1 = time.time()
             logger.info(f"⏱ HTTP POST: {t1-t0:.1f}s ({len(resp.content)} bytes)")
             if resp.status_code == 200:

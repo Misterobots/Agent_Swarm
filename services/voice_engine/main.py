@@ -76,9 +76,13 @@ def load_model():
     try:
         print(f"Loading TTS Model: {MODEL_PATH}...")
         tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+        # Pin the whole model to a single GPU. device_map="auto" shards a small (1.7B)
+        # model across all visible GPUs, which then crashes inference with a cross-device
+        # tensor `cat`. The model fits comfortably on one card.
+        _tts_device_map = {"": 0} if DEVICE == "cuda" else None
         model = AutoModel.from_pretrained(
             MODEL_PATH,
-            device_map="auto",
+            device_map=_tts_device_map,
             trust_remote_code=True,
             torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32
         )
@@ -235,6 +239,63 @@ async def text_to_speech(
     finally:
         # Cleanup temp files
                     pass
+
+@app.post("/speak")
+@app.get("/speak")
+async def speak_compat(text: str, pitch: int = 0, speed: float = 1.0, method: str = "rmvpe"):
+    """Driver-compatible TTS endpoint for BMO.
+
+    The .106 bmo_driver POSTs query params (text/pitch/speed/method) to /speak and expects
+    a WAV back — same shape as the old RVC server. This routes that request through Qwen3-TTS:
+    clone BMO's voice from BMO_REF_AUDIO (if present) and apply the 'BMO' sox character effect.
+    pitch/method are accepted for compatibility and otherwise ignored (tone comes from the
+    clone + BMO effect).
+    """
+    global model
+    if not model:
+        raise HTTPException(status_code=503, detail="TTS model not loaded.")
+    ref = os.getenv("BMO_REF_AUDIO", "/app/bmo_ref.wav")
+    ref_audio = [ref] if (ref and os.path.exists(ref)) else None
+    effect_name = os.getenv("BMO_EFFECT", "BMO")
+    temp_files = []
+    try:
+        text = text.replace("BMO", "Beemo").replace("bmo", "beemo").replace("Bmo", "Beemo")
+        output_audios, sample_rate = model.generate_voice_clone(
+            text=[text],
+            ref_audio=ref_audio,
+            ref_text=None,
+            x_vector_only_mode=True,
+            do_sample=True, top_p=0.8, temperature=0.8,
+        )
+        if not output_audios:
+            raise HTTPException(status_code=500, detail="Generation failed (empty output)")
+        raw_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+        temp_files.append(raw_path)
+        sf.write(raw_path, output_audios[0], sample_rate)
+        final_path = raw_path
+        if effect_name and effect_name in EFFECTS:
+            fx_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+            temp_files.append(fx_path)
+            try:
+                subprocess.run(["sox", raw_path, fx_path] + EFFECTS[effect_name], check=True)
+                final_path = fx_path
+            except Exception as e:
+                print(f"BMO effect '{effect_name}' failed (using raw): {e}")
+        with open(final_path, "rb") as f:
+            wav_content = f.read()
+        return Response(content=wav_content, media_type="audio/wav")
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        for p in temp_files:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
 
 @app.post("/stt")
 async def speech_to_text(

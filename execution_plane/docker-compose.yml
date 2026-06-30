@@ -114,6 +114,15 @@ services:
     container_name: voice_engine_gpu
     ports:
       - "8020:8020"
+      - "8100:8020"   # BMO driver (.106, default port 8100) connects here
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    restart: unless-stopped
     volumes:
       - ../services/voice_engine:/app
       - bmo_models:/root/.cache/huggingface # Share cache if possible or use new volume
