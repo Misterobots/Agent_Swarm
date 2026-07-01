@@ -402,6 +402,12 @@ def coordinate_task(
                     "card_type": "dev_project",
                 },
             }
+            # Mark the run 'needs_input' so the mobile task board shows it awaiting
+            # an answer (not a phantom 'running'). It resumes as a new coordination
+            # when the user answers the clarification card.
+            swarm_run_store.finish_run(
+                session.coordination_id, status="needs_input", ended_at=int(time.time())
+            )
             return
 
         yield {
