@@ -1643,6 +1643,13 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                         "suggested_followups", "workshop_questions",
                                         "workflow_next_steps", "agent_event",
                                         "file_change"):
+                            # Graceful-degradation fallback: rich events carry their
+                            # payload in structured fields, but give clarification cards
+                            # a human-readable `content` (the question) so a text-only or
+                            # lossy client still shows something instead of an empty drop.
+                            if msg_type == "clarification_card" and not update.get("content"):
+                                _clar = update.get("clarification") or {}
+                                update = {**update, "content": _clar.get("question", "Input needed")}
                             rich_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
