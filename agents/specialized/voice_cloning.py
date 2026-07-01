@@ -14,7 +14,7 @@ logger = setup_logger("VoiceCloningExpert")
 # Configuration
 VOICE_ENGINE_HOST = os.getenv("VOICE_ENGINE_HOST", "http://voice_engine_gpu:8020")
 MODEL_NAME = "qwen2.5-coder:14b" # Logic model for the agent itself
-BMO_ENGINE_URL = os.getenv("BMO_ENGINE_URL", "http://bmo_voice_gpu:8000/speak")
+BMO_ENGINE_URL = os.getenv("BMO_ENGINE_URL", "http://voice_engine_gpu:8020/speak")
 DEFAULT_REF_AUDIO = "/app/agents/bmo_voice/voice_samples/Intro02_Hello_ItsMeBEEMO.wav"
 
 # Multiple reference samples give the cloner a richer picture of BMO's voice.

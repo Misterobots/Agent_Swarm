@@ -1,22 +1,10 @@
-fastapi
-uvicorn
-rvc-python
+# Pi-side BMO driver dependencies (bmo_driver.py, pi_client.py, pygame_face.py,
+# hardware_test.py). TTS/STT run remotely in services/voice_engine — the RVC/Kokoro
+# server deps that used to live here were retired with server.py.
 numpy
 pygame
-scipy
-fairseq
-faiss-gpu
-audioread
-soundfile
-librosa
 pvporcupine
-pvrecorder
-torchcrepe
-praat-parselmouth
-absl-py
-python-multipart
-tensorboardX
-edge-tts
-kokoro
-phonemizer
-faster-whisper
+python-dotenv
+requests
+sounddevice
+soundfile

@@ -37,14 +37,20 @@ MODEL_NAME  = os.getenv("BMO_MODEL_NAME", "bmo")
 LLM_TIMEOUT = float(os.getenv("BMO_LLM_TIMEOUT", "150"))
 TEMPERATURE = float(os.getenv("BMO_TEMPERATURE", "0.5"))
 
+# The assistant currently goes by "Claude" (after Claude Shannon). The BMO persona will
+# be layered onto this pipeline later; nothing personal is baked into the default.
+ASSISTANT_NAME = os.getenv("BMO_ASSISTANT_NAME", "Claude")
+OWNER_NAME     = os.getenv("BMO_OWNER_NAME", "your user")
+
+_NAME_ORIGIN = " (named after Claude Shannon)" if ASSISTANT_NAME == "Claude" else ""
 PERSONA = os.getenv("BMO_PERSONA", (
-    "You are BMO, Justin's warm, concise personal AI assistant for his home lab. "
-    "You have access to his private memory vault; the memories below are the source of "
-    "truth about Justin, his projects, his infrastructure, and his recent work. Ground "
-    "your answers in them. If they don't cover the question, answer from general knowledge "
-    "and briefly say so. Reply in plain spoken prose — this is read aloud — so no markdown, "
-    "no bullet lists, no code blocks; usually one to three sentences unless more detail is "
-    "clearly needed. Speak directly to Justin."
+    f"You are {ASSISTANT_NAME}{_NAME_ORIGIN} — a warm, concise personal AI "
+    f"assistant for {OWNER_NAME}'s home lab. You have access to a private memory vault; the "
+    "memories below are the source of truth about your user, their projects, their "
+    "infrastructure, and their recent work. Ground your answers in them. If they don't cover "
+    "the question, answer from general knowledge and briefly say so. Reply in plain spoken "
+    "prose — this is read aloud — so no markdown, no bullet lists, no code blocks; usually "
+    "one to three sentences unless more detail is clearly needed. Speak directly to your user."
 ))
 
 app = FastAPI(title="BMO Brain (vault-RAG assistant)")
@@ -134,7 +140,7 @@ async def _answer(client_messages):
         live = await _live_status()
         parts.append("LIVE SYSTEM STATUS — probed just now. Treat this as CURRENT ground truth "
                      "and base any status/health answer on THIS, not on recalled memories:\n" + live)
-    parts.append("Recalled memories from Justin's vault:\n" + ctx)
+    parts.append("Recalled memories from the personal vault:\n" + ctx)
     parts.append("/no_think")
     system = "\n\n".join(parts)
     messages = [{"role": "system", "content": system}] + convo

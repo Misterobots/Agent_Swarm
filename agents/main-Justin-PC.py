@@ -4002,7 +4002,7 @@ async def training_voice_speak(req: TrainingVoiceSpeakRequest):
     """Synthesize a WAV clip via the BMO voice service and return audio bytes."""
     import requests as _requests
 
-    bmo_url = os.getenv("BMO_VOICE_URL", "http://bmo-voice:8000").rstrip("/")
+    bmo_url = os.getenv("BMO_VOICE_URL", "http://voice_engine_gpu:8020").rstrip("/")
     text = req.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")

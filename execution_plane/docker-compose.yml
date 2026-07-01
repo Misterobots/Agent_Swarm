@@ -88,25 +88,9 @@ services:
     networks:
       - execution_net
 
-  # BMO VOICE - RVC Inference Engine
-  bmo-voice:
-    build:
-      context: ../agents/bmo_voice
-      dockerfile: Dockerfile
-    container_name: bmo_voice_gpu
-    ports:
-      - "8100:8000"
-    volumes:
-      - ../agents/bmo_voice:/app
-    networks:
-      - execution_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.bmo-voice.rule=PathPrefix(`/bmo`)"
-      - "traefik.http.routers.bmo-voice.entrypoints=web"
-      - "traefik.http.services.bmo-voice.loadbalancer.server.port=8000"
-
   # VOICE ENGINE - Qwen3-TTS (1.7B)
+  # Replaced the retired bmo-voice RVC service (models lost); owns host port 8100
+  # so the .106 driver connects unchanged.
   voice-engine:
     build:
       context: ../services/voice_engine
@@ -135,8 +119,9 @@ services:
       - "traefik.http.services.voice-engine.loadbalancer.server.port=8020"
 
   # BMO BRAIN - OpenAI-compatible Tier-1 vault-RAG conversational assistant.
-  # Recalls personal-vault memories, injects them as context, and answers in BMO's persona
-  # via the LLM. Serves HA's OpenAI-Conversation agent AND the BMO Pi's bmo_driver.chat()
+  # Recalls personal-vault memories, injects them as context, and answers via the LLM.
+  # Persona currently goes by "Claude" (Claude Shannon); the BMO persona lands later.
+  # Serves HA's OpenAI-Conversation agent AND the BMO Pi's bmo_driver.chat()
   # (which targets :8000/v1). Personal vault values live in execution_plane/.env (gitignored);
   # vault recall is inert unless BMO_VAULT_URL + BMO_VAULT_OWNER are set there.
   bmo-brain:
@@ -151,6 +136,11 @@ services:
       - VAULT_OWNER=${BMO_VAULT_OWNER}
       - OLLAMA_URL=${BMO_OLLAMA_URL:-http://192.168.2.101:11434}
       - BMO_MODEL=${BMO_MODEL:-qwen3:8b}
+      # Persona identity — name-only override, read from execution_plane/.env.
+      # A full persona rewrite (BMO_PERSONA in main.py) is NOT wired here: add it as its
+      # own "- BMO_PERSONA=${BMO_PERSONA}" line below if you need to override the whole prompt.
+      - BMO_ASSISTANT_NAME=${BMO_ASSISTANT_NAME:-Claude}
+      - BMO_OWNER_NAME=${BMO_OWNER_NAME:-your user}
     restart: unless-stopped
     networks:
       - execution_net

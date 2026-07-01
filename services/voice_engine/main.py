@@ -1,9 +1,8 @@
 
+import asyncio
 import os
 import torch
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import Response
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
 try:
@@ -64,6 +63,11 @@ model = None
 tokenizer = None
 stt_model = None
 sv_model = None  # CAM++ speaker verification model
+models_loading = True
+
+# Qwen3-TTS generate_voice_clone is not reentrant — concurrent calls race on the same
+# CUDA model instance. Serialize all TTS inference through this lock.
+_tts_lock = asyncio.Lock()
 
 def load_model():
     global model, tokenizer, stt_model, sv_model
@@ -125,7 +129,28 @@ def load_model():
 
 @app.on_event("startup")
 async def startup_event():
-    load_model()
+    # Model load takes 60-120s; run it off the event loop so the server can answer
+    # /health (503 while loading) instead of refusing connections until ready.
+    async def _load():
+        global models_loading
+        try:
+            await asyncio.get_event_loop().run_in_executor(None, load_model)
+        finally:
+            models_loading = False
+    asyncio.ensure_future(_load())
+
+
+@app.get("/health")
+async def health():
+    status = {
+        "tts": model is not None,
+        "stt": stt_model is not None,
+        "speaker_verification": sv_model is not None,
+        "loading": models_loading,
+    }
+    if models_loading:
+        return Response(content='{"status": "loading"}', media_type="application/json", status_code=503)
+    return {"status": "ok" if model is not None else "degraded", **status}
 
 @app.post("/tts")
 async def text_to_speech(
@@ -190,15 +215,19 @@ async def text_to_speech(
         # 3. Generate Audio
         # Qwen3-TTS generate_voice_clone returns list of numpy arrays (batched), we take the first one
         # We pass a single text and a single (concatenated) reference audio path in a list of size 1
-        output_audios, sample_rate = model.generate_voice_clone(
-            text=[text],
-            ref_audio=[final_ref_audio_path] if final_ref_audio_path else None,
-            ref_text=[prompt_text] if prompt_text else None,
-            x_vector_only_mode=x_vector_only,
-            do_sample=True,
-            top_p=0.8,
-            temperature=0.8
-        )
+        async with _tts_lock:
+            output_audios, sample_rate = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: model.generate_voice_clone(
+                    text=[text],
+                    ref_audio=[final_ref_audio_path] if final_ref_audio_path else None,
+                    ref_text=[prompt_text] if prompt_text else None,
+                    x_vector_only_mode=x_vector_only,
+                    do_sample=True,
+                    top_p=0.8,
+                    temperature=0.8
+                )
+            )
         
         if not output_audios:
              raise HTTPException(status_code=500, detail="Generation failed (empty output)")
@@ -237,8 +266,11 @@ async def text_to_speech(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # Cleanup temp files
-                    pass
+        for p in temp_files:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
 
 @app.post("/speak")
 @app.get("/speak")
@@ -260,13 +292,17 @@ async def speak_compat(text: str, pitch: int = 0, speed: float = 1.0, method: st
     temp_files = []
     try:
         text = text.replace("BMO", "Beemo").replace("bmo", "beemo").replace("Bmo", "Beemo")
-        output_audios, sample_rate = model.generate_voice_clone(
-            text=[text],
-            ref_audio=ref_audio,
-            ref_text=None,
-            x_vector_only_mode=True,
-            do_sample=True, top_p=0.8, temperature=0.8,
-        )
+        async with _tts_lock:
+            output_audios, sample_rate = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: model.generate_voice_clone(
+                    text=[text],
+                    ref_audio=ref_audio,
+                    ref_text=None,
+                    x_vector_only_mode=True,
+                    do_sample=True, top_p=0.8, temperature=0.8,
+                )
+            )
         if not output_audios:
             raise HTTPException(status_code=500, detail="Generation failed (empty output)")
         raw_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name

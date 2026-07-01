@@ -256,10 +256,22 @@ class BMODriver:
             t1 = time.time()
             logger.info(f"⏱ HTTP POST: {t1-t0:.1f}s ({len(resp.content)} bytes)")
             if resp.status_code == 200:
-                filename = "bmo_response.wav"
-                with open(filename, "wb") as f:
-                    f.write(resp.content)
-                return filename
+                # Unique temp file per response — overlapping interactions (FIFO command +
+                # wake word) must not race on a shared filename. play_audio() deletes it;
+                # on a write failure we delete it here so it doesn't orphan on disk.
+                tmp_name = None
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, prefix="bmo_response_", suffix=".wav") as f:
+                        tmp_name = f.name
+                        f.write(resp.content)
+                    return tmp_name
+                except Exception:
+                    if tmp_name:
+                        try:
+                            os.remove(tmp_name)
+                        except Exception:
+                            pass
+                    raise
             else:
                 logger.error(f"Server Error: {resp.text}")
                 return None
@@ -428,28 +440,42 @@ class BMODriver:
             logger.error(f"Sound Check Error: {e}")
 
     def play_audio(self, filename):
-        """Play audio using aplay (subprocess.run) — safest method."""
+        """Play audio using aplay (subprocess.run) — safest method. Deletes the file after."""
         try:
             cmd = ["aplay", filename]
             alsa_dev = self._get_aplay_device()
             if alsa_dev:
                 cmd = ["aplay", "-D", alsa_dev, filename]
-            
+
             logger.info(f"Playing: {' '.join(cmd)}")
-            
+
+            # Timeout from the WAV's actual duration — a fixed 10s cut off any answer
+            # longer than ten seconds mid-playback.
+            timeout = 30
+            try:
+                with wave.open(filename, "rb") as w:
+                    timeout = max(30, w.getnframes() / w.getframerate() + 10)
+            except Exception:
+                pass
+
             # Use subprocess.run with timeout and DEVNULL to prevent hangs
             subprocess.run(
-                cmd, 
-                stdout=subprocess.DEVNULL, 
-                stderr=subprocess.DEVNULL, 
-                timeout=10, 
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=timeout,
                 check=False
             )
-                 
+
         except subprocess.TimeoutExpired:
             logger.error("Audio Playback Timeout!")
         except Exception as e:
             logger.error(f"Audio Error: {e}")
+        finally:
+            try:
+                os.remove(filename)
+            except Exception:
+                pass
 
     def detect_emotion(self, text):
         """
