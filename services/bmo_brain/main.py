@@ -138,7 +138,13 @@ async def _answer(client_messages, tools=None):
     the caller supplies one — e.g. HA's "Control Home Assistant" feature. tool_calls is
     Ollama's native shape (list of {"function": {"name", "arguments"}}) or None.
     """
-    convo = [m for m in client_messages if m.get("role") in ("user", "assistant") and m.get("content")]
+    # Keep tool-result turns (role "tool") and the assistant's own prior tool_calls turn
+    # (content is empty when it emits tool_calls) so multi-round tool-calling loops — e.g.
+    # HA retrying entity resolution after a failed target — carry forward instead of
+    # silently resetting to the original prompt on every round.
+    convo = [m for m in client_messages
+             if m.get("role") in ("user", "assistant", "tool")
+             and (m.get("content") or m.get("tool_calls"))]
     last_user = next((m["content"] for m in reversed(convo) if m.get("role") == "user"), "")
     mems = await _vault_recall(last_user)
     ctx = ("\n".join(f"- {c}" for c in mems)
@@ -186,7 +192,7 @@ async def chat_completions(req: Request):
         text, tool_calls = await _answer(client_messages, tools=tools)
     except Exception as e:  # noqa: BLE001
         text = f"(BMO brain error: {e})"
-        print(f"[bmo-brain] ERROR: {e}", flush=True)
+        print(f"[bmo-brain] ERROR: {type(e).__name__}: {e}", flush=True)
 
     # Ollama's tool_calls.function.arguments is a parsed object; OpenAI's is a JSON string.
     openai_tool_calls = None
@@ -283,7 +289,7 @@ async def ollama_chat(req: Request):
         text, tool_calls = await _answer(messages, tools=tools)
     except Exception as e:  # noqa: BLE001
         text = f"(BMO brain error: {e})"
-        print(f"[bmo-brain] /api/chat ERROR: {e}", flush=True)
+        print(f"[bmo-brain] /api/chat ERROR: {type(e).__name__}: {e}", flush=True)
 
     if tool_calls:
         print(f"[bmo-brain] /api/chat emitting tool_calls="
