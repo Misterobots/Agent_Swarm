@@ -1011,7 +1011,11 @@ def chat_swarm(
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
             intent = "ACTION_FIGURE"; confidence = 0.95; reasoning = "Keyword override: action figure keywords"
         _design_keywords = ["landing page", "saas landing", "mockup", "wireframe", "prototype", "ui design", "ux design", "pitch deck", "slide deck", "presentation deck", "html slideshow", "dashboard design", "mobile app design", "mobile ui", "web prototype", "html prototype"]
-        if any(kw in _lower for kw in _design_keywords) and intent not in ("IMAGE", "ACTION_FIGURE"):
+        # swarm_mode already ran its own precise design-intent gate above (_SWARM_MEDIA_RE) —
+        # this broader, unqualified substring list has no negation/context awareness and would
+        # otherwise clobber a correct swarm_mode decision on any prompt that merely mentions one
+        # of these words for any reason (e.g. "this is a real refactor, not a prototype").
+        if not swarm_mode and any(kw in _lower for kw in _design_keywords) and intent not in ("IMAGE", "ACTION_FIGURE"):
             intent = "DESIGN"; confidence = 0.95; reasoning = "Keyword override: design/UI keywords"
         if _lower.strip().startswith("/standardize-doc"):
             intent = "DOC_STANDARDS"; confidence = 1.0; reasoning = "Slash command: /standardize-doc"
