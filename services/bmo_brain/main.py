@@ -8,8 +8,12 @@ and asks the LLM to answer in BMO's persona — concise, conversational, spoken-
 OpenAI-compatible so Home Assistant's "OpenAI Conversation" agent and the BMO Pi's
 bmo_driver.chat() can both use it unchanged.
 
-Tier-2 (later): detect explicit "build / research / status" requests and delegate
-downstream to agent_runtime's swarm/coordinate pipeline. Not wired here yet.
+Tier-2, first slice: HA device control via tool-calling passthrough. When a caller
+sends a "tools" array, it's forwarded to Ollama verbatim; any tool_calls Ollama
+returns are propagated instead of collapsed to text, so HA's own "Control Home
+Assistant" feature can execute them against entities it has chosen to expose.
+Delegating "build / research" requests to agent_runtime's swarm/coordinate
+pipeline is a separate, still-unwired Tier-2 capability.
 
 Personal values (vault URL / owner) come from env — nothing personal is baked into the
 shared repo; the shim is inert for vault recall unless VAULT_URL + VAULT_OWNER are set.
@@ -127,8 +131,13 @@ async def _live_status() -> str:
     return "\n".join(checks) if checks else "(no live checks configured)"
 
 
-async def _answer(client_messages):
-    """Recall vault context, build the BMO prompt, call the LLM, return clean answer text."""
+async def _answer(client_messages, tools=None):
+    """Recall vault context, build the BMO prompt, call the LLM, return (text, tool_calls).
+
+    `tools` is forwarded to Ollama verbatim (OpenAI-style function-calling schema) when
+    the caller supplies one — e.g. HA's "Control Home Assistant" feature. tool_calls is
+    Ollama's native shape (list of {"function": {"name", "arguments"}}) or None.
+    """
     convo = [m for m in client_messages if m.get("role") in ("user", "assistant") and m.get("content")]
     last_user = next((m["content"] for m in reversed(convo) if m.get("role") == "user"), "")
     mems = await _vault_recall(last_user)
@@ -147,12 +156,19 @@ async def _answer(client_messages):
 
     payload = {"model": MODEL, "messages": messages, "stream": False,
                "options": {"temperature": TEMPERATURE}}
+    if tools:
+        payload["tools"] = tools
     async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as c:
         r = await c.post(f"{OLLAMA_URL}/api/chat", json=payload)
         r.raise_for_status()
-        text = _strip_think(r.json().get("message", {}).get("content", ""))
-    print(f"[bmo-brain] memories={len(mems)} status_probe={status_q} answer_chars={len(text)}", flush=True)
-    return text or "(no response)"
+        message = r.json().get("message", {})
+        text = _strip_think(message.get("content", "") or "")
+        tool_calls = message.get("tool_calls") or None
+    if not text and not tool_calls:
+        text = "(no response)"
+    print(f"[bmo-brain] memories={len(mems)} status_probe={status_q} "
+          f"tool_calls={len(tool_calls) if tool_calls else 0} answer_chars={len(text)}", flush=True)
+    return text, tool_calls
 
 
 @app.post("/v1/chat/completions")
@@ -161,32 +177,60 @@ async def chat_completions(req: Request):
     client_messages = body.get("messages", [])
     stream = bool(body.get("stream", False))
     model = body.get("model") or MODEL_NAME
+    tools = body.get("tools")
     cid = "chatcmpl-bmo-" + uuid.uuid4().hex[:12]
     created = int(time.time())
 
+    tool_calls = None
     try:
-        text = await _answer(client_messages)
+        text, tool_calls = await _answer(client_messages, tools=tools)
     except Exception as e:  # noqa: BLE001
         text = f"(BMO brain error: {e})"
         print(f"[bmo-brain] ERROR: {e}", flush=True)
 
+    # Ollama's tool_calls.function.arguments is a parsed object; OpenAI's is a JSON string.
+    openai_tool_calls = None
+    if tool_calls:
+        openai_tool_calls = [{
+            "id": "call_" + uuid.uuid4().hex[:12],
+            "type": "function",
+            "function": {
+                "name": tc.get("function", {}).get("name", ""),
+                "arguments": json.dumps(tc.get("function", {}).get("arguments", {})),
+            },
+        } for tc in tool_calls]
+        print(f"[bmo-brain] emitting tool_calls={[tc['function']['name'] for tc in openai_tool_calls]}", flush=True)
+    finish_reason = "tool_calls" if openai_tool_calls else "stop"
+
     if stream:
         async def gen():
-            for delta in ({"role": "assistant"}, {"content": text}):
+            if openai_tool_calls:
                 yield ("data: " + json.dumps({
                     "id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
-                    "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
+                    "choices": [{"index": 0,
+                                 "delta": {"role": "assistant", "tool_calls": openai_tool_calls},
+                                 "finish_reason": None}],
                 }) + "\n\n")
+            else:
+                for delta in ({"role": "assistant"}, {"content": text}):
+                    yield ("data: " + json.dumps({
+                        "id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
+                        "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
+                    }) + "\n\n")
             yield ("data: " + json.dumps({
                 "id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
-                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                "choices": [{"index": 0, "delta": {}, "finish_reason": finish_reason}],
             }) + "\n\n")
             yield "data: [DONE]\n\n"
         return StreamingResponse(gen(), media_type="text/event-stream")
 
+    message = {"role": "assistant", "content": None if openai_tool_calls else text}
+    if openai_tool_calls:
+        message["tool_calls"] = openai_tool_calls
+
     return JSONResponse({
         "id": cid, "object": "chat.completion", "created": created, "model": model,
-        "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
+        "choices": [{"index": 0, "message": message, "finish_reason": finish_reason}],
         "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
     })
 
@@ -216,12 +260,13 @@ async def ollama_tags():
 
 @app.post("/api/show")
 async def ollama_show(req: Request):
-    # HA probes model capabilities here during setup.
+    # HA probes model capabilities here during setup; "tools" must be advertised for HA
+    # to offer "Control Home Assistant" tool-calling for this model.
     return {
         "license": "", "modelfile": "", "parameters": "", "template": "{{ .Prompt }}",
         "details": {"parent_model": "", "format": "gguf", "family": "bmo",
                     "families": ["bmo"], "parameter_size": "8B", "quantization_level": ""},
-        "model_info": {}, "capabilities": ["completion"],
+        "model_info": {}, "capabilities": ["completion", "tools"],
     }
 
 
@@ -231,22 +276,34 @@ async def ollama_chat(req: Request):
     messages = body.get("messages", [])
     stream = body.get("stream", True)
     model = body.get("model") or f"{MODEL_NAME}:latest"
+    tools = body.get("tools")
     now = _now_iso()
+    tool_calls = None
     try:
-        text = await _answer(messages)
+        text, tool_calls = await _answer(messages, tools=tools)
     except Exception as e:  # noqa: BLE001
         text = f"(BMO brain error: {e})"
         print(f"[bmo-brain] /api/chat ERROR: {e}", flush=True)
 
+    if tool_calls:
+        print(f"[bmo-brain] /api/chat emitting tool_calls="
+              f"{[tc.get('function', {}).get('name') for tc in tool_calls]}", flush=True)
+
+    # Ollama's native tool_calls shape is passed through verbatim — HA's native Ollama
+    # integration talks to this endpoint directly, so no translation is needed.
+    message_body = {"role": "assistant", "content": text}
+    if tool_calls:
+        message_body["tool_calls"] = tool_calls
+
     if stream:
         async def gen():
             yield json.dumps({"model": model, "created_at": now,
-                              "message": {"role": "assistant", "content": text}, "done": False}) + "\n"
+                              "message": message_body, "done": False}) + "\n"
             yield json.dumps({"model": model, "created_at": _now_iso(),
                               "message": {"role": "assistant", "content": ""},
                               "done": True, "done_reason": "stop"}) + "\n"
         return StreamingResponse(gen(), media_type="application/x-ndjson")
 
     return JSONResponse({"model": model, "created_at": now,
-                         "message": {"role": "assistant", "content": text},
+                         "message": message_body,
                          "done": True, "done_reason": "stop"})

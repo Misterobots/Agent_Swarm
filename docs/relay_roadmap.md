@@ -43,22 +43,32 @@ and `BMO_OWNER_NAME` env vars, with a full-prompt override still available via `
 (note: `BMO_PERSONA` must be added manually to the `bmo-brain` service's `environment:` block
 in `execution_plane/docker-compose.yml` — it is not read from `.env` automatically).
 
-This tier is read-only and single-purpose: it can answer questions grounded in recalled
-memories, and nothing else. No tool use, no device control, no delegation.
+Until the change below, this tier was read-only and single-purpose: it could answer questions
+grounded in recalled memories, and nothing else — no tool use, no device control, no delegation.
 
-### Tier 2 — Actions (not started — the actual "Jarvis" gap)
+### Tier 2 — Actions (first slice shipped 2026-07-02; the rest not started)
 
-This is the biggest gap between what exists and what "Relay" needs to be a Jarvis-style
-assistant rather than a grounded voice chatbot. Nothing here is built yet. It needs:
+The biggest gap between what exists and what "Relay" needs to be a Jarvis-style assistant
+rather than a grounded voice chatbot. Shipped so far:
 
-- **Intent detection** layered onto `bmo_brain` (or routed through `agents/church.py`, which
-  already does intent/skill routing for text chat) to distinguish "answer a question" from
-  "do something."
-- **Home Assistant device control** — a bridge from a detected action intent to HA's service-call
-  API, so "turn off the lights" actually does something instead of just being answered in prose.
+- **Home Assistant device control (done).** `bmo_brain` now forwards a caller's `tools` array
+  to Ollama verbatim and propagates any `tool_calls` back instead of collapsing to text —
+  passthrough, not a custom intent-detector. HA's own "Control Home Assistant" feature owns
+  intent detection, entity resolution, and execution; entity exposure (opt-in in HA's Assist
+  settings) is the sole authorization boundary, by design. Both API surfaces are covered:
+  `/v1/chat/completions` translates Ollama's tool_calls into OpenAI's shape (JSON-string
+  arguments, `finish_reason: "tool_calls"`); `/api/chat` passes Ollama's native shape through
+  unchanged. `/api/show` now advertises the `"tools"` capability, which HA's Ollama integration
+  needs in order to offer "Control Home Assistant" for this model at all. Requests without
+  `tools` (e.g. the Pi driver) are byte-identical to before — verified via a mocked-Ollama
+  functional test covering both the tool-call and plain-text paths on both endpoints.
+  Still needs real end-to-end verification against live HA + an exposed entity, and enabling
+  "Control Home Assistant" in HA's integration config (manual, out of code scope).
+
+Not yet built:
+
 - **Delegation to `agent_runtime`'s swarm/coordinate pipeline** for "go build X" / "go research X"
-  voice requests — this is the exact feature named (but not implemented) in the
-  `bmo_brain/main.py:11` docstring.
+  voice requests — a separate action capability from device control, still unwired.
 
 ### Tier 3 — Memory that writes back (not started)
 
@@ -94,20 +104,37 @@ current foundation:
 
 ## Suggested sequencing
 
-Rough order, each roughly gating the next:
+Updated 2026-07-01: reordered after deciding to take the HA device-control slice first
+(see "Sequencing decision" below) rather than doing structural cleanup before any Tier 2 work.
 
-1. Unify the conversation path (structural cleanup #1) — otherwise Tier 2 work has to be done
-   twice, once per path.
-2. Collapse persona (#2) alongside it — cheap to do at the same time as #1 since both touch
+1. **Build Tier 2's first slice: HA device-control via tool-calling passthrough in
+   `bmo_brain`.** Confirmed via research that HA's native Ollama integration already supports
+   "Control Home Assistant" tool-calling, gated by opt-in entity exposure, with qwen3:8b
+   (bmo_brain's default model) specifically recommended for it. This only touches
+   `services/bmo_brain/main.py` — no need to resolve the dual-path question first, since HA
+   already owns entity/service execution regardless of what the Pi satellite path does.
+2. Unify the conversation path (structural cleanup #1) — staged directly after the feature
+   above. Still gates further Tier 2 work (swarm/coordinate delegation, below) so it shouldn't
+   slip much further.
+3. Collapse persona (#2) alongside #2 above — cheap to do at the same time since both touch
    the same files.
-3. Build Tier 2 intent detection + HA device control — the smallest, highest-value action
-   capability (turns "grounded chatbot" into "assistant that can do things").
 4. Build Tier 2 swarm/coordinate delegation — the heavier action capability, reuses
    `agent_runtime` infrastructure that already exists.
 5. Tier 3 memory writes — highest payoff for "feels like Jarvis," but wants Tier 2's intent
    detection as a prerequisite (need to distinguish "remember this" from ordinary chat).
 6. Docs rewrite + test coverage + observability can happen in parallel with any of the above;
    they're not blocking but the debt compounds the longer they're deferred.
+
+### Sequencing decision (2026-07-01)
+
+Originally planned to unify the conversation path before any Tier 2 work, to avoid building
+action-handling logic twice. In practice, HA device control is scoped entirely to the
+HA-facing path (`bmo_brain`) — HA owns entity resolution and service execution itself via its
+own tool-calling contract, so bmo_brain only needs to stop swallowing `tools`/`tool_calls`.
+Nothing about that requires deciding what the Pi-satellite path does. Deferring the
+path-unification work costs nothing for this specific slice, and shipping the device-control
+win first delivers the headline "assistant that can act" capability sooner. The
+conversation-path fix is staged as the very next item once this feature lands.
 
 BMO-the-character (voice clone, full persona swap-in) is intentionally not on this list — it's
 a content/asset task independent of the Relay system's technical maturity, and can land
