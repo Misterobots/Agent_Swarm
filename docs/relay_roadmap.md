@@ -62,13 +62,24 @@ rather than a grounded voice chatbot. Shipped so far:
   needs in order to offer "Control Home Assistant" for this model at all. Requests without
   `tools` (e.g. the Pi driver) are byte-identical to before — verified via a mocked-Ollama
   functional test covering both the tool-call and plain-text paths on both endpoints.
-  Still needs real end-to-end verification against live HA + an exposed entity, and enabling
-  "Control Home Assistant" in HA's integration config (manual, out of code scope).
+  Live end-to-end verified 2026-07-02 against real HA plus an exposed entity
+  (light.living_room_light_right, both on and off, confirmed via independent state checks).
+  That pass also caught and fixed a real bug: `_answer()` was dropping HA's tool-result
+  messages and the assistant's own prior tool_calls turn from the conversation history on every
+  round of HA's tool-calling loop, so a failed target resolution just re-guessed the same tool
+  call forever until HA's iteration cap gave up. Fixed by preserving `role: "tool"` messages and
+  content-empty assistant turns in `_answer()`'s message filter.
 
 Not yet built:
 
 - **Delegation to `agent_runtime`'s swarm/coordinate pipeline** for "go build X" / "go research X"
   voice requests — a separate action capability from device control, still unwired.
+- **Tool-use confirmation tuning.** The live test showed the model doesn't reliably recognize
+  "the tool already succeeded, stop and confirm" — one exchange took 6 rounds of `HassTurnOff`
+  before settling on a text reply, and that reply hedged ("let's try specifying it more clearly")
+  even though the action had already worked. The `PERSONA` prompt in `bmo_brain/main.py` says
+  nothing about tool-use behavior today. Small, cheap follow-up: add explicit guidance (e.g.
+  "once a tool call succeeds, confirm in one short sentence and stop calling tools").
 
 ### Tier 3 — Memory that writes back (not started)
 
