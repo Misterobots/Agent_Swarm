@@ -71,11 +71,22 @@ been silently inert this whole time — every response was answering blind. The 
 above made this visible: without the old "Claude" persona's explicit "you have access to a
 private memory vault" framing, the model started actively denying having vault/MemPalace
 access instead of just not knowing (fixed in `_answer()`'s system-prompt text, which now
-states the capability explicitly rather than relying on the persona to). Root config gap fixed
-separately: `execution_plane/.env` now sets `BMO_VAULT_URL=http://192.168.2.102:8200`
-(MemPalace, on Hopper) and `BMO_VAULT_OWNER=misterobots` (confirmed via `memex_palace` — that
-owner_id holds the real 192 memories; `default`/`justin` hold none). `/health` now reports
-`vault: true`, and a real query pulled real recalled memories end to end.
+states the capability explicitly rather than relying on the persona to).
+
+Root config gap fixed separately, and initially pointed at the wrong store — two distinct
+MemPalace-shaped systems exist on this network and they are not interchangeable:
+- **"Bush"** (`192.168.2.107`, undocumented elsewhere in this repo) is the real personal
+  vault — 7,136+ memories (still growing) under owner_id `vlt-e0eb20075b9b72b6` (the vault's
+  own identity-scoped id; distinct from the `misterobots` + two hash identities in
+  `MEMPALACE_VAULT_FOR`, which gate *who's allowed to read* the vault — a different role from
+  the id memories are *stored under*). `execution_plane/.env` now points here.
+- **Hopper's MemPalace** (`192.168.2.102:8200`) is a separate, much smaller store — that one
+  belongs to Memex, not this vault. Tried first (owner_id `misterobots`, 192 memories) before
+  the correction above; wrong store, not wrong syntax — `/health` reported `vault: true` and
+  recall worked fine against it, it was just the wrong data.
+
+`/health` now reports `vault: true` against Bush, and a real query pulled real recalled
+memories end to end (correctly referenced this project by its own codename, "Relay").
 
 ### Tier 2 — Actions (first slice shipped 2026-07-02; the rest not started)
 
