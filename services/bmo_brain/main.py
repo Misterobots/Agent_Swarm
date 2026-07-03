@@ -211,7 +211,12 @@ async def _answer(client_messages, tools=None):
         live = await _live_status()
         parts.append("LIVE SYSTEM STATUS — probed just now. Treat this as CURRENT ground truth "
                      "and base any status/health answer on THIS, not on recalled memories:\n" + live)
-    parts.append("Recalled memories from the personal vault:\n" + ctx)
+    parts.append(
+        "Beemo has access to a personal memory vault (also called MemPalace) — facts about "
+        "your user, their projects, and their infrastructure. If asked whether Beemo has a "
+        "vault or MemPalace, the answer is yes; below is whatever it recalled for this "
+        "question specifically:\n" + ctx
+    )
     parts.append("/no_think")
     system = "\n\n".join(parts)
     messages = [{"role": "system", "content": system}] + convo
