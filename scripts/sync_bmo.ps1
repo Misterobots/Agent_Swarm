@@ -24,11 +24,16 @@ try {
     Write-Host "Preparing remote directory $RemoteDir on $sshTarget"
     ssh $sshTarget $remotePrep
 
+    # Absolute -C paths — tar chains -C cumulatively (each one resolves relative to
+    # wherever the previous -C left it, not back to the invocation cwd), so relative
+    # paths after the first -C silently break ("could not chdir to 'scripts'").
+    # network.env is deliberately NOT synced here — it's Pi-specific runtime config
+    # holding real secrets (PICOVOICE_KEY, HOME_ASSISTANT_TOKEN, etc.), doesn't exist
+    # in this repo, and the Pi's own deployed copy is already correct.
     $tarArgs = @(
         "-cf", "-",
-        "-C", "agents/bmo_voice", ".",
-        "-C", "scripts", "requirements_satellite.txt",
-        "-C", ".", "network.env"
+        "-C", "$repoRoot/agents/bmo_voice", ".",
+        "-C", "$repoRoot/scripts", "requirements_satellite.txt"
     )
 
     $remoteExtract = "tar -xf - -C '$RemoteDir'"
