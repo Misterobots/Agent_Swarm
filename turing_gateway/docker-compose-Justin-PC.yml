@@ -375,12 +375,24 @@ services:
       - MEMPALACE_API_URL=http://mempalace:8200
       - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
       - REDIS_PORT=6379
-      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
-      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:14b}
-      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
-      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
-      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
-      - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
+      # GPU peer lock — Turing's own agent_runtime hosts /internal/gpu-lock/.
+      # localhost:8000 is correct (same container, single-node setup).
+      - GPU_LOCK_HOST=http://localhost:8000
+      # ── Model specialization (must match config.py defaults) ──────────────────
+      # All large models live on Lovelace; OLLAMA_HOST above routes them there.
+      # Kept in sync with canonical docker-compose.yml — do not revert to qwen3:14b.
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3.6:27b}
+      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-gemma4:31b}
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3-coder:30b}
+      - CODER_MODEL=${CODER_MODEL:-qwen3-coder:30b}
+      - DEVOPS_MODEL=${DEVOPS_MODEL:-qwen3-coder:30b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3.6:27b}
+      - RESEARCHER_MODEL=${RESEARCHER_MODEL:-qwen3.6:27b}
+      - ANALYST_MODEL=${ANALYST_MODEL:-qwen3.6:27b}
+      - VERIFIER_MODEL=${VERIFIER_MODEL:-qwen3:14b}
+      - CONV_MODEL=${CONV_MODEL:-qwen3.6:27b}
+      - SOLVER_MODEL=${SOLVER_MODEL:-qwen3-coder:30b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
@@ -399,6 +411,10 @@ services:
       - COMFYUI_HOST=${COMFYUI_HOST:-http://${LOVELACE_IP:-192.168.2.101}:8188}
       # Graphify codebase knowledge graph — repo is mounted at /workspace, agents subdir has the graph
       - GRAPHIFY_GRAPH_DIR=/workspace/agents/graphify-out
+    extra_hosts:
+      # mempalace resolves to Hopper — without this, MEMPALACE_API_URL (docker DNS
+      # name) never resolves on Turing's ai_lab_net and every recall fails silently.
+      - "mempalace:${HOPPER_IP:-192.168.2.102}"
     volumes:
       - ../agents:/app/agents
       - ../:/workspace
