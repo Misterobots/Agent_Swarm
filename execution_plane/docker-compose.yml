@@ -118,12 +118,14 @@ services:
       - "traefik.http.routers.voice-engine.entrypoints=web"
       - "traefik.http.services.voice-engine.loadbalancer.server.port=8020"
 
-  # BMO BRAIN - OpenAI-compatible Tier-1 vault-RAG conversational assistant.
-  # Recalls personal-vault memories, injects them as context, and answers via the LLM.
-  # Persona currently goes by "Claude" (Claude Shannon); the BMO persona lands later.
-  # Serves HA's OpenAI-Conversation agent AND the BMO Pi's bmo_driver.chat()
-  # (which targets :8000/v1). Personal vault values live in execution_plane/.env (gitignored);
-  # vault recall is inert unless BMO_VAULT_URL + BMO_VAULT_OWNER are set there.
+  # BMO BRAIN - OpenAI-compatible vault-RAG conversational assistant, speaking as BMO/Beemo.
+  # Recalls personal-vault (MemPalace) memories, injects them as context, and answers via
+  # the LLM. Canonical brain for both HA's OpenAI-Conversation agent and the BMO Pi's
+  # bmo_driver.chat() (which targets :8000/v1). Personal vault values live in
+  # execution_plane/.env (gitignored); vault recall is inert unless BMO_VAULT_URL +
+  # BMO_VAULT_OWNER are set there. To override the character prompt entirely, add
+  # "- BMO_PERSONA=${BMO_PERSONA}" below — not set by default (services/bmo_brain/persona.py
+  # is the default character).
   bmo-brain:
     build:
       context: ../services/bmo_brain
@@ -136,11 +138,6 @@ services:
       - VAULT_OWNER=${BMO_VAULT_OWNER}
       - OLLAMA_URL=${BMO_OLLAMA_URL:-http://192.168.2.101:11434}
       - BMO_MODEL=${BMO_MODEL:-qwen3:8b}
-      # Persona identity — name-only override, read from execution_plane/.env.
-      # A full persona rewrite (BMO_PERSONA in main.py) is NOT wired here: add it as its
-      # own "- BMO_PERSONA=${BMO_PERSONA}" line below if you need to override the whole prompt.
-      - BMO_ASSISTANT_NAME=${BMO_ASSISTANT_NAME:-Claude}
-      - BMO_OWNER_NAME=${BMO_OWNER_NAME:-your user}
     restart: unless-stopped
     networks:
       - execution_net
