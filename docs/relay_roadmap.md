@@ -65,6 +65,18 @@ available via `BMO_PERSONA` (note: must be added manually to the `bmo-brain` ser
 automatically); the old `BMO_ASSISTANT_NAME`/`BMO_OWNER_NAME` name-templating mechanism is
 gone now that the persona is a fixed character rather than a configurable placeholder name.
 
+**2026-07-03: vault recall is actually live.** `VAULT_URL`/`VAULT_OWNER` had been unset since
+this service was first stood up, so recall (and, once it shipped, the memory write below) had
+been silently inert this whole time — every response was answering blind. The persona swap
+above made this visible: without the old "Claude" persona's explicit "you have access to a
+private memory vault" framing, the model started actively denying having vault/MemPalace
+access instead of just not knowing (fixed in `_answer()`'s system-prompt text, which now
+states the capability explicitly rather than relying on the persona to). Root config gap fixed
+separately: `execution_plane/.env` now sets `BMO_VAULT_URL=http://192.168.2.102:8200`
+(MemPalace, on Hopper) and `BMO_VAULT_OWNER=misterobots` (confirmed via `memex_palace` — that
+owner_id holds the real 192 memories; `default`/`justin` hold none). `/health` now reports
+`vault: true`, and a real query pulled real recalled memories end to end.
+
 ### Tier 2 — Actions (first slice shipped 2026-07-02; the rest not started)
 
 The biggest gap between what exists and what "Relay" needs to be a Jarvis-style assistant
@@ -119,8 +131,9 @@ Not yet built:
 
 Vault recall used to be one-directional: `bmo_brain` read from the vault, nothing wrote to it.
 `_store_memory()` now fires a background write (`{VAULT_URL}/v1/extract`, same `owner_id`
-convention as the read path) after every answer that produced real text — inert, like recall,
-unless `VAULT_URL`/`VAULT_OWNER` are set. Ported from `voice_assistant.py`'s equivalent
+convention as the read path) after every answer that produced real text — live as of
+2026-07-03 now that `VAULT_URL`/`VAULT_OWNER` are actually configured (see Tier 1). Ported
+from `voice_assistant.py`'s equivalent
 (which wrote to MemPalace directly with a different `agent_id`-based convention — standardized
 on `owner_id` here to match `bmo_brain`'s own read path, so anything written can actually be
 recalled later by the same query shape). No judgment layer yet: every exchange with a text
