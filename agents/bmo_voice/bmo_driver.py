@@ -15,6 +15,7 @@ import logging
 import argparse
 import sys
 import os
+import re
 import requests
 import json
 import pygame # For Native Mixer Playback
@@ -38,7 +39,11 @@ except ImportError as e:
     print(f"DEBUG: numpy missing ({e})")
     AUDIO_AVAILABLE = False
 
-# Wake Word and STT migrated to voice_satellite.py
+# Wake word / mic capture — ported from the retired scripts/voice_satellite.py, which
+# used to own this; see _wake_word_loop() and record_with_vad() below.
+import pvporcupine
+import sounddevice as sd
+import soundfile as sf
 
 # Import Face Renderer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -48,9 +53,132 @@ from pygame_face import PygameFace
 SAMPLE_RATE = 44100 # For playback/recording logic
 BMO_VOICE_URL = "http://{host}:{port}/speak"
 
+# Wake word / mic-capture config — values tuned against the real Pi hardware in
+# scripts/voice_satellite.py; carried over as-is.
+MIC_SAMPLE_RATE = 16000
+POST_INTERACTION_COOLDOWN = 0.5  # brief cooldown after playback to absorb echo
+FOLLOWUP_WINDOW = 8.0            # seconds BMO stays in conversation mode after a response
+FOLLOWUP_SPEECH_FRAMES = 15      # ~480ms of confirmed speech needed (harder to false-trigger)
+SILENCE_GATE_FRAMES = 12         # ~384ms of quiet required BEFORE follow-up speech counts
+                                  # TV audio is continuous and never passes this gate;
+                                  # conversation speech comes after a pause.
+_speech_threshold = 10000        # calibrated at startup in _wake_word_loop(); used by record_with_vad()
+SPEAKER_VERIFY_ENABLED = os.getenv("BMO_SPEAKER_VERIFY", "false").lower() == "true"
+
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("bmo_driver")
+
+
+def _find_ppn_model():
+    """Find the Beem-Moe .ppn wake-word model file next to this script."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        for f in os.listdir(script_dir):
+            if f.lower().endswith(".ppn"):
+                return os.path.join(script_dir, f)
+    except Exception:
+        pass
+    return None
+
+
+def detect_mic_device():
+    """Auto-detect the USB microphone index (sounddevice). Fallback when --input_device isn't given."""
+    try:
+        devices = sd.query_devices()
+        for i, dev in enumerate(devices):
+            name = dev['name'].lower()
+            if ("usb" in name or "plantronics" in name or "blackwire" in name) and dev['max_input_channels'] > 0:
+                logger.info(f"🎙️ Auto-detected Mic: Index {i} ({dev['name']})")
+                return i
+    except Exception as e:
+        logger.warning(f"Mic detection failed: {e}")
+    logger.warning("⚠️ No USB Mic found, falling back to System Default.")
+    return None
+
+
+def clean_stt_text(text):
+    """Remove model tags like <|en|><|Speech|> and filter common blank-audio hallucinations."""
+    if not text:
+        return ""
+    cleaned = re.sub(r"<\|.*?\|>", "", text).strip()
+    # Strip non-ASCII (kills Whisper's Korean/Chinese/Russian hallucinations on silence)
+    cleaned = re.sub(r'[^\x00-\x7F]+', '', cleaned).strip()
+    lower_c = cleaned.lower()
+    hallucinations = [
+        "thank you.", "thanks for watching.", "amara.org", "bye.", "you.", ".",
+        "thanks for watching!", "subscribe", "thank you", "thanks", "thanks for watching",
+        "hello?", "hello.", "hello", "hi.", "hi", "testing.", "test.", "test", "...",
+        ",,,", "www", "okay.", "okay",
+    ]
+    if lower_c in hallucinations or len(lower_c) <= 2:
+        return ""
+    return cleaned
+
+
+def _is_speech_frame(pcm, threshold: int) -> bool:
+    """RMS above threshold AND zero-crossing rate in the voiced-speech range — rejects
+    continuous TV/music noise (ZCR too high) and low-frequency rumble (ZCR too low)."""
+    rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
+    if rms < threshold:
+        return False
+    signs = np.sign(pcm.astype(np.float32))
+    signs[signs == 0] = 1
+    crossings = int(np.sum(np.abs(np.diff(signs))) // 2)
+    return 20 <= crossings <= 350
+
+
+def record_with_vad(device, sample_rate=16000, frame_size=512,
+                     silence_frames_needed=20, max_duration=15.0):
+    """Record until silence_frames_needed consecutive quiet frames or max_duration.
+    Returns a numpy int16 array, or None if no speech starts within a 3s timeout."""
+    buf = queue.Queue()
+    collected = []
+    speech_started = False
+    silent_frames = 0
+    total_frames = 0
+    speech_frame_count = 0
+    max_frames = int(max_duration * sample_rate / frame_size)
+    no_speech_timeout_frames = int(3.0 * sample_rate / frame_size)
+    min_speech_frames = int(0.3 * sample_rate / frame_size)
+
+    def _cb(indata, frames, time_info, status):
+        buf.put(indata.copy())
+
+    try:
+        with sd.InputStream(samplerate=sample_rate, blocksize=frame_size,
+                             device=device, channels=1, dtype='int16',
+                             callback=_cb, latency='high'):
+            while total_frames < max_frames:
+                try:
+                    chunk = buf.get(timeout=0.5)
+                except queue.Empty:
+                    break
+
+                pcm = chunk.flatten()
+                rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
+                collected.append(pcm)
+                total_frames += 1
+
+                if rms > _speech_threshold:
+                    speech_started = True
+                    silent_frames = 0
+                    speech_frame_count += 1
+                elif speech_started:
+                    silent_frames += 1
+                    if silent_frames >= silence_frames_needed and speech_frame_count >= min_speech_frames:
+                        logger.info(f"🔇 End of speech ({speech_frame_count * frame_size / sample_rate:.1f}s spoken)")
+                        break
+                else:
+                    if total_frames > no_speech_timeout_frames:
+                        return None
+    except Exception as e:
+        logger.error(f"VAD Error: {e}")
+        return None
+
+    if not collected or speech_frame_count < min_speech_frames:
+        return None
+    return np.concatenate(collected)
 
 class BMODriver:
     def __init__(self, args):
@@ -63,28 +191,32 @@ class BMODriver:
         """Start the Face Server in a separate thread."""
         t = threading.Thread(target=self._run_server, daemon=True)
         t.start()
-        
+
         # Start Command Listener (SSH/FIFO)
         t_cmd = threading.Thread(target=self._command_fifo_thread, daemon=True)
         t_cmd.start()
-        
+
         # Wait for loop to be ready
         while self.loop is None:
             time.sleep(0.1)
         logger.info("Server Thread Started")
 
+        # Wake word / mic capture — needs self.loop ready to hand off detected
+        # interactions via asyncio.run_coroutine_threadsafe(). Non-fatal if it can't
+        # start (missing PICOVOICE_KEY, no .ppn model, etc.) — face + FIFO still work.
+        t_wake = threading.Thread(target=self._wake_word_loop, daemon=True)
+        t_wake.start()
+
     def _run_server(self):
         """The actual async loop running in the background thread."""
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        
+
         # Initial Expressions
         self.face.set_expression("happy")
         time.sleep(2)
         self.face.set_expression("neutral")
-        
-        # Start Wake Word logic is now handled by voice_satellite.py
-        
+
         # Run forever (needed for async coroutine scheduling)
         try:
             self.loop.run_forever()
@@ -118,7 +250,13 @@ class BMODriver:
                     break
                 
                 if cmd == "talk":
-                    logger.warning("Mic input migrated to voice_satellite.py! Say 'Hey Beemo' instead.")
+                    print("🎤 Recording (VAD — stops on silence)...")
+                    device = self.args.input_device if self.args.input_device is not None else detect_mic_device()
+                    recording = record_with_vad(device=device, sample_rate=MIC_SAMPLE_RATE)
+                    if recording is None:
+                        print("⚠️ No speech detected.")
+                    else:
+                        asyncio.run_coroutine_threadsafe(self.handle_voice_interaction(recording), self.loop)
                 else:
                     # Text input
                     asyncio.run_coroutine_threadsafe(self.handle_text_interaction(cmd), self.loop)
@@ -311,6 +449,283 @@ class BMODriver:
         finally:
             self.face.set_expression("neutral")
 
+    def _verify_speaker(self, wav_path: str) -> bool:
+        """POST to voice_engine's /verify_speaker. True if recognized or nothing is
+        enrolled yet; False only when a profile exists and the speaker doesn't match.
+        Fails open on network/service errors so BMO isn't silently broken."""
+        url = f"http://{self.args.host}:8020/verify_speaker"
+        try:
+            with open(wav_path, "rb") as f:
+                resp = requests.post(url, files={"audio": (os.path.basename(wav_path), f, "audio/wav")}, timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("no_profiles"):
+                    return True
+                accepted = data.get("accepted", False)
+                speaker = data.get("matched_speaker") or "unknown"
+                logger.info(f"🔐 Speaker: {speaker} score={data.get('score', 0.0):.3f} "
+                            f"{'✅ allowed' if accepted else '🚫 rejected'}")
+                return accepted
+            logger.warning(f"⚠️ Speaker verify returned {resp.status_code} — failing open")
+            return True
+        except Exception as e:
+            logger.warning(f"⚠️ Speaker verify error: {e} — failing open")
+            return True
+
+    async def handle_voice_interaction(self, recording) -> bool:
+        """Take VAD-recorded audio through STT → bmo_brain → TTS + playback.
+        Returns True if BMO's reply sounds like it's inviting a follow-up.
+        """
+        t0 = time.time()
+        self.face.set_expression("listening")
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            sf.write(tmp.name, recording.astype(np.int16), MIC_SAMPLE_RATE)
+            temp_path = tmp.name
+
+        try:
+            if SPEAKER_VERIFY_ENABLED:
+                verified = await self.loop.run_in_executor(None, self._verify_speaker, temp_path)
+                if not verified:
+                    logger.info("🚫 Unrecognized speaker — ignoring interaction.")
+                    self.face.set_expression("neutral")
+                    return False
+
+            self.face.set_expression("thinking")
+            stt_url = f"http://{self.args.host}:8020/stt"
+            try:
+                with open(temp_path, 'rb') as f:
+                    resp = await self.loop.run_in_executor(
+                        None, lambda: requests.post(stt_url, files={'audio_file': (temp_path, f, 'audio/wav')}))
+            except Exception as e:
+                logger.error(f"STT Request Error: {e}")
+                self.face.set_expression("neutral")
+                return False
+
+            if resp.status_code != 200:
+                logger.error(f"STT Error: {resp.text}")
+                self.face.set_expression("neutral")
+                return False
+
+            text = clean_stt_text(resp.json().get("text", ""))
+            if not text:
+                logger.info("No speech detected.")
+                self.face.set_expression("neutral")
+                return False
+            logger.info(f"📝 Transcribed: {text}")
+
+            reply = await self.loop.run_in_executor(None, self.chat, text)
+            if not reply:
+                logger.error("No reply from bmo_brain.")
+                self.face.set_expression("neutral")
+                return False
+
+            logger.info(f"⏱ Voice interaction total (pre-TTS): {time.time()-t0:.1f}s")
+            await self.handle_text_interaction(reply)
+            return "?" in reply or "what do you think" in reply.lower() or "how about" in reply.lower()
+        finally:
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+
+    def play_wake_ping(self):
+        """Two-tone ascending chime (C6→E6) confirming wake-word detection."""
+        try:
+            ping_wav = os.path.join(tempfile.gettempdir(), "bmo_wake.wav")
+            if not os.path.exists(ping_wav):
+                import math
+                sample_rate = 44100
+                tone_duration, gap_duration = 0.1, 0.03
+                n_tone = int(tone_duration * sample_rate)
+                n_gap = int(gap_duration * sample_rate)
+                freqs = [1047.0, 1319.0]  # C6, E6 — ascending major third
+                with wave.open(ping_wav, 'w') as f:
+                    f.setnchannels(1)
+                    f.setsampwidth(2)
+                    f.setframerate(sample_rate)
+                    for fi, freq in enumerate(freqs):
+                        for i in range(n_tone):
+                            env = min(1.0, i / (n_tone * 0.05)) * max(0.0, 1.0 - (i / n_tone) * 0.5)
+                            value = int(32767.0 * 0.25 * env * math.sin(2.0 * math.pi * freq * i / sample_rate))
+                            f.writeframesraw(struct.pack('<h', value))
+                        if fi < len(freqs) - 1:
+                            for _ in range(n_gap):
+                                f.writeframesraw(struct.pack('<h', 0))
+
+            cmd_prefix = ["aplay"]
+            alsa_dev = self._get_aplay_device()
+            if alsa_dev:
+                cmd_prefix = ["aplay", "-D", alsa_dev]
+            self._wake_hdmi(alsa_dev)
+            subprocess.run(cmd_prefix + [ping_wav], check=False, capture_output=True)
+        except Exception as e:
+            logger.error(f"Wake Ping Error: {e}")
+
+    def _wake_hdmi(self, alsa_dev):
+        """Play brief silence first — sleeping HDMI receivers drop the start of the
+        next clip otherwise. No-op cost is ~1.2s; only called right before real audio."""
+        try:
+            silence_path = os.path.join(tempfile.gettempdir(), "bmo_silence.wav")
+            if not os.path.exists(silence_path):
+                with wave.open(silence_path, 'w') as f:
+                    f.setnchannels(1)
+                    f.setsampwidth(2)
+                    f.setframerate(44100)
+                    f.writeframesraw(b"\x00\x00" * int(1.2 * 44100))
+            cmd = ["aplay", silence_path] if not alsa_dev else ["aplay", "-D", alsa_dev, silence_path]
+            subprocess.run(cmd, check=False, capture_output=True)
+        except Exception as e:
+            logger.debug(f"HDMI wake silence skipped: {e}")
+
+    def _wake_word_loop(self):
+        """Listen for the "Beemo" wake word (Porcupine) and hand detected interactions
+        off to handle_voice_interaction() on the async loop. Ported from the retired
+        scripts/voice_satellite.py — calibration/threshold formulas and hardware
+        workarounds (mic gain, attenuation) are tuned against this specific Pi and
+        carried over unchanged. Non-fatal on any init failure: logs and returns,
+        leaving face display + FIFO control still working.
+        """
+        access_key = os.getenv("PICOVOICE_KEY", "")
+        if not access_key:
+            logger.error("❌ PICOVOICE_KEY not set — wake word disabled (face/FIFO still work).")
+            return
+        ppn_path = _find_ppn_model()
+        if not ppn_path:
+            logger.error("❌ No .ppn wake word model file found — wake word disabled.")
+            return
+
+        try:
+            porcupine = pvporcupine.create(access_key=access_key, keyword_paths=[ppn_path], sensitivities=[0.65])
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Porcupine: {e} — wake word disabled.")
+            return
+
+        global _speech_threshold
+        FRAME_LENGTH = porcupine.frame_length
+        HARDWARE_RATE = MIC_SAMPLE_RATE
+        HARDWARE_CHUNK = FRAME_LENGTH
+        logger.info(f"✅ Porcupine ready. frame_length={FRAME_LENGTH}, hw_rate={HARDWARE_RATE}")
+
+        MIC_DEVICE = self.args.input_device if self.args.input_device is not None else detect_mic_device()
+
+        # This USB codec resets capture gain to max every time the device is opened.
+        try:
+            subprocess.run(["amixer", "-c", "2", "sset", "Mic", "35", "cap"], capture_output=True, check=False)
+        except Exception as e:
+            logger.warning(f"⚠️ Could not set mic gain: {e}")
+
+        audio_queue = queue.Queue()
+
+        def callback(indata, frames, time_info, status):
+            audio_queue.put(indata.copy())
+
+        SPEECH_THRESHOLD = 10000
+        logger.info("📏 Calibrating ambient noise floor — please stay quiet for 3 seconds...")
+        _cal_rms_samples = []
+        try:
+            def _cal_callback(indata, frames, time_info, status):
+                _cal_rms_samples.append(int(np.sqrt(np.mean(indata.astype(np.float32) ** 2))))
+            with sd.InputStream(samplerate=HARDWARE_RATE, blocksize=HARDWARE_CHUNK, device=MIC_DEVICE,
+                                 channels=1, callback=_cal_callback, dtype='int16', latency='high'):
+                time.sleep(3.0)
+        except Exception as e:
+            logger.warning(f"⚠️ Calibration failed: {e} — using default threshold {SPEECH_THRESHOLD}")
+            _cal_rms_samples = []
+
+        if _cal_rms_samples:
+            ambient_mean = int(np.mean(_cal_rms_samples))
+            ambient_std = int(np.std(_cal_rms_samples))
+            SPEECH_THRESHOLD = min(max(int(ambient_mean + 2.0 * ambient_std), 5000), 30000)
+            _speech_threshold = SPEECH_THRESHOLD
+            logger.info(f"📏 Ambient RMS: mean={ambient_mean}, std={ambient_std} → SPEECH_THRESHOLD={SPEECH_THRESHOLD}")
+
+        logger.info("🎙️ Wake Word: 'Beemo' (Porcupine custom model)")
+        self.face.set_expression("neutral")
+
+        followup_until = 0.0
+        silence_gate = 0
+        speech_frames = 0
+        last_heartbeat = time.time()
+
+        while self.running:
+            interacted = False
+            try:
+                with sd.InputStream(samplerate=HARDWARE_RATE, blocksize=HARDWARE_CHUNK, device=MIC_DEVICE,
+                                     channels=1, callback=callback, dtype='int16', latency='high'):
+                    while not interacted and self.running:
+                        if time.time() - last_heartbeat > 30:
+                            logger.debug(f"wake-word thread alive. Q={audio_queue.qsize()}")
+                            last_heartbeat = time.time()
+                        try:
+                            chunk = audio_queue.get(timeout=0.05)
+                            while audio_queue.qsize() > 1:
+                                audio_queue.get_nowait()
+                            pcm = chunk.flatten()
+                            rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
+                            self.face.set_mic_rms(rms)
+
+                            # Attenuate to 25% — mic AGC saturates near int16 max regardless of
+                            # room volume; this brings levels back into Porcupine's trained range.
+                            pcm_ppn = (pcm.astype(np.float32) * 0.25).clip(-32768, 32767).astype(np.int16)
+                            detected = False
+                            for i in range(0, len(pcm_ppn) - FRAME_LENGTH + 1, FRAME_LENGTH):
+                                if porcupine.process(pcm_ppn[i:i + FRAME_LENGTH]) >= 0:
+                                    detected = True
+                                    break
+
+                            if detected:
+                                logger.info("⚡ Wake Word Detected: Beemo!")
+                                speech_frames = 0
+                                self.face.set_expression("acknowledged")
+                                self.play_wake_ping()
+                                self.face.set_expression("listening")
+                                interacted = True
+                            elif followup_until > time.time():
+                                if rms < SPEECH_THRESHOLD:
+                                    silence_gate = min(silence_gate + 1, SILENCE_GATE_FRAMES + 1)
+                                    speech_frames = 0
+                                elif silence_gate >= SILENCE_GATE_FRAMES:
+                                    if _is_speech_frame(pcm, SPEECH_THRESHOLD):
+                                        speech_frames += 1
+                                        if speech_frames >= FOLLOWUP_SPEECH_FRAMES:
+                                            logger.info("💬 Follow-up speech detected")
+                                            speech_frames = 0
+                                            silence_gate = 0
+                                            self.face.set_expression("acknowledged")
+                                            interacted = True
+                                    else:
+                                        speech_frames = 0
+                                else:
+                                    speech_frames = 0
+                            else:
+                                silence_gate = 0
+                                speech_frames = 0
+                        except queue.Empty:
+                            pass
+            except Exception as e:
+                logger.error(f"Wake-word stream error: {e}")
+                time.sleep(2)
+                continue
+
+            if interacted:
+                time.sleep(0.3)  # let the listener stream release the hardware
+                recording = record_with_vad(device=MIC_DEVICE, sample_rate=HARDWARE_RATE)
+                if recording is None:
+                    logger.info("⚠️ No speech detected — skipping.")
+                    self.face.set_expression("neutral")
+                else:
+                    fut = asyncio.run_coroutine_threadsafe(self.handle_voice_interaction(recording), self.loop)
+                    try:
+                        wants_followup = fut.result(timeout=120)
+                    except Exception as e:
+                        logger.error(f"Voice interaction error: {e}")
+                        wants_followup = False
+                    followup_until = time.time() + FOLLOWUP_WINDOW if wants_followup else followup_until
+                time.sleep(POST_INTERACTION_COOLDOWN)
+
+        porcupine.delete()
+
     def _command_fifo_thread(self):
         """Listen for commands on a named pipe (e.g. echo 'say:Hello' > /tmp/bmo_cmd.fifo)."""
         fifo_path = "/tmp/bmo_cmd.fifo"
@@ -446,6 +861,9 @@ class BMODriver:
             alsa_dev = self._get_aplay_device()
             if alsa_dev:
                 cmd = ["aplay", "-D", alsa_dev, filename]
+
+            # Sleeping HDMI receivers drop the first ~second of a clip otherwise.
+            self._wake_hdmi(alsa_dev)
 
             logger.info(f"Playing: {' '.join(cmd)}")
 

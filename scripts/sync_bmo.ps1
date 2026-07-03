@@ -27,7 +27,6 @@ try {
     $tarArgs = @(
         "-cf", "-",
         "-C", "agents/bmo_voice", ".",
-        "-C", "scripts", "voice_satellite.py",
         "-C", "scripts", "requirements_satellite.txt",
         "-C", ".", "network.env"
     )
@@ -39,7 +38,7 @@ try {
         throw "BMO sync failed during archive transfer."
     }
 
-    $remoteValidate = "cd '$RemoteDir' && python3 -m py_compile bmo_driver.py voice_satellite.py pi_client.py"
+    $remoteValidate = "cd '$RemoteDir' && python3 -m py_compile bmo_driver.py pi_client.py"
     Write-Host "Validating Python entrypoints on remote host"
     ssh $sshTarget $remoteValidate
 

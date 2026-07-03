@@ -1,23 +1,29 @@
-"""BMO Brain — Tier-1 vault-grounded conversational assistant (OpenAI-compatible).
+"""BMO Brain — the canonical conversational brain for both Home Assistant and the Pi
+voice satellite (Tier-1 vault-grounded, Tier-2 tool-using).
 
-The "brain" stage of the voice pipeline: takes a transcribed question and produces the
-answer text. It is a clean, purpose-built personal assistant (NOT the agent_runtime dev
-router): it recalls relevant memories from the personal vault, injects them as context,
-and asks the LLM to answer in BMO's persona — concise, conversational, spoken-friendly.
+Takes a transcribed question and produces the answer text, speaking as BMO/Beemo. It
+recalls relevant memories from the personal vault, injects them as context, and asks
+the LLM to answer in character.
 
-OpenAI-compatible so Home Assistant's "OpenAI Conversation" agent and the BMO Pi's
-bmo_driver.chat() can both use it unchanged.
+OpenAI-compatible and Ollama-native-compatible, so Home Assistant's "Control Home
+Assistant" feature and the BMO Pi's bmo_driver.chat() both use it unchanged.
 
-Tier-2, first slice: HA device control via tool-calling passthrough. When a caller
-sends a "tools" array, it's forwarded to Ollama verbatim; any tool_calls Ollama
-returns are propagated instead of collapsed to text, so HA's own "Control Home
-Assistant" feature can execute them against entities it has chosen to expose.
-Delegating "build / research" requests to agent_runtime's swarm/coordinate
-pipeline is a separate, still-unwired Tier-2 capability.
+Two tool-calling modes, both via the shared `_answer()`:
+  - Passthrough: caller supplies its own `tools` array (HA's "Control Home Assistant"
+    feature does this) — forwarded to Ollama verbatim, any tool_calls propagated back
+    UNEXECUTED. HA owns entity resolution/execution/authorization via its own opt-in
+    entity-exposure list; bmo_brain never needs its own device-authorization layer here.
+  - Self-executing: caller supplies no `tools` (e.g. the Pi driver) — bmo_brain offers
+    its own tool set (tools.py: weather/time/news/web search/device control), executes
+    any tool_calls itself, and loops until the model produces final text. Callers with
+    no way to execute a tool call (like the Pi driver) never see one.
+Delegating "build / research" requests to agent_runtime's swarm/coordinate pipeline is
+a separate, still-unwired Tier-2 capability.
 
 Personal values (vault URL / owner) come from env — nothing personal is baked into the
 shared repo; the shim is inert for vault recall unless VAULT_URL + VAULT_OWNER are set.
 """
+import asyncio
 import datetime
 import json
 import os
@@ -28,6 +34,9 @@ import uuid
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+
+from persona import BMO_SYSTEM_PROMPT
+from tools import TOOL_SCHEMAS, call_tool
 
 VAULT_URL       = os.getenv("VAULT_URL", "").rstrip("/")
 VAULT_OWNER     = os.getenv("VAULT_OWNER", "")
@@ -40,22 +49,10 @@ MODEL       = os.getenv("BMO_MODEL", "qwen3:8b")
 MODEL_NAME  = os.getenv("BMO_MODEL_NAME", "bmo")
 LLM_TIMEOUT = float(os.getenv("BMO_LLM_TIMEOUT", "150"))
 TEMPERATURE = float(os.getenv("BMO_TEMPERATURE", "0.5"))
+SELF_TOOL_MAX_ROUNDS = int(os.getenv("BMO_SELF_TOOL_MAX_ROUNDS", "6"))
 
-# The assistant currently goes by "Claude" (after Claude Shannon). The BMO persona will
-# be layered onto this pipeline later; nothing personal is baked into the default.
-ASSISTANT_NAME = os.getenv("BMO_ASSISTANT_NAME", "Claude")
-OWNER_NAME     = os.getenv("BMO_OWNER_NAME", "your user")
-
-_NAME_ORIGIN = " (named after Claude Shannon)" if ASSISTANT_NAME == "Claude" else ""
-PERSONA = os.getenv("BMO_PERSONA", (
-    f"You are {ASSISTANT_NAME}{_NAME_ORIGIN} — a warm, concise personal AI "
-    f"assistant for {OWNER_NAME}'s home lab. You have access to a private memory vault; the "
-    "memories below are the source of truth about your user, their projects, their "
-    "infrastructure, and their recent work. Ground your answers in them. If they don't cover "
-    "the question, answer from general knowledge and briefly say so. Reply in plain spoken "
-    "prose — this is read aloud — so no markdown, no bullet lists, no code blocks; usually "
-    "one to three sentences unless more detail is clearly needed. Speak directly to your user."
-))
+# Full override still available for testing/experimentation via BMO_PERSONA.
+PERSONA = os.getenv("BMO_PERSONA", BMO_SYSTEM_PROMPT)
 
 app = FastAPI(title="BMO Brain (vault-RAG assistant)")
 
@@ -131,12 +128,71 @@ async def _live_status() -> str:
     return "\n".join(checks) if checks else "(no live checks configured)"
 
 
+async def _ollama_chat(messages: list, tools=None):
+    """One raw call to Ollama's /api/chat. Returns (text, tool_calls) — tool_calls is
+    Ollama's native shape (list of {"function": {"name", "arguments"}}) or None."""
+    payload = {"model": MODEL, "messages": messages, "stream": False,
+               "options": {"temperature": TEMPERATURE}}
+    if tools:
+        payload["tools"] = tools
+    async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as c:
+        r = await c.post(f"{OLLAMA_URL}/api/chat", json=payload)
+        r.raise_for_status()
+        message = r.json().get("message", {})
+    text = _strip_think(message.get("content", "") or "")
+    tool_calls = message.get("tool_calls") or None
+    return text, tool_calls
+
+
+async def _self_execute_tools(messages: list):
+    """Offer bmo_brain's own tool set (tools.py), executing any tool_calls server-side
+    and looping until the model produces a final text-only response. Used only when the
+    caller supplied no `tools` of its own — see _answer()'s docstring. Always returns
+    tool_calls=None: a caller with no `tools` array has no way to execute one itself.
+    """
+    convo = list(messages)
+    for _round in range(SELF_TOOL_MAX_ROUNDS):
+        text, tool_calls = await _ollama_chat(convo, TOOL_SCHEMAS)
+        if not tool_calls:
+            return text, None
+        convo.append({"role": "assistant", "content": text, "tool_calls": tool_calls})
+        for tc in tool_calls:
+            fn = tc.get("function", {})
+            name = fn.get("name", "")
+            args = fn.get("arguments") or {}
+            result = await call_tool(name, args)
+            print(f"[bmo-brain] self-executed tool={name} args={args} -> {result[:120]!r}", flush=True)
+            convo.append({"role": "tool", "content": result})
+    print(f"[bmo-brain] self-executing tool loop exhausted {SELF_TOOL_MAX_ROUNDS} rounds "
+          f"without a final answer", flush=True)
+    return "Beemo tried a few things there but could not finish that one. Try asking again?", None
+
+
+async def _store_memory(user_text: str, response_text: str):
+    """Fire-and-forget: store the exchange back to the vault. Non-fatal on any failure —
+    inert (like _vault_recall) unless VAULT_URL + VAULT_OWNER are set."""
+    if not (VAULT_URL and VAULT_OWNER and user_text and response_text):
+        return
+    try:
+        async with httpx.AsyncClient(timeout=VAULT_TIMEOUT) as c:
+            await c.post(f"{VAULT_URL}/v1/extract",
+                         json={"conversation": f"User: {user_text}\nBMO: {response_text}",
+                               "owner_id": VAULT_OWNER})
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] memory store failed (non-fatal): {e}", flush=True)
+
+
 async def _answer(client_messages, tools=None):
     """Recall vault context, build the BMO prompt, call the LLM, return (text, tool_calls).
 
-    `tools` is forwarded to Ollama verbatim (OpenAI-style function-calling schema) when
-    the caller supplies one — e.g. HA's "Control Home Assistant" feature. tool_calls is
-    Ollama's native shape (list of {"function": {"name", "arguments"}}) or None.
+    `tools`, when supplied by the caller, is forwarded to Ollama verbatim (OpenAI-style
+    function-calling schema) and any tool_calls are propagated back UNEXECUTED —
+    passthrough mode, e.g. HA's "Control Home Assistant" feature, which owns entity
+    resolution/execution/authorization itself. When the caller supplies no `tools`,
+    bmo_brain offers its own tool set (tools.py) and executes any tool_calls itself,
+    looping until the model produces a final text-only response — self-executing mode,
+    e.g. the Pi driver, which has no way to execute a tool call itself. tool_calls in the
+    return value is always None in self-executing mode.
     """
     # Keep tool-result turns (role "tool") and the assistant's own prior tool_calls turn
     # (content is empty when it emits tool_calls) so multi-round tool-calling loops — e.g.
@@ -160,20 +216,16 @@ async def _answer(client_messages, tools=None):
     system = "\n\n".join(parts)
     messages = [{"role": "system", "content": system}] + convo
 
-    payload = {"model": MODEL, "messages": messages, "stream": False,
-               "options": {"temperature": TEMPERATURE}}
     if tools:
-        payload["tools"] = tools
-    async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as c:
-        r = await c.post(f"{OLLAMA_URL}/api/chat", json=payload)
-        r.raise_for_status()
-        message = r.json().get("message", {})
-        text = _strip_think(message.get("content", "") or "")
-        tool_calls = message.get("tool_calls") or None
+        text, tool_calls = await _ollama_chat(messages, tools)
+    else:
+        text, tool_calls = await _self_execute_tools(messages)
+
     if not text and not tool_calls:
         text = "(no response)"
     print(f"[bmo-brain] memories={len(mems)} status_probe={status_q} "
           f"tool_calls={len(tool_calls) if tool_calls else 0} answer_chars={len(text)}", flush=True)
+    asyncio.create_task(_store_memory(last_user, text))
     return text, tool_calls
 
 
