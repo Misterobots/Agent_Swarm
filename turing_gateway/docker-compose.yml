@@ -583,6 +583,21 @@ services:
       - "traefik.http.routers.terminal-ws-ext.tls=true"
       - "traefik.http.routers.terminal-ws-ext.service=terminal-ws"
       - "traefik.http.routers.terminal-ws-ext.middlewares=globalHeaders@file,authentik@docker"
+      # WebSocket pairing relay — bypasses Next.js (its /api/backend proxy cannot
+      # upgrade WebSockets), routes directly to execution-node backend like
+      # terminal-ws above. REST create/join/leave still go via /api/backend.
+      - "traefik.http.routers.pairing-ws.rule=PathPrefix(`/api/v1/pairing/ws`)"
+      - "traefik.http.routers.pairing-ws.entrypoints=web"
+      - "traefik.http.routers.pairing-ws.priority=30"
+      - "traefik.http.routers.pairing-ws.service=pairing-ws"
+      - "traefik.http.routers.pairing-ws.middlewares=authentik@docker"
+      - "traefik.http.routers.pairing-ws-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/api/v1/pairing/ws`)"
+      - "traefik.http.routers.pairing-ws-ext.entrypoints=websecure"
+      - "traefik.http.routers.pairing-ws-ext.priority=30"
+      - "traefik.http.routers.pairing-ws-ext.tls=true"
+      - "traefik.http.routers.pairing-ws-ext.service=pairing-ws"
+      - "traefik.http.routers.pairing-ws-ext.middlewares=globalHeaders@file,authentik@docker"
+      - "traefik.http.services.pairing-ws.loadbalancer.server.url=http://agent_runtime:8000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # OPENCLAUDE gRPC INFERENCE GATEWAY (Phase 6)

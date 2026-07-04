@@ -26,6 +26,19 @@ export interface PairingActions {
 const MEMEX_URL =
   typeof window !== "undefined" ? window.location.origin : "";
 
+// WebSocket base — the pairing relay must bypass the Next.js /api/backend proxy
+// (which cannot upgrade WebSockets) and hit the gateway directly, exactly like
+// the dev terminal. REST create/join/leave still go through /api/backend (HTTP).
+const WS_BASE = (() => {
+  const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL || "";
+  if (gateway.startsWith("https://")) return gateway.replace("https://", "wss://");
+  if (gateway.startsWith("http://"))  return gateway.replace("http://", "ws://");
+  if (typeof window !== "undefined") {
+    return (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host;
+  }
+  return "ws://localhost";
+})();
+
 export function usePairing(): [PairingState, PairingActions] {
   const [state, setState] = useState<PairingState>({
     status: "idle", role: null, code: null, peerName: null, error: null,
@@ -46,8 +59,7 @@ export function usePairing(): [PairingState, PairingActions] {
   useEffect(() => () => cleanup(), [cleanup]);
 
   const connectWs = useCallback((token: string) => {
-    const wsBase = MEMEX_URL.replace(/^https/, "wss").replace(/^http/, "ws");
-    const ws = new WebSocket(`${wsBase}/api/backend/api/v1/pairing/ws/${token}`);
+    const ws = new WebSocket(`${WS_BASE}/api/v1/pairing/ws/${token}`);
     wsRef.current = ws;
 
     ws.onmessage = (ev) => {
