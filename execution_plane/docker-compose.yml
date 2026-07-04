@@ -185,8 +185,10 @@ services:
       - OLLAMA_HOST=http://ollama:11434
       # Local Ollama — BMO voice uses qwen3:14b (9.2GB VRAM, fits alongside other services)
       - BMO_OLLAMA_HOST=http://ollama:11434
-      # Fish Audio cloud TTS for BMO voice (overrides local RVC)
-      - FISH_AUDIO_API_KEY=9c84d88f61174cdba215e69e65daff4d
+      # Fish Audio cloud TTS for BMO voice (overrides local RVC).
+      # FISH_AUDIO_API_KEY is injected via env_file (network.env) and intentionally
+      # NOT set here — an `environment:` entry would override env_file, and the
+      # ${..} form resolves from execution_plane/.env, not network.env.
       - FISH_AUDIO_MODEL_ID=323847d4c5394c678e5909c2206725f6
       - OPENHANDS_URL=http://openhands:3000
       - OPENHANDS_API_KEY=sk-sandbox-local
