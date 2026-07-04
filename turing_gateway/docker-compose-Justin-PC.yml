@@ -375,12 +375,26 @@ services:
       - MEMPALACE_API_URL=http://mempalace:8200
       - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
       - REDIS_PORT=6379
-      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
-      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:14b}
-      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
-      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
-      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
-      - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
+      # GPU peer lock — Turing's own agent_runtime hosts /internal/gpu-lock/.
+      # localhost:8000 is correct (same container, single-node setup).  If a second
+      # agent_runtime is added on another host, point THAT host's GPU_LOCK_HOST at
+      # Turing's external port: http://${TURING_IP}:8008.  GPU_LOCK_SECRET via network.env.
+      - GPU_LOCK_HOST=http://localhost:8000
+      # ── Model specialization (must match config.py defaults) ──────────────────
+      # All large models live on Lovelace; OLLAMA_HOST above routes them there.
+      # Turing local ollama only hosts llama-guard3:8b and nomic-embed-text.
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3.6:27b}
+      - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-gemma4:31b}
+      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3-coder:30b}
+      - CODER_MODEL=${CODER_MODEL:-qwen3-coder:30b}
+      - DEVOPS_MODEL=${DEVOPS_MODEL:-qwen3-coder:30b}
+      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3.6:27b}
+      - RESEARCHER_MODEL=${RESEARCHER_MODEL:-qwen3.6:27b}
+      - ANALYST_MODEL=${ANALYST_MODEL:-qwen3.6:27b}
+      - VERIFIER_MODEL=${VERIFIER_MODEL:-qwen3:14b}
+      - CONV_MODEL=${CONV_MODEL:-qwen3.6:27b}
+      - SOLVER_MODEL=${SOLVER_MODEL:-qwen3-coder:30b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
@@ -399,6 +413,8 @@ services:
       - COMFYUI_HOST=${COMFYUI_HOST:-http://${LOVELACE_IP:-192.168.2.101}:8188}
       # Graphify codebase knowledge graph — repo is mounted at /workspace, agents subdir has the graph
       - GRAPHIFY_GRAPH_DIR=/workspace/agents/graphify-out
+    extra_hosts:
+      - "mempalace:${HOPPER_IP:-192.168.2.102}"
     volumes:
       - ../agents:/app/agents
       - ../:/workspace
@@ -511,12 +527,12 @@ services:
       - "traefik.http.routers.terminal-ws-ext.service=terminal-ws"
       - "traefik.http.routers.terminal-ws-ext.middlewares=globalHeaders@file,authentik@file"
       # Static asset bypass — no Authentik for Next.js chunks (prevents OAuth redirect hijack)
-      - "traefik.http.routers.memex-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.memex-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
       - "traefik.http.routers.memex-static.entrypoints=websecure"
       - "traefik.http.routers.memex-static.priority=30"
       - "traefik.http.routers.memex-static.tls=true"
       - "traefik.http.routers.memex-static.service=memex-ext"
-      - "traefik.http.routers.memex-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.memex-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
       - "traefik.http.routers.memex-static-http.entrypoints=web"
       - "traefik.http.routers.memex-static-http.priority=30"
       - "traefik.http.routers.memex-static-http.middlewares=cf-https-proto@file"
