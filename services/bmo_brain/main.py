@@ -1,9 +1,10 @@
 """BMO Brain — the canonical conversational brain for both Home Assistant and the Pi
 voice satellite (Tier-1 vault-grounded, Tier-2 tool-using).
 
-Takes a transcribed question and produces the answer text, speaking as BMO/Beemo. It
-recalls relevant memories from the personal vault, injects them as context, and asks
-the LLM to answer in character.
+Takes a transcribed question and produces the answer text, speaking as Friday (the active
+persona — see persona.py; BMO/Beemo is a deferred future persona, not currently wired in).
+Recalls relevant memories from the personal vault, injects them as context, and asks the
+LLM to answer in character.
 
 OpenAI-compatible and Ollama-native-compatible, so Home Assistant's "Control Home
 Assistant" feature and the BMO Pi's bmo_driver.chat() both use it unchanged.
@@ -35,7 +36,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from persona import BMO_SYSTEM_PROMPT
+from persona import FRIDAY_SYSTEM_PROMPT
 from tools import TOOL_SCHEMAS, call_tool
 
 VAULT_URL       = os.getenv("VAULT_URL", "").rstrip("/")
@@ -52,7 +53,7 @@ TEMPERATURE = float(os.getenv("BMO_TEMPERATURE", "0.5"))
 SELF_TOOL_MAX_ROUNDS = int(os.getenv("BMO_SELF_TOOL_MAX_ROUNDS", "6"))
 
 # Full override still available for testing/experimentation via BMO_PERSONA.
-PERSONA = os.getenv("BMO_PERSONA", BMO_SYSTEM_PROMPT)
+PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
 
 app = FastAPI(title="BMO Brain (vault-RAG assistant)")
 
@@ -212,10 +213,9 @@ async def _answer(client_messages, tools=None):
         parts.append("LIVE SYSTEM STATUS — probed just now. Treat this as CURRENT ground truth "
                      "and base any status/health answer on THIS, not on recalled memories:\n" + live)
     parts.append(
-        "Beemo has access to a personal memory vault (also called MemPalace) — facts about "
-        "your user, their projects, and their infrastructure. If asked whether Beemo has a "
-        "vault or MemPalace, the answer is yes; below is whatever it recalled for this "
-        "question specifically:\n" + ctx
+        "I have access to a personal memory vault (also called MemPalace) — facts about "
+        "your projects and infrastructure. If asked whether I have a vault or MemPalace, "
+        "the answer is yes; below is whatever I recalled for this question specifically:\n" + ctx
     )
     parts.append("/no_think")
     system = "\n\n".join(parts)

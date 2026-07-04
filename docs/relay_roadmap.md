@@ -2,12 +2,15 @@
 
 **Relay** is the project codename for the personal, Jarvis-style voice assistant being built
 on top of the BMO hardware (wake-word device, GPU-backed TTS/STT, and the vault-grounded
-conversational brain). The assistant's own in-conversation name is separate from the project
-name: it speaks as **BMO ("Beemo")** as of 2026-07-02 (`services/bmo_brain/persona.py`) — the
-"Claude"-placeholder persona this doc originally described has been retired now that the
-BMO character prompt (already written and proven in `agents/specialized/bmo_persona.py`) was
-ported in. "Relay" is what we call the overall system in docs, code comments, and planning —
-not the voice itself.
+conversational brain). The assistant's own in-conversation name is separate from both the
+project name and the hardware's name: it speaks as **Friday** as of 2026-07-03
+(`services/bmo_brain/persona.py`, `FRIDAY_SYSTEM_PROMPT`) — a JARVIS-successor-style AI
+assistant persona, matching this project's own "Jarvis-style" framing. BMO-the-character
+(`BMO_SYSTEM_PROMPT`, same file) was briefly wired as the active persona on 2026-07-02 but
+turned out to be ahead of where the project actually wants to be right now — BMO-the-character
+remains the *eventual* goal for this hardware, kept in the file for later, not the current
+voice. "Relay" is what we call the overall system in docs, code comments, and planning — not
+the voice itself; "BMO" is what we call the physical hardware/Pi project — also not the voice.
 
 This doc exists because there was previously no forward-looking plan for this system anywhere
 in the repo — only a single inline comment (`services/bmo_brain/main.py:11`) gesturing at a
@@ -45,10 +48,27 @@ gate, and STT call directly into `bmo_driver.py` as a new thread, wired into the
 `chat()` (→ `bmo_brain`) and `handle_text_interaction()` (→ TTS/face/playback, already
 hardened) methods — `bmo_driver.py` is now the single, self-sufficient canonical script.
 `scripts/voice_satellite.py` (+ its `-Justin-PC`/`_pi_template` variants) and the
-`bmo_satellite.service` unit are retired. **Not yet verified against real hardware** — no way
-to test Porcupine/mic capture from a dev machine; needs a live-deployment pass with the user
-(sync `bmo_driver.py`, disable the old `bmo_satellite.service`, restart `bmo.service`, test a
-real "Hey Beemo").
+`bmo_satellite.service` unit are retired.
+
+**Partially live-verified 2026-07-03.** Deployed to the physical Pi; wake word detection
+itself confirmed working twice on real hardware ("Hey Beemo" triggered Porcupine correctly).
+Two real bugs found and fixed in that pass: (1) the systemd unit's `--input_device 3` had zero
+input channels and failed to open at all — `_wake_word_loop` now verifies the configured
+device first and falls back to name-based auto-detection (matching what `voice_satellite.py`
+always did) rather than trusting an unverified index; (2) the STT request in
+`handle_voice_interaction()` had no timeout, so a slow/unreachable `voice_engine` hung for
+~2 minutes before an unrelated outer timeout surfaced a blank error message — fixed with an
+explicit 30s timeout and better error logging. Full round-trip (wake word → STT → brain →
+TTS → playback) has not yet been retested after those fixes — still the next concrete step.
+
+**Google Home entry point — staged, not yet done (2026-07-03).** A third way to reach the same
+brain, alongside HA's Assist pipeline and the Pi: "Hey Google, talk to Friday" via HA Cloud's
+(Nabu Casa) Google Assistant conversation relay. `cloud`, `google_assistant`, and
+`ollama.conversation` are all confirmed active HA components, but the actual relay toggle
+lives in Nabu Casa's own UI (Settings → Home Assistant Cloud → Google Assistant) and can't be
+inspected or set via HA's REST API — needs the user to walk through renaming the Assist
+pipeline to "Friday," enabling the conversation-relay exposure there, and testing live. No
+code changes needed for this one; it's pure configuration once bmo_brain speaks as Friday.
 
 Remaining known gaps at this tier: no automated tests (only the manual `scripts/bmo_sandbox.py`
 harness), no barge-in/interrupt support, and the `-Justin-PC` file-pair pattern (duplicate
@@ -57,13 +77,13 @@ service/launch files for a second deployment target) still has no single source 
 ### Tier 1 — Grounded chat (done)
 
 `services/bmo_brain/main.py` recalls vault memories, injects them as context, and answers as
-BMO in character (`services/bmo_brain/persona.py`, ported from `agents/specialized/bmo_persona.py`
-— see structural cleanup #2). It serves both Home Assistant's native Ollama/OpenAI-Conversation
-integration and, as of 2026-07-02, the Pi driver directly. A full-prompt override is still
-available via `BMO_PERSONA` (note: must be added manually to the `bmo-brain` service's
-`environment:` block in `execution_plane/docker-compose.yml` — it is not read from `.env`
-automatically); the old `BMO_ASSISTANT_NAME`/`BMO_OWNER_NAME` name-templating mechanism is
-gone now that the persona is a fixed character rather than a configurable placeholder name.
+Friday in character (`services/bmo_brain/persona.py`, `FRIDAY_SYSTEM_PROMPT` — see the intro
+above for why BMO isn't the active persona yet). It serves both Home Assistant's native
+Ollama/OpenAI-Conversation integration and, as of 2026-07-02, the Pi driver directly — same
+brain, same persona, both surfaces. A full-prompt override is still available via
+`BMO_PERSONA` (note: must be added manually to the `bmo-brain` service's `environment:` block
+in `execution_plane/docker-compose.yml` — it is not read from `.env` automatically; the env
+var name is a historical leftover, it overrides whichever persona is active, not just BMO's).
 
 **2026-07-03: vault recall is actually live.** `VAULT_URL`/`VAULT_OWNER` had been unset since
 this service was first stood up, so recall (and, once it shipped, the memory write below) had
@@ -163,13 +183,16 @@ current foundation:
    reconstructing wake-word/mic-capture inside `bmo_driver.py` (see Tier 0) since
    `voice_satellite.py` had been quietly doing that job too — not anticipated when this item
    was originally written.
-2. **~~Collapse persona into one source.~~ Mostly done 2026-07-02.** `services/bmo_brain/persona.py`
-   now carries the BMO/Beemo character (ported from `agents/specialized/bmo_persona.py`,
-   which stays the reference copy — see its module docstring). Not a true single source: it's
+2. **~~Collapse persona into one source.~~ Mostly done 2026-07-02, superseded 2026-07-03.**
+   `services/bmo_brain/persona.py` carries both `BMO_SYSTEM_PROMPT` (ported from
+   `agents/specialized/bmo_persona.py`, which stays the reference copy — see its module
+   docstring) and `FRIDAY_SYSTEM_PROMPT` (the active default as of 2026-07-03, no separate
+   canonical source elsewhere — Friday only exists in `bmo_brain`, there's no Pi-hardware
+   equivalent of `bmo_persona.py` for her). BMO's copy is still not a true single source: it's
    a manual copy, not an import, because `bmo_brain`'s Dockerfile only `COPY`s its own
    directory and can't reach `agents/`. A real single source would need a shared package both
-   services can install, or a build-time copy step — not done, flagged here for whoever hits
-   persona drift next.
+   services can install, or a build-time copy step — not done, flagged here for whenever BMO
+   becomes the active persona again and this starts mattering.
 3. **Docs rewrite.** `docs/bmo_complete_guide.md`, `docs/bmo_deployment_guide.md`,
    `docs/bmo_troubleshooting.md`, and `docs-site/docs/admin-guide/bmo.md` all still describe the
    retired Kokoro+RVC pipeline (models, ports, `--method rmvpe`). An operator following them today
