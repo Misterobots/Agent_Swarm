@@ -251,8 +251,9 @@ class BMODriver:
                 
                 if cmd == "talk":
                     print("🎤 Recording (VAD — stops on silence)...")
-                    device = self.args.input_device if self.args.input_device is not None else detect_mic_device()
-                    recording = record_with_vad(device=device, sample_rate=MIC_SAMPLE_RATE)
+                    # Auto-detect by name rather than trusting --input_device — see the
+                    # same reasoning in _wake_word_loop().
+                    recording = record_with_vad(device=detect_mic_device(), sample_rate=MIC_SAMPLE_RATE)
                     if recording is None:
                         print("⚠️ No speech detected.")
                     else:
@@ -372,11 +373,8 @@ class BMODriver:
         return None
 
     def send_text_request(self, text, pitch_offset=0, speed=1.0):
-        """Send text to BMO Voice TTS."""
+        """Send text to the voice engine for TTS."""
         url = BMO_VOICE_URL.format(host=self.args.host, port=self.args.port)
-        
-        # Phonetics formatting for BMO's name
-        text = text.replace("BMO", "Beemo").replace("bmo", "beemo").replace("Bmo", "Beemo")
 
         # Base pitch + offset
         final_pitch = self.args.pitch + pitch_offset
@@ -496,7 +494,7 @@ class BMODriver:
             try:
                 with open(temp_path, 'rb') as f:
                     resp = await self.loop.run_in_executor(
-                        None, lambda: requests.post(stt_url, files={'audio_file': (temp_path, f, 'audio/wav')}))
+                        None, lambda: requests.post(stt_url, files={'audio_file': (temp_path, f, 'audio/wav')}, timeout=30))
             except Exception as e:
                 logger.error(f"STT Request Error: {e}")
                 self.face.set_expression("neutral")
@@ -607,7 +605,22 @@ class BMODriver:
         HARDWARE_CHUNK = FRAME_LENGTH
         logger.info(f"✅ Porcupine ready. frame_length={FRAME_LENGTH}, hw_rate={HARDWARE_RATE}")
 
-        MIC_DEVICE = self.args.input_device if self.args.input_device is not None else detect_mic_device()
+        # --input_device is trusted if given, but verified first: a stale/wrong index
+        # (e.g. an output-only or zero-input-channel device) fails loudly at stream-open
+        # time, not at startup, which turns into a silent retry loop. Confirmed live on
+        # this Pi: index 3 ("sysdefault") has 0 input channels; the real USB mic is
+        # auto-detected reliably by name (as voice_satellite.py always did) — fall back
+        # to that rather than trusting an unverified index.
+        MIC_DEVICE = self.args.input_device
+        if MIC_DEVICE is not None:
+            try:
+                with sd.InputStream(samplerate=MIC_SAMPLE_RATE, device=MIC_DEVICE, channels=1, dtype='int16'):
+                    pass
+            except Exception as e:
+                logger.warning(f"⚠️ --input_device {MIC_DEVICE} failed to open ({e}) — falling back to auto-detect.")
+                MIC_DEVICE = None
+        if MIC_DEVICE is None:
+            MIC_DEVICE = detect_mic_device()
 
         # This USB codec resets capture gain to max every time the device is opened.
         try:
@@ -719,7 +732,7 @@ class BMODriver:
                     try:
                         wants_followup = fut.result(timeout=120)
                     except Exception as e:
-                        logger.error(f"Voice interaction error: {e}")
+                        logger.error(f"Voice interaction error: {type(e).__name__}: {e}")
                         wants_followup = False
                     followup_until = time.time() + FOLLOWUP_WINDOW if wants_followup else followup_until
                 time.sleep(POST_INTERACTION_COOLDOWN)

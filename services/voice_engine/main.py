@@ -275,23 +275,25 @@ async def text_to_speech(
 @app.post("/speak")
 @app.get("/speak")
 async def speak_compat(text: str, pitch: int = 0, speed: float = 1.0, method: str = "rmvpe"):
-    """Driver-compatible TTS endpoint for BMO.
+    """Driver-compatible TTS endpoint for the Pi (bmo_driver.py).
 
     The .106 bmo_driver POSTs query params (text/pitch/speed/method) to /speak and expects
-    a WAV back — same shape as the old RVC server. This routes that request through Qwen3-TTS:
-    clone BMO's voice from BMO_REF_AUDIO (if present) and apply the 'BMO' sox character effect.
-    pitch/method are accepted for compatibility and otherwise ignored (tone comes from the
-    clone + BMO effect).
+    a WAV back — same shape as the old RVC server. This routes that request through Qwen3-TTS,
+    cloning Friday's voice from BMO_REF_AUDIO (if present) — env var name is a historical
+    leftover from the hardware/project's "BMO_"-prefixed convention, not tied to any specific
+    persona. No sox effect applies by default (BMO_EFFECT unset): the "BMO" character effect
+    (robotic filtering, pitch+100) doesn't fit Friday's voice — it's still available via
+    BMO_EFFECT if a future persona wants it. pitch/method are accepted for compatibility and
+    otherwise ignored.
     """
     global model
     if not model:
         raise HTTPException(status_code=503, detail="TTS model not loaded.")
     ref = os.getenv("BMO_REF_AUDIO", "/app/bmo_ref.wav")
     ref_audio = [ref] if (ref and os.path.exists(ref)) else None
-    effect_name = os.getenv("BMO_EFFECT", "BMO")
+    effect_name = os.getenv("BMO_EFFECT", "")
     temp_files = []
     try:
-        text = text.replace("BMO", "Beemo").replace("bmo", "beemo").replace("Bmo", "Beemo")
         async with _tts_lock:
             output_audios, sample_rate = await asyncio.get_event_loop().run_in_executor(
                 None,

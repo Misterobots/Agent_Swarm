@@ -100,6 +100,42 @@ def _is_status_question(text: str) -> bool:
     return bool(_STATUS_RE.search(text or ""))
 
 
+_COUNT_RE = re.compile(
+    r"how many (memories|facts|things (do|did) you (know|remember|learn))"
+    r"|memory count"
+    r"|how much (do you (know|remember)|memory)"
+    r"|(size|count) of (the |your )?(vault|memories)",
+    re.IGNORECASE,
+)
+
+
+def _is_count_question(text: str) -> bool:
+    return bool(_COUNT_RE.search(text or ""))
+
+
+async def _vault_stats() -> str:
+    """Query the vault's real aggregate memory count.
+
+    _vault_recall is semantic search over content, not an aggregate — it cannot answer
+    "how many memories are there" (that produced a fabricated number, since the LLM had
+    no real total and just guessed). This hits /v1/memories/stats directly for the
+    actual count, same ground-truth-injection pattern as _live_status.
+    """
+    if not VAULT_URL:
+        return "(vault not configured)"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as c:
+            r = await c.get(f"{VAULT_URL}/v1/memories/stats")
+        if r.status_code != 200:
+            return f"(vault stats HTTP {r.status_code})"
+        data = r.json()
+        top = sorted(data.get("breakdown", []), key=lambda b: -b["count"])[:5]
+        top_str = ", ".join(f"{b['type']}/{b['domain']}: {b['count']}" for b in top)
+        return f"Total memories: {data.get('total', 'unknown')}. Largest categories: {top_str}."
+    except Exception as e:  # noqa: BLE001
+        return f"(vault stats unreachable: {type(e).__name__})"
+
+
 async def _live_status() -> str:
     """Probe live health of the vault stack + Ollama; return a short status block.
 
@@ -132,7 +168,11 @@ async def _live_status() -> str:
 async def _ollama_chat(messages: list, tools=None):
     """One raw call to Ollama's /api/chat. Returns (text, tool_calls) — tool_calls is
     Ollama's native shape (list of {"function": {"name", "arguments"}}) or None."""
-    payload = {"model": MODEL, "messages": messages, "stream": False,
+    # keep_alive keeps qwen3:8b resident in VRAM between calls — this GPU is shared with
+    # other consumers (embeddings, other models), so without it Ollama's default eviction
+    # window lets the model fall out of VRAM between conversational turns, and the next
+    # call pays a real reload cost (observed: 8-11s on an otherwise-idle model).
+    payload = {"model": MODEL, "messages": messages, "stream": False, "keep_alive": "30m",
                "options": {"temperature": TEMPERATURE}}
     if tools:
         payload["tools"] = tools
@@ -212,6 +252,12 @@ async def _answer(client_messages, tools=None):
         live = await _live_status()
         parts.append("LIVE SYSTEM STATUS — probed just now. Treat this as CURRENT ground truth "
                      "and base any status/health answer on THIS, not on recalled memories:\n" + live)
+    count_q = _is_count_question(last_user)
+    if count_q:
+        stats = await _vault_stats()
+        parts.append("VAULT MEMORY COUNT — queried just now. Treat this as the exact, authoritative "
+                     "count; state it plainly if asked how many memories exist. Do not guess a "
+                     "different number:\n" + stats)
     parts.append(
         "I have access to a personal memory vault (also called MemPalace) — facts about "
         "your projects and infrastructure. If asked whether I have a vault or MemPalace, "
@@ -228,9 +274,14 @@ async def _answer(client_messages, tools=None):
 
     if not text and not tool_calls:
         text = "(no response)"
-    print(f"[bmo-brain] memories={len(mems)} status_probe={status_q} "
+    print(f"[bmo-brain] memories={len(mems)} status_probe={status_q} count_probe={count_q} "
           f"tool_calls={len(tool_calls) if tool_calls else 0} answer_chars={len(text)}", flush=True)
-    asyncio.create_task(_store_memory(last_user, text))
+    # Status/count answers are point-in-time snapshots (current health, current total) —
+    # storing them as vault "facts" makes them go stale immediately, and a wrong one
+    # (e.g. a guessed memory count) becomes self-reinforcing: future recalls surface the
+    # stale answer as ground truth and can cause it to be restated and stored again.
+    if not status_q and not count_q:
+        asyncio.create_task(_store_memory(last_user, text))
     return text, tool_calls
 
 
