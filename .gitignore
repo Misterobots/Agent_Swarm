@@ -71,6 +71,7 @@ migration_backup_*/
 *.pth
 *.mp4
 *.wav
+!services/voice_engine/bmo_ref.wav
 *.png
 !docs/screenshots/*.png
 !docs/assets/screenshots/*.png
