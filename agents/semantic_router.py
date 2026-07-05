@@ -100,6 +100,16 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
         r"|how do you work|what tools do you have|what.+capabilities)\??$",
         re.I,
     ), "CONVERSATION", 0.90),
+
+    # CAD — OpenSCAD / parametric 3D-print modelling; vocabulary is highly specific
+    (re.compile(
+        r"\bopenscad\b|\.scad\b"
+        r"|\b(parametric (model|part|design)|cad model|cad file)\b"
+        r"|\b(3d.?print(able|ing)?|print this (part|mount|bracket|holder|enclosure))\b"
+        r"|\bstl (file|model|export)\b"
+        r"|\b(make|design|model|create).{0,40}(bracket|mount|enclosure|holder|standoff|bushing|flange)\b",
+        re.I,
+    ), "CAD", 0.93),
 ]
 
 # ---------------------------------------------------------------------------

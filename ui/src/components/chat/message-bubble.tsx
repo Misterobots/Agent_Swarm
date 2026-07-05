@@ -10,6 +10,7 @@ import { ToolCallBlock } from "./tool-call-block";
 import { ToolApprovalCard } from "./tool-approval-card";
 import { ClarificationCard } from "./clarification-card";
 import { DesignArtifactCard } from "./design-artifact-card";
+import { CadArtifactCard } from "./cad-artifact-card";
 import { DiffViewer } from "./diff-viewer";
 import { WorkshopQuestionsCard } from "./workshop-questions-card";
 import { WorkflowActionsCard } from "./workflow-actions-card";
@@ -568,6 +569,10 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
             artifact={message.designArtifact}
             onSend={onSelectFollowup}
           />
+        )}
+        {/* CAD artifact — OpenSCAD model with inline 3D viewer */}
+        {message.cadArtifact && (
+          <CadArtifactCard artifact={message.cadArtifact} />
         )}
         {/* Workshop Phase-1 loading skeleton — shown while questions generate */}
         {message.workshopQuestionsLoading && !message.workshopQuestions?.length && (

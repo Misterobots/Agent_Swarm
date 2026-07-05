@@ -526,10 +526,14 @@ def chat_swarm(
     # Rules:
     #   image/*  → appended as data-URI (handle_vision picks the first one;
     #              design/other handlers see the placeholder text after stripping)
+    #   *.stl    → binary saved to /workspace/cad_artifacts/uploads/; path in ctx
     #   text/*/json/pdf → base64-decoded and appended as labelled text block
     #   Multiple attachments are APPENDED, not overwritten.
+    _uploaded_stl: str | None = None
+    _uploaded_stl_name: str | None = None
     if attachments:
         import base64 as _b64
+        import uuid as _uuid_att
         image_count = 0
         for att in attachments:
             mime = att.get("mimeType", "")
@@ -547,6 +551,20 @@ def chat_swarm(
                     extracted_context = (extracted_context + "\n" + image_uri).strip()
                 image_count += 1
                 yield _l(f"[Router] Image attachment #{image_count} promoted to context: {name} ({mime})")
+            elif name.lower().endswith(".stl") or any(s in mime.lower() for s in ("model/stl", "application/sla", "application/vnd.ms-pki.stl")):
+                # Binary STL — save to disk; path forwarded via ctx["uploaded_stl"]
+                try:
+                    _stl_dir = "/workspace/cad_artifacts/uploads"
+                    os.makedirs(_stl_dir, exist_ok=True)
+                    _stl_bytes = _b64.b64decode(data)
+                    _stl_fname = f"{_uuid_att.uuid4().hex}_{name}"
+                    _stl_path = f"{_stl_dir}/{_stl_fname}"
+                    Path(_stl_path).write_bytes(_stl_bytes)
+                    _uploaded_stl = _stl_path
+                    _uploaded_stl_name = name
+                    yield _l(f"[Router] STL attachment saved: {name} → {_stl_path} ({len(_stl_bytes):,} B)")
+                except Exception as _stl_err:
+                    yield _l(f"[Router] STL save failed for {name}: {_stl_err}")
             else:
                 try:
                     decoded = _b64.b64decode(data).decode("utf-8", errors="replace")
@@ -844,6 +862,7 @@ def chat_swarm(
             ("/plan",       "swarm_mode",      "ultraplan"),
             ("/research",   None,              "research"),
             ("/think",      None,              "think"),
+            ("/cad",        None,              "cad"),
         ]
         for _sc_cmd, _sc_flag, _sc_extra in _SLASH_TABLE:
             if _scl.startswith(_sc_cmd + " ") or _scl == _sc_cmd:
@@ -854,6 +873,7 @@ def chat_swarm(
                 if _sc_extra == "ultraplan":     ultraplan_mode   = True
                 if _sc_extra == "think":         ultrathink_mode  = True
                 if _sc_extra == "research":      _research_slash  = True; research_mode = True
+                if _sc_extra == "cad":           intent = "CAD";  confidence = 1.0; reasoning = "Slash command: /cad"
                 break
 
         # ---------------------------------------------------------------------------
@@ -977,6 +997,14 @@ def chat_swarm(
             intent = "TRAIN"; confidence = 0.98; reasoning = "Keyword override: explicit training directive"
         if any(kw in _lower for kw in ["action figure", "posable", "ball joint", "figurine", "poseable"]):
             intent = "ACTION_FIGURE"; confidence = 0.95; reasoning = "Keyword override: action figure keywords"
+        _cad_keywords = ["openscad", ".scad", "3d print", "3d-print", "printable", "cad model",
+                         "parametric model", "stl file", "stl model", "print this part",
+                         "print a bracket", "print a mount", "print a holder", "print an enclosure"]
+        if any(kw in _lower for kw in _cad_keywords) and intent not in ("ACTION_FIGURE",):
+            intent = "CAD"; confidence = 0.95; reasoning = "Keyword override: CAD/3D-print keywords"
+        # STL attachment always routes to CAD pipeline regardless of text content
+        if _uploaded_stl and intent not in ("IMAGE", "ACTION_FIGURE", "DESIGN"):
+            intent = "CAD"; confidence = 1.0; reasoning = "STL attachment detected → CAD pipeline"
         _design_keywords = ["landing page", "saas landing", "mockup", "wireframe", "prototype", "ui design", "ux design", "pitch deck", "slide deck", "presentation deck", "html slideshow", "dashboard design", "mobile app design", "mobile ui", "web prototype", "html prototype"]
         if any(kw in _lower for kw in _design_keywords) and intent not in ("IMAGE", "ACTION_FIGURE"):
             intent = "DESIGN"; confidence = 0.95; reasoning = "Keyword override: design/UI keywords"
@@ -1030,6 +1058,20 @@ def chat_swarm(
                 "card_type": "ambiguity",
             }}
             return
+
+        # CAD sub-mode: detect review / modify / integrate when STL is attached
+        _cad_mode = "generate"
+        if _uploaded_stl:
+            _cad_lower = user_input.lower()
+            _modify_kw  = ("modify", "change", "add ", "remove", "cut ", "fix ", "update", "improve", "redesign", "adjust", "edit ", "strengthen", "thicken", "hollow", "resize")
+            _integrate_kw = ("integrate", "fit around", "build around", "design around", "assembly", "mount to", "combine with", "bracket for", "attach to", "add connector", "add mounts")
+            if any(kw in _cad_lower for kw in _integrate_kw):
+                _cad_mode = "integrate"
+            elif any(kw in _cad_lower for kw in _modify_kw):
+                _cad_mode = "modify"
+            else:
+                _cad_mode = "review"  # default when STL attached with no clear modify/integrate intent
+            yield _l(f"[Router] CAD sub-mode: {_cad_mode} (STL={_uploaded_stl_name})")
 
         _fast_mode = (model == "hive-fast")
         if _fast_mode:
@@ -1172,6 +1214,10 @@ def chat_swarm(
             "history_context": history_context,
             "constraint_context": constraint_context,
             "extracted_context": extracted_context,
+            # STL upload — set when user attaches an .stl file
+            "uploaded_stl": _uploaded_stl,
+            "uploaded_stl_name": _uploaded_stl_name,
+            "cad_mode": _cad_mode,
             "model": _handler_model,
             "ace_token": ace_token,
             "template_metadata": template_metadata,
@@ -1284,6 +1330,11 @@ def chat_swarm(
         if intent == "IOT_CONTROL":
             from handlers.train import handle_iot_control
             yield from handle_iot_control(user_input, ctx)
+            return
+
+        if intent == "CAD":
+            from handlers.cad import handle_cad
+            yield from handle_cad(user_input, ctx)
             return
 
         # Default: architect / code

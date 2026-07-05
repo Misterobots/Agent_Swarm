@@ -10,7 +10,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "todo" | "usage";
+      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "cad_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "todo" | "usage";
       // Swarm theater fields
       phase_num?: number;
       phase_name?: string;
@@ -46,6 +46,9 @@ export interface ChatCompletionChunk {
     completion_chars:  number;
   };
 }
+
+type ChunkDelta = ChatCompletionChunk["choices"][number]["delta"];
+
 /**
  * Parse an SSE line from the OpenAI-compatible streaming API.
  * Returns the parsed chunk or null for non-data lines / [DONE].
@@ -65,8 +68,219 @@ export function parseSSELine(line: string): ChatCompletionChunk | null {
 }
 
 /**
+ * Map a single SSE chunk delta to a typed StreamEvent (or null for no-op).
+ *
+ * SINGLE SOURCE OF TRUTH — used by both the line loop and the trailing-buffer
+ * path in streamSSE so the two dispatch sites can no longer drift (they were
+ * previously copy-pasted and had already diverged by four event types).
+ * `chunk` is passed because token usage is carried on the chunk, not the delta.
+ */
+function deltaToStreamEvent(
+  delta: ChunkDelta,
+  chunk: ChatCompletionChunk
+): StreamEvent | null {
+  // Tool lifecycle events
+  if (delta.type === "tool_start") {
+    return {
+      type: "tool_start",
+      content: `Starting tool: ${delta.tool_name}`,
+      tool_name: delta.tool_name,
+      tool_call_id: delta.tool_call_id,
+      tool_input: delta.tool_input,
+      tool_state: "queued",
+    };
+  }
+  if (delta.type === "tool_progress") {
+    return {
+      type: "tool_progress",
+      content: delta.content || `${delta.tool_name} in progress...`,
+      tool_name: delta.tool_name,
+      tool_call_id: delta.tool_call_id,
+      tool_state: "executing",
+      tool_progress: delta.tool_progress || 0,
+    };
+  }
+  if (delta.type === "tool_result") {
+    return {
+      type: "tool_result",
+      content: delta.tool_output || delta.content || "Tool executed",
+      tool_name: delta.tool_name,
+      tool_call_id: delta.tool_call_id,
+      tool_output: delta.tool_output,
+      tool_state: "completed",
+      artifacts: delta.artifacts as any,
+    };
+  }
+  if (delta.type === "tool_approval_needed") {
+    return {
+      type: "tool_approval_needed",
+      content: delta.content || `Approval required: ${delta.tool_name}`,
+      tool_name: delta.tool_name,
+      tool_call_id: delta.tool_call_id,
+      tool_input: delta.tool_input,
+    };
+  }
+  // Stream state
+  if (delta.type === "stream_mode") {
+    return {
+      type: "stream_mode",
+      content: delta.content || `Stream mode: ${delta.streamMode}`,
+      streamMode: delta.streamMode,
+    };
+  }
+  // Turn coordination
+  if (delta.type === "turn_boundary") {
+    return {
+      type: "turn_boundary",
+      content: delta.content || `Turn complete`,
+      turnId: delta.turnId,
+    };
+  }
+  if (delta.type === "turn_metadata") {
+    return {
+      type: "turn_metadata",
+      content: delta.content || "Turn metadata",
+      turnId: delta.turnId,
+      turnMetadata: delta.turnMetadata as TurnMetadata | undefined,
+    };
+  }
+  if (delta.type === "continuation") {
+    return {
+      type: "continuation",
+      content: delta.content || "Ready to continue",
+      continuationHint: delta.continuationHint,
+    };
+  }
+  // Clarification / media / design cards
+  if (delta.type === "clarification_card") {
+    return { type: "clarification_card", content: "", clarification: (delta as any).clarification };
+  }
+  if (delta.type === "media_attachment") {
+    return { type: "media_attachment", content: "", media: (delta as any).content };
+  }
+  if (delta.type === "design_artifact") {
+    return { type: "design_artifact", content: "", design: (delta as any).content };
+  }
+  if (delta.type === "cad_artifact") {
+    return { type: "cad_artifact", content: "", cadArtifact: (delta as any).cad_artifact };
+  }
+  // Workshop pipeline
+  if (delta.type === "workshop_questions") {
+    return {
+      type: "workshop_questions",
+      content: "",
+      workshopQuestions: ((delta as any).content?.questions ?? []),
+      workshopQuestionsLoading: (delta as any).content?.loading ?? false,
+    };
+  }
+  if (delta.type === "workflow_next_steps") {
+    return {
+      type: "workflow_next_steps",
+      content: "",
+      workflowNextSteps: ((delta as any).content?.steps ?? []),
+    };
+  }
+  if (delta.type === "suggested_followups") {
+    return { type: "suggested_followups", content: "", followups: (delta as any).followups || [] };
+  }
+  // Structured agent trace event
+  if (delta.type === "agent_event") {
+    return {
+      type: "agent_event",
+      content: (delta as any).content || "",
+      agentEvent: {
+        agent: (delta as any).agent_name || "Agent",
+        eventType: (delta as any).event_type || "status",
+        content: (delta as any).content || "",
+        timestamp: Date.now(),
+      },
+    };
+  }
+  // Agent pushes a URL into the preview pane
+  if (delta.type === "set_preview_url") {
+    return { type: "set_preview_url", content: "", url: (delta as any).url || (delta as any).content || "" };
+  }
+  // Model queue status — emitted before GPU lock acquisition
+  if (delta.type === "model_queue_status") {
+    return { type: "model_queue_status", content: "", queueStatus: (delta as any).content };
+  }
+  // Swarm theater events
+  if (delta.type === "swarm_phase") {
+    return {
+      type: "swarm_phase",
+      content: delta.content || "",
+      phase_num: delta.phase_num,
+      phase_name: delta.phase_name,
+      total_phases: delta.total_phases,
+    };
+  }
+  if (delta.type === "swarm_worker_created") {
+    return {
+      type: "swarm_worker_created",
+      content: delta.content || "",
+      worker_id: delta.worker_id,
+      role: delta.role,
+      pioneer_name: delta.pioneer_name,
+      pioneer_full_name: delta.pioneer_full_name,
+      pioneer_motto: delta.pioneer_motto,
+      task: delta.task,
+    };
+  }
+  if (delta.type === "swarm_task_list") {
+    return { type: "swarm_task_list", content: delta.content || "", workers: delta.workers as any };
+  }
+  // File-system activity chips from swarm workers
+  if (delta.type === "file_change") {
+    return {
+      type: "file_change",
+      content: "",
+      fileChange: (delta as any).content as import("@/types/chat").FileChange,
+    };
+  }
+  // Agent todo list (TodoWrite) — full list each update
+  if (delta.type === "todo") {
+    return { type: "todo", content: "", todos: ((delta as any).content?.todos ?? []) };
+  }
+  // Legacy tool call format (backward compatible)
+  if (delta.type === "tool_call") {
+    return {
+      type: "tool_call",
+      content: delta.content || "",
+      tool_name: delta.tool_name,
+      tool_input: delta.tool_input,
+      tool_call_id: delta.tool_call_id,
+    };
+  }
+  // Server-reported token usage — carried on the chunk, delta.content is empty
+  if (delta.type === "usage") {
+    return { type: "usage", content: "", usage: chunk.usage };
+  }
+  // Error — checked BEFORE the generic content fallback so an error event that
+  // carries content keeps its errorCode / errorDetails instead of being
+  // demoted to a plain content event.
+  if (delta.type === "error") {
+    return {
+      type: "error",
+      content: delta.content || "Stream error occurred",
+      errorCode: delta.errorCode,
+      errorDetails: delta.errorDetails,
+    };
+  }
+  // Standard content/status/thought/plan/log (backward compatible)
+  if (delta.content) {
+    const knownTypes = ["status", "thought", "plan", "log", "error"] as const;
+    const mappedType = (knownTypes as readonly string[]).includes(delta.type || "")
+      ? (delta.type as "status" | "thought" | "plan" | "log" | "error")
+      : "content";
+    return { type: mappedType, content: delta.content };
+  }
+  return null;
+}
+
+/**
  * Async generator that reads an SSE response body and yields typed stream events.
- * Supports both legacy (content, status, thought, tool_call) and new event types (tool_start, tool_progress, tool_result, turn_metadata, stream_mode, continuation).
+ * Both the per-line loop and the trailing-buffer tail delegate to
+ * deltaToStreamEvent so all event types are handled identically in both paths.
  */
 export async function* streamSSE(
   response: Response
@@ -88,394 +302,21 @@ export async function* streamSSE(
 
       for (const line of lines) {
         const chunk = parseSSELine(line);
-        if (chunk) {
-          const delta = chunk.choices[0]?.delta;
-          if (!delta) continue;
-
-          // Tool lifecycle events (new)
-          if (delta.type === "tool_start") {
-            yield {
-              type: "tool_start",
-              content: `Starting tool: ${delta.tool_name}`,
-              tool_name: delta.tool_name,
-              tool_call_id: delta.tool_call_id,
-              tool_input: delta.tool_input,
-              tool_state: "queued",
-            };
-          } else if (delta.type === "tool_progress") {
-            yield {
-              type: "tool_progress",
-              content: delta.content || `${delta.tool_name} in progress...`,
-              tool_name: delta.tool_name,
-              tool_call_id: delta.tool_call_id,
-              tool_state: "executing",
-              tool_progress: delta.tool_progress || 0,
-            };
-          } else if (delta.type === "tool_result") {
-            yield {
-              type: "tool_result",
-              content: delta.tool_output || delta.content || "Tool executed",
-              tool_name: delta.tool_name,
-              tool_call_id: delta.tool_call_id,
-              tool_output: delta.tool_output,
-              tool_state: "completed",
-              artifacts: delta.artifacts as any,
-            };
-          } else if (delta.type === "tool_approval_needed") {
-            yield {
-              type: "tool_approval_needed",
-              content: delta.content || `Approval required: ${delta.tool_name}`,
-              tool_name: delta.tool_name,
-              tool_call_id: delta.tool_call_id,
-              tool_input: delta.tool_input,
-            };
-          }
-          // Stream state events (new)
-          else if (delta.type === "stream_mode") {
-            yield {
-              type: "stream_mode",
-              content: delta.content || `Stream mode: ${delta.streamMode}`,
-              streamMode: delta.streamMode,
-            };
-          }
-          // Turn coordination events (new)
-          else if (delta.type === "turn_boundary") {
-            yield {
-              type: "turn_boundary",
-              content: delta.content || `Turn complete`,
-              turnId: delta.turnId,
-            };
-          } else if (delta.type === "turn_metadata") {
-            const metadata = delta.turnMetadata as TurnMetadata | undefined;
-            yield {
-              type: "turn_metadata",
-              content: delta.content || "Turn metadata",
-              turnId: delta.turnId,
-              turnMetadata: metadata,
-            };
-          }
-          // Continuation hints (new)
-          else if (delta.type === "continuation") {
-            yield {
-              type: "continuation",
-              content: delta.content || "Ready to continue",
-              continuationHint: delta.continuationHint,
-            };
-          }
-          // Clarification cards (new)
-          else if (delta.type === "clarification_card") {
-            yield {
-              type: "clarification_card",
-              content: "",
-              clarification: (delta as any).clarification,
-            };
-          }
-          // Media attachments (new)
-          else if (delta.type === "media_attachment") {
-            yield {
-              type: "media_attachment",
-              content: "",
-              media: (delta as any).content,
-            };
-          }
-          // Design artifacts (Open Design)
-          else if (delta.type === "design_artifact") {
-            yield {
-              type: "design_artifact",
-              content: "",
-              design: (delta as any).content,
-            };
-          }
-          // Workshop Phase-1 discovery question chips
-          else if (delta.type === "workshop_questions") {
-            yield {
-              type: "workshop_questions",
-              content: "",
-              workshopQuestions: ((delta as any).content?.questions ?? []),
-              workshopQuestionsLoading: (delta as any).content?.loading ?? false,
-            };
-          }
-          // Workshop Phase-2 pipeline continuation buttons
-          else if (delta.type === "workflow_next_steps") {
-            yield {
-              type: "workflow_next_steps",
-              content: "",
-              workflowNextSteps: ((delta as any).content?.steps ?? []),
-            };
-          }
-          // End-of-response follow-up chips (LLM-generated)
-          else if (delta.type === "suggested_followups") {
-            yield {
-              type: "suggested_followups",
-              content: "",
-              followups: (delta as any).followups || [],
-            };
-          }
-          // Structured agent trace event — coordinator / worker / verifier communication
-          else if (delta.type === "agent_event") {
-            yield {
-              type: "agent_event",
-              content: (delta as any).content || "",
-              agentEvent: {
-                agent: (delta as any).agent_name || "Agent",
-                eventType: (delta as any).event_type || "status",
-                content: (delta as any).content || "",
-                timestamp: Date.now(),
-              },
-            };
-          }
-          // Agent pushes a URL into the preview pane
-          else if (delta.type === "set_preview_url") {
-            yield {
-              type: "set_preview_url",
-              content: "",
-              url: (delta as any).url || (delta as any).content || "",
-            };
-          }
-          // Model queue status — emitted before GPU lock acquisition
-          else if (delta.type === "model_queue_status") {
-            yield {
-              type: "model_queue_status",
-              content: "",
-              queueStatus: (delta as any).content,
-            };
-          }
-          // Swarm theater events
-          else if (delta.type === "swarm_phase") {
-            yield {
-              type: "swarm_phase",
-              content: delta.content || "",
-              phase_num: delta.phase_num,
-              phase_name: delta.phase_name,
-              total_phases: delta.total_phases,
-            };
-          } else if (delta.type === "swarm_worker_created") {
-            yield {
-              type: "swarm_worker_created",
-              content: delta.content || "",
-              worker_id: delta.worker_id,
-              role: delta.role,
-              pioneer_name: delta.pioneer_name,
-              pioneer_full_name: delta.pioneer_full_name,
-              pioneer_motto: delta.pioneer_motto,
-              task: delta.task,
-            };
-          } else if (delta.type === "swarm_task_list") {
-            yield {
-              type: "swarm_task_list",
-              content: delta.content || "",
-              workers: delta.workers as any,
-            };
-          }
-          // File-system activity chips from swarm workers
-          else if (delta.type === "file_change") {
-            yield {
-              type: "file_change",
-              content: "",
-              fileChange: (delta as any).content as import("@/types/chat").FileChange,
-            };
-          }
-          // Agent todo list (TodoWrite) — full list each update
-          else if (delta.type === "todo") {
-            yield {
-              type: "todo",
-              content: "",
-              todos: ((delta as any).content?.todos ?? []),
-            };
-          }
-          // Legacy tool call format (backward compatible)
-          else if (delta.type === "tool_call") {
-            yield {
-              type: "tool_call",
-              content: delta.content || "",
-              tool_name: delta.tool_name,
-              tool_input: delta.tool_input,
-              tool_call_id: delta.tool_call_id,
-            };
-          }
-          // Standard content/status/thought/plan/log (backward compatible)
-          else if (delta.content) {
-            const knownTypes = ["status", "thought", "plan", "log", "error"] as const;
-            const mappedType = (knownTypes as readonly string[]).includes(delta.type || "")
-              ? (delta.type as "status" | "thought" | "plan" | "log" | "error")
-              : "content";
-            yield {
-              type: mappedType,
-              content: delta.content,
-            };
-          }
-          // Error events
-          else if (delta.type === "error") {
-            yield {
-              type: "error",
-              content: delta.content || "Stream error occurred",
-              errorCode: delta.errorCode,
-              errorDetails: delta.errorDetails,
-            };
-          }
-        }
+        if (!chunk) continue;
+        const delta = chunk.choices[0]?.delta;
+        if (!delta) continue;
+        const event = deltaToStreamEvent(delta, chunk);
+        if (event) yield event;
       }
     }
 
-    // Process remaining buffer
+    // Process remaining buffer (a final event line with no trailing newline)
     if (buffer.trim()) {
       const chunk = parseSSELine(buffer);
       if (chunk) {
         const delta = chunk.choices[0]?.delta;
-        if (delta) {
-          // Same parsing logic as above
-          if (delta.type === "tool_start") {
-            yield {
-              type: "tool_start",
-              content: `Starting tool: ${delta.tool_name}`,
-              tool_name: delta.tool_name,
-              tool_call_id: delta.tool_call_id,
-              tool_input: delta.tool_input,
-              tool_state: "queued",
-            };
-          } else if (delta.type === "tool_progress") {
-            yield {
-              type: "tool_progress",
-              content: delta.content || `${delta.tool_name} in progress...`,
-              tool_name: delta.tool_name,
-              tool_call_id: delta.tool_call_id,
-              tool_state: "executing",
-              tool_progress: delta.tool_progress || 0,
-            };
-          } else if (delta.type === "tool_result") {
-            yield {
-              type: "tool_result",
-              content: delta.tool_output || delta.content || "Tool executed",
-              tool_name: delta.tool_name,
-              tool_call_id: delta.tool_call_id,
-              tool_output: delta.tool_output,
-              tool_state: "completed",
-              artifacts: delta.artifacts as any,
-            };
-          } else if (delta.type === "stream_mode") {
-            yield {
-              type: "stream_mode",
-              content: delta.content || `Stream mode: ${delta.streamMode}`,
-              streamMode: delta.streamMode,
-            };
-          } else if (delta.type === "turn_boundary") {
-            yield {
-              type: "turn_boundary",
-              content: delta.content || `Turn complete`,
-              turnId: delta.turnId,
-            };
-          } else if (delta.type === "turn_metadata") {
-            const metadata = delta.turnMetadata as TurnMetadata | undefined;
-            yield {
-              type: "turn_metadata",
-              content: delta.content || "Turn metadata",
-              turnId: delta.turnId,
-              turnMetadata: metadata,
-            };
-          } else if (delta.type === "continuation") {
-            yield {
-              type: "continuation",
-              content: delta.content || "Ready to continue",
-              continuationHint: delta.continuationHint,
-            };
-          } else if (delta.type === "clarification_card") {
-            yield {
-              type: "clarification_card",
-              content: "",
-              clarification: (delta as any).clarification,
-            };
-          } else if (delta.type === "media_attachment") {
-            yield {
-              type: "media_attachment",
-              content: "",
-              media: (delta as any).content,
-            };
-          } else if (delta.type === "design_artifact") {
-            yield {
-              type: "design_artifact",
-              content: "",
-              design: (delta as any).content,
-            };
-          } else if (delta.type === "workshop_questions") {
-            yield {
-              type: "workshop_questions",
-              content: "",
-              workshopQuestions: ((delta as any).content?.questions ?? []),
-              workshopQuestionsLoading: (delta as any).content?.loading ?? false,
-            };
-          } else if (delta.type === "workflow_next_steps") {
-            yield {
-              type: "workflow_next_steps",
-              content: "",
-              workflowNextSteps: ((delta as any).content?.steps ?? []),
-            };
-          } else if (delta.type === "suggested_followups") {
-            yield {
-              type: "suggested_followups",
-              content: "",
-              followups: (delta as any).followups || [],
-            };
-          } else if (delta.type === "agent_event") {
-            yield {
-              type: "agent_event",
-              content: (delta as any).content || "",
-              agentEvent: {
-                agent: (delta as any).agent_name || "Agent",
-                eventType: (delta as any).event_type || "status",
-                content: (delta as any).content || "",
-                timestamp: Date.now(),
-              },
-            };
-          } else if (delta.type === "set_preview_url") {
-            yield {
-              type: "set_preview_url",
-              content: "",
-              url: (delta as any).url || (delta as any).content || "",
-            };
-          } else if (delta.type === "model_queue_status") {
-            yield {
-              type: "model_queue_status",
-              content: "",
-              queueStatus: (delta as any).content,
-            };
-          } else if (delta.type === "file_change") {
-            yield {
-              type: "file_change",
-              content: "",
-              fileChange: (delta as any).content as import("@/types/chat").FileChange,
-            };
-          } else if (delta.type === "todo") {
-            yield {
-              type: "todo",
-              content: "",
-              todos: ((delta as any).content?.todos ?? []),
-            };
-          } else if (delta.type === "tool_call") {
-            yield {
-              type: "tool_call",
-              content: delta.content || "",
-              tool_name: delta.tool_name,
-              tool_input: delta.tool_input,
-              tool_call_id: delta.tool_call_id,
-            };
-          } else if (delta.content) {
-            const knownTypes = ["status", "thought", "plan", "log", "error"] as const;
-            const mappedType = (knownTypes as readonly string[]).includes(delta.type || "")
-              ? (delta.type as "status" | "thought" | "plan" | "log" | "error")
-              : "content";
-            yield {
-              type: mappedType,
-              content: delta.content,
-            };
-          } else if (delta.type === "error") {
-            yield {
-              type: "error",
-              content: delta.content || "Stream error occurred",
-              errorCode: delta.errorCode,
-              errorDetails: delta.errorDetails,
-            };
-          }
-        }
+        const event = delta ? deltaToStreamEvent(delta, chunk) : null;
+        if (event) yield event;
       }
     }
   } finally {
