@@ -78,6 +78,9 @@ migration_backup_*/
 !docs-site/docs/assets/**/*.png
 !docs-site/docs/assets/*.png
 !ui/public/pioneers/*.png
+!ui/public/icons/*.png
+!ui/public/apple-touch-icon.png
+!mobile/twa/assets/*.png
 *.index
 delivered_artifacts/
 

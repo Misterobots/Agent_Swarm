@@ -136,9 +136,16 @@ async def pairing_ws(websocket: WebSocket, token: str):
     room.touch()
 
     role = "host" if token == room.host_token else "guest"
-    peer_token = room.guest_token if role == "host" else room.host_token
 
-    # Announce presence to peer
+    def _peer_token() -> str | None:
+        # Resolve the peer token FRESH on every use. The host connects right after
+        # /create — before any guest exists — so a value captured once here would
+        # be frozen as None and every host→guest message would be dropped. The
+        # guest_token is only assigned when /join runs, after this socket is open.
+        return room.guest_token if role == "host" else room.host_token
+
+    # Announce presence to a peer that is already connected
+    peer_token = _peer_token()
     if peer_token and peer_token in room.sockets:
         try:
             await room.sockets[peer_token].send_json({"type": "peer_joined", "role": role})
@@ -149,15 +156,16 @@ async def pairing_ws(websocket: WebSocket, token: str):
         while True:
             data = await websocket.receive_json()
             room.touch()
-            # Relay to peer only (not back to sender)
-            peer = _rooms_by_token.get(peer_token) if peer_token else None
-            if peer and peer_token and peer_token in room.sockets:
+            # Relay to peer only (not back to sender) — re-resolve each message
+            peer_token = _peer_token()
+            if peer_token and peer_token in room.sockets:
                 try:
                     await room.sockets[peer_token].send_json({**data, "_from": role})
                 except Exception:
                     pass
     except WebSocketDisconnect:
         room.sockets.pop(token, None)
+        peer_token = _peer_token()
         if peer_token and peer_token in room.sockets:
             try:
                 await room.sockets[peer_token].send_json({"type": "peer_left", "role": role})

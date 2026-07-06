@@ -74,10 +74,12 @@ def _get_preferred_host(model_name: str) -> str:
     Small/safe models go to Turing (SECONDARY_OLLAMA_HOST); everything else to Lovelace.
     Health-aware callers fall back to the other host if the preferred one is down.
     """
-    # Models that live on Turing's local Ollama (RTX 3070 Ti, 8 GB VRAM).
-    # As of current deployment, Turing only hosts: llama-guard3:8b, nomic-embed-text.
-    # ALL other models (qwen3:8b, qwen3:14b, gemma4:31b, qwen3-coder:30b, qwen3.6:27b,
-    # deepseek-r1:32b, etc.) live on Lovelace and are reached via OLLAMA_HOST.
+    # Models that live on Turing's local Ollama (RTX 3070 Ti, 8 GB VRAM) — the
+    # small-model FAST PATH. Anything that fits in 8 GB and benefits from low
+    # latency routes here: safety, embeddings, and the nano/small general models
+    # (router + fast conversation). Everything larger (>8 GB) stays on Lovelace.
+    # Substring match — keep each entry specific enough not to catch a larger
+    # sibling (e.g. "qwen3:8b" must not match "qwen3:14b").
     #
     # NOTE: In Turing's agent_runtime container, OLLAMA_HOST is set to Lovelace
     # (192.168.2.101:11434) and SECONDARY_OLLAMA_HOST is set to the local Turing
@@ -85,11 +87,11 @@ def _get_preferred_host(model_name: str) -> str:
     # OLLAMA_HOST = local).  The routing below is consistent with BOTH:
     # - On Lovelace: SECONDARY_OLLAMA_HOST = Turing, these models are routed there ✓
     # - On Turing:   SECONDARY_OLLAMA_HOST = local ollama, these models are local ✓
-    turing_safe = ["llama-guard", "nomic-embed"]
+    turing_models = ["llama-guard", "nomic-embed", "llama3.2:3b", "qwen3:8b"]
 
-    if any(m in model_name for m in turing_safe):
-        return SECONDARY_OLLAMA_HOST  # Turing: safety + embeddings (8 GB)
-    # Everything else (gemma4, qwen3-coder:30b, qwen3.6:27b, qwen3:14b, etc.)
+    if any(m in model_name for m in turing_models):
+        return SECONDARY_OLLAMA_HOST  # Turing fast path: safety, embeds, nano/small
+    # Everything larger (gemma4, qwen3-coder:30b, qwen3.6:27b, qwen3:14b, etc.)
     # → Lovelace (dual 5060 Ti, 32 GB VRAM)
     return OLLAMA_HOST
 

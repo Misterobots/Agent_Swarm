@@ -45,6 +45,7 @@ interface ChatState {
   setMessagePendingClarification: (conversationId: string, messageId: string, card: ClarificationCard | undefined) => void;
   setMessageMediaAttachments: (conversationId: string, messageId: string, attachments: MediaAttachment[]) => void;
   setMessageDesignArtifact: (conversationId: string, messageId: string, artifact: import("@/types/chat").DesignArtifact) => void;
+  setMessageCadArtifact: (conversationId: string, messageId: string, artifact: import("@/types/chat").CadArtifact) => void;
   setMessageQueueStatus: (conversationId: string, messageId: string, status: import("@/types/chat").QueueStatus | undefined) => void;
   setMessageSuggestedFollowups: (conversationId: string, messageId: string, followups: import("@/types/chat").SuggestedFollowup[]) => void;
   setMessageFlaggedFollowup: (conversationId: string, messageId: string, followup: import("@/types/chat").FlaggedFollowup) => void;
@@ -282,6 +283,20 @@ export const useChatStore = create<ChatState>()(
               ...c,
               messages: c.messages.map((m) =>
                 m.id === messageId ? { ...m, designArtifact: artifact } : m
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      setMessageCadArtifact: (conversationId, messageId, artifact) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, cadArtifact: artifact } : m
               ),
               updatedAt: Date.now(),
             };

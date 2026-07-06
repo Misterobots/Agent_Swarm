@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- full-bleed background (OS applies the mask) -->
+  <rect width="512" height="512" fill="#0e1117"/>
+  <!-- glyph scaled into the maskable safe zone (~75%) -->
+  <g transform="translate(256,267) scale(0.74) translate(-256,-267)">
+    <circle cx="256" cy="262" r="180" fill="#00cca8" opacity="0.06"/>
+    <path d="M256 85 L427 184 V349 L256 448 L85 349 V184 Z" stroke="#00cca8" stroke-width="11" stroke-linejoin="round" fill="rgba(0,204,168,0.08)"/>
+    <path d="M256 149 L363 211 V323 L256 384 L149 323 V211 Z" stroke="#00eed0" stroke-width="5" opacity="0.55" fill="none" stroke-linejoin="round"/>
+    <g stroke="#00cca8" stroke-width="4" opacity="0.4">
+      <line x1="256" y1="267" x2="256" y2="149"/>
+      <line x1="256" y1="267" x2="363" y2="211"/>
+      <line x1="256" y1="267" x2="363" y2="323"/>
+      <line x1="256" y1="267" x2="256" y2="384"/>
+      <line x1="256" y1="267" x2="149" y2="323"/>
+      <line x1="256" y1="267" x2="149" y2="211"/>
+    </g>
+    <g fill="#00cca8" opacity="0.75">
+      <circle cx="256" cy="149" r="11"/>
+      <circle cx="363" cy="211" r="11"/>
+      <circle cx="363" cy="323" r="11"/>
+      <circle cx="256" cy="384" r="11"/>
+      <circle cx="149" cy="323" r="11"/>
+      <circle cx="149" cy="211" r="11"/>
+    </g>
+    <circle cx="256" cy="267" r="28" fill="#00cca8"/>
+    <circle cx="256" cy="267" r="13" fill="#9580ff"/>
+  </g>
+</svg>

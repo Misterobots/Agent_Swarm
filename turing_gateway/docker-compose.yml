@@ -557,14 +557,14 @@ services:
       # Static asset bypass — no auth for Next.js assets to prevent post-login redirect to /manifest.json
       # Browser fetches these in the background; without bypass they hijack the Authentik redirect state
       # HTTPS bypass (websecure): static assets served directly, no ForwardAuth
-      - "traefik.http.routers.memex-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.memex-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
       - "traefik.http.routers.memex-static.entrypoints=websecure"
       - "traefik.http.routers.memex-static.priority=30"
       - "traefik.http.routers.memex-static.tls=true"
       - "traefik.http.routers.memex-static.service=memex-ext"
       # HTTP bypass (web): same paths on port 80 — redirect to HTTPS only, no authentik
       # Static HTTP bypass: inject X-Forwarded-Proto for CF tunnel, no auth gate
-      - "traefik.http.routers.memex-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || Path(`/manifest.json`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.memex-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
       - "traefik.http.routers.memex-static-http.entrypoints=web"
       - "traefik.http.routers.memex-static-http.priority=30"
       - "traefik.http.routers.memex-static-http.middlewares=cf-https-proto@file"
@@ -583,6 +583,21 @@ services:
       - "traefik.http.routers.terminal-ws-ext.tls=true"
       - "traefik.http.routers.terminal-ws-ext.service=terminal-ws"
       - "traefik.http.routers.terminal-ws-ext.middlewares=globalHeaders@file,authentik@docker"
+      # WebSocket pairing relay — bypasses Next.js (its /api/backend proxy cannot
+      # upgrade WebSockets), routes directly to execution-node backend like
+      # terminal-ws above. REST create/join/leave still go via /api/backend.
+      - "traefik.http.routers.pairing-ws.rule=PathPrefix(`/api/v1/pairing/ws`)"
+      - "traefik.http.routers.pairing-ws.entrypoints=web"
+      - "traefik.http.routers.pairing-ws.priority=30"
+      - "traefik.http.routers.pairing-ws.service=pairing-ws"
+      - "traefik.http.routers.pairing-ws.middlewares=authentik@docker"
+      - "traefik.http.routers.pairing-ws-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/api/v1/pairing/ws`)"
+      - "traefik.http.routers.pairing-ws-ext.entrypoints=websecure"
+      - "traefik.http.routers.pairing-ws-ext.priority=30"
+      - "traefik.http.routers.pairing-ws-ext.tls=true"
+      - "traefik.http.routers.pairing-ws-ext.service=pairing-ws"
+      - "traefik.http.routers.pairing-ws-ext.middlewares=globalHeaders@file,authentik@docker"
+      - "traefik.http.services.pairing-ws.loadbalancer.server.url=http://agent_runtime:8000"
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # OPENCLAUDE gRPC INFERENCE GATEWAY (Phase 6)

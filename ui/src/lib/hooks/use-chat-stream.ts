@@ -94,6 +94,7 @@ export function useChatStream(options?: {
     setMessagePendingApprovals,
     setMessageMediaAttachments,
     setMessageDesignArtifact,
+    setMessageCadArtifact,
     setMessagePendingClarification,
     setMessageQueueStatus,
     setMessageSuggestedFollowups,
@@ -394,6 +395,11 @@ export function useChatStream(options?: {
             // Handle generated design artifacts from Open Design Studio
             if (event.design) {
               setMessageDesignArtifact(convId!, assistantId, event.design);
+            }
+          } else if (event.type === "cad_artifact") {
+            // CAD artifact from OpenSCAD pipeline
+            if ((event as any).cadArtifact) {
+              setMessageCadArtifact(convId!, assistantId, (event as any).cadArtifact);
             }
           } else if (event.type === "workshop_questions") {
             // Workshop Phase-1 discovery question chips

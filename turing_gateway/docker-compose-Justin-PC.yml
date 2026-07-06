@@ -15,7 +15,7 @@ services:
       - PING=1
       - VERSION=1
       - EVENTS=0
-      - POST=0
+      - POST=1        # Allows restart/exec; secured by node-IP bind + host iptables allowlist
       - AUTH=0
       - BUILD=0
       - IMAGES=0
@@ -25,7 +25,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
-      - "2375:2375"
+      - "192.168.2.103:2375:2375"  # Bind to LAN IP only, not 0.0.0.0
     networks:
       - ai_lab_net
 
@@ -382,7 +382,9 @@ services:
       - GPU_LOCK_HOST=http://localhost:8000
       # ── Model specialization (must match config.py defaults) ──────────────────
       # All large models live on Lovelace; OLLAMA_HOST above routes them there.
-      # Turing local ollama only hosts llama-guard3:8b and nomic-embed-text.
+      # Kept in sync with canonical docker-compose.yml — do not revert to qwen3:14b.
+      # (Turing local ollama also hosts small fast-path models: llama-guard3:8b,
+      # nomic-embed-text, llama3.2:3b, qwen3:8b — see gpu_queue.py routing.)
       - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3.6:27b}
       - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
       - COORDINATOR_MODEL=${COORDINATOR_MODEL:-gemma4:31b}
@@ -414,6 +416,8 @@ services:
       # Graphify codebase knowledge graph — repo is mounted at /workspace, agents subdir has the graph
       - GRAPHIFY_GRAPH_DIR=/workspace/agents/graphify-out
     extra_hosts:
+      # mempalace resolves to Hopper — without this, MEMPALACE_API_URL (docker DNS
+      # name) never resolves on Turing's ai_lab_net and every recall fails silently.
       - "mempalace:${HOPPER_IP:-192.168.2.102}"
     volumes:
       - ../agents:/app/agents
@@ -526,6 +530,21 @@ services:
       - "traefik.http.routers.terminal-ws-ext.tls=true"
       - "traefik.http.routers.terminal-ws-ext.service=terminal-ws"
       - "traefik.http.routers.terminal-ws-ext.middlewares=globalHeaders@file,authentik@file"
+      # WebSocket pairing relay — bypasses Next.js (its /api/backend proxy cannot
+      # upgrade WebSockets), routes directly to execution-node backend like
+      # terminal-ws above. REST create/join/leave still go via /api/backend.
+      - "traefik.http.routers.pairing-ws.rule=PathPrefix(`/api/v1/pairing/ws`)"
+      - "traefik.http.routers.pairing-ws.entrypoints=web"
+      - "traefik.http.routers.pairing-ws.priority=30"
+      - "traefik.http.routers.pairing-ws.service=pairing-ws"
+      - "traefik.http.routers.pairing-ws.middlewares=authentik@file"
+      - "traefik.http.routers.pairing-ws-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/api/v1/pairing/ws`)"
+      - "traefik.http.routers.pairing-ws-ext.entrypoints=websecure"
+      - "traefik.http.routers.pairing-ws-ext.priority=30"
+      - "traefik.http.routers.pairing-ws-ext.tls=true"
+      - "traefik.http.routers.pairing-ws-ext.service=pairing-ws"
+      - "traefik.http.routers.pairing-ws-ext.middlewares=globalHeaders@file,authentik@file"
+      - "traefik.http.services.pairing-ws.loadbalancer.server.url=http://agent_runtime:8000"
       # Static asset bypass — no Authentik for Next.js chunks (prevents OAuth redirect hijack)
       - "traefik.http.routers.memex-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
       - "traefik.http.routers.memex-static.entrypoints=websecure"
