@@ -29,6 +29,57 @@ export interface OpsHealth {
   control_plane: ControlPlaneService[];
 }
 
+export interface SwarmWorker {
+  worker_id: string;
+  name: string | null;
+  role: string;
+  phase: string;
+  state: "pending" | "running" | "completed" | "failed" | "cancelled";
+  task: string;
+  elapsed_s: number | null;
+  error: string | null;
+  model?: string | null;
+}
+
+export interface SwarmSession {
+  coordination_id: string;
+  session_id: string;
+  owner_id: string | null;
+  created_at: number;
+  elapsed_s: number;
+  worker_count: number;
+  running_count: number;
+  workers: SwarmWorker[];
+}
+
+export interface SwarmSessionsResponse {
+  sessions: SwarmSession[];
+  count: number;
+  error?: string;
+}
+
+export interface GpuLockStatus {
+  locked: boolean | null;
+  holder_context: string | null;
+  acquired_at?: number | null;
+  ttl?: number | null;
+  expires_at?: number | null;
+  remaining_s: number | null;
+  error?: string;
+}
+
+export interface ContainerLogs {
+  node: string;
+  container: string;
+  tail: number;
+  logs: string;
+}
+
+export interface FleetActionResult {
+  status: string;
+  detail?: string;
+}
+
 export interface Trace {
   id: string;
   timestamp: string | null;

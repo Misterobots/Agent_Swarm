@@ -1,4 +1,14 @@
-import type { OpsHealth, TraceListResponse, TraceDetail, Observation, ServiceCheckResponse } from "@/types/ops";
+import type {
+  OpsHealth,
+  TraceListResponse,
+  TraceDetail,
+  Observation,
+  ServiceCheckResponse,
+  GpuLockStatus,
+  ContainerLogs,
+  FleetActionResult,
+  SwarmSessionsResponse,
+} from "@/types/ops";
 
 const API_BASE = "/api/backend";
 
@@ -69,5 +79,71 @@ export async function restartService(serviceId: string): Promise<{ status: strin
     return { status: "restarted" };
   } catch (e) {
     return { status: "error", detail: String(e) };
+  }
+}
+
+// ── Agent View: live swarm coordination sessions ─────────────────────────────
+
+export async function fetchSwarmSessions(): Promise<SwarmSessionsResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/swarm/sessions`);
+    if (!response.ok) return { sessions: [], count: 0, error: `HTTP ${response.status}` };
+    return response.json();
+  } catch (e) {
+    return { sessions: [], count: 0, error: String(e) };
+  }
+}
+
+// ── Fleet panel: administer arbitrary containers + GPU lock ──────────────────
+
+export async function fetchGpuLock(): Promise<GpuLockStatus | null> {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/ops/gpu-lock`);
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function clearGpuLock(): Promise<FleetActionResult> {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/ops/gpu-lock/clear`, { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { status: "error", detail: data.detail || `HTTP ${response.status}` };
+    return { status: data.reason === "was_free" ? "was_free" : "cleared" };
+  } catch (e) {
+    return { status: "error", detail: String(e) };
+  }
+}
+
+export async function restartContainer(node: string, container: string): Promise<FleetActionResult> {
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/v1/ops/fleet/${encodeURIComponent(node)}/${encodeURIComponent(container)}/restart`,
+      { method: "POST" },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { status: "error", detail: data.detail || `HTTP ${response.status}` };
+    return { status: "restarted" };
+  } catch (e) {
+    return { status: "error", detail: String(e) };
+  }
+}
+
+export async function fetchContainerLogs(
+  node: string,
+  container: string,
+  tail = 200,
+): Promise<ContainerLogs | { error: string }> {
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/v1/ops/fleet/${encodeURIComponent(node)}/${encodeURIComponent(container)}/logs?tail=${tail}`,
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: data.detail || `HTTP ${response.status}` };
+    return data as ContainerLogs;
+  } catch (e) {
+    return { error: String(e) };
   }
 }

@@ -208,6 +208,29 @@ async def release(
         return ReleaseResponse(released=True, reason="ok")
 
 
+@router.post("/clear", response_model=ReleaseResponse)
+async def clear(
+    x_gpu_lock_secret: Optional[str] = Header(default=None, alias="X-GPU-Lock-Secret"),
+):
+    """
+    Admin force-clear: drop the lease regardless of holder.
+
+    Unlike /release this does NOT require the holder's lock_id — it exists so an
+    operator can break a stuck lease (crashed worker that never released) from the
+    Fleet panel. Guarded by GPU_LOCK_SECRET when configured.
+    """
+    _check_auth(x_gpu_lock_secret)
+
+    async with _get_lock():
+        if _state.lock_id is None or _state.is_free():
+            _state.clear()
+            return ReleaseResponse(released=True, reason="was_free")
+        ctx = _state.context
+        _state.clear()
+        logger.warning(f"[GPULockServer] Lease force-cleared by operator: context={ctx!r}")
+        return ReleaseResponse(released=True, reason="force_cleared")
+
+
 @router.get("/status", response_model=StatusResponse)
 async def status():
     """Health/debug endpoint — always open, no auth."""
