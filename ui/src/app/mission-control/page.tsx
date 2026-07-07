@@ -9,6 +9,7 @@ import {
   Gauge,
   HeartPulse,
   RefreshCw,
+  Server,
   ShieldAlert,
   Shield,
   Wrench,
@@ -17,6 +18,7 @@ import type { LucideIcon } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { OpsDashboard } from "@/components/ops/ops-dashboard";
 import { MaintenanceQueue } from "@/components/mission-control/maintenance-queue";
+import { FleetPanel } from "@/components/mission-control/fleet-panel";
 import { ServiceHealthBody } from "@/components/monitoring/service-health-body";
 import { GovernanceWorkflow } from "@/components/governance/governance-workflow";
 import { fetchOpsHealth } from "@/lib/api/ops";
@@ -27,10 +29,11 @@ import type { GovernanceRequest } from "@/types/workspaces";
 import { Button, Card } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 
-type TabId = "status" | "action-queue" | "service-health" | "diagnostics";
+type TabId = "status" | "fleet" | "action-queue" | "service-health" | "diagnostics";
 
 const TABS: { id: TabId; label: string; icon: typeof Activity }[] = [
   { id: "status", label: "Status", icon: Gauge },
+  { id: "fleet", label: "Fleet", icon: Server },
   { id: "action-queue", label: "Action Queue", icon: ClipboardCheck },
   { id: "service-health", label: "Service Health", icon: HeartPulse },
   { id: "diagnostics", label: "Diagnostics", icon: Wrench },
@@ -197,6 +200,8 @@ export default function MissionControlPage() {
         </div>
 
         {tab === "status" && <OpsDashboard />}
+
+        {tab === "fleet" && <FleetPanel nodes={health?.nodes || []} onChanged={load} />}
 
         {tab === "action-queue" && (
           <div className="space-y-8">

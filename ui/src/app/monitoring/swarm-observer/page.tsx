@@ -1,11 +1,18 @@
 "use client";
 
-import { ChevronDown, ExternalLink, Radar, RefreshCw, Search } from "lucide-react";
+import { Boxes, ChevronDown, Cpu, ExternalLink, Radar, RefreshCw, Search } from "lucide-react";
 import { WorkspaceSection, WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { Button, Card } from "@/components/ui";
-import { fetchTraceDetail, fetchTraces } from "@/lib/api/ops";
+import { fetchSwarmSessions, fetchTraceDetail, fetchTraces } from "@/lib/api/ops";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Observation, Trace, TraceDetail } from "@/types/ops";
+import type {
+  Observation,
+  SwarmSession,
+  SwarmSessionsResponse,
+  SwarmWorker,
+  Trace,
+  TraceDetail,
+} from "@/types/ops";
 import { cn } from "@/lib/utils/cn";
 
 // ── helpers ──────────────────────────────────────────────────────────────
@@ -29,6 +36,28 @@ function fmtTs(ts: string | null) {
   }
 }
 
+function fmtElapsed(s: number | null) {
+  if (s == null) return "—";
+  if (s < 60) return `${Math.round(s)}s`;
+  const m = Math.floor(s / 60);
+  return `${m}m ${Math.round(s % 60)}s`;
+}
+
+function workerStateClass(state: SwarmWorker["state"]) {
+  switch (state) {
+    case "running":
+      return "bg-amber-500/15 text-amber-400";
+    case "completed":
+      return "bg-emerald-500/15 text-emerald-400";
+    case "failed":
+      return "bg-red-500/15 text-red-400";
+    case "cancelled":
+      return "bg-zinc-500/15 text-zinc-400";
+    default:
+      return "bg-[var(--hover-tint)] text-[var(--chat-subtle)]"; // pending
+  }
+}
+
 function spanDuration(obs: Observation): string {
   if (!obs.startTime || !obs.endTime) return "";
   try {
@@ -41,7 +70,7 @@ function spanDuration(obs: Observation): string {
   }
 }
 
-// ── sub-components ────────────────────────────────────────────────────────
+// ── trace sub-components ───────────────────────────────────────────────────
 function CodeBlock({ children }: { children: React.ReactNode }) {
   return (
     <pre
@@ -147,6 +176,15 @@ function ObservationRow({ obs }: { obs: Observation }) {
   );
 }
 
+function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">{label}</span>
+      <span className="text-[var(--chat-text)] font-medium">{children}</span>
+    </>
+  );
+}
+
 function TraceInspector({
   traceId,
   langfuseUrl,
@@ -240,17 +278,130 @@ function TraceInspector({
   );
 }
 
-function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
+// ── Live Agents panel ──────────────────────────────────────────────────────
+function WorkerRow({ w }: { w: SwarmWorker }) {
   return (
-    <>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--chat-subtle)]">{label}</span>
-      <span className="text-[var(--chat-text)] font-medium">{children}</span>
-    </>
+    <div className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-[var(--hover-tint)]">
+      <span
+        className={cn(
+          "h-2 w-2 shrink-0 rounded-full",
+          w.state === "running" ? "bg-amber-400 animate-pulse" : w.state === "completed" ? "bg-emerald-400" : w.state === "failed" ? "bg-red-400" : "bg-[var(--chat-subtle)]"
+        )}
+      />
+      <span className="w-28 shrink-0 truncate font-medium text-[var(--chat-text)]">{w.name || w.worker_id}</span>
+      <span className="w-24 shrink-0 truncate text-[12px] text-[var(--chat-subtle)]">{w.role}</span>
+      <span className="hidden w-32 shrink-0 truncate font-mono text-[11px] text-[var(--chat-accent)] md:inline">
+        {w.model || "—"}
+      </span>
+      <span className="flex-1 truncate text-[12px] text-[var(--chat-muted)]">{w.phase}</span>
+      <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-[var(--chat-muted)]">
+        {fmtElapsed(w.elapsed_s)}
+      </span>
+      <span
+        className={cn(
+          "w-20 shrink-0 rounded-sm px-1.5 py-0.5 text-center text-[10px] font-semibold uppercase tracking-wider",
+          workerStateClass(w.state)
+        )}
+      >
+        {w.state}
+      </span>
+    </div>
   );
 }
 
-// ── page ─────────────────────────────────────────────────────────────────
-export default function SwarmObserverPage() {
+function SessionCard({ s }: { s: SwarmSession }) {
+  return (
+    <div className="rounded-lg border border-[var(--chat-border)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--chat-border)] px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <Boxes size={15} className="text-[var(--chat-subtle)]" />
+          <span className="text-sm font-semibold text-[var(--chat-text)]">{s.session_id}</span>
+          <span className="font-mono text-[11px] text-[var(--chat-subtle)]">{s.coordination_id}</span>
+          {s.owner_id && (
+            <span className="rounded bg-[var(--hover-tint)] px-1.5 py-0.5 text-[10px] text-[var(--chat-subtle)]">
+              {s.owner_id}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-[var(--chat-subtle)]">
+          <span className="flex items-center gap-1 text-amber-400">
+            <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            {s.running_count} running
+          </span>
+          <span>
+            {s.worker_count} worker{s.worker_count !== 1 ? "s" : ""}
+          </span>
+          <span className="tabular-nums">{fmtElapsed(s.elapsed_s)}</span>
+        </div>
+      </div>
+      {s.workers.length ? (
+        <div className="divide-y divide-[var(--chat-border)]">
+          {s.workers.map((w) => (
+            <WorkerRow key={w.worker_id} w={w} />
+          ))}
+        </div>
+      ) : (
+        <div className="px-4 py-3 text-[13px] text-[var(--chat-subtle)]">
+          Decomposing — no workers spawned yet.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LiveAgentsPanel({ refreshTick }: { refreshTick: number }) {
+  const [data, setData] = useState<SwarmSessionsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const d = await fetchSwarmSessions();
+    setData(d);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [load, refreshTick]);
+
+  const sessions = data?.sessions ?? [];
+
+  return (
+    <WorkspaceSection
+      title={`Active Coordinations${sessions.length ? ` — ${sessions.length}` : ""}`}
+      description="Live swarm sessions and their workers. Polls every 3s. A session disappears when its coordination finishes."
+    >
+      {data?.error && (
+        <div className="mb-3 rounded-md border border-red-700/40 bg-red-950/40 px-4 py-2.5 text-[13px] text-red-300">
+          {data.error}
+        </div>
+      )}
+      {loading && !data ? (
+        <Card padding="lg" className="text-center">
+          <p className="text-sm text-[var(--chat-muted)]">Loading active sessions…</p>
+        </Card>
+      ) : sessions.length === 0 ? (
+        <Card padding="lg" className="text-center">
+          <Cpu size={22} className="mx-auto mb-2 text-[var(--chat-subtle)]" />
+          <p className="text-sm text-[var(--chat-text)]">No active coordinations.</p>
+          <p className="mt-1 text-[12px] text-[var(--chat-muted)]">
+            Start a <span className="font-mono text-[var(--chat-accent)]">/swarm</span> task to watch agents here live.
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {sessions.map((s) => (
+            <SessionCard key={s.coordination_id} s={s} />
+          ))}
+        </div>
+      )}
+    </WorkspaceSection>
+  );
+}
+
+// ── Traces panel (Langfuse) ─────────────────────────────────────────────────
+function TracesPanel({ refreshTick }: { refreshTick: number }) {
   const [traces, setTraces] = useState<Trace[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -267,7 +418,7 @@ export default function SwarmObserverPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, refreshTick]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return traces;
@@ -281,22 +432,7 @@ export default function SwarmObserverPage() {
   }, [traces, search]);
 
   return (
-    <WorkspaceShell
-      title="Swarm Observer"
-      description="Live trace feed from Langfuse — inspect agent spans, model calls, and latency."
-      icon={Radar}
-      actions={
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={load}
-          iconLeft={<RefreshCw size={13} className={loading ? "animate-spin" : ""} />}
-        >
-          Refresh
-        </Button>
-      }
-    >
-      {/* Toolbar */}
+    <>
       <div className="mb-4 flex items-center gap-2">
         <div className="relative flex-1">
           <Search
@@ -408,6 +544,72 @@ export default function SwarmObserverPage() {
         >
           <TraceInspector traceId={selected.id} />
         </WorkspaceSection>
+      )}
+    </>
+  );
+}
+
+// ── page ─────────────────────────────────────────────────────────────────
+type View = "agents" | "traces";
+
+export default function SwarmObserverPage() {
+  const [view, setView] = useState<View>("agents");
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const TABS: { id: View; label: string; icon: typeof Radar }[] = [
+    { id: "agents", label: "Live Agents", icon: Boxes },
+    { id: "traces", label: "Traces", icon: Radar },
+  ];
+
+  return (
+    <WorkspaceShell
+      title="Swarm Observer"
+      description="Live agent sessions and Langfuse trace history for the swarm."
+      icon={Radar}
+      actions={
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setRefreshTick((t) => t + 1)}
+          iconLeft={<RefreshCw size={13} />}
+        >
+          Refresh
+        </Button>
+      }
+    >
+      <div
+        role="tablist"
+        aria-label="Swarm Observer views"
+        className="mb-5 inline-flex items-center gap-1 rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] p-1"
+        style={{ boxShadow: "var(--elev-1), inset 0 1px 2px rgba(0,0,0,0.08)" }}
+      >
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const active = view === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setView(t.id)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[13px] font-medium transition-all",
+                active
+                  ? "bg-[var(--chat-elevated)] text-[var(--chat-text)] shadow-[var(--elev-1)]"
+                  : "text-[var(--chat-muted)] hover:text-[var(--chat-text)]"
+              )}
+            >
+              <Icon size={14} className={active ? "text-[var(--chat-accent)]" : ""} />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {view === "agents" ? (
+        <LiveAgentsPanel refreshTick={refreshTick} />
+      ) : (
+        <TracesPanel refreshTick={refreshTick} />
       )}
     </WorkspaceShell>
   );
