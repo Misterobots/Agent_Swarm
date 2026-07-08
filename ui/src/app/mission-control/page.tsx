@@ -21,6 +21,7 @@ import {
   Send,
   Server,
   Sunrise,
+  Terminal,
   TrendingUp,
   Wrench,
 } from "lucide-react";
@@ -52,6 +53,7 @@ import { cn } from "@/lib/utils/cn";
 import { useAccess } from "@/lib/hooks/use-access";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useLauncherStore } from "@/lib/stores/launcher-store";
+import { streamSSE } from "@/lib/utils/sse-parser";
 
 const MemoryGraph3D = dynamic(
   () => import("@/components/graph/memory-graph-3d").then((m) => m.MemoryGraph3D),
@@ -166,6 +168,8 @@ export default function ControlCenterPage() {
   const [now, setNow] = useState<Date | null>(null);
   const [prompt, setPrompt] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const [taskRun, setTaskRun] = useState<{ label: string; status: string; output: string; running: boolean } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   async function load() {
     setLoading(true);
@@ -225,18 +229,60 @@ export default function ControlCenterPage() {
     return days;
   }, [runs]);
 
+  async function runInline(label: string, text: string) {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setTaskRun({ label, status: "Running…", output: "", running: true });
+    try {
+      const resp = await fetch("/api/backend/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "default",
+          messages: [{ role: "user", content: text }],
+          stream: true,
+          session_id: "mc-console",
+          memory_enabled: false,
+          skill: "general", // forces CONVERSATION → a plain streamed answer in the console
+        }),
+        signal: ac.signal,
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      for await (const ev of streamSSE(resp)) {
+        setTaskRun((cur) => {
+          if (!cur) return cur;
+          if (ev.type === "content" && ev.content) return { ...cur, output: cur.output + ev.content };
+          if ((ev.type === "status" || ev.type === "thought") && ev.content) return { ...cur, status: ev.content };
+          if (ev.type === "error") return { ...cur, status: "Error", output: cur.output + `\n[error] ${ev.content || ev.errorDetails || ""}` };
+          return cur;
+        });
+      }
+    } catch (e) {
+      if (!ac.signal.aborted) setTaskRun((cur) => (cur ? { ...cur, output: cur.output + `\n[stream error] ${String(e)}` } : cur));
+    } finally {
+      setTaskRun((cur) => (cur ? { ...cur, running: false, status: ac.signal.aborted ? "Stopped" : cur.status.startsWith("Error") ? cur.status : "Done" } : cur));
+    }
+  }
+
   function fireSkill(skill: Skill) {
     const p = prompt.trim();
     if (skill.needsInput && !p) {
       taRef.current?.focus();
       return;
     }
-    applyModeForCommand(skill.command);
     const body = skill.needsInput ? p : skill.task || "";
     const text = skill.command ? `${skill.command} ${body}`.trim() : body;
     if (!text) return;
-    useLauncherStore.getState().setPendingLaunch(text);
-    router.push("/chat");
+    if (skill.needsInput) {
+      // Interactive/creative skills (Build/Plan/Design/Research/Ask) → full chat.
+      applyModeForCommand(skill.command);
+      useLauncherStore.getState().setPendingLaunch(text);
+      router.push("/chat");
+    } else {
+      // Admin/maintenance/update tasks → run inline; stay in Mission Control.
+      runInline(skill.label, text);
+    }
   }
 
   return (
@@ -329,6 +375,29 @@ export default function ControlCenterPage() {
                 </div>
                 <ActivitySpark data={activity} />
               </Card>
+
+              {/* Inline task console — admin/maintenance skills stream here, in Mission Control */}
+              {taskRun && (
+                <Card padding="md">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Terminal size={15} className="shrink-0 text-[var(--chat-accent)]" />
+                      <span className="truncate text-sm font-semibold text-[var(--chat-text)]">{taskRun.label}</span>
+                      {taskRun.running && <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 animate-pulse" />}
+                      <span className="truncate text-[11px] text-[var(--chat-subtle)]">{taskRun.status}</span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {taskRun.running && (
+                        <Button variant="ghost" size="sm" onClick={() => abortRef.current?.abort()}>Stop</Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => { abortRef.current?.abort(); setTaskRun(null); }}>Clear</Button>
+                    </div>
+                  </div>
+                  <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-[var(--chat-border)] bg-[var(--chat-bg)] p-3 text-[13px] leading-relaxed text-[var(--chat-text)]">
+                    {taskRun.output || (taskRun.running ? "…" : "(no output)")}
+                  </pre>
+                </Card>
+              )}
 
               {/* Launcher + recent runs */}
               <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
