@@ -5,22 +5,24 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Activity,
-  Box,
   Boxes,
-  BrainCircuit,
   ClipboardCheck,
   Code2,
   Cpu,
+  Database,
+  GitBranch,
   HeartPulse,
   LayoutDashboard,
   ListTree,
-  MessagesSquare,
   Network,
   Palette,
   RefreshCw,
   Search,
   Send,
   Server,
+  Sunrise,
+  TrendingUp,
+  Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -67,26 +69,68 @@ const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "action-queue", label: "Action Queue", icon: ClipboardCheck },
 ];
 
-// ── Launcher tiles (fire /command into chat) ────────────────────────────────
-type ModeId = "swarm" | "plan" | "design" | "cad" | "research" | "workshop" | "think";
-const MODES: { id: ModeId; label: string; command: string; icon: LucideIcon; accent: string }[] = [
-  { id: "swarm",    label: "Build",    command: "/swarm",    icon: Code2,          accent: "text-cyan-300" },
-  { id: "plan",     label: "Plan",     command: "/plan",     icon: ListTree,       accent: "text-emerald-300" },
-  { id: "design",   label: "Design",   command: "/design",   icon: Palette,        accent: "text-purple-300" },
-  { id: "cad",      label: "CAD",      command: "/cad",      icon: Box,            accent: "text-orange-300" },
-  { id: "research", label: "Research", command: "/research", icon: Search,         accent: "text-sky-300" },
-  { id: "workshop", label: "Workshop", command: "/workshop", icon: MessagesSquare, accent: "text-amber-300" },
-  { id: "think",    label: "Think",    command: "/think",    icon: BrainCircuit,   accent: "text-fuchsia-300" },
+// ── Skills — each tile fires a REAL agentic task into chat (not just a mode) ──
+type SkillCat = "Daily" | "Maintenance" | "Memory" | "Research" | "Build";
+
+interface Skill {
+  id: string;
+  label: string;
+  cat: SkillCat;
+  icon: LucideIcon;
+  command: string; // "" plain · "/swarm" · "/research" · …
+  needsInput?: boolean; // uses the typed prompt as the task body
+  task?: string; // canned task prompt for zero-input skills
+  desc: string;
+}
+
+const SKILLS: Skill[] = [
+  { id: "brief", label: "Morning Brief", cat: "Daily", icon: Sunrise, command: "",
+    task: "Morning brief: overnight swarm runs and their outcomes, any failed containers or unhealthy services, current GPU usage, and the top 3 things worth my attention today.",
+    desc: "Overnight status + what needs you" },
+
+  { id: "health", label: "Cluster Health", cat: "Maintenance", icon: Wrench, command: "",
+    task: "Run a full cluster health check across Turing, Lovelace, and Hopper — container states, GPU lease, and control-plane service health. Flag anything degraded and recommend fixes.",
+    desc: "Nodes, containers, services" },
+  { id: "gpu", label: "GPU Audit", cat: "Maintenance", icon: Cpu, command: "",
+    task: "Report the current GPU lease status and recent usage across the Ollama nodes; flag anything stuck or contended and whether the lease should be cleared.",
+    desc: "Lease + usage" },
+  { id: "sweep", label: "Container Sweep", cat: "Maintenance", icon: Boxes, command: "",
+    task: "List any stopped or unhealthy containers across the cluster and recommend which to restart.",
+    desc: "Stopped / unhealthy" },
+
+  { id: "kbstatus", label: "KB Status", cat: "Memory", icon: HeartPulse, command: "",
+    task: "Summarize my MemPalace memory store: total memories, top domains, recent additions, and entity-graph coverage.",
+    desc: "Store summary" },
+  { id: "cleanup", label: "Memory Cleanup", cat: "Memory", icon: Database, command: "",
+    task: "Audit my MemPalace memories for duplicates, stale, or low-value entries and propose a cleanup plan. Do not delete anything without my confirmation.",
+    desc: "Dedupe + prune (proposal only)" },
+  { id: "recall", label: "Recall Audit", cat: "Memory", icon: Search, command: "",
+    task: "Test my memory recall: run several sample queries across my domains and report whether relevant memories surface and under which owner_id.",
+    desc: "Verify recall works" },
+
+  { id: "research", label: "Deep Research", cat: "Research", icon: Search, command: "/research", needsInput: true,
+    desc: "Multi-source research on a topic (needs a prompt)" },
+  { id: "trending", label: "GitHub Trending", cat: "Research", icon: GitBranch, command: "",
+    task: "Gather today's trending GitHub projects relevant to LLM agents, inference infrastructure, and homelab automation. Summarize the 5 most relevant to my stack.",
+    desc: "Repos worth a look" },
+  { id: "radar", label: "Tech Radar", cat: "Research", icon: TrendingUp, command: "",
+    task: "Brief me on what's new this week in AI and agent tooling that's relevant to my Memex stack.",
+    desc: "This week in AI tooling" },
+
+  { id: "build", label: "Build", cat: "Build", icon: Code2, command: "/swarm", needsInput: true, desc: "Multi-agent build swarm (needs a prompt)" },
+  { id: "plan", label: "Plan", cat: "Build", icon: ListTree, command: "/plan", needsInput: true, desc: "Structured planning pass (needs a prompt)" },
+  { id: "design", label: "Design", cat: "Build", icon: Palette, command: "/design", needsInput: true, desc: "Generate an HTML mockup (needs a prompt)" },
 ];
 
-function applyMode(id: ModeId) {
+const SKILL_CATS: SkillCat[] = ["Daily", "Maintenance", "Memory", "Research", "Build"];
+
+function applyModeForCommand(command: string) {
   const s = useSettingsStore.getState();
   s.setWorkshopMode(false);
   s.setDesignMode(false);
   s.setSwarmMode(false);
-  if (id === "workshop") s.setWorkshopMode(true);
-  else if (id === "design") s.setDesignMode(true);
-  else if (id === "swarm" || id === "plan") s.setSwarmMode(true);
+  if (command === "/design") s.setDesignMode(true);
+  else if (command === "/swarm" || command === "/plan") s.setSwarmMode(true);
 }
 
 function relTime(epochSec?: number): string {
@@ -181,15 +225,17 @@ export default function ControlCenterPage() {
     return days;
   }, [runs]);
 
-  function fireMode(command: string) {
+  function fireSkill(skill: Skill) {
     const p = prompt.trim();
-    if (!p) {
+    if (skill.needsInput && !p) {
       taRef.current?.focus();
       return;
     }
-    const id = MODES.find((m) => m.command === command)?.id;
-    if (id) applyMode(id);
-    useLauncherStore.getState().setPendingLaunch(command ? `${command} ${p}` : p);
+    applyModeForCommand(skill.command);
+    const body = skill.needsInput ? p : skill.task || "";
+    const text = skill.command ? `${skill.command} ${body}`.trim() : body;
+    if (!text) return;
+    useLauncherStore.getState().setPendingLaunch(text);
     router.push("/chat");
   }
 
@@ -293,38 +339,52 @@ export default function ControlCenterPage() {
                     ref={taRef}
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); fireMode("/swarm"); } }}
+                    onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); const b = SKILLS.find((s) => s.id === "build"); if (b) fireSkill(b); } }}
                     rows={2}
-                    placeholder="Type any prompt, then pick a mode…"
+                    placeholder="Type a prompt for Build / Research / Design — or just click a maintenance or memory skill below."
                     className="mt-3 w-full resize-none rounded-md border border-[var(--chat-border)] bg-[var(--chat-bg)] p-2.5 text-[14px] text-[var(--chat-text)] placeholder:text-[var(--chat-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--chat-accent)]"
                   />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {MODES.map((m) => {
-                      const Icon = m.icon;
-                      return (
-                        <button
-                          key={m.id}
-                          onClick={() => fireMode(m.command)}
-                          disabled={!prompt.trim()}
-                          title={prompt.trim() ? `Launch ${m.label}` : "Type a prompt first"}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-all",
-                            prompt.trim()
-                              ? "border-[var(--chat-border)] text-[var(--chat-text)] hover:border-[var(--chat-accent)] hover:bg-[var(--hover-tint)]"
-                              : "cursor-not-allowed border-[var(--chat-border)] text-[var(--chat-subtle)] opacity-50",
-                          )}
-                        >
-                          <Icon size={13} className={m.accent} /> {m.label}
-                          <span className="font-mono text-[10px] text-[var(--chat-subtle)]">{m.command}</span>
-                        </button>
-                      );
-                    })}
+                  <div className="mt-2 flex justify-end">
                     <button
-                      onClick={() => fireMode("")}
+                      onClick={() => fireSkill({ id: "ask", label: "Ask", cat: "Daily", icon: Send, command: "", needsInput: true, desc: "" })}
                       disabled={!prompt.trim()}
-                      className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium", prompt.trim() ? "bg-[var(--chat-accent)] text-white hover:opacity-90" : "cursor-not-allowed bg-[var(--hover-tint)] text-[var(--chat-subtle)]")}>
+                      className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium", prompt.trim() ? "bg-[var(--chat-accent)] text-white hover:opacity-90" : "cursor-not-allowed bg-[var(--hover-tint)] text-[var(--chat-subtle)]")}
+                    >
                       <Send size={13} /> Ask
                     </button>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {SKILL_CATS.map((cat) => {
+                      const items = SKILLS.filter((s) => s.cat === cat);
+                      if (!items.length) return null;
+                      return (
+                        <div key={cat}>
+                          <div className="mb-1.5 text-[10px] uppercase tracking-wide text-[var(--chat-subtle)]">{cat}</div>
+                          <div className="flex flex-wrap gap-2">
+                            {items.map((sk) => {
+                              const Icon = sk.icon;
+                              const disabled = !!sk.needsInput && !prompt.trim();
+                              return (
+                                <button
+                                  key={sk.id}
+                                  onClick={() => fireSkill(sk)}
+                                  disabled={disabled}
+                                  title={sk.desc}
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-all",
+                                    disabled
+                                      ? "cursor-not-allowed border-[var(--chat-border)] text-[var(--chat-subtle)] opacity-50"
+                                      : "border-[var(--chat-border)] text-[var(--chat-text)] hover:border-[var(--chat-accent)] hover:bg-[var(--hover-tint)]",
+                                  )}
+                                >
+                                  <Icon size={13} className="text-[var(--chat-accent)]" /> {sk.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </Card>
 
