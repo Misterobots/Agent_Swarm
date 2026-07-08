@@ -52,10 +52,13 @@ export function MemoryGraph3D({
   ownerId,
   reloadKey = 0,
   onLoaded,
+  background = false,
 }: {
   ownerId: string | null;
   reloadKey?: number;
   onLoaded?: () => void;
+  /** Ambient mode: fills the parent, dimmed, non-interactive, no chrome. */
+  background?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
@@ -130,7 +133,11 @@ export function MemoryGraph3D({
   const graphData = useMemo(() => ({ nodes, links }), [nodes, links]);
 
   return (
-    <div ref={containerRef} className="relative flex-1 w-full overflow-hidden" style={{ background: "var(--chat-bg)" }}>
+    <div
+      ref={containerRef}
+      className={`relative w-full overflow-hidden ${background ? "h-full pointer-events-none" : "flex-1"}`}
+      style={{ background: background ? "transparent" : "var(--chat-bg)", opacity: background ? 0.5 : 1 }}
+    >
       {status === "ready" && dims.w > 0 && (
         <ForceGraph3D
           graphData={graphData}
@@ -141,6 +148,8 @@ export function MemoryGraph3D({
           nodeColor={(n: GNode) => n.color}
           nodeRelSize={4}
           nodeOpacity={0.9}
+          enableNavigationControls={!background}
+          showNavInfo={false}
           nodeLabel={(n: GNode) =>
             `<div style="max-width:280px;font:12px/1.4 system-ui;color:#e5e7eb;background:#111827;border:1px solid #374151;border-radius:6px;padding:6px 8px">
                <b>${escapeHtml(n.name)}</b>
@@ -153,12 +162,12 @@ export function MemoryGraph3D({
           linkWidth={(l: RawEdge) => Math.max(0.3, (l.weight ?? 0.3) * 1.5)}
           linkOpacity={0.35}
           enableNodeDrag={false}
-          warmupTicks={40}
-          cooldownTicks={120}
+          warmupTicks={background ? 60 : 40}
+          cooldownTicks={background ? 90 : 120}
         />
       )}
 
-      {status !== "ready" && (
+      {!background && status !== "ready" && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex flex-col items-center gap-2 text-center">
             <Brain size={24} className="text-[var(--chat-subtle)]" />
@@ -181,7 +190,7 @@ export function MemoryGraph3D({
         </div>
       )}
 
-      {status === "ready" && (
+      {!background && status === "ready" && (
         <div className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-[var(--chat-border)] bg-black/40 px-2.5 py-1.5 text-[11px] text-[var(--chat-subtle)]">
           {nodes.length} nodes · {links.length} edges · colored by community
         </div>

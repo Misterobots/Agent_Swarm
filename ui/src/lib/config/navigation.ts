@@ -93,7 +93,7 @@ export const primaryNavigation: NavigationItem[] = [
 
 export const secondaryNavigation: NavigationItem[] = [
   {
-    label: "Mission Control",
+    label: "Control Center",
     href: "/mission-control",
     icon: LayoutDashboard,
     matchPrefixes: [
