@@ -29,6 +29,17 @@ export interface OpsHealth {
   control_plane: ControlPlaneService[];
 }
 
+export interface SwarmRun {
+  coordination_id: string;
+  session_id?: string;
+  title?: string | null;
+  status: string;
+  phase?: number;
+  phase_name?: string | null;
+  started_at?: number;
+  updated_at?: number;
+}
+
 export interface SwarmWorker {
   worker_id: string;
   name: string | null;

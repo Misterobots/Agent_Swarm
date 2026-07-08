@@ -8,9 +8,21 @@ import type {
   ContainerLogs,
   FleetActionResult,
   SwarmSessionsResponse,
+  SwarmRun,
 } from "@/types/ops";
 
 const API_BASE = "/api/backend";
+
+export async function fetchSwarmRuns(limit = 50): Promise<SwarmRun[]> {
+  try {
+    const response = await fetch(`${API_BASE}/v1/tasks?limit=${limit}`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return (data.runs ?? []) as SwarmRun[];
+  } catch {
+    return [];
+  }
+}
 
 export async function fetchOpsHealth(): Promise<OpsHealth | null> {
   try {
