@@ -627,7 +627,7 @@ def chat_swarm(
                 import httpx as _httpx_recall
                 _mp_url = os.getenv("MEMPALACE_API_URL", "http://192.168.2.102:8200")
                 with _httpx_recall.Client(timeout=3.0) as _mp_client:  # was 10 s; keep pre-routing fast
-                    _mp_resp = _mp_client.post(f"{_mp_url}/v1/memories/search", json={"query": user_input, "owner_id": owner_id, "limit": 5})
+                    _mp_resp = _mp_client.post(f"{_mp_url}/v1/memories/search", json={"query": user_input, "owner_id": owner_id, "limit": 10})
                 if _mp_resp.status_code == 200:
                     _mp_breaker.record_success("mempalace", "recall")
                     strong = [m for m in _mp_resp.json() if (m.get("score") or 0) > 0.5]

@@ -657,18 +657,21 @@ def _resolve_owner_id(payload_user_id: Optional[str], request: Request) -> Optio
     }
     logger.debug(f"[owner_id] payload={payload_user_id}, headers={auth_headers}")
     
-    if payload_user_id:
-        logger.info(f"[owner_id] Resolved from payload: {payload_user_id}")
-        return payload_user_id
-
-    # Check Authentik forward-auth headers (injected by Traefik forwardAuth middleware).
-    # Prefer the human-readable username over the opaque UID hash — the username is what
-    # the UI uses for ownership checks (useAccess().username) and what shows in the Palace
-    # viewer Source field.  Fall back to UID only if username is absent.
+    # Prefer the authenticated, human-readable username as the CANONICAL owner id.
+    # This MUST precede payload_user_id: the UI sometimes sends an opaque uid hash as
+    # the payload user_id, which previously won here and fragmented a single user's
+    # memories across {username, uid-hash} silos — so recall (owner-scoped) only ever
+    # saw one silo. Username-first keeps every authenticated request for a given user
+    # on one owner_id. (owner_id canonicalization, 2026-07.)
     authentik_user = request.headers.get("X-authentik-username", "").strip()
     if authentik_user:
         logger.info(f"[owner_id] Resolved from X-authentik-username: {authentik_user}")
         return authentik_user
+
+    if payload_user_id:
+        logger.info(f"[owner_id] Resolved from payload: {payload_user_id}")
+        return payload_user_id
+
     authentik_uid = request.headers.get("X-authentik-uid", "").strip()
     if authentik_uid:
         logger.info(f"[owner_id] Resolved from X-authentik-uid: {authentik_uid}")
