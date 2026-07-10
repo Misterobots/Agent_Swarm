@@ -19,6 +19,11 @@ HOME_LAT  = os.getenv("HOME_LAT", "41.8781")
 HOME_LON  = os.getenv("HOME_LON", "-87.6298")
 HOME_CITY = os.getenv("HOME_CITY", "your area")
 
+# Agent swarm (agent_runtime) — heavy multi-step delegation target.
+# Set AGENT_RUNTIME_URL in the service env to agent_runtime's real base URL (NOT bmo_brain's :8000).
+AGENT_RUNTIME_URL = os.getenv("AGENT_RUNTIME_URL", "").rstrip("/")
+_SWARM_TIMEOUT = float(os.getenv("SWARM_TIMEOUT", "90"))  # swarm runs longer than local tools
+
 _HTTP_TIMEOUT = 8.0
 
 
@@ -140,6 +145,36 @@ async def web_search(query: str, **_kwargs) -> str:
         return f"Search is unreachable right now ({type(e).__name__})."
 
 
+async def delegate_to_swarm(task: str, mode: str = "research", **_kwargs) -> str:
+    """Hand a HEAVY multi-step task (deep research, building/writing something substantial,
+    complex analysis) to the agent swarm via agent_runtime's OpenAI-compatible endpoint.
+
+    Synchronous: blocks until the swarm answers, so Friday warns the user it may take a moment
+    before this is called (enforced by the persona rules). Returns the final text only.
+
+    Requires AGENT_RUNTIME_URL to be set to agent_runtime's base URL — inert until then."""
+    if not task:
+        return "No task was given to hand off."
+    if not AGENT_RUNTIME_URL:
+        return "The swarm is not reachable — its endpoint is not configured yet."
+    flags = {
+        "research": {"research_mode": True, "skill": "research"},
+        "build":    {"swarm_mode": True, "skill": "code"},
+        "plan":     {"ultraplan_mode": True},
+    }.get((mode or "research").lower(), {"swarm_mode": True})
+    payload = {"model": "default", "stream": False,
+               "messages": [{"role": "user", "content": task}], **flags}
+    try:
+        async with httpx.AsyncClient(timeout=_SWARM_TIMEOUT) as c:
+            r = await c.post(f"{AGENT_RUNTIME_URL}/v1/chat/completions", json=payload)
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+    except httpx.TimeoutException:
+        return "The swarm is still working on that one — it is taking longer than expected."
+    except Exception as e:  # noqa: BLE001
+        return f"Could not reach the swarm right now ({type(e).__name__})."
+
+
 async def _ha_call(method: str, path: str, json_body: dict | None = None) -> dict:
     url = f"{HOME_ASSISTANT_URL}/api/{path}"
     headers = {"Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}", "Content-Type": "application/json"}
@@ -232,6 +267,17 @@ TOOL_SCHEMAS = [
         "name": "list_devices", "description":
         "List available smart home devices. Use when the user asks what devices exist or you need to discover an entity_id.",
         "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "delegate_to_swarm", "description":
+        "Hand off a HEAVY, multi-step task to the agent swarm: deep research, building or writing "
+        "something substantial, or complex analysis. Do NOT use for quick facts (use web_search) "
+        "or device control. Before calling, tell the user in one short line that you are handing it "
+        "to the swarm and it may take a moment. "
+        "mode: 'research' = investigate or find out, 'build' = make/write/code, 'plan' = decompose only.",
+        "parameters": {"type": "object", "properties": {
+            "task": {"type": "string", "description": "full, self-contained description of the task"},
+            "mode": {"type": "string", "description": "research | build | plan"}},
+            "required": ["task"]}}},
 ]
 
 _DISPATCH = {
@@ -245,6 +291,7 @@ _DISPATCH = {
     "turn_off_device": turn_off_device,
     "get_device_state": get_device_state,
     "list_devices": list_devices,
+    "delegate_to_swarm": delegate_to_swarm,
 }
 
 
