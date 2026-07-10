@@ -2,8 +2,8 @@
 # hardware_test.py). TTS/STT run remotely in services/voice_engine — the RVC/Kokoro
 # server deps that used to live here were retired with server.py.
 numpy
+openwakeword
 pygame
-pvporcupine
 python-dotenv
 requests
 sounddevice

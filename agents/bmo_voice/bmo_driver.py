@@ -39,9 +39,11 @@ except ImportError as e:
     print(f"DEBUG: numpy missing ({e})")
     AUDIO_AVAILABLE = False
 
-# Wake word / mic capture — ported from the retired scripts/voice_satellite.py, which
-# used to own this; see _wake_word_loop() and record_with_vad() below.
-import pvporcupine
+# Wake word / mic capture — see _wake_word_loop() and record_with_vad() below. Wake-word
+# engine is openWakeWord (open-source, trains locally/via Colab, no account) — switched
+# from Porcupine because Porcupine's custom-training API requires a Picovoice Console
+# account, which was pending review with no ETA when "Hey Friday" needed training.
+from openwakeword.model import Model
 import sounddevice as sd
 import soundfile as sf
 
@@ -53,15 +55,34 @@ from pygame_face import PygameFace
 SAMPLE_RATE = 44100 # For playback/recording logic
 BMO_VOICE_URL = "http://{host}:{port}/speak"
 
-# Wake word / mic-capture config — values tuned against the real Pi hardware in
-# scripts/voice_satellite.py; carried over as-is.
+# Wake word / mic-capture config — values tuned against the real Pi hardware in the retired
+# scripts/voice_satellite.py, carried over from the Porcupine implementation but RESCALED
+# for openWakeWord's frame size (80ms vs Porcupine's 32ms — see _wake_word_loop()). The
+# scaling preserves the original real-time durations; exact multipliers are estimated, not
+# re-tuned live, and may need adjustment once tested against real "Hey Friday" audio.
 MIC_SAMPLE_RATE = 16000
 POST_INTERACTION_COOLDOWN = 0.5  # brief cooldown after playback to absorb echo
 FOLLOWUP_WINDOW = 8.0            # seconds BMO stays in conversation mode after a response
-FOLLOWUP_SPEECH_FRAMES = 15      # ~480ms of confirmed speech needed (harder to false-trigger)
-SILENCE_GATE_FRAMES = 12         # ~384ms of quiet required BEFORE follow-up speech counts
-                                  # TV audio is continuous and never passes this gate;
-                                  # conversation speech comes after a pause.
+FOLLOWUP_SPEECH_FRAMES = 6       # ~480ms of confirmed speech needed (was 15 frames @ 32ms)
+SILENCE_GATE_FRAMES = 5          # ~400ms of quiet required BEFORE follow-up speech counts
+                                  # (was 12 frames @ 32ms). TV audio is continuous and never
+                                  # passes this gate; conversation speech comes after a pause.
+WAKE_THRESHOLD = 0.5             # openWakeWord's own suggested default; raise for fewer
+                                  # false positives at the cost of some recall, if needed.
+WAKE_TRIGGER_LEVEL = 2           # consecutive 80ms frames that must score > WAKE_THRESHOLD
+                                  # before a wake is registered — the single-frame detector
+                                  # below had no debounce at all (a lone noise spike, click,
+                                  # or cough scoring >0.5 for exactly one frame fired
+                                  # immediately), unlike HA's own official openWakeWord
+                                  # add-on, which exposes this exact knob as `trigger_level`
+                                  # for the same reason. 2 frames (~160ms) is a low-cost
+                                  # floor: a real "Hey Friday" utterance holds an elevated
+                                  # score across many consecutive frames as it's spoken, so
+                                  # this should cost negligible recall while meaningfully
+                                  # cutting single-frame false accepts — not verified against
+                                  # real audio on the actual hardware, tune WAKE_TRIGGER_LEVEL
+                                  # up if false accepts are still observed, or down if genuine
+                                  # wake words start getting missed.
 _speech_threshold = 10000        # calibrated at startup in _wake_word_loop(); used by record_with_vad()
 SPEAKER_VERIFY_ENABLED = os.getenv("BMO_SPEAKER_VERIFY", "false").lower() == "true"
 
@@ -70,12 +91,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("bmo_driver")
 
 
-def _find_ppn_model():
-    """Find the Beem-Moe .ppn wake-word model file next to this script."""
+def _find_oww_model():
+    """Find the "Hey Friday" openWakeWord model (.onnx or .tflite) next to this script."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     try:
         for f in os.listdir(script_dir):
-            if f.lower().endswith(".ppn"):
+            if f.lower().endswith((".onnx", ".tflite")):
                 return os.path.join(script_dir, f)
     except Exception:
         pass
@@ -118,14 +139,16 @@ def clean_stt_text(text):
 
 def _is_speech_frame(pcm, threshold: int) -> bool:
     """RMS above threshold AND zero-crossing rate in the voiced-speech range — rejects
-    continuous TV/music noise (ZCR too high) and low-frequency rumble (ZCR too low)."""
+    continuous TV/music noise (ZCR too high) and low-frequency rumble (ZCR too low).
+    Crossing range scaled 2.5x from the original 20-350 (tuned for 512-sample/32ms frames)
+    for openWakeWord's 1280-sample/80ms frames — estimated, not re-tuned against real audio."""
     rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
     if rms < threshold:
         return False
     signs = np.sign(pcm.astype(np.float32))
     signs[signs == 0] = 1
     crossings = int(np.sum(np.abs(np.diff(signs))) // 2)
-    return 20 <= crossings <= 350
+    return 50 <= crossings <= 875
 
 
 def record_with_vad(device, sample_rate=16000, frame_size=512,
@@ -203,7 +226,7 @@ class BMODriver:
 
         # Wake word / mic capture — needs self.loop ready to hand off detected
         # interactions via asyncio.run_coroutine_threadsafe(). Non-fatal if it can't
-        # start (missing PICOVOICE_KEY, no .ppn model, etc.) — face + FIFO still work.
+        # start (no .onnx/.tflite model found, etc.) — face + FIFO still work.
         t_wake = threading.Thread(target=self._wake_word_loop, daemon=True)
         t_wake.start()
 
@@ -577,33 +600,31 @@ class BMODriver:
             logger.debug(f"HDMI wake silence skipped: {e}")
 
     def _wake_word_loop(self):
-        """Listen for the "Beemo" wake word (Porcupine) and hand detected interactions
+        """Listen for the "Hey Friday" wake word (openWakeWord) and hand detected interactions
         off to handle_voice_interaction() on the async loop. Ported from the retired
         scripts/voice_satellite.py — calibration/threshold formulas and hardware
-        workarounds (mic gain, attenuation) are tuned against this specific Pi and
-        carried over unchanged. Non-fatal on any init failure: logs and returns,
-        leaving face display + FIFO control still working.
+        workarounds (mic gain) are tuned against this specific Pi and carried over
+        unchanged aside from the frame-size rescaling noted at the top of this file.
+        Non-fatal on any init failure: logs and returns, leaving face display + FIFO
+        control still working.
         """
-        access_key = os.getenv("PICOVOICE_KEY", "")
-        if not access_key:
-            logger.error("❌ PICOVOICE_KEY not set — wake word disabled (face/FIFO still work).")
-            return
-        ppn_path = _find_ppn_model()
-        if not ppn_path:
-            logger.error("❌ No .ppn wake word model file found — wake word disabled.")
+        model_path = _find_oww_model()
+        if not model_path:
+            logger.error("❌ No 'Hey Friday' wake word model (.onnx/.tflite) found — wake word disabled.")
             return
 
         try:
-            porcupine = pvporcupine.create(access_key=access_key, keyword_paths=[ppn_path], sensitivities=[0.65])
+            # No download step needed — this installed version bundles the shared
+            # melspectrogram/embedding preprocessing models directly in the package.
+            oww_model = Model(wakeword_model_paths=[model_path])
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Porcupine: {e} — wake word disabled.")
+            logger.error(f"❌ Failed to initialize openWakeWord: {e} — wake word disabled.")
             return
 
         global _speech_threshold
-        FRAME_LENGTH = porcupine.frame_length
         HARDWARE_RATE = MIC_SAMPLE_RATE
-        HARDWARE_CHUNK = FRAME_LENGTH
-        logger.info(f"✅ Porcupine ready. frame_length={FRAME_LENGTH}, hw_rate={HARDWARE_RATE}")
+        HARDWARE_CHUNK = 1280  # 80ms @ 16kHz — openWakeWord's native frame size
+        logger.info(f"✅ openWakeWord ready. model={os.path.basename(model_path)}, hw_rate={HARDWARE_RATE}")
 
         # --input_device is trusted if given, but verified first: a stale/wrong index
         # (e.g. an output-only or zero-input-channel device) fails loudly at stream-open
@@ -653,12 +674,13 @@ class BMODriver:
             _speech_threshold = SPEECH_THRESHOLD
             logger.info(f"📏 Ambient RMS: mean={ambient_mean}, std={ambient_std} → SPEECH_THRESHOLD={SPEECH_THRESHOLD}")
 
-        logger.info("🎙️ Wake Word: 'Beemo' (Porcupine custom model)")
+        logger.info("🎙️ Wake Word: 'Hey Friday' (openWakeWord)")
         self.face.set_expression("neutral")
 
         followup_until = 0.0
         silence_gate = 0
         speech_frames = 0
+        wake_consecutive_frames = 0
         last_heartbeat = time.time()
 
         while self.running:
@@ -678,18 +700,18 @@ class BMODriver:
                             rms = int(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
                             self.face.set_mic_rms(rms)
 
-                            # Attenuate to 25% — mic AGC saturates near int16 max regardless of
-                            # room volume; this brings levels back into Porcupine's trained range.
-                            pcm_ppn = (pcm.astype(np.float32) * 0.25).clip(-32768, 32767).astype(np.int16)
-                            detected = False
-                            for i in range(0, len(pcm_ppn) - FRAME_LENGTH + 1, FRAME_LENGTH):
-                                if porcupine.process(pcm_ppn[i:i + FRAME_LENGTH]) >= 0:
-                                    detected = True
-                                    break
+                            prediction = oww_model.predict(pcm)
+                            score = max(prediction.values()) if prediction else 0.0
+                            if score > WAKE_THRESHOLD:
+                                wake_consecutive_frames += 1
+                            else:
+                                wake_consecutive_frames = 0
+                            detected = wake_consecutive_frames >= WAKE_TRIGGER_LEVEL
 
                             if detected:
-                                logger.info("⚡ Wake Word Detected: Beemo!")
+                                logger.info(f"⚡ Wake Word Detected: Hey Friday! (score={score:.2f})")
                                 speech_frames = 0
+                                wake_consecutive_frames = 0  # clean slate for the next cycle
                                 self.face.set_expression("acknowledged")
                                 self.play_wake_ping()
                                 self.face.set_expression("listening")
@@ -736,8 +758,6 @@ class BMODriver:
                         wants_followup = False
                     followup_until = time.time() + FOLLOWUP_WINDOW if wants_followup else followup_until
                 time.sleep(POST_INTERACTION_COOLDOWN)
-
-        porcupine.delete()
 
     def _command_fifo_thread(self):
         """Listen for commands on a named pipe (e.g. echo 'say:Hello' > /tmp/bmo_cmd.fifo)."""
