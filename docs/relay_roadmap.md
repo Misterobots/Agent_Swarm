@@ -151,12 +151,42 @@ Not yet built:
 
 - **Delegation to `agent_runtime`'s swarm/coordinate pipeline** for "go build X" / "go research X"
   voice requests — a separate action capability from device control, still unwired.
-- **Tool-use confirmation tuning.** The live test showed the model doesn't reliably recognize
-  "the tool already succeeded, stop and confirm" — one exchange took 6 rounds of `HassTurnOff`
-  before settling on a text reply, and that reply hedged ("let's try specifying it more clearly")
-  even though the action had already worked. The `PERSONA` prompt in `bmo_brain/main.py` says
-  nothing about tool-use behavior today. Small, cheap follow-up: add explicit guidance (e.g.
-  "once a tool call succeeds, confirm in one short sentence and stop calling tools").
+- **~~Tool-use confirmation tuning.~~ Done 2026-07-06.** The live test showed the model doesn't
+  reliably recognize "the tool already succeeded, stop and confirm" — one exchange took 6 rounds
+  of `HassTurnOff` before settling on a text reply, and that reply hedged even though the action
+  had already worked. Reproduced live again on 2026-07-06 (a phone/HA-app "no response" report
+  turned out to be this: `bmo_brain` logs showed 3 rounds of `HassTurnOff` over 24 seconds before
+  a real text answer, and HA's Assist UI reads that gap as unresponsive even though the device
+  state change had already happened). Fixed by adding an explicit stop-condition to both personas
+  in `services/bmo_brain/persona.py`'s "USING YOUR TOOLS" section: "Once a tool call succeeds,
+  stop. Do not call the same tool again to double check it worked." `bmo-brain` doesn't
+  bind-mount its code (unlike `voice-engine`) — needed a `docker compose build bmo-brain` +
+  `up -d`, not just a restart. Retested live from the phone 2026-07-06: round-trip dropped from
+  3 rounds/24s to 2 rounds/~16s — better, but the model still doesn't reliably settle in one
+  round. Not re-opened as a separate item since the practical symptom (Assist reading a slow
+  reply as "no response") is resolved; the residual redundant round is cosmetic/latency, not
+  correctness.
+- **Room-wide device targeting picks one remembered entity instead of the whole area (found
+  2026-07-06).** Same live retest surfaced a second, distinct bug: "turn off the living room
+  lights" (plural, no single device named) reported success but only one of the two physical
+  lights actually turned off. Added verbose tool-call/result logging to `bmo_brain/main.py`
+  (`_answer()` now logs incoming `role: tool` results and prior `tool_calls`, and both
+  `/api/chat`/`/v1/chat/completions` emit call arguments, not just names) to see exactly what
+  happened: the model's first two `HassTurnOff` attempts mixed a specific `name` with
+  `area`/`device_class` in the same call (`{name: 'living_room_light_right', area: 'living
+  room', device_class: 'light'}`) — HA rejected both as `InvalidSlotInfo` — then it fell back to
+  a bare `{name: 'light.living_room_light_right'}`, which succeeded but only ever targeted the
+  one entity it already knew by name, never the room's other light. Root cause is on the HA
+  side, not `bmo_brain`: there's no light-group entity for "the living room," so a plural/
+  area-wide request has no single target to resolve to and the model guesses. Real fix (not yet
+  done, needs the user in HA's UI): create a Light Group combining both living-room light
+  entities under one name so room-wide requests have an unambiguous target regardless of what
+  the model does. Shipped as a defense-in-depth complement: both personas in `persona.py` now
+  say "when a request names a whole room or area, target by area and device type only — do not
+  also include a specific device name in that call, and do not narrow a room-wide request down
+  to one device you happen to remember." Not a substitute for the HA-side group fix, since it
+  depends on the model reliably following a prompt instruction rather than making the ambiguity
+  structurally impossible.
 
 ### Tier 3 — Memory that writes back (basic write shipped 2026-07-02)
 
