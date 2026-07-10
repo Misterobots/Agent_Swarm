@@ -38,6 +38,18 @@ RUN pip3 install --no-cache-dir \
         sox einops onnxruntime librosa \
         "transformers==4.57.3" "accelerate==1.12.0"
 
+# faster-qwen3-tts wraps the SAME qwen-tts model class pinned above with CUDA-graph capture
+# around the decode loop — it depends on qwen-tts>=0.1.1 (already satisfied by the pin above,
+# so it doesn't get a chance to touch the transformers/accelerate pins). Fixes /speak's real
+# bottleneck: measured live on this exact GPU, RTF dropped from ~1.6 (current baseline) to
+# ~0.4 after a one-time CUDA-graph warm-up at model load — the reference-audio encoding
+# (whisper_encoder's missing flash-attn) and GPU contention were both ruled out first;
+# per-autoregressive-step CPU-GPU dispatch overhead was the actual cost, and this is the
+# fix that targets it directly. Installed last, after the version pins, purely as a safety
+# margin — its own resolver shouldn't need to touch transformers/accelerate since qwen-tts
+# is already satisfied, but this ordering means it can't win a conflict if it tried.
+RUN pip3 install --no-cache-dir faster-qwen3-tts
+
 COPY . .
 
 # Expose port 8020

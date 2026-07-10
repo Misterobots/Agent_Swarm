@@ -6,6 +6,15 @@ import uvicorn
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
 try:
+    # Wraps the same qwen-tts model class below with CUDA-graph capture around the decode
+    # loop — measured live on this GPU: RTF drops from ~1.6 to ~0.4 after a one-time warm-up
+    # at load time (see load_model()). Tried first; a failure here just falls back to the
+    # native loader below, never blocks the service.
+    from faster_qwen3_tts import FasterQwen3TTS
+    _FASTER_QWEN_AVAILABLE = True
+except ImportError:
+    _FASTER_QWEN_AVAILABLE = False
+try:
     from modelscope import AutoTokenizer
     # Qwen3-TTS architecture is not recognized by Transformers AutoModel yet
     # We load the implementation class directly from the installed qwen-tts library
@@ -69,32 +78,120 @@ models_loading = True
 # CUDA model instance. Serialize all TTS inference through this lock.
 _tts_lock = asyncio.Lock()
 
+# /speak (the driver-compatible endpoint used by both the Pi and the Wyoming bridge, and
+# therefore every Assist reply and the morning brief) always clones from the SAME fixed
+# BMO_REF_AUDIO file — it never changes at runtime. Passing ref_audio=[...] on every call
+# makes generate_voice_clone re-run the reference-audio encoder (speaker embedding +
+# speech-code extraction) from scratch each time, which is the same encoder that logs
+# "flash-attn is not installed... manual PyTorch version" — a real, avoidable cost paid on
+# every single utterance for a reference clip that's already identical to the last one.
+# qwen_tts's own API supports precomputing this once via create_voice_clone_prompt() and
+# reusing the resulting VoiceClonePromptItem via generate_voice_clone(voice_clone_prompt=...)
+# instead of ref_audio=..., which skips re-encoding entirely. Built once at load time below;
+# _speak_voice_prompt stays None (falls back to the old ref_audio path, unchanged behavior)
+# if the reference file is missing or prompt-building fails for any reason.
+_speak_voice_prompt = None
+
+# True once FasterQwen3TTS (CUDA-graph backend) loaded successfully; False if it wasn't
+# available or failed and we're on the native qwen_tts loader instead. Only used to pick
+# the right kwarg name in _clone_kwargs() below — the wrapper renames x_vector_only_mode to
+# xvec_only, everything else about the call shape is identical between the two backends
+# (both accept text=, language=, ref_audio=, ref_text=, voice_clone_prompt=).
+_using_faster_backend = False
+
+
+def _clone_kwargs(x_vector_only: bool) -> dict:
+    key = "xvec_only" if _using_faster_backend else "x_vector_only_mode"
+    return {key: x_vector_only}
+
+
+def _scalar_if_faster(value):
+    """faster-qwen3-tts's ref_audio=/ref_text= expect a bare scalar (it does its own
+    list-wrapping internally) — confirmed live that handing it an already-list
+    double-wraps and fails to resolve (ref_audio=['/app/bmo_ref.wav'] made it try to open
+    the literal path string "['/app/bmo_ref.wav']"). The native backend's ref_audio=/
+    ref_text= accept either a scalar or a list, so this is a no-op there. Only affects the
+    non-cached-prompt paths (/tts's user-uploaded reference audio, and /speak's rare
+    fallback when precomputing the cached prompt failed) — the common cached-prompt path
+    never passes ref_audio/ref_text at all."""
+    if not _using_faster_backend or value is None:
+        return value
+    return value[0] if isinstance(value, list) else value
+
+
 def load_model():
-    global model, tokenizer, stt_model, sv_model
+    global model, tokenizer, stt_model, sv_model, _speak_voice_prompt, _using_faster_backend
 
     # Ensure persistent dirs exist (mounted volume)
     os.makedirs(SPEAKER_PROFILES_DIR, exist_ok=True)
     os.makedirs(SPEAKER_MODEL_CACHE_DIR, exist_ok=True)
 
+    # Try the CUDA-graph backend first — it wraps the exact same qwen_tts model class the
+    # native path below loads directly, just with CUDA-graph capture around the decode
+    # loop. Measured live on this GPU: RTF ~1.6 -> ~0.4 after a one-time warm-up (below).
+    # Falls back to the native loader on any failure (missing package, incompatible
+    # environment, etc.) so a bad install never blocks TTS entirely.
+    if _FASTER_QWEN_AVAILABLE:
+        try:
+            print(f"Loading TTS Model via faster-qwen3-tts (CUDA-graph backend): {MODEL_PATH}...")
+            model = FasterQwen3TTS.from_pretrained(MODEL_PATH)
+            _using_faster_backend = True
+            print("TTS Model Loaded Successfully (faster-qwen3-tts).")
+        except Exception as e:
+            print(f"WARNING: faster-qwen3-tts failed to load ({e}); falling back to native qwen_tts loader.")
+            model = None
+            _using_faster_backend = False
+
     # Load TTS model independently so a failure doesn't block STT
-    try:
-        print(f"Loading TTS Model: {MODEL_PATH}...")
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
-        # Pin the whole model to a single GPU. device_map="auto" shards a small (1.7B)
-        # model across all visible GPUs, which then crashes inference with a cross-device
-        # tensor `cat`. The model fits comfortably on one card.
-        _tts_device_map = {"": 0} if DEVICE == "cuda" else None
-        model = AutoModel.from_pretrained(
-            MODEL_PATH,
-            device_map=_tts_device_map,
-            trust_remote_code=True,
-            torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32
-        )
-        print("TTS Model Loaded Successfully.")
-    except Exception as e:
-        print(f"WARNING: TTS Model failed to load: {e}")
-        model = None
-        tokenizer = None
+    if model is None:
+        try:
+            print(f"Loading TTS Model (native): {MODEL_PATH}...")
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+            # Pin the whole model to a single GPU. device_map="auto" shards a small (1.7B)
+            # model across all visible GPUs, which then crashes inference with a cross-device
+            # tensor `cat`. The model fits comfortably on one card.
+            _tts_device_map = {"": 0} if DEVICE == "cuda" else None
+            model = AutoModel.from_pretrained(
+                MODEL_PATH,
+                device_map=_tts_device_map,
+                trust_remote_code=True,
+                torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32
+            )
+            _using_faster_backend = False
+            print("TTS Model Loaded Successfully (native).")
+        except Exception as e:
+            print(f"WARNING: TTS Model failed to load: {e}")
+            model = None
+            tokenizer = None
+
+    # Precompute /speak's voice-clone prompt once, from the fixed reference clip, so every
+    # subsequent /speak call skips re-running the reference-audio encoder (see the
+    # _speak_voice_prompt comment above). Failure here is non-fatal: /speak falls back to
+    # its original per-call ref_audio behavior if this is still None.
+    if model is not None:
+        ref = os.getenv("BMO_REF_AUDIO", "/app/bmo_ref.wav")
+        if ref and os.path.exists(ref):
+            try:
+                print(f"Precomputing voice-clone prompt from {ref}...")
+                # FasterQwen3TTS wraps the real model at .model; the native loader IS the
+                # real model already, so it exposes create_voice_clone_prompt directly.
+                prompt_builder = model.model if hasattr(model, "model") else model
+                _speak_voice_prompt = prompt_builder.create_voice_clone_prompt(
+                    ref_audio=[ref], x_vector_only_mode=True
+                )
+                print("Voice-clone prompt cached — /speak will skip per-call reference encoding.")
+                if _using_faster_backend:
+                    # faster-qwen3-tts captures its CUDA graphs on first use, not at load
+                    # time — pay that one-time cost (a few seconds) now, during startup,
+                    # so the first real user request never eats it.
+                    print("Warming up CUDA graphs (one-time, ~5-10s)...")
+                    model.generate_voice_clone(text="Warming up.", language="English",
+                                                voice_clone_prompt=_speak_voice_prompt)
+                    print("CUDA graphs warmed.")
+            except Exception as e:
+                print(f"WARNING: could not precompute voice-clone prompt (falling back to "
+                      f"per-call ref_audio): {e}")
+                _speak_voice_prompt = None
 
     # Load STT model independently so a TTS failure doesn't prevent transcription
     try:
@@ -144,6 +241,7 @@ async def startup_event():
 async def health():
     status = {
         "tts": model is not None,
+        "tts_backend": "faster-qwen3-tts" if _using_faster_backend else "native",
         "stt": stt_model is not None,
         "speaker_verification": sv_model is not None,
         "loading": models_loading,
@@ -220,12 +318,13 @@ async def text_to_speech(
                 None,
                 lambda: model.generate_voice_clone(
                     text=[text],
-                    ref_audio=[final_ref_audio_path] if final_ref_audio_path else None,
-                    ref_text=[prompt_text] if prompt_text else None,
-                    x_vector_only_mode=x_vector_only,
+                    language="English",
+                    ref_audio=_scalar_if_faster([final_ref_audio_path] if final_ref_audio_path else None),
+                    ref_text=_scalar_if_faster([prompt_text] if prompt_text else None),
                     do_sample=True,
                     top_p=0.8,
-                    temperature=0.8
+                    temperature=0.8,
+                    **_clone_kwargs(x_vector_only),
                 )
             )
         
@@ -286,23 +385,28 @@ async def speak_compat(text: str, pitch: int = 0, speed: float = 1.0, method: st
     BMO_EFFECT if a future persona wants it. pitch/method are accepted for compatibility and
     otherwise ignored.
     """
-    global model
+    global model, _speak_voice_prompt
     if not model:
         raise HTTPException(status_code=503, detail="TTS model not loaded.")
-    ref = os.getenv("BMO_REF_AUDIO", "/app/bmo_ref.wav")
-    ref_audio = [ref] if (ref and os.path.exists(ref)) else None
     effect_name = os.getenv("BMO_EFFECT", "")
     temp_files = []
     try:
         async with _tts_lock:
+            if _speak_voice_prompt is not None:
+                # Cached path: skips re-running the reference-audio encoder entirely.
+                gen_kwargs = dict(voice_clone_prompt=_speak_voice_prompt)
+            else:
+                # Fallback: original per-call behavior if caching wasn't available at load time.
+                ref = os.getenv("BMO_REF_AUDIO", "/app/bmo_ref.wav")
+                ref_audio = [ref] if (ref and os.path.exists(ref)) else None
+                gen_kwargs = dict(ref_audio=_scalar_if_faster(ref_audio), ref_text=None, **_clone_kwargs(True))
             output_audios, sample_rate = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: model.generate_voice_clone(
                     text=[text],
-                    ref_audio=ref_audio,
-                    ref_text=None,
-                    x_vector_only_mode=True,
+                    language="English",
                     do_sample=True, top_p=0.8, temperature=0.8,
+                    **gen_kwargs,
                 )
             )
         if not output_audios:
