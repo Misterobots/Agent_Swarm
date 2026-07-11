@@ -74,6 +74,44 @@ Remaining known gaps at this tier: no automated tests (only the manual `scripts/
 harness), no barge-in/interrupt support, and the `-Justin-PC` file-pair pattern (duplicate
 service/launch files for a second deployment target) still has no single source of truth.
 
+**2026-07-09: the HA-Assist satellite architecture — a second, parallel voice front-end.**
+Everything above is the *Pi* path (`bmo_driver.py` owns wake word + mic + STT + TTS itself). A
+separate, HA-native path was stood up alongside it so Home Assistant's own Assist pipeline can
+reach the same Friday brain with GPU-quality STT/TTS and an off-the-shelf satellite — no custom
+Pi required. Four new pieces, all code-complete but **undeployed/unverified** (the compose
+comments deliberately stage a build + smoke-test before any HA registration):
+
+- **`services/wyoming_friday_tts/` (port 10200)** — a Wyoming-protocol adapter (no synthesis of
+  its own) wrapping `voice_engine`'s `/speak`, so HA's Assist can select Friday's cloned
+  Qwen3-TTS voice as a first-class local TTS engine — the same voice the Pi hears. Protocol
+  translation only: Describe→Info, Synthesize→`/speak`→AudioStart/Chunk/Stop.
+- **`services/wyoming_whisper_gpu/` (port 10300)** — a self-contained GPU faster-whisper Wyoming
+  server (CTranslate2, no PyTorch) to replace HA's CPU-bound Whisper add-on, which live traces
+  measured at 3.2–6.2s of pure transcription — the pipeline's dominant bottleneck. `--vad-filter`
+  hard-gates the decoder behind Silero VAD specifically to kill Whisper's "Thank you."
+  silence-hallucination (a real observed failure); `start.sh` warms the CUDA kernels at startup
+  so the first real command isn't slow.
+- **`agents/bmo_voice/hey_friday.onnx` + `wakeword_training/`** — a custom "hey_friday"
+  openWakeWord model and its full training pipeline (sample generation, negatives, feature
+  extraction, train), replacing Porcupine's "Hey Beemo" with a wake word matching the active
+  persona.
+- **`agents/bmo_voice/wakeword_training/esphome/google-mini-voice.yaml`** — an ESPHome config
+  that turns a repurposed Google Home Mini into a Wyoming voice satellite (wake word + mic +
+  speaker), so the whole loop can run on cheap hardware through HA Assist instead of a custom Pi.
+
+Net effect: three ways into the same brain — the Pi driver, HA's Assist pipeline (Ollama/
+OpenAI-Conversation), and (staged) "Hey Google" via the Nabu Casa relay. `bmo_brain` is the one
+canonical brain for all of them.
+
+**2026-07-11: correctness pass on the above.** A review of the Jul-9 batch found and fixed three
+issues (commit `fix(bmo-brain): harden tool-calling loop…`): OpenAI-shaped tool_call arguments
+(JSON strings) were forwarded to Ollama's `/api/chat`, which rejects them — broke multi-round
+tool loops on the `/v1/chat/completions` surface; HA tool-failure detection substring-matched a
+literal `"error"` token a non-`json.dumps` client would miss (silently disabling the
+clarify-loop breaker and risking a mislearned synonym); and `wyoming_friday_tts` sent no Wyoming
+events on a synth failure, hanging HA's Assist until timeout. All three are code-fixed and
+compile-clean but share the same caveat as the services themselves — not yet runtime-verified.
+
 ### Tier 1 — Grounded chat (done)
 
 `services/bmo_brain/main.py` recalls vault memories, injects them as context, and answers as
@@ -149,8 +187,14 @@ rather than a grounded voice chatbot. Shipped so far:
 
 Not yet built:
 
-- **Delegation to `agent_runtime`'s swarm/coordinate pipeline** for "go build X" / "go research X"
-  voice requests — a separate action capability from device control, still unwired.
+- **~~Delegation to `agent_runtime`'s swarm/coordinate pipeline~~ Tool shipped 2026-07-09, inert
+  pending config.** `tools.py`'s `delegate_to_swarm(task, mode)` is now registered in `bmo_brain`'s
+  self-executing tool set (research/build/plan → `agent_runtime`'s `/v1/chat/completions` with the
+  matching mode flag), and the persona tells Friday to warn the user it may take a moment before
+  handing off. Synchronous (blocks until the swarm answers) and **inert until `AGENT_RUNTIME_URL`
+  is set** in the service env — unset by default, unverified end-to-end. Only reachable in
+  self-executing mode (the Pi driver, or Assist without HA's own tools), not HA's tool-calling
+  passthrough.
 - **~~Tool-use confirmation tuning.~~ Done 2026-07-06.** The live test showed the model doesn't
   reliably recognize "the tool already succeeded, stop and confirm" — one exchange took 6 rounds
   of `HassTurnOff` before settling on a text reply, and that reply hedged even though the action
@@ -187,19 +231,48 @@ Not yet built:
   to one device you happen to remember." Not a substitute for the HA-side group fix, since it
   depends on the model reliably following a prompt instruction rather than making the ambiguity
   structurally impossible.
+- **Deterministic area/entity resolution + learned synonyms (shipped 2026-07-09, superseding the
+  prompt-only defenses above).** `services/bmo_brain/hass_resolver.py` now rewrites a tool_call's
+  `area`/`name` to the closest *real* HA name before it's returned, via a five-stage pipeline
+  (exact → learned-synonym → difflib fuzzy → optional embedding → give up), fetching the HA
+  area/entity registry over `/api/template` (cached, TTL-refreshed, no new pip dependency).
+  Confident non-exact hits are written into a SQLite synonym table (`hass_synonyms.py`) so the
+  same phrasing resolves for free next time, and observed failure→success retries are learned
+  reactively — carefully round-guarded (`_extract_tool_attempts`) so a batched multi-target turn
+  can't mislearn one target's success as a correction of another's failure (a real prior incident:
+  "deck" taught as a synonym for "Living Room"). `_sanitize_hass_tool_calls()` also deterministically
+  strips the invalid slot combinations HA kept rejecting (`device_class` as a list, `area`+`name`
+  together, `domain`+`device_class` together, bare `device_class` promoted to `domain`). Past a
+  failure threshold the loop stops guessing and forces a clarifying question naming real nearby
+  rooms. Code-complete, not yet live-verified; still complements — does not replace — the HA-side
+  Light Group fix for a physically-plural "living room lights" with no group entity.
 
 ### Tier 3 — Memory that writes back (basic write shipped 2026-07-02)
 
 Vault recall used to be one-directional: `bmo_brain` read from the vault, nothing wrote to it.
-`_store_memory()` now fires a background write (`{VAULT_URL}/v1/extract`, same `owner_id`
-convention as the read path) after every answer that produced real text — live as of
-2026-07-03 now that `VAULT_URL`/`VAULT_OWNER` are actually configured (see Tier 1). Ported
-from `voice_assistant.py`'s equivalent
-(which wrote to MemPalace directly with a different `agent_id`-based convention — standardized
-on `owner_id` here to match `bmo_brain`'s own read path, so anything written can actually be
-recalled later by the same query shape). No judgment layer yet: every exchange with a text
-reply gets stored, with no filtering of conversational noise vs. what's actually worth
-persisting — that discernment is still not built.
+`_store_memory()` now writes back after every answer that produced real text — live as of
+2026-07-03 once `VAULT_URL`/`VAULT_OWNER` were actually configured (see Tier 1).
+
+**2026-07-09: the write path was re-architected off the hot synchronous extract.** The old
+`_store_memory()` fired `{VAULT_URL}/v1/extract`, which ran the LLM extraction inline and
+contended with `bmo_brain`'s own chat model for the GPU. It now has three tiers:
+- **`local_pending.py`** — a same-day SQLite cache written synchronously first, so just-said
+  context is recallable even when the vault is slow or unreachable (rows pruned after 2 days; a
+  cache, not the store of record).
+- **`{VAULT_URL}/v1/extract/queue`** (MemPalace) — a new near-instant endpoint that only *queues*
+  the conversation (zero LLM/embedding calls), replacing the heavy inline extract.
+- **`{VAULT_URL}/v1/extract/process_pending`** — an off-peak batch job (external cron, twice
+  daily) that drains the queue through the LLM into durable curated memories, each row committed
+  individually so a mid-batch crash keeps prior progress.
+
+Recall reads both tiers: `_vault_recall` (semantic, curated) runs concurrently with
+`_pending_recall` (`/v1/extract/pending/search`, a fast keyword ILIKE over not-yet-processed
+rows) plus the local cache, so same-day items surface before the nightly batch has run. Backed
+by a new `pending_extractions` table (migration `0004`). Tool activity this exchange is appended
+to the stored text (`tool_trace`) so the nightly pass can learn from what was tried/failed, not
+just the clean final answer. Still no judgment layer: every text-reply exchange is queued, with
+no filtering of conversational noise vs. what's worth persisting — that discernment is still not
+built.
 
 ## Structural cleanup still owed
 
