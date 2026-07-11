@@ -374,6 +374,30 @@ async def _sanitize_hass_tool_calls(tool_calls, owner_id: str = ""):
     return tool_calls
 
 
+def _tool_result_is_error(content) -> bool:
+    """Whether a tool-result message's content signals failure.
+
+    HA's Ollama integration json.dumps()es tool results, so a failed intent surfaces as
+    {"error": ...}. Check that structurally rather than substring-matching the literal
+    '"error"' token: a client that hands back a dict (or serializes with single quotes)
+    would never match the quoted-token form, so every failure would read as a success —
+    silently breaking the clarify-loop breaker AND letting a failed attempt be mislearned
+    as a synonym. The JSON-dict path is precise; the trailing check preserves the original
+    quoted-substring behavior for any non-JSON string content (never loosened)."""
+    if content is None:
+        return False
+    if isinstance(content, dict):
+        return "error" in content
+    text = str(content)
+    try:
+        parsed = json.loads(text)
+    except (TypeError, ValueError):
+        parsed = None
+    if isinstance(parsed, dict):
+        return "error" in parsed
+    return '"error"' in text
+
+
 def _count_trailing_tool_failures(convo) -> int:
     """Count consecutive failed tool-result turns at the end of this exchange.
 
@@ -387,7 +411,7 @@ def _count_trailing_tool_failures(convo) -> int:
     for m in reversed(convo):
         role = m.get("role")
         if role == "tool":
-            if '"error"' in str(m.get("content") or ""):
+            if _tool_result_is_error(m.get("content")):
                 count += 1
             else:
                 break
@@ -476,7 +500,7 @@ def _extract_tool_attempts(convo) -> list:
                 except (TypeError, ValueError):
                     args = None
             if fn.get("name") in _HASS_AREA_INTENTS and isinstance(args, dict):
-                success = '"error"' not in str(m.get("content") or "")
+                success = not _tool_result_is_error(m.get("content"))
                 for key, kind in (("area", "area"), ("name", "entity")):
                     raw = args.get(key)
                     if raw and isinstance(raw, str):
@@ -513,6 +537,32 @@ def _is_likely_stt_hallucination(text: str) -> bool:
     return cleaned.lower() in _STT_HALLUCINATION_PHRASES
 
 
+def _coerce_tool_call_args(tool_calls):
+    """Return tool_calls with each function.arguments coerced to a dict.
+
+    The OpenAI-compatible surface (/v1/chat/completions) echoes prior-turn tool_calls
+    back with `arguments` as a JSON *string* (see _extract_tool_attempts's note). Ollama's
+    /api/chat expects an object there and rejects a string outright, so forwarding an
+    OpenAI-shaped assistant turn verbatim would 500 the whole exchange on round 2+ of a
+    multi-round tool loop. Parse it back to a dict before the call. Ollama's own native
+    shape already carries a dict, so this is a no-op on the /api/chat path — and a shallow
+    copy is made only for turns that actually need it, so caller messages aren't mutated."""
+    if not tool_calls:
+        return tool_calls
+    out = []
+    for tc in tool_calls:
+        fn = tc.get("function") or {}
+        args = fn.get("arguments")
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except (TypeError, ValueError):
+                args = {}
+            tc = {**tc, "function": {**fn, "arguments": args}}
+        out.append(tc)
+    return out
+
+
 async def _answer(client_messages, tools=None):
     """Recall vault context, build the BMO prompt, call the LLM, return (text, tool_calls).
 
@@ -529,9 +579,17 @@ async def _answer(client_messages, tools=None):
     # (content is empty when it emits tool_calls) so multi-round tool-calling loops — e.g.
     # HA retrying entity resolution after a failed target — carry forward instead of
     # silently resetting to the original prompt on every round.
-    convo = [m for m in client_messages
-             if m.get("role") in ("user", "assistant", "tool")
-             and (m.get("content") or m.get("tool_calls"))]
+    convo = []
+    for m in client_messages:
+        if m.get("role") not in ("user", "assistant", "tool"):
+            continue
+        if not (m.get("content") or m.get("tool_calls")):
+            continue
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            # Normalize any OpenAI-shaped (JSON-string) arguments to dicts so the turn is
+            # safe to forward to Ollama's /api/chat (see _coerce_tool_call_args).
+            m = {**m, "tool_calls": _coerce_tool_call_args(m["tool_calls"])}
+        convo.append(m)
     last_user = next((m["content"] for m in reversed(convo) if m.get("role") == "user"), "")
 
     # Confirmed live: an STT engine transcribed near-silent audio (a muted mic, and

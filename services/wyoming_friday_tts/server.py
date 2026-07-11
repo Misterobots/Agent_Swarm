@@ -16,7 +16,7 @@ import os
 import wave
 
 import httpx
-from wyoming.audio import wav_to_chunks
+from wyoming.audio import AudioStart, AudioStop, wav_to_chunks
 from wyoming.event import Event
 from wyoming.info import Attribution, Describe, Info, TtsProgram, TtsVoice
 from wyoming.server import AsyncEventHandler, AsyncServer
@@ -73,9 +73,13 @@ class FridayTtsHandler(AsyncEventHandler):
                     resp.raise_for_status()
                     wav_bytes = resp.content
             except Exception as e:  # noqa: BLE001
-                # No audio events sent on failure — Assist will just get silence rather
-                # than the connection dying, matching this project's fail-soft convention.
+                # Emit an empty AudioStart -> AudioStop so HA's Assist pipeline completes
+                # this synthesis cleanly (as silence) and moves on, instead of waiting for
+                # audio events that never arrive and hanging until its own pipeline timeout.
+                # (rate/width/channels are nominal — there are no chunks between them.)
                 _LOGGER.error("voice_engine call failed: %s: %s", type(e).__name__, e)
+                await self.write_event(AudioStart(rate=22050, width=2, channels=1).event())
+                await self.write_event(AudioStop().event())
                 return True
 
             with io.BytesIO(wav_bytes) as wav_io:
