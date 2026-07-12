@@ -67,6 +67,22 @@ def already_done(output_dir: Path) -> bool:
     return True
 
 
+def _existing_bg_dirs() -> list:
+    """Background-noise source dirs that actually populated. AudioSet is optional (its
+    upstream source was removed — see download_background_audio.py), so include only dirs
+    that exist and are non-empty; audiomentations' AddBackgroundNoise errors on a
+    missing/empty path. Falls back to mit_rirs if no dedicated background source downloaded,
+    so AddBackgroundNoise always has at least one non-empty source to draw from."""
+    candidates = [BG_DIR / "fma_16k", BG_DIR / "audioset_16k"]
+    dirs = [str(d) for d in candidates if d.exists() and any(d.iterdir())]
+    if not dirs:
+        rirs = BG_DIR / "mit_rirs"
+        if rirs.exists() and any(rirs.iterdir()):
+            dirs = [str(rirs)]
+    log(f"augmentation background_paths: {dirs or '(none found)'}")
+    return dirs
+
+
 def _build_augmenter() -> Augmentation:
     # Parameters below are copied verbatim from microWakeWord's own training notebook
     # (cells 5 and 7) — these are the hyperparameters upstream itself suggests
@@ -85,7 +101,7 @@ def _build_augmenter() -> Augmentation:
             "RIR": 0.5,
         },
         impulse_paths=[str(BG_DIR / "mit_rirs")],
-        background_paths=[str(BG_DIR / "fma_16k"), str(BG_DIR / "audioset_16k")],
+        background_paths=_existing_bg_dirs(),
         background_min_snr_db=-5,
         background_max_snr_db=10,
         min_jitter_s=0.195,

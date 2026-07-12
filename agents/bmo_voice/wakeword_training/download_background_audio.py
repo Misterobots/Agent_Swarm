@@ -56,50 +56,24 @@ def download_mit_rirs() -> None:
 
 
 def download_audioset_part() -> None:
-    """One balanced-train part of AudioSet, resampled to 16kHz WAV.
+    """AudioSet background noise — DISABLED (upstream source removed).
 
-    NOTE: this mirrors the notebook's minimal-viable choice of a single part
-    (bal_train09.tar) rather than the full corpus. For a production-quality model,
-    consider downloading more parts from huggingface.co/datasets/agkphysics/AudioSet
-    directly — flagged here rather than silently expanded, since fetching the full
-    set is multiple GB and a real time/disk trade-off the caller should opt into.
+    This was written against agkphysics/AudioSet's old layout: a single
+    `data/bal_train09.tar` of .flac clips (~1 GB, the notebook's minimal-viable sample).
+    That dataset has since been restructured to sharded parquet (`data/bal_train/NN.parquet`)
+    — the old .tar URL now 404s, and streaming the parquet corpus via `datasets` pulls far
+    more than the intended ~1 GB. AudioSet is only ONE of several augmentation background
+    sources (FMA music + MIT RIR reverb remain, downloaded above/below), so it's skipped
+    here rather than chased. To re-enable: drop 16 kHz WAVs into background_audio/audioset_16k/
+    by hand — the "already present" check below will then use them, and extract_features.py's
+    background_paths picks up any populated background dir automatically.
     """
-    tar_dir = BG_DIR / "audioset_raw"
     out_dir = BG_DIR / "audioset_16k"
     if _dir_has_files(out_dir):
-        log(f"audioset_16k already present at {out_dir} — skipping.")
+        log(f"audioset_16k already present at {out_dir} — using it.")
         return
-
-    import datasets
-    import urllib.request
-
-    tar_dir.mkdir(parents=True, exist_ok=True)
-    fname = "bal_train09.tar"
-    tar_path = tar_dir / fname
-    if not tar_path.exists() or tar_path.stat().st_size < 100_000_000:
-        log(f"Downloading AudioSet part {fname} (~1GB+)...")
-        url = f"https://huggingface.co/datasets/agkphysics/AudioSet/resolve/main/data/{fname}"
-        urllib.request.urlretrieve(url, str(tar_path))
-    else:
-        log(f"{fname} already downloaded ({tar_path.stat().st_size} bytes).")
-
-    import tarfile
-
-    log(f"Extracting {fname}...")
-    with tarfile.open(tar_path) as tf:
-        tf.extractall(str(tar_dir))
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    flac_files = [str(p) for p in tar_dir.glob("**/*.flac")]
-    log(f"Resampling {len(flac_files)} AudioSet clips to 16kHz WAV...")
-    audioset_dataset = datasets.Dataset.from_dict({"audio": flac_files})
-    audioset_dataset = audioset_dataset.cast_column("audio", datasets.Audio(sampling_rate=16000))
-    for row in audioset_dataset:
-        name = row["audio"]["path"].split("/")[-1].replace(".flac", ".wav")
-        scipy.io.wavfile.write(
-            str(out_dir / name), 16000, (row["audio"]["array"] * 32767).astype(np.int16)
-        )
-    log(f"audioset_16k: wrote {len(flac_files)} clips to {out_dir}.")
+    log("audioset_16k SKIPPED — upstream .tar source removed (restructured to parquet); "
+        "see docstring. Augmentation background will use FMA + MIT RIRs.")
 
 
 def download_fma_xs() -> None:

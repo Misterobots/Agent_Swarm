@@ -186,6 +186,39 @@ RUN pip install --no-cache-dir --no-deps "piper-tts>=1.3.0,<2"
 # the --no-deps strategy exists to prevent).
 RUN pip install --no-cache-dir onnxruntime "numpy==2.4.6"
 
+# tensorboard: microwakeword/train.py's training loop calls tf.summary.scalar() to log
+# loss/accuracy each step, which requires tensorboard — a separate package the tensorflow
+# install above did not pull in. Symptom: the model builds and the initial validation pass
+# runs, then training dies at the first tf.summary.scalar with TBNotInstalledError. Confirmed
+# tensorboard 2.21.0 restores the call. Placed late so the heavy pip layers above stay cached.
+RUN pip install --no-cache-dir tensorboard
+
+# Pin datasets to the 3.x line. microwakeword (above) pulls datasets in transitively
+# unpinned -> resolves to 5.x, whose Audio feature returns a torchcodec.AudioDecoder object
+# instead of the {"array","path","sampling_rate"} dict that download_background_audio.py
+# (ported from microWakeWord's pre-4.0 notebook) indexes into -> "'AudioDecoder' object is
+# not subscriptable" at Stage 2. The 3.x line keeps that dict API and decodes wav/flac/mp3
+# via soundfile + the image's libsndfile1 (>=1.1 has mp3) — no torchcodec needed. Confirmed
+# on 3.6.0: row["audio"] is the expected dict. Placed after onnxruntime so heavier layers
+# stay cached; the numpy==2.4.6 pin above is preserved (datasets 3.x accepts numpy 2.x).
+RUN pip install --no-cache-dir "datasets>=3.0,<4.0"
+
+# microWakeWord's SUBPACKAGES (microwakeword.audio for extract_features.py; microwakeword.layers
+# for the training entrypoint: model_train_eval -> utils -> layers; possibly others) are NOT
+# shipped by the pip package: those dirs have no __init__.py, so the package's find_packages()
+# skips them and pip installs only the TOP-LEVEL modules (data/mixednet/model_train_eval/utils/...).
+# At runtime they load fine as implicit namespace subpackages once the source is present, and their
+# deps are already installed transitively above. Vendor them ALL in one shot by merging the pinned
+# repo's microwakeword/ tree into the installed package — cp -rn adds the missing subdirs without
+# clobbering pip's own files. SITE is resolved from WORKDIR (not the clone) so it points at
+# site-packages. Placed late so the heavy torch/piper pip layers above stay cached.
+RUN git clone --quiet https://github.com/kahrendt/microWakeWord /tmp/mww \
+    && git -C /tmp/mww checkout --quiet ${MICROWAKEWORD_SHA} \
+    && SITE="$(python -c 'import microwakeword, os; print(os.path.dirname(microwakeword.__file__))')" \
+    && cp -rn /tmp/mww/microwakeword/. "$SITE/" \
+    && rm -rf /tmp/mww \
+    && python -c 'from microwakeword.audio.augmentation import Augmentation; from microwakeword.audio.clips import Clips; from microwakeword.audio.spectrograms import SpectrogramGeneration; from microwakeword.layers import modes, stream, strided_drop; print("microwakeword subpackages vendored OK")'
+
 # The LibriTTS-R generator weights (~200 MB, same v2.0.0 release asset the microWakeWord
 # notebook itself downloads) are deliberately NOT baked into the image here — they are
 # fetched once into the persistent /data mount by generate_samples.sh, so a container
