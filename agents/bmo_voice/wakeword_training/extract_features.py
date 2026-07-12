@@ -14,6 +14,22 @@ file_pattern is '**/*.wav' (recursive), not the notebook's flat '*.wav': generat
 writes each phrase variant into its own numbered subdirectory (avoiding filename collisions
 between variants, since piper-sample-generator always numbers files 0.wav, 1.wav, ... from
 zero on every invocation), so feature extraction has to glob recursively to see all of them.
+
+Two positive sources are extracted independently into two output feature sets:
+  - generated_samples/  ->  generated_augmented_features/   (synthetic TTS positives — always)
+  - real_samples/       ->  real_augmented_features/        (OPTIONAL real recordings)
+Both get the IDENTICAL augmentation chain, so real clips also pick up simulated noise/reverb
+on top of whatever room they were actually recorded in. Each real recording must be ONE
+utterance per WAV (16 kHz mono) — Clips reads each file as a single clip and windows it to
+clip_duration_ms, so a continuous multi-utterance file would collapse to one usable clip.
+The real source is skipped silently when real_samples/ is absent or empty, so this stays a
+no-op for a fresh clone / anyone who hasn't added real recordings.
+
+training_parameters.yaml lists the two as SEPARATE feature sets with their own
+sampling_weight — that's what keeps a few dozen real clips from being drowned by the ~4000
+synthetic ones (sampling_weight sets how often a set is drawn per batch, INDEPENDENT of its
+file count) and, deliberately kept at parity rather than higher, keeps them from DOMINATING
+either — so the synthetic set's broad speaker diversity still carries guests / unseen voices.
 """
 
 import os
@@ -27,46 +43,36 @@ from mmap_ninja.ragged import RaggedMmap
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 SAMPLES_DIR = DATA_DIR / "generated_samples"
+REAL_SAMPLES_DIR = DATA_DIR / "real_samples"
 BG_DIR = DATA_DIR / "background_audio"
 OUTPUT_DIR = DATA_DIR / "generated_augmented_features"
+REAL_OUTPUT_DIR = DATA_DIR / "real_augmented_features"
 
 
 def log(msg: str) -> None:
     print(f"[extract_features] {msg}", flush=True)
 
 
-def already_done() -> bool:
+def already_done(output_dir: Path) -> bool:
     """Idempotency check: a prior successful run leaves a non-empty wakeword_mmap dir
     under every split. Re-running after a partial/interrupted run will re-do all splits
-    (cheap relative to sample generation / downloads, so not worth finer-grained resume)."""
+    (cheap relative to sample generation / downloads, so not worth finer-grained resume).
+
+    NOTE: to pick up newly-added real recordings you must delete the corresponding
+    *_augmented_features/ directory first, or this check will short-circuit re-extraction."""
     for split in ("training", "validation", "testing"):
-        mmap_dir = OUTPUT_DIR / split / "wakeword_mmap"
+        mmap_dir = output_dir / split / "wakeword_mmap"
         if not mmap_dir.exists() or not any(mmap_dir.iterdir()):
             return False
     return True
 
 
-def main() -> None:
-    if already_done():
-        log(f"Augmented features already present under {OUTPUT_DIR} — skipping extraction.")
-        return
-
-    start = time.time()
-
+def _build_augmenter() -> Augmentation:
     # Parameters below are copied verbatim from microWakeWord's own training notebook
     # (cells 5 and 7) — these are the hyperparameters upstream itself suggests
     # experimenting with to improve model quality; left at defaults here since this
     # pipeline's job is to reproduce the confirmed-working shape, not to tune it.
-    clips = Clips(
-        input_directory=str(SAMPLES_DIR),
-        file_pattern="**/*.wav",
-        max_clip_duration_s=None,
-        remove_silence=False,
-        random_split_seed=10,
-        split_count=0.1,
-    )
-
-    augmenter = Augmentation(
+    return Augmentation(
         augmentation_duration_s=3.2,
         augmentation_probabilities={
             "SevenBandParametricEQ": 0.1,
@@ -86,10 +92,37 @@ def main() -> None:
         max_jitter_s=0.205,
     )
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+def _extract_source(name: str, samples_dir: Path, output_dir: Path,
+                    augmenter: Augmentation) -> None:
+    """Featurize every *.wav (recursively) under samples_dir into output_dir's
+    training/validation/testing RaggedMmap splits. Shared by the synthetic and real
+    positive sets — same augmentation chain for both. A missing/empty samples_dir is a
+    no-op (the real set is optional)."""
+    if already_done(output_dir):
+        log(f"[{name}] augmented features already present under {output_dir} — skipping.")
+        return
+
+    wav_count = sum(1 for _ in samples_dir.glob("**/*.wav")) if samples_dir.exists() else 0
+    if wav_count == 0:
+        log(f"[{name}] no .wav files under {samples_dir} — skipping this source.")
+        return
+
+    log(f"[{name}] extracting {wav_count} wav file(s) from {samples_dir} -> {output_dir}")
+
+    clips = Clips(
+        input_directory=str(samples_dir),
+        file_pattern="**/*.wav",
+        max_clip_duration_s=None,
+        remove_silence=False,
+        random_split_seed=10,
+        split_count=0.1,
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     for split in ("training", "validation", "testing"):
-        out_dir = OUTPUT_DIR / split
+        out_dir = output_dir / split
         out_dir.mkdir(parents=True, exist_ok=True)
 
         if split == "training":
@@ -106,13 +139,27 @@ def main() -> None:
             step_ms=10,
         )
 
-        log(f"Generating '{split}' split (source split='{split_name}', repeat={repetition})...")
+        log(f"[{name}] generating '{split}' split (source split='{split_name}', repeat={repetition})...")
         RaggedMmap.from_generator(
             out_dir=str(out_dir / "wakeword_mmap"),
             sample_generator=spectrograms.spectrogram_generator(split=split_name, repeat=repetition),
             batch_size=100,
             verbose=True,
         )
+
+
+def main() -> None:
+    start = time.time()
+    augmenter = _build_augmenter()
+
+    # Synthetic TTS positives — always present (produced by generate_samples.sh).
+    _extract_source("synthetic", SAMPLES_DIR, OUTPUT_DIR, augmenter)
+
+    # Optional real recordings dropped into real_samples/ (one utterance per 16 kHz mono
+    # WAV). Inert if that directory is absent/empty. When you DO add clips, also uncomment
+    # the real_augmented_features block in training_parameters.yaml so training actually
+    # uses them (see that file's comment for the weighting rationale).
+    _extract_source("real", REAL_SAMPLES_DIR, REAL_OUTPUT_DIR, augmenter)
 
     log(f"Done. Elapsed: {time.time() - start:.0f}s.")
 

@@ -35,6 +35,24 @@ features:
     truncation_strategy: truncate_start
     type: mmap
 
+  # OPTIONAL real recordings (your household + your rooms), extracted by
+  # extract_features.py from real_samples/ into real_augmented_features/. UNCOMMENT this
+  # block once you've added clips to real_samples/ AND re-run so real_augmented_features/
+  # exists — model_train_eval expects every listed features_dir to be present on disk, so
+  # leaving it commented keeps the default (no-real-clips) pipeline working out of the box.
+  #
+  # sampling_weight is kept EQUAL to the synthetic set above (2.0), not higher: the weight
+  # sets how often this set is drawn per batch INDEPENDENT of its file count, so parity lets
+  # a few dozen real clips pull real influence without DOMINATING — which keeps the synthetic
+  # set's broad speaker diversity in play so guests / unseen voices still trigger. Drop to 1.0
+  # if it starts overfitting to your specific recordings (great on your clips, worse in general).
+  # - features_dir: real_augmented_features
+  #   sampling_weight: 2.0
+  #   penalty_weight: 1.0
+  #   truth: true
+  #   truncation_strategy: truncate_start
+  #   type: mmap
+
   # Negative sets, pre-built by microWakeWord's authors and downloaded by
   # download_negatives.sh from huggingface.co/datasets/kahrendt/microwakeword.
   - features_dir: negative_datasets/speech
