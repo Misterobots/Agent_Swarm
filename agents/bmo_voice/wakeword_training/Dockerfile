@@ -175,6 +175,17 @@ RUN pip install --no-cache-dir "piper-phonemize-cross==1.2.1"
 # work) to downgrade/clobber the pins above. --no-deps, installed last, avoids that.
 RUN pip install --no-cache-dir --no-deps "piper-tts>=1.3.0,<2"
 
+# onnxruntime is a piper-tts IMPORT-time dependency: piper/voice.py does `import onnxruntime`
+# unconditionally, so generate_samples.py's `from piper import PiperVoice` (a top-level import)
+# fails with ModuleNotFoundError without it — even though the .pt/LibriTTS-generator code path
+# this pipeline actually runs never executes an ONNX model. The --no-deps piper-tts install
+# above skipped it: the comment there reasoned "not used at runtime == not needed", but the
+# import happens regardless of the code path taken. Confirmed live — a first end-to-end run
+# crashed here at Stage 1. numpy is pinned to the version TensorFlow/microWakeWord already
+# resolved so onnxruntime's own numpy requirement can't downgrade it (the exact pin-clobber
+# the --no-deps strategy exists to prevent).
+RUN pip install --no-cache-dir onnxruntime "numpy==2.4.6"
+
 # The LibriTTS-R generator weights (~200 MB, same v2.0.0 release asset the microWakeWord
 # notebook itself downloads) are deliberately NOT baked into the image here — they are
 # fetched once into the persistent /data mount by generate_samples.sh, so a container

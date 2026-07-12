@@ -50,6 +50,18 @@ if [ "$(wc -c < "$MODEL_PATH")" -lt 100000000 ]; then
     exit 1
 fi
 
+# ── Model config ─────────────────────────────────────────────────────────────────
+# generate_samples.py opens "{model}.json" (espeak voice, sample_rate, num_speakers) right
+# next to the .pt checkpoint. The v2.0.0 RELEASE ships only the .pt weights — the matching
+# config lives in piper-sample-generator's OWN repo under models/, so copy it beside the
+# downloaded weights. (Without this a first run crashes with FileNotFoundError on
+# en_US-libritts_r-medium.pt.json.)
+CONFIG_SRC="$PSG_DIR/models/en_US-libritts_r-medium.pt.json"
+if [ ! -f "$MODEL_PATH.json" ]; then
+    cp "$CONFIG_SRC" "$MODEL_PATH.json"
+    echo "[generate_samples] Installed model config -> $MODEL_PATH.json"
+fi
+
 # ── Phrase variants ────────────────────────────────────────────────────────────────
 # Index-prefixed directory names guarantee uniqueness even though "hey Friday" and
 # "hey friday" (variants 1 and 3) differ only by case and would otherwise slugify to
