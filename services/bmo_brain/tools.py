@@ -13,6 +13,8 @@ import xml.etree.ElementTree as ET
 
 import httpx
 
+from ha_registry import REGISTRY_DISPATCH
+
 HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL", "http://192.168.2.100:8123").rstrip("/")
 HOME_ASSISTANT_TOKEN = os.getenv("HOME_ASSISTANT_TOKEN", "")
 HOME_LAT  = os.getenv("HOME_LAT", "41.8781")
@@ -293,6 +295,14 @@ _DISPATCH = {
     "list_devices": list_devices,
     "delegate_to_swarm": delegate_to_swarm,
 }
+
+# HA registry editing (move device -> area, assign entity -> area, rename, create area) lives in
+# ha_registry.py (WebSocket-based, unlike these REST tools). Register the DISPATCH so call_tool
+# can EXECUTE them, but do NOT fold their schemas into TOOL_SCHEMAS: these are irreversible WRITES,
+# so main.py's _answer decides per-turn whether to OFFER them (gated behind the registry-intent
+# regex, on both the passthrough and self-executing paths) rather than exposing them to the model
+# on every turn.
+_DISPATCH.update(REGISTRY_DISPATCH)
 
 
 async def call_tool(name: str, arguments: dict) -> str:

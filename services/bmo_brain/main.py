@@ -38,6 +38,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 import hass_resolver
 import local_pending
+from ha_registry import REGISTRY_TOOL_NAMES, REGISTRY_TOOL_SCHEMAS, call_registry_tool
 from persona import FRIDAY_SYSTEM_PROMPT
 from tools import TOOL_SCHEMAS, call_tool
 
@@ -69,6 +70,28 @@ BMO_SOURCE_DEVICE = os.getenv("BMO_SOURCE_DEVICE", "lovelace")
 # way. Past this many consecutive failed attempts in one exchange, stop guessing and ask
 # a clarifying question instead. Tunable — 2 is a starting point, not a fixed constant.
 HASS_CLARIFY_THRESHOLD = int(os.getenv("HASS_CLARIFY_THRESHOLD", "2"))
+
+# Registry-edit tools (move/assign/rename/create area — see ha_registry.py) are distinct from
+# HA's on/off intents and WebSocket-executed by bmo_brain itself. Offering them on EVERY voice
+# turn risks a small model mis-firing them on ordinary commands, so they're gated behind this
+# intent regex on the user's text and only offered/executed when the request actually looks
+# like a registry edit — ordinary on/off turns keep the exact single-call passthrough behavior
+# they had before, untouched. BMO_REGISTRY_MAX_ROUNDS caps the internal execute-then-reprompt loop.
+REGISTRY_MAX_ROUNDS = int(os.getenv("BMO_REGISTRY_MAX_ROUNDS", "4"))
+# Bias toward catching registry intents: a false negative silently breaks the feature. A false
+# positive is low-cost but NOT free — it exposes the registry WRITE tools to the model on a
+# non-registry turn, so the model could in principle misfire one. That residual risk is bounded
+# by ha_registry.py's strict resolution cutoff (a misfire must still resolve a real device+area
+# at high confidence) and by every registry edit being reversible and visible in the HA UI.
+# Key the move/assign case off the connector (to/in/into) rather than the literal word
+# "area"/"room", since the destination is usually a named room ("to the office"). "put ... on"
+# (an on/off phrasing) has no to/in/into connector, so it correctly does NOT match.
+_REGISTRY_INTENT_RE = re.compile(
+    r"\b(move|relocate|reassign|put|assign)\b.{0,50}\b(to|in|into)\b"
+    r"|\brename\b|\bchange the name\b"
+    r"|\b(create|make|add)\b.{0,30}\b(area|room|zone)\b",
+    re.IGNORECASE,
+)
 
 # Full override still available for testing/experimentation via BMO_PERSONA.
 PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
@@ -203,15 +226,17 @@ async def _ollama_chat(messages: list, tools=None):
     return text, tool_calls
 
 
-async def _self_execute_tools(messages: list):
-    """Offer bmo_brain's own tool set (tools.py), executing any tool_calls server-side
-    and looping until the model produces a final text-only response. Used only when the
-    caller supplied no `tools` of its own — see _answer()'s docstring. Always returns
-    tool_calls=None: a caller with no `tools` array has no way to execute one itself.
+async def _self_execute_tools(messages: list, tools: list):
+    """Offer the given `tools`, executing any tool_calls server-side and looping until the model
+    produces a final text-only response. Used only when the caller supplied no `tools` of its own
+    — see _answer()'s docstring. `tools` is built by the caller: the base self-exec set, plus the
+    registry WRITE tools ONLY when the turn looks like a registry edit (the same gating the
+    passthrough path uses), so the Pi path can't misfire a registry write on an ordinary command.
+    Always returns tool_calls=None: a caller with no `tools` array has no way to execute one itself.
     """
     convo = list(messages)
     for _round in range(SELF_TOOL_MAX_ROUNDS):
-        text, tool_calls = await _ollama_chat(convo, TOOL_SCHEMAS)
+        text, tool_calls = await _ollama_chat(convo, tools)
         if not tool_calls:
             return text, None
         convo.append({"role": "assistant", "content": text, "tool_calls": tool_calls})
@@ -225,6 +250,54 @@ async def _self_execute_tools(messages: list):
     print(f"[bmo-brain] self-executing tool loop exhausted {SELF_TOOL_MAX_ROUNDS} rounds "
           f"without a final answer", flush=True)
     return "Beemo tried a few things there but could not finish that one. Try asking again?", None
+
+
+def _split_registry_calls(tool_calls):
+    """Partition tool_calls into (registry-owned, HA-owned). Registry-owned are bmo_brain's own
+    ha_registry tools it must execute itself; HA-owned (HassTurnOn, etc.) are handed back to HA
+    unexecuted, exactly as normal passthrough does."""
+    reg, other = [], []
+    for tc in (tool_calls or []):
+        name = (tc.get("function") or {}).get("name", "")
+        (reg if name in REGISTRY_TOOL_NAMES else other).append(tc)
+    return reg, other
+
+
+async def _passthrough_with_registry(messages, tools):
+    """Passthrough tool-calling with one twist: bmo_brain EXECUTES its own HA registry tools
+    itself (HA has no Assist intent for registry edits), looping until the model produces final
+    text or an HA-owned tool_call — the latter returned UNEXECUTED for HA to run, exactly as
+    normal passthrough does. Only reached when the user's text looked like a registry edit (see
+    _REGISTRY_INTENT_RE), so the registry tool schemas are offered ONLY here — never on ordinary
+    on/off turns. Returns (text, tool_calls) matching _answer's contract."""
+    all_tools = list(tools) + REGISTRY_TOOL_SCHEMAS
+    convo = list(messages)
+    text, tool_calls = "", None
+    for _round in range(REGISTRY_MAX_ROUNDS):
+        text, tool_calls = await _ollama_chat(convo, all_tools)
+        reg_calls, ha_calls = _split_registry_calls(tool_calls)
+        if reg_calls:
+            # Execute our OWN registry tools first (HA can't run them). Doing this before the
+            # ha_calls return is deliberate: if the model batched a registry call and an HA
+            # on/off call into the same round, the registry edit would otherwise be silently
+            # dropped. Registry ops are self-contained and each returns a spoken-style string.
+            convo = convo + [{"role": "assistant", "content": text, "tool_calls": reg_calls}]
+            for tc in reg_calls:
+                fn = tc.get("function") or {}
+                result = await call_registry_tool(fn.get("name", ""), fn.get("arguments") or {})
+                print(f"[bmo-brain] registry tool={fn.get('name')} args={fn.get('arguments')} "
+                      f"-> {result[:160]!r}", flush=True)
+                convo.append({"role": "tool", "content": result})
+            if ha_calls:
+                # Same round also carried HA-owned calls — hand them back now (the registry
+                # edits above already applied), matching normal passthrough for the on/off part.
+                return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
+            continue  # only registry calls -> reprompt for a spoken confirmation
+        if ha_calls:
+            return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
+        return text, None  # no tool_calls -> final text answer
+    print(f"[bmo-brain] registry passthrough loop exhausted {REGISTRY_MAX_ROUNDS} rounds", flush=True)
+    return (text or "I got partway through that change but couldn't finish it."), None
 
 
 async def _pending_recall(query: str, owner_id: str):
@@ -722,11 +795,21 @@ async def _answer(client_messages, tools=None):
         text, tool_calls = await _ollama_chat(clarify_messages, tools=None)
         tool_calls = None  # belt-and-suspenders: this path must never emit a tool call
         asked_for_clarity = True
+    elif tools and _REGISTRY_INTENT_RE.search(last_user or ""):
+        # Registry-edit intent: offer bmo_brain's own registry tools and execute them here,
+        # since HA can't. Ordinary on/off turns skip this entirely (regex miss) and stay on the
+        # untouched single-call path below.
+        text, tool_calls = await _passthrough_with_registry(messages, tools)
     elif tools:
         text, tool_calls = await _ollama_chat(messages, tools)
         tool_calls = await _sanitize_hass_tool_calls(tool_calls, VAULT_OWNER)
     else:
-        text, tool_calls = await _self_execute_tools(messages)
+        # Self-executing (Pi) path. Offer the base tool set, and add the registry WRITE tools
+        # ONLY when the turn looks like a registry edit — the same gate the passthrough path uses,
+        # so an ordinary self-executed command can't expose or misfire a destructive registry edit.
+        self_tools = TOOL_SCHEMAS + (REGISTRY_TOOL_SCHEMAS
+                                     if _REGISTRY_INTENT_RE.search(last_user or "") else [])
+        text, tool_calls = await _self_execute_tools(messages, self_tools)
 
     if not text and not tool_calls:
         text = "(no response)"
