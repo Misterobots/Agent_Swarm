@@ -63,6 +63,54 @@ GPU_LOCK_HOST = os.getenv("GPU_LOCK_HOST", "http://localhost:8000")
 TRAINING_WINDOW_START = int(os.getenv("TRAINING_WINDOW_START", "2"))   # hour (24h)
 TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (24h)
 
+# ---------------------------------------------------------------------------
+# Protected models — never evicted by a zone switch.
+#
+# A one-off image / 3D / compose / training job calls evict_ollama(), which frees
+# VRAM by unloading EVERY resident Ollama model. That used to include the
+# Friday/BMO voice LLM (BMO_LLM_MODEL, default qwen3:14b), so a single media
+# request bulldozed the voice assistant mid-conversation and the next voice turn
+# ate a 20–30s cold reload. Models listed here are kept resident through the
+# eviction so the latency-critical voice lane stays warm. Comma-separated Ollama
+# model names; defaults to the voice model. Set PROTECTED_OLLAMA_MODELS="" to
+# restore the old evict-everything behaviour.
+#
+# NOTE (VRAM): keeping the voice model resident is OOM-safe when the incoming
+# media backend uses only GPU 1 (Klein/OmniGen). ComfyUI uses BOTH cards, so
+# confirm the voice model occupies a single card before relying on this under
+# heavy ComfyUI load.
+# ---------------------------------------------------------------------------
+_PROTECTED_RAW = os.getenv("PROTECTED_OLLAMA_MODELS", os.getenv("BMO_LLM_MODEL", "qwen3:14b"))
+PROTECTED_OLLAMA_MODELS = frozenset(m.strip() for m in _PROTECTED_RAW.split(",") if m.strip())
+
+
+def _is_protected_model(model_name: str) -> bool:
+    """True when an Ollama model holds a protected lane and must not be evicted.
+
+    Substring match (same idiom as _get_preferred_host's turing_models list) so a
+    catalog tag like 'qwen3:14b' matches whatever /api/ps reports for it."""
+    return bool(model_name) and any(p in model_name for p in PROTECTED_OLLAMA_MODELS)
+
+
+# Whether evict_ollama() also frees the SECONDARY Ollama host (Turing's 8 GB fast
+# path). Default False: a Lovelace image/compose/training job does NOT share GPUs
+# with Turing, so evicting Turing's safety/embed/nano models is pure collateral that
+# cold-starts the fast path for nothing. Set EVICT_SECONDARY_OLLAMA=true to restore
+# the old evict-both-hosts behaviour.
+_EVICT_SECONDARY_OLLAMA = os.getenv("EVICT_SECONDARY_OLLAMA", "false").lower() in ("true", "1", "yes")
+
+# Warm-pin: when True, a protected model that is already resident is re-pinned with
+# keep_alive=-1 during evict_ollama(), so it survives Ollama's idle-unload
+# (OLLAMA_KEEP_ALIVE) as well as zone-switch eviction — Friday stays instant even
+# after long idle. OFF by default; enabling it is a deliberate eval step.
+#   Roll back: set WARM_PIN_PROTECTED_MODELS=false (future runs stop pinning); to
+#   release a pin already set on a live model without an Ollama restart, call
+#   unpin_protected_models().
+_WARM_PIN_PROTECTED = os.getenv("WARM_PIN_PROTECTED_MODELS", "false").lower() in ("true", "1", "yes")
+# keep_alive handed back to a model by unpin_protected_models() to restore normal
+# idle-unload (mirror of the ollama container's OLLAMA_KEEP_ALIVE).
+_UNPIN_KEEP_ALIVE = os.getenv("UNPIN_KEEP_ALIVE", "5m")
+
 def _get_preferred_host(model_name: str) -> str:
     """
     Static hardware-aware routing (no health checks).
@@ -701,13 +749,55 @@ def warmup_omnigen():
             time.sleep(20)
 
 
+def _set_model_keep_alive(host: str, model_name: str, keep_alive) -> None:
+    """Best-effort: set an Ollama model's keep_alive without generating tokens.
+    keep_alive=-1 pins it resident; a duration string (e.g. '5m') restores normal
+    idle-unload. Load-only request (empty prompt)."""
+    try:
+        requests.post(f"{host}/api/generate",
+                      json={"model": model_name, "keep_alive": keep_alive},
+                      timeout=10)
+    except Exception as e:
+        logger.warning(f"[GPU Queue] keep_alive={keep_alive} request failed for {model_name} on {host}: {e}")
+
+
+def warm_pin_protected_models(host: str = OLLAMA_HOST) -> None:
+    """Load (if needed) and pin every protected model resident (keep_alive=-1) so the
+    voice lane is instant even from a cold boot. Intended as an optional startup hook;
+    no-op unless WARM_PIN_PROTECTED_MODELS is enabled. Safe to call repeatedly."""
+    if not _WARM_PIN_PROTECTED or not PROTECTED_OLLAMA_MODELS:
+        return
+    for name in PROTECTED_OLLAMA_MODELS:
+        logger.info(f"[GPU Queue] Warm-pinning protected model {name} on {host} (keep_alive=-1).")
+        _set_model_keep_alive(host, name, -1)
+
+
+def unpin_protected_models(host: str = OLLAMA_HOST) -> None:
+    """Rollback for the warm-pin: hand every resident protected model back to normal
+    idle-unload (keep_alive=UNPIN_KEEP_ALIVE) so a keep_alive=-1 pin can be released
+    without restarting Ollama. Only touches models currently loaded."""
+    for name in _get_loaded_model_names(host):
+        if _is_protected_model(name):
+            logger.info(f"[GPU Queue] Unpinning protected model {name} on {host} (keep_alive={_UNPIN_KEEP_ALIVE}).")
+            _set_model_keep_alive(host, name, _UNPIN_KEEP_ALIVE)
+
+
 def evict_ollama():
-    """Unloads active models from all Ollama hosts (primary + secondary) via keep_alive=0.
-    Both hosts must be evicted — large models run on OLLAMA_HOST (Lovelace) which shares
-    physical GPUs with ComfyUI/Klein. Turing (SECONDARY_OLLAMA_HOST) holds safety/embedding
-    models. Polls /api/ps after eviction to confirm VRAM is free before returning."""
+    """Unload resident Ollama models via keep_alive=0 to free VRAM for the next zone.
+
+    By default only OLLAMA_HOST (Lovelace) is touched — it shares physical GPUs with
+    ComfyUI/Klein/OmniGen. The SECONDARY host (Turing's 8 GB fast path) is left alone;
+    it doesn't share those GPUs, so evicting it is pure collateral. Set
+    EVICT_SECONDARY_OLLAMA=true to also free the secondary host.
+
+    Models in PROTECTED_OLLAMA_MODELS (the Friday/BMO voice LLM by default) are never
+    evicted — they hold a latency-critical lane (see _is_protected_model). With
+    WARM_PIN_PROTECTED_MODELS enabled they are additionally re-pinned (keep_alive=-1)
+    so they survive Ollama's idle-unload too. Polls /api/ps until every NON-protected
+    model is gone before returning."""
     hosts_to_evict = [OLLAMA_HOST]
-    if SECONDARY_OLLAMA_HOST and SECONDARY_OLLAMA_HOST != OLLAMA_HOST:
+    if (_EVICT_SECONDARY_OLLAMA and SECONDARY_OLLAMA_HOST
+            and SECONDARY_OLLAMA_HOST != OLLAMA_HOST):
         hosts_to_evict.append(SECONDARY_OLLAMA_HOST)
 
     for host in hosts_to_evict:
@@ -725,6 +815,13 @@ def evict_ollama():
 
             for model in models:
                 model_name = model.get("name")
+                if _is_protected_model(model_name):
+                    if _WARM_PIN_PROTECTED:
+                        logger.info(f"[GPU Queue] Keeping protected model {model_name} resident on {host} and pinning it (keep_alive=-1).")
+                        _set_model_keep_alive(host, model_name, -1)
+                    else:
+                        logger.info(f"[GPU Queue] Keeping protected model {model_name} resident on {host} (voice lane).")
+                    continue
                 logger.info(f"[GPU Queue] Unloading {model_name} from {host}")
                 try:
                     requests.post(f"{host}/api/generate", json={
@@ -734,15 +831,21 @@ def evict_ollama():
                 except Exception as e:
                     logger.warning(f"[GPU Queue] keep_alive=0 request timed out for {model_name} on {host}: {e}")
 
-            # Poll /api/ps until models list is empty — unload is async, VRAM needs time to free
+            # Poll /api/ps until every NON-protected model is gone — unload is
+            # async, VRAM needs time to free. Protected models (voice lane) stay
+            # resident by design, so wait for them to be the ONLY thing left, not
+            # for an empty list (which would otherwise always time out).
             deadline = time.time() + 20
             while time.time() < deadline:
                 time.sleep(2)
                 try:
                     check = requests.get(f"{host}/api/ps", timeout=3)
-                    if check.status_code == 200 and not check.json().get("models", []):
-                        logger.info(f"[GPU Queue] Ollama VRAM confirmed free on {host}.")
-                        break
+                    if check.status_code == 200:
+                        remaining = [m for m in check.json().get("models", [])
+                                     if not _is_protected_model(m.get("name", ""))]
+                        if not remaining:
+                            logger.info(f"[GPU Queue] Ollama VRAM freed on {host} (protected models retained).")
+                            break
                 except Exception:
                     break
             else:
