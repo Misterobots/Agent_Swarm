@@ -556,12 +556,16 @@ micro_wake_word:
     - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
       id: stop
       internal: true
-    # TODO(hey_friday): add once agents/bmo_voice/wakeword_training produces a
-    # trained model — mirror the `kenobi` entry's pattern (URL to a hosted
-    # manifest.json), NOT the `hey_jarvis` pattern (bare name only works for
-    # models compiled into the micro_wake_word component itself). Example:
-    #   - model: https://raw.githubusercontent.com/<owner>/Agent_Swarm/main/agents/bmo_voice/wakeword_training/models/hey_friday/hey_friday.json
-    #     id: hey_friday
+    # hey_friday: trained by agents/bmo_voice/wakeword_training (see its README) on ~4000
+    # synthetic TTS positives + 106 real household recordings. Mirrors the `kenobi` pattern —
+    # a URL to the hosted manifest.json; ESPHome then fetches hey_friday.tflite from the same
+    # directory via the manifest's "model" field, so both files must sit side by side (they do).
+    # NOTE: this raw URL resolves only once models/hey_friday/{hey_friday.json,hey_friday.tflite}
+    # are on the `main` branch on GitHub. They are currently committed on branch
+    # claude/continue-previous-work-ef3a70 — merge to main and push first (or temporarily point
+    # the URL at that branch) before flashing, or the download 404s at compile time.
+    - model: https://raw.githubusercontent.com/Misterobots/Agent_Swarm/main/agents/bmo_voice/wakeword_training/models/hey_friday/hey_friday.json
+      id: hey_friday
   vad:
     probability_cutoff: 0.03
   on_wake_word_detected:
@@ -946,13 +950,20 @@ select:
       - Moderately sensitive
       - Very sensitive
     on_value:
+      # Governs both okay_nabu and hey_friday. The hey_friday branches mirror okay_nabu's exact
+      # set_probability_cutoff() calls (same component API/scale), so the same sensitivity control
+      # applies to the custom model. This overrides hey_friday's manifest-baked cutoff (0.97) with
+      # the selected value — drop the id(hey_friday) lines if you'd rather keep it fixed at 0.97.
       lambda: |-
         if (x == "Slightly sensitive") {
           id(okay_nabu).set_probability_cutoff(217);
+          id(hey_friday).set_probability_cutoff(217);
         } else if (x == "Moderately sensitive") {
           id(okay_nabu).set_probability_cutoff(176);
+          id(hey_friday).set_probability_cutoff(176);
         } else if (x == "Very sensitive") {
           id(okay_nabu).set_probability_cutoff(50);
+          id(hey_friday).set_probability_cutoff(50);
         }
   - platform: logger
     id: logger_select
