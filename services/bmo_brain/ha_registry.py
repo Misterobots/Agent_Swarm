@@ -44,9 +44,15 @@ HOME_ASSISTANT_URL = os.getenv("HOME_ASSISTANT_URL", "http://192.168.2.100:8123"
 HOME_ASSISTANT_TOKEN = os.getenv("HOME_ASSISTANT_TOKEN", "")
 
 _WS_TIMEOUT = float(os.getenv("HASS_WS_TIMEOUT", "10"))
-# Registry names ("Living Room Lamp", "Upstairs") are short; the same fuzzy cutoff
-# hass_resolver uses for area/entity resolution is the right default here too.
-_FUZZY_CUTOFF = float(os.getenv("HASS_REG_FUZZY_CUTOFF", "0.72"))
+# Shorter CONNECT timeout so a firewalled/unreachable HA WebSocket fails fast instead of stacking
+# 10s hangs across the several ops a registry turn issues (which could exceed HA Assist's own
+# conversation timeout). The per-message recv timeout stays at _WS_TIMEOUT.
+_WS_CONNECT_TIMEOUT = float(os.getenv("HASS_WS_CONNECT_TIMEOUT", "5"))
+# Registry edits are IRREVERSIBLE writes, so name resolution here is intentionally stricter than
+# the 0.72 hass_resolver uses for reversible on/off: a near-miss ("lamp" vs "ramp", ratio 0.75)
+# must NOT silently mutate the wrong device/entity/area. Better to fail with "couldn't find X"
+# and let the user rephrase than to move or rename the wrong thing.
+_FUZZY_CUTOFF = float(os.getenv("HASS_REG_FUZZY_CUTOFF", "0.85"))
 _MAX_MSG = 16 * 1024 * 1024  # a large household's registry list can be a few hundred KB
 
 
@@ -108,7 +114,7 @@ async def _session():
     Raises if the token is missing or auth fails; callers convert that to a spoken error."""
     if not HOME_ASSISTANT_TOKEN:
         raise RuntimeError("HOME_ASSISTANT_TOKEN not set")
-    async with _ws_connect(_ws_url(), open_timeout=_WS_TIMEOUT, max_size=_MAX_MSG) as conn:
+    async with _ws_connect(_ws_url(), open_timeout=_WS_CONNECT_TIMEOUT, max_size=_MAX_MSG) as conn:
         await asyncio.wait_for(conn.recv(), timeout=_WS_TIMEOUT)  # auth_required
         await conn.send(json.dumps({"type": "auth", "access_token": HOME_ASSISTANT_TOKEN}))
         resp = json.loads(await asyncio.wait_for(conn.recv(), timeout=_WS_TIMEOUT))
@@ -272,7 +278,11 @@ async def create_area(name: str = "", **_) -> str:
     try:
         async with _session() as ws:
             areas = _result(await ws.command("config/area_registry/list"))
-            if _best_id(name, _area_candidates(areas)):
+            # Exact (normalized) duplicate check only — NOT fuzzy _best_id, which would refuse to
+            # create a legitimately-distinct room whose name is merely similar to an existing one
+            # (e.g. "Bathroom 2" fuzzy-matches "Bathroom" at 0.89 and would be wrongly blocked).
+            existing = {_norm(text) for _id, text in _area_candidates(areas) if text}
+            if _norm(name) in existing:
                 return f"There's already a room called {name}."
             res = await ws.command("config/area_registry/create", name=name)
             if not res.get("success"):
