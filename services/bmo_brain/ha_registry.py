@@ -89,6 +89,31 @@ def _best_id(name: str, candidates: list):
     return by_norm[close[0]] if close else None
 
 
+def _exact_ids(name: str, candidates: list) -> list:
+    """Distinct ids whose normalized text EXACTLY equals name's — used to detect ambiguity
+    (two+ things share a name) before an irreversible write would pick one arbitrarily."""
+    n = _norm(name)
+    if not n:
+        return []
+    ids = []
+    for id_, text in candidates:
+        if id_ and _norm(text) == n and id_ not in ids:
+            ids.append(id_)
+    return ids
+
+
+def _resolve_one(name: str, candidates: list, kind: str):
+    """Resolve a spoken name to a SINGLE id. Returns (id, None) on a unique match; (None, msg)
+    when AMBIGUOUS — 2+ things share the exact name, so refuse and ask rather than mutate an
+    arbitrary one (a real hazard for these irreversible writes); or (None, None) when nothing
+    matches at all (the caller emits its own 'couldn't find' message)."""
+    exact = _exact_ids(name, candidates)
+    if len(exact) > 1:
+        return None, (f"There's more than one {kind} called {name}. "
+                      f"Tell me which area it's in and I'll be precise.")
+    return _best_id(name, candidates), None
+
+
 class _HAWebSocket:
     """Thin wrapper over an authenticated HA WS connection: sends a command with an
     auto-incrementing id and returns the matching `result` message (ignoring anything else)."""
@@ -197,14 +222,20 @@ async def move_device_to_area(device: str = "", area: str = "", **_) -> str:
         async with _session() as ws:
             areas = _result(await ws.command("config/area_registry/list"))
             devices = _result(await ws.command("config/device_registry/list"))
-            area_id = _best_id(area, _area_candidates(areas))
+            area_id, amb = _resolve_one(area, _area_candidates(areas), "room")
+            if amb:
+                return amb
             if not area_id:
                 return f"I couldn't find a room called {area}."
-            device_id = _best_id(device, _device_candidates(devices))
+            device_id, amb = _resolve_one(device, _device_candidates(devices), "device")
+            if amb:
+                return amb
             if not device_id:
                 # Fall back: the user may have named one of the device's entities.
                 entities = _result(await ws.command("config/entity_registry/list"))
-                ent_id = _best_id(device, _entity_candidates(entities))
+                ent_id, amb = _resolve_one(device, _entity_candidates(entities), "thing")
+                if amb:
+                    return amb
                 device_id = _device_id_for_entity(ent_id, entities) if ent_id else None
             if not device_id:
                 return f"I couldn't find a device called {device}."
@@ -226,10 +257,14 @@ async def assign_entity_to_area(entity: str = "", area: str = "", **_) -> str:
         async with _session() as ws:
             areas = _result(await ws.command("config/area_registry/list"))
             entities = _result(await ws.command("config/entity_registry/list"))
-            area_id = _best_id(area, _area_candidates(areas))
+            area_id, amb = _resolve_one(area, _area_candidates(areas), "room")
+            if amb:
+                return amb
             if not area_id:
                 return f"I couldn't find a room called {area}."
-            entity_id = _best_id(entity, _entity_candidates(entities))
+            entity_id, amb = _resolve_one(entity, _entity_candidates(entities), "thing")
+            if amb:
+                return amb
             if not entity_id:
                 return f"I couldn't find anything called {entity}."
             res = await ws.command("config/entity_registry/update",
@@ -250,7 +285,9 @@ async def rename_device_or_entity(target: str = "", new_name: str = "", **_) -> 
     try:
         async with _session() as ws:
             entities = _result(await ws.command("config/entity_registry/list"))
-            entity_id = _best_id(target, _entity_candidates(entities))
+            entity_id, amb = _resolve_one(target, _entity_candidates(entities), "thing")
+            if amb:
+                return amb
             if entity_id:
                 res = await ws.command("config/entity_registry/update",
                                        entity_id=entity_id, name=new_name)
@@ -258,7 +295,9 @@ async def rename_device_or_entity(target: str = "", new_name: str = "", **_) -> 
                     return f"Home Assistant wouldn't rename that. {_err(res)}"
                 return f"Renamed {_entity_name(entity_id, entities)} to {new_name}."
             devices = _result(await ws.command("config/device_registry/list"))
-            device_id = _best_id(target, _device_candidates(devices))
+            device_id, amb = _resolve_one(target, _device_candidates(devices), "device")
+            if amb:
+                return amb
             if device_id:
                 res = await ws.command("config/device_registry/update",
                                        device_id=device_id, name_by_user=new_name)
