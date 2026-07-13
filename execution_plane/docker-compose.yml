@@ -88,25 +88,9 @@ services:
     networks:
       - execution_net
 
-  # BMO VOICE - RVC Inference Engine
-  bmo-voice:
-    build:
-      context: ../agents/bmo_voice
-      dockerfile: Dockerfile
-    container_name: bmo_voice_gpu
-    ports:
-      - "8100:8000"
-    volumes:
-      - ../agents/bmo_voice:/app
-    networks:
-      - execution_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.bmo-voice.rule=PathPrefix(`/bmo`)"
-      - "traefik.http.routers.bmo-voice.entrypoints=web"
-      - "traefik.http.services.bmo-voice.loadbalancer.server.port=8000"
-
   # VOICE ENGINE - Qwen3-TTS (1.7B)
+  # Replaced the retired bmo-voice RVC service (models lost); owns host port 8100
+  # so the .106 driver connects unchanged.
   voice-engine:
     build:
       context: ../services/voice_engine
@@ -114,6 +98,15 @@ services:
     container_name: voice_engine_gpu
     ports:
       - "8020:8020"
+      - "8100:8020"   # BMO driver (.106, default port 8100) connects here
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    restart: unless-stopped
     volumes:
       - ../services/voice_engine:/app
       - bmo_models:/root/.cache/huggingface # Share cache if possible or use new volume
@@ -124,6 +117,89 @@ services:
       - "traefik.http.routers.voice-engine.rule=PathPrefix(`/voice`)"
       - "traefik.http.routers.voice-engine.entrypoints=web"
       - "traefik.http.services.voice-engine.loadbalancer.server.port=8020"
+
+  # WYOMING FRIDAY TTS - protocol adapter only, no synthesis of its own. Lets Home
+  # Assistant's Assist pipeline select Friday's cloned voice_engine/Qwen3-TTS voice as a
+  # first-class local TTS engine (same voice the Pi hears), instead of only being reachable
+  # via voice_engine's own HTTP API. Wraps voice-engine's existing /speak endpoint.
+  wyoming-friday-tts:
+    build:
+      context: ../services/wyoming_friday_tts
+      dockerfile: Dockerfile
+    container_name: wyoming_friday_tts
+    ports:
+      - "10200:10200"
+    environment:
+      - VOICE_ENGINE_URL=http://voice-engine:8020
+    restart: unless-stopped
+    depends_on:
+      - voice-engine
+    networks:
+      - execution_net
+
+  # GPU-ACCELERATED WYOMING WHISPER STT - replaces HA's CPU-bound "Whisper" Supervisor
+  # add-on (runs on the HA host itself, .100, no GPU). Live pipeline traces measured
+  # 3.2-6.2+ seconds of pure Whisper transcription time after VAD already isolated the
+  # speech segment — the dominant bottleneck in the whole voice pipeline, and one trace
+  # failed to recognize speech at all (an accuracy problem from the add-on's likely
+  # tiny/base-int8 default model, not just a speed problem). Unlike wyoming-friday-tts,
+  # this is a complete, self-contained Wyoming server (the rhasspy package IS the server,
+  # no separate HTTP backend to bridge to) — no PyTorch dependency at all, transcription
+  # runs through CTranslate2 directly. Deliberately staged: build + smoke-test on this
+  # container BEFORE registering it with HA or repointing the Friday pipeline's stt_engine
+  # — keep the existing CPU stt.faster_whisper entity as a fallback during burn-in.
+  wyoming-whisper-gpu:
+    build:
+      context: ../services/wyoming_whisper_gpu
+      dockerfile: Dockerfile
+    container_name: wyoming_whisper_gpu
+    ports:
+      - "10300:10300"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    restart: unless-stopped
+    volumes:
+      - whisper_models:/data
+    networks:
+      - execution_net
+
+  # BMO BRAIN - OpenAI-compatible vault-RAG conversational assistant, speaking as BMO/Beemo.
+  # Recalls personal-vault (MemPalace) memories, injects them as context, and answers via
+  # the LLM. Canonical brain for both HA's OpenAI-Conversation agent and the BMO Pi's
+  # bmo_driver.chat() (which targets :8000/v1). Personal vault values live in
+  # execution_plane/.env (gitignored); vault recall is inert unless BMO_VAULT_URL +
+  # BMO_VAULT_OWNER are set there. To override the character prompt entirely, add
+  # "- BMO_PERSONA=${BMO_PERSONA}" below — not set by default (services/bmo_brain/persona.py
+  # is the default character).
+  bmo-brain:
+    build:
+      context: ../services/bmo_brain
+      dockerfile: Dockerfile
+    container_name: bmo_brain
+    ports:
+      - "8000:8000"
+    environment:
+      - VAULT_URL=${BMO_VAULT_URL}
+      - VAULT_OWNER=${BMO_VAULT_OWNER}
+      - OLLAMA_URL=${BMO_OLLAMA_URL:-http://192.168.2.101:11434}
+      - BMO_MODEL=${BMO_MODEL:-qwen3:8b}
+      # HA API access for tools.py's device-control tools (self-executing mode) and, new,
+      # hass_resolver.py's fuzzy-matching + learned-synonym resolution of area/entity
+      # names for HA passthrough mode — previously missing from this container entirely,
+      # so tools.py's turn_on_device/turn_off_device/get_device_state/list_devices were
+      # silently non-functional here too.
+      - HOME_ASSISTANT_URL=${HOME_ASSISTANT_URL:-http://192.168.2.100:8123}
+      - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
+    volumes:
+      - bmo_brain_data:/app/data
+    restart: unless-stopped
+    networks:
+      - execution_net
 
   # OPENHANDS - Sandboxed Execution Environment (Protected by Authentik SSO)
   openhands:
@@ -908,6 +984,8 @@ networks:
 
 volumes:
   bmo_models:
+  bmo_brain_data:
+  whisper_models:
   ollama_models:
   klein_model_cache:
   omnigen_model_cache:

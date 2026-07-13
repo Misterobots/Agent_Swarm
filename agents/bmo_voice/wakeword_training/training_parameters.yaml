@@ -1,0 +1,110 @@
+# microWakeWord training configuration for the "Hey Friday" wake word.
+#
+# Copied verbatim from microWakeWord's own basic_training_notebook.ipynb (cell 9,
+# fetched from github.com/kahrendt/microWakeWord/notebooks/) — these are the exact
+# hyperparameters upstream itself ships as a starting point, not re-derived or
+# guessed. All `features_dir` paths are relative to the current working directory,
+# which train.sh sets to /data before invoking `python -m microwakeword.model_train_eval`
+# — so these resolve against the same /data layout generate_samples.sh and
+# download_negatives.sh write into.
+#
+# train.sh copies this file to /data/training_parameters.yaml on first run (if not
+# already there) rather than reading it straight from the image, specifically so you
+# can hand-edit thresholds/weights in /data without rebuilding the Docker image —
+# re-running train.sh after an edit picks up your changes.
+#
+# window_step_ms must match build_manifest.py's --feature-step-size (both are "how many
+# ms of audio the spectrogram advances per frame") — kept in sync deliberately, see the
+# comment in build_manifest.py.
+window_step_ms: 10
+
+train_dir: trained_models/wakeword
+
+# Each entry's features_dir must contain training/, validation/, and/or testing/
+# subfolders, each holding a RaggedMmap directory ending in "_mmap" (produced by
+# extract_features.py for the positive set, and by download_negatives.sh's HF zip
+# extraction for the negative sets below — those come pre-built as microWakeWord
+# spectrogram features, not raw audio).
+features:
+  # Positive ("Hey Friday") samples, generated + augmented by generate_samples.sh
+  # and extract_features.py.
+  - features_dir: generated_augmented_features
+    sampling_weight: 2.0
+    penalty_weight: 1.0
+    truth: true
+    truncation_strategy: truncate_start
+    type: mmap
+
+  # OPTIONAL real recordings (your household + your rooms), extracted by
+  # extract_features.py from real_samples/ into real_augmented_features/. UNCOMMENT this
+  # block once you've added clips to real_samples/ AND re-run so real_augmented_features/
+  # exists — model_train_eval expects every listed features_dir to be present on disk, so
+  # leaving it commented keeps the default (no-real-clips) pipeline working out of the box.
+  #
+  # sampling_weight is kept EQUAL to the synthetic set above (2.0), not higher: the weight
+  # sets how often this set is drawn per batch INDEPENDENT of its file count, so parity lets
+  # a few dozen real clips pull real influence without DOMINATING — which keeps the synthetic
+  # set's broad speaker diversity in play so guests / unseen voices still trigger. Drop to 1.0
+  # if it starts overfitting to your specific recordings (great on your clips, worse in general).
+  # - features_dir: real_augmented_features
+  #   sampling_weight: 2.0
+  #   penalty_weight: 1.0
+  #   truth: true
+  #   truncation_strategy: truncate_start
+  #   type: mmap
+
+  # Negative sets, pre-built by microWakeWord's authors and downloaded by
+  # download_negatives.sh from huggingface.co/datasets/kahrendt/microwakeword.
+  - features_dir: negative_datasets/speech
+    sampling_weight: 10.0
+    penalty_weight: 1.0
+    truth: false
+    truncation_strategy: random
+    type: mmap
+
+  - features_dir: negative_datasets/dinner_party
+    sampling_weight: 10.0
+    penalty_weight: 1.0
+    truth: false
+    truncation_strategy: random
+    type: mmap
+
+  - features_dir: negative_datasets/no_speech
+    sampling_weight: 5.0
+    penalty_weight: 1.0
+    truth: false
+    truncation_strategy: random
+    type: mmap
+
+  # Validation/test only (sampling_weight 0.0 excludes it from training batches).
+  - features_dir: negative_datasets/dinner_party_eval
+    sampling_weight: 0.0
+    penalty_weight: 1.0
+    truth: false
+    truncation_strategy: split
+    type: mmap
+
+# Training schedule — single-phase, 10k steps, matching the notebook's own default.
+training_steps: [10000]
+positive_class_weight: [1]
+negative_class_weight: [20]
+learning_rates: [0.001]
+batch_size: 128
+
+# SpecAugment — disabled (all zeros), matching the notebook's own default. Enabling
+# this is one of the first things upstream suggests trying if the trained model
+# under/over-fits.
+time_mask_max_size: [0]
+time_mask_count: [0]
+freq_mask_max_size: [0]
+freq_mask_count: [0]
+
+eval_step_interval: 500
+clip_duration_ms: 1500
+
+# Model-selection metric: minimize nothing (minimization_metric: null disables it),
+# maximize average_viable_recall. See microwakeword/model_train_eval.py's own
+# docstring for the full list of available metrics if you want to change this.
+target_minimization: 0.9
+minimization_metric: null
+maximization_metric: average_viable_recall

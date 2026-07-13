@@ -90,6 +90,14 @@ Return ONLY a JSON array. Each element must have:
 Rules:
 - Only extract genuinely useful, durable information.
 - Skip trivial, temporary, or context-specific details.
+- If the conversation includes a "[Tool activity this exchange: ...]" block, that is a
+  technical trace of device/tool calls that were attempted and their results — look for
+  a call that failed one way but then succeeded with different arguments (or failed
+  repeatedly the same way). Extract the WORKING pattern, or the specific combination to
+  avoid, as a "procedural" memory (e.g. "For HassTurnOff area-wide commands, use area
+  and domain only — combining domain with device_class causes InvalidSlotInfo"). This is
+  exactly the kind of durable, reusable lesson worth keeping, even though it comes from
+  a technical trace rather than something the user said directly.
 - If nothing is worth remembering, return an empty array [].
 - Do NOT include any text outside the JSON array.
 

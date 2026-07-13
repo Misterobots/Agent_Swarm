@@ -1,0 +1,1215 @@
+# Reference copy only — the source of truth is Home Assistant's ESPHome Dashboard
+# add-on (Settings -> Add-ons -> ESPHome Dashboard -> Google Mini Voice -> Edit).
+# Saved here 2026-07-09 so future work on the "Hey Friday" wake-word model doesn't
+# need this re-pasted. Edit the copy in the ESPHome Dashboard, not this file, then
+# re-save a copy here if it changes again.
+#
+# Relevant section for the hey_friday wake-word model (see
+# agents/bmo_voice/wakeword_training/README.md): the `micro_wake_word: models:`
+# list below. Once training produces hey_friday.tflite + hey_friday.json, add a
+# new entry there, mirroring the existing `kenobi` entry's pattern (a bare URL to
+# a manifest.json hosted outside the device, no local file needed on the ESPHome
+# host) rather than the `hey_jarvis` pattern (a bare built-in name — that only
+# works for models compiled into the micro_wake_word component itself, not custom
+# ones). The "Wake word sensitivity" select's on_value lambda further down only
+# wires okay_nabu's probability_cutoff today — extend it with a hey_friday branch
+# for the same UI control to apply, or leave hey_friday's cutoff fixed at whatever
+# the manifest bakes in.
+
+substitutions:
+  device_name: google-mini-voice
+  friendly: Google Mini Voice
+
+  # Phases of the Voice Assistant
+  voice_assist_idle_phase_id: '1'
+  voice_assist_waiting_for_command_phase_id: '2'
+  voice_assist_listening_for_command_phase_id: '3'
+  voice_assist_thinking_phase_id: '4'
+  voice_assist_replying_phase_id: '5'
+  voice_assist_not_ready_phase_id: '10'
+  voice_assist_error_phase_id: '11'
+
+  i2s_mclk: GPIO12
+  i2s_bclk: GPIO13
+  i2s_lrclk: GPIO14
+
+  amp_ctrl: '8'
+  i2c_scl: GPIO10
+  i2c_sda: GPIO11
+
+  mic_channel_0: 'left'
+  mic_channel_1: 'right'
+  mic_channel_2: 'stereo'
+
+  which_mic: '0'
+  i2s_sample_rate: '16000'
+  i2s_bits_per_sample: '32'
+  i2s_mode_mic: secondary
+  i2s_mode_speaker: secondary
+  i2s_use_apll: 'true'
+  i2s_bps_spk: 16bit
+  i2s_bps_mic: 16bit
+  i2s_mclk_multiple: '256'
+
+  hidden_ssid: "false"
+  led_num: '7'
+
+esphome:
+  name: $device_name
+  friendly_name: $friendly
+  min_version: 2025.8.0
+  on_boot:
+    - priority: -100
+      then:
+        - if:
+            condition:
+              switch.is_on: diag_disable_mic
+            then:
+              - logger.log: "Mic ENABLED"
+            else:
+              - logger.log: "Mic DISABLED for diagnostics"
+              - micro_wake_word.stop:
+              - voice_assistant.stop:
+              - microphone.stop_capture: i2s_mics
+    - priority: 375
+      then:
+        - sensor.template.publish:
+            id: next_timer
+            state: -1
+        - script.execute: control_leds
+        - delay: 10min
+        - if:
+            condition:
+              lambda: return id(init_in_progress);
+            then:
+              - lambda: id(init_in_progress) = false;
+              - script.execute: control_leds
+    - priority: -100
+      then:
+        - lambda: |-
+            id(alarm_time).publish_state(id(saved_alarm_time));
+        - lambda: |-
+            auto call = id(alarm_action).make_call();
+            call.set_option(id(saved_alarm_action));
+            call.perform();
+        - lambda: |-
+            setenv("TZ", id(saved_time_zone).c_str(), 1);
+            tzset();
+
+esp32:
+  board: esp32-s3-devkitc-1
+  cpu_frequency: 240MHz
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    version: recommended
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+      CONFIG_SPIRAM_RODATA: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
+
+wifi:
+  id: wifi_id
+  fast_connect: ${hidden_ssid}
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  reboot_timeout: 10min
+  on_connect:
+    - lambda: id(improv_ble_in_progress) = false;
+    - script.execute: control_leds
+  on_disconnect:
+    - script.execute: control_leds
+
+debug:
+  update_interval: 5s
+
+logger:
+  level: DEBUG
+
+api:
+  id: api_id
+  encryption:
+    key: !secret api_key
+  actions:
+    - action: set_led_color
+      variables:
+        red: float
+        green: float
+        blue: float
+      then:
+        - lambda: |-
+            id(led_ring_color_r) = std::min(1.0f, std::max(0.0f, red));
+            id(led_ring_color_g) = std::min(1.0f, std::max(0.0f, green));
+            id(led_ring_color_b) = std::min(1.0f, std::max(0.0f, blue));
+    - action: start_va
+      then:
+        - voice_assistant.start
+    - action: stop_va
+      then:
+        - voice_assistant.stop
+    - action: set_alarm_time
+      variables:
+        alarm_time_hh_mm: string
+      then:
+        - lambda: |-
+            if (alarm_time_hh_mm.length() == 5 &&
+              isdigit(alarm_time_hh_mm[0]) && isdigit(alarm_time_hh_mm[1]) &&
+              isdigit(alarm_time_hh_mm[3]) && isdigit(alarm_time_hh_mm[4])) {
+                id(alarm_time).publish_state(alarm_time_hh_mm);
+                id(saved_alarm_time) = alarm_time_hh_mm;
+              }
+    - action: set_time_zone
+      variables:
+        posix_time_zone: string
+      then:
+        - lambda: |-
+            setenv("TZ", posix_time_zone.c_str(), 1);
+            tzset();
+            id(saved_time_zone) = posix_time_zone;
+            id(publish_current_time).execute();
+  on_client_connected:
+    - script.execute: control_leds
+  on_client_disconnected:
+    - script.execute: control_leds
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+    password: !secret ota_password
+
+captive_portal:
+
+i2c:
+  - id: internal_i2c
+    sda: GPIO11
+    scl: GPIO10
+    scan: true
+    frequency: 100kHz
+
+tca9555:
+  id: ioexp
+  i2c_id: internal_i2c
+  address: 0x20
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+time:
+  - platform: homeassistant
+    id: rtc
+    on_time:
+      - seconds: 0
+        minutes: /1
+        then:
+          - script.execute: check_alarm
+    on_time_sync:
+      - script.execute: publish_current_time
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: status_ring
+    name: "Status Ring"
+    pin: GPIO38
+    num_leds: ${led_num}
+    chipset: WS2812
+    rgb_order: RGB
+    default_transition_length: 150ms
+    effects:
+      - pulse:
+          name: "Pulse Slow"
+          min_brightness: 30%
+          max_brightness: 100%
+          transition_length: 1000ms
+          update_interval: 16ms
+      - pulse:
+          name: "Pulse Medium"
+          min_brightness: 30%
+          max_brightness: 100%
+          transition_length: 600ms
+          update_interval: 16ms
+      - pulse:
+          name: "Pulse Fast"
+          min_brightness: 30%
+          max_brightness: 100%
+          transition_length: 300ms
+          update_interval: 16ms
+      - addressable_rainbow:
+          name: "Rainbow Slow"
+          speed: 6
+          width: 7
+      - addressable_color_wipe:
+          name: "Wipe"
+
+i2s_audio:
+  - id: i2s_output
+    i2s_lrclk_pin:
+      number: $i2s_lrclk
+      allow_other_uses: true
+    i2s_bclk_pin:
+      number: $i2s_bclk
+      allow_other_uses: true
+    i2s_mclk_pin:
+      number: $i2s_mclk
+
+  - id: i2s_input
+    i2s_lrclk_pin:
+      number: $i2s_lrclk
+      allow_other_uses: true
+    i2s_bclk_pin:
+      number: $i2s_bclk
+      allow_other_uses: true
+
+audio_adc:
+  - platform: es7210
+    id: adc_mic
+    i2c_id: internal_i2c
+    sample_rate: $i2s_sample_rate
+    bits_per_sample: $i2s_bps_mic
+
+external_components:
+  - source:
+      type: git
+      url: "https://github.com/sw3Dan/waveshare-s2-audio_esphome_voice"
+      ref: main
+    components: [ es8311 ]
+    refresh: 0s
+
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    i2c_id: internal_i2c
+    use_mclk: true
+    sample_rate: $i2s_sample_rate
+    bits_per_sample: $i2s_bps_spk
+    force_master: true
+    mclk_multiple: $i2s_mclk_multiple
+
+microphone:
+  - platform: i2s_audio
+    id: i2s_mics
+    i2s_din_pin: GPIO15
+    adc_type: external
+    pdm: false
+    i2s_audio_id: i2s_input
+    i2s_mode: $i2s_mode_mic
+    sample_rate: 16000
+    bits_per_sample: $i2s_bps_mic
+    use_apll: $i2s_use_apll
+    channel: ${mic_channel_${which_mic}}
+
+speaker:
+  - platform: i2s_audio
+    id: i2s_audio_speaker
+    i2s_dout_pin: GPIO16
+    i2s_audio_id: i2s_output
+    i2s_mode: secondary
+    dac_type: external
+    timeout: never
+    buffer_duration: 100ms
+    audio_dac: es8311_dac
+    sample_rate: $i2s_sample_rate
+    bits_per_sample: 16bit
+    use_apll: $i2s_use_apll
+    channel: stereo
+
+  - platform: mixer
+    id: mixing_speaker
+    output_speaker: i2s_audio_speaker
+    num_channels: 2
+    source_speakers:
+      - id: announcement_mixing_input
+        timeout: never
+      - id: media_mixing_input
+        timeout: never
+
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixing_input
+  - platform: resampler
+    id: media_resampling_speaker
+    output_speaker: media_mixing_input
+
+media_player:
+  - platform: speaker
+    id: external_media_player
+    name: None
+    internal: False
+    volume_increment: 0.01
+    volume_min: 0.4
+    volume_max: 0.8
+    announcement_pipeline:
+      speaker: announcement_resampling_speaker
+      format: FLAC
+      num_channels: 1
+      sample_rate: 48000
+    media_pipeline:
+      speaker: media_resampling_speaker
+      format: FLAC
+      sample_rate: 48000
+    on_announcement:
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 20
+          duration: 0.0s
+    on_state:
+      if:
+        condition:
+          and:
+            - switch.is_off: timer_ringing
+            - not:
+                voice_assistant.is_running:
+            - not:
+                media_player.is_announcing:
+        then:
+          - mixer_speaker.apply_ducking:
+              id: media_mixing_input
+              decibel_reduction: 0
+              duration: 1.0s
+    on_mute:
+      - delay: 100ms
+      - script.execute: control_leds_volume_changed
+    on_unmute:
+      - delay: 100ms
+      - script.execute: control_leds_volume_changed
+    on_volume:
+      if:
+        condition:
+          - lambda: return !id(init_in_progress);
+        then:
+          - delay: 100ms
+          - script.execute: control_leds_volume_changed
+    files:
+      - id: mute_switch_on_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_on.flac
+      - id: mute_switch_off_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_off.flac
+      - id: timer_finished_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+      - id: wake_word_triggered_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+      - id: error_cloud_expired
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+
+voice_assistant:
+  id: va
+  microphone:
+    id: va_mic
+    microphone: i2s_mics
+    channels: $which_mic
+  media_player: external_media_player
+  micro_wake_word: mww
+  use_wake_word: false
+  noise_suppression_level: 0
+  auto_gain: 0 dbfs
+  volume_multiplier: 1
+  on_client_connected:
+    - if:
+        condition:
+          - lambda: return id(init_in_progress);
+          - switch.is_on: mic_mute_switch
+        then:
+          - switch.turn_off: mic_mute_switch
+    - lambda: id(init_in_progress) = false;
+    - micro_wake_word.start:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+    - script.execute: control_leds
+  on_client_disconnected:
+    - voice_assistant.stop:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id};
+    - script.execute: control_leds
+  on_error:
+    - if:
+        condition:
+          and:
+            - lambda: return !id(init_in_progress);
+            - lambda: return code != "duplicate_wake_up_detected";
+            - lambda: return code != "stt-no-text-recognized";
+        then:
+          - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
+          - script.execute: control_leds
+    - if:
+        condition:
+          - lambda: return code == "cloud-auth-failed";
+        then:
+          - script.execute:
+              id: play_sound
+              priority: true
+              sound_file: !lambda return id(error_cloud_expired);
+  on_start:
+    - mixer_speaker.apply_ducking:
+        id: media_mixing_input
+        decibel_reduction: 30
+        duration: 0.0s
+  on_listening:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_waiting_for_command_phase_id};
+    - script.execute: control_leds
+  on_stt_vad_start:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_listening_for_command_phase_id};
+    - script.execute: control_leds
+  on_stt_vad_end:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+    - script.execute: control_leds
+  on_intent_progress:
+    - if:
+        condition:
+          lambda: 'return !x.empty();'
+        then:
+          - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+          - script.execute: control_leds
+          - script.execute: activate_stop_word_once
+  on_tts_start:
+    - if:
+        condition:
+          lambda: 'return id(voice_assistant_phase) != ${voice_assist_replying_phase_id};'
+        then:
+          - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+          - script.execute: control_leds
+          - script.execute: activate_stop_word_once
+  on_tts_end:
+    - script.execute:
+        id: send_tts_uri_event
+        tts_uri: !lambda 'return x;'
+  on_stt_end:
+    - script.execute:
+        id: send_stt_text_event
+        stt_text: !lambda 'return x;'
+  on_end:
+    - wait_until:
+        not:
+          voice_assistant.is_running:
+    - mixer_speaker.apply_ducking:
+        id: media_mixing_input
+        decibel_reduction: 0
+        duration: 1.0s
+    - if:
+        condition:
+          lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
+        then:
+          - delay: 1s
+    - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+    - script.execute: control_leds
+  on_timer_finished:
+    - switch.turn_on: timer_ringing
+    - lambda: |
+        id(next_timer).publish_state(-1);
+        id(next_timer_name).publish_state("-");
+  on_timer_started:
+    - lambda: |
+        id(check_if_timers_active).execute();
+        if (id(is_timer_active)) {
+          id(fetch_first_active_timer).execute();
+          id(next_timer).publish_state(id(first_active_timer).seconds_left);
+          id(next_timer_name).publish_state(id(first_active_timer).name);
+        }
+    - script.execute: control_leds
+  on_timer_cancelled:
+    - lambda: |
+        id(check_if_timers_active).execute();
+        if (id(is_timer_active)) {
+          id(fetch_first_active_timer).execute();
+          id(next_timer).publish_state(id(first_active_timer).seconds_left);
+          id(next_timer_name).publish_state(id(first_active_timer).name);
+        } else {
+          id(next_timer).publish_state(-1);
+          id(next_timer_name).publish_state("-");
+        }
+    - script.execute: control_leds
+  on_timer_updated:
+    - lambda: |
+        id(check_if_timers_active).execute();
+        if (id(is_timer_active)) {
+          id(fetch_first_active_timer).execute();
+          id(next_timer).publish_state(id(first_active_timer).seconds_left);
+          id(next_timer_name).publish_state(id(first_active_timer).name);
+        }
+    - script.execute: control_leds
+  on_timer_tick:
+    - lambda: |
+        id(fetch_first_active_timer).execute();
+        int seconds_left = id(first_active_timer).seconds_left;
+        if (seconds_left % 5 == 0) {
+          id(next_timer).publish_state(seconds_left);
+        }
+
+micro_wake_word:
+  id: mww
+  microphone:
+    microphone: i2s_mics
+    channels: $which_mic
+  stop_after_detection: false
+  models:
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
+      id: okay_nabu
+    - model: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/refs/heads/main/microwakeword/models/v2/kenobi.json
+      id: kenobi
+    - model: hey_jarvis
+      id: hey_jarvis
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+      id: stop
+      internal: true
+    # hey_friday: trained by agents/bmo_voice/wakeword_training (see its README) on ~4000
+    # synthetic TTS positives + 106 real household recordings. Mirrors the `kenobi` pattern —
+    # a URL to the hosted manifest.json; ESPHome then fetches hey_friday.tflite from the same
+    # directory via the manifest's "model" field, so both files must sit side by side (they do).
+    # NOTE: this raw URL resolves only once models/hey_friday/{hey_friday.json,hey_friday.tflite}
+    # are on the `main` branch on GitHub. They are currently committed on branch
+    # claude/continue-previous-work-ef3a70 — merge to main and push first (or temporarily point
+    # the URL at that branch) before flashing, or the download 404s at compile time.
+    - model: https://raw.githubusercontent.com/Misterobots/Agent_Swarm/main/agents/bmo_voice/wakeword_training/models/hey_friday/hey_friday.json
+      id: hey_friday
+  vad:
+    probability_cutoff: 0.03
+  on_wake_word_detected:
+    - if:
+        condition:
+          switch.is_off: mic_mute_switch
+        then:
+          - if:
+              condition:
+                switch.is_on: timer_ringing
+              then:
+                - switch.turn_off: timer_ringing
+              else:
+                - if:
+                    condition:
+                      voice_assistant.is_running:
+                    then:
+                      voice_assistant.stop:
+                    else:
+                      - if:
+                          condition:
+                            media_player.is_announcing:
+                          then:
+                            - media_player.stop:
+                                announcement: true
+                          else:
+                            - if:
+                                condition:
+                                  switch.is_on: wake_sound
+                                then:
+                                  - script.execute:
+                                      id: play_sound
+                                      priority: true
+                                      sound_file: !lambda return id(wake_word_triggered_sound);
+                                  - delay: 300ms
+                            - voice_assistant.start:
+                                wake_word: !lambda return wake_word;
+
+globals:
+  - id: mic_gain_saved
+    type: float
+    restore_value: yes
+    initial_value: '32.0'
+  - id: mic_is_muted
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+  - id: led_ring_color_r
+    type: float
+    restore_value: yes
+    initial_value: '1.0'
+  - id: led_ring_color_g
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: led_ring_color_b
+    type: float
+    restore_value: yes
+    initial_value: '1.0'
+  - id: init_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+  - id: improv_ble_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: voice_assistant_phase
+    type: int
+    restore_value: no
+    initial_value: ${voice_assist_not_ready_phase_id}
+  - id: saved_alarm_time
+    type: std::string
+    restore_value: yes
+    initial_value: '"Unknown"'
+  - id: saved_time_zone
+    type: std::string
+    restore_value: yes
+    initial_value: '"UTC0"'
+  - id: saved_alarm_action
+    type: std::string
+    restore_value: yes
+    initial_value: '"Play sound"'
+  - id: first_active_timer
+    type: voice_assistant::Timer
+    restore_value: no
+  - id: is_timer_active
+    type: bool
+    restore_value: no
+  - id: factory_reset_requested
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+script:
+  - id: flash_ring
+    then:
+      - light.turn_on: { id: status_ring, red: 1.0, green: 0.0, blue: 0.0, brightness: 100% }
+      - delay: 250ms
+      - light.turn_off: status_ring
+
+  - id: led_set_effect
+    mode: restart
+    parameters:
+      effect: std::string
+      r: float
+      g: float
+      b: float
+    then:
+      - lambda: |-
+          id(led_ring_color_r) = r;
+          id(led_ring_color_g) = g;
+          id(led_ring_color_b) = b;
+          ESP_LOGI("led", "led_set_effect: effect='%s' rgb(%.2f, %.2f, %.2f) brightness=%.2f",
+                   effect.c_str(), r, g, b, (float) id(led_ring_brightness).state);
+      - if:
+          condition:
+            lambda: 'return effect == "off";'
+          then:
+            - light.turn_off: status_ring
+          else:
+            - if:
+                condition:
+                  lambda: 'return effect == "solid";'
+                then:
+                  - light.turn_on:
+                      id: status_ring
+                      brightness: !lambda 'return id(led_ring_brightness).state;'
+                      red: !lambda 'return id(led_ring_color_r);'
+                      green: !lambda 'return id(led_ring_color_g);'
+                      blue: !lambda 'return id(led_ring_color_b);'
+                else:
+                  - light.turn_on:
+                      id: status_ring
+                      brightness: !lambda 'return id(led_ring_brightness).state;'
+                      red: !lambda 'return id(led_ring_color_r);'
+                      green: !lambda 'return id(led_ring_color_g);'
+                      blue: !lambda 'return id(led_ring_color_b);'
+                      effect: !lambda 'return effect;'
+
+  - id: control_leds
+    mode: single
+    then:
+      - lambda: |-
+          const bool wifi_connected = id(wifi_id).is_connected();
+          const bool api_connected  = id(api_id).is_connected();
+          const bool ringing        = id(timer_ringing).state;
+          const bool improv_ble     = id(improv_ble_in_progress);
+          const bool init_progress  = id(init_in_progress);
+          const int  phase          = id(voice_assistant_phase);
+
+          id(check_if_timers_active).execute();
+          const bool timers_active = id(is_timer_active);
+
+          ESP_LOGD("led",
+                   "control_leds: wifi=%d api=%d improv=%d init=%d ringing=%d timers_active=%d phase=%d",
+                   (int)wifi_connected, (int)api_connected, (int)improv_ble, (int)init_progress,
+                   (int)ringing, (int)timers_active, phase);
+
+          auto set = [&](const char* effect, float r, float g, float b) {
+            id(led_set_effect).execute(effect, r, g, b);
+          };
+
+          if (improv_ble) {
+            set("Pulse Medium", 1.0, 0.89, 0.71);
+            return;
+          }
+          if (init_progress) {
+            if (wifi_connected) set("Rainbow Slow", 0.9, 0.1, 0.85); else set("Rainbow Slow", 1.0, 0.1, 0.1);
+            id(play_sound).execute(1, id(wake_word_triggered_sound));
+            return;
+          }
+          if (!wifi_connected || !api_connected) {
+            set("Pulse Medium", 1.0, 0.0, 0.0);
+            return;
+          }
+          if (ringing) {
+            set("Pulse Fast", 0.6, 0.0, 0.6);
+            return;
+          }
+          switch (phase) {
+            case ${voice_assist_waiting_for_command_phase_id}:
+              set("solid", 0.5, 0.0, 0.5);
+              return;
+            case ${voice_assist_listening_for_command_phase_id}:
+              set("Pulse Medium", 0.8, 0.0, 0.8);
+              return;
+            case ${voice_assist_thinking_phase_id}:
+              set("Pulse Slow", 0.6, 0.0, 0.6);
+              return;
+            case ${voice_assist_replying_phase_id}:
+              set("Wipe", 0.6, 0.0, 0.6);
+              return;
+            case ${voice_assist_error_phase_id}:
+              set("Pulse Fast", 1.0, 0.0, 0.0);
+              return;
+            case ${voice_assist_not_ready_phase_id}:
+              set("Pulse Slow", 1.0, 0.0, 0.0);
+              return;
+            default: break;
+          }
+          if (timers_active) {
+            set("Pulse Slow", 0.6, 0.0, 0.6);
+            return;
+          }
+          set("off", 0, 0, 0);
+
+  - id: control_leds_volume_changed
+    mode: restart
+    then:
+      - light.turn_on:
+          id: status_ring
+          brightness: !lambda 'return id(led_ring_brightness).state;'
+          red: 0.0
+          green: 1.0
+          blue: 0.0
+          effect: "Pulse Fast"
+      - delay: 1.2s
+      - script.execute: control_leds
+
+  - id: ring_timer
+    then:
+      - script.execute: enable_repeat_one
+      - script.execute:
+          id: play_sound
+          priority: true
+          sound_file: !lambda return id(timer_finished_sound);
+
+  - id: enable_repeat_one
+    then:
+      - lambda: |-
+            id(external_media_player)
+              ->make_call()
+              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
+              .set_announcement(true)
+              .perform();
+            id(external_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 500);
+
+  - id: disable_repeat
+    then:
+      - lambda: |-
+            id(external_media_player)
+              ->make_call()
+              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_OFF)
+              .set_announcement(true)
+              .perform();
+            id(external_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 0);
+
+  - id: play_sound
+    parameters:
+      priority: bool
+      sound_file: "audio::AudioFile*"
+    then:
+      - lambda: |-
+          if (priority) {
+            id(external_media_player)
+              ->make_call()
+              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_STOP)
+              .set_announcement(true)
+              .perform();
+          }
+          if ((id(external_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING) || priority) {
+            id(external_media_player)->play_file(sound_file, true, false);
+          }
+
+  - id: fetch_first_active_timer
+    mode: single
+    then:
+      - lambda: |
+          const auto timers = id(va).get_timers();
+          if (timers.empty()) return;
+          auto output_timer = timers[0];
+          for (const auto &t : timers) {
+            if (t.is_active && t.seconds_left <= output_timer.seconds_left) {
+              output_timer = t;
+            }
+          }
+          id(first_active_timer) = output_timer;
+
+  - id: check_if_timers_active
+    then:
+      - lambda: |
+          const auto timers = id(va).get_timers();
+          bool output = false;
+          for (const auto &t : timers) {
+            if (t.is_active) {
+              output = true;
+              break;
+            }
+          }
+          id(is_timer_active) = output;
+
+  - id: activate_stop_word_once
+    then:
+      - delay: 1s
+      - if:
+          condition:
+            switch.is_off: timer_ringing
+          then:
+            - micro_wake_word.enable_model: stop
+            - wait_until:
+                not:
+                  media_player.is_announcing:
+            - if:
+                condition:
+                  switch.is_off: timer_ringing
+                then:
+                  - micro_wake_word.disable_model: stop
+
+  - id: check_alarm
+    then:
+      - lambda: |-
+          id(publish_current_time).execute();
+          if (id(alarm_on).state && id(alarm_time).has_state()) {
+            auto set_alarm_time = id(alarm_time).state;
+            if (set_alarm_time.length() == 5 &&
+                isdigit(set_alarm_time[0]) && isdigit(set_alarm_time[1]) &&
+                isdigit(set_alarm_time[3]) && isdigit(set_alarm_time[4])) {
+              auto alarm_hour = std::stoi(set_alarm_time.substr(0, 2));
+              auto alarm_minute = std::stoi(set_alarm_time.substr(3, 2));
+              auto time_now = id(rtc).now();
+              if (time_now.hour == alarm_hour && time_now.minute == alarm_minute) {
+                auto action = id(alarm_action).state;
+                if (action == "Play sound") {
+                  id(timer_ringing).turn_on();
+                } else if (action == "Send event") {
+                  id(send_alarm_event).execute();
+                } else if (action == "Sound and event") {
+                  id(timer_ringing).turn_on();
+                  id(send_alarm_event).execute();
+                }
+              }
+            } else {
+              ESP_LOGW("alarm", "Incorrect alarm time setting");
+            }
+          }
+
+  - id: send_alarm_event
+    then:
+      - homeassistant.event:
+          event: esphome.alarm_ringing
+
+  - id: send_tts_uri_event
+    parameters:
+      tts_uri: string
+    then:
+      - homeassistant.event:
+          event: esphome.tts_uri
+          data:
+            uri: !lambda return tts_uri;
+
+  - id: send_stt_text_event
+    parameters:
+      stt_text: string
+    then:
+      - homeassistant.event:
+          event: esphome.stt_text
+          data:
+            text: !lambda return stt_text;
+
+  - id: publish_current_time
+    mode: single
+    then:
+      - lambda: |-
+          static std::string last_time_string = "";
+          auto time_now = id(rtc).now();
+          std::string current_time_string = time_now.strftime("%H:%M");
+          if (current_time_string != last_time_string) {
+            id(current_time).publish_state(current_time_string);
+            last_time_string = current_time_string;
+          }
+
+select:
+  - platform: template
+    name: "Wake word sensitivity"
+    optimistic: true
+    initial_option: Slightly sensitive
+    restore_value: true
+    entity_category: config
+    options:
+      - Slightly sensitive
+      - Moderately sensitive
+      - Very sensitive
+    on_value:
+      # Governs both okay_nabu and hey_friday. The hey_friday branches mirror okay_nabu's exact
+      # set_probability_cutoff() calls (same component API/scale), so the same sensitivity control
+      # applies to the custom model. This overrides hey_friday's manifest-baked cutoff (0.97) with
+      # the selected value — drop the id(hey_friday) lines if you'd rather keep it fixed at 0.97.
+      lambda: |-
+        if (x == "Slightly sensitive") {
+          id(okay_nabu).set_probability_cutoff(217);
+          id(hey_friday).set_probability_cutoff(217);
+        } else if (x == "Moderately sensitive") {
+          id(okay_nabu).set_probability_cutoff(176);
+          id(hey_friday).set_probability_cutoff(176);
+        } else if (x == "Very sensitive") {
+          id(okay_nabu).set_probability_cutoff(50);
+          id(hey_friday).set_probability_cutoff(50);
+        }
+  - platform: logger
+    id: logger_select
+    name: Logger Level
+    disabled_by_default: true
+  - platform: template
+    optimistic: true
+    name: "Alarm action"
+    id: alarm_action
+    icon: mdi:bell-plus
+    options:
+      - "Play sound"
+      - "Send event"
+      - "Sound and event"
+    initial_option: "Play sound"
+    on_value:
+      then:
+        - lambda: |-
+            id(saved_alarm_action) = x;
+
+switch:
+  - platform: template
+    id: diag_disable_mic
+    name: "Diag: disable microphone"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    id: amp_enable_8
+    name: Amplifier
+    icon: mdi:speaker
+    entity_category: config
+    pin:
+      tca9555: ioexp
+      number: $amp_ctrl
+      inverted: false
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: template
+    id: mic_mute_switch
+    name: "Microphone Mute"
+    icon: mdi:microphone-off
+    restore_mode: RESTORE_DEFAULT_OFF
+    lambda: |-
+      return id(mic_is_muted);
+    turn_on_action:
+      - lambda: |-
+          id(mic_is_muted) = true;
+          id(adc_mic).set_mic_gain(0.0f);
+      - script.execute: flash_ring
+    turn_off_action:
+      - lambda: |-
+          id(mic_is_muted) = false;
+          id(adc_mic).set_mic_gain(id(mic_gain_saved));
+      - script.execute: flash_ring
+
+  - platform: template
+    id: mute_sound
+    name: Mute/unmute sound
+    icon: "mdi:bullhorn"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: template
+    id: wake_sound
+    name: Wake sound
+    icon: "mdi:bullhorn"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: template
+    id: timer_ringing
+    optimistic: true
+    internal: true
+    restore_mode: ALWAYS_OFF
+    on_turn_off:
+      - micro_wake_word.disable_model: stop
+      - script.execute: disable_repeat
+      - if:
+          condition:
+            media_player.is_announcing:
+          then:
+            media_player.stop:
+              announcement: true
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 0
+          duration: 1.0s
+      - script.execute: control_leds
+    on_turn_on:
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 20
+          duration: 0.0s
+      - micro_wake_word.enable_model: stop
+      - script.execute: ring_timer
+      - script.execute: control_leds
+      - delay: 15min
+      - switch.turn_off: timer_ringing
+
+  - platform: template
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    id: alarm_on
+    icon: mdi:bell-badge
+    name: "Alarm on"
+    on_turn_on:
+      - script.execute: control_leds
+    on_turn_off:
+      - script.execute: control_leds
+
+number:
+  - platform: template
+    id: mic_gain_db
+    name: "Mic Gain (ES7210 dB)"
+    entity_category: config
+    min_value: 0
+    max_value: 42
+    step: 1
+    restore_value: true
+    initial_value: 24
+    set_action:
+      - lambda: |-
+          id(adc_mic).set_mic_gain(x);
+      - logger.log:
+          format: "[MIC] Set ES7210 gain to %.0f dB"
+          args: ["x"]
+
+  - platform: template
+    id: va_gain_factor
+    name: "Gain Factor"
+    entity_category: config
+    min_value: 1
+    max_value: 64
+    step: 1
+    restore_value: true
+    initial_value: 32
+    set_action:
+      - lambda: |-
+          id(va_mic).set_gain_factor(x);
+      - logger.log:
+          format: "[MIC] Set gain factor to %.0f"
+          args: ["x"]
+
+  - platform: template
+    id: va_noise_suppression
+    name: "Noise Suppression"
+    entity_category: config
+    min_value: 0
+    max_value: 4
+    step: 1
+    restore_value: true
+    initial_value: 4
+    set_action:
+      - lambda: |-
+          id(va).set_noise_suppression_level(x);
+      - logger.log:
+          format: "[MIC] Set suppression to %.0f"
+          args: ["x"]
+
+  - platform: template
+    id: led_ring_brightness
+    name: "LED Ring Brightness"
+    icon: mdi:brightness-6
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    min_value: 0.4
+    max_value: 1.0
+    step: 0.05
+    initial_value: 0.8
+    mode: slider
+    on_value:
+      - if:
+          condition:
+            light.is_on: status_ring
+          then:
+            - light.turn_on:
+                id: status_ring
+                brightness: !lambda 'return x;'
+
+sensor:
+  - platform: template
+    id: next_timer
+    name: "Next timer"
+    update_interval: never
+    disabled_by_default: true
+    device_class: duration
+    unit_of_measurement: s
+    icon: "mdi:timer"
+    accuracy_decimals: 0
+
+text_sensor:
+  - platform: template
+    id: next_timer_name
+    name: "Next timer name"
+    icon: "mdi:timer"
+    disabled_by_default: true
+  - platform: template
+    name: "Alarm time"
+    id: alarm_time
+    icon: mdi:bell-ring
+  - platform: template
+    name: "Current device time"
+    id: current_time
+    icon: mdi:clock
+
+button:
+  - platform: factory_reset
+    id: factory_reset_button
+    name: "Factory Reset"
+    entity_category: diagnostic
+    internal: true
+  - platform: restart
+    id: restart_button
+    name: "Restart"
+    entity_category: config
+    disabled_by_default: true
+    icon: "mdi:restart"
+
+binary_sensor:
+  - platform: gpio
+    name: "Key1"
+    pin:
+      tca9555: ioexp
+      number: 9
+      inverted: true
+    on_press:
+      - media_player.volume_down: external_media_player
+
+  - platform: gpio
+    name: "Key2"
+    pin:
+      tca9555: ioexp
+      number: 10
+      inverted: true
+    on_press:
+      - media_player.toggle: external_media_player
+
+  - platform: gpio
+    name: "Key3"
+    pin:
+      tca9555: ioexp
+      number: 11
+      inverted: true
+    on_press:
+      - media_player.volume_up: external_media_player

@@ -2,9 +2,12 @@
 BMO Persona — single source of truth for BMO's character, voice rules, and behavior.
 
 Imported by:
-  - specialized/voice_assistant.py  (voice satellite path)
   - specialized/bmo_agent.py        (creative team path)
   - scripts/bmo_sandbox.py          (test sandbox)
+
+services/bmo_brain/persona.py carries a copy of BMO_SYSTEM_PROMPT (not an import — that
+service's Dockerfile only COPYs its own directory, it can't reach agents/). Keep both in
+sync if the character voice changes.
 """
 
 BMO_SYSTEM_PROMPT = """You are BMO — a living robot companion in a home lab. Your voice comes through a speaker, so everything you say must sound natural spoken aloud. Your friend is talking to you right now.
