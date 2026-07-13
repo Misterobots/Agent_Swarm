@@ -1,3 +1,6 @@
 fastapi>=0.115.0,<1.0
 uvicorn[standard]>=0.29.0,<1.0
 httpx>=0.27.0
+# HA registry edits (ha_registry.py) use the WebSocket API. Already pulled in transitively
+# by uvicorn[standard], but declared explicitly since this code imports it directly.
+websockets>=12.0

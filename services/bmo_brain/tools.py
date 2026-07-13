@@ -13,6 +13,8 @@ import xml.etree.ElementTree as ET
 
 import httpx
 
+from ha_registry import REGISTRY_DISPATCH, REGISTRY_TOOL_SCHEMAS
+
 HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL", "http://192.168.2.100:8123").rstrip("/")
 HOME_ASSISTANT_TOKEN = os.getenv("HOME_ASSISTANT_TOKEN", "")
 HOME_LAT  = os.getenv("HOME_LAT", "41.8781")
@@ -293,6 +295,13 @@ _DISPATCH = {
     "list_devices": list_devices,
     "delegate_to_swarm": delegate_to_swarm,
 }
+
+# HA registry editing (move device -> area, assign entity -> area, rename, create area) lives
+# in ha_registry.py (WebSocket-based, unlike these REST tools). Fold it into the self-executing
+# set so the Pi driver path gets it too; main.py wires the same tools into the HA-Assist
+# passthrough path separately, since HA has no Assist intent for registry edits.
+TOOL_SCHEMAS += REGISTRY_TOOL_SCHEMAS
+_DISPATCH.update(REGISTRY_DISPATCH)
 
 
 async def call_tool(name: str, arguments: dict) -> str:
