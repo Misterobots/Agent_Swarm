@@ -61,11 +61,10 @@ DEFAULT_OUTPUT_DIR = DATA_DIR / "models" / "hey_friday"
 
 
 def build_manifest(args: argparse.Namespace) -> dict:
-    return {
+    manifest = {
         "type": "micro",
         "wake_word": args.wake_word,
         "author": args.author,
-        "website": args.website,
         "model": args.model_filename,
         "trained_languages": ["en"],
         "version": 2,
@@ -77,6 +76,14 @@ def build_manifest(args: argparse.Namespace) -> dict:
             "minimum_esphome_version": args.minimum_esphome_version,
         },
     }
+    # `website` is Optional in ESPHome's MANIFEST_SCHEMA_V2 but validated with cv.url when
+    # present — an empty string fails at flash time with "Invalid manifest file: Expected a
+    # file scheme or a URL scheme with host". So only emit the key when a real URL was given;
+    # omitting it (as the known-good kenobi/okay_nabu manifests do) is valid. `author` stays
+    # unconditionally — it's cv.Required + cv.string, so an empty string is fine there.
+    if args.website:
+        manifest["website"] = args.website
+    return manifest
 
 
 def main() -> None:
