@@ -754,7 +754,10 @@ script:
               set("Pulse Medium", 0.8, 0.0, 0.8);
               return;
             case ${voice_assist_thinking_phase_id}:
-              set("Pulse Slow", 0.6, 0.0, 0.6);
+              // BLUE (not purple) so it's obvious Friday stopped listening and is now
+              // processing. The old purple-on-purple made "thinking" look identical to
+              // "listening", which read as a 5-6s dead wait. Adjust the RGB to taste.
+              set("Pulse Medium", 0.0, 0.35, 1.0);
               return;
             case ${voice_assist_replying_phase_id}:
               set("Wipe", 0.6, 0.0, 0.6);
