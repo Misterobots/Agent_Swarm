@@ -2,7 +2,6 @@
   "type": "micro",
   "wake_word": "Hey Friday",
   "author": "",
-  "website": "",
   "model": "hey_friday.tflite",
   "trained_languages": [
     "en"
