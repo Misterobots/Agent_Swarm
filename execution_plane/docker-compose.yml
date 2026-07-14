@@ -207,11 +207,17 @@ services:
   # BMO_VAULT_OWNER are set there. To override the character prompt entirely, add
   # "- BMO_PERSONA=${BMO_PERSONA}" below — not set by default (services/bmo_brain/persona.py
   # is the default character).
-  bmo-brain:
+  # FRIDAY BRAIN — the HA-Assist conversation agent (renamed from bmo-brain 2026-07-14).
+  # bmo_brain was always Friday's pipeline; the BMO voice HARDWARE lives under agents/bmo_voice
+  # and is unrelated. Env var NAMES keep the BMO_ prefix for .env compatibility (the gitignored
+  # .env still supplies BMO_VAULT_URL/BMO_OLLAMA_URL/etc.); container-internal names (VAULT_URL,
+  # OLLAMA_URL) are what main.py reads and are unchanged. Port 8000 and the bmo_brain_data volume
+  # are preserved so HA (192.168.2.101:8000) + the Pi driver + the /app/data cache are unaffected.
+  friday-brain:
     build:
-      context: ../services/bmo_brain
+      context: ../services/friday_brain
       dockerfile: Dockerfile
-    container_name: bmo_brain
+    container_name: friday_brain
     ports:
       - "8000:8000"
     environment:
@@ -220,7 +226,7 @@ services:
       - OLLAMA_URL=${BMO_OLLAMA_URL:-http://192.168.2.101:11434}
       - BMO_MODEL=${BMO_MODEL:-qwen3:8b}
       # Swarm delegation: delegate_to_swarm hands heavy research/build tasks to agent_runtime's
-      # OpenAI-compatible endpoint (NOT bmo_brain's own :8000). The tool short-circuits until set.
+      # OpenAI-compatible endpoint (NOT friday_brain's own :8000). The tool short-circuits until set.
       - AGENT_RUNTIME_URL=${BMO_AGENT_RUNTIME_URL}
       # HA API access for tools.py's device-control tools (self-executing mode) and, new,
       # hass_resolver.py's fuzzy-matching + learned-synonym resolution of area/entity
@@ -233,7 +239,12 @@ services:
       - bmo_brain_data:/app/data
     restart: unless-stopped
     networks:
-      - execution_net
+      # Keep bmo_brain/bmo-brain as network aliases so any container-DNS caller using the old
+      # name still resolves during the transition. HA + the Pi connect by host IP:8000 (unaffected).
+      execution_net:
+        aliases:
+          - bmo_brain
+          - bmo-brain
 
   # OPENHANDS - Sandboxed Execution Environment (Protected by Authentik SSO)
   openhands:

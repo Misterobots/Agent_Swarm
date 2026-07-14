@@ -101,7 +101,7 @@ _REGISTRY_INTENT_RE = re.compile(
 # Full override still available for testing/experimentation via BMO_PERSONA.
 PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
 
-app = FastAPI(title="BMO Brain (vault-RAG assistant)")
+app = FastAPI(title="Friday Brain (vault-RAG assistant)")
 
 
 @app.get("/health")
