@@ -188,6 +188,9 @@ services:
       - VAULT_OWNER=${BMO_VAULT_OWNER}
       - OLLAMA_URL=${BMO_OLLAMA_URL:-http://192.168.2.101:11434}
       - BMO_MODEL=${BMO_MODEL:-qwen3:8b}
+      # Swarm delegation: delegate_to_swarm hands heavy research/build tasks to agent_runtime's
+      # OpenAI-compatible endpoint (NOT bmo_brain's own :8000). The tool short-circuits until set.
+      - AGENT_RUNTIME_URL=${BMO_AGENT_RUNTIME_URL}
       # HA API access for tools.py's device-control tools (self-executing mode) and, new,
       # hass_resolver.py's fuzzy-matching + learned-synonym resolution of area/entity
       # names for HA passthrough mode — previously missing from this container entirely,
