@@ -166,3 +166,21 @@ def test_unpin_restores_idle_unload(monkeypatch):
     gq.unpin_protected_models("http://primary:11434")
     assert "5m" in rec.keep_alives_for("qwen3:14b")
     assert rec.keep_alives_for("qwen3:8b") == []      # non-protected untouched
+
+
+# --- warm-pin startup hook (main.py step 10) --------------------------------
+
+def test_warm_pin_startup_hook_pins_when_enabled(monkeypatch):
+    gq = _import_gpu_queue()
+    rec = _OllamaRecorder({})
+    _patch(gq, monkeypatch, rec, warm_pin=True)
+    gq.warm_pin_protected_models("http://primary:11434")
+    assert -1 in rec.keep_alives_for("qwen3:14b")     # loaded + pinned from boot
+
+
+def test_warm_pin_startup_hook_noop_when_disabled(monkeypatch):
+    gq = _import_gpu_queue()
+    rec = _OllamaRecorder({})
+    _patch(gq, monkeypatch, rec, warm_pin=False)
+    gq.warm_pin_protected_models("http://primary:11434")
+    assert rec.posts == []                            # nothing loaded/pinned

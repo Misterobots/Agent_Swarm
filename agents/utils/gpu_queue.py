@@ -749,27 +749,29 @@ def warmup_omnigen():
             time.sleep(20)
 
 
-def _set_model_keep_alive(host: str, model_name: str, keep_alive) -> None:
+def _set_model_keep_alive(host: str, model_name: str, keep_alive, timeout: float = 10) -> None:
     """Best-effort: set an Ollama model's keep_alive without generating tokens.
     keep_alive=-1 pins it resident; a duration string (e.g. '5m') restores normal
-    idle-unload. Load-only request (empty prompt)."""
+    idle-unload. Load-only request (empty prompt). `timeout` is generous for the
+    warm-pin path, which may cold-load a multi-GB model."""
     try:
         requests.post(f"{host}/api/generate",
                       json={"model": model_name, "keep_alive": keep_alive},
-                      timeout=10)
+                      timeout=timeout)
     except Exception as e:
         logger.warning(f"[GPU Queue] keep_alive={keep_alive} request failed for {model_name} on {host}: {e}")
 
 
 def warm_pin_protected_models(host: str = OLLAMA_HOST) -> None:
     """Load (if needed) and pin every protected model resident (keep_alive=-1) so the
-    voice lane is instant even from a cold boot. Intended as an optional startup hook;
-    no-op unless WARM_PIN_PROTECTED_MODELS is enabled. Safe to call repeatedly."""
+    voice lane is instant even from a cold boot. Intended as an optional startup hook
+    (call it off-thread — a cold load blocks); no-op unless WARM_PIN_PROTECTED_MODELS
+    is enabled. Safe to call repeatedly."""
     if not _WARM_PIN_PROTECTED or not PROTECTED_OLLAMA_MODELS:
         return
     for name in PROTECTED_OLLAMA_MODELS:
         logger.info(f"[GPU Queue] Warm-pinning protected model {name} on {host} (keep_alive=-1).")
-        _set_model_keep_alive(host, name, -1)
+        _set_model_keep_alive(host, name, -1, timeout=180)
 
 
 def unpin_protected_models(host: str = OLLAMA_HOST) -> None:
