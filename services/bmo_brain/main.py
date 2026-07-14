@@ -129,6 +129,47 @@ def _strip_think(text: str) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
+# Markdown/symbol stripping for spoken output. The persona asks the model for plain spoken text,
+# but a small model (qwen3:8b) reliably emits markdown for structured answers — a device-status
+# reply comes back as a **bold** bulleted list with °F / % symbols — and the TTS engine then
+# pronounces the literal symbols as gibberish ("asterisk asterisk", "dash"). This flattens it
+# deterministically so it doesn't depend on the model obeying the prompt: emphasis/links reduce
+# to their text, bullets/headers/code are removed, unit symbols become spoken words, and list
+# lines are joined into prose. Applied to every text response in _answer.
+_SPEECH_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")   # [label](url) -> label
+_SPEECH_STAR_RE = re.compile(r"\*{1,3}([^*]+?)\*{1,3}")  # *x* / **x** / ***x*** -> x
+_SPEECH_USCORE_RE = re.compile(r"__([^_]+?)__")          # __x__ -> x (leave single _ for snake_case)
+_SPEECH_BULLET_RE = re.compile(r"(?m)^\s*(?:[-*+•]|\d+[.)])\s+")  # -, *, 1. list markers
+_SPEECH_HEADER_RE = re.compile(r"(?m)^\s*#{1,6}\s*")     # # headers
+
+
+def _speechify(text: str) -> str:
+    if not text or not text.strip():
+        return text
+    t = _SPEECH_LINK_RE.sub(r"\1", text)
+    t = _SPEECH_STAR_RE.sub(r"\1", t)
+    t = _SPEECH_USCORE_RE.sub(r"\1", t)
+    t = t.replace("`", "")
+    t = _SPEECH_HEADER_RE.sub("", t)
+    t = _SPEECH_BULLET_RE.sub("", t)
+    t = re.sub(r"°\s*[FfCc]\b", " degrees", t)   # 73°F -> 73 degrees
+    t = t.replace("°", " degrees").replace("%", " percent").replace("&", " and ")
+    # Flatten remaining lines (e.g. a bulleted list) into prose sentences so TTS reads it smoothly.
+    out = []
+    for ln in t.splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        if ln.endswith(":"):
+            ln = ln[:-1] + "."
+        elif ln[-1] not in ".!?,;":
+            ln = ln + "."
+        out.append(ln)
+    t = " ".join(out)
+    t = t.replace("*", "").replace("#", "")      # any stragglers (unbalanced markers)
+    return re.sub(r"[ \t]{2,}", " ", t).strip()
+
+
 _STATUS_RE = re.compile(
     r"\b(status|health|healthy|degraded|online|offline|operational|reachable|uptime)\b"
     r"|is (it|the [\w .'-]+?) (up|running|online|down|working)"
@@ -824,7 +865,9 @@ async def _answer(client_messages, tools=None):
     if not status_q and not count_q:
         tool_trace = _build_tool_trace(convo) if (tool_failures or asked_for_clarity) else ""
         asyncio.create_task(_store_memory(last_user, text, tool_trace))
-    return text, tool_calls
+    # Strip markdown/symbols from the spoken text so TTS doesn't read them aloud as gibberish.
+    # Done here (not before _store_memory) so memory keeps the original; only the reply is cleaned.
+    return _speechify(text), tool_calls
 
 
 @app.post("/v1/chat/completions")
