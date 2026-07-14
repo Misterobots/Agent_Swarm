@@ -45,7 +45,12 @@ from tools import TOOL_SCHEMAS, call_tool
 VAULT_URL       = os.getenv("VAULT_URL", "").rstrip("/")
 VAULT_OWNER     = os.getenv("VAULT_OWNER", "")
 VAULT_LIMIT     = int(os.getenv("VAULT_LIMIT", "6"))
-VAULT_MIN_SCORE = float(os.getenv("VAULT_MIN_SCORE", "0.4"))
+# 0.4 was too permissive: the shared MemPalace is dominated by dev-project (HHGTTG/UI
+# design) memories that semantically mis-match Friday's home/life queries at 0.5-0.56
+# (e.g. a "two-register layout" design note surfaced for "network layout"), leaking
+# irrelevant trivia into spoken answers. 0.6 keeps only genuinely strong matches; her own
+# home-relevant memories accrue over time via the write-back path. Tunable via env.
+VAULT_MIN_SCORE = float(os.getenv("VAULT_MIN_SCORE", "0.6"))
 VAULT_TIMEOUT   = float(os.getenv("VAULT_TIMEOUT", "12"))
 # Pending-tier recall is a fast-text-search fallback, not the primary semantic search —
 # it must not cost as much as VAULT_TIMEOUT, and is run concurrently with _vault_recall
