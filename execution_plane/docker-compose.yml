@@ -88,6 +88,37 @@ services:
     networks:
       - execution_net
 
+  # FRIDAY'S DEDICATED OLLAMA — pinned to GPU 1, isolated from the swarm (2026-07-14).
+  # The shared ollama_gpu couldn't keep Friday's qwen3:8b resident (the swarm kept evicting it,
+  # causing 23-47s reload spikes = "voice stops at intent"). This instance pins qwen3:8b to GPU 1
+  # alone (keep_alive=-1); bmo_brain targets it via BMO_OLLAMA_URL=http://ollama_friday:11434.
+  # Shares the ollama_models volume so qwen3:8b needs no re-download. No host port (reached by
+  # container DNS on execution_net). NOTE: CUDA_VISIBLE_DEVICES is THIS host's GPU-1 UUID — on
+  # different hardware refresh it via `docker exec ollama_friday nvidia-smi -L`, or the pin
+  # silently falls back to all GPUs and the isolation is lost.
+  ollama_friday:
+    image: ollama/ollama:latest
+    container_name: ollama_friday
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+        limits:
+          memory: 6g
+    environment:
+      - CUDA_VISIBLE_DEVICES=GPU-b23f2137-ee9f-b8db-84fa-cdb6425d473e  # Lovelace GPU 1 (RTX 5060 Ti)
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_KEEP_ALIVE=-1
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - execution_net
+
   # VOICE ENGINE - Qwen3-TTS (1.7B)
   # Replaced the retired bmo-voice RVC service (models lost); owns host port 8100
   # so the .106 driver connects unchanged.
