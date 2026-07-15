@@ -38,6 +38,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 import hass_resolver
 import local_pending
+import claude_consult
 from ha_registry import REGISTRY_TOOL_NAMES, REGISTRY_TOOL_SCHEMAS, call_registry_tool
 from persona import FRIDAY_SYSTEM_PROMPT
 from tools import TOOL_SCHEMAS, call_tool
@@ -100,6 +101,40 @@ _REGISTRY_INTENT_RE = re.compile(
 
 # Full override still available for testing/experimentation via BMO_PERSONA.
 PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
+
+# --- Consult Claude: ask-first offload when the local model dead-ends (claude_consult.py) ---
+# The OFFER is appended by code ONLY on the two genuine dead-end paths (loop exhaustion), never by
+# the model — the persona deliberately says nothing about consulting Claude, so qwen3:8b is not
+# trained to produce this sentinel. CONSENT requires all of: (a) consult_available() (fail-closed
+# on key/budget), (b) the immediately-preceding assistant turn ended with _CONSULT_OFFER, and
+# (c) the user affirming THIS turn — a real human yes the model cannot fabricate. There is NO
+# consult tool in TOOL_SCHEMAS/_DISPATCH, so the model has no way to reach Claude on its own.
+_CONSULT_OFFER = "Would you like me to consult Claude about this?"
+_CONSULT_AFFIRM_RE = re.compile(
+    r"\b(yes|yeah|yep|sure|okay|ok|please|go ahead|do it|consult\s+claude|ask\s+claude)\b", re.I)
+_CONSULT_DECLINE_RE = re.compile(
+    r"\b(no|nope|never\s*mind|leave it|forget it|don'?t)\b", re.I)
+
+
+def _maybe_offer_consult(fallback_text: str) -> str:
+    """On a genuine dead-end, offer a Claude consult instead of the plain 'couldn't finish' reply —
+    but only when consult is actually armed, so Friday never offers something she can't deliver."""
+    if claude_consult.consult_available():
+        return "I couldn't work that one out on my own. " + _CONSULT_OFFER
+    return fallback_text
+
+
+def _pending_consult_question(convo: list) -> str:
+    """The user turn immediately before the offer assistant turn — the question to hand Claude."""
+    seen_offer = False
+    for m in reversed(convo):
+        if not seen_offer:
+            if m.get("role") == "assistant" and (m.get("content") or "").rstrip().endswith(_CONSULT_OFFER):
+                seen_offer = True
+            continue
+        if m.get("role") == "user":
+            return m.get("content") or ""
+    return ""
 
 app = FastAPI(title="Friday Brain (vault-RAG assistant)")
 
@@ -295,7 +330,8 @@ async def _self_execute_tools(messages: list, tools: list):
             convo.append({"role": "tool", "content": result})
     print(f"[bmo-brain] self-executing tool loop exhausted {SELF_TOOL_MAX_ROUNDS} rounds "
           f"without a final answer", flush=True)
-    return "Beemo tried a few things there but could not finish that one. Try asking again?", None
+    return _maybe_offer_consult(
+        "I tried a few things there but couldn't finish that one. Want to try asking again?"), None
 
 
 def _split_registry_calls(tool_calls):
@@ -343,7 +379,8 @@ async def _passthrough_with_registry(messages, tools):
             return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
         return text, None  # no tool_calls -> final text answer
     print(f"[bmo-brain] registry passthrough loop exhausted {REGISTRY_MAX_ROUNDS} rounds", flush=True)
-    return (text or "I got partway through that change but couldn't finish it."), None
+    return _maybe_offer_consult(
+        text or "I got partway through that change but couldn't finish it."), None
 
 
 async def _pending_recall(query: str, owner_id: str):
@@ -730,6 +767,25 @@ async def _answer(client_messages, tools=None):
     if _is_likely_stt_hallucination(last_user):
         print(f"[bmo-brain] dropped likely STT hallucination: {last_user!r}", flush=True)
         return "", None
+
+    # Consult-Claude consent gate (see _CONSULT_OFFER). If the previous assistant turn offered a
+    # consult and the user affirms THIS turn, call Claude — the single call site — and short-circuit
+    # recall / the LLM / all tools for this turn. Gated on consult_available() (fail-closed on
+    # key + monthly budget), so it is a hard no-op until the feature is armed.
+    if claude_consult.consult_available():
+        prev_assistant = next(
+            (m.get("content") or "" for m in reversed(convo) if m.get("role") == "assistant"), "")
+        if prev_assistant.rstrip().endswith(_CONSULT_OFFER):
+            if _CONSULT_AFFIRM_RE.search(last_user or ""):
+                question = _pending_consult_question(convo)
+                if not question:
+                    return "Remind me what you wanted me to ask Claude?", None
+                print(f"[bmo-brain] consulting Claude on: {question[:120]!r}", flush=True)
+                answer = await claude_consult.consult_claude(question)
+                return _speechify(answer), None
+            if _CONSULT_DECLINE_RE.search(last_user or ""):
+                return "Okay, I'll leave it.", None
+
     for m in convo:
         if m.get("role") == "tool":
             print(f"[bmo-brain] incoming tool result: {str(m.get('content'))[:300]!r}", flush=True)

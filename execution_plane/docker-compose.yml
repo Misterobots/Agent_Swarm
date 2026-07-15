@@ -235,6 +235,17 @@ services:
       # silently non-functional here too.
       - HOME_ASSISTANT_URL=${HOME_ASSISTANT_URL:-http://192.168.2.100:8123}
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
+      # Consult-Claude offload (claude_consult.py) — Friday asks Claude Opus 4.8 for help ONLY
+      # after the user opts in on that turn. HARD NO-OP until BOTH are set: add ANTHROPIC_API_KEY
+      # to the gitignored execution_plane/.env, then flip FRIDAY_CONSULT_ENABLED=true. Budget +
+      # log persist in the bmo_brain_data volume; default cap $5/month, fail-closed.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - FRIDAY_CONSULT_ENABLED=${FRIDAY_CONSULT_ENABLED:-false}
+      - FRIDAY_CONSULT_MODEL=${FRIDAY_CONSULT_MODEL:-claude-opus-4-8}
+      - FRIDAY_CONSULT_EFFORT=${FRIDAY_CONSULT_EFFORT:-high}
+      - FRIDAY_CONSULT_MONTHLY_BUDGET_USD=${FRIDAY_CONSULT_MONTHLY_BUDGET_USD:-5.0}
+      - FRIDAY_CONSULT_BUDGET_FILE=/app/data/consult_budget.json
+      - FRIDAY_CONSULT_LOG=/app/data/consult_log.jsonl
     volumes:
       - bmo_brain_data:/app/data
     restart: unless-stopped
