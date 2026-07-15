@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils/cn";
 import { ChatStatusBar } from "./chat-status-bar";
 import { ChatPreviewPane } from "./chat-preview-pane";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useLauncherStore } from "@/lib/stores/launcher-store";
 import { THEME_PERSONALITIES } from "@/lib/themes/personalities";
 import { useBuddyStore } from "@/lib/stores/buddy-store";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
@@ -146,6 +147,16 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
     }
     prevStreamingRef.current = isStreaming;
   }, [isStreaming, buddyReact, pushEvent]);
+
+  // Launcher hand-off: if a /launcher tile stashed a message, fire it once on
+  // mount. consumePendingLaunch clears it atomically so it never replays.
+  const didLaunchRef = useRef(false);
+  useEffect(() => {
+    if (didLaunchRef.current) return;
+    didLaunchRef.current = true;
+    const pending = useLauncherStore.getState().consumePendingLaunch();
+    if (pending?.text) sendMessage(pending.text);
+  }, [sendMessage]);
 
   // Message action handlers
   const handleEditMessage = useCallback((content: string) => {
