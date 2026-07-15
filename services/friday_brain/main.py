@@ -68,6 +68,13 @@ TEMPERATURE = float(os.getenv("BMO_TEMPERATURE", "0.5"))
 # schema list can approach that on their own. Explicit since relying on the model's/
 # host's default risks silent truncation rather than an obvious failure.
 NUM_CTX = int(os.getenv("BMO_NUM_CTX", "16384"))
+# ollama_friday (GPU 1) is DEDICATED to Friday — nothing else uses that card — so pin qwen3:8b
+# resident indefinitely (keep_alive=-1). A finite window (was "30m") let it idle-unload, and the
+# next voice request paid a ~12s cold reload = flaky voice pickup / "can't reach the model".
+# Overridable via BMO_KEEP_ALIVE ("-1" / "0" / a duration like "30m"); note an explicit
+# per-request keep_alive always wins over the container's OLLAMA_KEEP_ALIVE default.
+_KA_RAW = os.getenv("BMO_KEEP_ALIVE", "-1").strip()
+KEEP_ALIVE = int(_KA_RAW) if _KA_RAW.lstrip("-").isdigit() else _KA_RAW
 SELF_TOOL_MAX_ROUNDS = int(os.getenv("BMO_SELF_TOOL_MAX_ROUNDS", "6"))
 BMO_SOURCE_DEVICE = os.getenv("BMO_SOURCE_DEVICE", "lovelace")
 # HA's own tool-calling loop (passthrough mode) has no round cap of its own — bmo_brain
@@ -290,11 +297,9 @@ async def _live_status() -> str:
 async def _ollama_chat(messages: list, tools=None):
     """One raw call to Ollama's /api/chat. Returns (text, tool_calls) — tool_calls is
     Ollama's native shape (list of {"function": {"name", "arguments"}}) or None."""
-    # keep_alive keeps qwen3:8b resident in VRAM between calls — this GPU is shared with
-    # other consumers (embeddings, other models), so without it Ollama's default eviction
-    # window lets the model fall out of VRAM between conversational turns, and the next
-    # call pays a real reload cost (observed: 8-11s on an otherwise-idle model).
-    payload = {"model": MODEL, "messages": messages, "stream": False, "keep_alive": "30m",
+    # keep_alive pins qwen3:8b resident in VRAM between calls (KEEP_ALIVE=-1 by default now that
+    # ollama_friday's GPU is dedicated to Friday) so a voice turn never pays a cold reload.
+    payload = {"model": MODEL, "messages": messages, "stream": False, "keep_alive": KEEP_ALIVE,
                "options": {"temperature": TEMPERATURE, "num_ctx": NUM_CTX}}
     if tools:
         payload["tools"] = tools
