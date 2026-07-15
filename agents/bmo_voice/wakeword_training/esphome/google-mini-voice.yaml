@@ -408,9 +408,13 @@ voice_assistant:
   media_player: external_media_player
   micro_wake_word: mww
   use_wake_word: false
-  noise_suppression_level: 0
-  auto_gain: 0 dbfs
-  volume_multiplier: 1
+  # Raised from 0/0/1 (raw, quiet audio) to the Home Assistant Voice PE defaults — the Google
+  # Mini's mic was feeding Whisper audio too quiet for its Silero VAD (VAD filter removed 100%
+  # of speech -> stt-no-text-recognized). auto_gain + volume_multiplier make speech loud enough
+  # to clear the VAD and transcribe cleanly; noise_suppression cleans the mic stream.
+  noise_suppression_level: 2
+  auto_gain: 31 dbfs
+  volume_multiplier: 2.0
   on_client_connected:
     - if:
         condition:
