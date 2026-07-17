@@ -184,6 +184,11 @@ services:
       context: ../services/wyoming_whisper_gpu
       dockerfile: Dockerfile
     container_name: wyoming_whisper_gpu
+    environment:
+      # Silero VAD gate for the STT decoder (start.sh --vad-threshold). 0.3 default; lower passes
+      # quieter speech but risks silence-hallucinations. The durable fix for quiet audio is the
+      # ESPHome mic gain (google-mini-voice.yaml auto_gain/volume_multiplier), not this.
+      - WHISPER_VAD_THRESHOLD=${WHISPER_VAD_THRESHOLD:-0.3}
     ports:
       - "10300:10300"
     deploy:
