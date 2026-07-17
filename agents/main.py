@@ -197,6 +197,18 @@ async def lifespan(app: FastAPI):
         import asyncio as _asyncio
         training_watchdog = _asyncio.create_task(_training_watchdog_loop())
 
+        # 10. Warm-pin protected (voice) models so the lane is instant from boot.
+        #     No-op unless WARM_PIN_PROTECTED_MODELS is enabled; runs off-thread so
+        #     a cold multi-GB load never delays startup (see utils/gpu_queue.py).
+        try:
+            import threading as _threading
+            from utils.gpu_queue import warm_pin_protected_models as _warm_pin
+            _threading.Thread(target=_warm_pin, name="warm-pin-protected",
+                              daemon=True).start()
+            logger.info("Warm-pin startup hook scheduled (no-op unless WARM_PIN_PROTECTED_MODELS set)")
+        except Exception as e:
+            logger.warning(f"Warm-pin startup hook skipped (non-fatal): {e}")
+
         print("DEBUG: Startup Complete. Yielding...")
         logger.info("Swarm Engine Online. Waiting for events...")
         yield

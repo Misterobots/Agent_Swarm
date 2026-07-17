@@ -221,6 +221,15 @@ services:
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
       # BMO Voice LLM — qwen3:14b fits in VRAM (9.2GB < 15.93GB); latency masked by async ack
       - BMO_LLM_MODEL=qwen3:14b
+      # Warm-pin the voice model so Friday is resident from boot. Roll back: set false
+      # (or remove) + recreate. (gpu_queue.py)
+      - WARM_PIN_PROTECTED_MODELS=true
+      # PROTECT FRIDAY'S ACTUAL BRAIN: qwen3:8b (served by Lovelace), NOT the qwen3:14b
+      # BMO_LLM_MODEL default that PROTECTED_OLLAMA_MODELS would otherwise inherit. Benchmark
+      # 2026-07-14 confirmed qwen3:8b is Friday's deployed brain (median 0.49s warm, 100% tool
+      # reliability); without this the eviction-protection guarded the wrong model and Friday hit
+      # 50-60s reload spikes ("stops at intent") when the swarm evicted her from the shared GPU.
+      - PROTECTED_OLLAMA_MODELS=qwen3:8b
       # BMO Weather location (Open-Meteo, no API key needed)
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}
