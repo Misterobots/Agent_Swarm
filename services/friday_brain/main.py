@@ -28,6 +28,7 @@ import asyncio
 import datetime
 import json
 import os
+import random
 import re
 import time
 import uuid
@@ -41,7 +42,10 @@ import local_pending
 import claude_consult
 from ha_registry import REGISTRY_TOOL_NAMES, REGISTRY_TOOL_SCHEMAS, call_registry_tool
 from persona import FRIDAY_SYSTEM_PROMPT
-from tools import TOOL_SCHEMAS, call_tool
+# delegate_to_swarm + AGENT_RUNTIME_URL imported by NAME (not `import tools`) on purpose: _answer()
+# has a parameter named `tools` (the HA tool list) that would shadow the module inside it.
+from tools import (TOOL_SCHEMAS, call_tool, delegate_to_swarm, AGENT_RUNTIME_URL,
+                   HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN)
 
 VAULT_URL       = os.getenv("VAULT_URL", "").rstrip("/")
 VAULT_OWNER     = os.getenv("VAULT_OWNER", "")
@@ -91,6 +95,8 @@ HASS_CLARIFY_THRESHOLD = int(os.getenv("HASS_CLARIFY_THRESHOLD", "2"))
 # like a registry edit — ordinary on/off turns keep the exact single-call passthrough behavior
 # they had before, untouched. BMO_REGISTRY_MAX_ROUNDS caps the internal execute-then-reprompt loop.
 REGISTRY_MAX_ROUNDS = int(os.getenv("BMO_REGISTRY_MAX_ROUNDS", "4"))
+# Caps the web-search passthrough's execute-then-summarise loop (search -> reprompt for a spoken answer).
+WEB_MAX_ROUNDS = int(os.getenv("BMO_WEB_MAX_ROUNDS", "3"))
 # Bias toward catching registry intents: a false negative silently breaks the feature. A false
 # positive is low-cost but NOT free — it exposes the registry WRITE tools to the model on a
 # non-registry turn, so the model could in principle misfire one. That residual risk is bounded
@@ -106,6 +112,21 @@ _REGISTRY_INTENT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Explicit "hand this off to the swarm" voice intent → code-driven delegate_to_swarm. On the HA
+# passthrough path the model has NO delegate_to_swarm tool (HA owns the tools there), so without this
+# she can only TALK about the swarm instead of actually delegating. The task is whatever follows the
+# phrase; a bare "hand that off to the swarm" refers to the previous user turn. Matches the verb
+# phrase up to the task so `.end()` slices the task cleanly.
+_SWARM_INTENT_RE = re.compile(
+    r"\b(?:"
+    r"hand(?:\s+(?:this|that|it))?\s+(?:off\s+)?(?:to\s+)?the\s+swarm|"
+    r"(?:give|send|pass|kick|throw)\s+(?:this|that|it)?\s*(?:off\s+|over\s+)?(?:to\s+)?the\s+swarm|"
+    r"delegate\s+(?:this|that|it)?\s*(?:to\s+)?the\s+swarm|"
+    r"(?:ask|have|get|let|use|put)\s+the\s+swarm"
+    r")",
+    re.IGNORECASE,
+)
+
 # Full override still available for testing/experimentation via BMO_PERSONA.
 PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
 
@@ -118,30 +139,190 @@ PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
 # consult tool in TOOL_SCHEMAS/_DISPATCH, so the model has no way to reach Claude on its own.
 _CONSULT_OFFER = "Would you like me to consult Claude about this?"
 _CONSULT_AFFIRM_RE = re.compile(
-    r"\b(yes|yeah|yep|sure|okay|ok|please|go ahead|do it|consult\s+claude|ask\s+claude)\b", re.I)
+    r"\b(yes|yeah|yep|sure|okay|ok|please|go ahead|do it|"
+    r"consult|ask\s+(claude|the\s+swarm)|the\s+swarm|swarm|claude)\b", re.I)
 _CONSULT_DECLINE_RE = re.compile(
     r"\b(no|nope|never\s*mind|leave it|forget it|don'?t)\b", re.I)
+# Cap the escalation-consult wait so a slow backend (the swarm can take ~40s+) can't blow past HA's
+# voice-turn timeout — that would abandon the turn AND risk a duplicate delegation on retry. The
+# backend keeps running server-side on a timeout; the user just asks again. Env-tunable.
+CONSULT_TIMEOUT = float(os.getenv("FRIDAY_CONSULT_TIMEOUT", "50"))
+
+
+# --- Escalation backends: which deeper resources are armed to consult on a dead-end --------------
+# The Swarm (delegate_to_swarm, inert unless AGENT_RUNTIME_URL is set) is local and free, so it is
+# preferred on a bare "yes"; Claude (claude_consult, fail-closed on key + monthly budget) is the
+# deeper, paid fallback. NEITHER is a model tool, so qwen3:8b can never self-escalate — a real human
+# "yes" the next turn is always required (see the consent gate in _answer()).
+def _consult_backends() -> list:
+    """Armed escalation backends, in preference order (index 0 = the bare-'yes' default)."""
+    backends = []
+    if AGENT_RUNTIME_URL:
+        backends.append("swarm")
+    if claude_consult.consult_available():
+        backends.append("claude")
+    return backends
+
+
+_CONSULT_OFFERS = {
+    "swarm": "Would you like me to put the Swarm on this?",
+    "claude": _CONSULT_OFFER,
+    "both": "Would you like me to consult the Swarm or Claude on this?",
+}
+
+
+def _consult_offer_phrase(backends: list) -> str:
+    """The offer sentence naming exactly the armed backends — empty string when none are armed."""
+    if "swarm" in backends and "claude" in backends:
+        return _CONSULT_OFFERS["both"]
+    if backends == ["swarm"]:
+        return _CONSULT_OFFERS["swarm"]
+    if backends == ["claude"]:
+        return _CONSULT_OFFERS["claude"]
+    return ""
+
+
+def _ends_with_consult_offer(text: str) -> bool:
+    """True if a prior assistant turn ended with any consult offer (so a 'yes' now is real consent)."""
+    t = (text or "").rstrip()
+    return any(t.endswith(o) for o in _CONSULT_OFFERS.values())
+
+
+def _chosen_backend(user_text: str, backends: list) -> str:
+    """Route the affirmation: an explicit 'claude'/'swarm' in the reply wins, else the default."""
+    t = (user_text or "").lower()
+    if "claude" in t and "claude" in backends:
+        return "claude"
+    if "swarm" in t and "swarm" in backends:
+        return "swarm"
+    return backends[0]
 
 
 def _maybe_offer_consult(fallback_text: str) -> str:
-    """On a genuine dead-end, offer a Claude consult instead of the plain 'couldn't finish' reply —
-    but only when consult is actually armed, so Friday never offers something she can't deliver."""
-    if claude_consult.consult_available():
-        return "I couldn't work that one out on my own. " + _CONSULT_OFFER
+    """On a genuine dead-end, offer a Swarm/Claude consult instead of the plain 'couldn't finish'
+    reply — naming only backends that are actually armed, so Friday never offers what she can't
+    deliver. Falls back to the plain text when nothing is armed."""
+    offer = _consult_offer_phrase(_consult_backends())
+    if offer:
+        return "I couldn't work that one out on my own. " + offer
     return fallback_text
 
 
 def _pending_consult_question(convo: list) -> str:
-    """The user turn immediately before the offer assistant turn — the question to hand Claude."""
+    """The user turn immediately before the offer assistant turn — the request to hand the backend."""
     seen_offer = False
     for m in reversed(convo):
         if not seen_offer:
-            if m.get("role") == "assistant" and (m.get("content") or "").rstrip().endswith(_CONSULT_OFFER):
+            if m.get("role") == "assistant" and _ends_with_consult_offer(m.get("content") or ""):
                 seen_offer = True
             continue
         if m.get("role") == "user":
             return m.get("content") or ""
     return ""
+
+
+# --- Empty-answer recovery: silent retry, then a varying spoken failure + escalation offer --------
+# Nudge for the ONE silent retry when the model returns nothing. Tools are withheld so it is forced
+# to answer in words — the common cause is qwen3:8b emitting a blank assistant turn (often right
+# after a tool result it should have summarised) instead of speaking.
+_RETRY_NUDGE = (
+    "Your previous attempt returned no answer at all. Do NOT call any tools now. Using only the "
+    "information already in this conversation (including any tool results above), give a short, "
+    "direct spoken answer. If you truly cannot, say so plainly in one sentence."
+)
+
+# Varying so a run of failures doesn't sound like a broken record. {x} = a short issue fragment.
+_ESCALATE_PHRASES = (
+    "There seemed to be an issue {x}. I gave it another go and I'm still not getting it.",
+    "Something went wrong {x}, and a second attempt didn't sort it out either.",
+    "I hit a snag {x} — I tried again but I'm still stuck.",
+    "That didn't come together {x}, even after another try.",
+    "I ran into trouble {x} and a retry didn't help.",
+)
+
+# Friendly label per tool so the issue fragment can name what was being attempted.
+_TOOL_ISSUE_LABELS = {
+    "GetWeather": "getting the weather", "HassGetWeather": "getting the weather",
+    "GetDateTime": "checking the time", "HassGetState": "checking that",
+    "HassTurnOn": "controlling that device", "HassTurnOff": "controlling that device",
+    "HassToggle": "controlling that device", "HassLightSet": "adjusting that light",
+    "delegate_to_swarm": "handing that to the swarm",
+    "web_search": "looking that up", "search_web": "looking that up",
+}
+
+
+def _issue_fragment(convo: list) -> str:
+    """A short '{x}' fragment naming what was attempted, from the most recent tool call; generic else."""
+    for m in reversed(convo):
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            name = ((m["tool_calls"][0] or {}).get("function", {}) or {}).get("name", "")
+            label = _TOOL_ISSUE_LABELS.get(name)
+            return "while " + label if label else "with that request"
+    return "with that request"
+
+
+def _failure_with_consult_offer(convo: list) -> str:
+    """The spoken reply when an answer fails even after the retry: a varying 'issue with X' line plus,
+    if any backend is armed, the escalation offer; otherwise a plain graceful close."""
+    base = random.choice(_ESCALATE_PHRASES).format(x=_issue_fragment(convo))
+    offer = _consult_offer_phrase(_consult_backends())
+    return f"{base} {offer}" if offer else f"{base} Want to try again in a moment?"
+
+
+# --- Interaction log: per-turn signals for the nightly "understanding" learning job (Stage 1) -----
+# The vault stores the TEXT of each exchange, but NOT the outcome signals (failures, clarifications,
+# empty-answer recovery, escalation) the nightly analyzer needs to spot what confused Friday. This
+# JSONL log on the persistent /app/data volume captures exactly those — one line per turn. The
+# nightly job consumes + rotates it; this side is append-only and best-effort so it never breaks a
+# turn. Contains conversation text, so it stays local (same trust boundary as the vault store).
+INTERACTION_LOG = os.getenv("FRIDAY_INTERACTION_LOG", "/app/data/interaction_log.jsonl")
+
+
+def _log_interaction(record: dict) -> None:
+    try:
+        record = {"ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+                  **record}
+        with open(INTERACTION_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] interaction log write failed (non-fatal): {e}", flush=True)
+
+
+# --- Location awareness: resolve "near me" to HA's configured home (no clarification loop) ---------
+_home_location = None
+_home_location_ts = 0.0
+_HOME_LOCATION_TTL = float(os.getenv("FRIDAY_HOME_LOCATION_TTL", "3600"))
+
+
+async def _get_home_location() -> str:
+    """Home's name + rough coords + timezone from HA (/api/config), cached for _HOME_LOCATION_TTL.
+    Injected into the system prompt so "near me" / local weather / local events resolve to home
+    instead of triggering a "where are you?" clarification. Empty (inert) if HA has no token/URL."""
+    global _home_location, _home_location_ts
+    if not (HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN):
+        return ""
+    now = time.time()
+    if _home_location is not None and (now - _home_location_ts) < _HOME_LOCATION_TTL:
+        return _home_location
+    try:
+        async with httpx.AsyncClient(timeout=VAULT_TIMEOUT) as c:
+            r = await c.get(f"{HOME_ASSISTANT_URL}/api/config",
+                            headers={"Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}"})
+        if r.status_code == 200:
+            cfg = r.json()
+            loc = cfg.get("location_name") or "Home"
+            lat, lon = cfg.get("latitude"), cfg.get("longitude")
+            if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+                loc += f" (approx {lat:.3f}, {lon:.3f})"
+            if cfg.get("time_zone"):
+                loc += f", timezone {cfg['time_zone']}"
+            _home_location, _home_location_ts = loc, now
+            return loc
+        print(f"[bmo-brain] home location fetch HTTP {r.status_code}", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] home location fetch failed (non-fatal): {e}", flush=True)
+    return _home_location or ""
+
 
 app = FastAPI(title="Friday Brain (vault-RAG assistant)")
 
@@ -388,13 +569,74 @@ async def _passthrough_with_registry(messages, tools):
         text or "I got partway through that change but couldn't finish it."), None
 
 
+# web_search is friday_brain's own READ-ONLY tool — it lives in TOOL_SCHEMAS (the self-exec set) and
+# is NOT among the tools HA sends on a voice turn, so without this a live-info question on voice
+# ("events near me", news, store hours) has no way to actually search and just deflects ("I don't
+# have real-time data…", confirmed in the interaction log). Offer it alongside HA's tools and execute
+# it locally, like the registry passthrough. Read-only, so unlike the registry tools it's safe on ANY
+# turn — no gate. Empty list (web_search not found) makes this a plain passthrough, a safe no-op.
+_WEB_SEARCH_SCHEMA = [t for t in TOOL_SCHEMAS if (t.get("function") or {}).get("name") == "web_search"]
+
+
+def _split_web_calls(tool_calls):
+    """Partition tool_calls into (web_search-owned, HA-owned). web_search we execute here; HA-owned
+    (HassTurnOn, etc.) are handed back to HA unexecuted, exactly as normal passthrough does."""
+    web, other = [], []
+    for tc in (tool_calls or []):
+        name = (tc.get("function") or {}).get("name", "")
+        (web if name == "web_search" else other).append(tc)
+    return web, other
+
+
+async def _passthrough_with_web(messages, tools):
+    """Passthrough tool-calling that ALSO offers the read-only web_search and executes it locally,
+    looping until the model produces final text or an HA-owned tool_call (returned UNEXECUTED for HA
+    to run, exactly as normal passthrough). Lets live-info questions actually search instead of
+    deflecting. Falls back to plain passthrough when web_search isn't available. Returns
+    (text, tool_calls) matching _answer's contract."""
+    all_tools = list(tools) + _WEB_SEARCH_SCHEMA
+    convo = list(messages)
+    text, tool_calls = "", None
+    for _round in range(WEB_MAX_ROUNDS):
+        text, tool_calls = await _ollama_chat(convo, all_tools)
+        web_calls, ha_calls = _split_web_calls(tool_calls)
+        if web_calls:
+            # Execute our OWN web_search first; if the same round also carried an HA on/off call,
+            # hand that back after (mirrors the registry passthrough so a batched call isn't dropped).
+            convo = convo + [{"role": "assistant", "content": text, "tool_calls": web_calls}]
+            for tc in web_calls:
+                fn = tc.get("function") or {}
+                result = await call_tool(fn.get("name", ""), fn.get("arguments") or {})
+                print(f"[bmo-brain] web tool={fn.get('name')} args={fn.get('arguments')} "
+                      f"-> {str(result)[:160]!r}", flush=True)
+                convo.append({"role": "tool", "content": result})
+            if ha_calls:
+                return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
+            continue  # only web calls -> reprompt for a spoken summary of the results
+        if ha_calls:
+            return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
+        return text, None  # no tool_calls -> final text answer
+    print(f"[bmo-brain] web passthrough loop exhausted {WEB_MAX_ROUNDS} rounds", flush=True)
+    return (text or "I searched but couldn't pull that together — want me to try again?"), None
+
+
+# Flips True the first time the vault 404s the pending-search endpoint. Newer MemPalace builds
+# removed /v1/extract/pending/search (confirmed 2026-07-15 — the vault now exposes /v1/extract,
+# /v1/entities/extract, /v1/palace/audit/extractions, none of them a pending-queue search), so
+# without this every single turn paid a wasted round-trip AND logged a 404. Same-session recall is
+# still covered by the local pending tier (local_pending.search_local), so disabling loses nothing;
+# a process restart re-probes, so a future vault that restores the endpoint self-heals.
+_pending_recall_unavailable = False
+
+
 async def _pending_recall(query: str, owner_id: str):
     """Query the vault's pending (not-yet-processed) queue for same-day recall.
 
     Fast text search over conversations queued but not yet promoted to the curated
     memory store. Never raises and keeps a short timeout — this must not block the
     response for long if the vault is slow or unreachable."""
-    if not (VAULT_URL and owner_id and query):
+    global _pending_recall_unavailable
+    if _pending_recall_unavailable or not (VAULT_URL and owner_id and query):
         return []
     try:
         async with httpx.AsyncClient(timeout=VAULT_PENDING_TIMEOUT) as c:
@@ -402,6 +644,11 @@ async def _pending_recall(query: str, owner_id: str):
                              params={"owner_id": owner_id, "query": query})
         if r.status_code == 200:
             return [item["content"] for item in r.json()]
+        if r.status_code == 404:
+            _pending_recall_unavailable = True
+            print("[bmo-brain] pending recall endpoint absent (404) — disabling it for this "
+                  "process; same-session recall stays covered by the local pending tier", flush=True)
+            return []
         print(f"[bmo-brain] pending recall HTTP {r.status_code}", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"[bmo-brain] pending recall failed: {e}", flush=True)
@@ -773,23 +1020,69 @@ async def _answer(client_messages, tools=None):
         print(f"[bmo-brain] dropped likely STT hallucination: {last_user!r}", flush=True)
         return "", None
 
-    # Consult-Claude consent gate (see _CONSULT_OFFER). If the previous assistant turn offered a
-    # consult and the user affirms THIS turn, call Claude — the single call site — and short-circuit
-    # recall / the LLM / all tools for this turn. Gated on consult_available() (fail-closed on
-    # key + monthly budget), so it is a hard no-op until the feature is armed.
-    if claude_consult.consult_available():
+    # Escalation consent gate (see _CONSULT_OFFERS). If the previous assistant turn offered a
+    # Swarm/Claude consult and the user affirms THIS turn, route to the chosen (or default) backend —
+    # the single call site — and short-circuit recall / the LLM / all tools for this turn. Gated on
+    # _consult_backends() so it is a hard no-op unless at least one backend is armed (Swarm needs
+    # AGENT_RUNTIME_URL; Claude is fail-closed on key + monthly budget). Neither backend is a model
+    # tool, so the model can never reach here on its own — a real human affirmation is required.
+    backends = _consult_backends()
+    if backends:
         prev_assistant = next(
             (m.get("content") or "" for m in reversed(convo) if m.get("role") == "assistant"), "")
-        if prev_assistant.rstrip().endswith(_CONSULT_OFFER):
-            if _CONSULT_AFFIRM_RE.search(last_user or ""):
+        if _ends_with_consult_offer(prev_assistant):
+            reply = (last_user or "").lower()
+            # Only treat THIS turn as an answer to the offer if it is a short reply OR explicitly names
+            # a backend. Otherwise a fresh command that merely opens with filler ("okay, turn on the
+            # lights") would be swallowed by the bare "okay"/"yes" match and misrouted into a consult,
+            # dropping the real command. A genuine yes/no to a yes/no question is always short.
+            is_answer = len(reply.split()) <= 5 or "swarm" in reply or "claude" in reply
+            if is_answer and _CONSULT_DECLINE_RE.search(reply):
+                return "Okay, I'll leave it.", None
+            if is_answer and _CONSULT_AFFIRM_RE.search(reply):
                 question = _pending_consult_question(convo)
                 if not question:
-                    return "Remind me what you wanted me to ask Claude?", None
-                print(f"[bmo-brain] consulting Claude on: {question[:120]!r}", flush=True)
-                answer = await claude_consult.consult_claude(question)
-                return _speechify(answer), None
-            if _CONSULT_DECLINE_RE.search(last_user or ""):
-                return "Okay, I'll leave it.", None
+                    return "Remind me what you wanted me to look into?", None
+                choice = _chosen_backend(last_user, backends)
+                if choice == "claude":
+                    print(f"[bmo-brain] escalating to Claude on: {question[:120]!r}", flush=True)
+                    consult = claude_consult.consult_claude(question)
+                    who = "Claude"
+                else:
+                    print(f"[bmo-brain] escalating to the Swarm on: {question[:120]!r}", flush=True)
+                    consult = delegate_to_swarm(question, mode="research")
+                    who = "the Swarm"
+                try:
+                    approach = await asyncio.wait_for(consult, timeout=CONSULT_TIMEOUT)
+                except asyncio.TimeoutError:
+                    print(f"[bmo-brain] {who} consult exceeded {CONSULT_TIMEOUT}s — graceful hold", flush=True)
+                    return _speechify(f"{who} is still working on that one — it's taking a bit. "
+                                      "Ask me again in a moment and I'll have it."), None
+                return _speechify(f"Here's what {who} came back with. {approach}"), None
+
+    # Explicit "hand this off to the swarm" intent (voice path). See _SWARM_INTENT_RE. Runs AFTER the
+    # consent gate (so a "yes, put the swarm on it" answering an offer is handled there first) and is
+    # gated on the swarm being armed. Bounded by CONSULT_TIMEOUT like the escalation consult.
+    if AGENT_RUNTIME_URL:
+        swm = _SWARM_INTENT_RE.search(last_user or "")
+        if swm:
+            task = (last_user or "")[swm.end():].strip(" ,.:;-—")
+            task = re.sub(r"^(?:to|on|about|for|with|regarding)\s+", "", task, flags=re.I).strip()
+            if len(task.split()) < 3:
+                # Bare handoff ("hand that off to the swarm") — the referent is the previous user turn.
+                task = next((m.get("content") or "" for m in reversed(convo[:-1])
+                             if m.get("role") == "user"), "")
+            if not task:
+                return "Sure — what would you like the swarm to work on?", None
+            print(f"[bmo-brain] direct swarm handoff on: {task[:120]!r}", flush=True)
+            try:
+                result = await asyncio.wait_for(delegate_to_swarm(task, mode="research"),
+                                                timeout=CONSULT_TIMEOUT)
+            except asyncio.TimeoutError:
+                print(f"[bmo-brain] swarm handoff exceeded {CONSULT_TIMEOUT}s — graceful hold", flush=True)
+                return _speechify("The swarm's on it, but it's taking longer than I can hold the line "
+                                  "for — ask me again in a moment and I'll have what it found."), None
+            return _speechify(f"Here's what the swarm came back with. {result}"), None
 
     for m in convo:
         if m.get("role") == "tool":
@@ -811,6 +1104,12 @@ async def _answer(client_messages, tools=None):
     ctx = ("\n".join(ctx_lines)
            if ctx_lines else "(no specific vault memories matched this question)")
     parts = [PERSONA]
+    home = await _get_home_location()
+    if home:
+        parts.append(
+            "USER'S LOCATION: home is " + home + ". When the user says 'near me', 'around here', "
+            "'local', or asks about nearby weather, events, places, or businesses without naming a "
+            "location, use THIS location — do not ask where they are.")
     status_q = _is_status_question(last_user)
     if status_q:
         live = await _live_status()
@@ -908,8 +1207,10 @@ async def _answer(client_messages, tools=None):
         # untouched single-call path below.
         text, tool_calls = await _passthrough_with_registry(messages, tools)
     elif tools:
-        text, tool_calls = await _ollama_chat(messages, tools)
-        tool_calls = await _sanitize_hass_tool_calls(tool_calls, VAULT_OWNER)
+        # HA-driven turn. Offer web_search alongside HA's tools (executed locally) so live-info
+        # questions actually search instead of deflecting; pure device commands still return HA
+        # tool_calls to HA untouched. Sanitizing happens inside the passthrough.
+        text, tool_calls = await _passthrough_with_web(messages, tools)
     else:
         # Self-executing (Pi) path. Offer the base tool set, and add the registry WRITE tools
         # ONLY when the turn looks like a registry edit — the same gate the passthrough path uses,
@@ -918,12 +1219,46 @@ async def _answer(client_messages, tools=None):
                                      if _REGISTRY_INTENT_RE.search(last_user or "") else [])
         text, tool_calls = await _self_execute_tools(messages, self_tools)
 
+    empty_recovered = False
+    escalated = False
     if not text and not tool_calls:
-        text = "(no response)"
+        # Empty answer — no text and no tool call. The usual cause is qwen3:8b emitting a blank
+        # assistant turn (often right after a tool result it should have summarised). Retry ONCE
+        # with tools withheld and an explicit nudge, forcing a spoken answer. The retry is silent —
+        # a "let me try again" cannot span one HA turn — so the user simply hears the recovered
+        # answer, or the varying failure + escalation offer below if it still comes up empty.
+        retry_messages = [{"role": "system", "content": system + "\n\n" + _RETRY_NUDGE}] + convo
+        try:
+            text, _ = await _ollama_chat(retry_messages, tools=None)
+        except Exception as e:  # noqa: BLE001
+            print(f"[bmo-brain] empty-answer retry errored: {type(e).__name__}: {e}", flush=True)
+            text = ""
+        if text:
+            empty_recovered = True
+            print(f"[bmo-brain] recovered empty answer on retry ({len(text)} chars)", flush=True)
+        else:
+            escalated = True
+            print("[bmo-brain] still empty after retry — surfacing failure + escalation offer", flush=True)
+            text = _failure_with_consult_offer(convo)
+        tool_calls = None
     print(f"[bmo-brain] memories={len(mems)} local_pending={len(local_mems)} "
           f"vault_pending={len(pending_mems)} status_probe={status_q} count_probe={count_q} "
           f"tool_failures={tool_failures} asked_for_clarity={asked_for_clarity} "
           f"tool_calls={len(tool_calls) if tool_calls else 0} answer_chars={len(text)}", flush=True)
+    _log_interaction({
+        "user": (last_user or "")[:1000],
+        "response": (text or "")[:1500],
+        "answer_chars": len(text),
+        "tool_failures": tool_failures,
+        "asked_for_clarity": asked_for_clarity,
+        "tool_calls": len(tool_calls) if tool_calls else 0,
+        "empty_recovered": empty_recovered,   # model returned blank but the silent retry saved it
+        "escalated": escalated,               # blank even after retry -> failure + consult offer spoken
+        "memories": len(mems),
+        "had_tools": bool(tools),             # HA-driven turn (tools present) vs self-exec/Pi turn
+        "status_q": status_q,
+        "count_q": count_q,
+    })
     # Status/count answers are point-in-time snapshots (current health, current total) —
     # storing them as vault "facts" makes them go stale immediately, and a wrong one
     # (e.g. a guessed memory count) becomes self-reinforcing: future recalls surface the
