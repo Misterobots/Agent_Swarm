@@ -41,7 +41,9 @@ substitutions:
   mic_channel_1: 'right'
   mic_channel_2: 'stereo'
 
-  which_mic: '0'
+  # '2' => source i2s_mics uses channel: stereo (BOTH ES7210 mics). Consumers below select explicit
+  # channels: voice_assistant streams both (0 + 1) to HA; the wake word stays on channel 0.
+  which_mic: '2'
   i2s_sample_rate: '16000'
   i2s_bits_per_sample: '32'
   i2s_mode_mic: secondary
@@ -402,9 +404,19 @@ media_player:
 voice_assistant:
   id: va
   microphone:
-    id: va_mic
-    microphone: i2s_mics
-    channels: $which_mic
+    # BOTH mics -> two mono sources streamed to HA, which combines them (needs HA 2026.6+; this HA
+    # is 2026.7). Channel 0 (va_mic) carries our software processing — the gain_factor plus the
+    # noise_suppression/auto_gain/volume_multiplier below — so it's the "processed" channel for the
+    # quiet/famine case; channel 1 is the raw reference for the loud/feast case. HA picks the better
+    # channel per pipeline stage. NOTE: our Waveshare board has no XMOS DSP (unlike HA Voice PE), so
+    # this is software-processed + raw rather than hardware-processed + raw — an experiment on this
+    # hardware. To revert to the single left mic: set which_mic back to '0' and restore this block to
+    # a single source with `channels: 0`, and micro_wake_word to `channels: 0`.
+    - id: va_mic
+      microphone: i2s_mics
+      channels: 0
+    - microphone: i2s_mics
+      channels: 1
   media_player: external_media_player
   micro_wake_word: mww
   use_wake_word: false
@@ -547,8 +559,10 @@ voice_assistant:
 micro_wake_word:
   id: mww
   microphone:
+    # Wake word stays on channel 0 — the mic the "Hey Friday" model was trained on. Only the
+    # voice_assistant (command STT) path uses both mics, so wake detection is unchanged by this.
     microphone: i2s_mics
-    channels: $which_mic
+    channels: 0
   stop_after_detection: false
   models:
     - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
@@ -1089,10 +1103,17 @@ number:
     id: mic_gain_db
     name: "Mic Gain (ES7210 dB)"
     entity_category: config
+    optimistic: true
     min_value: 0
     max_value: 42
     step: 1
     restore_value: true
+    # HARDWARE ES7210 ADC gain. 24 dB transcribes cleanly at close range. 36 dB over-drove the
+    # ADC into CLIPPING — Whisper's Silero VAD then discards the distorted audio exactly like
+    # silence (VAD filter removed 100% -> stt-no-text-recognized), so higher is NOT always better.
+    # Keep the default conservative; tune UP in small steps (2-4 dB) via the 'Mic Gain (ES7210 dB)'
+    # entity while testing at distance. optimistic:true is REQUIRED — without it a runtime set fires
+    # set_mic_gain() but the HA state never reports back (frozen display), making live tuning blind.
     initial_value: 24
     set_action:
       - lambda: |-
