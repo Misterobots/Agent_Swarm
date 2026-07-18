@@ -323,7 +323,7 @@ _bg_tasks = set()  # strong refs so fire-and-forget background consults aren't G
 _DIGEST_SYSTEM = (
     "You are Friday, relaying a result OUT LOUD to the user. Rewrite the text below into a SHORT "
     "spoken answer: 2-3 sentences max, most important point first, conversational. No lists, no "
-    "markdown, no headings, no URLs or 'see [link]'. If there's a lot, give the gist and offer to "
+    "markdown, no headings, no emojis, no URLs or 'see [link]'. If there's a lot, give the gist and offer to "
     "share more if they want. If the text is a clarifying QUESTION, keep it as one short question. "
     "Output ONLY the spoken reply, nothing else. /no_think")
 
@@ -348,6 +348,15 @@ def _ends_with_question(text: str) -> bool:
     return (text or "").rstrip().endswith("?")
 
 
+# assist_satellite.announce / start_conversation are BLOCKING HA service calls — the REST request
+# does not return until the announcement finishes PLAYING (announce) or the whole conversation ends
+# (start_conversation, which reopens the mic and waits for the user). A 300-char digest is ~20s of
+# TTS, and a reopened mic waits far longer, so the old 30s client timeout fired spuriously (an empty-
+# string httpx.ReadTimeout) even though HA was fine — that was the "fell off a cliff" silence. This is
+# a background task with no voice-turn deadline, so give it room. Env-tunable.
+ANNOUNCE_TIMEOUT = float(os.getenv("FRIDAY_ANNOUNCE_TIMEOUT", "150"))
+
+
 async def _ha_announce(message: str, target: str = None) -> None:
     """Speak `message` on the satellite proactively (no wake word). If it ends in a question, use
     start_conversation (announce AND reopen the mic) so the user can answer without re-waking her;
@@ -361,14 +370,19 @@ async def _ha_announce(message: str, target: str = None) -> None:
         service, payload = "announce", {"entity_id": target, "message": message}
     if ANNOUNCE_CHIME_MEDIA_ID:
         payload["preannounce_media_id"] = ANNOUNCE_CHIME_MEDIA_ID
+    t0 = time.monotonic()
     try:
-        async with httpx.AsyncClient(timeout=30) as c:
+        async with httpx.AsyncClient(timeout=ANNOUNCE_TIMEOUT) as c:
             r = await c.post(f"{HOME_ASSISTANT_URL}/api/services/assist_satellite/{service}",
                              headers={"Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}"}, json=payload)
+        dt = time.monotonic() - t0
         if r.status_code >= 300:
-            print(f"[bmo-brain] {service} HTTP {r.status_code}: {str(r.text)[:200]}", flush=True)
+            print(f"[bmo-brain] {service} HTTP {r.status_code} in {dt:.1f}s: {str(r.text)[:200]}", flush=True)
+        else:
+            print(f"[bmo-brain] {service} ok in {dt:.1f}s", flush=True)
     except Exception as e:  # noqa: BLE001
-        print(f"[bmo-brain] {service} failed (non-fatal): {e}", flush=True)
+        print(f"[bmo-brain] {service} failed in {time.monotonic()-t0:.1f}s "
+              f"(non-fatal): {type(e).__name__}: {e!r}", flush=True)
 
 
 def _fire_consult_announce(consult, who: str, target: str = None) -> None:
@@ -540,6 +554,12 @@ _SPEECH_STAR_RE = re.compile(r"\*{1,3}([^*]+?)\*{1,3}")  # *x* / **x** / ***x***
 _SPEECH_USCORE_RE = re.compile(r"__([^_]+?)__")          # __x__ -> x (leave single _ for snake_case)
 _SPEECH_BULLET_RE = re.compile(r"(?m)^\s*(?:[-*+•]|\d+[.)])\s+")  # -, *, 1. list markers
 _SPEECH_HEADER_RE = re.compile(r"(?m)^\s*#{1,6}\s*")     # # headers
+# Emojis/pictographs: the small model sprinkles them into "friendly" replies (e.g. a trailing 😊).
+# TTS reads them as noise ("smiling face"), and a trailing emoji after a "?" also defeats the
+# start_conversation (reopen-mic) check in _ha_announce. Strip them from all spoken output.
+_SPEECH_EMOJI_RE = re.compile(
+    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002190-\U000021FF\U00002B00-\U00002BFF"
+    "\U0000FE00-\U0000FE0F\U00002300-\U000023FF\U0000200D\U0000FE0F]+", flags=re.UNICODE)
 
 
 def _speechify(text: str) -> str:
@@ -551,6 +571,7 @@ def _speechify(text: str) -> str:
     t = t.replace("`", "")
     t = _SPEECH_HEADER_RE.sub("", t)
     t = _SPEECH_BULLET_RE.sub("", t)
+    t = _SPEECH_EMOJI_RE.sub("", t)
     t = re.sub(r"°\s*[FfCc]\b", " degrees", t)   # 73°F -> 73 degrees
     t = t.replace("°", " degrees").replace("%", " percent").replace("&", " and ")
     # Flatten remaining lines (e.g. a bulleted list) into prose sentences so TTS reads it smoothly.
@@ -1231,7 +1252,10 @@ async def _answer(client_messages, tools=None):
     # the swarm — <question>?" (see _SWARM_CLARIFY_MARKER), THIS turn is the user's answer. The swarm-
     # intent regex won't re-fire on a bare answer like "woodworking, half a day", so catch it here: fold
     # the answer into the original ask and hand the now-clear task off (router-reasoned mode).
-    if AGENT_RUNTIME_URL and last_user:
+    if AGENT_RUNTIME_URL and last_user and not _SWARM_INTENT_RE.search(last_user):
+        # (Guarded on NOT a fresh swarm command: if the user starts a NEW "ask the swarm ..." while a
+        # clarify is still pending, that's a pivot, not the answer — let it fall through to the swarm-
+        # intent gate below as its own request instead of getting folded into the abandoned one.)
         _clarified = next(
             (m.get("content") or "" for m in reversed(convo[:-1]) if m.get("role") == "assistant"), "")
         if _SWARM_CLARIFY_MARKER in _clarified:
