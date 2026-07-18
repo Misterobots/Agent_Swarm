@@ -93,6 +93,37 @@ async def get_weather_forecast(**_kwargs) -> str:
         return f"Forecast is unreachable right now ({type(e).__name__})."
 
 
+async def get_hourly_forecast(**_kwargs) -> str:
+    """Today's hourly temperature curve — for 'hottest/coolest part of the day', 'when will it
+    peak / warm up'. Returns the peak and dip hour + temp so Friday answers with real numbers."""
+    try:
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={HOME_LAT}&longitude={HOME_LON}"
+            "&hourly=temperature_2m&temperature_unit=fahrenheit&timezone=auto&forecast_days=1"
+        )
+        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as c:
+            r = await c.get(url)
+        h = r.json().get("hourly", {})
+        pairs = [(t, temp) for t, temp in zip(h.get("time", []), h.get("temperature_2m", []))
+                 if temp is not None]
+        if not pairs:
+            return "The hourly forecast is unavailable right now."
+        import datetime as _dt
+
+        def _fmt(iso):
+            try:
+                return _dt.datetime.fromisoformat(iso).strftime("%-I %p")
+            except Exception:
+                return iso
+        hot_t, hot = max(pairs, key=lambda p: p[1])
+        cold_t, cold = min(pairs, key=lambda p: p[1])
+        return (f"Today peaks around {_fmt(hot_t)} at {round(hot)}°F, "
+                f"and is coolest around {_fmt(cold_t)} at {round(cold)}°F.")
+    except Exception as e:  # noqa: BLE001
+        return f"The hourly forecast is unreachable right now ({type(e).__name__})."
+
+
 async def get_current_time(**_kwargs) -> str:
     import datetime
     return datetime.datetime.now().strftime("%-I:%M %p")
@@ -147,7 +178,7 @@ async def web_search(query: str, **_kwargs) -> str:
         return f"Search is unreachable right now ({type(e).__name__})."
 
 
-async def delegate_to_swarm(task: str, mode: str = "research", **_kwargs) -> str:
+async def delegate_to_swarm(task: str, mode: str = "auto", **_kwargs) -> str:
     """Hand a HEAVY multi-step task (deep research, building/writing something substantial,
     complex analysis) to the agent swarm via agent_runtime's OpenAI-compatible endpoint.
 
@@ -163,7 +194,10 @@ async def delegate_to_swarm(task: str, mode: str = "research", **_kwargs) -> str
         "research": {"research_mode": True, "skill": "research"},
         "build":    {"swarm_mode": True, "skill": "code"},
         "plan":     {"ultraplan_mode": True},
-    }.get((mode or "research").lower(), {"swarm_mode": True})
+        # 'auto' sends NO mode flag, so agent_runtime's neural router reasons about the (clarified)
+        # task and picks the depth itself instead of Friday hard-forcing deep-research on everything.
+        "auto":     {},
+    }.get((mode or "auto").lower(), {})
     payload = {"model": "default", "stream": False,
                "messages": [{"role": "user", "content": task}], **flags}
     try:
@@ -231,6 +265,11 @@ TOOL_SCHEMAS = [
         "Get the weather forecast for today and tomorrow. Use for 'will it rain today?' or 'weather tomorrow?'",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
+        "name": "get_hourly_forecast", "description":
+        "Today's hour-by-hour temperature — the peak and coolest times. Use for 'hottest part of the "
+        "day?', 'when will it be warmest/coolest?', 'when does it peak?'.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
         "name": "get_current_time", "description": "Get the current time. Use for 'what time is it?'",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
@@ -285,6 +324,7 @@ TOOL_SCHEMAS = [
 _DISPATCH = {
     "get_current_weather": get_current_weather,
     "get_weather_forecast": get_weather_forecast,
+    "get_hourly_forecast": get_hourly_forecast,
     "get_current_time": get_current_time,
     "get_current_date": get_current_date,
     "get_news_headlines": get_news_headlines,

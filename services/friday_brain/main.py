@@ -127,6 +127,29 @@ _SWARM_INTENT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# --- Swarm handoff: router-reasoned mode + Friday-side clarify gate ----------------------------------
+# Friday no longer force-flags deep research on every handoff. SWARM_HANDOFF_MODE='auto' sends NO mode
+# flag so agent_runtime's own neural router reasons about the task and picks the depth itself. And
+# before handing a VAGUE ask off, Friday asks ONE clarifying question locally (cheap qwen3:8b call) so
+# the swarm gets a CLEAR task instead of dumping assumptions — the felt "what activity level?" behavior,
+# done on Friday's side (graduate to the swarm's own Workshop later if needed). FRIDAY_SWARM_CLARIFY=
+# false hands off unconditionally.
+SWARM_HANDOFF_MODE = os.getenv("FRIDAY_SWARM_MODE", "auto")
+_SWARM_CLARIFY_ENABLED = os.getenv("FRIDAY_SWARM_CLARIFY", "true").lower() in ("1", "true", "yes")
+# Opener that marks Friday's own swarm-clarify question so the NEXT turn's answer routes back into a
+# handoff (the swarm-intent regex won't re-fire on a bare answer like "woodworking, half a day"). It's
+# spoken aloud, so it reads as a natural lead-in.
+_SWARM_CLARIFY_MARKER = "Before I hand this to the swarm"
+_SWARM_ASSESS_SYSTEM = (
+    "A task is about to be handed to a research/build swarm. Your ONLY job is to catch tasks that are "
+    "too VAGUE to act on. Default STRONGLY to letting it through: reply with exactly READY unless the "
+    "task is genuinely under-specified — missing what/which thing, or so open-ended the result would "
+    "just be guesses (e.g. 'plan a weekend project', 'help me with the house', 'find me something "
+    "fun'). A task that names a concrete subject and what to do with it is READY even if it isn't "
+    "perfectly scoped (e.g. 'compare the 3 best budget keyboards under $100' is READY — do NOT ask "
+    "about criteria). Only if it is truly too vague, reply with ONE short spoken clarifying question "
+    "and nothing else. /no_think")
+
 # Full override still available for testing/experimentation via BMO_PERSONA.
 PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
 
@@ -147,6 +170,17 @@ _CONSULT_DECLINE_RE = re.compile(
 # voice-turn timeout — that would abandon the turn AND risk a duplicate delegation on retry. The
 # backend keeps running server-side on a timeout; the user just asks again. Env-tunable.
 CONSULT_TIMEOUT = float(os.getenv("FRIDAY_CONSULT_TIMEOUT", "50"))
+# Async announce (default): instead of blocking the voice turn on a slow swarm/Claude consult, ack
+# instantly and speak the result later via assist_satellite.announce (no wake word) — no HA voice-turn
+# timeout, no dead air. Set FRIDAY_SWARM_ANNOUNCE=false (or clear FRIDAY_ANNOUNCE_TARGET) to fall back
+# to the bounded sync wait above. ANNOUNCE_TARGET is the satellite to speak back on — HA's chat
+# request carries no device id, so a single configured target (multi-satellite needs HA passthrough).
+_SWARM_ANNOUNCE = os.getenv("FRIDAY_SWARM_ANNOUNCE", "true").lower() in ("true", "1", "yes")
+ANNOUNCE_TARGET = os.getenv("FRIDAY_ANNOUNCE_TARGET",
+                            "assist_satellite.google_mini_voice_assist_satellite")
+# Chime played before a proactive announce / start_conversation. Empty = HA's default chime; set to a
+# media id (e.g. media-source://media_source/local/snowpiercer_chime.mp3) once the file is on HA (#5).
+ANNOUNCE_CHIME_MEDIA_ID = os.getenv("FRIDAY_ANNOUNCE_CHIME", "")
 
 
 # --- Escalation backends: which deeper resources are armed to consult on a dead-end --------------
@@ -221,6 +255,20 @@ def _pending_consult_question(convo: list) -> str:
     return ""
 
 
+def _user_before_marker(convo: list, marker: str) -> str:
+    """The user turn immediately before the assistant turn containing `marker` — the original ask that
+    Friday asked a swarm-clarify question about (see _SWARM_CLARIFY_MARKER)."""
+    seen = False
+    for m in reversed(convo):
+        if not seen:
+            if m.get("role") == "assistant" and marker in (m.get("content") or ""):
+                seen = True
+            continue
+        if m.get("role") == "user":
+            return m.get("content") or ""
+    return ""
+
+
 # --- Empty-answer recovery: silent retry, then a varying spoken failure + escalation offer --------
 # Nudge for the ONE silent retry when the model returns nothing. Tools are withheld so it is forced
 # to answer in words — the common cause is qwen3:8b emitting a blank assistant turn (often right
@@ -267,6 +315,110 @@ def _failure_with_consult_offer(convo: list) -> str:
     base = random.choice(_ESCALATE_PHRASES).format(x=_issue_fragment(convo))
     offer = _consult_offer_phrase(_consult_backends())
     return f"{base} {offer}" if offer else f"{base} Want to try again in a moment?"
+
+
+# --- Async announce: ack a slow consult instantly, then speak the result via the satellite ---------
+_bg_tasks = set()  # strong refs so fire-and-forget background consults aren't GC'd mid-flight
+
+_DIGEST_SYSTEM = (
+    "You are Friday, relaying a result OUT LOUD to the user. Rewrite the text below into a SHORT "
+    "spoken answer: 2-3 sentences max, most important point first, conversational. No lists, no "
+    "markdown, no headings, no URLs or 'see [link]'. If there's a lot, give the gist and offer to "
+    "share more if they want. If the text is a clarifying QUESTION, keep it as one short question. "
+    "Output ONLY the spoken reply, nothing else. /no_think")
+
+
+async def _digest_for_voice(raw: str, who: str = "the swarm") -> str:
+    """Condense a long swarm/consult result into a 2-3 sentence spoken answer so TTS doesn't read a
+    wall of text. Short results pass through untouched; on any failure, fall back to a truncation."""
+    raw = (raw or "").strip()
+    if len(raw) < 220:  # already spoken-length
+        return raw
+    try:
+        text, _ = await _ollama_chat(
+            [{"role": "system", "content": _DIGEST_SYSTEM},
+             {"role": "user", "content": raw[:6000]}], tools=None)
+        return (text or "").strip() or raw[:400]
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] digest failed (non-fatal): {e}", flush=True)
+        return raw[:400]
+
+
+def _ends_with_question(text: str) -> bool:
+    return (text or "").rstrip().endswith("?")
+
+
+async def _ha_announce(message: str, target: str = None) -> None:
+    """Speak `message` on the satellite proactively (no wake word). If it ends in a question, use
+    start_conversation (announce AND reopen the mic) so the user can answer without re-waking her;
+    otherwise a one-way announce. Both carry preannounce_media_id (the announcement chime) when set."""
+    target = target or ANNOUNCE_TARGET
+    if not (HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN and target and message):
+        return
+    if _ends_with_question(message):
+        service, payload = "start_conversation", {"entity_id": target, "start_message": message}
+    else:
+        service, payload = "announce", {"entity_id": target, "message": message}
+    if ANNOUNCE_CHIME_MEDIA_ID:
+        payload["preannounce_media_id"] = ANNOUNCE_CHIME_MEDIA_ID
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(f"{HOME_ASSISTANT_URL}/api/services/assist_satellite/{service}",
+                             headers={"Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}"}, json=payload)
+        if r.status_code >= 300:
+            print(f"[bmo-brain] {service} HTTP {r.status_code}: {str(r.text)[:200]}", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] {service} failed (non-fatal): {e}", flush=True)
+
+
+def _fire_consult_announce(consult, who: str, target: str = None) -> None:
+    """Run a slow consult coroutine in the background; announce its result to the satellite when it
+    finishes. Lets the voice turn close instantly instead of blocking ~20-45s on the swarm/Claude."""
+    async def _run():
+        try:
+            result = await consult
+        except Exception as e:  # noqa: BLE001
+            print(f"[bmo-brain] background {who} consult failed: {type(e).__name__}: {e}", flush=True)
+            result = f"I couldn't finish that one — I hit a problem reaching {who}."
+        spoken = await _digest_for_voice(result, who)
+        await _ha_announce(_speechify(f"Here's what {who} found. {spoken}"), target)
+    t = asyncio.create_task(_run())
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
+
+
+async def _dispatch_consult(consult, who: str):
+    """Speak the result of a slow consult. Default (FRIDAY_SWARM_ANNOUNCE): async — ack now, announce
+    the result to the satellite when the backend finishes (no HA voice-turn timeout, no dead air).
+    Fallback: a bounded synchronous wait (CONSULT_TIMEOUT). Returns (text, None)."""
+    if _SWARM_ANNOUNCE and ANNOUNCE_TARGET:
+        _fire_consult_announce(consult, who)
+        return _speechify(f"On it — I'll have {who} look into that and let you know in a moment."), None
+    try:
+        result = await asyncio.wait_for(consult, timeout=CONSULT_TIMEOUT)
+    except asyncio.TimeoutError:
+        print(f"[bmo-brain] {who} consult exceeded {CONSULT_TIMEOUT}s — graceful hold", flush=True)
+        return _speechify(f"{who} is still working on that — ask me again in a moment and I'll have it."), None
+    return _speechify(f"Here's what {who} found. {await _digest_for_voice(result, who)}"), None
+
+
+async def _assess_swarm_task(task: str) -> str:
+    """Return ONE clarifying question if `task` is too vague to hand off well, else "" (ready to go).
+    One cheap local qwen3:8b call — insurance against the swarm dumping assumptions on a fuzzy ask.
+    Fails OPEN (returns "" so the handoff proceeds) on any error or if disabled."""
+    if not (_SWARM_CLARIFY_ENABLED and task):
+        return ""
+    try:
+        text, _ = await _ollama_chat(
+            [{"role": "system", "content": _SWARM_ASSESS_SYSTEM},
+             {"role": "user", "content": task}], tools=None)
+        text = (text or "").strip()
+        if not text or text.upper().startswith("READY"):
+            return ""
+        return text if text.endswith("?") else text + "?"
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] swarm task assess failed (non-fatal, handing off): {e}", flush=True)
+        return ""
 
 
 # --- Interaction log: per-turn signals for the nightly "understanding" learning job (Stage 1) -----
@@ -322,6 +474,25 @@ async def _get_home_location() -> str:
     except Exception as e:  # noqa: BLE001
         print(f"[bmo-brain] home location fetch failed (non-fatal): {e}", flush=True)
     return _home_location or ""
+
+
+# Location-relevant swarm asks: fold Friday's known home location into the task so "near me" / local /
+# weather / events resolve without the swarm (or the clarify assessor) stopping to ask where the user
+# is — Friday already knows from HA (see _get_home_location). No-op for tasks with no location angle.
+_LOC_RE = re.compile(
+    r"\b(near\s*(me|by|here)|nearby|local(?:ly)?|around\s+(here|me|town)|in\s+my\s+area|"
+    r"weather|forecast|temperature|climate|restaurants?|bars?|events?|things?\s+to\s+do|"
+    r"this\s+weekend|hikes?|trails?|parks?)\b", re.I)
+
+
+async def _with_location_context(task: str) -> str:
+    if not task or not _LOC_RE.search(task):
+        return task
+    loc = await _get_home_location()
+    if not loc:
+        return task
+    return (f"{task}\n\n(Location context: the user is near {loc}. Resolve 'near me', 'local', and "
+            "'nearby' to that area — do not ask where they are.)")
 
 
 app = FastAPI(title="Friday Brain (vault-RAG assistant)")
@@ -569,55 +740,57 @@ async def _passthrough_with_registry(messages, tools):
         text or "I got partway through that change but couldn't finish it."), None
 
 
-# web_search is friday_brain's own READ-ONLY tool — it lives in TOOL_SCHEMAS (the self-exec set) and
-# is NOT among the tools HA sends on a voice turn, so without this a live-info question on voice
-# ("events near me", news, store hours) has no way to actually search and just deflects ("I don't
-# have real-time data…", confirmed in the interaction log). Offer it alongside HA's tools and execute
-# it locally, like the registry passthrough. Read-only, so unlike the registry tools it's safe on ANY
-# turn — no gate. Empty list (web_search not found) makes this a plain passthrough, a safe no-op.
-_WEB_SEARCH_SCHEMA = [t for t in TOOL_SCHEMAS if (t.get("function") or {}).get("name") == "web_search"]
+# friday_brain's own READ-ONLY info tools — web_search + the Open-Meteo weather tools (incl. the new
+# hourly "hottest part of the day") + news. They live in TOOL_SCHEMAS (the self-exec set) and are NOT
+# among the tools HA sends on a voice turn, so without this a live-info question on voice has no real
+# data source: it either deflects, or (with web_search alone) reads DuckDuckGo LINKS aloud instead of
+# the actual answer. Offer them alongside HA's tools and execute locally, like the registry
+# passthrough. All read-only, so unlike the registry tools they're safe on ANY turn — no gate.
+_INFO_TOOL_NAMES = frozenset({"web_search", "get_current_weather", "get_weather_forecast",
+                              "get_hourly_forecast", "get_news_headlines"})
+_INFO_SCHEMAS = [t for t in TOOL_SCHEMAS if (t.get("function") or {}).get("name") in _INFO_TOOL_NAMES]
 
 
-def _split_web_calls(tool_calls):
-    """Partition tool_calls into (web_search-owned, HA-owned). web_search we execute here; HA-owned
-    (HassTurnOn, etc.) are handed back to HA unexecuted, exactly as normal passthrough does."""
-    web, other = [], []
+def _split_info_calls(tool_calls):
+    """Partition tool_calls into (info-owned we execute here, HA-owned handed back to HA untouched).
+    HA-owned (HassTurnOn, etc.) return UNEXECUTED for HA to run, exactly as normal passthrough does."""
+    info, other = [], []
     for tc in (tool_calls or []):
         name = (tc.get("function") or {}).get("name", "")
-        (web if name == "web_search" else other).append(tc)
-    return web, other
+        (info if name in _INFO_TOOL_NAMES else other).append(tc)
+    return info, other
 
 
-async def _passthrough_with_web(messages, tools):
-    """Passthrough tool-calling that ALSO offers the read-only web_search and executes it locally,
-    looping until the model produces final text or an HA-owned tool_call (returned UNEXECUTED for HA
-    to run, exactly as normal passthrough). Lets live-info questions actually search instead of
-    deflecting. Falls back to plain passthrough when web_search isn't available. Returns
+async def _passthrough_with_info(messages, tools):
+    """Passthrough tool-calling that ALSO offers friday_brain's read-only info tools (web_search +
+    weather + news) and executes them locally, looping until final text or an HA-owned tool_call
+    (returned UNEXECUTED for HA). Lets live-info questions answer with REAL DATA (a weather ask hits
+    Open-Meteo, not a link dump). Falls back to plain passthrough if none are found. Returns
     (text, tool_calls) matching _answer's contract."""
-    all_tools = list(tools) + _WEB_SEARCH_SCHEMA
+    all_tools = list(tools) + _INFO_SCHEMAS
     convo = list(messages)
     text, tool_calls = "", None
     for _round in range(WEB_MAX_ROUNDS):
         text, tool_calls = await _ollama_chat(convo, all_tools)
-        web_calls, ha_calls = _split_web_calls(tool_calls)
-        if web_calls:
-            # Execute our OWN web_search first; if the same round also carried an HA on/off call,
+        info_calls, ha_calls = _split_info_calls(tool_calls)
+        if info_calls:
+            # Execute our OWN info tools first; if the same round also carried an HA on/off call,
             # hand that back after (mirrors the registry passthrough so a batched call isn't dropped).
-            convo = convo + [{"role": "assistant", "content": text, "tool_calls": web_calls}]
-            for tc in web_calls:
+            convo = convo + [{"role": "assistant", "content": text, "tool_calls": info_calls}]
+            for tc in info_calls:
                 fn = tc.get("function") or {}
                 result = await call_tool(fn.get("name", ""), fn.get("arguments") or {})
-                print(f"[bmo-brain] web tool={fn.get('name')} args={fn.get('arguments')} "
+                print(f"[bmo-brain] info tool={fn.get('name')} args={fn.get('arguments')} "
                       f"-> {str(result)[:160]!r}", flush=True)
                 convo.append({"role": "tool", "content": result})
             if ha_calls:
                 return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
-            continue  # only web calls -> reprompt for a spoken summary of the results
+            continue  # only info calls -> reprompt for a spoken answer built from the results
         if ha_calls:
             return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
         return text, None  # no tool_calls -> final text answer
-    print(f"[bmo-brain] web passthrough loop exhausted {WEB_MAX_ROUNDS} rounds", flush=True)
-    return (text or "I searched but couldn't pull that together — want me to try again?"), None
+    print(f"[bmo-brain] info passthrough loop exhausted {WEB_MAX_ROUNDS} rounds", flush=True)
+    return (text or "I looked but couldn't pull that together — want me to try again?"), None
 
 
 # Flips True the first time the vault 404s the pending-search endpoint. Newer MemPalace builds
@@ -1050,19 +1223,29 @@ async def _answer(client_messages, tools=None):
                     who = "Claude"
                 else:
                     print(f"[bmo-brain] escalating to the Swarm on: {question[:120]!r}", flush=True)
-                    consult = delegate_to_swarm(question, mode="research")
+                    consult = delegate_to_swarm(await _with_location_context(question), mode=SWARM_HANDOFF_MODE)
                     who = "the Swarm"
-                try:
-                    approach = await asyncio.wait_for(consult, timeout=CONSULT_TIMEOUT)
-                except asyncio.TimeoutError:
-                    print(f"[bmo-brain] {who} consult exceeded {CONSULT_TIMEOUT}s — graceful hold", flush=True)
-                    return _speechify(f"{who} is still working on that one — it's taking a bit. "
-                                      "Ask me again in a moment and I'll have it."), None
-                return _speechify(f"Here's what {who} came back with. {approach}"), None
+                return await _dispatch_consult(consult, who)
+
+    # Swarm-clarify answer gate: if the previous assistant turn was Friday's own "Before I hand this to
+    # the swarm — <question>?" (see _SWARM_CLARIFY_MARKER), THIS turn is the user's answer. The swarm-
+    # intent regex won't re-fire on a bare answer like "woodworking, half a day", so catch it here: fold
+    # the answer into the original ask and hand the now-clear task off (router-reasoned mode).
+    if AGENT_RUNTIME_URL and last_user:
+        _clarified = next(
+            (m.get("content") or "" for m in reversed(convo[:-1]) if m.get("role") == "assistant"), "")
+        if _SWARM_CLARIFY_MARKER in _clarified:
+            if len(last_user.split()) <= 4 and _CONSULT_DECLINE_RE.search(last_user.lower()):
+                return "Okay, I'll hold off on that.", None
+            original = _user_before_marker(convo, _SWARM_CLARIFY_MARKER)
+            refined = (f"{original}. Details from the user: {last_user}" if original else last_user).strip()
+            refined = await _with_location_context(refined)
+            print(f"[bmo-brain] swarm handoff (clarified) on: {refined[:120]!r}", flush=True)
+            return await _dispatch_consult(delegate_to_swarm(refined, mode=SWARM_HANDOFF_MODE), "the swarm")
 
     # Explicit "hand this off to the swarm" intent (voice path). See _SWARM_INTENT_RE. Runs AFTER the
     # consent gate (so a "yes, put the swarm on it" answering an offer is handled there first) and is
-    # gated on the swarm being armed. Bounded by CONSULT_TIMEOUT like the escalation consult.
+    # gated on the swarm being armed. A vague ask gets ONE local clarifying question first (Option A).
     if AGENT_RUNTIME_URL:
         swm = _SWARM_INTENT_RE.search(last_user or "")
         if swm:
@@ -1074,15 +1257,15 @@ async def _answer(client_messages, tools=None):
                              if m.get("role") == "user"), "")
             if not task:
                 return "Sure — what would you like the swarm to work on?", None
+            task = await _with_location_context(task)
+            # Friday-side reasoning gate: too vague → ask ONE question (ends in "?" → mic reopens via
+            # start_conversation); the answer returns through the swarm-clarify answer gate above.
+            clarify = await _assess_swarm_task(task)
+            if clarify:
+                print(f"[bmo-brain] swarm-clarify before handoff: {clarify[:120]!r}", flush=True)
+                return f"{_SWARM_CLARIFY_MARKER} — {clarify}", None
             print(f"[bmo-brain] direct swarm handoff on: {task[:120]!r}", flush=True)
-            try:
-                result = await asyncio.wait_for(delegate_to_swarm(task, mode="research"),
-                                                timeout=CONSULT_TIMEOUT)
-            except asyncio.TimeoutError:
-                print(f"[bmo-brain] swarm handoff exceeded {CONSULT_TIMEOUT}s — graceful hold", flush=True)
-                return _speechify("The swarm's on it, but it's taking longer than I can hold the line "
-                                  "for — ask me again in a moment and I'll have what it found."), None
-            return _speechify(f"Here's what the swarm came back with. {result}"), None
+            return await _dispatch_consult(delegate_to_swarm(task, mode=SWARM_HANDOFF_MODE), "the swarm")
 
     for m in convo:
         if m.get("role") == "tool":
@@ -1110,6 +1293,11 @@ async def _answer(client_messages, tools=None):
             "USER'S LOCATION: home is " + home + ". When the user says 'near me', 'around here', "
             "'local', or asks about nearby weather, events, places, or businesses without naming a "
             "location, use THIS location — do not ask where they are.")
+    parts.append(
+        "SPOKEN OUTPUT: you are talking out loud, not on a screen. NEVER read URLs, links, or "
+        "'check [website] for details' — the user cannot click anything. When a tool returns data, "
+        "SPEAK THE ACTUAL ANSWER (the numbers, facts, times, names), not where to find it. Keep it "
+        "short and conversational — a sentence or two, not a list or an essay.")
     status_q = _is_status_question(last_user)
     if status_q:
         live = await _live_status()
@@ -1207,10 +1395,11 @@ async def _answer(client_messages, tools=None):
         # untouched single-call path below.
         text, tool_calls = await _passthrough_with_registry(messages, tools)
     elif tools:
-        # HA-driven turn. Offer web_search alongside HA's tools (executed locally) so live-info
-        # questions actually search instead of deflecting; pure device commands still return HA
-        # tool_calls to HA untouched. Sanitizing happens inside the passthrough.
-        text, tool_calls = await _passthrough_with_web(messages, tools)
+        # HA-driven turn. Offer friday_brain's read-only info tools (web_search + weather + news)
+        # alongside HA's tools, executed locally, so live-info questions answer with REAL DATA instead
+        # of deflecting/reading links; device commands still return to HA untouched. Sanitizing
+        # happens inside the passthrough.
+        text, tool_calls = await _passthrough_with_info(messages, tools)
     else:
         # Self-executing (Pi) path. Offer the base tool set, and add the registry WRITE tools
         # ONLY when the turn looks like a registry edit — the same gate the passthrough path uses,
