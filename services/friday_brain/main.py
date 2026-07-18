@@ -136,10 +136,12 @@ _SWARM_INTENT_RE = re.compile(
 # false hands off unconditionally.
 SWARM_HANDOFF_MODE = os.getenv("FRIDAY_SWARM_MODE", "auto")
 _SWARM_CLARIFY_ENABLED = os.getenv("FRIDAY_SWARM_CLARIFY", "true").lower() in ("1", "true", "yes")
-# Opener that marks Friday's own swarm-clarify question so the NEXT turn's answer routes back into a
-# handoff (the swarm-intent regex won't re-fire on a bare answer like "woodworking, half a day"). It's
-# spoken aloud, so it reads as a natural lead-in.
-_SWARM_CLARIFY_MARKER = "Before I hand this to the swarm"
+# When Friday asks a swarm-clarify question she SPEAKS it via start_conversation (which reopens the mic
+# so the user can answer without re-waking) and parks the original ask here. The next turn's answer —
+# spoken into the reopened mic OR after a re-wake — folds into a refined handoff. One entry (a single
+# satellite), bounded by a TTL so a stale, unanswered clarify can't hijack an unrelated later utterance.
+_pending_clarify: dict = {}   # {"original": str, "ts": float}
+_CLARIFY_TTL = float(os.getenv("FRIDAY_CLARIFY_TTL", "90"))
 _SWARM_ASSESS_SYSTEM = (
     "A task is about to be handed to a research/build swarm. Your ONLY job is to catch tasks that are "
     "too VAGUE to act on. Default STRONGLY to letting it through: reply with exactly READY unless the "
@@ -249,20 +251,6 @@ def _pending_consult_question(convo: list) -> str:
         if not seen_offer:
             if m.get("role") == "assistant" and _ends_with_consult_offer(m.get("content") or ""):
                 seen_offer = True
-            continue
-        if m.get("role") == "user":
-            return m.get("content") or ""
-    return ""
-
-
-def _user_before_marker(convo: list, marker: str) -> str:
-    """The user turn immediately before the assistant turn containing `marker` — the original ask that
-    Friday asked a swarm-clarify question about (see _SWARM_CLARIFY_MARKER)."""
-    seen = False
-    for m in reversed(convo):
-        if not seen:
-            if m.get("role") == "assistant" and marker in (m.get("content") or ""):
-                seen = True
             continue
         if m.get("role") == "user":
             return m.get("content") or ""
@@ -401,6 +389,19 @@ def _fire_consult_announce(consult, who: str, target: str = None) -> None:
         spoken = await _digest_for_voice(result, who)
         # reopen=False: this is a RESULT delivery, not a question — don't re-trigger the mic afterward.
         await _ha_announce(_speechify(f"Here's what {who} found. {spoken}"), target, reopen=False)
+    t = asyncio.create_task(_run())
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
+
+
+def _fire_reopen(message: str, target: str = None) -> None:
+    """Speak a question on the satellite AND reopen the mic (start_conversation), fired in the background
+    after a short beat so the (empty) turn that requested it has closed and the satellite is idle. Used
+    for swarm-clarify questions so the user can answer without re-waking. start_conversation sequences
+    speak-then-listen internally, so the mic opens only after Friday finishes asking."""
+    async def _run():
+        await asyncio.sleep(1.2)
+        await _ha_announce(_speechify(message), target, reopen=True)
     t = asyncio.create_task(_run())
     _bg_tasks.add(t)
     t.add_done_callback(_bg_tasks.discard)
@@ -1255,24 +1256,21 @@ async def _answer(client_messages, tools=None):
                     who = "the Swarm"
                 return await _dispatch_consult(consult, who)
 
-    # Swarm-clarify answer gate: if the previous assistant turn was Friday's own "Before I hand this to
-    # the swarm — <question>?" (see _SWARM_CLARIFY_MARKER), THIS turn is the user's answer. The swarm-
-    # intent regex won't re-fire on a bare answer like "woodworking, half a day", so catch it here: fold
-    # the answer into the original ask and hand the now-clear task off (router-reasoned mode).
-    if AGENT_RUNTIME_URL and last_user and not _SWARM_INTENT_RE.search(last_user):
-        # (Guarded on NOT a fresh swarm command: if the user starts a NEW "ask the swarm ..." while a
-        # clarify is still pending, that's a pivot, not the answer — let it fall through to the swarm-
-        # intent gate below as its own request instead of getting folded into the abandoned one.)
-        _clarified = next(
-            (m.get("content") or "" for m in reversed(convo[:-1]) if m.get("role") == "assistant"), "")
-        if _SWARM_CLARIFY_MARKER in _clarified:
-            if len(last_user.split()) <= 4 and _CONSULT_DECLINE_RE.search(last_user.lower()):
-                return "Okay, I'll hold off on that.", None
-            original = _user_before_marker(convo, _SWARM_CLARIFY_MARKER)
-            refined = (f"{original}. Details from the user: {last_user}" if original else last_user).strip()
-            refined = await _with_location_context(refined)
-            print(f"[bmo-brain] swarm handoff (clarified) on: {refined[:120]!r}", flush=True)
-            return await _dispatch_consult(delegate_to_swarm(refined, mode=SWARM_HANDOFF_MODE), "the swarm")
+    # Swarm-clarify answer: Friday recently asked a swarm-clarify question (via reopen) and parked the
+    # original ask in _pending_clarify. THIS turn is the answer — fold it in and hand off — UNLESS it is
+    # a fresh swarm command (a pivot; let the swarm-intent gate own it) or a short decline. Works whether
+    # the user used the reopened mic or re-woke, as long as it is within the TTL.
+    if (AGENT_RUNTIME_URL and last_user and _pending_clarify.get("original")
+            and (time.time() - _pending_clarify.get("ts", 0)) < _CLARIFY_TTL
+            and not _SWARM_INTENT_RE.search(last_user)):
+        if len(last_user.split()) <= 4 and _CONSULT_DECLINE_RE.search(last_user.lower()):
+            _pending_clarify.clear()
+            return "Okay, I'll hold off on that.", None
+        original = _pending_clarify.get("original", "")
+        _pending_clarify.clear()
+        refined = await _with_location_context(f"{original}. Details from the user: {last_user}".strip())
+        print(f"[bmo-brain] swarm handoff (clarified) on: {refined[:120]!r}", flush=True)
+        return await _dispatch_consult(delegate_to_swarm(refined, mode=SWARM_HANDOFF_MODE), "the swarm")
 
     # Explicit "hand this off to the swarm" intent (voice path). See _SWARM_INTENT_RE. Runs AFTER the
     # consent gate (so a "yes, put the swarm on it" answering an offer is handled there first) and is
@@ -1288,13 +1286,19 @@ async def _answer(client_messages, tools=None):
                              if m.get("role") == "user"), "")
             if not task:
                 return "Sure — what would you like the swarm to work on?", None
+            raw_task = task  # the pre-location ask, parked verbatim if we need to clarify
             task = await _with_location_context(task)
-            # Friday-side reasoning gate: too vague → ask ONE question (ends in "?" → mic reopens via
-            # start_conversation); the answer returns through the swarm-clarify answer gate above.
+            # Friday-side reasoning gate: too vague → ask ONE clarifying question, SPOKEN via reopen so
+            # the user answers without re-waking. Park the ask and return "" (start_conversation does the
+            # speaking); the answer comes back through the swarm-clarify answer gate above.
             clarify = await _assess_swarm_task(task)
             if clarify:
-                print(f"[bmo-brain] swarm-clarify before handoff: {clarify[:120]!r}", flush=True)
-                return f"{_SWARM_CLARIFY_MARKER} — {clarify}", None
+                print(f"[bmo-brain] swarm-clarify (reopen) on: {clarify[:120]!r}", flush=True)
+                _pending_clarify.clear()
+                _pending_clarify.update({"original": raw_task, "ts": time.time()})
+                _fire_reopen(clarify)
+                return "", None
+            _pending_clarify.clear()
             print(f"[bmo-brain] direct swarm handoff on: {task[:120]!r}", flush=True)
             return await _dispatch_consult(delegate_to_swarm(task, mode=SWARM_HANDOFF_MODE), "the swarm")
 
