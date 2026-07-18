@@ -323,9 +323,9 @@ _bg_tasks = set()  # strong refs so fire-and-forget background consults aren't G
 _DIGEST_SYSTEM = (
     "You are Friday, relaying a result OUT LOUD to the user. Rewrite the text below into a SHORT "
     "spoken answer: 2-3 sentences max, most important point first, conversational. No lists, no "
-    "markdown, no headings, no emojis, no URLs or 'see [link]'. If there's a lot, give the gist and offer to "
-    "share more if they want. If the text is a clarifying QUESTION, keep it as one short question. "
-    "Output ONLY the spoken reply, nothing else. /no_think")
+    "markdown, no headings, no emojis, no URLs or 'see [link]'. If there's a lot, give the gist and "
+    "stop — do NOT tack on a follow-up question or an offer to continue (it re-triggers the mic). "
+    "End on a statement. Output ONLY the spoken reply, nothing else. /no_think")
 
 
 async def _digest_for_voice(raw: str, who: str = "the swarm") -> str:
@@ -357,14 +357,18 @@ def _ends_with_question(text: str) -> bool:
 ANNOUNCE_TIMEOUT = float(os.getenv("FRIDAY_ANNOUNCE_TIMEOUT", "150"))
 
 
-async def _ha_announce(message: str, target: str = None) -> None:
-    """Speak `message` on the satellite proactively (no wake word). If it ends in a question, use
-    start_conversation (announce AND reopen the mic) so the user can answer without re-waking her;
-    otherwise a one-way announce. Both carry preannounce_media_id (the announcement chime) when set."""
+async def _ha_announce(message: str, target: str = None, reopen: bool = None) -> None:
+    """Speak `message` on the satellite proactively (no wake word). `reopen` forces the mode:
+    True → start_conversation (announce AND reopen the mic so the user can answer without re-waking),
+    False → a one-way announce. None (default) picks start_conversation iff the message ends in a
+    question. Reserve reopen for when Friday genuinely NEEDS a reply — reopening after just *delivering*
+    a result re-triggers the mic on this AEC-less board (it hears her own audio tail) and dead-ends.
+    Both carry preannounce_media_id (the announcement chime) when set."""
     target = target or ANNOUNCE_TARGET
     if not (HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN and target and message):
         return
-    if _ends_with_question(message):
+    want_reopen = reopen if reopen is not None else _ends_with_question(message)
+    if want_reopen:
         service, payload = "start_conversation", {"entity_id": target, "start_message": message}
     else:
         service, payload = "announce", {"entity_id": target, "message": message}
@@ -395,7 +399,8 @@ def _fire_consult_announce(consult, who: str, target: str = None) -> None:
             print(f"[bmo-brain] background {who} consult failed: {type(e).__name__}: {e}", flush=True)
             result = f"I couldn't finish that one — I hit a problem reaching {who}."
         spoken = await _digest_for_voice(result, who)
-        await _ha_announce(_speechify(f"Here's what {who} found. {spoken}"), target)
+        # reopen=False: this is a RESULT delivery, not a question — don't re-trigger the mic afterward.
+        await _ha_announce(_speechify(f"Here's what {who} found. {spoken}"), target, reopen=False)
     t = asyncio.create_task(_run())
     _bg_tasks.add(t)
     t.add_done_callback(_bg_tasks.discard)
@@ -1193,6 +1198,8 @@ async def _answer(client_messages, tools=None):
             m = {**m, "tool_calls": _coerce_tool_call_args(m["tool_calls"])}
         convo.append(m)
     last_user = next((m["content"] for m in reversed(convo) if m.get("role") == "user"), "")
+    if last_user:
+        print(f"[bmo-brain] utterance: {last_user[:140]!r}", flush=True)
 
     # Confirmed live: an STT engine transcribed near-silent audio (a muted mic, and
     # separately a synthesized test tone) as "Thank you." — Whisper's single most common
