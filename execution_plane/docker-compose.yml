@@ -251,6 +251,19 @@ services:
       - FRIDAY_CONSULT_MONTHLY_BUDGET_USD=${FRIDAY_CONSULT_MONTHLY_BUDGET_USD:-5.0}
       - FRIDAY_CONSULT_BUDGET_FILE=/app/data/consult_budget.json
       - FRIDAY_CONSULT_LOG=/app/data/consult_log.jsonl
+      # Proactive announce: slow swarm/Claude consults ack instantly, then speak the result on the
+      # satellite with no wake word. The chime plays first (preannounce_media_id) — upload the mp3 via
+      # HA's Media -> Local Media and it resolves as media-source://media_source/local/<file>. Clear
+      # FRIDAY_ANNOUNCE_CHIME to go back to a silent announcement.
+      - FRIDAY_ANNOUNCE_CHIME=${FRIDAY_ANNOUNCE_CHIME:-media-source://media_source/local/snowpiercer_chime.mp3}
+      - FRIDAY_ANNOUNCE_TARGET=${FRIDAY_ANNOUNCE_TARGET:-assist_satellite.google_mini_voice_assist_satellite}
+      - FRIDAY_SWARM_ANNOUNCE=${FRIDAY_SWARM_ANNOUNCE:-true}
+      # Swarm handoff: 'auto' sends no mode flag so agent_runtime's own router picks the depth. The
+      # clarify gate asks ONE question on a vague ask (spoken via start_conversation so the mic reopens)
+      # and parks the original ask for FRIDAY_CLARIFY_TTL seconds awaiting the answer.
+      - FRIDAY_SWARM_MODE=${FRIDAY_SWARM_MODE:-auto}
+      - FRIDAY_SWARM_CLARIFY=${FRIDAY_SWARM_CLARIFY:-true}
+      - FRIDAY_CLARIFY_TTL=${FRIDAY_CLARIFY_TTL:-90}
     volumes:
       - bmo_brain_data:/app/data
     restart: unless-stopped
