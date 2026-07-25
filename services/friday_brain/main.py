@@ -162,7 +162,7 @@ PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
 # on key/budget), (b) the immediately-preceding assistant turn ended with _CONSULT_OFFER, and
 # (c) the user affirming THIS turn — a real human yes the model cannot fabricate. There is NO
 # consult tool in TOOL_SCHEMAS/_DISPATCH, so the model has no way to reach Claude on its own.
-_CONSULT_OFFER = "Would you like me to consult Claude about this?"
+_CONSULT_OFFER = "Would you like me to dig deeper on this?"
 _CONSULT_AFFIRM_RE = re.compile(
     r"\b(yes|yeah|yep|sure|okay|ok|please|go ahead|do it|"
     r"consult|ask\s+(claude|the\s+swarm)|the\s+swarm|swarm|claude)\b", re.I)
@@ -200,22 +200,19 @@ def _consult_backends() -> list:
     return backends
 
 
+# ONE offer sentence regardless of which backend is armed. From the user's side there is no "swarm" and
+# no "Claude" — it is all Friday; the backend is an implementation detail that never reaches speech.
+# (Saying "claude"/"swarm" in the reply still steers _chosen_backend for power use — see below.)
 _CONSULT_OFFERS = {
-    "swarm": "Would you like me to put the Swarm on this?",
+    "swarm": _CONSULT_OFFER,
     "claude": _CONSULT_OFFER,
-    "both": "Would you like me to consult the Swarm or Claude on this?",
+    "both": _CONSULT_OFFER,
 }
 
 
 def _consult_offer_phrase(backends: list) -> str:
-    """The offer sentence naming exactly the armed backends — empty string when none are armed."""
-    if "swarm" in backends and "claude" in backends:
-        return _CONSULT_OFFERS["both"]
-    if backends == ["swarm"]:
-        return _CONSULT_OFFERS["swarm"]
-    if backends == ["claude"]:
-        return _CONSULT_OFFERS["claude"]
-    return ""
+    """The offer sentence — empty string when no backend is armed."""
+    return _CONSULT_OFFER if backends else ""
 
 
 def _ends_with_consult_offer(text: str) -> bool:
@@ -282,7 +279,7 @@ _TOOL_ISSUE_LABELS = {
     "GetDateTime": "checking the time", "HassGetState": "checking that",
     "HassTurnOn": "controlling that device", "HassTurnOff": "controlling that device",
     "HassToggle": "controlling that device", "HassLightSet": "adjusting that light",
-    "delegate_to_swarm": "handing that to the swarm",
+    "delegate_to_swarm": "digging into that",
     "web_search": "looking that up", "search_web": "looking that up",
 }
 
@@ -387,39 +384,43 @@ def _fire_consult_announce(consult, who: str, target: str = None) -> None:
             print(f"[bmo-brain] background {who} consult failed: {type(e).__name__}: {e}", flush=True)
             result = f"I couldn't finish that one — I hit a problem reaching {who}."
         spoken = await _digest_for_voice(result, who)
+        # First person: from the user's side it's all Friday — `who` is for logs only, never speech.
         # reopen=False: this is a RESULT delivery, not a question — don't re-trigger the mic afterward.
-        await _ha_announce(_speechify(f"Here's what {who} found. {spoken}"), target, reopen=False)
+        await _ha_announce(_speechify(f"Okay, here's what I found. {spoken}"), target, reopen=False)
     t = asyncio.create_task(_run())
     _bg_tasks.add(t)
     t.add_done_callback(_bg_tasks.discard)
 
 
-def _fire_reopen(message: str, target: str = None) -> None:
-    """Speak a question on the satellite AND reopen the mic (start_conversation), fired in the background
-    after a short beat so the (empty) turn that requested it has closed and the satellite is idle. Used
-    for swarm-clarify questions so the user can answer without re-waking. start_conversation sequences
-    speak-then-listen internally, so the mic opens only after Friday finishes asking."""
-    async def _run():
-        await asyncio.sleep(1.2)
-        await _ha_announce(_speechify(message), target, reopen=True)
-    t = asyncio.create_task(_run())
-    _bg_tasks.add(t)
-    t.add_done_callback(_bg_tasks.discard)
+def _is_echo_of(utterance: str, spoken: str) -> bool:
+    """True if `utterance` is really Friday's own `spoken` line coming back through the mic. This
+    satellite has no acoustic echo cancellation, so a reopened/hot mic can transcribe her own question
+    and it arrives looking like a user turn (confirmed live: her clarify question came back verbatim
+    as the 'answer'). Compared on normalized words with a high overlap bar so a user genuinely echoing
+    a word or two isn't mistaken for feedback."""
+    norm = lambda s: set(re.findall(r"[a-z']+", (s or "").lower()))
+    u, s = norm(utterance), norm(spoken)
+    if not u or not s:
+        return False
+    return len(u & s) / len(u) >= 0.8
 
 
 async def _dispatch_consult(consult, who: str):
     """Speak the result of a slow consult. Default (FRIDAY_SWARM_ANNOUNCE): async — ack now, announce
     the result to the satellite when the backend finishes (no HA voice-turn timeout, no dead air).
-    Fallback: a bounded synchronous wait (CONSULT_TIMEOUT). Returns (text, None)."""
+    Fallback: a bounded synchronous wait (CONSULT_TIMEOUT). Returns (text, None).
+
+    `who` names the backend for LOGS ONLY — every spoken line here is first person. From the user's
+    perspective there is no swarm and no Claude: it is all Friday."""
     if _SWARM_ANNOUNCE and ANNOUNCE_TARGET:
         _fire_consult_announce(consult, who)
-        return _speechify(f"On it — I'll have {who} look into that and let you know in a moment."), None
+        return _speechify("Let me do some digging into that one — I'll get back to you in a moment."), None
     try:
         result = await asyncio.wait_for(consult, timeout=CONSULT_TIMEOUT)
     except asyncio.TimeoutError:
         print(f"[bmo-brain] {who} consult exceeded {CONSULT_TIMEOUT}s — graceful hold", flush=True)
-        return _speechify(f"{who} is still working on that — ask me again in a moment and I'll have it."), None
-    return _speechify(f"Here's what {who} found. {await _digest_for_voice(result, who)}"), None
+        return _speechify("I'm still working on that one — ask me again in a moment and I'll have it."), None
+    return _speechify(f"Okay, here's what I found. {await _digest_for_voice(result, who)}"), None
 
 
 async def _assess_swarm_task(task: str) -> str:
@@ -1263,6 +1264,13 @@ async def _answer(client_messages, tools=None):
     if (AGENT_RUNTIME_URL and last_user and _pending_clarify.get("original")
             and (time.time() - _pending_clarify.get("ts", 0)) < _CLARIFY_TTL
             and not _SWARM_INTENT_RE.search(last_user)):
+        if _is_echo_of(last_user, _pending_clarify.get("question", "")):
+            # Friday's own clarify question came back through the mic — don't treat it as the answer and
+            # keep the pending ask armed. Return a SHORT nudge rather than "": an empty reply is exactly
+            # what makes HA speak "unable to get response" (confirmed live), and it can't echo-loop
+            # because it shares almost no words with the parked question.
+            print(f"[bmo-brain] ignored mic echo of own clarify: {last_user[:80]!r}", flush=True)
+            return "Go ahead whenever you're ready.", None
         if len(last_user.split()) <= 4 and _CONSULT_DECLINE_RE.search(last_user.lower()):
             _pending_clarify.clear()
             return "Okay, I'll hold off on that.", None
@@ -1285,19 +1293,20 @@ async def _answer(client_messages, tools=None):
                 task = next((m.get("content") or "" for m in reversed(convo[:-1])
                              if m.get("role") == "user"), "")
             if not task:
-                return "Sure — what would you like the swarm to work on?", None
+                return "Sure — what would you like me to look into?", None
             raw_task = task  # the pre-location ask, parked verbatim if we need to clarify
             task = await _with_location_context(task)
-            # Friday-side reasoning gate: too vague → ask ONE clarifying question, SPOKEN via reopen so
-            # the user answers without re-waking. Park the ask and return "" (start_conversation does the
-            # speaking); the answer comes back through the swarm-clarify answer gate above.
+            # Friday-side reasoning gate: too vague → ask ONE clarifying question SPOKEN AS THE REPLY.
+            # NOT via reopen: this satellite has no echo cancellation, so reopening the mic makes it hear
+            # Friday's own question and fold that back as the "answer" (confirmed live). And returning ""
+            # makes HA say "unable to get response". So we speak the question normally and park the ask;
+            # the user's re-woken answer folds in via the swarm-clarify answer gate above (within TTL).
             clarify = await _assess_swarm_task(task)
             if clarify:
-                print(f"[bmo-brain] swarm-clarify (reopen) on: {clarify[:120]!r}", flush=True)
+                print(f"[bmo-brain] swarm-clarify on: {clarify[:120]!r}", flush=True)
                 _pending_clarify.clear()
-                _pending_clarify.update({"original": raw_task, "ts": time.time()})
-                _fire_reopen(clarify)
-                return "", None
+                _pending_clarify.update({"original": raw_task, "question": clarify, "ts": time.time()})
+                return _speechify(clarify), None
             _pending_clarify.clear()
             print(f"[bmo-brain] direct swarm handoff on: {task[:120]!r}", flush=True)
             return await _dispatch_consult(delegate_to_swarm(task, mode=SWARM_HANDOFF_MODE), "the swarm")
