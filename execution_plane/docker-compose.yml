@@ -130,6 +130,12 @@ services:
     ports:
       - "8020:8020"
       - "8100:8020"   # BMO driver (.106, default port 8100) connects here
+    environment:
+      # Pin TTS onto GPU 0 (the display/image card, which has headroom). voice_engine is the heavy one
+      # — measured ~4 GB fresh, growing to ~5.5 GB with CUDA graphs + synthesis (Qwen3-TTS-1.7B +
+      # SenseVoice STT + speaker models) — too large to sit on GPU 1 with Friday's brain without risking
+      # a brain->CPU spill. count:all injects both GPUs; CUDA_VISIBLE_DEVICES filters CUDA to GPU 0.
+      - CUDA_VISIBLE_DEVICES=GPU-0236956d-3c81-9ccd-d1f5-c12e0745366e  # Lovelace GPU 0 (RTX 5060 Ti, display)
     deploy:
       resources:
         reservations:
@@ -189,6 +195,10 @@ services:
       # quieter speech but risks silence-hallucinations. The durable fix for quiet audio is the
       # ESPHome mic gain (google-mini-voice.yaml auto_gain/volume_multiplier), not this.
       - WHISPER_VAD_THRESHOLD=${WHISPER_VAD_THRESHOLD:-0.3}
+      # Co-locate STT with Friday's brain on GPU 1. Whisper is only ~1.4 GB, so brain (~7.9 GB) + STT
+      # ≈ 9.3 GB leaves ~6.7 GB headroom — the heavy TTS goes to GPU 0 instead. count:all injects both
+      # GPUs; CUDA_VISIBLE_DEVICES filters CUDA to GPU 1 only.
+      - CUDA_VISIBLE_DEVICES=GPU-b23f2137-ee9f-b8db-84fa-cdb6425d473e  # Lovelace GPU 1 (RTX 5060 Ti, Friday)
     ports:
       - "10300:10300"
     deploy:
