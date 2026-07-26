@@ -474,6 +474,12 @@ voice_assistant:
   on_stt_vad_end:
     - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
     - script.execute: control_leds
+  # Event 5 (intent-start): HA has finished STT and the brain is now reasoning — the true "thinking"
+  # moment. Anchor the thinking animation here so it shows reliably even if on_stt_vad_end (Event 12,
+  # VAD end) is flaky on this board, and so it covers the whole brain-processing window until tts-start.
+  on_intent_start:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+    - script.execute: control_leds
   on_intent_progress:
     - if:
         condition:
