@@ -501,6 +501,11 @@ voice_assistant:
         id: send_tts_uri_event
         tts_uri: !lambda 'return x;'
   on_stt_end:
+    # Also anchor THINKING here (Event 4, stt-end): this fires reliably the instant transcription is
+    # ready — no VAD dependency, unlike on_stt_vad_end (Event 12, flaky on this board) — right before
+    # intent-start. Belt-and-suspenders so the cyan thinking animation actually renders during the wait.
+    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+    - script.execute: control_leds
     - script.execute:
         id: send_stt_text_event
         stt_text: !lambda 'return x;'
