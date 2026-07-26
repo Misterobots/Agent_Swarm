@@ -275,6 +275,10 @@ services:
       - FRIDAY_SWARM_MODE=${FRIDAY_SWARM_MODE:-auto}
       - FRIDAY_SWARM_CLARIFY=${FRIDAY_SWARM_CLARIFY:-true}
       - FRIDAY_CLARIFY_TTL=${FRIDAY_CLARIFY_TTL:-90}
+      # The container has no system TZ, so datetime.now() is UTC. FRIDAY_TZ is the local IANA zone used
+      # by the get_current_time/date tools and as the fallback for the prompt-injected clock (main.py
+      # prefers HA's own configured time_zone when reachable). Without this, Friday reports UTC (~5h off).
+      - FRIDAY_TZ=${FRIDAY_TZ:-America/Chicago}
     volumes:
       - bmo_brain_data:/app/data
     restart: unless-stopped

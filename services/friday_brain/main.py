@@ -465,13 +465,17 @@ def _log_interaction(record: dict) -> None:
 _home_location = None
 _home_location_ts = 0.0
 _HOME_LOCATION_TTL = float(os.getenv("FRIDAY_HOME_LOCATION_TTL", "3600"))
+# HA's configured IANA timezone (e.g. "America/Chicago"), cached from the same /api/config fetch as the
+# home location. The container itself has no TZ set, so datetime.now() is UTC — we resolve local time
+# through this instead (see _local_now). FRIDAY_TZ overrides if HA is unreachable.
+_ha_tz = os.getenv("FRIDAY_TZ") or None
 
 
 async def _get_home_location() -> str:
     """Home's name + rough coords + timezone from HA (/api/config), cached for _HOME_LOCATION_TTL.
     Injected into the system prompt so "near me" / local weather / local events resolve to home
     instead of triggering a "where are you?" clarification. Empty (inert) if HA has no token/URL."""
-    global _home_location, _home_location_ts
+    global _home_location, _home_location_ts, _ha_tz
     if not (HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN):
         return ""
     now = time.time()
@@ -489,12 +493,26 @@ async def _get_home_location() -> str:
                 loc += f" (approx {lat:.3f}, {lon:.3f})"
             if cfg.get("time_zone"):
                 loc += f", timezone {cfg['time_zone']}"
+                _ha_tz = cfg["time_zone"]
             _home_location, _home_location_ts = loc, now
             return loc
         print(f"[bmo-brain] home location fetch HTTP {r.status_code}", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"[bmo-brain] home location fetch failed (non-fatal): {e}", flush=True)
     return _home_location or ""
+
+
+def _local_now() -> datetime.datetime:
+    """Current time in HA's configured timezone (see _ha_tz). The container clock is UTC (no TZ set),
+    so this is the ONLY correct local-time source — datetime.now() would be ~5h off. Falls back to
+    system time only if the tz is unknown/invalid."""
+    if _ha_tz:
+        try:
+            from zoneinfo import ZoneInfo
+            return datetime.datetime.now(ZoneInfo(_ha_tz))
+        except Exception:  # noqa: BLE001
+            pass
+    return datetime.datetime.now()
 
 
 # Location-relevant swarm asks: fold Friday's known home location into the task so "near me" / local /
@@ -1337,6 +1355,13 @@ async def _answer(client_messages, tools=None):
             "USER'S LOCATION: home is " + home + ". When the user says 'near me', 'around here', "
             "'local', or asks about nearby weather, events, places, or businesses without naming a "
             "location, use THIS location — do not ask where they are.")
+    _now = _local_now()
+    parts.append(
+        "CURRENT DATE & TIME (authoritative, as of this message): it is "
+        + _now.strftime("%-I:%M %p") + " on " + _now.strftime("%A, %B %-d, %Y") + ". You ALREADY KNOW "
+        "the current time, date, and day of week from this line — answer any such question directly and "
+        "conversationally (say it in words, e.g. 'It's twenty past five'). Do NOT call get_current_time "
+        "or get_current_date; the answer is right here, and calling a tool is slower and unnecessary.")
     parts.append(
         "SPOKEN OUTPUT: you are talking out loud, not on a screen. NEVER read URLs, links, or "
         "'check [website] for details' — the user cannot click anything. When a tool returns data, "

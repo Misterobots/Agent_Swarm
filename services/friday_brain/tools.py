@@ -124,14 +124,26 @@ async def get_hourly_forecast(**_kwargs) -> str:
         return f"The hourly forecast is unreachable right now ({type(e).__name__})."
 
 
+def _tz_now():
+    """Local time. The container has no TZ set, so a bare datetime.now() is UTC (~5h off). Resolve
+    through FRIDAY_TZ (IANA name, e.g. America/Chicago) via zoneinfo; fall back to system time."""
+    import datetime, os
+    tz = os.getenv("FRIDAY_TZ")
+    if tz:
+        try:
+            from zoneinfo import ZoneInfo
+            return datetime.datetime.now(ZoneInfo(tz))
+        except Exception:  # noqa: BLE001
+            pass
+    return datetime.datetime.now()
+
+
 async def get_current_time(**_kwargs) -> str:
-    import datetime
-    return datetime.datetime.now().strftime("%-I:%M %p")
+    return _tz_now().strftime("%-I:%M %p")
 
 
 async def get_current_date(**_kwargs) -> str:
-    import datetime
-    return datetime.datetime.now().strftime("%A, %B %-d, %Y")
+    return _tz_now().strftime("%A, %B %-d, %Y")
 
 
 _NEWS_FEEDS = {
