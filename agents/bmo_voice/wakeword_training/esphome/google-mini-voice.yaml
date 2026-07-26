@@ -778,13 +778,14 @@ script:
               set("Pulse Medium", 0.8, 0.0, 0.8);
               return;
             case ${voice_assist_thinking_phase_id}:
-              // BLUE (not purple) so it's obvious Friday stopped listening and is now
-              // processing. The old purple-on-purple made "thinking" look identical to
-              // "listening", which read as a 5-6s dead wait. Adjust the RGB to taste.
-              set("Pulse Medium", 0.0, 0.35, 1.0);
+              // THINKING animation (brain is reasoning, ~3-8s): a brisk CYAN pulse. Deliberately
+              // NOT purple (that read identical to listening) and NOT the multi-color spin below,
+              // so "thinking" and "replying" are visually distinct. Pulse Fast = never looks static.
+              set("Pulse Fast", 0.0, 0.7, 1.0);
               return;
             case ${voice_assist_replying_phase_id}:
-              set("Wipe", 0.6, 0.0, 0.6);
+              // REPLYING animation (Friday is speaking): the spinning multi-color rainbow.
+              set("Rainbow Slow", 0.9, 0.1, 0.85);
               return;
             case ${voice_assist_error_phase_id}:
               set("Pulse Fast", 1.0, 0.0, 0.0);
