@@ -283,6 +283,13 @@ services:
       # experimental model. Runtime-only (resets to default on restart). FRIDAY_BRAIN_SWAP=false disables.
       - FRIDAY_ALT_BRAIN=${FRIDAY_ALT_BRAIN:-goekdenizguelmez/JOSIEFIED-Qwen3:8b}
       - FRIDAY_BRAIN_SWAP=${FRIDAY_BRAIN_SWAP:-true}
+      # Per-brain persona + memory + visual-reference management. Each brain (default vs the
+      # brain-swap alt) carries its own persona, its own isolated memory namespace, and its own
+      # visual refs — all editable at http://192.168.2.101:8000/personas (mtime-cached, no restart).
+      # personas.json + visual_refs/ live in the bmo_brain_data volume (persist across rebuilds).
+      # FRIDAY_PERSONA_TOKEN guards the LAN editor + CRUD API; empty = open on the LAN (default).
+      # Set a secret before exposing /personas externally via the Turing Traefik route (Phase B).
+      - FRIDAY_PERSONA_TOKEN=${FRIDAY_PERSONA_TOKEN:-}
     volumes:
       - bmo_brain_data:/app/data
     restart: unless-stopped

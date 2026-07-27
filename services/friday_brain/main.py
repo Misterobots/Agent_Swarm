@@ -26,6 +26,7 @@ shared repo; the shim is inert for vault recall unless VAULT_URL + VAULT_OWNER a
 """
 import asyncio
 import datetime
+import hmac
 import json
 import os
 import random
@@ -34,14 +35,17 @@ import time
 import uuid
 
 import httpx
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI, File, Request, UploadFile
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               PlainTextResponse, Response, StreamingResponse)
 
 import hass_resolver
 import local_pending
 import claude_consult
+import personas
 from ha_registry import REGISTRY_TOOL_NAMES, REGISTRY_TOOL_SCHEMAS, call_registry_tool
 from persona import FRIDAY_SYSTEM_PROMPT
+from persona_page import PERSONA_EDITOR_HTML
 # delegate_to_swarm + AGENT_RUNTIME_URL imported by NAME (not `import tools`) on purpose: _answer()
 # has a parameter named `tools` (the HA tool list) that would shadow the module inside it.
 from tools import (TOOL_SCHEMAS, call_tool, delegate_to_swarm, AGENT_RUNTIME_URL,
@@ -168,8 +172,33 @@ _SWARM_ASSESS_SYSTEM = (
     "about criteria). Only if it is truly too vague, reply with ONE short spoken clarifying question "
     "and nothing else. /no_think")
 
-# Full override still available for testing/experimentation via BMO_PERSONA.
-PERSONA = os.getenv("BMO_PERSONA", FRIDAY_SYSTEM_PROMPT)
+# Per-brain personas (personas.py). Each brain (default vs the FRIDAY_ALT_BRAIN "brain swap"
+# target) carries its OWN persona + memory namespace + visual refs, all editable live at GET
+# /personas (mtime-cached, so edits apply with no restart). _compose_persona(model) builds the
+# character prompt for whichever brain is active; a full BMO_PERSONA override still short-circuits
+# the whole thing (testing/experimentation), matching the old single-persona behavior.
+_PERSONA_OVERRIDE = os.getenv("BMO_PERSONA", "")
+# Optional shared-secret guard for the LAN-exposed persona editor + CRUD API. Empty = open on LAN.
+FRIDAY_PERSONA_TOKEN = os.getenv("FRIDAY_PERSONA_TOKEN", "")
+
+
+def _compose_persona(model: str) -> str:
+    """Character system prompt for the given brain — or the raw BMO_PERSONA override if set."""
+    if _PERSONA_OVERRIDE:
+        return _PERSONA_OVERRIDE
+    try:
+        return personas.compose_persona(model)
+    except Exception as e:  # noqa: BLE001 — never let a persona read break a voice turn
+        print(f"[bmo-brain] persona compose failed ({e}) — falling back to default prompt", flush=True)
+        return FRIDAY_SYSTEM_PROMPT
+
+
+def _memory_owner(model: str) -> str:
+    """Per-brain memory owner_id (isolates recall/store between brains — zero bleed)."""
+    try:
+        return personas.memory_owner(VAULT_OWNER, model)
+    except Exception:  # noqa: BLE001
+        return VAULT_OWNER
 
 # --- Consult Claude: ask-first offload when the local model dead-ends (claude_consult.py) ---
 # The OFFER is appended by code ONLY on the two genuine dead-end paths (loop exhaustion), never by
@@ -583,7 +612,114 @@ app = FastAPI(title="Friday Brain (vault-RAG assistant)")
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "model": MODEL, "vault": bool(VAULT_URL and VAULT_OWNER), "ollama": OLLAMA_URL}
+    active = ""
+    try:
+        active = personas.get_persona(_current_model).get("display_name", "")
+    except Exception:  # noqa: BLE001
+        pass
+    return {"status": "ok", "model": MODEL, "current_model": _current_model,
+            "active_persona": active, "vault": bool(VAULT_URL and VAULT_OWNER), "ollama": OLLAMA_URL}
+
+
+# ---------------------------------------------------------------------------
+# Persona / memory / visual-reference management (LAN editor page + CRUD API).
+# The editor page is served at GET /personas; the API under /api/personas. Both are guarded by
+# FRIDAY_PERSONA_TOKEN when set (LAN-first — open on the LAN by default, opt-in secret for the
+# external Traefik route). Model ids can contain "/" (e.g. goekdenizguelmez/JOSIEFIED-Qwen3:8b),
+# so the {model:path} converter is used and more-specific routes are registered first.
+# ---------------------------------------------------------------------------
+def _persona_auth_ok(request: Request) -> bool:
+    if not FRIDAY_PERSONA_TOKEN:
+        return True
+    tok = request.headers.get("x-persona-token") or request.query_params.get("token") or ""
+    auth = request.headers.get("authorization", "")
+    if not tok and auth.lower().startswith("bearer "):
+        tok = auth[7:]
+    return hmac.compare_digest(tok, FRIDAY_PERSONA_TOKEN)
+
+
+@app.get("/personas")
+async def persona_editor_page():
+    # The page itself carries no secrets; it prompts for the token (if configured) and sends it on
+    # every API call. Serving it unauthenticated keeps a bookmarked /personas link usable.
+    return HTMLResponse(PERSONA_EDITOR_HTML)
+
+
+@app.get("/api/personas")
+async def api_personas_all(request: Request):
+    if not _persona_auth_ok(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    data = personas.load_personas()
+    return {"personas": data,
+            "active_model": _current_model,
+            "default_model": MODEL,
+            "alt_model": _ALT_BRAIN,
+            "token_required": bool(FRIDAY_PERSONA_TOKEN)}
+
+
+@app.post("/api/personas/{model:path}/visual_ref")
+async def api_persona_add_ref(model: str, request: Request, file: UploadFile = File(...)):
+    if not _persona_auth_ok(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    data = await file.read()
+    if not data:
+        return JSONResponse({"error": "empty upload"}, status_code=400)
+    if len(data) > 12 * 1024 * 1024:
+        return JSONResponse({"error": "file too large (max 12 MB)"}, status_code=413)
+    ref = personas.add_visual_ref(model, file.filename or "image", data)
+    return {"ok": True, "ref": ref}
+
+
+@app.get("/api/personas/{model:path}/visual_ref/{name}")
+async def api_persona_get_ref(model: str, name: str, request: Request):
+    if not _persona_auth_ok(request):
+        return PlainTextResponse("unauthorized", status_code=401)
+    path = personas.visual_ref_path(model, name)
+    if not path:
+        return PlainTextResponse("not found", status_code=404)
+    return FileResponse(path)
+
+
+@app.get("/api/personas/{model:path}/self_image")
+async def api_persona_self_image(model: str, request: Request):
+    # The canonical self-portrait for this brain — the seed a future "make a picture of you"
+    # image-gen call should reference. TODO(visual-refs wiring): the OmniGen/ComfyUI image-gen
+    # path lives in the agents/ tree (a separate service), not friday_brain — that call should
+    # fetch this endpoint (or personas.self_image_path) to condition the generation on the brain's
+    # own look. Left as a stub hook here; not wired into image gen yet.
+    if not _persona_auth_ok(request):
+        return PlainTextResponse("unauthorized", status_code=401)
+    path = personas.self_image_path(model)
+    if not path:
+        return PlainTextResponse("no self image set", status_code=404)
+    return FileResponse(path)
+
+
+@app.put("/api/personas/{model:path}")
+async def api_persona_update(model: str, request: Request):
+    if not _persona_auth_ok(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "expected an object"}, status_code=400)
+    data = personas.load_personas()
+    entry = data.get(model) or personas.get_persona(model)
+    for k in personas.EDITABLE_FIELDS:
+        if k in body:
+            entry[k] = body[k]
+    data[model] = entry
+    personas.save_personas(data)
+    return {"ok": True, "persona": entry}
+
+
+@app.get("/api/personas/{model:path}")
+async def api_persona_get(model: str, request: Request):
+    if not _persona_auth_ok(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return personas.get_persona(model)
 
 
 @app.get("/v1/models")
@@ -591,14 +727,17 @@ async def models():
     return {"object": "list", "data": [{"id": MODEL_NAME, "object": "model", "owned_by": "bmo"}]}
 
 
-async def _vault_recall(query: str):
-    """Return a list of recalled memory strings for the query (empty on any failure)."""
-    if not (VAULT_URL and VAULT_OWNER and query):
+async def _vault_recall(query: str, owner_id: str = ""):
+    """Return a list of recalled memory strings for the query (empty on any failure).
+
+    owner_id is the per-brain memory owner (see _memory_owner); defaults to the base VAULT_OWNER."""
+    owner = owner_id or VAULT_OWNER
+    if not (VAULT_URL and owner and query):
         return []
     try:
         async with httpx.AsyncClient(timeout=VAULT_TIMEOUT) as c:
             r = await c.post(f"{VAULT_URL}/v1/memories/search",
-                             json={"query": query, "owner_id": VAULT_OWNER, "limit": VAULT_LIMIT})
+                             json={"query": query, "owner_id": owner, "limit": VAULT_LIMIT})
         if r.status_code == 200:
             return [m["content"] for m in r.json() if float(m.get("score") or 0) >= VAULT_MIN_SCORE]
         print(f"[bmo-brain] vault search HTTP {r.status_code}", flush=True)
@@ -937,7 +1076,7 @@ async def _pending_recall(query: str, owner_id: str):
     return []
 
 
-async def _store_memory(user_text: str, response_text: str, tool_trace: str = ""):
+async def _store_memory(user_text: str, response_text: str, tool_trace: str = "", owner_id: str = ""):
     """Store the exchange for later recall. Non-fatal on any failure — inert (like
     _vault_recall) unless VAULT_URL + VAULT_OWNER are set.
 
@@ -952,17 +1091,18 @@ async def _store_memory(user_text: str, response_text: str, tool_trace: str = ""
     quirk (e.g. a specific slot combination HA rejects) never becomes a memory even
     though the exchange that discovered it is stored, because the stored text alone
     gives no sign anything went wrong underneath a clean-looking final answer."""
-    if not (VAULT_URL and VAULT_OWNER and user_text and response_text):
+    owner = owner_id or VAULT_OWNER
+    if not (VAULT_URL and owner and user_text and response_text):
         return
     conversation = f"User: {user_text}\nBMO: {response_text}"
     if tool_trace:
         conversation += f"\n[Tool activity this exchange:\n{tool_trace}\n]"
-    local_pending.queue_local(conversation, VAULT_OWNER)
+    local_pending.queue_local(conversation, owner)
     try:
         async with httpx.AsyncClient(timeout=VAULT_TIMEOUT) as c:
             await c.post(f"{VAULT_URL}/v1/extract/queue",
                          json={"conversation": conversation,
-                               "owner_id": VAULT_OWNER,
+                               "owner_id": owner,
                                "source_device": BMO_SOURCE_DEVICE})
     except Exception as e:  # noqa: BLE001
         print(f"[bmo-brain] memory store failed (non-fatal): {e}", flush=True)
@@ -1410,13 +1550,18 @@ async def _answer(client_messages, tools=None):
             print(f"[bmo-brain] incoming tool result: {str(m.get('content'))[:300]!r}", flush=True)
         elif m.get("role") == "assistant" and m.get("tool_calls"):
             print(f"[bmo-brain] incoming prior tool_calls: {m['tool_calls']}", flush=True)
-    local_mems = local_pending.search_local(last_user, VAULT_OWNER)
+    # Per-brain memory isolation: recall + store are keyed by the ACTIVE brain's owner_id, so the
+    # default brain and the swapped-in alt brain never see each other's memories (zero bleed). The
+    # base VAULT_OWNER stays on HA device-resolution (hass_resolver / _sanitize_hass_tool_calls) —
+    # that is device sanitization, not memory, and must not be namespaced.
+    mem_owner = _memory_owner(_current_model)
+    local_mems = local_pending.search_local(last_user, mem_owner)
     # Run concurrently, not sequentially — otherwise a slow/unreachable vault costs
     # VAULT_TIMEOUT twice (once per call) instead of once, which would double worst-case
     # latency on every single request and defeat the point of the local-resilience tier.
     mems, pending_mems = await asyncio.gather(
-        _vault_recall(last_user),
-        _pending_recall(last_user, VAULT_OWNER),
+        _vault_recall(last_user, mem_owner),
+        _pending_recall(last_user, mem_owner),
     )
     pending_ctx_lines = [f"- Recent (may still be processing): {c}"
                          for c in (local_mems + pending_mems)]
@@ -1424,7 +1569,7 @@ async def _answer(client_messages, tools=None):
     ctx_lines = pending_ctx_lines + curated_ctx_lines
     ctx = ("\n".join(ctx_lines)
            if ctx_lines else "(no specific vault memories matched this question)")
-    parts = [PERSONA]
+    parts = [_compose_persona(_current_model)]
     home = await _get_home_location()
     if home:
         parts.append(
@@ -1606,7 +1751,7 @@ async def _answer(client_messages, tools=None):
     # stale answer as ground truth and can cause it to be restated and stored again.
     if not status_q and not count_q:
         tool_trace = _build_tool_trace(convo) if (tool_failures or asked_for_clarity) else ""
-        asyncio.create_task(_store_memory(last_user, text, tool_trace))
+        asyncio.create_task(_store_memory(last_user, text, tool_trace, owner_id=mem_owner))
     # Strip markdown/symbols from the spoken text so TTS doesn't read them aloud as gibberish.
     # Done here (not before _store_memory) so memory keeps the original; only the reply is cleaned.
     return _speechify(text), tool_calls
