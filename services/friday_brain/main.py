@@ -79,6 +79,22 @@ NUM_CTX = int(os.getenv("BMO_NUM_CTX", "16384"))
 # per-request keep_alive always wins over the container's OLLAMA_KEEP_ALIVE default.
 _KA_RAW = os.getenv("BMO_KEEP_ALIVE", "-1").strip()
 KEEP_ALIVE = int(_KA_RAW) if _KA_RAW.lstrip("-").isdigit() else _KA_RAW
+
+# --- Brain swap: toggle Friday's LLM between the default and an experimental model by voice ----------
+# "Hey Friday, brain swap" flips _current_model between MODEL and FRIDAY_ALT_BRAIN. The two 8B brains
+# can't co-reside on Friday's card alongside STT+TTS (~120 MB free), so a swap UNLOADS the current model
+# and warms the new one (~10-20s) in the background — the turn just acks. Runtime-only: resets to MODEL
+# on restart (safe default). FRIDAY_BRAIN_SWAP=false disables the whole feature.
+_ALT_BRAIN = os.getenv("FRIDAY_ALT_BRAIN", "goekdenizguelmez/JOSIEFIED-Qwen3:8b")
+_BRAIN_SWAP_ENABLED = os.getenv("FRIDAY_BRAIN_SWAP", "true").lower() in ("1", "true", "yes")
+_current_model = MODEL   # the model _ollama_chat actually calls; mutated by the brain-swap gate
+_BRAIN_SWAP_RE = re.compile(
+    r"\b(brain\s*swap|swap\s+(?:your\s+|the\s+|my\s+)?brains?|switch\s+(?:your\s+|the\s+)?brains?)\b", re.I)
+
+def _brain_name(m: str) -> str:
+    """Spoken name for the swap confirmation."""
+    return "my default brain" if m == MODEL else "the Josiefied experimental brain"
+
 SELF_TOOL_MAX_ROUNDS = int(os.getenv("BMO_SELF_TOOL_MAX_ROUNDS", "6"))
 BMO_SOURCE_DEVICE = os.getenv("BMO_SOURCE_DEVICE", "lovelace")
 # HA's own tool-calling loop (passthrough mode) has no round cap of its own — bmo_brain
@@ -725,7 +741,7 @@ async def _ollama_chat(messages: list, tools=None):
     Ollama's native shape (list of {"function": {"name", "arguments"}}) or None."""
     # keep_alive pins qwen3:8b resident in VRAM between calls (KEEP_ALIVE=-1 by default now that
     # ollama_friday's GPU is dedicated to Friday) so a voice turn never pays a cold reload.
-    payload = {"model": MODEL, "messages": messages, "stream": False, "keep_alive": KEEP_ALIVE,
+    payload = {"model": _current_model, "messages": messages, "stream": False, "keep_alive": KEEP_ALIVE,
                "options": {"temperature": TEMPERATURE, "num_ctx": NUM_CTX}}
     if tools:
         payload["tools"] = tools
@@ -736,6 +752,25 @@ async def _ollama_chat(messages: list, tools=None):
     text = _strip_think(message.get("content", "") or "")
     tool_calls = message.get("tool_calls") or None
     return text, tool_calls
+
+
+async def _do_brain_swap(old_model: str, new_model: str) -> None:
+    """Background half of a brain swap: unload the old model (free VRAM — two 8B brains can't co-reside
+    with STT+TTS on Friday's card) then warm the new one, pinned. Fires after the swap gate acks; the
+    next voice turn calls _current_model (already flipped)."""
+    async with httpx.AsyncClient(timeout=180) as c:
+        try:
+            await c.post(f"{OLLAMA_URL}/api/generate", json={"model": old_model, "keep_alive": 0})
+            print(f"[bmo-brain] brain-swap: unloaded {old_model}", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"[bmo-brain] brain-swap unload failed (non-fatal): {e}", flush=True)
+        try:
+            await c.post(f"{OLLAMA_URL}/api/generate", json={
+                "model": new_model, "prompt": "ok", "keep_alive": KEEP_ALIVE,
+                "options": {"num_ctx": NUM_CTX}})
+            print(f"[bmo-brain] brain-swap: warmed {new_model}", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"[bmo-brain] brain-swap warm failed (non-fatal): {e}", flush=True)
 
 
 async def _self_execute_tools(messages: list, tools: list):
@@ -1268,6 +1303,19 @@ async def _answer(client_messages, tools=None):
     if _is_likely_stt_hallucination(last_user):
         print(f"[bmo-brain] dropped likely STT hallucination: {last_user!r}", flush=True)
         return "", None
+
+    # Brain swap: "Hey Friday, brain swap" toggles the LLM between the default and the experimental
+    # model (see _BRAIN_SWAP_RE). The unload+warm runs in the background — the two 8B brains can't
+    # co-reside on Friday's card — so this turn just flips _current_model and acks.
+    if _BRAIN_SWAP_ENABLED and last_user and _BRAIN_SWAP_RE.search(last_user):
+        global _current_model
+        old, new = _current_model, (_ALT_BRAIN if _current_model == MODEL else MODEL)
+        _current_model = new
+        _t = asyncio.create_task(_do_brain_swap(old, new))
+        _bg_tasks.add(_t)
+        _t.add_done_callback(_bg_tasks.discard)
+        print(f"[bmo-brain] brain swap: {old} -> {new}", flush=True)
+        return _speechify(f"Okay, swapping to {_brain_name(new)}. Give me a moment while it loads."), None
 
     # Escalation consent gate (see _CONSULT_OFFERS). If the previous assistant turn offered a
     # Swarm/Claude consult and the user affirms THIS turn, route to the chosen (or default) backend —

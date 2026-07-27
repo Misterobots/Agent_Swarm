@@ -279,6 +279,10 @@ services:
       # by the get_current_time/date tools and as the fallback for the prompt-injected clock (main.py
       # prefers HA's own configured time_zone when reachable). Without this, Friday reports UTC (~5h off).
       - FRIDAY_TZ=${FRIDAY_TZ:-America/Chicago}
+      # Brain swap: "Hey Friday, brain swap" toggles the LLM between BMO_MODEL (default) and this
+      # experimental model. Runtime-only (resets to default on restart). FRIDAY_BRAIN_SWAP=false disables.
+      - FRIDAY_ALT_BRAIN=${FRIDAY_ALT_BRAIN:-goekdenizguelmez/JOSIEFIED-Qwen3:8b}
+      - FRIDAY_BRAIN_SWAP=${FRIDAY_BRAIN_SWAP:-true}
     volumes:
       - bmo_brain_data:/app/data
     restart: unless-stopped
