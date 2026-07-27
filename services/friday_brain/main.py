@@ -45,7 +45,7 @@ from persona import FRIDAY_SYSTEM_PROMPT
 # delegate_to_swarm + AGENT_RUNTIME_URL imported by NAME (not `import tools`) on purpose: _answer()
 # has a parameter named `tools` (the HA tool list) that would shadow the module inside it.
 from tools import (TOOL_SCHEMAS, call_tool, delegate_to_swarm, AGENT_RUNTIME_URL,
-                   HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN)
+                   HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN, get_current_weather)
 
 VAULT_URL       = os.getenv("VAULT_URL", "").rstrip("/")
 VAULT_OWNER     = os.getenv("VAULT_OWNER", "")
@@ -513,6 +513,34 @@ def _local_now() -> datetime.datetime:
         except Exception:  # noqa: BLE001
             pass
     return datetime.datetime.now()
+
+
+# Ambient weather (Tier 0-A, same idea as the date/time injection): keep current conditions warm in a
+# small TTL cache and inject them into the prompt so "what's the weather" answers in ONE LLM call
+# instead of a get_current_weather tool round-trip. Refresh is ASYNC — a stale turn kicks off a
+# background refresh and uses whatever is cached (empty on first run → the model just falls back to the
+# tool, still correct). Never blocks the turn.
+_weather_cache = {"text": "", "ts": 0.0}
+_WEATHER_TTL = float(os.getenv("FRIDAY_WEATHER_TTL", "600"))  # 10 min
+
+
+async def _refresh_weather() -> None:
+    try:
+        wx = await get_current_weather()
+        if wx and "unreachable" not in wx.lower():   # don't cache the error fallback string
+            _weather_cache["text"], _weather_cache["ts"] = wx, time.time()
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] weather refresh failed (non-fatal): {e}", flush=True)
+
+
+def _weather_for_prompt() -> str:
+    """Cached current weather for prompt injection. Non-blocking: if stale, kick off a background
+    refresh and return whatever is currently cached (empty until the first refresh lands)."""
+    if time.time() - _weather_cache["ts"] > _WEATHER_TTL:
+        t = asyncio.create_task(_refresh_weather())
+        _bg_tasks.add(t)
+        t.add_done_callback(_bg_tasks.discard)
+    return _weather_cache["text"]
 
 
 # Location-relevant swarm asks: fold Friday's known home location into the task so "near me" / local /
@@ -1362,6 +1390,13 @@ async def _answer(client_messages, tools=None):
         "the current time, date, and day of week from this line — answer any such question directly and "
         "conversationally (say it in words, e.g. 'It's twenty past five'). Do NOT call get_current_time "
         "or get_current_date; the answer is right here, and calling a tool is slower and unnecessary.")
+    _wx = _weather_for_prompt()
+    if _wx:
+        parts.append(
+            "CURRENT LOCAL WEATHER (refreshed within the last few minutes): " + _wx + ". Answer "
+            "questions about the current weather, temperature, or 'how's it out' directly from this — do "
+            "NOT call get_current_weather. (For a multi-day forecast or a specific future time, you may "
+            "still use the forecast/hourly tools.)")
     parts.append(
         "SPOKEN OUTPUT: you are talking out loud, not on a screen. NEVER read URLs, links, or "
         "'check [website] for details' — the user cannot click anything. When a tool returns data, "
