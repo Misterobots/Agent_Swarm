@@ -10,22 +10,10 @@ route:
   group_interval: 10s
   repeat_interval: 12h
   routes:
-    # Mirror every alert to the maintenance_router. It classifies the alert
-    # and either dispatches it to auto_repair_daemon (agent_safe path) or
-    # parks it in the Mission Control human queue. The original email/ntfy
-    # receivers still fire — this route is additive (continue: true).
-    - receiver: "maintenance-router"
-      continue: true
     - receiver: "default-receiver"
       group_by: ['env', 'instance']
 
 receivers:
-  - name: "maintenance-router"
-    webhook_configs:
-      - url: 'http://maintenance-router:9095/webhook/alertmanager'
-        send_resolved: true
-        max_alerts: 0   # forward every alert in the group, no batching cap
-
   - name: "default-receiver"
     email_configs:
       - to: 'Justin@shivelymail.com'

@@ -1,0 +1,28 @@
+groups:
+  - name: container-health
+    interval: 30s
+    rules:
+      - alert: ContainerCrashLooping
+        expr: max by (name, node) (changes(container_start_time_seconds{name!=""}[15m])) > 3
+        for: 0m
+        labels: {severity: critical, category: availability}
+        annotations:
+          summary: "Container {{ $labels.name }} is crash-looping"
+          description: "{{ $labels.name }} on {{ $labels.node }} restarted >3 times in 15m (value {{ $value }}). Check: docker logs {{ $labels.name }}"
+      - alert: CriticalContainerAbsent
+        expr: absent(container_last_seen{name="traefik"}) or absent(container_last_seen{name="cloudflared"}) or absent(container_last_seen{name="authentik"})
+        for: 2m
+        labels: {severity: critical, category: availability}
+        annotations:
+          summary: "Critical edge container missing from cAdvisor"
+          description: "traefik/cloudflared/authentik series absent for 2m -- removed or dead. Per-service up/down is also in Uptime Kuma."
+  - name: external-reachability
+    interval: 30s
+    rules:
+      - alert: ExternalHostUnreachable
+        expr: probe_success{job="blackbox-external"} == 0
+        for: 2m
+        labels: {severity: critical, category: reachability}
+        annotations:
+          summary: "External host {{ $labels.instance }} unreachable"
+          description: "blackbox probe to {{ $labels.instance }} failing 2m. Containers up but this firing => DNS (stale A record) / CF tunnel / Traefik outage class."
