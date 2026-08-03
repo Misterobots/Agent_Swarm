@@ -49,7 +49,8 @@ from persona_page import PERSONA_EDITOR_HTML
 # delegate_to_swarm + AGENT_RUNTIME_URL imported by NAME (not `import tools`) on purpose: _answer()
 # has a parameter named `tools` (the HA tool list) that would shadow the module inside it.
 from tools import (TOOL_SCHEMAS, call_tool, delegate_to_swarm, AGENT_RUNTIME_URL,
-                   HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN, get_current_weather)
+                   HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN, get_current_weather,
+                   list_media_players, MEDIA_SEARCH_SENTINEL)
 
 VAULT_URL       = os.getenv("VAULT_URL", "").rstrip("/")
 VAULT_OWNER     = os.getenv("VAULT_OWNER", "")
@@ -76,6 +77,21 @@ TEMPERATURE = float(os.getenv("BMO_TEMPERATURE", "0.5"))
 # schema list can approach that on their own. Explicit since relying on the model's/
 # host's default risks silent truncation rather than an obvious failure.
 NUM_CTX = int(os.getenv("BMO_NUM_CTX", "16384"))
+# Anti-runaway decoding. qwen3:8b will occasionally degenerate into repeating the same sentence;
+# with no output cap it repeats until it fills NUM_CTX (16K) — the "she says the last thing over and
+# over" symptom. REPEAT_PENALTY over the last REPEAT_LAST_N tokens is the PRIMARY loop-breaker;
+# NUM_PREDICT is only a generous backstop that bounds a pathological runaway (~2K tokens ≈ 30s at
+# ~68 tok/s, versus ~240s to fill 16K). It MUST sit above a normal thinking+answer turn: qwen3 runs
+# with <think> on, and a tight cap truncated the reasoning before the tool call on harder turns
+# (measured: media-call succeeded 1/3 at 512, 2/3 at 1024, 3/3 at 2048), so keep it roomy. Env-tunable.
+REPEAT_PENALTY = float(os.getenv("FRIDAY_REPEAT_PENALTY", "1.3"))
+REPEAT_LAST_N  = int(os.getenv("FRIDAY_REPEAT_LAST_N", "64"))
+NUM_PREDICT    = int(os.getenv("FRIDAY_NUM_PREDICT", "2048"))
+# A strong repeat penalty tames free-form speech loops, but it also nudges the model off the exact
+# tokens a tool call needs — repeated entity_id prefixes, area names, JSON keys — which shows up as
+# over-generalized device targeting ("all the lights" for "the lamps"). So tool-offering turns use a
+# gentle penalty (protect HA targeting accuracy); pure-speech turns keep the strong one.
+REPEAT_PENALTY_TOOLS = float(os.getenv("FRIDAY_REPEAT_PENALTY_TOOLS", "1.1"))
 # ollama_friday (GPU 1) is DEDICATED to Friday — nothing else uses that card — so pin qwen3:8b
 # resident indefinitely (keep_alive=-1). A finite window (was "30m") let it idle-unload, and the
 # next voice request paid a ~12s cold reload = flaky voice pickup / "can't reach the model".
@@ -880,8 +896,11 @@ async def _ollama_chat(messages: list, tools=None):
     Ollama's native shape (list of {"function": {"name", "arguments"}}) or None."""
     # keep_alive pins qwen3:8b resident in VRAM between calls (KEEP_ALIVE=-1 by default now that
     # ollama_friday's GPU is dedicated to Friday) so a voice turn never pays a cold reload.
+    penalty = REPEAT_PENALTY_TOOLS if tools else REPEAT_PENALTY
     payload = {"model": _current_model, "messages": messages, "stream": False, "keep_alive": KEEP_ALIVE,
-               "options": {"temperature": TEMPERATURE, "num_ctx": NUM_CTX}}
+               "options": {"temperature": TEMPERATURE, "num_ctx": NUM_CTX,
+                           "repeat_penalty": penalty, "repeat_last_n": REPEAT_LAST_N,
+                           "num_predict": NUM_PREDICT}}
     if tools:
         payload["tools"] = tools
     async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as c:
@@ -931,6 +950,15 @@ async def _self_execute_tools(messages: list, tools: list):
             name = fn.get("name", "")
             args = fn.get("arguments") or {}
             result = await call_tool(name, args)
+            if isinstance(result, str) and result.startswith(MEDIA_SEARCH_SENTINEL):
+                # Pi/self-exec has no async-announce channel for the swarm-search fallback, so
+                # degrade to an honest spoken message rather than leaking the sentinel to the model.
+                try:
+                    src = json.loads(result[len(MEDIA_SEARCH_SENTINEL):]).get("source", "that")
+                except Exception:  # noqa: BLE001
+                    src = "that"
+                result = (f"I don't have a station for {src} set up, and I can't search for one on this "
+                          "device. Try a station name like jazz or chill, or a stream URL.")
             print(f"[bmo-brain] self-executed tool={name} args={args} -> {result[:120]!r}", flush=True)
             convo.append({"role": "tool", "content": result})
     print(f"[bmo-brain] self-executing tool loop exhausted {SELF_TOOL_MAX_ROUNDS} rounds "
@@ -1039,6 +1067,144 @@ async def _passthrough_with_info(messages, tools):
         return text, None  # no tool_calls -> final text answer
     print(f"[bmo-brain] info passthrough loop exhausted {WEB_MAX_ROUNDS} rounds", flush=True)
     return (text or "I looked but couldn't pull that together — want me to try again?"), None
+
+
+# friday_brain's own media-control tools (transport + volume + stream play), executed locally via HA's
+# service API — HA's Assist doesn't reliably expose media_player control as intents, so without this a
+# "play/pause/skip/volume" turn had nothing to call (confirmed: no media tool existed at all). These
+# are WRITES but reversible/low-risk, so — unlike the registry tools — no consent gate; they're offered
+# on the passthrough path ONLY when the utterance looks media-related (_MEDIA_INTENT_RE) to keep
+# ordinary turns lean. The read-only info tools ride along so a batched "play jazz and what's the
+# weather" still answers both. HA-owned tool_calls still return UNEXECUTED to HA.
+_MEDIA_TOOL_NAMES = frozenset({"control_media", "set_volume", "play_media"})
+_MEDIA_SCHEMAS = [t for t in TOOL_SCHEMAS if (t.get("function") or {}).get("name") in _MEDIA_TOOL_NAMES]
+_MEDIA_LOCAL_NAMES = _MEDIA_TOOL_NAMES | _INFO_TOOL_NAMES
+_MEDIA_INTENT_RE = re.compile(
+    r"\b(play|pause|resume|unpause|"
+    r"stop\s+(?:the\s+)?(?:music|playback|song|track|speaker|media)|"
+    r"skip|next\s+(?:track|song)|previous\s+(?:track|song)|"
+    r"volume|louder|quieter|mute|unmute|"
+    r"turn\s+(?:it\s+|the\s+(?:volume|music|sound)\s+)?(?:up|down)|"
+    r"put\s+on\s+(?:some\s+)?\w+|cast)\b", re.I)
+
+
+def _split_media_calls(tool_calls):
+    """(locally-owned we execute here = media + read-only info, HA-owned handed back to HA untouched)."""
+    local, other = [], []
+    for tc in (tool_calls or []):
+        name = (tc.get("function") or {}).get("name", "")
+        (local if name in _MEDIA_LOCAL_NAMES else other).append(tc)
+    return local, other
+
+
+# HA may expose its OWN media intents (HassMediaSearchAndPlay from Spotify/Music Assistant,
+# HassMediaPause, HassSetVolume, HassMediaNext, ...). When it does, THOSE own media — friday_brain's
+# media tools must step aside. If they don't, the model sometimes picks ours for a "play X" and either
+# kicks off a bogus radio-stream search or no-ops media_play (a false "Done" with nothing playing),
+# and even collides with HA's real intent (observed live once Spotify was added). Our media tools are
+# a FALLBACK, offered only when HA exposes no media control at all (the original gap they filled).
+_HA_MEDIA_NAME_RE = re.compile(r"(media|volume)", re.I)
+
+
+def _ha_offers_media(tools) -> bool:
+    for t in (tools or []):
+        name = (t.get("function") or {}).get("name") or t.get("name") or ""
+        if _HA_MEDIA_NAME_RE.search(name):
+            return True
+    return False
+
+
+# Tier 1 (entity): give the model the real media_player entity_ids so it targets the right speaker
+# instead of guessing. Cached fetch (shared with the resolver), injected only on media turns.
+async def _media_players_prompt():
+    try:
+        players = await list_media_players()
+    except Exception:  # noqa: BLE001
+        players = []
+    if not players:
+        return None
+    listing = "; ".join(f"{eid} = {fn}" for eid, fn in players[:20])
+    return ("MEDIA PLAYERS in this home — when you call a media tool, pass one of these EXACT "
+            "entity_id values (choose by room): " + listing)
+
+
+_URL_RE = re.compile(r"https?://[^\s\"'>)\]]+", re.I)
+
+
+async def _media_search_and_play(entity_id: str, source: str):
+    """Tier 3 (music): the source wasn't a known station/URL, so ask the swarm to find a playable
+    STREAM URL, then cast it and announce the result. Runs in the background after an immediate
+    spoken ack (the swarm is slow). Announce-only (reopen=False) — this hardware self-triggers if the
+    mic reopens on Friday's own TTS (see the reopen/echo notes)."""
+    try:
+        ask = (f"Find one direct, publicly-playable internet-radio or audio STREAM URL "
+               f"(an mp3/aac/m3u8/icecast/shoutcast endpoint) for: {source}. "
+               f"Respond with ONLY the URL and nothing else.")
+        raw = await delegate_to_swarm(ask, mode="research")
+        m = _URL_RE.search(str(raw) or "")
+        if not m:
+            await _ha_announce(f"I couldn't find a stream for {source}.", reopen=False)
+            return
+        played = await call_tool("play_media", {"entity_id": entity_id, "source": m.group(0)})
+        if isinstance(played, str) and played.startswith("Playing"):
+            await _ha_announce(f"Found a stream for {source}. Playing it now.", reopen=False)
+        else:
+            await _ha_announce(f"I found a stream for {source} but couldn't start it.", reopen=False)
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] media search-and-play failed: {type(e).__name__}: {e}", flush=True)
+        await _ha_announce(f"I ran into trouble finding a stream for {source}.", reopen=False)
+
+
+async def _passthrough_with_media(messages, tools):
+    """Passthrough tool-calling that ALSO offers friday_brain's media-control tools (+ the read-only
+    info tools) and executes them locally via HA's service API, looping until final text or an
+    HA-owned tool_call (returned UNEXECUTED for HA). Mirrors _passthrough_with_info; reached only on
+    a media-intent turn. Injects the real media_player list (Tier 1) and honors play_media's
+    swarm-search signal (Tier 3). Returns (text, tool_calls) matching _answer's contract."""
+    all_tools = list(tools) + _MEDIA_SCHEMAS + _INFO_SCHEMAS
+    convo = list(messages)
+    mp = await _media_players_prompt()
+    if mp:
+        if convo and convo[0].get("role") == "system":
+            convo = [{**convo[0], "content": convo[0]["content"] + "\n\n" + mp}] + convo[1:]
+        else:
+            convo = [{"role": "system", "content": mp}] + convo
+    text, tool_calls = "", None
+    for _round in range(WEB_MAX_ROUNDS):
+        text, tool_calls = await _ollama_chat(convo, all_tools)
+        local_calls, ha_calls = _split_media_calls(tool_calls)
+        if local_calls:
+            convo = convo + [{"role": "assistant", "content": text, "tool_calls": local_calls}]
+            for tc in local_calls:
+                fn = tc.get("function") or {}
+                result = await call_tool(fn.get("name", ""), fn.get("arguments") or {})
+                if isinstance(result, str) and result.startswith(MEDIA_SEARCH_SENTINEL):
+                    # Tier 3 (music): source unresolved. Hand to the swarm in the background, ack now.
+                    try:
+                        payload = json.loads(result[len(MEDIA_SEARCH_SENTINEL):])
+                    except Exception:  # noqa: BLE001
+                        payload = {}
+                    src = payload.get("source") or "that"
+                    eid = payload.get("entity_id") or ""
+                    if AGENT_RUNTIME_URL and eid:
+                        _t = asyncio.create_task(_media_search_and_play(eid, src))
+                        _bg_tasks.add(_t)
+                        _t.add_done_callback(_bg_tasks.discard)
+                        print(f"[bmo-brain] media source {src!r} unresolved -> swarm search (async)", flush=True)
+                        return _speechify(f"I don't have {src} as a station. Let me find a stream for it, one moment."), None
+                    return _speechify(f"I don't have a station for {src}. Try one like jazz or chill, "
+                                      "or give me a stream URL."), None
+                print(f"[bmo-brain] media tool={fn.get('name')} args={fn.get('arguments')} "
+                      f"-> {str(result)[:160]!r}", flush=True)
+                convo.append({"role": "tool", "content": result})
+            if ha_calls:
+                return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
+            continue  # only local calls -> reprompt for a spoken confirmation
+        if ha_calls:
+            return text, await _sanitize_hass_tool_calls(ha_calls, VAULT_OWNER)
+        return text, None  # no tool_calls -> final text answer
+    print(f"[bmo-brain] media passthrough loop exhausted {WEB_MAX_ROUNDS} rounds", flush=True)
+    return (text or "I tried to do that with the media player but couldn't finish — want me to try again?"), None
 
 
 # Flips True the first time the vault 404s the pending-search endpoint. Newer MemPalace builds
@@ -1691,6 +1857,11 @@ async def _answer(client_messages, tools=None):
         # since HA can't. Ordinary on/off turns skip this entirely (regex miss) and stay on the
         # untouched single-call path below.
         text, tool_calls = await _passthrough_with_registry(messages, tools)
+    elif tools and _MEDIA_INTENT_RE.search(last_user or "") and not _ha_offers_media(tools):
+        # Media intent AND HA exposes no native media control -> use friday_brain's media tools
+        # (transport/volume/stream) as the fallback, executed via HA's service API. When HA DOES
+        # expose media (Spotify/Music Assistant intents), this is skipped so those own it (below).
+        text, tool_calls = await _passthrough_with_media(messages, tools)
     elif tools:
         # HA-driven turn. Offer friday_brain's read-only info tools (web_search + weather + news)
         # alongside HA's tools, executed locally, so live-info questions answer with REAL DATA instead

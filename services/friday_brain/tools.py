@@ -8,7 +8,11 @@ web_search is a deliberately simpler DuckDuckGo-only implementation than the
 agents/tools/web_browser.py original (no Google CSE fallback, no content-trust
 scanning) — the trade-off is a smaller dependency footprint for this microservice.
 """
+import difflib
+import json
 import os
+import re
+import time
 import xml.etree.ElementTree as ET
 
 import httpx
@@ -267,6 +271,193 @@ async def list_devices(**_kwargs) -> str:
     return "Could not list devices"
 
 
+# --- Media playback (HA media_player domain) --------------------------------------------------
+# Transport + volume control work on any media_player entity. play_media casts a direct stream URL
+# or a named internet-radio station (_STATIONS: SomaFM defaults, extendable via the
+# FRIDAY_RADIO_STATIONS JSON env var). Resolving an arbitrary song/artist BY NAME needs a music
+# provider (Music Assistant / Spotify) on the HA side — none is installed here — so play_media is
+# stream/URL based by design.
+_DEFAULT_STATIONS = {
+    "groove salad": "https://ice1.somafm.com/groovesalad-128-mp3",
+    "chill":        "https://ice1.somafm.com/groovesalad-128-mp3",
+    "ambient":      "https://ice1.somafm.com/dronezone-128-mp3",
+    "drone zone":   "https://ice1.somafm.com/dronezone-128-mp3",
+    "indie":        "https://ice1.somafm.com/indiepop-128-mp3",
+    "indie pop":    "https://ice1.somafm.com/indiepop-128-mp3",
+    "jazz":         "https://ice1.somafm.com/sonicuniverse-128-mp3",
+    "lounge":       "https://ice1.somafm.com/secretagent-128-mp3",
+    "80s":          "https://ice1.somafm.com/u80s-128-mp3",
+    "eighties":     "https://ice1.somafm.com/u80s-128-mp3",
+}
+try:
+    _STATIONS = {**_DEFAULT_STATIONS, **json.loads(os.getenv("FRIDAY_RADIO_STATIONS", "") or "{}")}
+except Exception:  # noqa: BLE001 — a malformed override must never break tool loading
+    _STATIONS = dict(_DEFAULT_STATIONS)
+
+_MEDIA_SERVICE = {
+    "play": "media_play", "resume": "media_play", "unpause": "media_play",
+    "pause": "media_pause",
+    "stop": "media_stop",
+    "next": "media_next_track", "skip": "media_next_track",
+    "previous": "media_previous_track", "back": "media_previous_track",
+    "volume_up": "volume_up", "louder": "volume_up",
+    "volume_down": "volume_down", "quieter": "volume_down",
+    "mute": "volume_mute", "unmute": "volume_mute",
+}
+
+
+def _ha_service_ok(result) -> bool:
+    """HA service calls return a JSON list of changed states on success; _ha_call returns a
+    {"error": ...} dict on a non-200. Success = anything that isn't that error dict."""
+    return not (isinstance(result, dict) and "error" in result)
+
+
+# --- Media entity resolution ladder: exact -> room/substring -> difflib fuzzy -> clarify -------
+# Small models fumble exact entity_ids ('media_player.office' vs 'media_player.office_speaker').
+# resolve_media_player() forgives that locally (no LLM, no extra network beyond a short-TTL cached
+# /states): a confident single hit is used silently; anything ambiguous returns candidates so the
+# caller can ask. MEDIA_SEARCH_SENTINEL is play_media's signal that the SOURCE (not the speaker)
+# couldn't be resolved locally — main.py turns that into the swarm-search fallback.
+MEDIA_SEARCH_SENTINEL = "\x00MEDIA_SEARCH\x00"
+_media_players_cache = {"list": [], "ts": 0.0}
+_MEDIA_PLAYERS_TTL = 120.0
+_MEDIA_STOPWORDS = frozenset({"the", "a", "an", "in", "on", "to", "my", "our", "please",
+                              "speaker", "speakers", "player", "media", "device", "tv"})
+
+
+def _norm_media(s: str) -> str:
+    return re.sub(r"[^a-z0-9 ]+", " ", (s or "").lower()).strip()
+
+
+async def list_media_players() -> list:
+    """[(entity_id, friendly_name)] for every media_player entity — short-TTL cached so the resolver
+    and the prompt-context injection share one HA /states call."""
+    now = time.time()
+    if _media_players_cache["list"] and (now - _media_players_cache["ts"]) < _MEDIA_PLAYERS_TTL:
+        return _media_players_cache["list"]
+    states = await _ha_call("GET", "states")
+    if isinstance(states, list):
+        players = [(e.get("entity_id", ""),
+                    (e.get("attributes", {}) or {}).get("friendly_name", "") or e.get("entity_id", ""))
+                   for e in states if e.get("entity_id", "").startswith("media_player.")]
+        _media_players_cache["list"] = players
+        _media_players_cache["ts"] = now
+        return players
+    return _media_players_cache["list"]
+
+
+async def resolve_media_player(target: str):
+    """(entity_id | None, candidates). entity_id is set ONLY on a confident single match (exact id,
+    a room/substring hit, or a clear difflib winner >= 0.8); otherwise None plus a candidate list
+    for a spoken clarify."""
+    want = (target or "").strip()
+    players = await list_media_players()
+    if not players:
+        return None, []
+    if want in {eid for eid, _ in players}:
+        return want, players
+    nwant = _norm_media(want)
+    if not nwant:
+        return None, players
+    toks = [t for t in nwant.split() if t not in _MEDIA_STOPWORDS]
+    scored = []
+    for eid, fn in players:
+        hay = _norm_media(eid.split(".", 1)[-1].replace("_", " ")) + " " + _norm_media(fn)
+        if nwant in hay:
+            score = 1.0
+        elif toks and all(t in hay for t in toks):
+            score = 0.95
+        else:
+            score = difflib.SequenceMatcher(None, nwant, _norm_media(fn)).ratio()
+        scored.append((eid, fn, score))
+    scored.sort(key=lambda x: -x[2])
+    best = scored[0]
+    runner = scored[1][2] if len(scored) > 1 else 0.0
+    if best[2] >= 0.8 and (best[2] - runner) >= 0.1:
+        return best[0], players
+    close = [(eid, fn) for eid, fn, sc in scored if sc >= 0.55]
+    return None, (close or players)
+
+
+def _media_clarify(candidates: list) -> str:
+    names = [fn for _, fn in candidates][:6]
+    if not names:
+        return "I couldn't find any speakers to control. Which device did you mean?"
+    listed = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]
+    return f"I couldn't tell which one you meant. I can use the {listed}. Which should I use?"
+
+
+async def control_media(entity_id: str, action: str, **_kwargs) -> str:
+    """Transport + volume control on a media_player: play/resume, pause, stop, next, previous,
+    volume_up, volume_down, mute, unmute."""
+    act = (action or "").lower().strip()
+    svc = _MEDIA_SERVICE.get(act)
+    if not svc:
+        return (f"Error: unknown media action '{action}'. Use play, pause, stop, next, previous, "
+                "volume_up, volume_down, mute, or unmute.")
+    eid, candidates = await resolve_media_player(entity_id)
+    if not eid:
+        return _media_clarify(candidates)
+    body = {"entity_id": eid}
+    if svc == "volume_mute":
+        body["is_volume_muted"] = act != "unmute"
+    result = await _ha_call("POST", f"services/media_player/{svc}", body)
+    if not _ha_service_ok(result):
+        return f"Error: {result['error']}"
+    return f"Done: {act} on {eid}"
+
+
+async def set_volume(entity_id: str, level=None, volume=None, **_kwargs) -> str:
+    """Set a media_player's volume. Accepts 0-100 (percent) or 0-1 (fraction)."""
+    raw = level if level is not None else volume
+    try:
+        lvl = float(raw)
+    except (TypeError, ValueError):
+        return "Error: volume must be a number from zero to one hundred."
+    if lvl > 1:
+        lvl /= 100.0
+    lvl = max(0.0, min(1.0, lvl))
+    eid, candidates = await resolve_media_player(entity_id)
+    if not eid:
+        return _media_clarify(candidates)
+    result = await _ha_call("POST", "services/media_player/volume_set",
+                            {"entity_id": eid, "volume_level": lvl})
+    if not _ha_service_ok(result):
+        return f"Error: {result['error']}"
+    return f"Set {eid} to {round(lvl * 100)} percent volume"
+
+
+async def play_media(entity_id: str, source: str = "", url: str = "", query: str = "",
+                     media_type: str = "music", **_kwargs) -> str:
+    """Start audio on a media_player from a direct stream URL or a known station name (_STATIONS).
+    Not a by-name song lookup (no music provider installed) — streams/URLs only."""
+    eid, candidates = await resolve_media_player(entity_id)
+    if not eid:
+        return _media_clarify(candidates)
+    want = (source or url or query or "").strip()
+    key = want.lower()
+    if want.startswith(("http://", "https://")):
+        media_url = want
+    elif key in _STATIONS:
+        media_url = _STATIONS[key]
+    else:
+        media_url = next((u for name, u in _STATIONS.items() if name in key), "")
+        if not media_url and any(w in key for w in
+                                 ("music", "song", "tune", "something", "anything", "radio", "playlist")):
+            media_url = _STATIONS.get("groove salad") or next(iter(_STATIONS.values()), "")
+    if not media_url:
+        # Tier 3 (music): source isn't a known station/URL. Signal main.py to engage the swarm to
+        # hunt a stream. On the self-exec/Pi path (no sentinel handling) this degrades to a plain
+        # spoken message — see _self_execute_tools / _passthrough_with_media.
+        return MEDIA_SEARCH_SENTINEL + json.dumps({"entity_id": eid, "source": want})
+    result = await _ha_call("POST", "services/media_player/play_media",
+                            {"entity_id": eid, "media_content_id": media_url,
+                             "media_content_type": media_type or "music"})
+    if not _ha_service_ok(result):
+        return f"Error: {result['error']}"
+    return f"Playing on {eid}"
+
+
 TOOL_SCHEMAS = [
     {"type": "function", "function": {
         "name": "get_current_weather", "description":
@@ -321,6 +512,36 @@ TOOL_SCHEMAS = [
         "List available smart home devices. Use when the user asks what devices exist or you need to discover an entity_id.",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
+        "name": "control_media", "description":
+        "Control playback on a speaker or media player: play/resume, pause, stop, next, previous, "
+        "volume_up, volume_down, mute, unmute. Use for 'pause the living room speaker', 'skip this "
+        "song', 'turn it up', 'resume the music', 'mute the kitchen'.",
+        "parameters": {"type": "object", "properties": {
+            "entity_id": {"type": "string", "description":
+                "media_player entity, e.g. 'media_player.living_room_speaker' or 'media_player.kitchen_display'"},
+            "action": {"type": "string", "description":
+                "play, pause, stop, next, previous, volume_up, volume_down, mute, or unmute"}},
+            "required": ["entity_id", "action"]}}},
+    {"type": "function", "function": {
+        "name": "set_volume", "description":
+        "Set a speaker/media player's volume to a specific level. Use for 'set the kitchen volume to "
+        "forty percent' or 'make the living room half volume'.",
+        "parameters": {"type": "object", "properties": {
+            "entity_id": {"type": "string", "description":
+                "media_player entity, e.g. 'media_player.kitchen_display'"},
+            "level": {"type": "number", "description": "volume 0-100 (percent) or 0-1 (fraction)"}},
+            "required": ["entity_id", "level"]}}},
+    {"type": "function", "function": {
+        "name": "play_media", "description":
+        "Start audio on a speaker from an internet-radio station name or a direct stream URL. Use for "
+        "'play some jazz in the living room' or 'put on the chill station in the kitchen'. NOTE: this "
+        "plays radio streams, NOT specific songs/artists by name (no music service is set up).",
+        "parameters": {"type": "object", "properties": {
+            "entity_id": {"type": "string", "description": "media_player entity to play on"},
+            "source": {"type": "string", "description":
+                "a station name (e.g. 'jazz', 'chill', 'indie', '80s') or a direct stream URL"}},
+            "required": ["entity_id", "source"]}}},
+    {"type": "function", "function": {
         "name": "delegate_to_swarm", "description":
         "Hand off a HEAVY, multi-step task to the agent swarm: deep research, building or writing "
         "something substantial, or complex analysis. Do NOT use for quick facts (use web_search) "
@@ -345,6 +566,9 @@ _DISPATCH = {
     "turn_off_device": turn_off_device,
     "get_device_state": get_device_state,
     "list_devices": list_devices,
+    "control_media": control_media,
+    "set_volume": set_volume,
+    "play_media": play_media,
     "delegate_to_swarm": delegate_to_swarm,
 }
 
