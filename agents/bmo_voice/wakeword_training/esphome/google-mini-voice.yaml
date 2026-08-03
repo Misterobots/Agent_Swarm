@@ -990,6 +990,10 @@ select:
       lambda: |-
         if (x == "Slightly sensitive") {
           id(okay_nabu).set_probability_cutoff(217);
+          // hey_friday at 217 (~0.85). The 2026-08-02 retrain added ~1400 household hard-negative
+          // clips, so the model now rejects THIS home's ambient itself (validation: ~0.4 false-accepts
+          // /hour vs 549 pre-retrain) — the earlier 234 stopgap is no longer needed. Start at 217;
+          // tune UP if it still over-triggers on-device, DOWN if real "Hey Friday" gets missed.
           id(hey_friday).set_probability_cutoff(217);
         } else if (x == "Moderately sensitive") {
           id(okay_nabu).set_probability_cutoff(176);
