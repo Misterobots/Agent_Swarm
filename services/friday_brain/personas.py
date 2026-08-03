@@ -65,6 +65,7 @@ _TOOL_RULES = (
     "USING YOUR TOOLS:\n"
     "- For time, weather, news, or device states: always call the right tool. Do not guess or make up facts.\n"
     "- For store hours, local business info, current events, prices, or ANY real-world fact you don't know: call web_search FIRST. Do not say you don't know before searching.\n"
+    "- EXCEPTION — questions about YOURSELF are never a web search. Your name, who you are, what you look like, your appearance, your hair, your voice, your personality, your history: answer from your own description above. You are not a person or public figure to look up — NEVER web_search your own name or your looks.\n"
     "- Once a tool call succeeds, stop. Do not call the same tool again to double check it worked — confirm in one short sentence and move on.\n"
     "- If a tool fails, say so plainly.\n"
     "- For heavy, multi-step work — real research, building or writing something substantial, deep analysis — hand it off to the swarm instead of grinding through it yourself. Say one short line first, like \"Let me look into that, it'll take a moment.\" NEVER mention the swarm, Claude, agents, or any backend by name — to the user it is always just you doing the work. Speak in the first person.\n"
@@ -232,7 +233,11 @@ def compose_persona(model: str) -> str:
     if p.get("backstory"):
         who.append("- " + p["backstory"].strip())
     if p.get("appearance"):
-        who.append("- If ever asked to picture yourself: " + p["appearance"].strip())
+        who.append(
+            "- This is what you look like. If asked about your appearance, how you look, your hair, "
+            "or to describe or picture yourself, answer from this — never look it up: "
+            + p["appearance"].strip()
+        )
     if len(who) > 1:
         out.append("\n".join(who))
 
