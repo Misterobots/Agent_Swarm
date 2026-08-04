@@ -15,6 +15,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait as futures_wait
 from typing import Generator, Optional
 
+import swarm_run_store
 from config import ARCHITECT_MODEL
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock
@@ -47,7 +48,39 @@ def _drain_file_changes(session) -> list[dict]:
             events.append(q.get_nowait())
         except Exception:
             break
+    # Accumulate file_change payloads for the run's aggregate diff (task board).
+    # Per-run by construction — only this session's drained changes land here.
+    try:
+        acc = getattr(session, "file_changes", None)
+        if acc is not None:
+            for ev in events:
+                if isinstance(ev, dict) and ev.get("type") == "file_change":
+                    content = ev.get("content")
+                    if isinstance(content, dict):
+                        acc.append(content)
+    except Exception:
+        pass
     return events
+
+
+def _build_run_diff(changes: list[dict]) -> str:
+    """Join accumulated file_change payloads into one reviewable diff string.
+
+    Sandbox edits carry a unified `diff`; creates/writes carry only op/path/size,
+    so those become a one-line header. Bounded later by swarm_run_store.set_diff.
+    """
+    if not changes:
+        return ""
+    parts: list[str] = []
+    for c in changes:
+        op = c.get("op", "changed")
+        path = c.get("path", "?")
+        diff = c.get("diff")
+        if diff:
+            parts.append(f"### {op}: {path}\n{diff}")
+        else:
+            parts.append(f"### {op}: {path} ({c.get('size', 0)} bytes)")
+    return "\n\n".join(parts)
 
 
 def coordinate_project_onboarding(
@@ -110,6 +143,12 @@ def coordinate_task(
     matching the chat_swarm() yield contract.
     """
     session = CoordinatorSession(session_id, owner_id)
+    # Record the run for the mobile task board (fire-and-forget; no-ops if the
+    # caller has no resolvable owner so anonymous runs never appear on a board).
+    swarm_run_store.create_run(
+        session.coordination_id, session.session_id, session.owner_id,
+        title=user_input, scope=None, started_at=int(session.created_at),
+    )
     logger.info(
         f"[Coordinator] Starting coordination {session.coordination_id} "
         f"for session {session_id}"
@@ -117,6 +156,7 @@ def coordinate_task(
 
     try:
         # === PHASE 1: DECOMPOSE ===
+        swarm_run_store.update_run_phase(session.coordination_id, 1, "Decompose")
         yield {"type": "swarm_phase", "phase_num": 1, "phase_name": "Decompose", "total_phases": 5}
         yield {"type": "status", "content": "🧩 Coordinator: Decomposing task..."}
         yield {"type": "thought", "content": "→ Phase 1/5: Task Decomposition (LLM)"}
@@ -378,6 +418,12 @@ def coordinate_task(
                     "card_type": "dev_project",
                 },
             }
+            # Mark the run 'needs_input' so the mobile task board shows it awaiting
+            # an answer (not a phantom 'running'). It resumes as a new coordination
+            # when the user answers the clarification card.
+            swarm_run_store.finish_run(
+                session.coordination_id, status="needs_input", ended_at=int(time.time())
+            )
             return
 
         yield {
@@ -605,6 +651,7 @@ def coordinate_task(
             return
 
         # === PHASE 2: RESEARCH (parallel) ===
+        swarm_run_store.update_run_phase(session.coordination_id, 2, "Research")
         yield {"type": "swarm_phase", "phase_num": 2, "phase_name": "Research", "total_phases": 5}
         yield {
             "type": "status",
@@ -765,6 +812,7 @@ def coordinate_task(
                                 yield _fc
 
         # === PHASE 3: SYNTHESIZE (LLM) ===
+        swarm_run_store.update_run_phase(session.coordination_id, 3, "Synthesize")
         yield {"type": "swarm_phase", "phase_num": 3, "phase_name": "Synthesize", "total_phases": 5}
         yield {"type": "status", "content": "🧠 Coordinator: Synthesizing research findings..."}
         yield {"type": "thought", "content": "→ Phase 3/5: Synthesis (LLM — reading all findings)"}
@@ -906,6 +954,7 @@ def coordinate_task(
         yield {"type": "log", "content": f"[Coordinator] Synthesis: {len(synthesis)} chars, confidence={synth_confidence:.0%}"}
 
         # === PHASE 4: IMPLEMENTATION (serial) ===
+        swarm_run_store.update_run_phase(session.coordination_id, 4, "Implement")
         yield {"type": "swarm_phase", "phase_num": 4, "phase_name": "Implement", "total_phases": 5}
 
         execute_code = (not plan_mode) and (not ultraplan_mode) and (scope == "codebase")
@@ -1132,6 +1181,7 @@ def coordinate_task(
                         )
 
         # === PHASE 5: VERIFICATION ===
+        swarm_run_store.update_run_phase(session.coordination_id, 5, "Verify")
         yield {"type": "swarm_phase", "phase_num": 5, "phase_name": "Verify", "total_phases": 5}
         yield {"type": "status", "content": "🔍 Coordinator: Verification in progress..."}
         yield {"type": "thought", "content": "→ Phase 5/5: Verification (fresh-eyes worker)"}
@@ -1287,7 +1337,19 @@ def coordinate_task(
             f"[Coordinator] Coordination {session.coordination_id} complete: "
             f"{completed}/{total_workers} workers, {total_time:.1f}s"
         )
+        run_diff = _build_run_diff(getattr(session, "file_changes", []))
+        if run_diff:
+            swarm_run_store.set_diff(session.coordination_id, run_diff)
+        swarm_run_store.finish_run(
+            session.coordination_id, status="completed",
+            workers_total=total_workers, workers_completed=completed,
+            workers_failed=failed, summary=synthesis, ended_at=int(time.time()),
+        )
 
     except Exception as e:
         logger.error(f"[Coordinator] Coordination failed: {e}", exc_info=True)
+        swarm_run_store.finish_run(
+            session.coordination_id, status="failed",
+            error=str(e), ended_at=int(time.time()),
+        )
         yield {"type": "error", "content": f"Coordination failed: {e}"}

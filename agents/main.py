@@ -166,6 +166,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Dev projects store init failed (non-fatal): {e}")
 
+        # 7f. Initialize Swarm Run Store (mobile task-board history)
+        try:
+            from swarm_run_store import init_table as _init_swarm_run_table
+            _init_swarm_run_table()
+        except Exception as e:
+            logger.warning(f"Swarm run store init failed (non-fatal): {e}")
+
         # 8. Clean up orphaned training runs (status='running' but server restarted)
         try:
             from config import TEMPLATE_DB_URL
@@ -294,6 +301,11 @@ if os.path.exists("/workspace/delivered_artifacts"):
 # Mount User Projects — agents write web apps here; served at /projects/<name>/
 os.makedirs("/workspace/user_projects", exist_ok=True)
 app.mount("/projects", StaticFiles(directory="/workspace/user_projects", html=True), name="projects")
+
+# Mount CAD artifacts (.scad + .stl) for browser download
+_CAD_ARTIFACTS_DIR = os.getenv("CAD_OUTPUT_DIR", "/workspace/cad_artifacts")
+os.makedirs(_CAD_ARTIFACTS_DIR, exist_ok=True)
+app.mount("/files/cad", StaticFiles(directory=_CAD_ARTIFACTS_DIR), name="cad_artifacts")
 
 # --- Direct File Serving for Voice Samples (StaticFiles mount was unreliable) ---
 from fastapi.responses import FileResponse
@@ -1235,6 +1247,29 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
     yield "data: [DONE]\n\n"
 
 
+# ---------------------------------------------------------------------------
+# SSE event allowlists — single source of truth for the streaming loop below.
+# Any new rich event type must be added HERE (both mode-blocks reference these)
+# and taught to the UI parser at ui/src/lib/utils/sse-parser.ts.
+# ---------------------------------------------------------------------------
+# Rich typed events forwarded verbatim (delta = full update dict) in BOTH modes.
+_RICH_EVENT_TYPES = frozenset({
+    "clarification_request", "clarification_card", "media_attachment",
+    "set_preview_url", "preview_unavailable", "design_artifact", "cad_artifact",
+    "suggested_followups", "workshop_questions", "workflow_next_steps",
+    "agent_event", "file_change",
+    # queue/VRAM status, tool lifecycle, and DevHarness todos — the UI already
+    # parses and renders these; they were previously dropped here at the allowlist.
+    "model_queue_status", "tool_start", "tool_progress", "tool_result", "todo",
+})
+# UI-routing signals forwarded only in non-standard mode (standard mode handles
+# status/thought/plan individually above the allowlist).
+_NONSTANDARD_SIGNAL_TYPES = frozenset({
+    "status", "thought", "log", "plan",
+    "turn_boundary", "turn_metadata", "continuation", "stream_mode",
+})
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest, http_request: Request):
     """
@@ -1527,6 +1562,15 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     # Reset content for this iteration (prevent stale content from previous)
                     content = ""
 
+                    # Heartbeat: orchestrator liveness ping with no content. Dropping
+                    # it (as before) silently reset the 30 s keepalive timer above
+                    # without ever putting bytes on the wire, so long swarm phases
+                    # could stall past Cloudflare/Traefik's ~100 s idle timeout.
+                    # Convert it into a real SSE keepalive comment instead.
+                    if msg_type == "heartbeat":
+                        yield ": keepalive\n\n"
+                        continue
+
                     # --- SWARM THEATER EVENTS (unconditional — both modes) ---
                     # Handled before the is_standard_mode split so swarm events
                     # always produce typed deltas regardless of which model is used.
@@ -1600,12 +1644,14 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                             yield f"data: {json.dumps(tool_chunk)}\n\n"
                             continue
 
-                        if msg_type in ("clarification_request", "clarification_card",
-                                        "media_attachment", "set_preview_url",
-                                        "preview_unavailable", "design_artifact",
-                                        "suggested_followups", "workshop_questions",
-                                        "workflow_next_steps", "agent_event",
-                                        "file_change"):
+                        if msg_type in _RICH_EVENT_TYPES:
+                            # Graceful-degradation fallback: rich events carry their
+                            # payload in structured fields, but give clarification cards
+                            # a human-readable `content` (the question) so a text-only or
+                            # lossy client still shows something instead of an empty drop.
+                            if msg_type == "clarification_card" and not update.get("content"):
+                                _clar = update.get("clarification") or {}
+                                update = {**update, "content": _clar.get("question", "Input needed")}
                             rich_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
@@ -1629,15 +1675,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                         # stream_mode are UI-routing signals — forward as
                         # typed chunks so the hook handles them, not the
                         # content appender.
-                        if msg_type in ("status", "thought", "log", "plan",
-                                        "turn_boundary", "turn_metadata",
-                                        "continuation", "stream_mode",
-                                        "clarification_request", "clarification_card",
-                                        "media_attachment", "set_preview_url",
-                                        "preview_unavailable", "design_artifact",
-                                        "suggested_followups", "workshop_questions",
-                                        "workflow_next_steps", "agent_event",
-                                        "file_change"):
+                        if msg_type in (_NONSTANDARD_SIGNAL_TYPES | _RICH_EVENT_TYPES):
                             typed_chunk = {
                                 "id": "chatcmpl-swarm",
                                 "object": "chat.completion.chunk",
@@ -2359,6 +2397,92 @@ async def graph_report():
         content=report_path.read_text(encoding="utf-8"),
         media_type="text/markdown; charset=utf-8",
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task board endpoints (mobile Codex loop — swarm run history)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/v1/tasks")
+async def list_tasks(request: Request, status: str = "all", limit: int = 50):
+    """List the authenticated user's swarm runs for the mobile task board.
+
+    Owner is resolved with _resolve_owner_id — the SAME resolution the swarm
+    dispatch uses on the write path — so the board sees the rows it recorded
+    (raw X-authentik-uid would miss username-keyed rows; the critic's blocker #1).
+    """
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        return {"runs": []}
+    import swarm_run_store
+    return {"runs": swarm_run_store.list_runs(
+        owner_id, limit=min(max(int(limit), 1), 200), running_only=(status == "running")
+    )}
+
+
+@app.get("/v1/tasks/{coordination_id}")
+async def get_task(coordination_id: str, request: Request):
+    """Run detail + per-worker (pioneer) status for the board drill-down."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"run": run, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
+
+
+@app.get("/v1/tasks/{coordination_id}/diff")
+async def get_task_diff(coordination_id: str, request: Request):
+    """Aggregated unified diff for a completed run, for mobile review."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if run.get("status") == "running":
+        raise HTTPException(status_code=409, detail="Run still in progress")
+    diff_text = swarm_run_store.get_diff(coordination_id, owner_id)
+    if not diff_text:
+        raise HTTPException(status_code=404, detail="No diff for this run")
+    return {
+        "coordination_id": coordination_id,
+        "scope": run.get("scope"),
+        "diff_text": diff_text,
+        "truncated": "[...diff truncated...]" in diff_text,
+    }
+
+
+@app.post("/v1/tasks/{coordination_id}/approve")
+async def approve_task(coordination_id: str, request: Request):
+    """Record acceptance of a run's result from the phone.
+
+    v1 is POST-HOC: swarm runs auto-execute and have no coordinator approval
+    gate, so this records 'I accept this diff' — it does NOT pause/release a
+    build. set_approval is owner-scoped, so a foreign owner gets 404.
+    """
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    if not swarm_run_store.set_approval(coordination_id, owner_id, "approved"):
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"ok": True, "approval_state": "approved"}
+
+
+@app.post("/v1/tasks/{coordination_id}/deny")
+async def deny_task(coordination_id: str, request: Request):
+    """Record rejection of a run's result from the phone (post-hoc, owner-scoped)."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    if not swarm_run_store.set_approval(coordination_id, owner_id, "denied"):
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"ok": True, "approval_state": "denied"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -5292,6 +5416,158 @@ async def ops_service_restart(service_id: str):
         raise HTTPException(status_code=502, detail=f"Cannot reach Docker socket proxy on {svc['node']} ({docker_url})")
     except _requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail=f"Restart timed out for {container} on {svc['node']}")
+
+
+# ---------------------------------------------------------------------------
+# Fleet panel — administer ANY container by (node, name), not just the
+# 16 registry services. Backs the Fleet tab in /mission-control.
+# ---------------------------------------------------------------------------
+
+def _docker_url_for_node(node: str) -> str:
+    """Resolve a node name (case-insensitive) to its docker socket-proxy URL."""
+    for k, v in NODE_DOCKER_SOCKETS.items():
+        if k.lower() == node.lower():
+            return v
+    raise HTTPException(status_code=404, detail=f"Unknown node: {node}")
+
+
+def _demux_docker_logs(raw: bytes) -> str:
+    """Decode a Docker /logs stream.
+
+    Non-TTY containers return a multiplexed stream: each frame is an 8-byte
+    header [stream(1), 0,0,0, size(4 big-endian)] followed by `size` payload
+    bytes. TTY containers return the payload raw. Best-effort: fall back to a
+    plain decode if the framing doesn't parse cleanly.
+    """
+    if not raw:
+        return ""
+    out = []
+    i, n = 0, len(raw)
+    try:
+        while i + 8 <= n:
+            stream_type = raw[i]
+            size = int.from_bytes(raw[i + 4:i + 8], "big")
+            # Header sanity: stream_type is 0/1/2 and frame fits in the buffer.
+            if stream_type not in (0, 1, 2) or i + 8 + size > n:
+                raise ValueError("not multiplexed")
+            out.append(raw[i + 8:i + 8 + size].decode("utf-8", errors="replace"))
+            i += 8 + size
+        if out:
+            return "".join(out)
+    except Exception:
+        pass
+    return raw.decode("utf-8", errors="replace")
+
+
+@app.post("/api/v1/ops/fleet/{node}/{container}/restart")
+async def ops_fleet_restart(node: str, container: str):
+    """Restart any container on a cluster node by name (via Docker socket-proxy)."""
+    import requests as _requests
+
+    docker_url = _docker_url_for_node(node)
+    try:
+        resp = _requests.post(f"{docker_url}/containers/{container}/restart?t=10", timeout=30)
+    except _requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=502, detail=f"Cannot reach Docker socket proxy on {node} ({docker_url})")
+    except _requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail=f"Restart timed out for {container} on {node}")
+    if resp.status_code == 204:
+        return {"status": "restarted", "node": node, "container": container}
+    if resp.status_code == 404:
+        raise HTTPException(status_code=404, detail=f"Container '{container}' not found on {node}")
+    raise HTTPException(status_code=502, detail=f"Docker API returned {resp.status_code}: {resp.text[:200]}")
+
+
+@app.get("/api/v1/ops/fleet/{node}/{container}/logs")
+async def ops_fleet_logs(node: str, container: str, tail: int = 200):
+    """Fetch recent stdout+stderr for a container (via Docker socket-proxy)."""
+    import requests as _requests
+
+    docker_url = _docker_url_for_node(node)
+    tail = max(1, min(tail, 1000))
+    endpoint = (
+        f"{docker_url}/containers/{container}/logs"
+        f"?stdout=true&stderr=true&tail={tail}&timestamps=false"
+    )
+    try:
+        resp = _requests.get(endpoint, timeout=10)
+    except _requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=502, detail=f"Cannot reach Docker socket proxy on {node} ({docker_url})")
+    except _requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail=f"Log fetch timed out for {container} on {node}")
+    if resp.status_code == 404:
+        raise HTTPException(status_code=404, detail=f"Container '{container}' not found on {node}")
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Docker API returned {resp.status_code}: {resp.text[:200]}")
+    return {"node": node, "container": container, "tail": tail, "logs": _demux_docker_logs(resp.content)}
+
+
+@app.get("/api/v1/ops/gpu-lock")
+def ops_gpu_lock_status():
+    """Current GPU-lease status (proxied from the authoritative GPU_LOCK_HOST)."""
+    import requests as _requests
+    from config import GPU_LOCK_HOST
+
+    try:
+        resp = _requests.get(f"{GPU_LOCK_HOST}/internal/gpu-lock/status", timeout=4)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        # Surface as "unknown" rather than 500 so the panel degrades gracefully.
+        return {"locked": None, "holder_context": None, "remaining_s": None,
+                "error": f"GPU lock host unreachable: {str(e)[:100]}"}
+
+
+@app.post("/api/v1/ops/gpu-lock/clear")
+def ops_gpu_lock_clear():
+    """Force-clear a stuck GPU lease (operator action)."""
+    import os
+    import requests as _requests
+    from config import GPU_LOCK_HOST
+
+    headers = {}
+    secret = os.getenv("GPU_LOCK_SECRET", "")
+    if secret:
+        headers["X-GPU-Lock-Secret"] = secret
+    try:
+        resp = _requests.post(f"{GPU_LOCK_HOST}/internal/gpu-lock/clear", headers=headers, timeout=6)
+    except _requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=502, detail=f"Cannot reach GPU lock host ({GPU_LOCK_HOST})")
+    except _requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="GPU lock clear timed out")
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=f"GPU lock host: {resp.text[:200]}")
+    return resp.json()
+
+
+# ---------------------------------------------------------------------------
+# Agent View — live snapshot of active swarm coordination sessions + workers.
+# Backs the rebuilt /monitoring/swarm-observer surface (polled).
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/swarm/sessions")
+def swarm_sessions():
+    """Currently-running coordination sessions with per-worker phase/state/model."""
+    try:
+        from coordination.session import snapshot_active_sessions
+        sessions = snapshot_active_sessions()
+    except Exception as e:
+        return {"sessions": [], "count": 0, "error": f"snapshot failed: {str(e)[:120]}"}
+
+    # Enrich each worker with its resolved model (best-effort; role → model).
+    try:
+        from role_model_resolver import get_model_for_role
+        for s in sessions:
+            owner = s.get("owner_id")
+            for w in s.get("workers", []):
+                try:
+                    w["model"] = get_model_for_role(owner, w.get("role", ""))
+                except Exception:
+                    w["model"] = None
+    except Exception:
+        pass
+
+    return {"sessions": sessions, "count": len(sessions)}
 
 
 if __name__ == "__main__":

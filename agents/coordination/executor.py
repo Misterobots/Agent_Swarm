@@ -18,6 +18,7 @@ from config import ARCHITECT_MODEL
 from logger_setup import setup_logger
 from utils.gpu_queue import get_swarm_worker_host
 from coordination.session import CoordinatorSession, WorkerState
+import swarm_run_store
 
 logger = setup_logger("Lamport")
 
@@ -77,6 +78,11 @@ def _run_worker(
     worker = session.workers[worker_id]
     worker.state = WorkerState.RUNNING
     worker.started_at = time.time()
+    swarm_run_store.upsert_worker(
+        session.coordination_id, worker_id, worker.role, worker.task,
+        worker.phase, (worker.pioneer or {}).get("name"), status="running",
+        started_at=worker.started_at,
+    )
 
     if child_token and _JWT_AVAILABLE:
         set_current_token(child_token)
@@ -115,6 +121,11 @@ def _run_worker(
         worker.result = result
         worker.state = WorkerState.COMPLETED
         worker.completed_at = time.time()
+        swarm_run_store.upsert_worker(
+            session.coordination_id, worker_id, worker.role, worker.task,
+            worker.phase, (worker.pioneer or {}).get("name"), status="completed",
+            output=result, completed_at=worker.completed_at,
+        )
 
         safe_role = "".join(c if c.isalnum() or c in "_-" else "_" for c in worker.role.lower())
         filename = f"{worker.phase}_{safe_role}_{worker_id}.md"
@@ -128,6 +139,11 @@ def _run_worker(
         worker.state = WorkerState.FAILED
         worker.error = str(e)
         worker.completed_at = time.time()
+        swarm_run_store.upsert_worker(
+            session.coordination_id, worker_id, worker.role, worker.task,
+            worker.phase, (worker.pioneer or {}).get("name"), status="failed",
+            output=worker.error, completed_at=worker.completed_at,
+        )
         logger.error(f"[Coordinator] Worker {worker_id} ({worker.role}) failed: {e}")
         return f"ERROR: {e}"
     finally:

@@ -786,6 +786,7 @@ script:
               // THINKING animation (brain is reasoning, ~3-8s): a brisk CYAN pulse. Deliberately
               // NOT purple (that read identical to listening) and NOT the multi-color spin below,
               // so "thinking" and "replying" are visually distinct. Pulse Fast = never looks static.
+              // (Kept over main's blue "Pulse Medium" — this cyan-Fast variant was flashed + confirmed.)
               set("Pulse Fast", 0.0, 0.7, 1.0);
               return;
             case ${voice_assist_replying_phase_id}:
