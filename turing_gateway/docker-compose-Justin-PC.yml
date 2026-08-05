@@ -787,7 +787,11 @@ services:
       - "traefik.http.routers.docs-hive.entrypoints=websecure"
       - "traefik.http.routers.docs-hive.priority=30"
       - "traefik.http.routers.docs-hive.tls=true"
-      - "traefik.http.routers.docs-hive.middlewares=docs-strip"
+      - "traefik.http.routers.docs-hive.tls.certresolver=cfdns"
+      - "traefik.http.routers.docs-hive.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.docs-hive.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.docs-hive.tls.options=securetls@file"
+      - "traefik.http.routers.docs-hive.middlewares=docs-strip,globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@file"
       - "traefik.http.routers.docs-hive.service=docs"
 
 networks:
