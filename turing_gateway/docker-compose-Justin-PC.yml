@@ -793,6 +793,15 @@ services:
       - "traefik.http.routers.docs-hive.tls.options=securetls@file"
       - "traefik.http.routers.docs-hive.middlewares=docs-strip,globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@file"
       - "traefik.http.routers.docs-hive.service=docs"
+      # External HTTP route — the Cloudflare Tunnel terminates TLS at the edge and delivers plain
+      # HTTP to Traefik's `web` entrypoint, so external traffic never reaches the websecure router
+      # above. Without this, the host-less LAN `docs` router (PathPrefix only, no auth) is what
+      # actually serves memex.shivelymedia.com/docs-site over the tunnel. Mirrors memex-ext-http.
+      - "traefik.http.routers.docs-hive-http.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
+      - "traefik.http.routers.docs-hive-http.entrypoints=web"
+      - "traefik.http.routers.docs-hive-http.priority=30"
+      - "traefik.http.routers.docs-hive-http.middlewares=docs-strip,globalHeaders@file,robotHeaders@file,cf-https-proto@file,authentik@file"
+      - "traefik.http.routers.docs-hive-http.service=docs"
 
 networks:
   ai_lab_net:
