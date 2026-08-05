@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from typing import Optional
 from uuid import UUID
@@ -19,14 +20,14 @@ from fastapi.responses import HTMLResponse
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel, Field
-from sqlalchemy import select, delete, func, update, text, case
+from sqlalchemy import select, delete, func, update, text, case, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
 from .database import (
     async_session, init_db,
     Memory, AgentSnapshot, TeamMemory, MemoryAuditLog, ExtractionLog,
-    Entity, EntityRelation,
+    Entity, EntityRelation, PendingExtraction,
 )
 from .embeddings import embed_text, embed_texts, extract_memories, close_client
 from .entity_extractor import run_entity_extraction
@@ -38,17 +39,46 @@ logging.basicConfig(
 )
 logger = logging.getLogger("mempalace")
 
+# A whole natural-language question almost never appears verbatim in stored
+# conversation text, so matching the full query as one ILIKE substring effectively
+# never hits. search_pending_extractions() matches on individual keywords instead.
+_PENDING_SEARCH_STOPWORDS = {
+    "what", "was", "were", "the", "and", "that", "this", "with", "have",
+    "from", "your", "about", "again", "does", "did", "for", "are", "you",
+    "tell", "know", "there", "when", "where", "which",
+}
+
+
+def _pending_search_keywords(text: str, limit: int = 8) -> list[str]:
+    words = re.findall(r"[a-zA-Z0-9]{4,}", text.lower())
+    out: list[str] = []
+    for w in words:
+        if w in _PENDING_SEARCH_STOPWORDS or w in out:
+            continue
+        out.append(w)
+        if len(out) >= limit:
+            break
+    return out
+
 
 # ---------------------------------------------------------------------------
 # MCP server — defined before lifespan because lifespan references _mcp.
 # Tool implementations are registered further down once the ORM models and
 # helpers are in scope. Mounted onto the FastAPI app at the bottom of the file.
 # ---------------------------------------------------------------------------
+# allowed_hosts is env-configurable so each deployment can whitelist its own host
+# via MEMPALACE_MCP_ALLOWED_HOSTS (the default below preserves the original hosts).
+_mcp_allowed_hosts = [
+    h.strip() for h in os.getenv(
+        "MEMPALACE_MCP_ALLOWED_HOSTS",
+        "192.168.2.102:*,localhost:*,127.0.0.1:*,hopper:*",
+    ).split(",") if h.strip()
+]
 _mcp = FastMCP(
     "MemPalace",
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
-        allowed_hosts=["192.168.2.102:*", "localhost:*", "127.0.0.1:*", "hopper:*"],
+        allowed_hosts=_mcp_allowed_hosts,
     ),
 )
 
@@ -122,6 +152,24 @@ class ExtractionRequest(BaseModel):
     owner_id: Optional[str] = None
     agent_id: Optional[str] = None
     team_id: Optional[str] = None
+    source_device: Optional[str] = None
+
+
+class QueuedExtractionOut(BaseModel):
+    id: str
+    queued_at: str
+
+
+class PendingSearchResult(BaseModel):
+    content: str
+    created_at: str
+    source_device: Optional[str] = None
+
+
+class ProcessPendingSummary(BaseModel):
+    rows_examined: int
+    memories_stored: int
+    errors: int
 
 
 class SnapshotCreate(BaseModel):
@@ -469,6 +517,155 @@ async def extract_and_store(req: ExtractionRequest):
     logger.info("Extracted %d memories from conversation (owner=%s, agent=%s)",
                 len(stored), owner_id, req.agent_id)
     return [_memory_to_out(m) for m in stored]
+
+
+@app.post("/v1/extract/queue", response_model=QueuedExtractionOut)
+async def queue_extraction(req: ExtractionRequest):
+    """Queue conversation text for later batched extraction.
+
+    Near-instant: makes zero LLM/embedding calls. The heavy extract_memories()
+    call is deferred to the off-peak POST /v1/extract/process_pending batch job.
+    """
+    owner_id = (req.owner_id or "").strip()
+    if not owner_id:
+        raise HTTPException(400, "owner_id is required for extraction")
+
+    async with async_session() as session:
+        pending = PendingExtraction(
+            conversation=req.conversation,
+            owner_id=owner_id,
+            agent_id=req.agent_id,
+            team_id=req.team_id,
+            source_device=req.source_device,
+        )
+        session.add(pending)
+        await session.commit()
+        await session.refresh(pending)
+
+    logger.info("Queued extraction (owner=%s, agent=%s, id=%s)",
+                owner_id, req.agent_id, pending.id)
+    return QueuedExtractionOut(
+        id=str(pending.id),
+        queued_at=pending.created_at.isoformat() if pending.created_at else "",
+    )
+
+
+@app.get("/v1/extract/pending/search", response_model=list[PendingSearchResult])
+async def search_pending_extractions(
+    owner_id: str = Query(...),
+    query: str = Query(...),
+    limit: int = Query(10),
+):
+    """Plain text-match fallback tier over not-yet-processed queued conversations.
+
+    No embeddings involved — a fast ILIKE scan over keywords extracted from the query
+    (OR'd together), for finding recent context that hasn't made it through the nightly
+    extraction batch yet. Matching the whole query as one substring would almost never
+    hit, since a spoken question rarely appears verbatim in the stored conversation.
+    """
+    keywords = _pending_search_keywords(query)
+    stmt = (
+        select(
+            PendingExtraction.conversation,
+            PendingExtraction.created_at,
+            PendingExtraction.source_device,
+        )
+        .where(PendingExtraction.owner_id == owner_id)
+        .where(PendingExtraction.processed_at.is_(None))
+    )
+    if keywords:
+        stmt = stmt.where(or_(*[PendingExtraction.conversation.ilike(f"%{kw}%") for kw in keywords]))
+    stmt = stmt.order_by(PendingExtraction.created_at.desc()).limit(limit)
+
+    async with async_session() as session:
+        result = await session.execute(stmt)
+        rows = result.all()
+
+    return [
+        PendingSearchResult(
+            content=row.conversation[:500],
+            created_at=row.created_at.isoformat() if row.created_at else "",
+            source_device=row.source_device,
+        )
+        for row in rows
+    ]
+
+
+@app.post("/v1/extract/process_pending", response_model=ProcessPendingSummary)
+async def process_pending_extractions(limit: int = Query(200)):
+    """Nightly admission batch job: drain queued conversations through the LLM.
+
+    Meant to be triggered by an external cron (twice daily, off-peak), not by a
+    live user-facing caller — this is allowed to be slow. Each row is committed
+    individually so a crash partway through the batch doesn't lose progress
+    already made; a row that throws is logged and left pending for retry next
+    cycle rather than aborting the whole batch.
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(PendingExtraction)
+            .where(PendingExtraction.processed_at.is_(None))
+            .order_by(PendingExtraction.created_at.asc())
+            .limit(limit)
+        )
+        rows = result.scalars().all()
+
+    rows_examined = 0
+    memories_stored = 0
+    errors = 0
+
+    for row in rows:
+        rows_examined += 1
+        try:
+            extracted = await extract_memories(row.conversation)
+
+            embeddings: list[list[float]] = []
+            if extracted:
+                embeddings = await embed_texts([m["content"] for m in extracted])
+
+            async with async_session() as session:
+                stored: list[Memory] = []
+                for item, emb in zip(extracted, embeddings):
+                    mem = Memory(
+                        content=item["content"],
+                        memory_type=item["type"],
+                        domain=item.get("domain", "general"),
+                        agent_id=row.agent_id,
+                        team_id=row.team_id,
+                        owner_id=row.owner_id,
+                        embedding=emb,
+                    )
+                    session.add(mem)
+                    stored.append(mem)
+
+                session.add(ExtractionLog(
+                    owner_id=row.owner_id,
+                    agent_id=row.agent_id,
+                    memories_stored=len(stored),
+                    conversation_length=len(row.conversation),
+                ))
+
+                await session.execute(
+                    update(PendingExtraction)
+                    .where(PendingExtraction.id == row.id)
+                    .values(processed_at=func.now())
+                )
+                await session.commit()
+
+            memories_stored += len(stored)
+        except Exception as exc:
+            errors += 1
+            logger.warning("process_pending: row %s failed, will retry next cycle: %s",
+                            row.id, exc)
+            continue
+
+    logger.info("process_pending: examined=%d stored=%d errors=%d",
+                rows_examined, memories_stored, errors)
+    return ProcessPendingSummary(
+        rows_examined=rows_examined,
+        memories_stored=memories_stored,
+        errors=errors,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -3,8 +3,6 @@ Description=BMO Voice Agent
 After=network.target sound.target
 # Stop desktop to free GPU/Screen for Pygame KMSDRM
 Conflicts=lightdm.service
-# Also start the voice satellite whenever this service starts
-Wants=bmo_satellite.service
 
 [Service]
 User=misterobots
@@ -14,7 +12,7 @@ Environment="SDL_VIDEODRIVER=kmsdrm"
 Environment="SDL_AUDIODRIVER=alsa"
 Environment="PYTHONUNBUFFERED=1"
 # Ensure we pick up the virtualenv
-ExecStart=/home/misterobots/bmo_client/venv/bin/python bmo_driver.py --host ${LOVELACE_IP} --output_device 1 --input_device 3 --volume 20
+ExecStart=/home/misterobots/bmo_client/venv/bin/python bmo_driver.py --host ${LOVELACE_IP} --output_device 1 --volume 20
 Restart=always
 RestartSec=5
 

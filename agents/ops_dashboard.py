@@ -546,7 +546,7 @@ elif nav == "AI Tuning Studio":
                     # Determine URL based on environment
                     # Check if running in Docker container
                     if os.path.exists("/.dockerenv"):
-                        bmo_url = "http://bmo_voice_gpu:8000/speak"
+                        bmo_url = "http://voice_engine_gpu:8020/speak"
                     else:
                         bmo_url = "http://localhost:8100/speak"
                     

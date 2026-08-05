@@ -5,7 +5,7 @@ BMO Speaker Enrollment Script
 Records N voice samples from the Pi microphone and sends them to
 voice_engine_gpu's /enroll_speaker endpoint to build a speaker profile.
 
-Run this ON the Pi (or via SSH) after deploying voice_satellite.py:
+Run this ON the Pi (or via SSH) after deploying bmo_driver.py:
   python3 /home/misterobots/bmo_client/enroll_voice.py --speaker justin
 
 Each recording is 8 seconds. You'll be prompted to speak a different

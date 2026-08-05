@@ -461,48 +461,6 @@ async def submit_task(request: TaskRequest):
     
     return {"status": "accepted", "message": "Task queued for execution"}
 
-# --- Voice Assistant Endpoint ---
-class VoiceRequest(BaseModel):
-    text: str
-
-# Persist agent to avoid re-initializing Ollama/Phidata every request (reduces latency)
-_voice_agent = None
-
-def get_voice_agent():
-    global _voice_agent
-    if _voice_agent is None:
-        from specialized.voice_assistant import VoiceAssistantAgent
-        _voice_agent = VoiceAssistantAgent()
-    return _voice_agent
-
-@app.post("/v1/voice/chat")
-async def voice_chat(request: VoiceRequest):
-    """
-    Dedicated endpoint for Voice Satellite.
-    Returns text response AND audio path.
-    """
-    from specialized.voice_assistant import Message
-    
-    agent = get_voice_agent()
-    # Process message
-    response_msg = agent.process(Message(role="user", content=request.text))
-    metadata = response_msg.metadata or {}
-
-    return {
-        "text": response_msg.content,
-        "audio_path": metadata.get("audio_path"),
-        "sandbox": {
-            "emotion": metadata.get("emotion"),
-            "pitch": metadata.get("pitch"),
-            "speed": metadata.get("speed"),
-            "sample_match": metadata.get("sample_match"),
-            "response_sample": metadata.get("response_sample"),
-            "sample_file": metadata.get("sample_file"),
-            "sample_url": metadata.get("sample_url"),
-            "audio_kind": metadata.get("audio_kind"),
-        },
-    }
-
 # --- OpenAI-Compatible Chat Endpoint (For VS Code Extensions) ---
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -5313,7 +5271,7 @@ async def training_voice_speak(req: TrainingVoiceSpeakRequest):
     """Synthesize a WAV clip via the BMO voice service and return audio bytes."""
     import requests as _requests
 
-    bmo_url = os.getenv("BMO_VOICE_URL", "http://bmo-voice:8000").rstrip("/")
+    bmo_url = os.getenv("BMO_VOICE_URL", "http://voice_engine_gpu:8020").rstrip("/")
     text = req.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")

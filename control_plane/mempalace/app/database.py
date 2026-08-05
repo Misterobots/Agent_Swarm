@@ -233,6 +233,33 @@ class ExtractionLog(Base):
     attempted_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class PendingExtraction(Base):
+    """Queued conversation text awaiting batched LLM extraction.
+
+    Callers queue instantly via POST /v1/extract/queue (no LLM/embedding
+    calls). A separate off-peak batch job (POST /v1/extract/process_pending)
+    drains rows where processed_at IS NULL through extract_memories()/
+    embed_texts() and stamps processed_at once handled — decoupling the
+    cheap queue write from the expensive extraction call so real-time chat
+    no longer contends with it for GPU time.
+    """
+
+    __tablename__ = "pending_extractions"
+    __table_args__ = (
+        Index("ix_pending_extractions_owner_processed", "owner_id", "processed_at"),
+        {"schema": "mempalace"},
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    conversation = Column(Text, nullable=False)
+    owner_id = Column(String(100), nullable=False)
+    agent_id = Column(String(100))
+    team_id = Column(String(100))
+    source_device = Column(String(100))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    processed_at = Column(DateTime(timezone=True))         # NULL = still pending
+
+
 # ---------------------------------------------------------------------------
 # Bootstrap: ensure extension/schema exist, then run pending migrations
 # ---------------------------------------------------------------------------

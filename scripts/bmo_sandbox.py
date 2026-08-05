@@ -7,7 +7,7 @@ Tests the complete pipeline:
   2. LLM response generation (via Ollama)
   3. Response sample scanning (embedded phrase detection)
   4. Emotion detection + face/pitch mapping
-  5. TTS voice generation (optional, requires bmo-voice container)
+  5. TTS voice generation (optional, requires the voice-engine container)
 
 Usage:
   # Interactive chat mode (LLM only, no TTS)
@@ -148,7 +148,7 @@ def call_ollama(prompt, model, host, port, system_prompt):
 
 
 def call_tts(text, host, port=8100, pitch=3):
-    """Call bmo-voice /speak endpoint for TTS + RVC."""
+    """Call the voice-engine /speak endpoint (Qwen3-TTS; pitch/method kept for compat)."""
     import requests
 
     # Phonetic fix
