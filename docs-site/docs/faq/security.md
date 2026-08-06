@@ -49,4 +49,8 @@ The system uses several defenses:
 - Tool execution is sandboxed
 - File operations are scoped to the workspace directory
 
+## What is a capability token?
+
+Each agent is issued a capability token that limits which tools it's allowed to call. For example, a coding agent can't call media-generation tools, and a creative agent can't write files to the workspace. This is by design — it prevents an agent from taking actions outside its intended scope. If a request is blocked, switch to the workspace or agent that has the needed capability.
+
 

@@ -73,6 +73,21 @@ curl -v http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags
 
 ---
 
+## Authentik Unauthorized
+
+**Symptom**: A service that should be reachable instead shows "Authentik Unauthorized" or redirects to login unexpectedly.
+
+**Diagnose**:
+
+```bash
+docker compose ps authentik_server authentik_worker
+docker compose logs authentik_server --tail 30
+```
+
+**Fix**: If Authentik is healthy but still blocking access, the provider/proxy configuration likely needs updating after a service URL change. Log in to the Authentik admin UI as admin and verify the provider settings for that service.
+
+---
+
 ## Port Conflicts
 
 **Symptom**: Container fails to start with "port already in use".

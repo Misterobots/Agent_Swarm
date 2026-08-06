@@ -71,6 +71,35 @@ docker compose restart comfyui
 
 ---
 
+## Version Patch Not Applied / Workflow Errors After Update
+
+**Symptom**: ComfyUI returns 500s or workflow errors after a version bump.
+
+ComfyUI patching is version-sensitive. The container applies a version-specific patch on first start, tracked by a marker file (e.g. `.5060_patch_v10_applied`). If the container image changed but the marker wasn't cleared, the patch may be stale or missing.
+
+**Fix**:
+
+```bash
+# Force re-patch by removing the marker
+docker compose exec comfyui rm /home/runner/ComfyUI/.5060_patch_v10_applied
+docker compose restart comfyui
+
+# Watch patch logs
+docker compose logs comfyui -f
+```
+
+---
+
+## Outputs Not Visible in Agent Chat
+
+**Symptom**: ComfyUI generates an image successfully but it never appears in the agent chat UI.
+
+**Cause**: The agent runtime reads generated images from a mounted ComfyUI output directory. If the volume mount is wrong (or a Windows host path doesn't resolve correctly inside WSL2), the agent can't see new files.
+
+**Fix**: Verify the output volume mount in the execution-plane `docker-compose.yml` matches the actual ComfyUI output path, and that the host path resolves correctly from inside the container/WSL2.
+
+---
+
 ## ComfyUI Web Interface Not Loading
 
 **Symptom**: `http://{{ lovelace_ip }}:8188` doesn't respond.

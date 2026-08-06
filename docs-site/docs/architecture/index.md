@@ -56,4 +56,12 @@ graph TB
 | [Observability](observability.md) | jacquard, hollerith, Langfuse, knuth |
 | [Architecture Decisions](decisions/index.md) | ADR index and records |
 
+## System Philosophy
+
+Memex's architecture is built around three principles:
+
+1. **Specialization over generalization** - different tasks use purpose-built agents with the right model for the job. A routing model is fast and cheap; a coding model is deep and large. Neither substitutes for the other.
+2. **Inference-time verification** - output quality is enforced at runtime, not post-hoc. The [MarsRL Loop](marsrl.md) prevents bad output from ever reaching the user.
+3. **Locality and privacy** - all inference runs on-premises across the Lovelace/Hopper/Turing nodes (see [Topology](topology.md)). No external API calls for inference; training improves local models continuously from real usage data.
+
 
