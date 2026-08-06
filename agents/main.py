@@ -5,6 +5,7 @@ import os
 import json
 import uuid
 import time
+import threading
 # Ensure agents dir is in path
 if "/app/agents" not in sys.path:
     sys.path.append("/app/agents")
@@ -172,6 +173,44 @@ async def lifespan(app: FastAPI):
             _init_swarm_run_table()
         except Exception as e:
             logger.warning(f"Swarm run store init failed (non-fatal): {e}")
+
+        # 7g. Initialize Swarm Run Repo Store (New Task composer repo/branch metadata)
+        try:
+            from swarm_run_repo_store import init_table as _init_swarm_run_repo_table
+            _init_swarm_run_repo_table()
+        except Exception as e:
+            logger.warning(f"Swarm run repo store init failed (non-fatal): {e}")
+
+        # 7g2. Initialize GitHub Push Audit Store (gated push/PR trail)
+        try:
+            from github_push_audit_store import init_table as _init_push_audit_table
+            _init_push_audit_table()
+        except Exception as e:
+            logger.warning(f"GitHub push audit store init failed (non-fatal): {e}")
+
+        # 7h. Task queue reconciliation — a crash mid-task otherwise leaves a
+        # phantom 'running'/'queued' row AND (once the workspace lock is in
+        # play) a Redis lock nothing will ever release, silently freezing all
+        # future task creation. Mark stale rows failed BEFORE clearing the
+        # lock/queue so the two stay consistent.
+        try:
+            import swarm_run_store as _swarm_run_store_reconcile
+            from coordination import task_queue as _task_queue_reconcile
+            _fixed = _swarm_run_store_reconcile.reconcile_stale_runs()
+            _task_queue_reconcile.clear_all()
+            if _fixed:
+                logger.warning(f"Task queue reconciliation: marked {_fixed} stale run(s) failed on startup.")
+        except Exception as e:
+            logger.warning(f"Task queue reconciliation failed (non-fatal): {e}")
+
+        # 7g. Initialize GitHub Push Tokens Store (fine-grained PAT for repo-write
+        # access, Phase C of the Codex-task-composer plan — structurally separate
+        # from github_oauth.py's swarm.github_oauth_tokens table)
+        try:
+            from github_push_tokens import init_table as _init_github_push_table
+            _init_github_push_table()
+        except Exception as e:
+            logger.warning(f"GitHub push tokens store init failed (non-fatal): {e}")
 
         # 8. Clean up orphaned training runs (status='running' but server restarted)
         try:
@@ -2430,9 +2469,17 @@ async def list_tasks(request: Request, status: str = "all", limit: int = 50):
     if not owner_id:
         return {"runs": []}
     import swarm_run_store
-    return {"runs": swarm_run_store.list_runs(
+    import swarm_run_repo_store
+    runs = swarm_run_store.list_runs(
         owner_id, limit=min(max(int(limit), 1), 200), running_only=(status == "running")
-    )}
+    )
+    repo_by_id = swarm_run_repo_store.get_many([r["coordination_id"] for r in runs])
+    for r in runs:
+        repo = repo_by_id.get(r["coordination_id"])
+        if repo:
+            r["repo_url"] = repo["git_url"]
+            r["branch"] = repo["branch"]
+    return {"runs": runs}
 
 
 @app.get("/v1/tasks/{coordination_id}")
@@ -2442,9 +2489,14 @@ async def get_task(coordination_id: str, request: Request):
     if not owner_id:
         raise HTTPException(status_code=404, detail="Task not found")
     import swarm_run_store
+    import swarm_run_repo_store
     run = swarm_run_store.get_run(coordination_id, owner_id)
     if not run:
         raise HTTPException(status_code=404, detail="Task not found")
+    repo = swarm_run_repo_store.get(coordination_id)
+    if repo:
+        run["repo_url"] = repo["git_url"]
+        run["branch"] = repo["branch"]
     return {"run": run, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
 
 
@@ -2498,6 +2550,341 @@ async def deny_task(coordination_id: str, request: Request):
     if not swarm_run_store.set_approval(coordination_id, owner_id, "denied"):
         raise HTTPException(status_code=404, detail="Task not found")
     return {"ok": True, "approval_state": "denied"}
+
+
+# Default off — flip on only after manually verifying Phase A/B end to end
+# (see agents/dev_harness/SWARM_ON_DEVHARNESS.md for this repo's flagging
+# convention).
+TASKS_DIRECT_CREATE_ENABLED = os.getenv("TASKS_DIRECT_CREATE_ENABLED", "").lower() in ("1", "true", "yes")
+
+
+class CreateTaskRequest(BaseModel):
+    prompt: str
+    dev_project_id: Optional[str] = None
+    branch: Optional[str] = None
+    ultraplan_mode: bool = False
+    research_mode: bool = False
+
+
+# In-process registry of dispatch kwargs for tasks currently sitting in the
+# Redis wait list (coordination/task_queue.py). Deliberately not persisted —
+# see task_queue.py's module docstring for why that's an accepted tradeoff.
+_PENDING_TASK_DISPATCH: dict = {}
+_pending_task_dispatch_lock = threading.Lock()
+
+
+def _dispatch_task_now(coordination_id: str, dispatch_kwargs: dict) -> None:
+    """Flip a run to 'running' and drain its coordinate_task generator on a
+    background thread. However the run ends, the thread releases the shared-
+    sandbox lock and advances the queue — this is the only place that happens,
+    so every acquire is guaranteed a matching release."""
+    import swarm_run_store
+    from coordination import task_queue as _task_queue
+
+    swarm_run_store.set_status(coordination_id, "running")
+
+    def _run():
+        try:
+            from coordination.orchestrator import coordinate_task
+            for _ in coordinate_task(**dispatch_kwargs):
+                pass
+        except Exception as exc:
+            logger.error(f"[TaskQueue] coordinate_task failed for {coordination_id}: {exc}", exc_info=True)
+        finally:
+            _task_queue.release(coordination_id)
+            _advance_task_queue()
+
+    threading.Thread(target=_run, daemon=True, name=f"task-{coordination_id}").start()
+
+
+def _advance_task_queue() -> None:
+    """Pop the next queued task (if any) and dispatch it now that the shared
+    sandbox lock is free."""
+    from coordination import task_queue as _task_queue
+
+    next_id = _task_queue.pop_next()
+    if not next_id:
+        return
+    with _pending_task_dispatch_lock:
+        kwargs = _PENDING_TASK_DISPATCH.pop(next_id, None)
+    if not kwargs:
+        # Process restart lost this task's dispatch args — startup
+        # reconciliation already marked it 'failed'; nothing to run.
+        logger.warning(f"[TaskQueue] Queued task {next_id} had no pending dispatch args — skipping.")
+        _advance_task_queue()
+        return
+    if not _task_queue.try_acquire(next_id):
+        # Lock was somehow re-taken between pop and acquire — put it back and
+        # let the current holder's release trigger another advance.
+        with _pending_task_dispatch_lock:
+            _PENDING_TASK_DISPATCH[next_id] = kwargs
+        _task_queue.enqueue(next_id)
+        return
+    _dispatch_task_now(next_id, kwargs)
+
+
+@app.post("/v1/tasks", status_code=202)
+async def create_task(body: CreateTaskRequest, request: Request):
+    """Direct task creation for the "New Task" composer — bypasses chat entirely.
+
+    If dev_project_id is given, resolves it (owner-scoped) into a repo_context
+    that coordinate_task() checks the sandbox out to before Decompose starts
+    (see coordination/orchestrator.py's Phase 0). dev_sandbox is one shared
+    container/working tree, so only one task may run at a time — a second
+    POST while another task holds it is recorded as status="queued" and
+    dispatched automatically once the sandbox frees up (coordination/task_queue.py).
+    """
+    if not TASKS_DIRECT_CREATE_ENABLED:
+        raise HTTPException(status_code=404, detail="Direct task creation is not enabled")
+
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Could not resolve an authenticated owner")
+
+    prompt = (body.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="prompt must not be empty")
+
+    repo_context = None
+    if body.dev_project_id:
+        from dev_projects import store as _dev_projects_store
+        project = _dev_projects_store.get_project(body.dev_project_id, owner_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="dev_project_id not found")
+        if not project.get("git_url"):
+            raise HTTPException(status_code=400, detail="Selected project has no git_url to check out")
+        base_branch = project.get("git_ref") or "main"
+        repo_context = {
+            "git_url": project["git_url"],
+            "branch": (body.branch or base_branch).strip(),
+            "base_branch": base_branch,
+            "dev_project_id": body.dev_project_id,
+        }
+
+    import swarm_run_store
+    from coordination import task_queue as _task_queue
+
+    coordination_id = f"coord-{uuid.uuid4().hex[:8]}"
+    session_id = f"task-{uuid.uuid4().hex[:12]}"
+
+    dispatch_kwargs = dict(
+        user_input=prompt,
+        session_id=session_id,
+        owner_id=owner_id,
+        dev_mode=True,
+        skip_project_gate=True,
+        ultraplan_mode=body.ultraplan_mode,
+        research_mode=body.research_mode,
+        repo_context=repo_context,
+        coordination_id=coordination_id,
+    )
+
+    # Create the row synchronously (status set explicitly below) so GET
+    # /v1/tasks/{id} works the instant this call returns. coordinate_task()
+    # would also call create_run itself, but ON CONFLICT DO NOTHING makes
+    # that a safe no-op against the row we create here.
+    if _task_queue.try_acquire(coordination_id):
+        swarm_run_store.create_run(
+            coordination_id, session_id, owner_id, title=prompt, scope=None,
+            started_at=int(time.time()), status="running",
+        )
+        _dispatch_task_now(coordination_id, dispatch_kwargs)
+    else:
+        swarm_run_store.create_run(
+            coordination_id, session_id, owner_id, title=prompt, scope=None,
+            started_at=int(time.time()), status="queued",
+        )
+        with _pending_task_dispatch_lock:
+            _PENDING_TASK_DISPATCH[coordination_id] = dispatch_kwargs
+        _task_queue.enqueue(coordination_id)
+
+    return {"coordination_id": coordination_id}
+
+
+# ---------------------------------------------------------------------------
+# GATED PUSH + PR (Phase D of the Codex-task-composer plan)
+#
+# Two-step preview -> explicit-confirm flow. Every precondition is checked
+# BEFORE any GitHub/git call: diff must already be approved (a second,
+# deliberate gate layered on top of the existing one-tap approve — see the
+# plan's "Gate layering" decision), the requester must own the run, a
+# repo-write token must be connected, and confirm must present the exact
+# single-use token issued by the most recent preview. The actual git push +
+# PR creation happens in tools/github_push_ops.py, which is never reachable
+# from any LLM tool loop (see that module's docstring).
+# ---------------------------------------------------------------------------
+
+GITHUB_PUSH_ENABLED = os.getenv("GITHUB_PUSH_ENABLED", "").lower() in ("1", "true", "yes")
+_PUSH_CONFIRM_TTL = 15 * 60  # seconds — how long a preview's confirm_token stays valid
+
+
+def _push_confirm_key(coordination_id: str) -> str:
+    return f"swarm:push_confirm:{coordination_id}"
+
+
+@app.get("/v1/tasks/{coordination_id}/push/preview")
+async def push_preview(coordination_id: str, request: Request):
+    """Pure computation — proposes branch/PR title/body and issues a short-TTL
+    confirm_token. No GitHub or git side effects."""
+    if not GITHUB_PUSH_ENABLED:
+        raise HTTPException(status_code=404, detail="GitHub push is not enabled")
+
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    import swarm_run_store
+    import swarm_run_repo_store
+    import github_push_tokens
+    import github_push_audit_store
+
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if run.get("approval_state") != "approved":
+        raise HTTPException(status_code=409, detail="Approve the diff before requesting a push")
+
+    repo = swarm_run_repo_store.get(coordination_id)
+    if not repo or not repo.get("local_branch"):
+        raise HTTPException(status_code=409, detail="This task has no pushable branch")
+
+    if not github_push_tokens.get_status(owner_id):
+        raise HTTPException(status_code=409, detail="Connect a GitHub push token in Settings first")
+
+    remote_branch = repo["local_branch"]
+    pr_title = (run.get("title") or coordination_id)[:200]
+    pr_body = (run.get("summary") or "")[:60000] or f"Opened by Memex from task {coordination_id}."
+
+    import secrets
+    from utils.gpu_queue import get_redis_client
+    token = secrets.token_urlsafe(24)
+    try:
+        get_redis_client().set(_push_confirm_key(coordination_id), token, ex=_PUSH_CONFIRM_TTL)
+    except Exception as e:
+        logger.error(f"[push_preview] Redis unavailable, cannot issue confirm_token: {e}")
+        raise HTTPException(status_code=503, detail="Push confirmation is temporarily unavailable")
+
+    github_push_audit_store.record(
+        coordination_id, owner_id, "preview_shown",
+        target_repo=repo["git_url"], target_branch=remote_branch, base_branch=repo["base_branch"],
+    )
+
+    return {
+        "confirm_token": token,
+        "git_url": repo["git_url"],
+        "base_branch": repo["base_branch"],
+        "branch": remote_branch,
+        "pr_title": pr_title,
+        "pr_body": pr_body,
+        "expires_in": _PUSH_CONFIRM_TTL,
+    }
+
+
+class PushConfirmRequest(BaseModel):
+    confirm_token: str
+    branch: str
+    pr_title: str
+    pr_body: str = ""
+    base_branch: str
+
+
+@app.post("/v1/tasks/{coordination_id}/push/confirm")
+async def push_confirm(coordination_id: str, body: PushConfirmRequest, request: Request):
+    """Executes the push + PR creation after validating every precondition."""
+    if not GITHUB_PUSH_ENABLED:
+        raise HTTPException(status_code=404, detail="GitHub push is not enabled")
+
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    import swarm_run_store
+    import swarm_run_repo_store
+    import github_push_tokens
+    import github_push_audit_store
+
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if run.get("approval_state") != "approved":
+        raise HTTPException(status_code=409, detail="Approve the diff before pushing")
+
+    repo = swarm_run_repo_store.get(coordination_id)
+    if not repo or not repo.get("local_branch"):
+        raise HTTPException(status_code=409, detail="This task has no pushable branch")
+
+    token = github_push_tokens.get_token(owner_id)
+    if not token:
+        raise HTTPException(status_code=409, detail="Connect a GitHub push token in Settings first")
+
+    from utils.gpu_queue import get_redis_client
+    key = _push_confirm_key(coordination_id)
+    try:
+        client = get_redis_client()
+        stored_token = client.get(key)
+    except Exception as e:
+        logger.error(f"[push_confirm] Redis unavailable, cannot validate confirm_token: {e}")
+        raise HTTPException(status_code=503, detail="Push confirmation is temporarily unavailable")
+
+    if not stored_token or stored_token != body.confirm_token:
+        github_push_audit_store.record(
+            coordination_id, owner_id, "confirm_attempted",
+            target_repo=repo["git_url"], target_branch=body.branch, base_branch=body.base_branch,
+            error="stale or invalid confirm_token",
+        )
+        raise HTTPException(status_code=409, detail="This push preview has expired — request a new one")
+
+    # Single-use: consume immediately so a retried/duplicated request can't push twice.
+    try:
+        client.delete(key)
+    except Exception:
+        pass
+
+    github_push_audit_store.record(
+        coordination_id, owner_id, "confirm_attempted",
+        target_repo=repo["git_url"], target_branch=body.branch, base_branch=body.base_branch,
+    )
+
+    bundle_data = swarm_run_repo_store.get_bundle(coordination_id)
+
+    from tools.github_push_ops import push_and_open_pr, GithubPushError
+    try:
+        result = push_and_open_pr(
+            coordination_id=coordination_id,
+            bundle_data=bundle_data,
+            local_branch=repo["local_branch"],
+            git_url=repo["git_url"],
+            remote_branch=body.branch,
+            base_branch=body.base_branch,
+            pr_title=body.pr_title,
+            pr_body=body.pr_body,
+            token=token,
+        )
+    except GithubPushError as e:
+        github_push_audit_store.record(
+            coordination_id, owner_id, "push_failed",
+            target_repo=repo["git_url"], target_branch=body.branch, base_branch=body.base_branch,
+            error=str(e),
+        )
+        raise HTTPException(status_code=502, detail=str(e))
+
+    github_push_audit_store.record(
+        coordination_id, owner_id, "push_succeeded",
+        target_repo=repo["git_url"], target_branch=body.branch, base_branch=body.base_branch,
+        pr_number=result.get("pr_number"), pr_url=result.get("pr_url"),
+    )
+    return result
+
+
+@app.get("/v1/tasks/{coordination_id}/push/status")
+async def push_status(coordination_id: str, request: Request):
+    """Poll the latest audit row — confirm touches the network and may take a few seconds."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    import github_push_audit_store
+    latest_row = github_push_audit_store.latest(coordination_id, owner_id)
+    return latest_row or {"stage": None}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -5853,6 +6240,93 @@ async def github_disconnect(http_request: Request):
         logger.error(f"github_disconnect error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     return {"disconnected": deleted}
+
+
+# ---------------------------------------------------------------------------
+# GITHUB PUSH TOKENS — fine-grained PAT for repo-write access (Phase C of the
+# Codex-task-composer plan). Structurally separate from the OAuth device flow
+# above: github_oauth_tokens is a read:user credential consumed as an
+# LLM-provider identity; this is a human-pasted PAT scoped for git push / PR
+# creation, stored in its own swarm.github_push_tokens table
+# (agents/github_push_tokens.py). This module is settings-page-only and
+# human-driven — it is never imported by agents/dev_harness/tool_defs.py and
+# never registered in TOOL_DISPATCH, so the LLM agent itself can never reach
+# it (see agents/tools/sandbox_ops.py's _GIT_ALLOW safety boundary).
+# ---------------------------------------------------------------------------
+
+class _GithubPushTokenRequest(BaseModel):
+    token: str
+
+
+@app.post("/api/v1/github/push/token")
+async def github_push_connect(body: _GithubPushTokenRequest, http_request: Request):
+    """
+    Connect a fine-grained GitHub PAT for repo-write access.
+
+    Validates the token live against GET https://api.github.com/user BEFORE
+    ever storing it — an invalid/expired token is rejected with 400 and never
+    reaches swarm.github_push_tokens.
+    """
+    owner_id = _resolve_owner_id(None, http_request)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    token = (body.token or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="token is required")
+
+    import urllib.request as _ur
+    import urllib.error as _ue
+
+    user_req = _ur.Request(
+        "https://api.github.com/user",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+    )
+    try:
+        with _ur.urlopen(user_req, timeout=10) as resp:
+            user_data = json.loads(resp.read())
+    except _ue.HTTPError as e:
+        if e.code == 401:
+            raise HTTPException(status_code=400, detail="Invalid or expired GitHub token")
+        logger.warning(f"github_push_connect: GitHub API error {e.code} for owner_id={owner_id}")
+        raise HTTPException(status_code=400, detail=f"GitHub API error: {e.code}")
+    except Exception as e:
+        logger.warning(f"github_push_connect: validation failed for owner_id={owner_id}: {e}")
+        raise HTTPException(status_code=400, detail=f"Could not reach GitHub: {e}")
+
+    github_username = user_data.get("login")
+    if not github_username:
+        raise HTTPException(status_code=400, detail="GitHub API did not return a username")
+
+    import github_push_tokens
+    github_push_tokens.upsert_token(owner_id, github_username, token)
+
+    status = github_push_tokens.get_status(owner_id)
+    if not status:
+        raise HTTPException(status_code=500, detail="Token validated but failed to store")
+    return {"connected": True, "github_username": status["github_username"]}
+
+
+@app.get("/api/v1/github/push/status")
+async def github_push_status(http_request: Request):
+    """Return whether the current user has a connected repo-write PAT (never the token)."""
+    owner_id = _resolve_owner_id(None, http_request)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    import github_push_tokens
+    status = github_push_tokens.get_status(owner_id)
+    return status or {"connected": False}
+
+
+@app.delete("/api/v1/github/push/token")
+async def github_push_disconnect(http_request: Request):
+    """Remove the stored repo-write PAT for the current user."""
+    owner_id = _resolve_owner_id(None, http_request)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    import github_push_tokens
+    deleted = github_push_tokens.delete_token(owner_id)
+    return {"deleted": deleted}
 
 
 # ---------------------------------------------------------------------------

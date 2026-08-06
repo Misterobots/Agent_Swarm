@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, wait as futures
 from typing import Generator, Optional
 
 import swarm_run_store
+import swarm_run_repo_store
 from config import ARCHITECT_MODEL
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock
@@ -29,6 +30,7 @@ from coordination.session import CoordinatorSession, WorkerState
 from coordination.synthesizer import (
     _generate_followups, _synthesize_findings, _synthesize_perspective_matrix,
 )
+from coordination.workspace_ops import checkout_repo_branch, finalize_task_branch
 
 logger = setup_logger("Lamport")
 
@@ -137,12 +139,27 @@ def coordinate_task(
     research_mode: bool = False,
     skip_project_gate: bool = False,
     already_steered: bool = False,
+    repo_context: Optional[dict] = None,
+    coordination_id: Optional[str] = None,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
     matching the chat_swarm() yield contract.
+
+    repo_context (New Task composer path only): {"git_url", "branch",
+    "base_branch"?, "dev_project_id"?}. When set, the sandbox's shared
+    /workspace is checked out to this repo/branch before Decompose starts,
+    and the mapping is persisted via swarm_run_repo_store for the task board.
+    Callers that pass repo_context should also pass skip_project_gate=True —
+    the repo is already chosen, so the "existing vs new project" clarification
+    card would just be redundant.
+
+    coordination_id: pre-generated id (POST /v1/tasks needs to return the id
+    to the caller before this generator has been iterated at all, since it's
+    drained on a background thread). Leave unset for every other caller —
+    CoordinatorSession generates its usual random id.
     """
-    session = CoordinatorSession(session_id, owner_id)
+    session = CoordinatorSession(session_id, owner_id, coordination_id=coordination_id)
     # Record the run for the mobile task board (fire-and-forget; no-ops if the
     # caller has no resolvable owner so anonymous runs never appear on a board).
     swarm_run_store.create_run(
@@ -155,6 +172,33 @@ def coordinate_task(
     )
 
     try:
+        # === PHASE 0: WORKSPACE PREP (New Task composer path only) ===
+        if repo_context:
+            _repo_url = repo_context.get("git_url", "")
+            _repo_branch = repo_context.get("branch", "")
+            _repo_base = repo_context.get("base_branch", "main")
+            swarm_run_store.update_run_phase(session.coordination_id, 0, "Workspace Prep")
+            yield {"type": "swarm_phase", "phase_num": 0, "phase_name": "Workspace Prep", "total_phases": 5}
+            yield {"type": "status", "content": f"📦 Checking out {_repo_url} @ {_repo_branch}..."}
+            try:
+                checkout_repo_branch(_repo_url, _repo_branch, _repo_base)
+            except Exception as _wpe:
+                # Broad on purpose — checkout_repo_branch can raise plain
+                # RuntimeError (e.g. docker_exec._get_container() if the
+                # sandbox is unreachable), not just WorkspacePrepError.
+                logger.error(f"[Coordinator] Workspace prep failed: {_wpe}")
+                swarm_run_store.finish_run(
+                    session.coordination_id, status="failed",
+                    error=f"Workspace prep failed: {_wpe}", ended_at=int(time.time()),
+                )
+                yield {"type": "error", "content": f"Workspace prep failed: {_wpe}"}
+                return
+            swarm_run_repo_store.create(
+                session.coordination_id, repo_context.get("dev_project_id"),
+                _repo_url, _repo_branch, _repo_base,
+            )
+            yield {"type": "log", "content": f"[Coordinator] Workspace ready: {_repo_url} @ {_repo_branch}"}
+
         # === PHASE 1: DECOMPOSE ===
         swarm_run_store.update_run_phase(session.coordination_id, 1, "Decompose")
         yield {"type": "swarm_phase", "phase_num": 1, "phase_name": "Decompose", "total_phases": 5}
@@ -1340,6 +1384,31 @@ def coordinate_task(
         run_diff = _build_run_diff(getattr(session, "file_changes", []))
         if run_diff:
             swarm_run_store.set_diff(session.coordination_id, run_diff)
+
+        # Finalize a pushable branch+bundle for repo-linked tasks WHILE this
+        # run still holds the shared sandbox (Phase B's lock isn't released
+        # until this generator returns) — see finalize_task_branch's
+        # docstring for why this can't happen later, at push/confirm time.
+        # Best-effort: a failure here degrades to "no push available for
+        # this task", not a failed run.
+        if repo_context:
+            try:
+                local_branch, bundle_bytes = finalize_task_branch(session.coordination_id)
+                swarm_run_repo_store.set_local_branch(session.coordination_id, local_branch, bundle_bytes)
+                yield {
+                    "type": "log",
+                    "content": f"[Coordinator] Task branch finalized: {local_branch} ({len(bundle_bytes)} bytes bundled)",
+                }
+            except Exception as _fe:
+                # Deliberately broad: finalize_task_branch can raise plain
+                # RuntimeError (e.g. from docker_exec._get_container() if the
+                # sandbox is unreachable), not just WorkspacePrepError — and
+                # this step is best-effort. Letting anything escape here would
+                # fall through to the outer handler below and mark an
+                # otherwise-successful run "failed" over a push-only problem.
+                logger.warning(f"[Coordinator] Branch finalize failed (push unavailable for this task): {_fe}")
+                yield {"type": "log", "content": f"[Coordinator] Branch finalize failed: {_fe}"}
+
         swarm_run_store.finish_run(
             session.coordination_id, status="completed",
             workers_total=total_workers, workers_completed=completed,

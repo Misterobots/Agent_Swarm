@@ -55,10 +55,13 @@ class WorkerInfo:
 class CoordinatorSession:
     """Manages a single coordination session with scratchpad and worker registry."""
 
-    def __init__(self, session_id: str, owner_id: str = None):
+    def __init__(self, session_id: str, owner_id: str = None, coordination_id: str = None):
         self.session_id = session_id
         self.owner_id = owner_id
-        self.coordination_id = f"coord-{uuid.uuid4().hex[:8]}"
+        # Direct task creation (POST /v1/tasks) generates this up front so it
+        # can return the id to the caller before the generator has run at all;
+        # every other caller leaves it unset and gets the usual random id.
+        self.coordination_id = coordination_id or f"coord-{uuid.uuid4().hex[:8]}"
         self.workers: dict[str, WorkerInfo] = {}
         self.scratchpad_dir = SCRATCHPAD_ROOT / session_id / self.coordination_id
         self.scratchpad_dir.mkdir(parents=True, exist_ok=True)

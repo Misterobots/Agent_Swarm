@@ -14,6 +14,7 @@ import base64
 import logging
 import mimetypes
 import os
+import shlex
 from pathlib import PurePosixPath
 from typing import Optional
 
@@ -434,3 +435,43 @@ def provision_project_dir(uid: str, project_id: str) -> str:
         )
     logger.info("Provisioned project dir: %s", project_dir)
     return project_dir
+
+
+def git_clone(uid: str, project_id: str, git_url: str, git_ref: str = "main") -> None:
+    """
+    Clone `git_url` at ref `git_ref` into /workspace/<uid>/<project_id>.
+
+    Raises:
+        ValueError   — git_url isn't https/http, or git_ref looks unsafe
+        RuntimeError — container unavailable, or the clone/checkout itself failed
+    """
+    if not (git_url.startswith("https://") or git_url.startswith("http://")):
+        raise ValueError("git_url must use https:// or http:// scheme")
+    if not git_ref or git_ref.startswith("-"):
+        raise ValueError(f"invalid git_ref: {git_ref!r}")
+
+    project_dir = f"{WORKSPACE_ROOT}/{uid}/{project_id}"
+    q_url = shlex.quote(git_url)
+    q_ref = shlex.quote(git_ref)
+    q_dir = shlex.quote(project_dir)
+
+    # git_ref is usually a branch name, but may be a tag or commit SHA — try the
+    # fast `--branch` clone first (works for branches/tags), and fall back to a
+    # plain clone + checkout (works for anything, including a bare SHA).
+    rc, out, err = exec_in_sandbox(
+        "sh", "-c", f"git clone --branch {q_ref} {q_url} {q_dir} 2>&1",
+        timeout=180,
+    )
+    if rc != 0:
+        rc2, out2, err2 = exec_in_sandbox(
+            "sh", "-c",
+            f"rm -rf {q_dir}; git clone {q_url} {q_dir} 2>&1 "
+            f"&& cd {q_dir} && git checkout {q_ref} 2>&1",
+            timeout=180,
+        )
+        if rc2 != 0:
+            raise RuntimeError(
+                f"git clone failed for {git_url!r}@{git_ref!r}: "
+                f"{(err2 or out2 or err or out).strip()[:500]}"
+            )
+    logger.info("git_clone: %s@%s -> %s", git_url, git_ref, project_dir)
