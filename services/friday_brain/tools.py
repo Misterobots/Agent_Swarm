@@ -8,6 +8,7 @@ web_search is a deliberately simpler DuckDuckGo-only implementation than the
 agents/tools/web_browser.py original (no Google CSE fallback, no content-trust
 scanning) — the trade-off is a smaller dependency footprint for this microservice.
 """
+import contextvars
 import difflib
 import json
 import os
@@ -329,6 +330,46 @@ def _norm_media(s: str) -> str:
     return re.sub(r"[^a-z0-9 ]+", " ", (s or "").lower()).strip()
 
 
+# --- Node identity: which physical satellite+speaker issued this request ----------------------
+# HA's chat request carries no device_id (see main.py's ANNOUNCE_TARGET note) — the only per-turn
+# signal available today is the caller-chosen `model` string that reaches _answer(), since HA lets
+# you register a SEPARATE Ollama-conversation-agent entry per Assist pipeline, each pointed at this
+# same brain but naming a distinct model (advertised via /api/tags, see main.py). NODE_SPEAKER_MAP
+# maps that model string (tag stripped, e.g. "friday-library" not "friday-library:latest") to the
+# media_player entity_id co-located with that node, so a bare "volume up"/"turn it up" with no room
+# named defaults to the node's own speaker instead of clarifying. Configured via FRIDAY_NODE_SPEAKERS
+# (JSON object). Empty/unset (the default, and every caller that isn't a registered node) = no
+# behavior change — falls through to the existing clarify path exactly as before.
+try:
+    NODE_SPEAKER_MAP = json.loads(os.getenv("FRIDAY_NODE_SPEAKERS", "") or "{}")
+except Exception:  # noqa: BLE001 — a malformed override must never break tool loading
+    NODE_SPEAKER_MAP = {}
+
+_current_node: "contextvars.ContextVar[str]" = contextvars.ContextVar("_current_node", default="")
+
+
+def set_current_node(node: str) -> None:
+    """Called once per request (main.py's _answer) with the caller-identified node/model string.
+    A no-op for any caller whose model string isn't a key in NODE_SPEAKER_MAP — existing callers
+    (the Pi driver, the default 'bmo'/'friday' model) are unaffected."""
+    _current_node.set((node or "").split(":", 1)[0])
+
+
+def _node_default_speaker(players: list) -> str | None:
+    """This request's node-default media_player, if one is configured AND still a real player."""
+    default = NODE_SPEAKER_MAP.get(_current_node.get())
+    if default and default in {eid for eid, _ in players}:
+        return default
+    return None
+
+
+def current_node_speaker() -> str | None:
+    """This request's configured node-default media_player entity_id, if any — unvalidated
+    against the live player list (unlike _node_default_speaker), since this is for PROMPT
+    HINTS only (main.py's state-fallback nudge), not a value used directly in a tool call."""
+    return NODE_SPEAKER_MAP.get(_current_node.get()) or None
+
+
 async def list_media_players() -> list:
     """[(entity_id, friendly_name)] for every media_player entity — short-TTL cached so the resolver
     and the prompt-context injection share one HA /states call."""
@@ -358,7 +399,11 @@ async def resolve_media_player(target: str):
         return want, players
     nwant = _norm_media(want)
     if not nwant:
-        return None, players
+        # No usable target phrase at all — a bare "volume up"/"pause" with no room/speaker named.
+        # This is exactly the case that used to always clarify; a known node default resolves it
+        # silently instead. No default configured -> unchanged (clarify with the full list).
+        node_default = _node_default_speaker(players)
+        return (node_default, players) if node_default else (None, players)
     toks = [t for t in nwant.split() if t not in _MEDIA_STOPWORDS]
     scored = []
     for eid, fn in players:
@@ -376,6 +421,12 @@ async def resolve_media_player(target: str):
     if best[2] >= 0.8 and (best[2] - runner) >= 0.1:
         return best[0], players
     close = [(eid, fn) for eid, fn, sc in scored if sc >= 0.55]
+    if not close:
+        # The phrase (e.g. "the speaker", stripped to nothing but stopwords) didn't even loosely
+        # match anything real — same dead-end as the empty-phrase case above.
+        node_default = _node_default_speaker(players)
+        if node_default:
+            return node_default, players
     return None, (close or players)
 
 

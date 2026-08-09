@@ -237,8 +237,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - VAULT_URL=${BMO_VAULT_URL}
-      - VAULT_OWNER=${BMO_VAULT_OWNER}
+      - VAULT_URL=${FRIDAY_VAULT_URL}
+      - VAULT_OWNER=${FRIDAY_VAULT_OWNER}
       - OLLAMA_URL=${BMO_OLLAMA_URL:-http://192.168.2.101:11434}
       - BMO_MODEL=${BMO_MODEL:-qwen3:8b}
       # Swarm delegation: delegate_to_swarm hands heavy research/build tasks to agent_runtime's
@@ -269,6 +269,13 @@ services:
       - FRIDAY_ANNOUNCE_CHIME=${FRIDAY_ANNOUNCE_CHIME:-media-source://media_source/local/snowpiercer_chime.mp3}
       - FRIDAY_ANNOUNCE_TARGET=${FRIDAY_ANNOUNCE_TARGET:-assist_satellite.google_mini_voice_assist_satellite}
       - FRIDAY_SWARM_ANNOUNCE=${FRIDAY_SWARM_ANNOUNCE:-true}
+      # Node -> default speaker map (tools.py's NODE_SPEAKER_MAP): {"model-name": "media_player.x"}.
+      # HA's chat request carries no device_id, so this is keyed off which Ollama-conversation-agent
+      # entry made the request (register one per satellite/Assist pipeline in HA, each naming a
+      # different model from /api/tags — see main.py's ollama_tags()). Lets an unqualified "volume
+      # up" default to that node's own co-located speaker instead of asking which one. Empty/unset =
+      # no behavior change.
+      - FRIDAY_NODE_SPEAKERS=${FRIDAY_NODE_SPEAKERS:-}
       # Swarm handoff: 'auto' sends no mode flag so agent_runtime's own router picks the depth. The
       # clarify gate asks ONE question on a vague ask (spoken via start_conversation so the mic reopens)
       # and parks the original ask for FRIDAY_CLARIFY_TTL seconds awaiting the answer.

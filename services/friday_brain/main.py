@@ -50,7 +50,8 @@ from persona_page import PERSONA_EDITOR_HTML
 # has a parameter named `tools` (the HA tool list) that would shadow the module inside it.
 from tools import (TOOL_SCHEMAS, call_tool, delegate_to_swarm, AGENT_RUNTIME_URL,
                    HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN, get_current_weather,
-                   list_media_players, MEDIA_SEARCH_SENTINEL)
+                   list_media_players, MEDIA_SEARCH_SENTINEL, NODE_SPEAKER_MAP,
+                   set_current_node, current_node_speaker)
 
 VAULT_URL       = os.getenv("VAULT_URL", "").rstrip("/")
 VAULT_OWNER     = os.getenv("VAULT_OWNER", "")
@@ -634,7 +635,8 @@ async def health():
     except Exception:  # noqa: BLE001
         pass
     return {"status": "ok", "model": MODEL, "current_model": _current_model,
-            "active_persona": active, "vault": bool(VAULT_URL and VAULT_OWNER), "ollama": OLLAMA_URL}
+            "active_persona": active, "vault": bool(VAULT_URL and VAULT_OWNER), "ollama": OLLAMA_URL,
+            "node_speakers": NODE_SPEAKER_MAP}
 
 
 # ---------------------------------------------------------------------------
@@ -1114,6 +1116,222 @@ def _ha_offers_media(tools) -> bool:
     return False
 
 
+# HA's own media intents (HassSetVolumeRelative, HassMediaPause, ...) reject a target whose
+# CURRENT PLAYBACK STATE doesn't qualify — confirmed live: a single, unambiguously-targeted
+# "idle" speaker (on, nothing loaded) still gets MatchFailedError/MatchFailedReason.STATE from
+# HassSetVolumeRelative, independent of area/device targeting being correct. friday_brain's own
+# control_media/set_volume tools (tools.py) call HA's media_player services directly and have no
+# such state restriction. So when the MOST RECENT tool round this exchange was a media-intent
+# STATE failure, _answer() routes into _passthrough_with_media as a fallback for this turn even
+# though HA offers native media control — letting the model retry via friday_brain's tools
+# instead of looping on an HA intent that can never succeed against an idle target.
+_MATCH_FAILED_STATE_RE = re.compile(r'"MatchFailedError".*?MatchFailedReason\.STATE', re.DOTALL)
+
+
+def _trailing_media_tool_round(convo):
+    """(name, args, content) of the most recent tool_call/result pair this exchange, or None.
+    Pairing mirrors _extract_tool_attempts: prefer tool_call_id when present, else FIFO — a
+    single assistant turn can carry more than one tool_call. `args` is always a dict (coerced
+    from a JSON string on the OpenAI-compatible surface, same as _extract_tool_attempts)."""
+    pairs = []
+    pending = []
+    for m in convo:
+        role = m.get("role")
+        if role == "assistant" and m.get("tool_calls"):
+            pending = list(m["tool_calls"])
+        elif role == "tool" and pending:
+            result_id = m.get("tool_call_id")
+            idx = None
+            if result_id:
+                idx = next((i for i, c in enumerate(pending) if c.get("id") == result_id), None)
+            tc = pending.pop(idx if idx is not None else 0)
+            fn = tc.get("function") or {}
+            args = fn.get("arguments")
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except (TypeError, ValueError):
+                    args = {}
+            pairs.append((fn.get("name", ""), args or {}, m.get("content")))
+    return pairs[-1] if pairs else None
+
+
+def _trailing_media_state_failure(convo) -> bool:
+    """Whether the most recent tool_call/result pair in this exchange is a HA media/volume
+    intent that failed with MatchFailedReason.STATE."""
+    pair = _trailing_media_tool_round(convo)
+    if not pair:
+        return False
+    name, _args, content = pair
+    if not _HA_MEDIA_NAME_RE.search(name):
+        return False
+    text = content if isinstance(content, str) else json.dumps(content or {})
+    return bool(_MATCH_FAILED_STATE_RE.search(text))
+
+
+# Deterministic execution for the ONE case we can resolve with total confidence: the failed HA
+# call named no area/name of its own (an implicit "the speaker"/"it" command) AND this request
+# has a configured node-default speaker (NODE_SPEAKER_MAP). Confirmed live that even a leading,
+# explicitly-grounded nudge (_state_fallback_nudge) gets lost in the full persona+vault+status
+# system prompt under /no_think — a small model does not reliably act on it. Rather than keep
+# tuning prompt wording, execute the equivalent friday_brain tool call directly in code, matching
+# this codebase's existing house style of normalizing/deciding deterministically instead of
+# hoping the model self-corrects (see _sanitize_hass_tool_calls, HASS_CLARIFY_THRESHOLD).
+_HASS_MEDIA_ACTION_MAP = {
+    "HassMediaPause": lambda args: ("control_media", {"action": "pause"}),
+    "HassMediaUnpause": lambda args: ("control_media", {"action": "play"}),
+    "HassMediaNext": lambda args: ("control_media", {"action": "next"}),
+    "HassMediaPrevious": lambda args: ("control_media", {"action": "previous"}),
+    "HassSetVolumeRelative": lambda args: (
+        "control_media",
+        {"action": "volume_up" if (args.get("volume_step") or 0) >= 0 else "volume_down"}),
+    "HassSetVolume": lambda args: (
+        "set_volume", {"level": args.get("volume_level", args.get("volume", 50))}),
+}
+
+
+_MEDIA_ACTION_SPEECH = {
+    "volume_up": "Turned the {name} up.",
+    "volume_down": "Turned the {name} down.",
+    "pause": "Paused on the {name}.",
+    "play": "Resumed on the {name}.",
+    "mute": "Muted the {name}.",
+    "unmute": "Unmuted the {name}.",
+    "next": "Skipped to the next track on the {name}.",
+    "previous": "Went back a track on the {name}.",
+    "stop": "Stopped the {name}.",
+}
+
+
+async def _speak_media_action(tool_name: str, tool_args: dict, entity_id: str):
+    """Execute tool_name(tool_args, entity_id=entity_id) via friday_brain's own tools and build a
+    natural spoken confirmation — or None on failure (caller decides how to handle/report that).
+    Shared by _deterministic_media_fallback and _bare_media_shortcut so both speak the same way;
+    neither surfaces tools.py's raw programmatic "Done: <action> on <entity_id>" string, which is
+    meant for a MODEL to paraphrase — these paths bypass the model entirely, so the text has to
+    read well on its own."""
+    result = await call_tool(tool_name, {**tool_args, "entity_id": entity_id})
+    if not (isinstance(result, str) and result and not result.lower().startswith("error")):
+        return None
+    try:
+        players = await list_media_players()
+        friendly = next((fn for eid, fn in players if eid == entity_id), entity_id)
+    except Exception:  # noqa: BLE001
+        friendly = entity_id
+    if tool_name == "set_volume":
+        return f"Set the {friendly} to {tool_args.get('level')} percent."
+    template = _MEDIA_ACTION_SPEECH.get(tool_args.get("action", ""))
+    return template.format(name=friendly) if template else f"Done on the {friendly}."
+
+
+async def _deterministic_media_fallback(convo):
+    """Returns a spoken result string if the deterministic fallback applies, else None (caller
+    falls through to the existing LLM-driven passthrough)."""
+    pair = _trailing_media_tool_round(convo)
+    if not pair:
+        return None
+    name, args, content = pair
+    if not _HA_MEDIA_NAME_RE.search(name):
+        return None
+    text = content if isinstance(content, str) else json.dumps(content or {})
+    if not _MATCH_FAILED_STATE_RE.search(text):
+        return None
+    if args.get("area") or args.get("name"):
+        # The failed call already named a specific area/device — a real, deliberate target.
+        # Overriding it with the node default would silently redirect a command aimed
+        # somewhere specific; leave this case to the model/passthrough instead.
+        return None
+    default = current_node_speaker()
+    if not default:
+        return None
+    mapper = _HASS_MEDIA_ACTION_MAP.get(name)
+    if not mapper:
+        return None
+    tool_name, tool_args = mapper(args)
+    spoken = await _speak_media_action(tool_name, tool_args, default)
+    print(f"[bmo-brain] deterministic media state-fallback: {name}({args}) -> "
+          f"{tool_name}({tool_args}, entity_id={default}) -> {spoken!r}", flush=True)
+    return spoken  # None -> let the existing clarify/passthrough path handle a genuine failure
+
+
+# A curated EXACT-phrase allowlist (not a broad regex) of bare, untargeted media commands — "volume
+# up", "pause", "make it louder" — deliberately narrow so it can NEVER fire on a command that names
+# a specific room/device ("turn up the kitchen volume" has no entry here and falls through to the
+# normal model+HA path unchanged). Every value is (tool_name, tool_args) for friday_brain's own
+# tools.py — same shape _HASS_MEDIA_ACTION_MAP produces.
+_BARE_MEDIA_PHRASES = {
+    "volume up": ("control_media", {"action": "volume_up"}),
+    "turn it up": ("control_media", {"action": "volume_up"}),
+    "turn the volume up": ("control_media", {"action": "volume_up"}),
+    "turn up the volume": ("control_media", {"action": "volume_up"}),
+    "make it louder": ("control_media", {"action": "volume_up"}),
+    "louder": ("control_media", {"action": "volume_up"}),
+    "volume down": ("control_media", {"action": "volume_down"}),
+    "turn it down": ("control_media", {"action": "volume_down"}),
+    "turn the volume down": ("control_media", {"action": "volume_down"}),
+    "turn down the volume": ("control_media", {"action": "volume_down"}),
+    "make it quieter": ("control_media", {"action": "volume_down"}),
+    "make it softer": ("control_media", {"action": "volume_down"}),
+    "quieter": ("control_media", {"action": "volume_down"}),
+    "softer": ("control_media", {"action": "volume_down"}),
+    "pause": ("control_media", {"action": "pause"}),
+    "pause it": ("control_media", {"action": "pause"}),
+    "pause the music": ("control_media", {"action": "pause"}),
+    "stop the music": ("control_media", {"action": "stop"}),
+    "stop it": ("control_media", {"action": "stop"}),
+    "play": ("control_media", {"action": "play"}),
+    "resume": ("control_media", {"action": "play"}),
+    "resume the music": ("control_media", {"action": "play"}),
+    "resume it": ("control_media", {"action": "play"}),
+    "unpause": ("control_media", {"action": "play"}),
+    "unpause it": ("control_media", {"action": "play"}),
+    "mute": ("control_media", {"action": "mute"}),
+    "mute it": ("control_media", {"action": "mute"}),
+    "unmute": ("control_media", {"action": "unmute"}),
+    "unmute it": ("control_media", {"action": "unmute"}),
+    "skip": ("control_media", {"action": "next"}),
+    "skip it": ("control_media", {"action": "next"}),
+    "next": ("control_media", {"action": "next"}),
+    "next track": ("control_media", {"action": "next"}),
+    "next song": ("control_media", {"action": "next"}),
+    "previous": ("control_media", {"action": "previous"}),
+    "previous track": ("control_media", {"action": "previous"}),
+    "previous song": ("control_media", {"action": "previous"}),
+    "go back": ("control_media", {"action": "previous"}),
+}
+
+
+def _normalize_bare_phrase(text: str) -> str:
+    return re.sub(r"[^a-z0-9 ]+", "", (text or "").lower()).strip()
+
+
+async def _bare_media_shortcut(last_user: str):
+    """Deterministic round-0 shortcut for a small, curated set of EXACT bare media phrases (see
+    _BARE_MEDIA_PHRASES) when this request has a configured node-default speaker. Bypasses vault
+    recall, the LLM, and HA's native intent entirely.
+
+    Why this exists (confirmed live): qwen3:8b sometimes doesn't even ATTEMPT a tool call on round
+    1 for these exact terse phrasings ('volume up', 'turn it down') — it just answers in text.
+    _deterministic_media_fallback can't help there either, since it only reacts to an ALREADY-
+    FAILED HA tool round; if nothing was ever attempted, there's nothing to react to. This runs
+    BEFORE the model is ever called, so it can't depend on the model trying anything first.
+
+    Returns spoken text, or None (no exact match / no node configured / the local call itself
+    failed) — caller falls through to the normal path unchanged."""
+    default = current_node_speaker()
+    if not default:
+        return None
+    match = _BARE_MEDIA_PHRASES.get(_normalize_bare_phrase(last_user))
+    if not match:
+        return None
+    tool_name, tool_args = match
+    spoken = await _speak_media_action(tool_name, tool_args, default)
+    if spoken:
+        print(f"[bmo-brain] bare media shortcut: {last_user!r} -> {tool_name}({tool_args}, "
+              f"entity_id={default})", flush=True)
+    return spoken
+
+
 # Tier 1 (entity): give the model the real media_player entity_ids so it targets the right speaker
 # instead of guessing. Cached fetch (shared with the resolver), injected only on media turns.
 async def _media_players_prompt():
@@ -1155,14 +1373,44 @@ async def _media_search_and_play(entity_id: str, source: str):
         await _ha_announce(f"I ran into trouble finding a stream for {source}.", reopen=False)
 
 
-async def _passthrough_with_media(messages, tools):
+def _state_fallback_nudge() -> str:
+    """Built per-request (not a constant) so it can name THIS node's own default speaker by
+    entity_id when known — a small model won't reliably guess which of several undifferentiated
+    media_player entities in the injected list is 'this room's own speaker', and control_media/
+    set_volume/play_media all require entity_id, so an ungrounded nudge alone (confirmed live)
+    just gets a text-only 'which device?' instead of the tool call this fallback exists for."""
+    default = current_node_speaker()
+    hint = (f" This request's own speaker is {default} — use that entity_id unless the user "
+            "clearly named a different device." if default else "")
+    return (
+        "\n\nNOTE: the native device-control tool just failed on this target because of its current "
+        "playback state (e.g. idle/nothing loaded) — not because the wrong device was targeted. Do NOT "
+        "retry the same native tool again. Instead call control_media/set_volume/play_media directly "
+        "on the media_player entity you were just targeting." + hint
+    )
+
+
+async def _passthrough_with_media(messages, tools, state_fallback: bool = False):
     """Passthrough tool-calling that ALSO offers friday_brain's media-control tools (+ the read-only
     info tools) and executes them locally via HA's service API, looping until final text or an
-    HA-owned tool_call (returned UNEXECUTED for HA). Mirrors _passthrough_with_info; reached only on
-    a media-intent turn. Injects the real media_player list (Tier 1) and honors play_media's
-    swarm-search signal (Tier 3). Returns (text, tool_calls) matching _answer's contract."""
+    HA-owned tool_call (returned UNEXECUTED for HA). Mirrors _passthrough_with_info; reached on a
+    media-intent turn. Injects the real media_player list (Tier 1) and honors play_media's
+    swarm-search signal (Tier 3). Returns (text, tool_calls) matching _answer's contract.
+
+    state_fallback=True means this turn was routed here specifically because HA's own media intent
+    just failed with MatchFailedReason.STATE (see _trailing_media_state_failure) — HA's tools are
+    still offered (still useful for other targets/actions this same turn), but a nudge steers the
+    model toward friday_brain's own state-agnostic tools instead of re-trying the doomed HA call."""
     all_tools = list(tools) + _MEDIA_SCHEMAS + _INFO_SCHEMAS
     convo = list(messages)
+    if state_fallback and convo and convo[0].get("role") == "system":
+        # PREPENDED, not appended: confirmed live that a small model under /no_think, with this
+        # nudge tacked onto the END of the full persona+vault+status system prompt, ignores it
+        # and asks a clarifying question anyway — the same nudge WORKS when it's the first thing
+        # in a minimal prompt. Leading position gets it read before attention is spent elsewhere.
+        convo = [{**convo[0], "content": _state_fallback_nudge().strip() + "\n\n" + convo[0]["content"]}] + convo[1:]
+    elif state_fallback:
+        convo = [{"role": "system", "content": _state_fallback_nudge().strip()}] + convo
     mp = await _media_players_prompt()
     if mp:
         if convo and convo[0].get("role") == "system":
@@ -1559,7 +1807,7 @@ def _coerce_tool_call_args(tool_calls):
     return out
 
 
-async def _answer(client_messages, tools=None):
+async def _answer(client_messages, tools=None, model: str = ""):
     """Recall vault context, build the BMO prompt, call the LLM, return (text, tool_calls).
 
     `tools`, when supplied by the caller, is forwarded to Ollama verbatim (OpenAI-style
@@ -1570,7 +1818,16 @@ async def _answer(client_messages, tools=None):
     looping until the model produces a final text-only response — self-executing mode,
     e.g. the Pi driver, which has no way to execute a tool call itself. tool_calls in the
     return value is always None in self-executing mode.
+
+    `model` is the caller-supplied model string (both API surfaces already read this from
+    the request body for their own response envelope) — the ONLY per-request signal that
+    can distinguish which node/satellite is talking to Friday today, since HA's chat
+    request otherwise carries no device_id at all. Registering one Ollama-conversation-agent
+    entry per Assist pipeline in HA, each naming a distinct model (see NODE_SPEAKER_MAP /
+    /api/tags), lets that node's own co-located speaker resolve silently instead of
+    clarifying on an unqualified "volume up". A model with no matching entry is a no-op.
     """
+    set_current_node(model)
     # Keep tool-result turns (role "tool") and the assistant's own prior tool_calls turn
     # (content is empty when it emits tool_calls) so multi-round tool-calling loops — e.g.
     # HA retrying entity resolution after a failed target — carry forward instead of
@@ -1609,6 +1866,13 @@ async def _answer(client_messages, tools=None):
     if _is_likely_stt_hallucination(last_user):
         print(f"[bmo-brain] dropped likely STT hallucination: {last_user!r}", flush=True)
         return "", None
+
+    # Bare media shortcut (see _bare_media_shortcut) — checked before anything else so it never
+    # depends on the model attempting (and possibly not attempting) a tool call on its own. A
+    # no-op unless this request has a configured node-default speaker (NODE_SPEAKER_MAP).
+    bare_media_text = await _bare_media_shortcut(last_user)
+    if bare_media_text:
+        return bare_media_text, None
 
     # Brain swap: "Hey Friday, brain swap" toggles the LLM between the default and the experimental
     # model (see _BRAIN_SWAP_RE). The unload+warm runs in the background — the two 8B brains can't
@@ -1825,7 +2089,18 @@ async def _answer(client_messages, tools=None):
     else:
         attempts = []
 
-    if tools and tool_failures >= HASS_CLARIFY_THRESHOLD:
+    deterministic_media_text = None
+    if tools and _trailing_media_state_failure(convo):
+        deterministic_media_text = await _deterministic_media_fallback(convo)
+
+    if deterministic_media_text:
+        # See _deterministic_media_fallback's docstring: this specific case (HA's own media
+        # intent STATE-failed on an implicit "the speaker" command, node default known) is
+        # resolved in code rather than handed to the model — ahead of the clarify-threshold
+        # check below, since it would otherwise fire on the 2nd consecutive failure before this
+        # deterministic path ever got a chance.
+        text, tool_calls = deterministic_media_text, None
+    elif tools and tool_failures >= HASS_CLARIFY_THRESHOLD:
         # HA drives this retry loop, not bmo_brain — there is no round cap of our own
         # unless we impose one. Past the threshold, stop guessing new tool-call variations
         # and force a text-only answer (tools withheld, so another guess is structurally
@@ -1857,11 +2132,16 @@ async def _answer(client_messages, tools=None):
         # since HA can't. Ordinary on/off turns skip this entirely (regex miss) and stay on the
         # untouched single-call path below.
         text, tool_calls = await _passthrough_with_registry(messages, tools)
-    elif tools and _MEDIA_INTENT_RE.search(last_user or "") and not _ha_offers_media(tools):
-        # Media intent AND HA exposes no native media control -> use friday_brain's media tools
-        # (transport/volume/stream) as the fallback, executed via HA's service API. When HA DOES
-        # expose media (Spotify/Music Assistant intents), this is skipped so those own it (below).
-        text, tool_calls = await _passthrough_with_media(messages, tools)
+    elif tools and _MEDIA_INTENT_RE.search(last_user or "") and (
+        not _ha_offers_media(tools) or _trailing_media_state_failure(convo)
+    ):
+        # Media intent AND (HA exposes no native media control, OR HA's native media intent just
+        # failed on this exact target's playback STATE — see _trailing_media_state_failure) -> use
+        # friday_brain's media tools (transport/volume/stream) as the fallback, executed via HA's
+        # service API. The ordinary case (no native media at all) needs no nudge; the state-failure
+        # case does, so the model doesn't just retry the doomed HA call again.
+        text, tool_calls = await _passthrough_with_media(
+            messages, tools, state_fallback=_ha_offers_media(tools))
     elif tools:
         # HA-driven turn. Offer friday_brain's read-only info tools (web_search + weather + news)
         # alongside HA's tools, executed locally, so live-info questions answer with REAL DATA instead
@@ -1940,7 +2220,7 @@ async def chat_completions(req: Request):
 
     tool_calls = None
     try:
-        text, tool_calls = await _answer(client_messages, tools=tools)
+        text, tool_calls = await _answer(client_messages, tools=tools, model=model)
     except Exception as e:  # noqa: BLE001
         text = f"(BMO brain error: {e})"
         print(f"[bmo-brain] ERROR: {type(e).__name__}: {e}", flush=True)
@@ -2005,14 +2285,24 @@ async def ollama_version():
     return {"version": "0.5.0"}
 
 
-@app.get("/api/tags")
-async def ollama_tags():
-    return {"models": [{
-        "name": f"{MODEL_NAME}:latest", "model": f"{MODEL_NAME}:latest",
+def _tags_entry(name: str) -> dict:
+    return {
+        "name": f"{name}:latest", "model": f"{name}:latest",
         "modified_at": _now_iso(), "size": 0, "digest": "bmo",
         "details": {"parent_model": "", "format": "gguf", "family": "bmo",
                     "families": ["bmo"], "parameter_size": "8B", "quantization_level": ""},
-    }]}
+    }
+
+
+@app.get("/api/tags")
+async def ollama_tags():
+    # The base model plus one synthetic entry per NODE_SPEAKER_MAP key (see tools.py) — HA's Ollama
+    # integration lets you register a separate conversation-agent entry per Assist pipeline, each
+    # pointed at this same brain but naming a DIFFERENT model from this list. Selecting a node's own
+    # entry is what identifies "this pipeline/satellite" on every request that entry makes (see
+    # _answer()'s `model` param) — the only per-request signal Friday has for which node is talking,
+    # since HA's chat request otherwise carries no device_id at all.
+    return {"models": [_tags_entry(MODEL_NAME)] + [_tags_entry(node) for node in NODE_SPEAKER_MAP]}
 
 
 @app.post("/api/show")
@@ -2037,7 +2327,7 @@ async def ollama_chat(req: Request):
     now = _now_iso()
     tool_calls = None
     try:
-        text, tool_calls = await _answer(messages, tools=tools)
+        text, tool_calls = await _answer(messages, tools=tools, model=model)
     except Exception as e:  # noqa: BLE001
         text = f"(BMO brain error: {e})"
         print(f"[bmo-brain] /api/chat ERROR: {type(e).__name__}: {e}", flush=True)
