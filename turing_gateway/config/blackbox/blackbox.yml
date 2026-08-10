@@ -12,6 +12,20 @@ modules:
     http:
       method: POST
       preferred_ip_protocol: "ip4"
+  http_body_vault_true:
+    # friday_brain's /health returns {"status":"ok", ..., "vault": true|false, ...}. vault flipping
+    # to false means memory recall/write-back is silently disabled — confirmed live (2026-08) it can
+    # sit that way for weeks with zero visible error, since the service is fail-soft by design and
+    # simply answers without grounding rather than erroring. This module fails the probe (not just
+    # on non-2xx, but also) whenever the body doesn't contain "vault": true, so that condition alerts
+    # like any other outage instead of staying invisible.
+    prober: http
+    timeout: 5s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      preferred_ip_protocol: "ip4"
+      fail_if_body_not_matches_regexp:
+        - '"vault":\s*true'
   tcp_connect:
     prober: tcp
     timeout: 5s
