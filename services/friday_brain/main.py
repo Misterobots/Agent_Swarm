@@ -599,6 +599,26 @@ async def _refresh_weather() -> None:
         print(f"[bmo-brain] weather refresh failed (non-fatal): {e}", flush=True)
 
 
+_CURRENT_WEATHER_RE = re.compile(
+    r"\b(?:current\s+)?weather\b|\b(?:temperature|conditions)\s+(?:outside|right\s+now)\b|"
+    r"\b(?:how(?:'s|\s+is)\s+it|what(?:'s|\s+is)\s+it\s+like)\s+outside\b", re.I)
+
+
+async def _current_weather_shortcut(text: str) -> str | None:
+    """Answer current-condition questions from live data without paying an LLM round trip."""
+    if not text or not _CURRENT_WEATHER_RE.search(text):
+        return None
+    if time.time() - _weather_cache["ts"] <= _WEATHER_TTL and _weather_cache["text"]:
+        weather = _weather_cache["text"]
+    else:
+        weather = await get_current_weather()
+        if not weather or "unreachable" in weather.lower():
+            return None
+        _weather_cache["text"], _weather_cache["ts"] = weather, time.time()
+    print(f"[bmo-brain] current weather shortcut: {weather!r}", flush=True)
+    return _speechify("Current conditions are " + weather + ".")
+
+
 def _weather_for_prompt() -> str:
     """Cached current weather for prompt injection. Non-blocking: if stale, kick off a background
     refresh and return whatever is currently cached (empty until the first refresh lands)."""
@@ -1231,6 +1251,9 @@ async def _speak_media_action(tool_name: str, tool_args: dict, entity_id: str):
         friendly = entity_id
     if tool_name == "set_volume":
         return f"Set the {friendly} to {tool_args.get('level')} percent."
+    if tool_name == "adjust_volume":
+        return (f"Turned the {friendly} {tool_args.get('direction')} by "
+                f"{tool_args.get('amount')} percent.")
     template = _MEDIA_ACTION_SPEECH.get(tool_args.get("action", ""))
     return template.format(name=friendly) if template else f"Done on the {friendly}."
 
@@ -1344,6 +1367,10 @@ _NODE_VOLUME_RE = re.compile(
     r"^(?:set\s+(?:the\s+)?volume(?:\s+level)?\s+(?:to|at)|volume\s+(?:to|at))\s+"
     r"(.+?)(?:\s+percent)?$", re.I)
 
+_NODE_VOLUME_ADJUST_RE = re.compile(
+    r"^(?:(?:turn\s+)?(?:the\s+)?volume\s+|turn\s+it\s+)?"
+    r"(up|down)(?:\s+by)?(?:\s+(.+?))?(?:\s+please)?$", re.I)
+
 
 def _normalize_bare_phrase(text: str) -> str:
     return re.sub(r"[^a-z0-9 ]+", "", (text or "").lower()).strip()
@@ -1366,6 +1393,22 @@ async def _bare_media_shortcut(last_user: str):
     if not default:
         return None
     normalized = _normalize_bare_phrase(last_user)
+    adjust_match = _NODE_VOLUME_ADJUST_RE.fullmatch(normalized)
+    if adjust_match:
+        direction = adjust_match.group(1).lower()
+        raw_amount = (adjust_match.group(2) or "one").strip()
+        # Whisper commonly renders spoken "two" as "too" in short commands.
+        if raw_amount == "too":
+            raw_amount = "two"
+        amount = _parse_volume_percent(raw_amount)
+        if amount is not None:
+            spoken = await _speak_media_action(
+                "adjust_volume", {"direction": direction, "amount": amount}, default)
+            if spoken:
+                print(f"[bmo-brain] node volume adjustment: {last_user!r} -> "
+                      f"adjust_volume(direction={direction}, amount={amount}, "
+                      f"entity_id={default})", flush=True)
+            return spoken
     volume_match = _NODE_VOLUME_RE.fullmatch(normalized)
     if volume_match:
         level = _parse_volume_percent(volume_match.group(1))
@@ -1924,6 +1967,10 @@ async def _answer(client_messages, tools=None, model: str = ""):
     if _is_likely_stt_hallucination(last_user):
         print(f"[bmo-brain] dropped likely STT hallucination: {last_user!r}", flush=True)
         return "", None
+
+    current_weather_text = await _current_weather_shortcut(last_user)
+    if current_weather_text:
+        return current_weather_text, None
 
     # Bare media shortcut (see _bare_media_shortcut) — checked before anything else so it never
     # depends on the model attempting (and possibly not attempting) a tool call on its own. A

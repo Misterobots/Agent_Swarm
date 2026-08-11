@@ -478,6 +478,32 @@ async def set_volume(entity_id: str, level=None, volume=None, **_kwargs) -> str:
     return f"Set {eid} to {round(lvl * 100)} percent volume"
 
 
+async def adjust_volume(entity_id: str, direction: str, amount=1, **_kwargs) -> str:
+    """Adjust a media player's current volume by an exact number of percentage points."""
+    eid, candidates = await resolve_media_player(entity_id)
+    if not eid:
+        return _media_clarify(candidates)
+    state = await _ha_call("GET", f"states/{eid}")
+    if "error" in state:
+        return f"Error: {state['error']}"
+    current = (state.get("attributes") or {}).get("volume_level")
+    try:
+        delta = abs(float(amount)) / 100.0
+        current = float(current)
+    except (TypeError, ValueError):
+        return "Error: the current volume or requested adjustment is unavailable."
+    if (direction or "").lower() == "down":
+        delta = -delta
+    elif (direction or "").lower() != "up":
+        return "Error: volume direction must be up or down."
+    target = max(0.0, min(1.0, current + delta))
+    result = await _ha_call("POST", "services/media_player/volume_set",
+                            {"entity_id": eid, "volume_level": target})
+    if not _ha_service_ok(result):
+        return f"Error: {result['error']}"
+    return f"Adjusted {eid} {direction} by {round(abs(delta) * 100)} percent"
+
+
 async def play_media(entity_id: str, source: str = "", url: str = "", query: str = "",
                      media_type: str = "music", **_kwargs) -> str:
     """Start audio on a media_player from a direct stream URL or a known station name (_STATIONS).
@@ -619,6 +645,7 @@ _DISPATCH = {
     "list_devices": list_devices,
     "control_media": control_media,
     "set_volume": set_volume,
+    "adjust_volume": adjust_volume,
     "play_media": play_media,
     "delegate_to_swarm": delegate_to_swarm,
 }
