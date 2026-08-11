@@ -191,7 +191,7 @@ _SWARM_ASSESS_SYSTEM = (
     "fun'). A task that names a concrete subject and what to do with it is READY even if it isn't "
     "perfectly scoped (e.g. 'compare the 3 best budget keyboards under $100' is READY — do NOT ask "
     "about criteria). Only if it is truly too vague, reply with ONE short spoken clarifying question "
-    "and nothing else. /no_think")
+    "and nothing else.")
 
 # Per-brain personas (personas.py). Each brain (default vs the FRIDAY_ALT_BRAIN "brain swap"
 # target) carries its OWN persona + memory namespace + visual refs, all editable live at GET
@@ -376,7 +376,7 @@ _DIGEST_SYSTEM = (
     "spoken answer: 2-3 sentences max, most important point first, conversational. No lists, no "
     "markdown, no headings, no emojis, no URLs or 'see [link]'. If there's a lot, give the gist and "
     "stop — do NOT tack on a follow-up question or an offer to continue (it re-triggers the mic). "
-    "End on a statement. Output ONLY the spoken reply, nothing else. /no_think")
+    "End on a statement. Output ONLY the spoken reply, nothing else.")
 
 
 async def _digest_for_voice(raw: str, who: str = "the swarm") -> str:
@@ -904,6 +904,13 @@ async def _ollama_chat(messages: list, tools=None):
     # ollama_friday's GPU is dedicated to Friday) so a voice turn never pays a cold reload.
     penalty = REPEAT_PENALTY_TOOLS if tools else REPEAT_PENALTY
     payload = {"model": _current_model, "messages": messages, "stream": False, "keep_alive": KEEP_ALIVE,
+               # think:false is Ollama's top-level generation-control flag (/api/chat only — the
+               # /api/generate warm-up ping in _do_brain_swap ignores it, which is fine, that call's
+               # output is discarded). Confirmed live 2026-08-11: this is what actually disables Qwen3's
+               # reasoning — the /no_think prompt token below was a suggestion the model often ignored,
+               # costing 3-16s per turn AND once produced a hallucinated entity_id on an ambiguous
+               # command instead of asking. With this flag, same scenario asks for clarification in ~3s.
+               "think": False,
                "options": {"temperature": TEMPERATURE, "num_ctx": NUM_CTX,
                            "repeat_penalty": penalty, "repeat_last_n": REPEAT_LAST_N,
                            "num_predict": NUM_PREDICT}}
@@ -2045,7 +2052,6 @@ async def _answer(client_messages, tools=None, model: str = ""):
         "your projects and infrastructure. If asked whether I have a vault or MemPalace, "
         "the answer is yes; below is whatever I recalled for this question specifically:\n" + ctx
     )
-    parts.append("/no_think")
     system = "\n\n".join(parts)
     messages = [{"role": "system", "content": system}] + convo
 
