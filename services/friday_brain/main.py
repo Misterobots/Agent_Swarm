@@ -1311,6 +1311,39 @@ _BARE_MEDIA_PHRASES = {
     "go back": ("control_media", {"action": "previous"}),
 }
 
+_NUMBER_WORD_VALUES = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+    "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
+    "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80,
+    "ninety": 90, "hundred": 100,
+}
+
+
+def _parse_volume_percent(value: str) -> int | None:
+    """Parse a zero-to-one-hundred volume percentage from digits or common STT number words."""
+    value = (value or "").strip()
+    if value.isdigit():
+        number = int(value)
+    else:
+        words = value.replace("-", " ").split()
+        if not words or any(word not in _NUMBER_WORD_VALUES for word in words):
+            return None
+        if words == ["one", "hundred"] or words == ["hundred"]:
+            number = 100
+        elif "hundred" in words:
+            return None
+        else:
+            number = sum(_NUMBER_WORD_VALUES[word] for word in words)
+    return number if 0 <= number <= 100 else None
+
+
+_NODE_VOLUME_RE = re.compile(
+    r"^(?:set\s+(?:the\s+)?volume(?:\s+level)?\s+(?:to|at)|volume\s+(?:to|at))\s+"
+    r"(.+?)(?:\s+percent)?$", re.I)
+
 
 def _normalize_bare_phrase(text: str) -> str:
     return re.sub(r"[^a-z0-9 ]+", "", (text or "").lower()).strip()
@@ -1332,7 +1365,18 @@ async def _bare_media_shortcut(last_user: str):
     default = current_node_speaker()
     if not default:
         return None
-    match = _BARE_MEDIA_PHRASES.get(_normalize_bare_phrase(last_user))
+    normalized = _normalize_bare_phrase(last_user)
+    volume_match = _NODE_VOLUME_RE.fullmatch(normalized)
+    if volume_match:
+        level = _parse_volume_percent(volume_match.group(1))
+        if level is None:
+            return None
+        spoken = await _speak_media_action("set_volume", {"level": level}, default)
+        if spoken:
+            print(f"[bmo-brain] node volume shortcut: {last_user!r} -> "
+                  f"set_volume(level={level}, entity_id={default})", flush=True)
+        return spoken
+    match = _BARE_MEDIA_PHRASES.get(normalized)
     if not match:
         return None
     tool_name, tool_args = match
@@ -1856,7 +1900,10 @@ async def _answer(client_messages, tools=None, model: str = ""):
         convo.append(m)
     last_user = next((m["content"] for m in reversed(convo) if m.get("role") == "user"), "")
     if last_user:
-        print(f"[bmo-brain] utterance: {last_user[:140]!r}", flush=True)
+        node = (model or "").split(":", 1)[0]
+        print(f"[bmo-brain] utterance: {last_user[:140]!r} "
+              f"(request_model={model!r}, node={node!r}, "
+              f"node_speaker={current_node_speaker()!r})", flush=True)
 
     # Confirmed live: an STT engine transcribed near-silent audio (a muted mic, and
     # separately a synthesized test tone) as "Thank you." — Whisper's single most common
