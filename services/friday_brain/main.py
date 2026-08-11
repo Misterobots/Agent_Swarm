@@ -113,8 +113,12 @@ _BRAIN_SWAP_RE = re.compile(
     r"\b(brain\s*swap|swap\s+(?:your\s+|the\s+|my\s+)?brains?|switch\s+(?:your\s+|the\s+)?brains?)\b", re.I)
 
 def _brain_name(m: str) -> str:
-    """Spoken name for the swap confirmation."""
-    return "my default brain" if m == MODEL else "the Josiefied experimental brain"
+    """Spoken name for the swap confirmation. Derived from the active persona's display_name so
+    it stays correct across FRIDAY_ALT_BRAIN changes instead of naming a specific fine-tune."""
+    if m == MODEL:
+        return "my default brain"
+    name = personas.get_persona(m).get("display_name") or "the experimental brain"
+    return f"the {name} brain"
 
 SELF_TOOL_MAX_ROUNDS = int(os.getenv("BMO_SELF_TOOL_MAX_ROUNDS", "6"))
 BMO_SOURCE_DEVICE = os.getenv("BMO_SOURCE_DEVICE", "lovelace")
