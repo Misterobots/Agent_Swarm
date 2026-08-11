@@ -50,6 +50,7 @@ from persona_page import PERSONA_EDITOR_HTML
 # has a parameter named `tools` (the HA tool list) that would shadow the module inside it.
 from tools import (TOOL_SCHEMAS, call_tool, delegate_to_swarm, AGENT_RUNTIME_URL,
                    HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN, get_current_weather,
+                   get_weather_forecast,
                    list_media_players, MEDIA_SEARCH_SENTINEL, NODE_SPEAKER_MAP,
                    set_current_node, current_node_speaker)
 
@@ -602,11 +603,28 @@ async def _refresh_weather() -> None:
 _CURRENT_WEATHER_RE = re.compile(
     r"\b(?:current\s+)?weather\b|\b(?:temperature|conditions)\s+(?:outside|right\s+now)\b|"
     r"\b(?:how(?:'s|\s+is)\s+it|what(?:'s|\s+is)\s+it\s+like)\s+outside\b", re.I)
+_FUTURE_WEATHER_RE = re.compile(
+    r"\b(?:tomorrow|forecast|later\s+today|this\s+(?:afternoon|evening|weekend)|"
+    r"next\s+(?:hour|day|week))\b", re.I)
+_FORECAST_REQUEST_RE = re.compile(r"\b(?:weather|leather|forecast)\b", re.I)
+
+
+async def _forecast_weather_shortcut(text: str) -> str | None:
+    """Answer forecast requests directly; 'leather' covers a confirmed Whisper substitution."""
+    if not text or not (_FUTURE_WEATHER_RE.search(text) and _FORECAST_REQUEST_RE.search(text)):
+        return None
+    forecast = await get_weather_forecast()
+    if not forecast or "unreachable" in forecast.lower():
+        return None
+    if re.search(r"\btomorrow\b", text, re.I) and "|" in forecast:
+        forecast = forecast.split("|", 1)[1].strip()
+    print(f"[bmo-brain] forecast weather shortcut: {forecast!r}", flush=True)
+    return _speechify(forecast)
 
 
 async def _current_weather_shortcut(text: str) -> str | None:
     """Answer current-condition questions from live data without paying an LLM round trip."""
-    if not text or not _CURRENT_WEATHER_RE.search(text):
+    if not text or _FUTURE_WEATHER_RE.search(text) or not _CURRENT_WEATHER_RE.search(text):
         return None
     if time.time() - _weather_cache["ts"] <= _WEATHER_TTL and _weather_cache["text"]:
         weather = _weather_cache["text"]
@@ -939,7 +957,15 @@ async def _ollama_chat(messages: list, tools=None):
     async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as c:
         r = await c.post(f"{OLLAMA_URL}/api/chat", json=payload)
         r.raise_for_status()
-        message = r.json().get("message", {})
+        response_data = r.json()
+        message = response_data.get("message", {})
+    thinking = message.get("thinking") or ""
+    if thinking:
+        print(f"[bmo-brain] WARNING: Ollama returned {len(thinking)} chars of reasoning despite "
+              "think:false; discarded", flush=True)
+    if response_data.get("done_reason") == "length":
+        print(f"[bmo-brain] WARNING: Ollama response hit num_predict={NUM_PREDICT} and was truncated",
+              flush=True)
     text = _strip_think(message.get("content", "") or "")
     tool_calls = message.get("tool_calls") or None
     return text, tool_calls
@@ -1967,6 +1993,10 @@ async def _answer(client_messages, tools=None, model: str = ""):
     if _is_likely_stt_hallucination(last_user):
         print(f"[bmo-brain] dropped likely STT hallucination: {last_user!r}", flush=True)
         return "", None
+
+    forecast_weather_text = await _forecast_weather_shortcut(last_user)
+    if forecast_weather_text:
+        return forecast_weather_text, None
 
     current_weather_text = await _current_weather_shortcut(last_user)
     if current_weather_text:
