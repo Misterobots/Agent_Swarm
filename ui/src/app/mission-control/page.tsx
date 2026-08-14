@@ -51,7 +51,6 @@ import type { GovernanceRequest } from "@/types/workspaces";
 import { Button, Card } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAccess } from "@/lib/hooks/use-access";
-import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useLauncherStore } from "@/lib/stores/launcher-store";
 import { streamSSE } from "@/lib/utils/sse-parser";
 
@@ -125,15 +124,6 @@ const SKILLS: Skill[] = [
 ];
 
 const SKILL_CATS: SkillCat[] = ["Daily", "Maintenance", "Memory", "Research", "Build"];
-
-function applyModeForCommand(command: string) {
-  const s = useSettingsStore.getState();
-  s.setWorkshopMode(false);
-  s.setDesignMode(false);
-  s.setSwarmMode(false);
-  if (command === "/design") s.setDesignMode(true);
-  else if (command === "/swarm" || command === "/plan") s.setSwarmMode(true);
-}
 
 function relTime(epochSec?: number): string {
   if (!epochSec) return "—";
@@ -276,7 +266,8 @@ export default function ControlCenterPage() {
     if (!text) return;
     if (skill.needsInput) {
       // Interactive/creative skills (Build/Plan/Design/Research/Ask) → full chat.
-      applyModeForCommand(skill.command);
+      // The command is part of the prompt, so the backend selects the workflow
+      // without leaking a global UI mode into the next unrelated conversation.
       useLauncherStore.getState().setPendingLaunch(text);
       router.push("/chat");
     } else {

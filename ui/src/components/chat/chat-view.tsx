@@ -31,6 +31,7 @@ import { useIsMobile } from "@/lib/hooks/use-mobile";
 import type { ConversationExperience, FileAttachment, FlaggedFollowup } from "@/types/chat";
 import { useFollowupsStore } from "@/lib/stores/followups-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
+import { useLauncherStore } from "@/lib/stores/launcher-store";
 
 function usageBarClass(pct: number): string {
   if (pct >= 0.95) return "bg-red-500";
@@ -97,12 +98,18 @@ export function ChatView({ showDevContext = false, experience: experienceProp, a
     experience,
     onToolResult: devMode ? handleToolResult : undefined,
   });
+  const consumePendingLaunch = useLauncherStore((s) => s.consumePendingLaunch);
   const autoSentPrompt = useRef<string | null>(null);
   useEffect(() => {
     if (!autoSendPrompt || autoSentPrompt.current === autoSendPrompt || isStreaming) return;
     autoSentPrompt.current = autoSendPrompt;
     void sendMessage(autoSendPrompt);
   }, [autoSendPrompt, isStreaming, sendMessage]);
+  useEffect(() => {
+    if (experience !== "chat" || isStreaming) return;
+    const prompt = consumePendingLaunch();
+    if (prompt) void sendMessage(prompt);
+  }, [consumePendingLaunch, experience, isStreaming, sendMessage]);
   const { activeConversationId, activeConversation, updateConversation, setMessageFlaggedFollowup } = useChatStore();
   const addFollowup = useFollowupsStore((s) => s.addFollowup);
   const currentProjectId = useDevProjectStore((s) => s.currentProjectId);

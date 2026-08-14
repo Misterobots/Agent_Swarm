@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
 
-const SSH_BINARY = process.platform === "win32"
-  ? (require("fs").existsSync("C:\\Windows\\System32\\OpenSSH\\ssh.exe")
-      ? "C:\\Windows\\System32\\OpenSSH\\ssh.exe"
-      : "ssh")
-  : "ssh";
+// Resolve from PATH in every environment. An explicit override remains
+// available for managed hosts without an ssh binary on PATH.
+const SSH_BINARY = process.env.MEMEX_SSH_BINARY ?? "ssh";
 const SSH_USER = "misterobots";
 
 const NODE_IPS: Record<string, string> = {
@@ -26,7 +24,7 @@ async function executeSSH(node: string, command: string): Promise<{ stdout: stri
     // For Lovelace (local machine), execute directly
     if (node === "lovelace") {
       const proc = spawn("powershell.exe", ["-Command", command], {
-        shell: true,
+        shell: false,
       });
 
       let stdout = "";
