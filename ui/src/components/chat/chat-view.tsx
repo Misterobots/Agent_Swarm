@@ -28,7 +28,7 @@ import { WelcomeCard } from "@/components/onboarding/WelcomeCard";
 import { useAutoGoal } from "@/lib/hooks/use-goals";
 import { GoalsPanel } from "@/components/goals/GoalsPanel";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
-import type { FileAttachment, FlaggedFollowup } from "@/types/chat";
+import type { ConversationExperience, FileAttachment, FlaggedFollowup } from "@/types/chat";
 import { useFollowupsStore } from "@/lib/stores/followups-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 
@@ -39,7 +39,21 @@ function usageBarClass(pct: number): string {
   return "bg-[var(--chat-muted)]";
 }
 
-export function ChatView({ showDevContext = false }: { showDevContext?: boolean }) {
+interface ChatViewProps {
+  showDevContext?: boolean;
+  experience?: ConversationExperience;
+  autoSendPrompt?: string | null;
+}
+
+const EXPERIENCE_COPY: Record<ConversationExperience, { label: string; greeting: string; subtitle: string; placeholder: string }> = {
+  chat: { label: "Chat", greeting: "What can I help with?", subtitle: "Ask, reason, and work with Memex.", placeholder: "Send a message..." },
+  code: { label: "Code", greeting: "What should we build?", subtitle: "A project-scoped coding workspace with its own threads and tools.", placeholder: "Describe the code change..." },
+  research: { label: "Research", greeting: "What should we investigate?", subtitle: "A grounded research workspace with its own history.", placeholder: "Enter a research question..." },
+  routines: { label: "Routines", greeting: "Build a repeatable workflow", subtitle: "Plan recurring work here, then schedule it above.", placeholder: "Describe the routine you want to build..." },
+};
+
+export function ChatView({ showDevContext = false, experience: experienceProp, autoSendPrompt }: ChatViewProps) {
+  const experience = experienceProp ?? (showDevContext ? "code" : "chat");
   const selectedText = useDevStore((s) => s.selectedText);
   const editorLanguage = useDevStore((s) => s.editorLanguage);
   const activeFile = useDevStore((s) => s.activeFile);
@@ -71,12 +85,24 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   useFeatureSpotlight();
   useAutoGoal();
 
+  const setActiveExperience = useChatStore((s) => s.setActiveExperience);
+  useEffect(() => {
+    setActiveExperience(experience);
+  }, [experience, setActiveExperience]);
+
   const devMode = showDevContext && agentEnabled;
 
   const { messages, isStreaming, statusMessage, latestThought, streamMode, tokenUsage, sessionUsage, sendMessage, compactConversation, stopGeneration } = useChatStream({
     devMode,
+    experience,
     onToolResult: devMode ? handleToolResult : undefined,
   });
+  const autoSentPrompt = useRef<string | null>(null);
+  useEffect(() => {
+    if (!autoSendPrompt || autoSentPrompt.current === autoSendPrompt || isStreaming) return;
+    autoSentPrompt.current = autoSendPrompt;
+    void sendMessage(autoSendPrompt);
+  }, [autoSendPrompt, isStreaming, sendMessage]);
   const { activeConversationId, activeConversation, updateConversation, setMessageFlaggedFollowup } = useChatStore();
   const addFollowup = useFollowupsStore((s) => s.addFollowup);
   const currentProjectId = useDevProjectStore((s) => s.currentProjectId);
@@ -87,6 +113,22 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
   const personality = THEME_PERSONALITIES[theme] ?? THEME_PERSONALITIES.memex;
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeConv = activeConversation();
+  // A previously persisted client can carry a now-retired value while a new
+  // release is loading. Keep the surface usable and migrate its next action
+  // into Chat rather than crashing the entire workspace.
+  const experienceCopy = EXPERIENCE_COPY[experience] ?? {
+    label: "Chat",
+    greeting: "What can I help with?",
+    subtitle: "Ask, reason, and work with Memex.",
+    placeholder: "Send a message...",
+  };
+  const experienceLabel = experience === "code"
+    ? "Code"
+    : experience === "research"
+      ? "Research"
+      : experience === "routines"
+        ? "Routines"
+        : "Chat";
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const { isMobile } = useIsMobile();
   const buddyReact = useBuddyStore((s) => s.react);
@@ -251,7 +293,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         {/* Breadcrumb + title */}
         <div className="flex flex-col min-w-0 flex-1">
           <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--chat-muted)] select-none">
-            <span>Chat</span>
+            <span>{experienceLabel}</span>
             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50 flex-shrink-0"><path d="M9 18l6-6-6-6"/></svg>
             <span>Active Session</span>
           </div>
@@ -331,8 +373,8 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         <AwaySummaryBanner events={awayEvents} onDismiss={dismissAway} />
         {messages.length === 0 ? (
           <EmptyChatState
-            greeting={personality.greeting}
-            subtitle={personality.subtitle}
+            greeting={experience === "chat" ? personality.greeting : experienceCopy.greeting}
+            subtitle={experience === "chat" ? personality.subtitle : experienceCopy.subtitle}
             onPrompt={(prompt) => {
               window.dispatchEvent(new CustomEvent("chat:prefill", { detail: prompt }));
             }}
@@ -430,6 +472,7 @@ export function ChatView({ showDevContext = false }: { showDevContext?: boolean 
         }}
         onStop={stopGeneration}
         isStreaming={isStreaming}
+        placeholder={experienceCopy.placeholder}
       />
       <ChatStatusBar
         tokenPct={tokenUsage.pct * 100}

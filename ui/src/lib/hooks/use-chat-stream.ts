@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { AgentTraceEvent, ClarificationCard, FileChange, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
+import type { AgentTraceEvent, ClarificationCard, ConversationExperience, FileChange, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
@@ -58,6 +58,7 @@ function genId() {
 
 export function useChatStream(options?: {
   devMode?: boolean;
+  experience?: ConversationExperience;
   onToolResult?: (toolName: string, toolInput: Record<string, unknown>, output: string) => void;
 }) {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -114,7 +115,6 @@ export function useChatStream(options?: {
   const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
   const swarmMode = useSettingsStore((s) => s.swarmMode);
   const designMode = useSettingsStore((s) => s.designMode);
-  const workshopMode = useSettingsStore((s) => s.workshopMode);
   const groundingWeb = useSettingsStore((s) => s.groundingWeb);
   const groundingDocs = useSettingsStore((s) => s.groundingDocs);
   const groundingFile = useSettingsStore((s) => s.groundingFile);
@@ -186,11 +186,23 @@ export function useChatStream(options?: {
       // created on the previous render and still carries the old flag values.
       const _liveSettings = useSettingsStore.getState();
       const _swarmMode   = _liveSettings.swarmMode;
-      const _designMode  = _liveSettings.designMode;
-      const _workshopMode = _liveSettings.workshopMode;
+      // Experiences own their behavior.  These were formerly global switches,
+      // which meant a Research/Workshop click silently changed an ordinary Chat
+      // thread.  A route now selects the backend contract explicitly instead.
+      const _researchMode = options?.experience === "research";
+      const _designMode = _liveSettings.designMode;
+      const _workshopMode = options?.experience === "routines";
 
       // Ensure we have an active conversation
       let convId = activeConversationId;
+      const activeConv = convId
+        ? useChatStore.getState().conversations.find((conversation) => conversation.id === convId)
+        : undefined;
+      // Navigation and the first prompt can occur in the same render. Never
+      // append that prompt to the previously active experience's thread.
+      if (activeConv && (activeConv.experience ?? "chat") !== (options?.experience ?? "chat")) {
+        convId = null;
+      }
       if (!convId) {
         const prevState = useChatStore.getState();
         const prev = prevState.conversations.find((c) => c.id === prevState.activeConversationId);
@@ -209,7 +221,7 @@ export function useChatStream(options?: {
             // Memory persistence is best-effort.
           }
         }
-        convId = createConversation(model);
+        convId = createConversation(model, options?.experience);
       }
 
       const beforeConv = useChatStore.getState().conversations.find((c) => c.id === convId);
@@ -282,7 +294,7 @@ export function useChatStream(options?: {
             const _devProjectState = useDevProjectStore.getState();
             const _currentProjectId = _devProjectState.currentProjectId ?? undefined;
             const _activeFile = useDevStore.getState().activeFile ?? undefined;
-            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, _swarmMode, solvingMaxIter, solvingMaxTime, _designMode, _workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile)) {
+            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, _researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, _swarmMode, solvingMaxIter, solvingMaxTime, _designMode, _workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {

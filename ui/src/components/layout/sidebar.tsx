@@ -7,12 +7,12 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import {
   isConversationRoute,
+  conversationExperienceForPath,
   isNavigationItemActive,
   primaryNavigation,
   secondaryNavigation,
   utilityNavigation,
 } from "@/lib/config/navigation";
-import { ModeSwitcher } from "./mode-switcher";
 import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User, PanelLeftClose, Volume2, VolumeX, Link2 } from "lucide-react";
 import { BuddyWidget } from "@/components/buddy/buddy-widget";
@@ -83,6 +83,8 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
   const setSoundEnabled = useSettingsStore((s) => s.setSoundEnabled);
   const { isAdmin, authenticated, displayName } = useAccess();
   const showConversations = isConversationRoute(pathname);
+  const experience = conversationExperienceForPath(pathname);
+  const experienceLabel = experience === "code" ? "Code" : experience === "research" ? "Research" : experience === "routines" ? "Routine" : "Chat";
   const [searchQuery, setSearchQuery] = useState("");
   const [pairingOpen, setPairingOpen] = useState(false);
 
@@ -96,14 +98,15 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
   );
 
   const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
+    const scoped = conversations.filter((conv) => (conv.experience ?? "chat") === experience);
+    if (!searchQuery.trim()) return scoped;
     const q = searchQuery.toLowerCase();
-    return conversations.filter(
+    return scoped.filter(
       (conv) =>
         conv.title.toLowerCase().includes(q) ||
         conv.messages.some((m) => m.content.toLowerCase().includes(q))
     );
-  }, [conversations, searchQuery]);
+  }, [conversations, experience, searchQuery]);
 
   const groupedConversations = useMemo(
     () => groupByDate(filteredConversations),
@@ -195,14 +198,6 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
         <div className="absolute bottom-0 left-3 right-3 divider" />
       </div>
 
-      {/* Mode Switcher - Admin only */}
-      {isAdmin && (
-        <div className="px-3 py-3 relative">
-          <ModeSwitcher />
-          <div className="absolute bottom-0 left-3 right-3 divider" />
-        </div>
-      )}
-
       <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin">
         <SidebarSection title="Workspaces">
           {visiblePrimary.map((item) => (
@@ -249,14 +244,14 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
           <>
             <div className="sidebar-new-chat px-3 pt-3 pb-2 space-y-2">
               <button
-                onClick={() => createConversation(model)}
+                onClick={() => createConversation(model, experience)}
                 className="btn-secondary w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md transition-all"
               >
                 <Plus size={14} />
-                <span>New Chat</span>
+                <span>New {experienceLabel}</span>
               </button>
 
-              {conversations.length > 1 && (
+              {filteredConversations.length > 1 && (
                 <div className="relative">
                   <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--chat-subtle)] pointer-events-none" />
                   <input

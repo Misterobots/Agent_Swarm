@@ -363,7 +363,11 @@ export interface Conversation {
   memoryEnabled?: boolean;
   lastTurnId?: string;
   resumeCheckpoints?: Array<{ turnId: string; timestamp: number; resumeToken?: string }>;
+  /** Product surface that owns this thread. Missing values are legacy Chat threads. */
+  experience?: ConversationExperience;
 }
+
+export type ConversationExperience = "chat" | "code" | "research" | "routines";
 
 export interface ChatCompletionChunk {
   id: string;

@@ -2,24 +2,19 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Settings2, Brain, Activity } from "lucide-react";
+import { Settings2, Brain } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { ResearchToggle } from "./research-toggle";
 import { UltraplanToggle } from "./ultraplan-toggle";
 import { UltrathinkToggle } from "./ultrathink-toggle";
 import { WebGroundingToggle } from "./web-grounding-toggle";
 import { DocGroundingToggle } from "./doc-grounding-toggle";
 import { FileGroundingToggle } from "./file-grounding-toggle";
 import { SwarmToggle } from "./swarm-toggle";
-import { DesignModeToggle } from "./design-mode-toggle";
-import { WorkshopToggle } from "./workshop-toggle";
 import { GoalsToggle } from "./goals-toggle";
 import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useAccess } from "@/lib/hooks/use-access";
-import { useOnboardingStore } from "@/lib/stores/onboarding-store";
-import { FeatureCalloutBadge } from "@/components/onboarding/FeatureCalloutBadge";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,20 +27,13 @@ export function ChatSettingsMenu() {
   const activeConv = useChatStore((s) => s.activeConversation());
 
   const { isAdmin } = useAccess();
-  const hasNewMenuFeatures = useOnboardingStore((s) =>
-    s.hydrated && (
-      !s.seenFeatures.includes("workshop_v1") ||
-      !s.seenFeatures.includes("design_v1")
-    )
-  );
   const ultraplanMode = useSettingsStore((s) => s.ultraplanMode);
   const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
-  const researchMode = useSettingsStore((s) => s.researchMode);
   const swarmMode = useSettingsStore((s) => s.swarmMode);
   const groundingWeb = useSettingsStore((s) => s.groundingWeb);
   const groundingDocs = useSettingsStore((s) => s.groundingDocs);
   const groundingFile = useSettingsStore((s) => s.groundingFile);
-  const anyModeActive = ultraplanMode || ultrathinkMode || researchMode || swarmMode || groundingWeb || groundingDocs || groundingFile;
+  const anyModeActive = ultraplanMode || ultrathinkMode || swarmMode || groundingWeb || groundingDocs || groundingFile;
   const agentTransparency = useSettingsStore((s) => s.agentTransparency);
   const setAgentTransparency = useSettingsStore((s) => s.setAgentTransparency);
 
@@ -116,16 +104,9 @@ export function ChatSettingsMenu() {
       <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
         <label className="text-xs text-[var(--chat-muted)]">Modes</label>
         <div className="grid grid-cols-2 gap-1">
-          <ResearchToggle />
           <UltraplanToggle />
           <UltrathinkToggle />
           <SwarmToggle />
-          <FeatureCalloutBadge feature="design_v1">
-            <DesignModeToggle />
-          </FeatureCalloutBadge>
-          <FeatureCalloutBadge feature="workshop_v1">
-            <WorkshopToggle />
-          </FeatureCalloutBadge>
           {isAdmin && <GoalsToggle />}
         </div>
       </div>
@@ -219,10 +200,10 @@ export function ChatSettingsMenu() {
         title={anyModeActive ? "Chat settings (modes active)" : "Chat settings"}
       >
         <Settings2 size={16} />
-        {!isOpen && (anyModeActive || hasNewMenuFeatures) && (
+        {!isOpen && anyModeActive && (
           <span className={cn(
             "absolute top-0.5 right-0.5 w-2 h-2 rounded-full",
-            anyModeActive ? "bg-[var(--chat-accent-2)]" : "bg-[var(--chat-accent)] animate-pulse"
+            "bg-[var(--chat-accent-2)]"
           )} />
         )}
       </button>
