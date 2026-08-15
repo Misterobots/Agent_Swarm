@@ -323,6 +323,16 @@ except Exception as _e:
     import logging as _logging
     _logging.getLogger("main").warning(f"GPU lock router not loaded: {_e}")
 
+# Mission Control operational mutations. Keep host-affecting actions isolated
+# from this application entry point; read-only fleet endpoints remain inline
+# temporarily and will move with the broader Ops API aggregation work.
+try:
+    from ops.routes import router as ops_router
+    app.include_router(ops_router)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"Ops router not loaded: {_e}")
+
 # Staged rollout: parse mode logs policy mismatches without blocking,
 # soft/hard modes enforce endpoint-class policy in AuthorizationMiddleware.
 app.add_middleware(AuthorizationMiddleware)

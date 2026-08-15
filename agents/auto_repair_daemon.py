@@ -162,8 +162,10 @@ class AutoRepairDaemon:
         """Check Authentik service health."""
         logger.info("Checking Authentik health...")
         
-        # Check if Authentik is responding
-        url = f"http://{TURING_IP}:9000/-/health/live/"
+        # Check if Authentik is responding. Use the public health endpoint (reachable
+        # from Lovelace, where this daemon runs) — TURING_IP:9000 is not host-published,
+        # so the old URL was a permanent false positive that triggered needless repairs.
+        url = os.getenv("AUTHENTIK_HEALTH_URL", "https://auth.shivelymedia.com/-/health/live/")
         healthy, error = self.check_http_endpoint(url)
         
         if healthy:
