@@ -60,13 +60,15 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama_gpu
-    # Enable GPU Support
+    # Shared Code/model lane: GPU 0 only.  GPU 1 is reserved for Friday's
+    # always-warm voice lane below, so a Code request cannot evict or contend
+    # with the speaker assistant.
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ['0']
               capabilities: [ gpu ]
         # Hard cap on system RAM for the Ollama container.
         # Model weights live in VRAM; this RAM budget covers the binary,
@@ -76,7 +78,10 @@ services:
         limits:
           memory: 6g
     environment:
-      # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
+      # Keep shared Ollama off Friday's dedicated GPU 1.  GPU 0 is also the
+      # image card, so GPU-queue mediated image work must yield before a large
+      # Code model is loaded.
+      - CUDA_VISIBLE_DEVICES=GPU-0236956d-3c81-9ccd-d1f5-c12e0745366e
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
       - OLLAMA_NUM_PARALLEL=1          # 1 slot: KV cache halved so 14B models (~14.2 GB) fit on a 16 GB GPU
       - OLLAMA_KEEP_ALIVE=1h            # Unload after 1h idle; cold loads spike WSL2 RAM, keeping warm amortizes that cost
