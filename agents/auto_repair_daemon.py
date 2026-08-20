@@ -56,8 +56,10 @@ logger = logging.getLogger("AutoRepair")
 TURING_IP = os.getenv("TURING_IP", "192.168.2.103")
 HOPPER_IP = os.getenv("HOPPER_IP", "192.168.2.102")
 LOVELACE_IP = os.getenv("LOVELACE_IP", "192.168.2.101")
-SSH_USER = "misterobots"
-SSH_BIN = "C:\\Windows\\System32\\OpenSSH\\ssh.exe"
+SSH_USER = os.getenv("AUTO_REPAIR_SSH_USER", "misterobots")
+# Portable: "ssh" resolves via PATH on both Linux (systemd host / container) and
+# Windows (OpenSSH). Override with AUTO_REPAIR_SSH_BIN for a non-standard path.
+SSH_BIN = os.getenv("AUTO_REPAIR_SSH_BIN", "ssh")
 
 # Authentik database credentials
 AUTHENTIK_DB_USER = os.getenv("AUTHENTIK_DB_USER", "misterobots")
