@@ -128,6 +128,77 @@ def create_project(
             return dict(row)
 
 
+def set_git_url(id: str, uid: str, git_url: str, git_ref: str) -> Optional[dict]:
+    """
+    Attach a git remote to a project that didn't have one — the "Publish to
+    GitHub" flow, for a "blank" project that's been git-inited locally and
+    just got pushed to a new GitHub repo. Flips source to "git_url" too, so
+    future tasks against this project route through the normal ephemeral-clone
+    path (dev_projects.routes/main.py's create_task) instead of the
+    local-checkout path — it's a real linked repo now, not a local-only one.
+
+    Owner-scoped like get_project. Returns None if not found / uid mismatch.
+    """
+    with _db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                UPDATE dev_projects
+                SET git_url = %s, git_ref = %s, source = 'git_url'
+                WHERE id = %s AND uid = %s
+                RETURNING *
+                """,
+                (git_url, git_ref, id, uid),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def get_or_create_live_repo_project(uid: str) -> dict:
+    """
+    Return the one distinguished "live_repo" project for `uid` — the sole,
+    deliberate exception where a session container bind-mounts the actual
+    live Agent_Swarm repo (see session_sandbox.py's "live_repo" mode and
+    Design Decision 3 of the per-session-sandbox plan). Every other project
+    (source="blank"/"git_url") always gets a mount-free ephemeral container.
+
+    Lazy get-or-create, not a startup seed: works correctly for any uid
+    without hardcoding one, and only ever creates the row the first time a
+    given owner actually needs it (chat project picker, or POST /v1/tasks).
+
+    Deterministic id (f"live-repo-{uid}") makes this idempotent under a
+    race — ON CONFLICT DO NOTHING, then re-SELECT, rather than relying on
+    the caller to serialize. No schema change: `source` is already a
+    free-form TEXT column; only the public POST /v1/dev/projects route's
+    Pydantic Literal restricts values, and that endpoint never creates this
+    row, so the restriction never applies here.
+    """
+    live_id = f"live-repo-{uid}"
+    existing = get_project(live_id, uid)
+    if existing:
+        return existing
+
+    with _db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO dev_projects (id, uid, name, source, git_url, git_ref, path)
+                VALUES (%s, %s, %s, 'live_repo', NULL, 'main', '/workspace')
+                ON CONFLICT (id) DO NOTHING
+                RETURNING *
+                """,
+                (live_id, uid, "Agent_Swarm (live)"),
+            )
+            row = cur.fetchone()
+            if row:
+                logger.info(f"[dev_projects] Created live_repo project for uid={uid}")
+                return dict(row)
+
+    # ON CONFLICT DO NOTHING with no RETURNING row means another concurrent
+    # call just created it first — safe to just fetch what's there now.
+    return get_project(live_id, uid)  # type: ignore[return-value]
+
+
 def delete_project(id: str, uid: str) -> bool:
     """
     Delete the project row.  Returns True if a row was deleted, False otherwise

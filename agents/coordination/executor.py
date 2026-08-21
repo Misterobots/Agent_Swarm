@@ -71,8 +71,13 @@ def _run_worker(
         if dh_role in DEVHARNESS_ELIGIBLE_ROLES:
             from coordination.devharness_worker import run_devharness_worker
             from dev_harness.tool_defs import DEV_TOOL_DEFINITIONS
+            # getattr, not session.container_name directly: CoordinatorSession
+            # doesn't carry this field until the phase that actually resolves
+            # per-session containers lands — until then this is always None,
+            # _get_container() falls back to SANDBOX_CONTAINER, no behavior change.
             return run_devharness_worker(
-                session, worker_id, dh_role, scope or "unknown", prompt, DEV_TOOL_DEFINITIONS
+                session, worker_id, dh_role, scope or "unknown", prompt, DEV_TOOL_DEFINITIONS,
+                container_name=getattr(session, "container_name", None),
             )
 
     worker = session.workers[worker_id]

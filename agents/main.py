@@ -6,6 +6,34 @@ import json
 import uuid
 import time
 import threading
+import hashlib
+import hmac
+import ipaddress
+import socket
+import base64
+import re
+from urllib.parse import urlparse
+
+# Root logger configuration — most modules in this codebase call
+# logging.getLogger(__name__) directly rather than logger_setup.setup_logger(),
+# which means (with no handler ever attached to the root logger) their INFO-level
+# logs never reached container stdout at all: Python's logging module falls back
+# to a WARNING-only "handler of last resort" for any logger with no handler in
+# its chain. That silently swallowed things like "table ready"/"provisioned"/
+# "checked out" confirmations from every *_store.py and dev_files/dev_projects
+# module — real operational signal, not noise, and exactly what's needed to
+# keep sight of what a request actually did instead of just its final response.
+# force=True guarantees this applies regardless of what uvicorn's own default
+# logging config already touched on root. setup_logger()-based loggers
+# (logger_setup.py) set propagate=False specifically so they don't ALSO bubble
+# up here and print twice.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+
 # Ensure agents dir is in path
 if "/app/agents" not in sys.path:
     sys.path.append("/app/agents")
@@ -159,6 +187,13 @@ async def lifespan(app: FastAPI):
             _dev_sessions_store.init_tables()
         except Exception as e:
             logger.warning(f"Dev sessions store init failed (non-fatal): {e}")
+
+        # Durable neutral-history checkpoints for interrupted DevHarness turns.
+        try:
+            from dev_harness import checkpoints as _dev_checkpoint_store
+            _dev_checkpoint_store.init_table()
+        except Exception as e:
+            logger.warning(f"Dev checkpoint store init failed (non-fatal): {e}")
 
         # 7d. Initialize Dev Projects Store
         try:
@@ -532,6 +567,7 @@ class ChatRequest(BaseModel):
     attachments: Optional[List[dict]] = None  # file attachments [{name, mimeType, data, size}]
     dev_mode: bool = False            # Phase 2: enable AI agentic coding tools in dev workspace
     dev_permission_mode: Optional[str] = None  # dev harness gate: default|plan|acceptEdits|bypass (plan = read-only until approved)
+    dev_resume: bool = False          # resume a checkpoint after explicitly replaying interrupted tools
     grounding_web: bool = False       # inject live web search results (requires governance permission)
     grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
@@ -550,6 +586,36 @@ class ChatRequest(BaseModel):
     solving_corrector_max_time: Optional[int] = None    # Per-call corrector wall-clock (seconds)
     current_project_id: Optional[str] = None            # Active dev project ID (injects .memex/notes.md into system prompt)
     active_file: Optional[str] = None                   # Currently open file path in the dev workspace editor
+
+
+# Model choice is an administrative capability. The browser UI follows this
+# policy, but it must also be enforced here because API callers can submit an
+# arbitrary ``model`` field.
+_DEFAULT_CHAT_MODEL = os.getenv("MEMEX_DEFAULT_MODEL", "qwen3:14b")
+_DEFAULT_MODEL_ALIASES = {"", "default", "memex-default", "Home-AI-Swarm", "swarm-standard"}
+
+
+def _authentik_groups(request: Request) -> list[str]:
+    """Normalize Authentik group headers from Traefik/Next/Electron hops."""
+    return [group.strip() for group in re.split(r"[|,]", request.headers.get("X-authentik-groups", "")) if group.strip()]
+
+
+def _request_is_admin(request: Request) -> bool:
+    """Only an Authentik group assertion grants model-administration access."""
+    return any("admin" in group.lower() for group in _authentik_groups(request))
+
+
+def _apply_model_policy(request: ChatRequest, http_request: Request) -> None:
+    """Resolve the submitted model without allowing a client to bypass policy."""
+    requested = (request.model or "").strip()
+    if not _request_is_admin(http_request) or requested in _DEFAULT_MODEL_ALIASES:
+        request.model = _DEFAULT_CHAT_MODEL
+        return
+    if requested == "qwen3.8-27b-fp8":
+        raise HTTPException(
+            status_code=503,
+            detail="Qwen 3.8 27B FP8 is cataloged but not configured. Set up a compatible remote engine before selecting it.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -599,6 +665,9 @@ import asyncio as _asyncio
 _approval_events: dict[str, _asyncio.Event] = {}
 # Per-call decision: call_id -> True (approved) | False (denied)
 _approval_decisions: dict[str, bool] = {}
+# Per-call owner binding.  Approval IDs are opaque, but they are still
+# untrusted input: only the owner that received the pending call may decide it.
+_approval_owners: dict[str, str] = {}
 
 # Per-user auto-approve rules:
 #   key = uid, value = set of tool names (or "all") that are auto-approved
@@ -737,10 +806,18 @@ async def approve_tool_call(call_id: str, http_request: Request):
     tool_name = body.get("tool_name", "")
     uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
 
+    pending_owner = _approval_owners.get(call_id)
+    if pending_owner is None:
+        raise HTTPException(status_code=404, detail="Approval request not found or expired")
+    if pending_owner != uid:
+        logger.warning(f"[dev_approve] rejected cross-owner approval call_id={call_id} uid={uid}")
+        raise HTTPException(status_code=403, detail="Approval request belongs to another owner")
+
     if auto_scope != "none" and tool_name:
         _apply_auto_approve(uid, tool_name, auto_scope)
 
     _approval_decisions[call_id] = True
+    _approval_owners.pop(call_id, None)
     event = _approval_events.pop(call_id, None)
     if event:
         event.set()
@@ -752,7 +829,15 @@ async def approve_tool_call(call_id: str, http_request: Request):
 async def deny_tool_call(call_id: str, http_request: Request):
     """Deny a pending tool call from the AI agent."""
     uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    pending_owner = _approval_owners.get(call_id)
+    if pending_owner is None:
+        raise HTTPException(status_code=404, detail="Approval request not found or expired")
+    if pending_owner != uid:
+        logger.warning(f"[dev_approve] rejected cross-owner denial call_id={call_id} uid={uid}")
+        raise HTTPException(status_code=403, detail="Approval request belongs to another owner")
+
     _approval_decisions[call_id] = False
+    _approval_owners.pop(call_id, None)
     event = _approval_events.pop(call_id, None)
     if event:
         event.set()
@@ -779,6 +864,171 @@ async def clear_auto_approve_rules(http_request: Request):
     ws_data.pop(uid, None)
     _save_workspace_auto_approve(ws_data)
     return {"ok": True}
+
+
+def _checkpoint_public_view(row: dict) -> dict:
+    data = row.get("data") or {}
+    return {
+        "session_id": row.get("session_id"),
+        "status": row.get("status"),
+        "turn": row.get("turn", 0),
+        "updated_at": row.get("updated_at", 0),
+        "model": data.get("model"),
+        "permission_mode": data.get("permission_mode"),
+        "pending_tools": data.get("pending_tools", []),
+        "error": data.get("error", ""),
+    }
+
+
+class DevReplayRequest(BaseModel):
+    call_id: str
+    confirm: bool = False
+
+
+@app.get("/api/v1/dev/checkpoints")
+async def list_dev_checkpoints(http_request: Request):
+    """List incomplete DevHarness checkpoints for the authenticated owner."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    from dev_harness.checkpoints import list_recovery_required
+    return {"checkpoints": [_checkpoint_public_view(row) for row in list_recovery_required(uid)]}
+
+
+@app.get("/api/v1/dev/checkpoints/{session_id}")
+async def get_dev_checkpoint(session_id: str, http_request: Request):
+    """Inspect one owner-scoped checkpoint without exposing other owners."""
+    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    from dev_harness.checkpoints import get_checkpoint
+    row = get_checkpoint(uid, session_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Checkpoint not found")
+    return _checkpoint_public_view(row)
+
+
+@app.post("/api/v1/dev/checkpoints/{session_id}/replay")
+async def replay_dev_checkpoint_tool(
+    session_id: str,
+    body: DevReplayRequest,
+    http_request: Request,
+):
+    """Explicitly replay the next owner-approved sandbox tool call.
+
+    Only the first pending direct sandbox call can be replayed.  Meta-tools,
+    MCP calls, and subagent delegation require a new DevHarness turn because
+    their original execution context cannot be reconstructed safely here.
+    """
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="Set confirm=true to replay a tool call")
+
+    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    from dev_harness.checkpoints import get_checkpoint, save_checkpoint
+
+    row = get_checkpoint(uid, session_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Checkpoint not found")
+    if row.get("status") not in {"awaiting_tools", "recovery_required"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Checkpoint is not awaiting replay (status={row.get('status')})",
+        )
+
+    data = row.get("data") or {}
+    pending = data.get("pending_tools") or []
+    if not pending or not isinstance(pending[0], dict):
+        raise HTTPException(status_code=409, detail="Checkpoint has no replayable pending tool")
+    call = pending[0]
+    if call.get("call_id") != body.call_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Replay must proceed in recorded tool-call order",
+        )
+
+    tool_name = call.get("name")
+    args = call.get("args")
+    replayable = {"read_file", "write_file", "list_directory", "run_command", "edit_file", "glob", "grep", "git"}
+    if tool_name not in replayable or not isinstance(args, dict):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Tool {tool_name!r} cannot be safely replayed through this endpoint",
+        )
+
+    permission_mode = data.get("permission_mode") or "default"
+    if permission_mode == "bypass" and not _request_is_admin(http_request):
+        raise HTTPException(status_code=403, detail="Admin authorization is required to replay a bypass-mode tool")
+    from dev_harness.permissions import PermissionGate
+    allowed, reason = PermissionGate(permission_mode).check(tool_name)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=reason)
+
+    container_name = data.get("container_name")
+    if container_name is not None and not isinstance(container_name, str):
+        raise HTTPException(status_code=409, detail="Checkpoint container identity is invalid")
+    if container_name and not re.fullmatch(r"(?:dev-task-[A-Za-z0-9_.-]+|dev_sandbox)", container_name):
+        raise HTTPException(status_code=409, detail="Checkpoint container identity is not a sandbox container")
+
+    try:
+        loop = _asyncio.get_running_loop()
+        output, file_changes = await loop.run_in_executor(
+            None,
+            _exec_with_sink,
+            tool_name,
+            args,
+            container_name,
+        )
+        is_error = False
+    except Exception as exc:
+        output = f"Replay failed: {exc}"
+        file_changes = []
+        is_error = True
+
+    replayed = list(data.get("replay_results") or [])
+    replayed.append({
+        "call_id": call["call_id"],
+        "name": tool_name,
+        "output": str(output),
+        "is_error": is_error,
+    })
+    pending = pending[1:]
+    data["pending_tools"] = pending
+    data["replay_results"] = replayed
+
+    if pending:
+        status = "recovery_required"
+    else:
+        from dev_harness.history import History, ToolResult
+        try:
+            restored = History.from_checkpoint(data["history"])
+            restored.add_tool_results([
+                ToolResult(
+                    item["call_id"], item["name"], item["output"], bool(item.get("is_error", False))
+                )
+                for item in replayed
+            ])
+            data["history"] = restored.to_checkpoint()
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail=f"Checkpoint history cannot be restored: {exc}")
+        data.pop("replay_results", None)
+        status = "ready_to_resume"
+
+    saved = save_checkpoint(
+        uid,
+        session_id,
+        status=status,
+        turn=int(row.get("turn") or 0),
+        data=data,
+    )
+    if not saved:
+        raise HTTPException(status_code=503, detail="Replay ran but its result could not be durably recorded")
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "call_id": body.call_id,
+        "tool_name": tool_name,
+        "output": str(output),
+        "file_changes": file_changes,
+        "is_error": is_error,
+        "status": status,
+        "next_call_id": pending[0].get("call_id") if pending else None,
+    }
 
 
 @app.get("/v1/models")
@@ -1003,18 +1253,26 @@ def _handle_todowrite(args: dict):
     return f"Updated todo list ({done}/{len(todos)} complete).", [chunk]
 
 
-def _exec_with_sink(tool_name: str, args: dict):
+def _exec_with_sink(tool_name: str, args: dict, container_name: str | None = None):
     """Run a sandbox tool with a thread-local file_change sink so writes/edits
     surface as file_change events. Runs on the executor thread (where the
-    thread-local sink must live). Returns (result_str, [file_change event dicts])."""
+    thread-local sink must live). Returns (result_str, [file_change event dicts]).
+
+    container_name (may be None — see coordination/sandbox_identity.py) scopes
+    this call to a specific per-session Docker container instead of the shared
+    default; set on the same executor thread this function itself runs on,
+    same bracketing pattern as the file_change sink two lines below."""
     from tools.sandbox_ops import execute_tool as _sandbox_execute
     from tools.file_change_sink import set_file_change_sink
+    from coordination.sandbox_identity import set_current_container
     collected: list[dict] = []
     set_file_change_sink(collected.append)
+    set_current_container(container_name)
     try:
         result = _sandbox_execute(tool_name, args)
     finally:
         set_file_change_sink(None)
+        set_current_container(None)
     return result, collected
 
 
@@ -1034,13 +1292,17 @@ def _brief(obj, n: int = 80) -> str:
 
 
 async def _run_subagent(uid: str, model: str, description: str, prompt: str,
-                        subagent_type: str, gate):
+                        subagent_type: str, gate, container_name: str | None = None):
     """Spawn a child DevHarness for a delegated task.
 
     Returns (summary, [chunks]) where chunks are the agent_event trace plus
     forwarded file_change events.  The child runs autonomously (no interactive
     approval — the user already approved the Task spawn) but still under the
     permission gate + MAESTRO guard, and cannot spawn further subagents.
+
+    container_name (may be None — see coordination/sandbox_identity.py):
+    a Task subagent always inherits its caller's already-resolved session
+    container rather than resolving one of its own.
     """
     from dev_harness.history import History, UserMessage, StreamChunk
     from dev_harness.loop import DevHarness
@@ -1063,7 +1325,7 @@ async def _run_subagent(uid: str, model: str, description: str, prompt: str,
             res, _ = _handle_todowrite(targs)
             return res
         loop = _asyncio.get_event_loop()
-        result, fcs = await loop.run_in_executor(None, _exec_with_sink, tname, targs)
+        result, fcs = await loop.run_in_executor(None, _exec_with_sink, tname, targs, container_name)
         if fcs:
             return result, [StreamChunk(type="file_change", data=e["content"]) for e in fcs]
         return result
@@ -1204,7 +1466,9 @@ def _build_dev_providers(model: str, uid: str):
     return primary, [t for t in (github, anthropic) if t]
 
 
-async def _dev_harness_stream(request: "ChatRequest", uid: str):
+async def _dev_harness_stream(
+    request: "ChatRequest", uid: str, *, bypass_allowed: bool = False
+):
     """SSE generator wrapping DevHarness.run(); reuses the existing approval store."""
     from prompts.hivecode import HIVECODE_SYSTEM_PROMPT
     from dev_harness.history import History, StreamChunk
@@ -1212,18 +1476,61 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
     from dev_harness.router import ModelRouter
     from dev_harness.permissions import PermissionGate
 
-    msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+    # The public Desktop route traverses Cloudflare.  A cold model load or a
+    # per-session sandbox provision can take longer than its origin-first-byte
+    # deadline, which otherwise turns a healthy Code request into a 524 before
+    # the user sees anything.  Yield immediately so the proxy and client both
+    # know this stream is alive.
+    yield _dev_sse(request.model, {
+        "type": "status",
+        "content": "Preparing Code workspace…",
+    })
+
+    checkpoint_session_id = request.session_id or uid
+    stored_checkpoint = None
+    stored_checkpoint_data: dict = {}
+    if request.dev_resume:
+        from dev_harness.checkpoints import get_checkpoint
+        stored_checkpoint = get_checkpoint(uid, checkpoint_session_id)
+        if not stored_checkpoint or stored_checkpoint.get("status") != "ready_to_resume":
+            status = stored_checkpoint.get("status") if stored_checkpoint else "missing"
+            yield _dev_sse(request.model, {
+                "type": "error",
+                "content": f"Dev checkpoint is not ready to resume (status={status}).",
+            })
+            yield "data: [DONE]\n\n"
+            return
+        stored_checkpoint_data = stored_checkpoint.get("data") or {}
 
     # Slash command: /plan in the latest user message activates plan mode for
     # this turn (strip the prefix before the model sees it).
-    perm_mode = request.dev_permission_mode or "default"
-    if msgs and msgs[-1].get("role") == "user":
+    perm_mode = request.dev_permission_mode or stored_checkpoint_data.get("permission_mode") or "default"
+    msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+    if not request.dev_resume and msgs and msgs[-1].get("role") == "user":
         _last = (msgs[-1].get("content") or "").lstrip()
         if _last.startswith("/plan"):
             perm_mode = "plan"
             msgs[-1]["content"] = _last[len("/plan"):].lstrip() or "Investigate the request and propose a plan."
 
-    history = History.from_openai_messages(msgs, system=HIVECODE_SYSTEM_PROMPT)
+    # `bypass` is intentionally not a client-selectable permission escalation.
+    # The UI may request it, but only an authenticated administrator may use it;
+    # all other callers fall back to the ordinary approval path.
+    if perm_mode == "bypass" and not bypass_allowed:
+        logger.warning("[dev_harness] rejected bypass permission mode for non-admin uid=%s", uid)
+        perm_mode = "default"
+
+    if request.dev_resume:
+        try:
+            history = History.from_checkpoint(stored_checkpoint_data["history"])
+        except (KeyError, TypeError, ValueError) as exc:
+            yield _dev_sse(request.model, {
+                "type": "error",
+                "content": f"Dev checkpoint history is invalid: {exc}",
+            })
+            yield "data: [DONE]\n\n"
+            return
+    else:
+        history = History.from_openai_messages(msgs, system=HIVECODE_SYSTEM_PROMPT)
 
     try:
         primary, targets = _build_dev_providers(request.model, uid)
@@ -1241,24 +1548,86 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
 
     class _Approval:
         """Bridges the loop's approval gate to the existing uid-keyed store."""
+
+        def __init__(self, permission_gate):
+            self.permission_gate = permission_gate
+
         def needs(self, tool_name: str) -> bool:
             # TodoWrite is pure planning — never needs approval.  Task DOES
             # (spawning an autonomous subagent is a significant action).
             if tool_name == "TodoWrite":
+                return False
+            if self.permission_gate.auto_approve(tool_name):
                 return False
             return not _is_auto_approved(uid, tool_name)
 
         async def wait(self, call_id: str) -> str:
             event = _asyncio.Event()
             _approval_events[call_id] = event
+            _approval_owners[call_id] = uid
             try:
                 await _asyncio.wait_for(event.wait(), timeout=120.0)
             except _asyncio.TimeoutError:
                 _approval_decisions.pop(call_id, None)
                 return "timeout"
+            finally:
+                # The endpoint removes these on a decision; the finally block
+                # handles timeout, client disconnect, and unexpected errors.
+                _approval_events.pop(call_id, None)
+                _approval_owners.pop(call_id, None)
             return "approved" if _approval_decisions.pop(call_id, False) else "denied"
 
     gate = PermissionGate(mode=perm_mode)
+
+    # Per-session container this dev-mode chat turn's sandbox tool calls
+    # target — same session_sandbox.py mechanism the composer/swarm path
+    # uses (coordination/orchestrator.py), keyed by session_id (falls back
+    # to uid) rather than a coordination_id so it outlives a single turn and
+    # is reused across an entire /dev conversation (ensure_session_container
+    # is idempotent — no idle-timeout teardown by design, see Design
+    # Decision 2's "open questions" section; the startup orphan sweep is the
+    # only v1 reaper). SESSION_SANDBOX_ENABLED off (or setup failing to
+    # resolve a project) leaves this None, falling back to the shared
+    # default container — unchanged prior behavior.
+    container_name: str | None = stored_checkpoint_data.get("container_name") if request.dev_resume else None
+    from coordination.orchestrator import SESSION_SANDBOX_ENABLED as _SESSION_SANDBOX_ENABLED
+    if _SESSION_SANDBOX_ENABLED and not container_name:
+        try:
+            from dev_projects import store as _dev_projects_store
+            from dev_projects.repo_context import build_repo_context
+            from coordination.session_sandbox import ensure_session_container
+            from coordination.sandbox_identity import set_current_container
+            from coordination.workspace_ops import checkout_repo_branch
+
+            _project = None
+            if request.current_project_id:
+                _project = _dev_projects_store.get_project(request.current_project_id, uid)
+            if not _project:
+                # No project selected — same default as pre-redesign behavior,
+                # now backed by an isolated per-session live_repo container
+                # instead of the shared one.
+                _project = _dev_projects_store.get_or_create_live_repo_project(uid)
+
+            _mode = "live_repo" if _project.get("source") == "live_repo" else "ephemeral"
+            _session_key = request.session_id or uid
+            container_name, _dh_created = ensure_session_container(_session_key, mode=_mode)
+
+            # Clone into the container only once, right after it's first
+            # created — ensure_session_container's idempotency means later
+            # turns in the same conversation reuse it as-is, so re-cloning
+            # on every turn would be both wasteful and pointless.
+            if _dh_created and _mode == "ephemeral" and _project.get("git_url"):
+                set_current_container(container_name)
+                try:
+                    _rc = build_repo_context(_project)
+                    checkout_repo_branch(_rc["git_url"], _rc["branch"], _rc["base_branch"])
+                finally:
+                    set_current_container(None)
+        except Exception as e:
+            logger.error(f"[dev_harness] session container setup failed: {e}", exc_info=True)
+            yield _dev_sse(request.model, {"type": "error", "content": f"Dev session setup failed: {e}"})
+            yield "data: [DONE]\n\n"
+            return
 
     async def _tool_executor(call_id: str, tool_name: str, args: dict):
         # Harness meta tools — handled here, not dispatched to the sandbox.
@@ -1268,6 +1637,7 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
             return await _run_subagent(
                 uid, request.model, args.get("description", ""),
                 args.get("prompt", ""), args.get("subagent_type", "general"), gate,
+                container_name=container_name,
             )
         if tool_name == "kb_search":
             loop = _asyncio.get_event_loop()
@@ -1279,16 +1649,84 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
             loop = _asyncio.get_event_loop()
             return await loop.run_in_executor(None, _run_mcp_tool, uid, tool_name, args)
         loop = _asyncio.get_event_loop()
-        result, fcs = await loop.run_in_executor(None, _exec_with_sink, tool_name, args)
+        result, fcs = await loop.run_in_executor(None, _exec_with_sink, tool_name, args, container_name)
         if fcs:
             return result, [StreamChunk(type="file_change", data=e["content"]) for e in fcs]
         return result
 
+    async def _checkpoint(status: str, turn: int, pending_tools: list[dict], error: str) -> bool:
+        """Persist neutral history off-loop; false means fail closed."""
+        from dev_harness.checkpoints import save_checkpoint
+
+        payload = {
+            "version": 1,
+            "session_id": checkpoint_session_id,
+            "model": request.model,
+            "permission_mode": perm_mode,
+            "container_name": container_name,
+            "history": history.to_checkpoint(),
+            "pending_tools": pending_tools,
+            "error": error,
+        }
+        loop = _asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: save_checkpoint(
+                uid,
+                checkpoint_session_id,
+                status=status,
+                turn=turn,
+                data=payload,
+            ),
+        )
+
+    if not await _checkpoint("running", 0, [], ""):
+        yield _dev_sse(request.model, {
+            "type": "error",
+            "content": "Dev session checkpoint unavailable; execution stopped safely.",
+        })
+        yield "data: [DONE]\n\n"
+        return
+
     try:
-        async for chunk in DevHarness().run(
+        # Ollama's tool-capable call is deliberately non-streaming so we can
+        # receive a complete tool-call envelope.  That means cold model loads
+        # otherwise look like a frozen Code tab.  State the phase up front and
+        # report elapsed waits below without cancelling useful work.
+        yield _dev_sse(request.model, {
+            "type": "status",
+            "content": f"Workspace ready. Waiting for {request.model}…",
+        })
+        stream = DevHarness().run(
             history, DEV_TOOL_DEFINITIONS, _tool_executor, router,
-            approval=_Approval(), gate=gate,
-        ):
+            approval=_Approval(gate), gate=gate, checkpoint=_checkpoint,
+        ).__aiter__()
+        pending_chunk = _asyncio.ensure_future(stream.__anext__())
+        waited_seconds = 0
+        wait_notices = {15, 45, 90, 180}
+        while True:
+            # Do not cancel the in-flight model/tool call when the timeout
+            # elapses.  Instead, keep the public SSE response alive until its
+            # next real event arrives.
+            done, _ = await _asyncio.wait({pending_chunk}, timeout=15.0)
+            if not done:
+                waited_seconds += 15
+                if waited_seconds in wait_notices:
+                    yield _dev_sse(request.model, {
+                        "type": "status",
+                        "content": (
+                            f"Still waiting for {request.model} "
+                            f"({waited_seconds}s). The model may be loading or queued."
+                        ),
+                    })
+                else:
+                    yield ": keepalive\n\n"
+                continue
+            try:
+                chunk = pending_chunk.result()
+            except StopAsyncIteration:
+                break
+            pending_chunk = _asyncio.ensure_future(stream.__anext__())
             delta: dict = {"type": chunk.type, "content": chunk.content}
             if chunk.tool_name:
                 delta["tool_name"] = chunk.tool_name
@@ -1307,6 +1745,10 @@ async def _dev_harness_stream(request: "ChatRequest", uid: str):
             yield _dev_sse(request.model, delta)
     except Exception as e:
         logger.error(f"[dev_harness] stream error: {e}", exc_info=True)
+        try:
+            await _checkpoint("failed", 0, [], str(e))
+        except Exception:
+            logger.warning("[dev_harness] failed to persist error checkpoint", exc_info=True)
         yield _dev_sse(request.model, {"type": "error", "content": f"Dev harness error: {e}"})
     yield "data: [DONE]\n\n"
 
@@ -1351,7 +1793,11 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     if request.dev_mode and request.stream:
         _dev_uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
         return StreamingResponse(
-            _dev_harness_stream(request, _dev_uid), media_type="text/event-stream"
+            _dev_harness_stream(
+                request,
+                _dev_uid,
+                bypass_allowed=_request_is_admin(http_request),
+            ), media_type="text/event-stream"
         )
 
     # Route GitHub Models requests directly to the GitHubModelsProvider
@@ -6350,7 +6796,7 @@ async def github_push_disconnect(http_request: Request):
 
 
 # ---------------------------------------------------------------------------
-# DEV TERMINAL — WebSocket proxy to dev-sandbox container (Phase 1B)
+# DEV TERMINAL — WebSocket proxy to a per-session dev sandbox container
 # ---------------------------------------------------------------------------
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -6371,14 +6817,55 @@ async def terminal_ws(websocket: WebSocket):
         await websocket.close(code=4001, reason="Authentication required")
         return
 
+    session_param = websocket.query_params.get("session", "").strip()
+    project_id = websocket.query_params.get("projectId", "").strip()
+
     await websocket.accept()
+
+    # Resolve which container this terminal targets — same session_sandbox
+    # mechanism and project-resolution logic as Phase F's _dev_harness_stream,
+    # instead of the historical hardcoded "dev_sandbox" literal. Falls back to
+    # that literal when SESSION_SANDBOX_ENABLED is off, matching every other
+    # entry point's off-switch behavior.
+    container_name = "dev_sandbox"
+    try:
+        from coordination.orchestrator import SESSION_SANDBOX_ENABLED as _term_sse
+        if _term_sse:
+            from dev_projects import store as _dev_projects_store
+            from dev_projects.repo_context import build_repo_context
+            from coordination.session_sandbox import ensure_session_container
+            from coordination.sandbox_identity import set_current_container
+            from coordination.workspace_ops import checkout_repo_branch
+
+            project = None
+            if project_id:
+                project = _dev_projects_store.get_project(project_id, uid)
+            if not project:
+                project = _dev_projects_store.get_or_create_live_repo_project(uid)
+
+            mode = "live_repo" if project.get("source") == "live_repo" else "ephemeral"
+            session_key = session_param or uid
+            container_name, _term_created = ensure_session_container(session_key, mode=mode)
+
+            if _term_created and mode == "ephemeral" and project.get("git_url"):
+                set_current_container(container_name)
+                try:
+                    _rc = build_repo_context(project)
+                    checkout_repo_branch(_rc["git_url"], _rc["branch"], _rc["base_branch"])
+                finally:
+                    set_current_container(None)
+    except Exception as e:
+        logger.error(f"terminal_ws session container setup failed for uid={uid}: {e}", exc_info=True)
+        await websocket.send_text(f"\r\n\x1b[31mTerminal session setup failed: {e}\x1b[0m\r\n")
+        await websocket.close(code=4003, reason="Session setup failed")
+        return
 
     try:
         client = docker_sdk.from_env()
         try:
-            container = client.containers.get("dev_sandbox")
+            container = client.containers.get(container_name)
         except docker_sdk.errors.NotFound:
-            await websocket.send_text("\r\n\x1b[31mdev-sandbox container not found. Is it running?\x1b[0m\r\n")
+            await websocket.send_text(f"\r\n\x1b[31m{container_name} container not found. Is it running?\x1b[0m\r\n")
             await websocket.close(code=4002, reason="Sandbox unavailable")
             return
 

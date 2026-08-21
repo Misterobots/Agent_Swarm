@@ -62,6 +62,10 @@ class CoordinatorSession:
         # can return the id to the caller before the generator has run at all;
         # every other caller leaves it unset and gets the usual random id.
         self.coordination_id = coordination_id or f"coord-{uuid.uuid4().hex[:8]}"
+        # Name of this run's per-session Docker container (session_sandbox.py),
+        # once resolved — None means "use the shared default" (either the
+        # session-sandbox mechanism is off, or this run has no linked repo yet).
+        self.container_name: str | None = None
         self.workers: dict[str, WorkerInfo] = {}
         self.scratchpad_dir = SCRATCHPAD_ROOT / session_id / self.coordination_id
         self.scratchpad_dir.mkdir(parents=True, exist_ok=True)

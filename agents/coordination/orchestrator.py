@@ -10,6 +10,7 @@ Phases:
 """
 
 import json
+import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait as futures_wait
@@ -17,6 +18,7 @@ from typing import Generator, Optional
 
 import swarm_run_store
 import swarm_run_repo_store
+import swarm_run_local_store
 from config import ARCHITECT_MODEL
 from logger_setup import setup_logger
 from utils.gpu_queue import request_lock
@@ -30,9 +32,21 @@ from coordination.session import CoordinatorSession, WorkerState
 from coordination.synthesizer import (
     _generate_followups, _synthesize_findings, _synthesize_perspective_matrix,
 )
-from coordination.workspace_ops import checkout_repo_branch, finalize_task_branch
+from coordination.workspace_ops import checkout_repo_branch, checkout_local_project, finalize_task_branch
 
 logger = setup_logger("Lamport")
+
+# Per-session Docker containers (agents/coordination/session_sandbox.py), replacing
+# the single shared dev_sandbox container that caused a near-miss data-loss incident
+# (see the per-session-sandbox plan). Defaults ON as of Phase H — manually verified
+# end to end across all four entry points (composer, chat swarm, /dev dev-mode chat,
+# dev terminal): every ephemeral-mode container confirmed zero-mount and correctly
+# isolated, live_repo mode confirmed to still bind-mount the live tree exactly as
+# before, and the old clear-and-reclone data-loss footgun is retired (see
+# workspace_ops.checkout_repo_branch's loud-failure version). The env var override
+# is kept as an instant rollback switch (SESSION_SANDBOX_ENABLED=false), same
+# flagging convention as executor.py's SWARM_DEVHARNESS_WORKERS.
+SESSION_SANDBOX_ENABLED = os.getenv("SESSION_SANDBOX_ENABLED", "true").lower() in ("1", "true", "yes")
 
 
 def _drain_file_changes(session) -> list[dict]:
@@ -140,6 +154,7 @@ def coordinate_task(
     skip_project_gate: bool = False,
     already_steered: bool = False,
     repo_context: Optional[dict] = None,
+    session_mode: Optional[str] = None,
     coordination_id: Optional[str] = None,
 ) -> Generator[dict, None, None]:
     """
@@ -147,12 +162,21 @@ def coordinate_task(
     matching the chat_swarm() yield contract.
 
     repo_context (New Task composer path only): {"git_url", "branch",
-    "base_branch"?, "dev_project_id"?}. When set, the sandbox's shared
-    /workspace is checked out to this repo/branch before Decompose starts,
+    "base_branch"?, "dev_project_id"?}. When set, the session's sandbox
+    container is checked out to this repo/branch before Decompose starts,
     and the mapping is persisted via swarm_run_repo_store for the task board.
     Callers that pass repo_context should also pass skip_project_gate=True —
     the repo is already chosen, so the "existing vs new project" clarification
-    card would just be redundant.
+    card would just be redundant. Always None for session_mode="live_repo"
+    (see below) — there's nothing to check out, the container's /workspace
+    already IS the live repo via bind mount.
+
+    session_mode: which coordination/session_sandbox.py container mode this
+    run gets — "ephemeral" (isolated, no host mount) or "live_repo" (the one
+    distinguished project that bind-mounts the live Agent_Swarm repo). Leave
+    unset (None) for a caller with no linked project at all; if repo_context
+    is set but session_mode isn't, it defaults to "ephemeral" for backward
+    compatibility with callers that predate this parameter.
 
     coordination_id: pre-generated id (POST /v1/tasks needs to return the id
     to the caller before this generator has been iterated at all, since it's
@@ -171,9 +195,59 @@ def coordinate_task(
         f"for session {session_id}"
     )
 
+    # === PER-SESSION CONTAINER (composer/repo-linked tasks only, for now) ===
+    # Scoped to a resolved mode specifically: a chat-driven swarm run with no
+    # linked project doesn't reach here until a later phase routes it through
+    # session_mode too — this phase only closes the hole for tasks that
+    # already resolve a specific project (the exact path the original
+    # incident happened on). _session_container_owned tracks whether release
+    # is our responsibility in the finally below, independent of whether
+    # resolution actually succeeded.
+    _resolved_mode = session_mode or ("ephemeral" if repo_context else None)
+    _session_container_owned = False
+    if SESSION_SANDBOX_ENABLED and _resolved_mode:
+        try:
+            from coordination.session_sandbox import ensure_session_container
+            from coordination.sandbox_identity import set_current_container
+            session.container_name, _ = ensure_session_container(session.coordination_id, mode=_resolved_mode)
+            set_current_container(session.container_name)
+            _session_container_owned = True
+            logger.info(f"[Coordinator] Session container ready ({_resolved_mode}): {session.container_name}")
+        except Exception as _sce:
+            logger.error(f"[Coordinator] Session container setup failed: {_sce}", exc_info=True)
+            swarm_run_store.finish_run(
+                session.coordination_id, status="failed",
+                error=f"Session container setup failed: {_sce}", ended_at=int(time.time()),
+            )
+            yield {"type": "error", "content": f"Session container setup failed: {_sce}"}
+            return
+
     try:
         # === PHASE 0: WORKSPACE PREP (New Task composer path only) ===
-        if repo_context:
+        if repo_context and repo_context.get("local_path"):
+            # Blank project — seed from its own persisted, git-initialized
+            # files instead of cloning a git_url (see workspace_ops.
+            # checkout_local_project).
+            _local_path = repo_context["local_path"]
+            swarm_run_store.update_run_phase(session.coordination_id, 0, "Workspace Prep")
+            yield {"type": "swarm_phase", "phase_num": 0, "phase_name": "Workspace Prep", "total_phases": 5}
+            yield {"type": "status", "content": f"📦 Checking out local project {_local_path}..."}
+            try:
+                checkout_local_project(_local_path)
+            except Exception as _wpe:
+                logger.error(f"[Coordinator] Workspace prep failed: {_wpe}")
+                swarm_run_store.finish_run(
+                    session.coordination_id, status="failed",
+                    error=f"Workspace prep failed: {_wpe}", ended_at=int(time.time()),
+                )
+                yield {"type": "error", "content": f"Workspace prep failed: {_wpe}"}
+                return
+            swarm_run_local_store.create(
+                session.coordination_id, repo_context.get("dev_project_id"), _local_path,
+            )
+            yield {"type": "log", "content": f"[Coordinator] Workspace ready: local project {_local_path}"}
+
+        elif repo_context:
             _repo_url = repo_context.get("git_url", "")
             _repo_branch = repo_context.get("branch", "")
             _repo_base = repo_context.get("base_branch", "main")
@@ -1422,3 +1496,16 @@ def coordinate_task(
             error=str(e), ended_at=int(time.time()),
         )
         yield {"type": "error", "content": f"Coordination failed: {e}"}
+    finally:
+        # Covers every exit from the try/except above — success, an early
+        # `return` inside the try (e.g. a clarification card), or the
+        # exception handler itself — so a container we created is always
+        # torn down exactly once, however this run ends.
+        if _session_container_owned:
+            try:
+                from coordination.session_sandbox import release_session_container
+                from coordination.sandbox_identity import set_current_container
+                release_session_container(session.coordination_id)
+                set_current_container(None)
+            except Exception as _rce:
+                logger.warning(f"[Coordinator] Session container release failed (non-fatal): {_rce}")
