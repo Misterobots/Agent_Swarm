@@ -5,7 +5,6 @@ import { Send, Square } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import { useAccess } from "@/lib/hooks/use-access";
 import { canSelectModel } from "@/lib/utils/model-access";
 import { ChatSettingsMenu } from "./chat-settings-menu";
 import { IconButton } from "@/components/ui";
@@ -25,7 +24,6 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
   const deleteConversation = useChatStore((s) => s.deleteConversation);
   const model = useSettingsStore((s) => s.model);
   const setModel = useSettingsStore((s) => s.setModel);
-  const { isAdmin } = useAccess();
   const vimMode = useSettingsStore((s) => s.vimMode);
   // vim hook initialized with a stable ref; actual handleSend assigned after its definition
   const vimHandleSendRef = useRef<() => void>(() => {});
@@ -54,8 +52,8 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
       }
       if (cmd === "/model") {
         if (arg) {
-          if (!canSelectModel(arg, isAdmin)) {
-            onSend("Access denied: selected model is admin-only.");
+          if (!canSelectModel(arg)) {
+            onSend("That model is not available for chat.");
             setInput("");
             return true;
           }
@@ -94,10 +92,12 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [input, isStreaming, onSend]);
+  }, [executeSlash, input, isStreaming, onSend]);
 
   // Keep the vim hook's submit ref in sync with the real handleSend
-  vimHandleSendRef.current = handleSend;
+  useEffect(() => {
+    vimHandleSendRef.current = handleSend;
+  }, [handleSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

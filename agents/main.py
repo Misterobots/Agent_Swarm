@@ -602,9 +602,9 @@ class ChatRequest(BaseModel):
     active_file: Optional[str] = None                   # Currently open file path in the dev workspace editor
 
 
-# Model choice is an administrative capability. The browser UI follows this
-# policy, but it must also be enforced here because API callers can submit an
-# arbitrary ``model`` field.
+# Model choice is available to authenticated users, but the submitted value
+# must still be one of the curated, user-facing models.  The browser picker is
+# a convenience only; API callers can otherwise submit arbitrary model IDs.
 _DEFAULT_CHAT_MODEL = os.getenv("MEMEX_DEFAULT_MODEL", "qwen3:14b")
 _DEFAULT_MODEL_ALIASES = {"", "default", "memex-default", "Home-AI-Swarm", "swarm-standard"}
 
@@ -620,16 +620,22 @@ def _request_is_admin(request: Request) -> bool:
 
 
 def _apply_model_policy(request: ChatRequest, http_request: Request) -> None:
-    """Resolve the submitted model without allowing a client to bypass policy."""
+    """Resolve aliases and reject internal, unknown, or unavailable model IDs."""
     requested = (request.model or "").strip()
-    if not _request_is_admin(http_request) or requested in _DEFAULT_MODEL_ALIASES:
+    if requested in _DEFAULT_MODEL_ALIASES:
         request.model = _DEFAULT_CHAT_MODEL
         return
-    if requested == "qwen3.8-27b-fp8":
+
+    from model_registry import get_model
+    spec = get_model(requested)
+    if not spec or not spec.roles:
+        raise HTTPException(status_code=400, detail="Selected model is not available for chat.")
+    if not spec.available:
         raise HTTPException(
             status_code=503,
-            detail="Qwen 3.8 27B FP8 is cataloged but not configured. Set up a compatible remote engine before selecting it.",
+            detail=f"{requested} is not available on this runtime.",
         )
+    request.model = requested
 
 
 # ---------------------------------------------------------------------------
@@ -1057,10 +1063,20 @@ async def list_models(request: Request):
     """
     try:
         _ts = int(time.time())
-        base_models = [
-            {"id": "Home-AI-Swarm",  "object": "model", "created": _ts, "owned_by": "MarsRL", "label": "Memex"},
-            {"id": "swarm-standard", "object": "model", "created": _ts, "owned_by": "MarsRL", "label": "Swarm Standard"},
-        ]
+        base_models = [{
+            "id": "Home-AI-Swarm", "object": "model", "created": _ts,
+            "owned_by": "MarsRL", "label": "Memex default",
+            "description": f"Current default: {_DEFAULT_CHAT_MODEL}",
+        }]
+        # A curated operational catalog is safer than accepting arbitrary
+        # Ollama names. This remains independent from role assignments.
+        from model_registry import get_user_selectable_models
+        for spec in get_user_selectable_models():
+            base_models.append({
+                "id": spec.name, "object": "model", "created": _ts,
+                "owned_by": "MarsRL", "label": spec.name,
+                "description": spec.description, "available": spec.available,
+            })
 
         uid = request.headers.get("X-authentik-uid", "").strip()
         if uid:
@@ -1799,6 +1815,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     from church import chat_swarm
     import json
     import asyncio
+
+    _apply_model_policy(request, http_request)
 
     # --- Dev workspace agentic harness (handles dev_mode for ANY model) ---
     # Must precede the provider_for() dispatch below: local Ollama models resolve
