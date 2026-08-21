@@ -2940,15 +2940,22 @@ async def list_tasks(request: Request, status: str = "all", limit: int = 50):
         return {"runs": []}
     import swarm_run_store
     import swarm_run_repo_store
+    import swarm_run_local_store
     runs = swarm_run_store.list_runs(
         owner_id, limit=min(max(int(limit), 1), 200), running_only=(status == "running")
     )
-    repo_by_id = swarm_run_repo_store.get_many([r["coordination_id"] for r in runs])
+    coordination_ids = [r["coordination_id"] for r in runs]
+    repo_by_id = swarm_run_repo_store.get_many(coordination_ids)
+    local_by_id = swarm_run_local_store.get_many(coordination_ids)
     for r in runs:
         repo = repo_by_id.get(r["coordination_id"])
+        local = local_by_id.get(r["coordination_id"])
         if repo:
             r["repo_url"] = repo["git_url"]
             r["branch"] = repo["branch"]
+            r["dev_project_id"] = repo.get("dev_project_id")
+        elif local:
+            r["dev_project_id"] = local["dev_project_id"]
     return {"runs": runs}
 
 
@@ -2960,6 +2967,7 @@ async def get_task(coordination_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Task not found")
     import swarm_run_store
     import swarm_run_repo_store
+    import swarm_run_local_store
     run = swarm_run_store.get_run(coordination_id, owner_id)
     if not run:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -2967,6 +2975,11 @@ async def get_task(coordination_id: str, request: Request):
     if repo:
         run["repo_url"] = repo["git_url"]
         run["branch"] = repo["branch"]
+        run["dev_project_id"] = repo.get("dev_project_id")
+    else:
+        local = swarm_run_local_store.get(coordination_id)
+        if local:
+            run["dev_project_id"] = local["dev_project_id"]
     return {"run": run, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
 
 
@@ -3115,21 +3128,35 @@ async def create_task(body: CreateTaskRequest, request: Request):
     if not prompt:
         raise HTTPException(status_code=400, detail="prompt must not be empty")
 
+    # session_mode drives which session_sandbox container mode this run gets
+    # (see coordination/session_sandbox.py): "live_repo" for the one
+    # distinguished project that bind-mounts the live repo, "ephemeral" for a
+    # git_url-linked project (repo_context carries git_url/branch, Phase 0
+    # clones it fresh), "local" for a blank project (repo_context carries
+    # local_path instead, Phase 0 seeds the container from that project's own
+    # persisted, git-initialized files — see workspace_ops.checkout_local_project),
+    # or None when no project is linked at all (today's pre-redesign
+    # behavior — falls back to the shared dev_sandbox if SESSION_SANDBOX_ENABLED
+    # is even on, so it needs the SAME lock protection as live_repo below).
+    session_mode = None
     repo_context = None
     if body.dev_project_id:
         from dev_projects import store as _dev_projects_store
         project = _dev_projects_store.get_project(body.dev_project_id, owner_id)
         if not project:
             raise HTTPException(status_code=404, detail="dev_project_id not found")
-        if not project.get("git_url"):
-            raise HTTPException(status_code=400, detail="Selected project has no git_url to check out")
-        base_branch = project.get("git_ref") or "main"
-        repo_context = {
-            "git_url": project["git_url"],
-            "branch": (body.branch or base_branch).strip(),
-            "base_branch": base_branch,
-            "dev_project_id": body.dev_project_id,
-        }
+        if project.get("source") == "live_repo":
+            session_mode = "live_repo"
+        elif project.get("git_url"):
+            from dev_projects.repo_context import build_repo_context
+            repo_context = build_repo_context(project, branch=body.branch)
+            session_mode = "ephemeral"
+        else:
+            # Blank project — no git_url to clone, but provision_project_dir()
+            # git-inits every blank project at creation (docker_exec.py), so
+            # there's a real local repo to seed the task container from.
+            repo_context = {"dev_project_id": project["id"], "local_path": project["path"]}
+            session_mode = "local"
 
     import swarm_run_store
     from coordination import task_queue as _task_queue
@@ -3146,14 +3173,21 @@ async def create_task(body: CreateTaskRequest, request: Request):
         ultraplan_mode=body.ultraplan_mode,
         research_mode=body.research_mode,
         repo_context=repo_context,
+        session_mode=session_mode,
         coordination_id=coordination_id,
     )
+
+    # The live_repo lock only protects the one shared-host-path resource:
+    # live_repo mode (multiple containers, same mount) and no-project-linked
+    # runs (fall back to the shared dev_sandbox). An "ephemeral" run has its
+    # own fully-isolated container — nothing to serialize, dispatch immediately.
+    _needs_live_repo_lock = session_mode != "ephemeral"
 
     # Create the row synchronously (status set explicitly below) so GET
     # /v1/tasks/{id} works the instant this call returns. coordinate_task()
     # would also call create_run itself, but ON CONFLICT DO NOTHING makes
     # that a safe no-op against the row we create here.
-    if _task_queue.try_acquire(coordination_id):
+    if not _needs_live_repo_lock or _task_queue.try_acquire(coordination_id):
         swarm_run_store.create_run(
             coordination_id, session_id, owner_id, title=prompt, scope=None,
             started_at=int(time.time()), status="running",
