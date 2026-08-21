@@ -238,6 +238,20 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Task queue reconciliation failed (non-fatal): {e}")
 
+        # 7h2. Session container orphan sweep — must run AFTER the reconciliation
+        # above (session_sandbox.cleanup_orphans()'s own docstring documents this
+        # ordering): by the time this runs, reconcile_stale_runs()/clear_all()
+        # have already ensured nothing legitimately holds a session container
+        # from before this restart, so every dev-task-* container found here is
+        # a leak from an unclean shutdown, not a live run.
+        try:
+            from coordination.session_sandbox import cleanup_orphans as _cleanup_session_orphans
+            _reaped = _cleanup_session_orphans()
+            if _reaped:
+                logger.warning(f"Session container reconciliation: reaped {_reaped} orphaned container(s) on startup.")
+        except Exception as e:
+            logger.warning(f"Session container orphan sweep failed (non-fatal): {e}")
+
         # 7g. Initialize GitHub Push Tokens Store (fine-grained PAT for repo-write
         # access, Phase C of the Codex-task-composer plan — structurally separate
         # from github_oauth.py's swarm.github_oauth_tokens table)
