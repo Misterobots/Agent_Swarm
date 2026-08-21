@@ -5112,6 +5112,11 @@ async def ops_health():
     from config import HOPPER_IP, LANGFUSE_HOST, TURING_IP, LOVELACE_IP
 
     def normalize_containers(raw_containers):
+        # Docker's own /containers/json?all=true response is the source of truth for
+        # State (running/exited/created/restarting/paused/dead) — read it directly
+        # instead of assuming "running" (which silently hid every dropped/created
+        # container from the Fleet grid: Docker's default, non-`all` query only ever
+        # RETURNS running containers, so nothing else could previously arrive here).
         parsed = []
         for c in raw_containers or []:
             name = c.get("Names", ["/unknown"])
@@ -5120,13 +5125,14 @@ async def ops_health():
             image_raw = c.get("Image", "unknown")
             image = image_raw.split("/")[-1].split(":")[0]
             uptime = c.get("Status", "Unknown")
-            parsed.append({"name": name, "image": image, "uptime": uptime, "status": "running"})
+            status = c.get("State") or "unknown"
+            parsed.append({"name": name, "image": image, "uptime": uptime, "status": status})
         return parsed
 
     def fetch_local_containers():
         try:
             result = subprocess.run(
-                ["curl", "-s", "--unix-socket", "/var/run/docker.sock", "http://localhost/containers/json"],
+                ["curl", "-s", "--unix-socket", "/var/run/docker.sock", "http://localhost/containers/json?all=true"],
                 capture_output=True, text=True, timeout=5,
             )
             if result.returncode == 0 and result.stdout.strip():
@@ -5138,7 +5144,7 @@ async def ops_health():
             sock.settimeout(5)
             sock.connect("/var/run/docker.sock")
             request = (
-                "GET /containers/json HTTP/1.0\r\n"
+                "GET /containers/json?all=true HTTP/1.0\r\n"
                 "Host: localhost\r\n"
                 "Accept: application/json\r\n"
                 "\r\n"
@@ -5163,7 +5169,7 @@ async def ops_health():
             raise RuntimeError(f"Local docker query failed: {str(e)[:80]}")
 
     def fetch_remote_containers(ip_addr: str):
-        endpoint = f"http://{ip_addr}:2375/containers/json"
+        endpoint = f"http://{ip_addr}:2375/containers/json?all=true"
         resp = _requests.get(endpoint, timeout=4)
         if resp.status_code != 200:
             raise RuntimeError(f"HTTP {resp.status_code}")
@@ -5194,9 +5200,13 @@ async def ops_health():
     for node in cluster_defs:
         try:
             containers = node["fetch"]()
+            # `containers` now includes every state (see normalize_containers), so
+            # running_count must filter — it previously equaled len(containers) only
+            # because the fetch itself used to silently exclude non-running containers.
+            running = sum(1 for c in containers if c.get("status") == "running")
             nodes.append({
                 "name": node["name"], "role": node["role"], "ip": node["ip"],
-                "healthy": True, "running_count": len(containers),
+                "healthy": True, "running_count": running,
                 "containers": containers, "error": None,
             })
         except Exception as e:
