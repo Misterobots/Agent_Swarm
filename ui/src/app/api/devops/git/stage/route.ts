@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
 
-const SSH_BINARY = "C:\\Windows\\System32\\OpenSSH\\ssh.exe";
+const SSH_BINARY = process.env.MEMEX_SSH_BINARY ?? "ssh";
 const SSH_USER = "misterobots";
 
 const NODE_IPS: Record<string, string> = {

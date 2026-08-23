@@ -51,8 +51,11 @@ Make sure `/home/misterobots/bmo_client/network.env` contains the current `LOVEL
 ```bash
 cd /home/misterobots/bmo_client
 source venv/bin/activate
-python voice_satellite.py
+python bmo_driver.py --host $LOVELACE_IP --output_device 1 --input_device 3 --volume 20
 ```
+
+In normal operation this is started by `bmo.service` (systemd), not run manually — see that
+unit file in `agents/bmo_voice/`.
 
 ## Troubleshooting
 

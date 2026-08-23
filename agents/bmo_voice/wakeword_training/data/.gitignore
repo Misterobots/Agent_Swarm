@@ -1,0 +1,7 @@
+# microWakeWord runtime volume — bind-mounted to /data in the training container.
+# Everything here is generated or personal: synthetic samples, downloaded datasets,
+# feature caches, checkpoints, and your own real_samples/ recordings. Never commit any
+# of it (voice data + multi-GB downloads). This .gitignore is the only tracked file so
+# the directory itself survives in the repo as a mount point.
+*
+!.gitignore

@@ -12,6 +12,7 @@ export interface PairingState {
   role:     PairingRole | null;
   code:     string | null;
   peerName: string | null;
+  peerCapabilities: string[];
   error:    string | null;
 }
 
@@ -41,7 +42,7 @@ const WS_BASE = (() => {
 
 export function usePairing(): [PairingState, PairingActions] {
   const [state, setState] = useState<PairingState>({
-    status: "idle", role: null, code: null, peerName: null, error: null,
+    status: "idle", role: null, code: null, peerName: null, peerCapabilities: [], error: null,
   });
 
   const wsRef       = useRef<WebSocket | null>(null);
@@ -68,7 +69,7 @@ export function usePairing(): [PairingState, PairingActions] {
         if (msg.type === "peer_joined") {
           setState((s) => ({ ...s, status: "connected" }));
         } else if (msg.type === "peer_left") {
-          setState((s) => ({ ...s, status: "waiting", peerName: null }));
+          setState((s) => ({ ...s, status: "waiting", peerName: null, peerCapabilities: [] }));
         } else {
           listenersRef.current.forEach((cb) => cb(msg));
         }
@@ -92,10 +93,10 @@ export function usePairing(): [PairingState, PairingActions] {
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json() as { code: string; token: string };
       tokenRef.current = data.token;
-      setState({ status: "waiting", role: "host", code: data.code, peerName: null, error: null });
+      setState({ status: "waiting", role: "host", code: data.code, peerName: null, peerCapabilities: [], error: null });
       connectWs(data.token);
     } catch (e: unknown) {
-      setState({ status: "error", role: null, code: null, peerName: null, error: String(e) });
+      setState({ status: "error", role: null, code: null, peerName: null, peerCapabilities: [], error: String(e) });
     }
   }, [cleanup, connectWs]);
 
@@ -108,21 +109,23 @@ export function usePairing(): [PairingState, PairingActions] {
         body:    JSON.stringify({ display_name: displayName }),
       });
       if (!res.ok) throw new Error(res.status === 404 ? "Code not found" : `${res.status}`);
-      const data = await res.json() as { token: string; host_info: { display_name: string } };
+      const data = await res.json() as { token: string; host_info: { display_name: string; capabilities?: string[] } };
       tokenRef.current = data.token;
       setState({
         status: "connected", role: "guest", code: code.toUpperCase(),
-        peerName: data.host_info.display_name, error: null,
+        peerName: data.host_info.display_name,
+        peerCapabilities: Array.isArray(data.host_info.capabilities) ? data.host_info.capabilities : [],
+        error: null,
       });
       connectWs(data.token);
     } catch (e: unknown) {
-      setState({ status: "error", role: null, code: null, peerName: null, error: String(e) });
+      setState({ status: "error", role: null, code: null, peerName: null, peerCapabilities: [], error: String(e) });
     }
   }, [cleanup, connectWs]);
 
   const disconnect = useCallback(() => {
     cleanup();
-    setState({ status: "idle", role: null, code: null, peerName: null, error: null });
+    setState({ status: "idle", role: null, code: null, peerName: null, peerCapabilities: [], error: null });
   }, [cleanup]);
 
   const send = useCallback((msg: Record<string, unknown>) => {

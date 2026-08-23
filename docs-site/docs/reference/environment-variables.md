@@ -80,6 +80,19 @@ Complete reference for all environment variables used in `network.env`.
 | `STREAM_TIMEOUT` | SSE stream timeout (seconds) | `120` |
 | `LOG_LEVEL` | Logging level | `INFO` |
 
+## Swarm Planning & Solving Limits
+
+Control how long the swarm spends on planning and solving phases:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PLANNING_MAX_ITER` | Maximum number of planning output chunks (`0` = unlimited) | `0` |
+| `PLANNING_MAX_TIME` | Maximum planning time in seconds (`0` = unlimited) | `0` |
+| `SOLVING_MAX_ITER` | Maximum number of solving/verification/correction iterations | `2` |
+| `SOLVING_MAX_TIME` | Maximum solving time in seconds (`0` = unlimited) | `0` |
+
+If both a time and iteration limit are set, the phase stops at whichever comes first. If 100% confidence is reached before the limit, the swarm proceeds to final steps immediately.
+
 !!! warning "Security"
     Never commit `network.env` to version control. It contains secrets. See [Secrets Management](../admin-guide/operations/secrets.md).
 

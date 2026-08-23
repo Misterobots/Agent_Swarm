@@ -85,6 +85,28 @@ docker logs ollama
 
 ---
 
+## Trained Model Doesn't Appear After Training
+
+**Symptom**: A training run completes but the resulting model isn't listed by Ollama.
+
+**Diagnose**:
+
+```bash
+# Check the GGUF conversion output
+ls execution_plane/training_output/
+
+# Check if Ollama already has it
+curl http://{{ lovelace_ip }}:{{ ollama_port }}/api/tags
+```
+
+**Fix**: Import it manually:
+
+```bash
+docker exec ollama ollama import /path/to/output.gguf
+```
+
+---
+
 ## Model Corruption
 
 **Symptom**: Model loads but produces garbage output.

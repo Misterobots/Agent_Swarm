@@ -29,6 +29,12 @@ def setup_logger(name: str):
     c_handler.setFormatter(c_format)
     logger.addHandler(c_handler)
 
+    # Don't also bubble up to the root logger's handler (main.py configures one
+    # so plain logging.getLogger(__name__) modules are visible too — see there).
+    # Without this, every setup_logger()-based logger would print twice once
+    # that root handler exists.
+    logger.propagate = False
+
     # 2. Loki Handler
     if LOKI_AVAILABLE:
         # Suppress Uvicorn Access Logs (polute dashboard)

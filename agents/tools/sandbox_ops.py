@@ -74,14 +74,21 @@ def _rel_workspace(abs_path: str) -> str:
 
 
 def _get_container():
-    """Return the dev-sandbox Docker container object, or raise RuntimeError."""
+    """Return the target sandbox Docker container object, or raise RuntimeError.
+
+    Resolves the per-thread session container set via sandbox_identity
+    (agents/coordination/sandbox_identity.py), falling back to the shared
+    SANDBOX_CONTAINER env constant for any caller that hasn't set one.
+    """
+    from coordination.sandbox_identity import get_current_container
+    name = get_current_container(SANDBOX_CONTAINER)
     try:
         import docker
         client = docker.from_env()
-        container = client.containers.get(SANDBOX_CONTAINER)
+        container = client.containers.get(name)
         if container.status != "running":
             raise RuntimeError(
-                f"dev-sandbox container '{SANDBOX_CONTAINER}' is not running "
+                f"sandbox container '{name}' is not running "
                 f"(status={container.status!r}). Start it with: "
                 "docker compose -f execution_plane/docker-compose.yml up dev-sandbox"
             )
@@ -92,8 +99,8 @@ def _get_container():
             "Add 'docker' to the agent_runtime requirements."
         )
     except Exception as e:
-        logger.error(f"[sandbox_ops] Failed to get container '{SANDBOX_CONTAINER}': {e}", exc_info=True)
-        raise RuntimeError(f"Cannot connect to dev-sandbox: {e}") from e
+        logger.error(f"[sandbox_ops] Failed to get container '{name}': {e}", exc_info=True)
+        raise RuntimeError(f"Cannot connect to sandbox '{name}': {e}") from e
 
 
 # ---------------------------------------------------------------------------

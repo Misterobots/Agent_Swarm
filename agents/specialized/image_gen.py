@@ -851,6 +851,7 @@ def generate_image(
     seed: int = -1,
     target_device: str = "auto",
     negative_prompt: str = None,
+    gpu_context: str = "image",
     skip_refinement: bool = False,
 ) -> str:
     """
@@ -938,9 +939,12 @@ def generate_image(
 
     # GPU lock serializes concurrent requests and handles zone transitions
     # when Redis IS available. When Redis is down it's a no-op (fail-open).
+    if gpu_context not in {"image", "image_fast"}:
+        return f"Error: unsupported image GPU context '{gpu_context}'."
+
     try:
         from utils.gpu_queue import request_lock as _request_lock
-        _gpu_ctx = _request_lock("image", timeout=600)
+        _gpu_ctx = _request_lock(gpu_context, timeout=600)
     except Exception:
         from contextlib import nullcontext
         _gpu_ctx = nullcontext()

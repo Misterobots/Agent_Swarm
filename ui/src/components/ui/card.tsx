@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef } from "react";
+import { createElement, forwardRef } from "react";
 import { cn } from "@/lib/utils/cn";
 
 type Padding = "none" | "sm" | "md" | "lg";
@@ -37,20 +37,19 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   },
   ref,
 ) {
-  const Tag = as as React.ElementType;
-  return (
-    <Tag
-      ref={ref}
-      className={cn(
+  return createElement(
+    as,
+    {
+      ...rest,
+      ref,
+      className: cn(
         elevated ? "surface-elevated" : "surface",
         PADDING_CLASS[padding],
         interactive && "lift cursor-pointer",
         className,
-      )}
-      {...rest}
-    >
-      {children}
-    </Tag>
+      ),
+    },
+    children,
   );
 });
 

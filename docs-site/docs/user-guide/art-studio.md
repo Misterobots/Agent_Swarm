@@ -45,6 +45,29 @@ You can influence generation by including parameters in your request:
 
 The system maps these to appropriate ComfyUI workflow parameters (CFG scale, steps, scheduler).
 
+### 3D & Action Figure Pipeline Details
+
+The 3D and Action Figure modes (see [3D Generation](3d-generation.md) for the general pipeline) route through two mesh backends with different speed/quality tradeoffs:
+
+| Pipeline | Output | Time | Notes |
+|----------|--------|------|-------|
+| **TripoSG** | Untextured GLB mesh | ~2 min | Fast iteration, good for shape exploration |
+| **Hunyuan 3D** | Textured GLB mesh | ~8 min | Full color/texture, higher detail |
+
+!!! tip "Fast Iteration"
+    Use TripoSG first to validate the form, then switch to Hunyuan 3D for the final textured version.
+
+Action figures add a segmentation and joint-insertion step on top of the base mesh, producing 12 ball-and-socket joints: neck, shoulders (2), elbows (2), wrists (2), waist, hips (2), and knees (2).
+
+| Setting | Range | Default | Description |
+|---------|-------|---------|-------------|
+| Figure Height | 50–300 mm | — | Total height of the assembled figure |
+| Joint Clearance | 0.1–0.5 mm | 0.3 mm | Gap between ball and socket for print tolerance |
+| Per-Joint Toggles | on/off | all on | Enable or disable specific joints individually |
+
+!!! tip "Clearance by Printer Type"
+    **FDM printers:** 0.3 mm (default). **Resin printers:** 0.15 mm. If joints are too loose or tight after printing, adjust clearance in 0.05 mm increments.
+
 ### Custom Workflows
 
 Power users can access ComfyUI directly at `http://{{ lovelace_ip }}:8188` to:

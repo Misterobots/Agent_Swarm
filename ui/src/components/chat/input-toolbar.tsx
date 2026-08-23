@@ -1,7 +1,7 @@
 "use client";
 
 import type { FileAttachment } from "@/types/chat";
-import { Paperclip, X, Brain, Search, Zap } from "lucide-react";
+import { Paperclip, X, Brain, Zap } from "lucide-react";
 import { Fragment, useRef } from "react";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { cn } from "@/lib/utils/cn";
@@ -18,8 +18,6 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
   const fileRef = useRef<HTMLInputElement>(null);
   const groundingDocs = useSettingsStore((s) => s.groundingDocs);
   const setGroundingDocs = useSettingsStore((s) => s.setGroundingDocs);
-  const researchMode = useSettingsStore((s) => s.researchMode);
-  const setResearchMode = useSettingsStore((s) => s.setResearchMode);
   const swarmMode = useSettingsStore((s) => s.swarmMode);
   const setSwarmMode = useSettingsStore((s) => s.setSwarmMode);
 
@@ -61,14 +59,6 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
       icon: Brain,
       active: groundingDocs,
       onToggle: () => setGroundingDocs(!groundingDocs),
-    },
-    {
-      key: "research",
-      label: "Research",
-      icon: Search,
-      active: researchMode,
-      onToggle: () => setResearchMode(!researchMode),
-      feature: "research_v1",
     },
     {
       key: "swarm",

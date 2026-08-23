@@ -26,7 +26,7 @@ venv/
 
 # Logs
 *.log
-logs/
+/logs/
 auth_dump.txt
 provider_info.txt
 comfy_logs.txt
@@ -71,6 +71,7 @@ migration_backup_*/
 *.pth
 *.mp4
 *.wav
+!services/voice_engine/bmo_ref.wav
 *.png
 !docs/screenshots/*.png
 !docs/assets/screenshots/*.png
@@ -102,3 +103,5 @@ execution_plane/training_data/
 
 # Runtime workflow state
 workflow_state/
+
+.claude.bak_*/

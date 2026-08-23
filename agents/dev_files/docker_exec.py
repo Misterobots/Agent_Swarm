@@ -14,6 +14,7 @@ import base64
 import logging
 import mimetypes
 import os
+import shlex
 from pathlib import PurePosixPath
 from typing import Optional
 
@@ -31,15 +32,27 @@ MAX_FILE_BYTES = int(os.getenv("DEV_FILES_MAX_BYTES", str(4 * 1024 * 1024)))  # 
 # Container access
 # ---------------------------------------------------------------------------
 
-def _get_container():
-    """Return the running dev-sandbox Docker container, or raise RuntimeError."""
+def _get_container(container_name: Optional[str] = None):
+    """Return the target sandbox Docker container, or raise RuntimeError.
+
+    With container_name unset, resolves the per-thread session container set
+    via sandbox_identity (agents/coordination/sandbox_identity.py), falling
+    back to the shared SANDBOX_CONTAINER env constant for any caller that
+    hasn't set one. Passing container_name explicitly bypasses that
+    resolution entirely — for the rare caller that needs a SPECIFIC container
+    regardless of whatever the current thread-local target is (e.g.
+    workspace_ops.checkout_local_project(), which must read the shared
+    dev_sandbox even while a per-session container is already "current").
+    """
+    from coordination.sandbox_identity import get_current_container
+    name = container_name or get_current_container(SANDBOX_CONTAINER)
     try:
         import docker
         client = docker.from_env()
-        container = client.containers.get(SANDBOX_CONTAINER)
+        container = client.containers.get(name)
         if container.status != "running":
             raise RuntimeError(
-                f"dev-sandbox container '{SANDBOX_CONTAINER}' is not running "
+                f"sandbox container '{name}' is not running "
                 f"(status={container.status!r}). "
                 "Start it with: docker compose -f execution_plane/docker-compose.yml up dev-sandbox"
             )
@@ -51,8 +64,8 @@ def _get_container():
     except RuntimeError:
         raise
     except Exception as exc:
-        logger.error("Failed to get container '%s': %s", SANDBOX_CONTAINER, exc, exc_info=True)
-        raise RuntimeError(f"Cannot connect to dev-sandbox: {exc}") from exc
+        logger.error("Failed to get container '%s': %s", name, exc, exc_info=True)
+        raise RuntimeError(f"Cannot connect to sandbox '{name}': {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +77,7 @@ def exec_in_sandbox(
     input_bytes: Optional[bytes] = None,
     timeout: int = 30,
     user: str = "root",
+    container_name: Optional[str] = None,
 ) -> tuple[int, str, str]:
     """
     Execute *cmd inside the dev-sandbox container.
@@ -72,8 +86,11 @@ def exec_in_sandbox(
     If input_bytes is provided the command is run via a bash here-doc so that
     the bytes are fed to stdin.  (docker-py exec_run doesn't support stdin
     directly, so we base64-encode and pipe.)
+
+    container_name overrides the normal thread-local session-container
+    resolution — see _get_container()'s docstring.
     """
-    container = _get_container()
+    container = _get_container(container_name)
 
     if input_bytes is not None:
         # Encode payload as base64 and pipe into the target command through bash.
@@ -236,7 +253,14 @@ def list_tree(
     roots: list[FileNode] = []
 
     for line in out.splitlines():
-        line = line.strip()
+        # NOT .strip() — the root entry's %P is empty, so its line starts
+        # with a literal tab ("\td\t4096"). .strip() silently eats that
+        # leading tab as whitespace, shifting every field over by one:
+        # rel_name becomes "d" (the type char) instead of "", ftype_char
+        # becomes "4096" (so it's misparsed as a *file* named "d", size 0),
+        # and the "skip the root" check below never fires since rel_name is
+        # no longer "". splitlines() already strips the trailing newline, so
+        # there's nothing left to strip here.
         if not line:
             continue
         parts = line.split("\t", 2)
@@ -420,11 +444,17 @@ def write_file(
 # Project directory provisioning
 # ---------------------------------------------------------------------------
 
-def provision_project_dir(uid: str, project_id: str) -> str:
+def provision_project_dir(uid: str, project_id: str, git_ref: str = "main") -> str:
     """
-    Ensure /workspace/<uid>/<project_id> exists inside the dev-sandbox.
-    Returns the absolute path.
-    Raises RuntimeError if the container is unavailable.
+    Ensure /workspace/<uid>/<project_id> exists inside the dev-sandbox, as a
+    real git repo (not just a bare directory) — this is what lets a "blank"
+    project run tasks at all (coordination/workspace_ops.checkout_local_project
+    tars this directory into a fresh task container) and be pushed to GitHub
+    later without a separate "link git" step.
+
+    Returns the absolute path. Raises RuntimeError if the container is
+    unavailable (mkdir failure); a git-init failure is logged but non-fatal —
+    the directory is still usable for plain file browsing either way.
     """
     project_dir = f"{WORKSPACE_ROOT}/{uid}/{project_id}"
     rc, _, err = exec_in_sandbox("mkdir", "-p", project_dir, timeout=10)
@@ -432,5 +462,107 @@ def provision_project_dir(uid: str, project_id: str) -> str:
         raise RuntimeError(
             f"Could not provision project dir {project_dir!r}: {err.strip()}"
         )
+
+    q_dir = shlex.quote(project_dir)
+    q_ref = shlex.quote(git_ref or "main")
+    rc, out, err = exec_in_sandbox(
+        "sh", "-c",
+        f"cd {q_dir} && "
+        f"(git init -q -b {q_ref} 2>/dev/null || (git init -q && git symbolic-ref HEAD refs/heads/{q_ref})) && "
+        f"git -c user.email=memex@local -c user.name=Memex commit --allow-empty -q -m 'Initial commit'",
+        timeout=15,
+    )
+    if rc != 0:
+        logger.warning("git init failed for project dir %r (non-fatal): %s", project_dir, (err or out).strip())
+
     logger.info("Provisioned project dir: %s", project_dir)
     return project_dir
+
+
+def project_has_content(uid: str, project_id: str) -> bool:
+    """
+    True if the project directory has anything besides .git — the "basic
+    project setup completed" gate for Publish-to-GitHub (main.py's
+    publish/preview and publish routes): a brand-new blank project is just
+    the bootstrap empty commit from provision_project_dir() above, and
+    publishing that would create an empty GitHub repo for no reason.
+
+    -print -quit stops at the first match, so this is cheap even on a large tree.
+    """
+    project_dir = f"{WORKSPACE_ROOT}/{uid}/{project_id}"
+    q_dir = shlex.quote(project_dir)
+    # The .git/* pattern MUST stay quoted — unquoted, sh -c expands it as a
+    # glob before find ever sees it (against whatever files happen to match),
+    # which breaks find's argument parsing as soon as there's more than one
+    # match. Verified both ways in a real shell before landing this.
+    rc, out, _err = exec_in_sandbox(
+        "sh", "-c",
+        f"find {q_dir} -mindepth 1 -not -path {q_dir}/.git -not -path '{project_dir}/.git/*' -print -quit",
+        timeout=15,
+    )
+    return rc == 0 and bool(out.strip())
+
+
+def git_clone(uid: str, project_id: str, git_url: str, git_ref: str = "main") -> str:
+    """
+    Clone `git_url` into /workspace/<uid>/<project_id>, checked out at
+    `git_ref` if it exists (branch, tag, or SHA). If `git_ref` doesn't exist
+    anywhere — e.g. the caller's default "main" against a repo whose default
+    branch is still "master" — falls back to the repo's actual default
+    branch rather than failing the whole clone over a guessed ref.
+
+    Returns the ref actually checked out (equal to git_ref unless it fell
+    back). Callers should persist THIS value, not the requested git_ref, or
+    later operations that re-checkout by the stored ref will hit the same
+    "ref doesn't exist" failure this fallback exists to avoid.
+
+    Raises:
+        ValueError   — git_url isn't https/http, or git_ref looks unsafe
+        RuntimeError — container unavailable, or the clone itself failed
+    """
+    if not (git_url.startswith("https://") or git_url.startswith("http://")):
+        raise ValueError("git_url must use https:// or http:// scheme")
+    if not git_ref or git_ref.startswith("-"):
+        raise ValueError(f"invalid git_ref: {git_ref!r}")
+
+    project_dir = f"{WORKSPACE_ROOT}/{uid}/{project_id}"
+    q_url = shlex.quote(git_url)
+    q_ref = shlex.quote(git_ref)
+    q_dir = shlex.quote(project_dir)
+
+    # git_ref is usually a branch name, but may be a tag or commit SHA — try
+    # the fast `--branch` clone first (works for branches/tags).
+    rc, out, err = exec_in_sandbox(
+        "sh", "-c", f"git clone --branch {q_ref} {q_url} {q_dir} 2>&1",
+        timeout=180,
+    )
+    if rc == 0:
+        logger.info("git_clone: %s@%s -> %s", git_url, git_ref, project_dir)
+        return git_ref
+
+    # --branch failed — could be a SHA (needs a plain clone + checkout) or a
+    # ref that doesn't exist anywhere. Plain clone lands on the repo's real
+    # default branch, then try to move to what was actually requested.
+    rc2, out2, err2 = exec_in_sandbox(
+        "sh", "-c", f"rm -rf {q_dir}; git clone {q_url} {q_dir} 2>&1",
+        timeout=180,
+    )
+    if rc2 != 0:
+        raise RuntimeError(f"git clone failed for {git_url!r}: {(err2 or out2).strip()[:500]}")
+
+    rc3, out3, err3 = exec_in_sandbox(
+        "sh", "-c", f"cd {q_dir} && git checkout {q_ref} 2>&1", timeout=30,
+    )
+    if rc3 == 0:
+        logger.info("git_clone: %s@%s -> %s", git_url, git_ref, project_dir)
+        return git_ref
+
+    rc4, head_out, _head_err = exec_in_sandbox(
+        "sh", "-c", f"cd {q_dir} && git rev-parse --abbrev-ref HEAD", timeout=10,
+    )
+    actual_ref = head_out.strip() if rc4 == 0 and head_out.strip() else git_ref
+    logger.warning(
+        "git_clone: ref %r not found for %s (%s) — using default branch %r instead",
+        git_ref, git_url, (err3 or out3).strip()[:200], actual_ref,
+    )
+    return actual_ref

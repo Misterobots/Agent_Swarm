@@ -229,30 +229,150 @@ def handle_pending_context(
             yield {"type": "log", "content": f"[Context Manager] Visual context restored ({len(_saved_visual)} chars)"}
 
         if user_input.startswith("existing_project"):
-            logger.info("[Router] Dev project: routing as existing codebase task.")
-            yield {"type": "log", "content": "[Context Manager] Routing to existing project coordinator..."}
-            from lamport import coordinate_task as _coord
-            yield {"type": "status", "content": "🛠️ Launching codebase coordinator..."}
-            for chunk in _coord(
-                original_prompt,
-                session_id=session_id,
-                owner_id=owner_id,
-                history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
-                extracted_context=_restored_ctx,
-                ace_token=ace_token,
-                ultraplan_mode=ultraplan_mode,
-                dev_mode=dev_mode,
-                skip_project_gate=True,
-            ):
-                yield chunk
+            # Was previously a dead end: re-invoked coordinate_task with
+            # skip_project_gate=True and no project ever actually resolved,
+            # so every chat-driven swarm run landed on the shared dev_sandbox
+            # regardless of what the user meant by "existing project". Now
+            # shows a real picker (owner's dev_projects + the always-present
+            # live-repo option) so the answer actually selects a specific,
+            # isolated session container — see coordination/session_sandbox.py.
+            logger.info("[Router] Dev project: showing project picker.")
+            from dev_projects import store as _dev_projects_store
+            options = []
+            if owner_id:
+                live_repo_project = _dev_projects_store.get_or_create_live_repo_project(owner_id)
+                options.append({
+                    "label": live_repo_project["name"],
+                    "value": live_repo_project["id"],
+                    "description": "Improve Agent_Swarm's own codebase",
+                })
+                for p in _dev_projects_store.list_projects(owner_id):
+                    if p.get("source") == "live_repo":
+                        continue  # already added above, never duplicate
+                    options.append({
+                        "label": p["name"],
+                        "value": p["id"],
+                        "description": p.get("git_url") or "Blank project",
+                    })
+            try:
+                from brooks import save_pending_context as _save_ctx
+                _save_ctx(
+                    {"type": "dev_project_picker", "prompt": original_prompt, "visual_context": _saved_visual},
+                    session_id=session_id, owner_id=owner_id,
+                )
+            except Exception as _e:
+                logger.warning("[Router] Could not save dev_project_picker context: %s", _e)
+            yield {
+                "type": "clarification_card",
+                "clarification": {
+                    "question": "Which project is this for?",
+                    "context": f"Building: *{original_prompt[:120]}*",
+                    "options": options,
+                    "allow_freetext": False,
+                    "card_type": "dev_project_picker",
+                },
+            }
             result["handled"] = True
             return
 
         elif user_input.startswith("new_project"):
-            logger.info("[Router] Dev project (new): routing directly to coordinator.")
-            yield {"type": "log", "content": "[Context Manager] New project: launching coordinator..."}
-            from lamport import coordinate_task as _coord
-            yield {"type": "status", "content": "🛠️ Launching coordinator..."}
+            logger.info("[Router] Dev project (new): asking for a name.")
+            try:
+                from brooks import save_pending_context as _save_ctx
+                _save_ctx(
+                    {"type": "dev_project_new_name", "prompt": original_prompt, "visual_context": _saved_visual},
+                    session_id=session_id, owner_id=owner_id,
+                )
+            except Exception as _e:
+                logger.warning("[Router] Could not save dev_project_new_name context: %s", _e)
+            yield {
+                "type": "clarification_card",
+                "clarification": {
+                    "question": "What would you like to name this new project?",
+                    "context": f"Building: *{original_prompt[:120]}*",
+                    "options": [],
+                    "allow_freetext": True,
+                    "card_type": "dev_project_new_name",
+                },
+            }
+            result["handled"] = True
+            return
+
+        else:
+            # plan_only — fall through with original prompt
+            logger.info("[Router] Dev project: plan-only mode, routing as external.")
+            yield {"type": "log", "content": "[Context Manager] Plan-only mode — research and plan without code changes."}
+            result["user_input"] = original_prompt
+            return  # fall through
+
+    # -----------------------------------------------------------------------
+    # 7b. dev_project_picker — resume after the user selects a project from
+    # the picker card above. This is the step that finally makes chat-driven
+    # swarm work resolve a REAL repo_context/session container, the same
+    # shape POST /v1/tasks already builds (dev_projects/repo_context.py).
+    # -----------------------------------------------------------------------
+    if ctx_type == "dev_project_picker":
+        original_prompt = pending_ctx.get("prompt", "")
+        _saved_visual = pending_ctx.get("visual_context", "")
+        _restored_ctx = (
+            (extracted_context + "\n\n" + _saved_visual).strip() if _saved_visual else extracted_context
+        )
+        from brooks import clear_context
+        clear_context(session_id=session_id, owner_id=owner_id)
+
+        project_id = user_input.strip()
+        from dev_projects import store as _dev_projects_store
+        project = _dev_projects_store.get_project(project_id, owner_id) if owner_id else None
+        if not project:
+            logger.warning("[Router] dev_project_picker: project %r not found for owner %r", project_id, owner_id)
+            yield {
+                "type": "message",
+                "content": "⚠️ I couldn't find that project anymore — please try your request again.",
+            }
+            result["handled"] = True
+            return
+
+        if project.get("source") == "live_repo":
+            repo_context = None
+            session_mode = "live_repo"
+        elif project.get("git_url"):
+            from dev_projects.repo_context import build_repo_context
+            repo_context = build_repo_context(project)
+            session_mode = "ephemeral"
+        else:
+            # Blank project — nothing to check out, just an empty isolated container.
+            repo_context = None
+            session_mode = "ephemeral"
+
+        logger.info("[Router] Dev project picker: routing to project %r (mode=%s).", project["name"], session_mode)
+
+        # live_repo mode bind-mounts the SAME host path every live_repo session
+        # container uses — two running concurrently could interleave git ops
+        # against that shared tree (see coordination/task_queue.py). The
+        # composer (POST /v1/tasks) protects this with try_acquire()+queue; the
+        # chat path has no equivalent queue-and-auto-dispatch mechanism (this
+        # generator IS the live SSE response the user is watching), so instead
+        # of racing it rejects with a clear retry message when the lock is held
+        # rather than silently proceeding.
+        import uuid as _uuid
+        from coordination import task_queue as _task_queue
+        coordination_id = f"coord-{_uuid.uuid4().hex[:8]}"
+        _needs_live_repo_lock = session_mode != "ephemeral"
+        if _needs_live_repo_lock and not _task_queue.try_acquire(coordination_id):
+            yield {
+                "type": "message",
+                "content": (
+                    "⏳ Another task is currently using the live Agent_Swarm repo — "
+                    "please wait for it to finish and try again."
+                ),
+            }
+            result["handled"] = True
+            return
+
+        yield {"type": "log", "content": f"[Context Manager] Routing to project '{project['name']}'..."}
+        from lamport import coordinate_task as _coord
+        yield {"type": "status", "content": "🛠️ Launching coordinator..."}
+        try:
             for chunk in _coord(
                 original_prompt,
                 session_id=session_id,
@@ -263,17 +383,75 @@ def handle_pending_context(
                 ultraplan_mode=ultraplan_mode,
                 dev_mode=True,
                 skip_project_gate=True,
+                repo_context=repo_context,
+                session_mode=session_mode,
+                coordination_id=coordination_id,
             ):
                 yield chunk
+        finally:
+            if _needs_live_repo_lock:
+                _task_queue.release(coordination_id)
+        result["handled"] = True
+        return
+
+    # -----------------------------------------------------------------------
+    # 7c. dev_project_new_name — resume after the user names a brand-new
+    # project. Creates a "blank" dev_projects row (same source type the
+    # composer's own blank-project path uses) and routes into it — no host
+    # provisioning needed here: an "ephemeral" session container already
+    # starts as a fresh, empty /workspace on its own (session_sandbox.py),
+    # unlike the old shared-dev_sandbox model this table's `path` column
+    # was originally designed around.
+    # -----------------------------------------------------------------------
+    if ctx_type == "dev_project_new_name":
+        original_prompt = pending_ctx.get("prompt", "")
+        _saved_visual = pending_ctx.get("visual_context", "")
+        _restored_ctx = (
+            (extracted_context + "\n\n" + _saved_visual).strip() if _saved_visual else extracted_context
+        )
+        from brooks import clear_context
+        clear_context(session_id=session_id, owner_id=owner_id)
+
+        name = user_input.strip()[:64]
+        if not name or not owner_id:
+            yield {"type": "message", "content": "⚠️ I need a project name to continue — please try again."}
             result["handled"] = True
             return
 
-        else:
-            # plan_only — fall through with original prompt
-            logger.info("[Router] Dev project: plan-only mode, routing as external.")
-            yield {"type": "log", "content": "[Context Manager] Plan-only mode — research and plan without code changes."}
-            result["user_input"] = original_prompt
-            return  # fall through
+        import uuid as _uuid
+        from dev_projects import store as _dev_projects_store
+        project_id = str(_uuid.uuid4())
+        try:
+            project = _dev_projects_store.create_project(
+                id=project_id, uid=owner_id, name=name, source="blank",
+                git_url=None, git_ref="main", path=f"/workspace/{owner_id}/{project_id}",
+            )
+        except Exception as _e:
+            logger.warning("[Router] dev_project_new_name: create_project failed: %s", _e)
+            yield {"type": "message", "content": f"⚠️ Could not create project {name!r} — that name may already be taken."}
+            result["handled"] = True
+            return
+
+        logger.info("[Router] Dev project (new): created %r, launching coordinator.", project["name"])
+        yield {"type": "log", "content": f"[Context Manager] Created project '{project['name']}'. Launching coordinator..."}
+        from lamport import coordinate_task as _coord
+        yield {"type": "status", "content": "🛠️ Launching coordinator..."}
+        for chunk in _coord(
+            original_prompt,
+            session_id=session_id,
+            owner_id=owner_id,
+            history_context="\n".join(m.get("content", "") for m in (history or [])[-4:]),
+            extracted_context=_restored_ctx,
+            ace_token=ace_token,
+            ultraplan_mode=ultraplan_mode,
+            dev_mode=True,
+            skip_project_gate=True,
+            repo_context=None,
+            session_mode="ephemeral",
+        ):
+            yield chunk
+        result["handled"] = True
+        return
 
     # -----------------------------------------------------------------------
     # 8. task_intent_clarification

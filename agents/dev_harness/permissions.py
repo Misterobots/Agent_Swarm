@@ -6,9 +6,11 @@ active the harness allows only read/search tools (and the meta tools
 TodoWrite/Task) and blocks every mutating tool, so the model must present a
 plan and wait for the user to approve it (turn plan mode off) before editing.
 
-Phase 2 will extend this gate with risk tiers (bash_classifier) and the
-acceptEdits / bypass permission modes; the `mode` field is already shaped for
-that so the wiring doesn't change.
+The gate also owns the non-interactive approval modes used by the public chat
+route.  `acceptEdits` auto-approves only direct file edits; shell, git, task,
+and other mutating tools still go through the normal approval store.  `bypass`
+is an explicit administrative mode and is enforced by the route before the
+gate is constructed.
 """
 
 from __future__ import annotations
@@ -23,6 +25,11 @@ READ_ONLY_TOOLS = frozenset({
 # mode must block it too.
 META_TOOLS = frozenset({"TodoWrite"})
 
+# Only these tools are covered by the acceptEdits mode.  In particular, do not
+# include `run_command`, `git`, or `Task`: those can create effects that are
+# much broader than changing the file the user is reviewing.
+EDIT_TOOLS = frozenset({"write_file", "edit_file"})
+
 _VALID_MODES = ("default", "plan", "acceptEdits", "bypass")
 
 
@@ -33,6 +40,16 @@ class PermissionGate:
     @property
     def plan_mode(self) -> bool:
         return self.mode == "plan"
+
+    @property
+    def bypass_mode(self) -> bool:
+        return self.mode == "bypass"
+
+    def auto_approve(self, tool_name: str) -> bool:
+        """Return whether this mode suppresses the interactive approval card."""
+        if self.mode == "bypass":
+            return True
+        return self.mode == "acceptEdits" and tool_name in EDIT_TOOLS
 
     def check(self, tool_name: str) -> tuple[bool, str]:
         """Return (allowed, reason).  reason is shown to the model when blocked."""

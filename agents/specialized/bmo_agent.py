@@ -11,26 +11,26 @@ def get_bmo_agent() -> Agent:
     """
     MODEL_NAME = os.getenv("BMO_LLM_MODEL", "llama3.2:3b")
     OLLAMA_HOST = os.getenv("BMO_OLLAMA_HOST", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
-    BMO_VOICE_URL = "http://bmo-voice-gpu:8000/speak" # Container name in docker-compose
+    # Qwen3-TTS voice engine (voice_engine_gpu on execution_net); the old bmo-voice-gpu
+    # RVC container was retired.
+    BMO_VOICE_URL = os.getenv("BMO_VOICE_URL", "http://voice_engine_gpu:8020/speak")
 
-    def generate_bmo_speech(text: str, pitch: int = 3, method: str = "rmvpe") -> str:
+    def generate_bmo_speech(text: str) -> str:
         """
         Generates speech in BMO's voice from the given text.
-        
+
         Args:
             text (str): The text to be spoken.
-            pitch (int): Pitch shift in semitones (default 3).
-            method (str): RVC method (default 'rmvpe').
-            
+
         Returns:
             str: Status message.
         """
         try:
             # For now, we just ping the endpoint to verify connectivity
             # In a real scenario, we would post the text and get back an audio file ID or URL
-            response = requests.post(f"{BMO_VOICE_URL}?text={text}&pitch={pitch}&method={method}")
+            response = requests.post(BMO_VOICE_URL, params={"text": text}, timeout=90)
             if response.status_code == 200:
-                return f"Successfully sent to BMO Voice Engine: {text} (Pitch: {pitch})"
+                return f"Successfully sent to BMO Voice Engine: {text}"
             else:
                 return f"Error from BMO Voice Engine: {response.text}"
         except Exception as e:

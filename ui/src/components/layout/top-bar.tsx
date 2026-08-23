@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useChatStore } from "@/lib/stores/chat-store";
-import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useAccess } from "@/lib/hooks/use-access";
 import {
   isNavigationItemActive,
+  conversationExperienceForPath,
   primaryNavigation,
   secondaryNavigation,
+  utilityNavigation,
 } from "@/lib/config/navigation";
 import { cn } from "@/lib/utils/cn";
 import {
@@ -62,7 +63,9 @@ export function TopBar() {
     () => secondaryNavigation.filter((item) => !item.adminOnly || isAdmin),
     [isAdmin],
   );
-  const allNav = [...visiblePrimary, ...visibleSecondary];
+  const allNav = [...visiblePrimary, ...visibleSecondary, ...utilityNavigation];
+  const experience = conversationExperienceForPath(pathname);
+  const scopedConversations = conversations.filter((conv) => (conv.experience ?? "chat") === experience);
 
   useEffect(() => {
     if (!historyOpen) return;
@@ -73,8 +76,6 @@ export function TopBar() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [historyOpen]);
-
-  const isChat = pathname.startsWith("/chat");
 
   return (
     <header className="topbar flex items-center gap-2 px-3 h-11 border-b border-[var(--chat-border)] bg-[var(--chat-surface)] flex-shrink-0">
@@ -114,7 +115,7 @@ export function TopBar() {
         <button
           type="button"
           onClick={() => {
-            const id = createConversation();
+            const id = createConversation(undefined, experience);
             setActive(id);
           }}
           title="New conversation"
@@ -149,7 +150,7 @@ export function TopBar() {
                 <button
                   type="button"
                   onClick={() => {
-                    const id = createConversation();
+                    const id = createConversation(undefined, experience);
                     setActive(id);
                     setHistoryOpen(false);
                   }}
@@ -159,12 +160,12 @@ export function TopBar() {
                 </button>
               </div>
               <div className="max-h-80 overflow-y-auto">
-                {conversations.length === 0 ? (
+                {scopedConversations.length === 0 ? (
                   <div className="px-3 py-4 text-xs text-[var(--chat-muted)] text-center">
                     No conversations yet
                   </div>
                 ) : (
-                  conversations.slice(0, 30).map((conv) => (
+                  scopedConversations.slice(0, 30).map((conv) => (
                     <div
                       key={conv.id}
                       className={cn(

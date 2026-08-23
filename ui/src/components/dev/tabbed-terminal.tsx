@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal as TerminalIcon, Plus, X, Wifi, WifiOff, RotateCcw } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 import { getXtermTheme } from "./dev-theme-map";
 
 const WS_BASE = (() => {
@@ -107,7 +108,10 @@ export function TabbedTerminal() {
       tab.ws = null;
     }
     
-    const wsUrl = `${WS_BASE}/ws/terminal?uid=${encodeURIComponent(getUid())}&session=${encodeURIComponent(tab.id)}`;
+    const params = new URLSearchParams({ uid: getUid(), session: tab.id });
+    const currentProjectId = useDevProjectStore.getState().currentProjectId;
+    if (currentProjectId) params.set("projectId", currentProjectId);
+    const wsUrl = `${WS_BASE}/ws/terminal?${params.toString()}`;
     const ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
     tab.ws = ws;

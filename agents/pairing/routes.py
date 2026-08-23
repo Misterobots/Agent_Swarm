@@ -61,6 +61,9 @@ def _make_code() -> str:
 class CreateRequest(BaseModel):
     display_name: str = "Memex Desktop"
     memex_url:    str = ""
+    # Descriptive only: the relay never grants a capability. A paired desktop
+    # still validates every incoming CAD request against its own allowlist.
+    capabilities: list[str] = []
 
 class JoinRequest(BaseModel):
     display_name: str = "Memex Desktop"
@@ -76,6 +79,7 @@ async def create_room(body: CreateRequest, request: Request):
         "display_name": body.display_name,
         "memex_url":    body.memex_url,
         "uid":          request.headers.get("X-authentik-uid", "desktop"),
+        "capabilities": body.capabilities[:8],
     })
     _rooms_by_code[code]             = room
     _rooms_by_token[room.host_token] = room
