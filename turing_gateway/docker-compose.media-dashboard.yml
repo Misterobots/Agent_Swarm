@@ -1,0 +1,56 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Media Dashboard — Uptime Kuma frontline watch (Phase 1 of docs/media_dashboard_plan.md)
+# ═══════════════════════════════════════════════════════════════════════════
+# Part of the AI/Memex/observability stack, kept SEPARATE from the Saltbox media
+# stack — the two touch only at Traefik. Uptime Kuma watches the Saltbox stack
+# from the OUTSIDE:
+#   • container up/down/health  -> reads the docker-socket-proxy (host-level API
+#                                  read, not a cross-stack network link)
+#   • external reachability     -> HTTP(s) checks of the public *.shivelymedia.com
+#                                  URLs, through Traefik (the sanctioned touch point)
+# It is deliberately its own compose PROJECT (name: media-dashboard) so it never
+# interferes with the /home/misterobots/docker-compose.yml or turing_gateway
+# stacks, and is brought up independently:
+#   docker compose -f docker-compose.media-dashboard.yml up -d
+#
+# Kuma lives only on ai_lab_net. Traefik straddles ai_lab_net + saltbox, so it can
+# still route to Kuma without Kuma ever joining the saltbox network.
+name: media-dashboard
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    hostname: uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - uptime_kuma_data:/app/data
+    ports:
+      # Direct LAN access for first-run admin setup and as a Traefik-independent
+      # fallback. Kuma listens on 3001 inside the container.
+      - "3009:3001"
+    networks:
+      - ai_lab_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=ai_lab_net"
+      # External route (Cloudflare tunnel -> Traefik), gated by Authentik SSO.
+      # Mirrors the memex-ext router's middleware + TLS chain.
+      - "traefik.http.routers.uptime.rule=Host(`uptime.shivelymedia.com`)"
+      - "traefik.http.routers.uptime.entrypoints=websecure"
+      - "traefik.http.routers.uptime.tls=true"
+      - "traefik.http.routers.uptime.tls.certresolver=cfdns"
+      - "traefik.http.routers.uptime.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.uptime.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.uptime.tls.options=securetls@file"
+      - "traefik.http.routers.uptime.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@file"
+      - "traefik.http.routers.uptime.priority=20"
+      - "traefik.http.routers.uptime.service=uptime"
+      - "traefik.http.services.uptime.loadbalancer.server.port=3001"
+
+networks:
+  ai_lab_net:
+    external: true
+
+volumes:
+  uptime_kuma_data:

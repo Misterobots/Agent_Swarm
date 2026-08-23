@@ -1,9 +1,10 @@
-﻿global:
+global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 rule_files:
   - auth_alert_rules.yml
+  - container_health_rules.yml
 
 scrape_configs:
   # Turing node — container-level metrics (CPU, memory, network, disk I/O)
@@ -59,28 +60,6 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # Health check — blackbox probe on friday_brain's vault connectivity (Lovelace only; friday_brain
-  # has no Turing counterpart). See blackbox.yml's http_body_vault_true module docstring for why
-  # this checks the response BODY, not just reachability — a friday_brain that's up but has silently
-  # lost its VAULT_URL/VAULT_OWNER config still returns HTTP 200, just with "vault": false.
-  - job_name: 'friday-brain-vault-health'
-    metrics_path: /probe
-    params:
-      module: [http_body_vault_true]
-    scrape_interval: 60s
-    static_configs:
-      - targets:
-          - http://192.168.2.101:8000/health
-        labels:
-          node: 'Lovelace'
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-
   # NOTE: Ollama v0.15.x does not expose /metrics regardless of OLLAMA_METRICS=1.
   # Re-enable when Ollama adds confirmed Prometheus support:
   # - job_name: 'ollama-justin'
@@ -91,4 +70,26 @@ scrape_configs:
   # NOTE: Langfuse does not expose a Prometheus /metrics endpoint.
   # Langfuse observability data is accessed via its API and PostgreSQL-Swarm datasource in Grafana.
 
-
+  # External reachability of public *.shivelymedia.com hosts (DNS/CF-tunnel/Traefik outage class)
+  - job_name: 'blackbox-external'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - https://memex.shivelymedia.com
+          - https://jellyfin.shivelymedia.com
+          - https://radarr.shivelymedia.com
+          - https://sonarr.shivelymedia.com
+          - https://sabnzbd.shivelymedia.com
+          - https://seerr.shivelymedia.com
+          - https://notify.shivelymedia.com
+          - https://dash.shivelymedia.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
