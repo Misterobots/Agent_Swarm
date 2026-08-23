@@ -404,6 +404,8 @@ export interface Model {
   label?: string;
   description?: string;
   context_window?: number;
+  available?: boolean;
+  requires_configuration?: boolean;
 }
 
 export interface ToolCallEvent {

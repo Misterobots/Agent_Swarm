@@ -238,6 +238,84 @@ async def _ha_call(method: str, path: str, json_body: dict | None = None) -> dic
     return r.json()
 
 
+async def send_image_notification(service: str, image_url: str, message: str,
+                                  title: str = "Friday") -> str:
+    """Deliver an image through a specific HA Companion App notify service.
+
+    Deliberately requires ``service``: Friday must resolve an explicitly requested device
+    before calling this and must never silently choose somebody's phone.
+    """
+    service = (service or "").strip().removeprefix("notify.")
+    if not service or not re.fullmatch(r"[a-z0-9_]+", service):
+        return "Error: no valid notification device was selected."
+    if not image_url.startswith(("http://", "https://")):
+        return "Error: the generated image does not have a reachable URL."
+    notification_id = f"friday_image_{int(time.time())}"
+
+    # HA Companion pushes are transient and, without a click action, Android opens the
+    # app's default dashboard. Preserve a Home Assistant-side record first so the image
+    # remains reachable from HA's Notifications panel after the phone push is tapped.
+    record = await _ha_call(
+        "POST", "services/persistent_notification/create",
+        {
+            "notification_id": notification_id,
+            "title": title,
+            "message": f"{message}\n\n[Open image]({image_url})",
+        },
+    )
+    if isinstance(record, dict) and record.get("error"):
+        return f"Error: Home Assistant could not preserve the image notification: {record['error']}"
+
+    result = await _ha_call(
+        "POST", f"services/notify/{service}",
+        {
+            "title": title,
+            "message": message,
+            "data": {
+                "image": image_url,
+                # Android Companion uses clickAction; url also covers Companion clients
+                # that implement the generic navigation field.
+                "clickAction": image_url,
+                "url": image_url,
+                "tag": notification_id,
+            },
+        },
+    )
+    if isinstance(result, dict) and result.get("error"):
+        return f"Error: Home Assistant rejected the image notification: {result['error']}"
+    return f"Sent image notification through notify.{service}."
+
+
+async def send_delivery_failure_notification(service: str, message: str,
+                                             title: str = "Friday") -> str:
+    """Report an image-delivery failure to the selected delivery device only."""
+    service = (service or "").strip().removeprefix("notify.")
+    if not service or not re.fullmatch(r"[a-z0-9_]+", service):
+        return "Error: no valid notification device was selected."
+    result = await _ha_call(
+        "POST", f"services/notify/{service}",
+        {"title": title, "message": message, "data": {"tag": "friday_image_failure"}},
+    )
+    if isinstance(result, dict) and result.get("error"):
+        return f"Error: Home Assistant rejected the failure notification: {result['error']}"
+    return f"Sent failure notification through notify.{service}."
+
+
+async def send_image_status_notification(service: str, message: str,
+                                         title: str = "Friday") -> str:
+    """Send an image-search outcome that needs a user decision to its target device."""
+    service = (service or "").strip().removeprefix("notify.")
+    if not service or not re.fullmatch(r"[a-z0-9_]+", service):
+        return "Error: no valid notification device was selected."
+    result = await _ha_call(
+        "POST", f"services/notify/{service}",
+        {"title": title, "message": message, "data": {"tag": "friday_image_status"}},
+    )
+    if isinstance(result, dict) and result.get("error"):
+        return f"Error: Home Assistant rejected the image status notification: {result['error']}"
+    return f"Sent image status notification through notify.{service}."
+
+
 async def turn_on_device(entity_id: str, **_kwargs) -> str:
     domain = entity_id.split(".")[0]
     result = await _ha_call("POST", f"services/{domain}/turn_on", {"entity_id": entity_id})

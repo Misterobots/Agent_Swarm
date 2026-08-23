@@ -249,6 +249,19 @@ services:
       # Swarm delegation: delegate_to_swarm hands heavy research/build tasks to agent_runtime's
       # OpenAI-compatible endpoint (NOT friday_brain's own :8000). The tool short-circuits until set.
       - AGENT_RUNTIME_URL=${BMO_AGENT_RUNTIME_URL}
+      # Friday image delivery: Art Studio generates asynchronously; HA Companion notifications
+      # deliver the resulting URL. No default recipient: aliases must be spoken explicitly.
+      - FRIDAY_IMAGE_RUNTIME_URL=${FRIDAY_IMAGE_RUNTIME_URL:-http://agent-runtime:8000}
+      # Public, signed attachment URL: the HA Companion App fetches this image in the
+      # background on Wi-Fi or cellular. Do not use a private-LAN address here.
+      - FRIDAY_IMAGE_PUBLIC_BASE_URL=${FRIDAY_IMAGE_PUBLIC_BASE_URL:-https://memex.shivelymedia.com}
+      - FRIDAY_IMAGE_SIGNING_SECRET=${FRIDAY_IMAGE_SIGNING_SECRET:-}
+      - FRIDAY_IMAGE_URL_TTL_SECONDS=${FRIDAY_IMAGE_URL_TTL_SECONDS:-86400}
+      - FRIDAY_IMAGE_TARGETS=${FRIDAY_IMAGE_TARGETS:-{"justin phone":"mobile_app_justin_s_phone"}}
+      - FRIDAY_IMAGE_MODEL=${FRIDAY_IMAGE_MODEL:-sdxl-turbo-preview}
+      - FRIDAY_IMAGE_STEPS=${FRIDAY_IMAGE_STEPS:-4}
+      - FRIDAY_IMAGE_WIDTH=${FRIDAY_IMAGE_WIDTH:-768}
+      - FRIDAY_IMAGE_HEIGHT=${FRIDAY_IMAGE_HEIGHT:-768}
       # HA API access for tools.py's device-control tools (self-executing mode) and, new,
       # hass_resolver.py's fuzzy-matching + learned-synonym resolution of area/entity
       # names for HA passthrough mode — previously missing from this container entirely,
@@ -407,6 +420,9 @@ services:
       - GPU_LOCK_HOST=http://localhost:8000
       # Home Assistant Integration
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
+      # Used to validate Friday's expiring public image-attachment URLs. Empty falls
+      # back to HOME_ASSISTANT_TOKEN in-process so existing deployments remain safe.
+      - FRIDAY_IMAGE_SIGNING_SECRET=${FRIDAY_IMAGE_SIGNING_SECRET:-}
       # BMO Voice LLM — qwen3:14b fits in VRAM (9.2GB < 15.93GB); latency masked by async ack
       - BMO_LLM_MODEL=qwen3:14b
       # Warm-pin the voice model so Friday is resident from boot. Roll back: set false
@@ -561,10 +577,9 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              # device_ids=['1'] = same physical 5060 Ti as ComfyUI. OmniGen2 FP8
-              # (~12 GB) fits with headroom. ComfyUI is evicted in the image zone
-              # before either Klein or OmniGen warms up, so no contention.
-              device_ids: ['1']
+              # GPU 0 is the image card. GPU 1 is reserved for Friday's
+              # Qwen, STT, and TTS services.
+              device_ids: ['0']
               capabilities: [gpu]
     ports:
       - "8291:8190"
@@ -591,7 +606,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['1']
+              # GPU 0 is the dedicated image card; keep Friday's GPU 1 free.
+              device_ids: ['0']
               capabilities: [gpu]
     networks:
       execution_net:
@@ -1045,7 +1061,16 @@ services:
       - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
       - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
-      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
+      # Hardcoded (not ${COORDINATOR_MODEL:-...}) — deliberately ignores
+      # execution_plane/.env's COORDINATOR_MODEL=gemma4:31b override on THIS
+      # dev instance only. gemma4:31b needs to split across both GPUs, and
+      # GPU 1 is ~92% permanently reserved by Friday's voice stack (see
+      # docker-compose.yml's ollama_friday/voice-engine/wyoming comments) —
+      # there's rarely enough free room left for it to load, which was
+      # crashing swarm test runs with "llama runner process has terminated"
+      # (2026-08-07). qwen3:14b fits on a single GPU. agent-runtime (prod)
+      # is untouched and still reads gemma4:31b from .env as before.
+      - COORDINATOR_MODEL=qwen3:14b
       - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
       - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -1053,6 +1078,20 @@ services:
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
       # Bridges the no-Authentik-header gap on Lovelace; Authentik headers take priority if present
       - DEV_OWNER_UID=misterobots
+      # Codex-style task composer + gated GitHub push/PR (2026-08-06) — dev-only for now.
+      # TASKS_DIRECT_CREATE_ENABLED re-enabled 2026-08-07 for Phase C testing of the
+      # per-session-container redesign: repo-linked tasks now provision a fresh,
+      # zero-mount container (coordination/session_sandbox.py) instead of touching
+      # the shared dev_sandbox's /workspace (which is bind-mounted to the live repo —
+      # the original incident's root cause). SESSION_SANDBOX_ENABLED gates that new
+      # mechanism; both flags dev-only until the full phased plan lands.
+      - TASKS_DIRECT_CREATE_ENABLED=true
+      - SESSION_SANDBOX_ENABLED=true
+      # Flipped true 2026-08-09 to test the "Publish to GitHub" flow (blank
+      # project -> new repo) end to end — also un-gates the existing
+      # task-completion push/PR flow, they share one flag by design (both are
+      # "is GitHub write access enabled on this deployment"). Dev-only.
+      - GITHUB_PUSH_ENABLED=true
     volumes:
       - ../agents:/app/agents
       - ../:/workspace

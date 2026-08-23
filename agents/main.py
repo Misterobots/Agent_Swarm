@@ -154,6 +154,7 @@ async def lifespan(app: FastAPI):
             from trigger_scheduler import get_trigger_scheduler
             trigger_sched = get_trigger_scheduler()
             trigger_sched.start()
+            trigger_sched.load_persisted()
             logger.info(f"Trigger Scheduler started: {trigger_sched.count()} triggers")
         except ImportError as e:
             logger.warning(f"Trigger scheduler not available: {e}")
@@ -216,12 +217,26 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Swarm run repo store init failed (non-fatal): {e}")
 
+        # 7g3. Initialize Swarm Run Local Project Store (blank/local project metadata)
+        try:
+            from swarm_run_local_store import init_table as _init_swarm_run_local_table
+            _init_swarm_run_local_table()
+        except Exception as e:
+            logger.warning(f"Swarm run local store init failed (non-fatal): {e}")
+
         # 7g2. Initialize GitHub Push Audit Store (gated push/PR trail)
         try:
             from github_push_audit_store import init_table as _init_push_audit_table
             _init_push_audit_table()
         except Exception as e:
             logger.warning(f"GitHub push audit store init failed (non-fatal): {e}")
+
+        # 7g4. Initialize GitHub Publish Audit Store (blank project -> new repo trail)
+        try:
+            from github_publish_audit_store import init_table as _init_publish_audit_table
+            _init_publish_audit_table()
+        except Exception as e:
+            logger.warning(f"GitHub publish audit store init failed (non-fatal): {e}")
 
         # 7h. Task queue reconciliation — a crash mid-task otherwise leaves a
         # phantom 'running'/'queued' row AND (once the workspace lock is in
@@ -404,6 +419,41 @@ async def global_exception_handler(request: Request, exc: Exception):
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
+# Friday external image attachments are intentionally served on a separate route from
+# /delivered_artifacts.  Traefik exposes only this route, and each request must carry
+# an HMAC signature plus an expiry.  A dedicated secret may be configured later; the
+# HA token is a safe shared fallback because both trusted runtime containers already
+# receive it and it is never sent to the client.
+_FRIDAY_IMAGE_SIGNING_SECRET = os.getenv(
+    "FRIDAY_IMAGE_SIGNING_SECRET", os.getenv("HOME_ASSISTANT_TOKEN", "")
+)
+
+
+@app.get("/v1/public-artifacts/{filename}")
+async def serve_signed_public_artifact(filename: str, exp: int, sig: str):
+    """Serve one generated artifact only when its signed delivery URL is valid."""
+    if not _FRIDAY_IMAGE_SIGNING_SECRET:
+        raise HTTPException(status_code=503, detail="Image delivery signing is not configured")
+    if exp < int(time.time()):
+        raise HTTPException(status_code=403, detail="Image delivery link has expired")
+    if exp > int(time.time()) + 7 * 24 * 60 * 60:
+        raise HTTPException(status_code=403, detail="Invalid image delivery expiry")
+    if os.path.basename(filename) != filename:
+        raise HTTPException(status_code=400, detail="Invalid artifact name")
+
+    payload = f"{filename}:{exp}".encode("utf-8")
+    expected = hmac.new(
+        _FRIDAY_IMAGE_SIGNING_SECRET.encode("utf-8"), payload, hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(status_code=403, detail="Invalid image delivery signature")
+
+    artifact_dir = "/workspace/delivered_artifacts"
+    full_path = os.path.normpath(os.path.join(artifact_dir, filename))
+    if not full_path.startswith(f"{artifact_dir}{os.sep}") or not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(full_path, media_type="image/png")
+
 # Mount Delivered Artifacts for remote downloading (Satellite)
 if os.path.exists("/workspace/delivered_artifacts"):
     app.mount("/delivered_artifacts", StaticFiles(directory="/workspace/delivered_artifacts"), name="artifacts")
@@ -489,9 +539,8 @@ async def get_my_identity(request: Request, auth_claims: dict = Depends(SpiffeJW
     # Priority 1: Authentik forward-auth headers (set by Traefik)
     authentik_user = request.headers.get("X-authentik-username")
     if authentik_user:
-        groups_raw = request.headers.get("X-authentik-groups", "")
-        groups = [g.strip() for g in groups_raw.split("|") if g.strip()]
-        is_admin = any("admin" in g.lower() for g in groups)
+        groups = _authentik_groups(request)
+        is_admin = _request_is_admin(request)
         caller = {
             "username": authentik_user,
             "email": request.headers.get("X-authentik-email", ""),
@@ -2650,6 +2699,87 @@ async def trigger_list(trigger_type: Optional[str] = None):
     return {"triggers": sched.list_triggers(type_filter=trigger_type), "count": sched.count(), "running": sched.is_running}
 
 
+class TriggerCronSpec(BaseModel):
+    hour: Optional[int] = None
+    minute: Optional[int] = None
+    day_of_week: Optional[int] = None
+
+class TriggerTaskConfig(BaseModel):
+    """What to run when the trigger fires — passed straight through to chat_swarm()."""
+    prompt: str
+    session_id: Optional[str] = None
+    model: Optional[str] = None
+    swarm_mode: bool = False
+    dev_mode: bool = False
+    ultraplan_mode: bool = False
+
+class TriggerCreateRequest(BaseModel):
+    name: str
+    trigger_type: str  # "cron" | "interval" | "once"
+    task_config: TriggerTaskConfig
+    cron: Optional[TriggerCronSpec] = None
+    interval_seconds: Optional[float] = None
+    delay_seconds: Optional[float] = None
+    fire_at: Optional[float] = None
+
+@app.post("/api/v1/trigger/create")
+async def trigger_create(req: TriggerCreateRequest, request: Request):
+    """Create a scheduled task — a trigger whose handler fires a chat_swarm() call
+    (task_config), not a raw in-process Python handler. This is the only trigger
+    kind creatable over the API, and the only kind that survives a restart."""
+    from trigger_scheduler import get_trigger_scheduler
+    sched = get_trigger_scheduler()
+    uid = request.headers.get("X-authentik-uid", "").strip() or None
+    task_config = req.task_config.model_dump()
+    # owner_id defaults to the caller so scheduled runs are attributed correctly
+    task_config.setdefault("owner_id", uid)
+
+    if req.trigger_type == "cron":
+        cron = req.cron or TriggerCronSpec()
+        tid = sched.add_cron_task(
+            req.name, task_config, hour=cron.hour, minute=cron.minute, day_of_week=cron.day_of_week,
+            created_by=uid,
+        )
+    elif req.trigger_type == "interval":
+        if not req.interval_seconds:
+            raise HTTPException(status_code=400, detail="interval_seconds is required for an interval trigger")
+        tid = sched.add_interval_task(req.name, task_config, seconds=req.interval_seconds, created_by=uid)
+    elif req.trigger_type == "once":
+        if not req.delay_seconds and not req.fire_at:
+            raise HTTPException(status_code=400, detail="delay_seconds or fire_at is required for a one-shot trigger")
+        tid = sched.add_once_task(
+            req.name, task_config, delay_seconds=req.delay_seconds or 0, fire_at=req.fire_at, created_by=uid,
+        )
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown trigger_type: {req.trigger_type}")
+
+    return {"trigger": sched.get(tid)}
+
+@app.post("/api/v1/trigger/{trigger_id}/pause")
+async def trigger_pause(trigger_id: str):
+    from trigger_scheduler import get_trigger_scheduler
+    sched = get_trigger_scheduler()
+    if not sched.pause(trigger_id):
+        raise HTTPException(status_code=404, detail="Trigger not found or not active")
+    return {"trigger": sched.get(trigger_id)}
+
+@app.post("/api/v1/trigger/{trigger_id}/resume")
+async def trigger_resume(trigger_id: str):
+    from trigger_scheduler import get_trigger_scheduler
+    sched = get_trigger_scheduler()
+    if not sched.resume(trigger_id):
+        raise HTTPException(status_code=404, detail="Trigger not found or not paused")
+    return {"trigger": sched.get(trigger_id)}
+
+@app.delete("/api/v1/trigger/{trigger_id}")
+async def trigger_delete(trigger_id: str):
+    from trigger_scheduler import get_trigger_scheduler
+    sched = get_trigger_scheduler()
+    if not sched.remove(trigger_id):
+        raise HTTPException(status_code=404, detail="Trigger not found")
+    return {"deleted": trigger_id}
+
+
 # --- Phase 6: OpenClaude gRPC Gateway REST Endpoints ---
 
 class GrpcInferRequest(BaseModel):
@@ -4604,6 +4734,10 @@ class ImageGenRequest(BaseModel):
     sampler: str = "euler"
     scheduler: str = "normal"
     seed: int = -1
+    gpu_context: str = "image"
+
+class ImageSearchRequest(BaseModel):
+    query: str
 
 class ThreeDGenRequest(BaseModel):
     prompt: str
@@ -4680,12 +4814,136 @@ async def art_generate_image(req: ImageGenRequest):
                 sampler=req.sampler,
                 scheduler=req.scheduler,
                 seed=req.seed,
+                gpu_context=req.gpu_context,
             )
             status = "error" if result.startswith("Error") or result.startswith("Failed") else "ok"
             _art_job_finish(job_id, status, result)
         except Exception as e:
             logger.error(f"Art Studio image gen failed: {e}")
             _art_job_finish(job_id, "error", str(e))
+
+    _art_asyncio.get_event_loop().create_task(_run())
+    return {"job_id": job_id, "status": "running"}
+
+
+def _is_public_image_url(url: str) -> bool:
+    """Reject non-HTTP URLs and private/reserved destinations before downloading."""
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    try:
+        addresses = {item[4][0] for item in socket.getaddrinfo(parsed.hostname, None)}
+        return bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
+    except (OSError, ValueError):
+        return False
+
+
+def _search_and_cache_web_image(query: str) -> str:
+    """Find one moderated Internet image, cache it as an artifact, and preserve its source."""
+    try:
+        from ddgs import DDGS
+    except ImportError as exc:
+        return f"Error: Internet image search is unavailable: {exc}"
+
+    safe_query = (query or "").strip()
+    if not safe_query:
+        return "Error: no Internet image search query was supplied."
+    try:
+        results = DDGS().images(safe_query, max_results=8, safesearch="moderate")
+        for result in results or []:
+            image_url = str(result.get("image") or "")
+            if not _is_public_image_url(image_url):
+                logger.info("Internet image candidate skipped: non-public or unsupported URL")
+                continue
+            try:
+                response = _httpx.get(
+                    image_url,
+                    timeout=15.0,
+                    follow_redirects=False,
+                    headers={"User-Agent": "Friday image delivery/1.0"},
+                )
+                content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+                if response.status_code != 200 or not content_type.startswith("image/"):
+                    logger.info(
+                        "Internet image candidate skipped: status=%s content_type=%s",
+                        response.status_code, content_type or "missing",
+                    )
+                    continue
+                if len(response.content) > 10 * 1024 * 1024:
+                    continue
+                # Keep visual verification off Lovelace.  Moondream is reliable at
+                # describing images but not at returning a bare numeric answer, so
+                # derive an auditable score from its description rather than trusting
+                # a model-generated number.
+                confidence = None
+                try:
+                    verdict = _httpx.post(
+                        "http://192.168.2.103:11434/api/generate",
+                        timeout=50.0,
+                        json={
+                            "model": "moondream",
+                            "stream": False,
+                            # Image lookup is occasional; do not reserve Turing VRAM
+                            # after the one verification request completes.
+                            "keep_alive": "0",
+                            "prompt": "Describe this image in one short sentence.",
+                            "images": [base64.b64encode(response.content).decode("ascii")],
+                        },
+                    )
+                    description = verdict.json().get("response", "") if verdict.status_code == 200 else ""
+                    # Moondream is reliable at descriptions but not constrained yes/no
+                    # replies. Normalize simple singular/plural forms before matching so
+                    # an accurate caption such as "penguins" satisfies "penguin".
+                    def _vision_match_token(word: str) -> str:
+                        if word.endswith("ies") and len(word) > 4:
+                            return word[:-3] + "y"
+                        if word.endswith("s") and not word.endswith("ss") and len(word) > 3:
+                            return word[:-1]
+                        return word
+                    request_words = {
+                        _vision_match_token(word) for word in re.findall(r"[a-z]{3,}", safe_query.lower())
+                        if word not in {"image", "picture", "photo", "from", "with", "that", "this", "the", "and", "for"}
+                    }
+                    description_words = {
+                        _vision_match_token(word)
+                        for word in re.findall(r"[a-z]{3,}", str(description).lower())
+                    }
+                    if request_words and description_words:
+                        matched_words = sum(word in description_words for word in request_words)
+                        confidence = round(100 * matched_words / len(request_words))
+                except Exception as exc:
+                    logger.info("Internet image visual verification unavailable: %s", type(exc).__name__)
+                extension = {
+                    "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
+                }.get(content_type, ".img")
+                filename = f"web_{uuid.uuid4().hex}{extension}"
+                delivery_dir = "/workspace/delivered_artifacts"
+                os.makedirs(delivery_dir, exist_ok=True)
+                with open(os.path.join(delivery_dir, filename), "wb") as image_file:
+                    image_file.write(response.content)
+                source_url = str(result.get("url") or image_url)
+                confidence_note = f" | Visual confidence: {confidence}%" if confidence is not None else ""
+                return f"Generated Image: {filename} | Source: {source_url}{confidence_note}"
+            except Exception as exc:  # try the next search candidate
+                logger.info(f"Internet image candidate skipped: {type(exc).__name__}")
+        return "Error: no safe downloadable Internet image was found."
+    except Exception as exc:
+        logger.warning(f"Internet image search failed: {exc}")
+        return f"Error: Internet image search failed: {type(exc).__name__}"
+
+
+@app.post("/v1/art/search/image")
+async def art_search_image(req: ImageSearchRequest):
+    """Queue a moderated Internet-image search and cache the selected image for delivery."""
+    job_id = _art_job_create("image_search", req.query)
+
+    async def _run():
+        try:
+            result = await _art_asyncio.to_thread(_search_and_cache_web_image, req.query)
+            _art_job_finish(job_id, "error" if result.startswith("Error:") else "ok", result)
+        except Exception as exc:
+            logger.error(f"Art Studio Internet image search failed: {exc}")
+            _art_job_finish(job_id, "error", str(exc))
 
     _art_asyncio.get_event_loop().create_task(_run())
     return {"job_id": job_id, "status": "running"}
@@ -6393,25 +6651,6 @@ def _demux_docker_logs(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
-@app.post("/api/v1/ops/fleet/{node}/{container}/restart")
-async def ops_fleet_restart(node: str, container: str):
-    """Restart any container on a cluster node by name (via Docker socket-proxy)."""
-    import requests as _requests
-
-    docker_url = _docker_url_for_node(node)
-    try:
-        resp = _requests.post(f"{docker_url}/containers/{container}/restart?t=10", timeout=30)
-    except _requests.exceptions.ConnectionError:
-        raise HTTPException(status_code=502, detail=f"Cannot reach Docker socket proxy on {node} ({docker_url})")
-    except _requests.exceptions.Timeout:
-        raise HTTPException(status_code=504, detail=f"Restart timed out for {container} on {node}")
-    if resp.status_code == 204:
-        return {"status": "restarted", "node": node, "container": container}
-    if resp.status_code == 404:
-        raise HTTPException(status_code=404, detail=f"Container '{container}' not found on {node}")
-    raise HTTPException(status_code=502, detail=f"Docker API returned {resp.status_code}: {resp.text[:200]}")
-
-
 @app.get("/api/v1/ops/fleet/{node}/{container}/logs")
 async def ops_fleet_logs(node: str, container: str, tail: int = 200):
     """Fetch recent stdout+stderr for a container (via Docker socket-proxy)."""
@@ -6870,10 +7109,15 @@ from fastapi import WebSocket, WebSocketDisconnect
 @app.websocket("/ws/terminal")
 async def terminal_ws(websocket: WebSocket):
     """
-    WebSocket terminal: opens a shell inside the dev-sandbox container and
+    WebSocket terminal: opens a shell inside a dev sandbox container and
     pipes stdin/stdout/stderr bidirectionally.
     Requires X-authentik-uid header (passed as query param ?uid=... because
-    browsers cannot set custom WS headers).
+    browsers cannot set custom WS headers). Optional ?session=... scopes the
+    underlying container the same way _dev_harness_stream's chat turns do
+    (falls back to uid if omitted — one container per session key, reused
+    across reconnects); optional ?projectId=... selects which dev_projects
+    row that session's container is provisioned for (falls back to the
+    per-owner live-repo project, same default as chat).
     """
     import asyncio
     import docker as docker_sdk

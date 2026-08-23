@@ -873,6 +873,14 @@ def _run_zone_switch(context: str, current_zone):
         evict_comfyui()
         evict_omnigen()
         warmup_klein()
+    elif context == "image_fast":
+        # Friday's delivery path uses ComfyUI on the non-Friday 5060 Ti.
+        # Keep ComfyUI warm and do not start the dual-GPU Klein service, which
+        # would claim Friday's dedicated GPU. evict_ollama() only addresses
+        # the shared Ollama endpoint, not Friday's separate Ollama service.
+        evict_ollama()
+        evict_klein()
+        evict_omnigen()
     elif context == "compose":
         # OmniGen2 multi-image composition zone. Mutually exclusive with Klein
         # at the GPU layer — both target physical GPU 1.
@@ -894,7 +902,7 @@ def _run_zone_switch(context: str, current_zone):
 def request_lock(context: str, timeout: int = 300):
     """
     Acquires a global Mutex lock for the GPU and handles VRAM eviction for context switching.
-    context must be one of "text", "image", "compose", or "training".
+    context must be one of "text", "image", "image_fast", "compose", or "training".
 
     Two-layer locking:
       1. Cross-process: a Redis NX/EX mutex coordinates between agent_runtimes.

@@ -10,6 +10,7 @@ import { WebGroundingToggle } from "./web-grounding-toggle";
 import { DocGroundingToggle } from "./doc-grounding-toggle";
 import { FileGroundingToggle } from "./file-grounding-toggle";
 import { SwarmToggle } from "./swarm-toggle";
+import { ResearchToggle } from "./research-toggle";
 import { GoalsToggle } from "./goals-toggle";
 import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
@@ -30,10 +31,11 @@ export function ChatSettingsMenu() {
   const ultraplanMode = useSettingsStore((s) => s.ultraplanMode);
   const ultrathinkMode = useSettingsStore((s) => s.ultrathinkMode);
   const swarmMode = useSettingsStore((s) => s.swarmMode);
+  const researchMode = useSettingsStore((s) => s.researchMode);
   const groundingWeb = useSettingsStore((s) => s.groundingWeb);
   const groundingDocs = useSettingsStore((s) => s.groundingDocs);
   const groundingFile = useSettingsStore((s) => s.groundingFile);
-  const anyModeActive = ultraplanMode || ultrathinkMode || swarmMode || groundingWeb || groundingDocs || groundingFile;
+  const anyModeActive = researchMode || ultraplanMode || ultrathinkMode || swarmMode || groundingWeb || groundingDocs || groundingFile;
   const agentTransparency = useSettingsStore((s) => s.agentTransparency);
   const setAgentTransparency = useSettingsStore((s) => s.setAgentTransparency);
 
@@ -106,6 +108,7 @@ export function ChatSettingsMenu() {
         <div className="grid grid-cols-2 gap-1">
           <UltraplanToggle />
           <UltrathinkToggle />
+          <ResearchToggle />
           <SwarmToggle />
           {isAdmin && <GoalsToggle />}
         </div>

@@ -192,6 +192,24 @@ http:
       priority: 40
       service: friday-personas
       middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file, authentik@file]
+    # Friday image attachments: no Authentik redirect, because the Android Companion
+    # fetches notification images without an interactive browser session. Access is
+    # restricted by agent_runtime's HMAC signature and short expiry; only this path is
+    # exposed, never the generic /delivered_artifacts directory or the rest of the API.
+    friday-images-secure:
+      rule: "Host(`memex.shivelymedia.com`) && PathPrefix(`/v1/public-artifacts/`)"
+      entryPoints: [websecure]
+      priority: 50
+      service: friday-images
+      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
+      tls:
+        certResolver: cfdns
+    friday-images-http:
+      rule: "Host(`memex.shivelymedia.com`) && PathPrefix(`/v1/public-artifacts/`)"
+      entryPoints: [web]
+      priority: 50
+      service: friday-images
+      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file]
   services:
     authentik-cf-http:
       loadBalancer:
@@ -220,6 +238,10 @@ http:
     # Cross-host backend for the Friday Persona Studio (Phase B, see routers above). friday_brain
     # runs on Lovelace, not Turing, so this is a LAN URL, not a Docker-DNS name.
     friday-personas:
+      loadBalancer:
+        servers:
+          - url: http://192.168.2.101:8000
+    friday-images:
       loadBalancer:
         servers:
           - url: http://192.168.2.101:8000

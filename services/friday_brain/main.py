@@ -33,6 +33,7 @@ import random
 import re
 import time
 import uuid
+from urllib.parse import quote
 
 import httpx
 from fastapi import FastAPI, File, Request, UploadFile
@@ -52,7 +53,8 @@ from tools import (TOOL_SCHEMAS, call_tool, delegate_to_swarm, AGENT_RUNTIME_URL
                    HOME_ASSISTANT_URL, HOME_ASSISTANT_TOKEN, get_current_weather,
                    get_weather_forecast,
                    list_media_players, MEDIA_SEARCH_SENTINEL, NODE_SPEAKER_MAP,
-                   set_current_node, current_node_speaker)
+                   set_current_node, current_node_speaker, send_image_notification,
+                   send_delivery_failure_notification, send_image_status_notification)
 
 VAULT_URL       = os.getenv("VAULT_URL", "").rstrip("/")
 VAULT_OWNER     = os.getenv("VAULT_OWNER", "")
@@ -372,6 +374,191 @@ def _failure_with_consult_offer(convo: list) -> str:
 # --- Async announce: ack a slow consult instantly, then speak the result via the satellite ---------
 _bg_tasks = set()  # strong refs so fire-and-forget background consults aren't GC'd mid-flight
 
+# Image delivery is an explicit, auditable workflow rather than an LLM promise. Targets are an
+# alias->HA notify-service map; there is intentionally no default phone. The checked-in default is
+# only an explicit Justin-phone test alias and can be replaced/extended via JSON in compose/.env.
+_IMAGE_RUNTIME_URL = os.getenv("FRIDAY_IMAGE_RUNTIME_URL", "http://agent-runtime:8000").rstrip("/")
+_IMAGE_PUBLIC_BASE = os.getenv("FRIDAY_IMAGE_PUBLIC_BASE_URL", "https://memex.shivelymedia.com").rstrip("/")
+_IMAGE_SIGNING_SECRET = os.getenv("FRIDAY_IMAGE_SIGNING_SECRET") or HOME_ASSISTANT_TOKEN
+_IMAGE_URL_TTL_SECONDS = int(os.getenv("FRIDAY_IMAGE_URL_TTL_SECONDS", "86400"))
+_FRIDAY_IMAGE_MODEL = os.getenv("FRIDAY_IMAGE_MODEL", "sdxl-turbo-preview")
+_FRIDAY_IMAGE_STEPS = int(os.getenv("FRIDAY_IMAGE_STEPS", "4"))
+_FRIDAY_IMAGE_WIDTH = int(os.getenv("FRIDAY_IMAGE_WIDTH", "768"))
+_FRIDAY_IMAGE_HEIGHT = int(os.getenv("FRIDAY_IMAGE_HEIGHT", "768"))
+try:
+    _IMAGE_TARGETS = json.loads(os.getenv(
+        "FRIDAY_IMAGE_TARGETS", '{"justin phone":"mobile_app_justin_s_phone"}'))
+except json.JSONDecodeError:
+    _IMAGE_TARGETS = {}
+_IMAGE_TARGETS = {re.sub(r"[^a-z0-9]+", " ", str(k).lower()).strip(): str(v)
+                  for k, v in _IMAGE_TARGETS.items() if k and v}
+_DEFAULT_IMAGE_TARGET_ALIAS = re.sub(
+    r"[^a-z0-9]+", " ", os.getenv("FRIDAY_DEFAULT_IMAGE_TARGET", "justin phone").lower()
+).strip()
+_IMAGE_REQUEST_RE = re.compile(
+    r"\b(?:send|show|text|message|generate|make|create|find|search|look\s+up)\b.*\b(?:image|picture|photo)\b|"
+    r"\b(?:image|picture|photo)\s+of\b", re.I)
+_IMAGE_SEARCH_RE = re.compile(
+    r"\b(?:find|search|look\s+up)\b.*\b(?:image|picture|photo)\b|"
+    r"\b(?:image|picture|photo)\b.*\b(?:from|on)\s+(?:the\s+)?internet\b", re.I)
+_IMAGE_GENERATE_RE = re.compile(
+    r"\b(?:generate|make|create|draw|illustrate)\b.*\b(?:image|picture|photo|art)\b|"
+    r"\b(?:ai|generated)\s+(?:image|picture|photo|art)\b", re.I)
+_IMAGE_SOURCE_SEARCH_RE = re.compile(
+    r"\b(?:internet|online|web|real|photo|photograph|find|search|look\s+up)\b", re.I)
+_IMAGE_SOURCE_GENERATE_RE = re.compile(
+    r"\b(?:generate|make|create|draw|illustrate|ai|art)\b", re.I)
+_IMAGE_STATUS_RE = re.compile(r"\b(?:any luck|did (?:it|you)|where (?:is|would)|image status)\b", re.I)
+_IMAGE_APPROVE_RE = re.compile(r"\b(?:send|deliver|use)\b.*\b(?:it|that|image|picture|photo)\b|\b(?:yes|yeah|yep)\b", re.I)
+_IMAGE_GENERATE_INSTEAD_RE = re.compile(r"\b(?:generate|make|create)\b.*\b(?:one|it|image|picture|photo)\b", re.I)
+# A pending recipient must never hijack a new request. Keep this deliberately
+# conservative: it only identifies clear independent intents, while brief
+# unrecognised replies can still be corrected as device names.
+_IMAGE_SUPERSEDE_RE = re.compile(
+    r"\b(?:weather|forecast|temperature|time|date)\b|"
+    r"^\s*(?:what|who|when|where|why|how)\b|"
+    r"^\s*(?:turn|set|dim|brighten|play|pause|stop|start|open|close)\b",
+    re.I,
+)
+_image_delivery = {
+    "status": "idle", "prompt": "", "target": "", "service": "", "error": "", "url": "",
+    "confidence": None, "search_web": False,
+}
+
+
+def _resolve_image_target(text: str) -> tuple[str, str]:
+    # Preserve spoken possessives as the device owner's name: "Justin's phone"
+    # must match the configured "justin phone" alias, not become "justin s phone".
+    source = re.sub(r"\b([a-z0-9]+)'s\b", r"\1", (text or "").lower())
+    normalized = re.sub(r"[^a-z0-9]+", " ", source).strip()
+    for alias, service in sorted(_IMAGE_TARGETS.items(), key=lambda item: len(item[0]), reverse=True):
+        if re.search(rf"\b{re.escape(alias)}\b", normalized):
+            return alias, service
+    return "", ""
+
+
+def _image_target_or_default(text: str) -> tuple[str, str]:
+    """Use an explicit target first, then Justin's opted-in default phone."""
+    target_name, service = _resolve_image_target(text)
+    if target_name:
+        return target_name, service
+    return _DEFAULT_IMAGE_TARGET_ALIAS, _IMAGE_TARGETS.get(_DEFAULT_IMAGE_TARGET_ALIAS, "")
+
+
+def _image_prompt(text: str) -> str:
+    cleaned = re.sub(r"\b(?:please|send|show|text|message|generate|make|create|find|search|look|up|me|an?|the|image|picture|photo|on|internet|and|it)\b",
+                     " ", text or "", flags=re.I)
+    cleaned = re.sub(r"\b(?:to|on)\s+(?:justin(?:'s)?\s+)?phone\b", " ", cleaned, flags=re.I)
+    cleaned = re.sub(r"^\s*(?:of|for)\s+", "", cleaned, flags=re.I)
+    return re.sub(r"\s+", " ", cleaned).strip(" ,.-") or "a pleasant surprise image"
+
+
+def _signed_image_url(filename: str) -> str:
+    if not _IMAGE_PUBLIC_BASE or not _IMAGE_SIGNING_SECRET:
+        raise RuntimeError("external image delivery is not configured")
+    expires_at = int(time.time()) + _IMAGE_URL_TTL_SECONDS
+    payload = f"{filename}:{expires_at}".encode("utf-8")
+    signature = hmac.new(_IMAGE_SIGNING_SECRET.encode("utf-8"), payload, "sha256").hexdigest()
+    return (f"{_IMAGE_PUBLIC_BASE}/v1/public-artifacts/{quote(filename)}"
+            f"?exp={expires_at}&sig={signature}")
+
+
+async def proxy_signed_artifact(filename: str, exp: int, sig: str):
+    """External proxy for signed artifacts; agent_runtime remains LAN-private on :8008."""
+    upstream = (f"{_IMAGE_RUNTIME_URL}/v1/public-artifacts/{quote(filename)}"
+                f"?exp={exp}&sig={sig}")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(upstream)
+        return Response(
+            content=response.content,
+            status_code=response.status_code,
+            media_type=response.headers.get("content-type", "application/octet-stream"),
+        )
+    except httpx.HTTPError:
+        return JSONResponse({"detail": "Image artifact service unavailable"}, status_code=502)
+
+
+async def _generate_and_deliver_image(prompt: str, target_name: str, service: str,
+                                      search_web: bool = False) -> None:
+    _image_delivery.update(
+        status="generating", prompt=prompt, target=target_name, service=service,
+        error="", url="", confidence=None, search_web=search_web,
+    )
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            if search_web:
+                response = await client.post(f"{_IMAGE_RUNTIME_URL}/v1/art/search/image",
+                                             json={"query": prompt})
+            else:
+                response = await client.post(f"{_IMAGE_RUNTIME_URL}/v1/art/generate/image",
+                                             json={
+                                                 "prompt": prompt,
+                                                 "model_name": _FRIDAY_IMAGE_MODEL,
+                                                 "steps": _FRIDAY_IMAGE_STEPS,
+                                                 "width": _FRIDAY_IMAGE_WIDTH,
+                                                 "height": _FRIDAY_IMAGE_HEIGHT,
+                                                 "gpu_context": "image_fast",
+                                             })
+            response.raise_for_status()
+            job_id = response.json()["job_id"]
+        deadline = time.monotonic() + 600
+        while time.monotonic() < deadline:
+            await asyncio.sleep(3)
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                job = (await client.get(f"{_IMAGE_RUNTIME_URL}/v1/art/jobs/{job_id}")).json()
+            if job.get("status") in {"queued", "running"}:
+                continue
+            if job.get("status") not in {"ok", "completed"}:
+                raise RuntimeError(job.get("error") or job.get("result") or "generation failed")
+            match = re.search(r"Generated Image:\s*([^\s|]+)", str(job.get("result", "")))
+            if not match:
+                raise RuntimeError(f"generator returned no deliverable filename: {job.get('result')}")
+            filename = match.group(1)
+            image_url = _signed_image_url(filename)
+            confidence_match = re.search(r"Visual confidence:\s*(100|[1-9]?\d)%", str(job.get("result", "")))
+            confidence = int(confidence_match.group(1)) if confidence_match else None
+            # A visual score is only an advisory filter. Strong matches deliver
+            # normally; close/weak results wait for the user to decide rather
+            # than claiming that an unrelated image was the requested one.
+            if search_web and confidence is not None and confidence < 80:
+                status = "review" if confidence >= 50 else "no_match"
+                _image_delivery.update(status=status, url=image_url, confidence=confidence)
+                if status == "review":
+                    message = (
+                        f"I found an Internet image for {prompt}, but its visual match is only "
+                        f"{confidence}%. Reply ‘send it’ to deliver it, or ‘generate one’ for a new image."
+                    )
+                else:
+                    message = (
+                        f"I found an Internet image for {prompt}, but it did not match safely enough "
+                        f"({confidence}%). Reply ‘generate one’ and I will create one instead."
+                    )
+                await send_image_status_notification(service, message)
+                return
+            sent = await send_image_notification(service, image_url,
+                                                  f"Here is the image you asked Friday for: {prompt}")
+            if sent.startswith("Error:"):
+                raise RuntimeError(sent.removeprefix("Error: "))
+            if not search_web:
+                # Friday's image card should not remain occupied between infrequent
+                # generation jobs. Keep the ComfyUI server alive but release weights.
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as release_client:
+                        await release_client.post(
+                            "http://comfyui_gpu:8188/free",
+                            json={"unload_models": True, "free_memory": True},
+                        )
+                except httpx.HTTPError:
+                    pass
+            _image_delivery.update(status="sent", url=image_url)
+            return
+        raise TimeoutError("image generation timed out")
+    except Exception as exc:  # noqa: BLE001
+        _image_delivery.update(status="failed", error=str(exc)[:240])
+        await send_delivery_failure_notification(
+            service, f"I couldn't send the image you requested: {str(exc)[:140]}")
+
 _DIGEST_SYSTEM = (
     "You are Friday, relaying a result OUT LOUD to the user. Rewrite the text below into a SHORT "
     "spoken answer: 2-3 sentences max, most important point first, conversational. No lists, no "
@@ -667,6 +854,7 @@ async def _with_location_context(task: str) -> str:
 
 
 app = FastAPI(title="Friday Brain (vault-RAG assistant)")
+app.get("/v1/public-artifacts/{filename}")(proxy_signed_artifact)
 
 
 @app.get("/health")
@@ -1993,6 +2181,125 @@ async def _answer(client_messages, tools=None, model: str = ""):
     if _is_likely_stt_hallucination(last_user):
         print(f"[bmo-brain] dropped likely STT hallucination: {last_user!r}", flush=True)
         return "", None
+
+    if _IMAGE_STATUS_RE.search(last_user or "") and _image_delivery["status"] != "idle":
+        status = _image_delivery["status"]
+        if status == "awaiting_target":
+            return "I still need the phone or tablet name to send that image.", None
+        if status == "generating":
+            return "It is still generating. I will notify the selected device when it is ready.", None
+        if status == "sent":
+            return f"Yes. I sent it to {_image_delivery['target']} as a Home Assistant notification.", None
+        if status == "review":
+            return (f"I found a close Internet match, about {_image_delivery['confidence']} percent accurate. "
+                    "Should I send it, or generate one instead?", None)
+        if status == "no_match":
+            return (f"I could not find an Internet image that matches closely enough. The best match was about "
+                    f"{_image_delivery['confidence']} percent accurate. I can generate one instead.", None)
+        return f"No. The image delivery failed: {_image_delivery['error']}", None
+
+    # If Friday has explicitly asked for a missing recipient, the next short reply
+    # (for example, "Justin's phone") is data for this image workflow, never a
+    # fresh free-form request that an HA-supplied broadcast tool may reinterpret.
+    if _image_delivery["status"] == "awaiting_target":
+        target_name, notify_service = _resolve_image_target(last_user or "")
+        if target_name:
+            task = asyncio.create_task(_generate_and_deliver_image(
+                _image_delivery["prompt"], target_name, notify_service,
+                search_web=bool(_image_delivery["search_web"])))
+            _bg_tasks.add(task)
+            task.add_done_callback(_bg_tasks.discard)
+            kind = "Internet image" if _image_delivery["search_web"] else "image"
+            return f"I am preparing the {kind} and will send it to {target_name} when it is ready.", None
+        if not _IMAGE_SUPERSEDE_RE.search(last_user or ""):
+            return "I still need the phone or tablet name to send that image.", None
+        _image_delivery.update(
+            status="idle", prompt="", target="", service="", error="", url="",
+            confidence=None, search_web=False,
+        )
+
+    # Generic image wording is deliberately not guessed. Explicit source language
+    # is a high-confidence route; otherwise Assist keeps the conversation open for
+    # one source choice and delivers to the selected/default phone afterwards.
+    if _image_delivery["status"] == "awaiting_source":
+        if _IMAGE_SOURCE_SEARCH_RE.search(last_user or ""):
+            search_web = True
+        elif _IMAGE_SOURCE_GENERATE_RE.search(last_user or ""):
+            search_web = False
+        elif _IMAGE_SUPERSEDE_RE.search(last_user or ""):
+            _image_delivery.update(
+                status="idle", prompt="", target="", service="", error="", url="",
+                confidence=None, search_web=False,
+            )
+            search_web = None
+        else:
+            return "Would you like an Internet image or one I generate?", None
+        if search_web is not None:
+            task = asyncio.create_task(_generate_and_deliver_image(
+                _image_delivery["prompt"], _image_delivery["target"], _image_delivery["service"],
+                search_web=search_web))
+            _bg_tasks.add(task)
+            task.add_done_callback(_bg_tasks.discard)
+            kind = "an Internet image" if search_web else "a generated image"
+            return f"I am preparing {kind} and will send it to {_image_delivery['target']} when it is ready.", None
+
+    if _image_delivery["status"] == "review" and _IMAGE_APPROVE_RE.search(last_user or ""):
+        sent = await send_image_notification(
+            _image_delivery["service"], _image_delivery["url"],
+            f"Here is the close Internet image match Friday found for: {_image_delivery['prompt']}",
+        )
+        if sent.startswith("Error:"):
+            _image_delivery.update(status="failed", error=sent.removeprefix("Error: ")[:240])
+            return f"I could not send that image: {_image_delivery['error']}", None
+        _image_delivery.update(status="sent")
+        return f"Sending the {_image_delivery['confidence']} percent match to {_image_delivery['target']} now.", None
+
+    if _image_delivery["status"] in {"review", "no_match"} and _IMAGE_GENERATE_INSTEAD_RE.search(last_user or ""):
+        task = asyncio.create_task(_generate_and_deliver_image(
+            _image_delivery["prompt"], _image_delivery["target"], _image_delivery["service"], search_web=False))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+        return f"I am generating {_image_delivery['prompt']} and will send it to {_image_delivery['target']} when it is ready.", None
+
+    if _IMAGE_SEARCH_RE.search(last_user or ""):
+        target_name, notify_service = _image_target_or_default(last_user)
+        if not notify_service:
+            _image_delivery.update(status="awaiting_target", prompt=_image_prompt(last_user),
+                                   target="", service="", error="", url="", confidence=None,
+                                   search_web=True)
+            return ("Which device should I send the Internet image to? Name the phone or tablet; I will not guess a recipient.",
+                    None)
+        prompt = _image_prompt(last_user)
+        task = asyncio.create_task(_generate_and_deliver_image(
+            prompt, target_name, notify_service, search_web=True))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+        return (f"I am finding an Internet image of {prompt} and will check the match before sending it to "
+                f"{target_name}.", None)
+
+    if _IMAGE_GENERATE_RE.search(last_user or ""):
+        target_name, notify_service = _image_target_or_default(last_user)
+        if not notify_service:
+            _image_delivery.update(status="awaiting_target", prompt=_image_prompt(last_user),
+                                   target="", service="", error="", url="", confidence=None,
+                                   search_web=False)
+            return ("Which device should I send it to? Name the phone or tablet; I will not guess a recipient.",
+                    None)
+        prompt = _image_prompt(last_user)
+        task = asyncio.create_task(_generate_and_deliver_image(prompt, target_name, notify_service))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+        return f"I am generating {prompt} and will send it to {target_name} when it is ready.", None
+
+    if _IMAGE_REQUEST_RE.search(last_user or ""):
+        target_name, notify_service = _image_target_or_default(last_user)
+        if not notify_service:
+            return "Which phone or tablet should receive the image?", None
+        _image_delivery.update(
+            status="awaiting_source", prompt=_image_prompt(last_user), target=target_name,
+            service=notify_service, error="", url="", confidence=None, search_web=False,
+        )
+        return "Would you like an Internet image or one I generate?", None
 
     forecast_weather_text = await _forecast_weather_shortcut(last_user)
     if forecast_weather_text:
