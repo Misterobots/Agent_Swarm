@@ -103,3 +103,5 @@ execution_plane/training_data/
 
 # Runtime workflow state
 workflow_state/
+
+.claude.bak_*/
