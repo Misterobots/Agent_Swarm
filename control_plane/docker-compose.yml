@@ -83,6 +83,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg15
     container_name: postgres
+    restart: unless-stopped
     env_file:
       - .env
     environment:

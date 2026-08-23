@@ -4,6 +4,7 @@ import queue
 import threading
 import time
 import uuid
+import weakref
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -11,6 +12,15 @@ from typing import Optional
 from coordination.pioneers import _pioneer_for_role, _pick_unique_pioneer
 
 SCRATCHPAD_ROOT = Path(__file__).parent.parent / "scratchpad"
+
+# Live registry of in-flight coordination sessions, keyed by coordination_id.
+# WeakValueDictionary: an entry auto-drops as soon as the session object is
+# garbage-collected (i.e. when the coordinate_task generator frame that holds it
+# is exhausted/closed). This gives Agent View a "currently running" view with no
+# hooks in the orchestrator's many early-return paths.
+_ACTIVE_SESSIONS: "weakref.WeakValueDictionary[str, 'CoordinatorSession']" = (
+    weakref.WeakValueDictionary()
+)
 
 
 class WorkerState(Enum):
@@ -45,10 +55,17 @@ class WorkerInfo:
 class CoordinatorSession:
     """Manages a single coordination session with scratchpad and worker registry."""
 
-    def __init__(self, session_id: str, owner_id: str = None):
+    def __init__(self, session_id: str, owner_id: str = None, coordination_id: str = None):
         self.session_id = session_id
         self.owner_id = owner_id
-        self.coordination_id = f"coord-{uuid.uuid4().hex[:8]}"
+        # Direct task creation (POST /v1/tasks) generates this up front so it
+        # can return the id to the caller before the generator has run at all;
+        # every other caller leaves it unset and gets the usual random id.
+        self.coordination_id = coordination_id or f"coord-{uuid.uuid4().hex[:8]}"
+        # Name of this run's per-session Docker container (session_sandbox.py),
+        # once resolved — None means "use the shared default" (either the
+        # session-sandbox mechanism is off, or this run has no linked repo yet).
+        self.container_name: str | None = None
         self.workers: dict[str, WorkerInfo] = {}
         self.scratchpad_dir = SCRATCHPAD_ROOT / session_id / self.coordination_id
         self.scratchpad_dir.mkdir(parents=True, exist_ok=True)
@@ -60,6 +77,12 @@ class CoordinatorSession:
         # Accumulated file_change payloads ({op, path, size, diff?}) across all
         # phases — joined into the run's aggregate diff for the mobile task board.
         self.file_changes: list[dict] = []
+        # Publish to the live registry for Agent View. Best-effort — monitoring
+        # must never break coordination.
+        try:
+            _ACTIVE_SESSIONS[self.coordination_id] = self
+        except Exception:
+            pass
 
     def register_worker(self, role: str, task: str, phase: str) -> str:
         worker_id = f"w-{uuid.uuid4().hex[:6]}"
@@ -92,3 +115,55 @@ class CoordinatorSession:
             if f.is_file():
                 parts.append(f"=== {f.name} ===\n{f.read_text(encoding='utf-8')}")
         return "\n\n".join(parts)
+
+
+# ── Agent View: live snapshot of active coordination sessions ───────────────
+
+def _serialize_worker(w: "WorkerInfo", now: float) -> dict:
+    started = w.started_at
+    end = w.completed_at or now
+    elapsed = round(end - started, 1) if started else None
+    return {
+        "worker_id": w.worker_id,
+        "name": (w.pioneer or {}).get("name"),
+        "role": w.role,
+        "phase": w.phase,
+        "state": w.state.value,
+        "task": (w.task or "")[:160],
+        "elapsed_s": elapsed,
+        "error": w.error or None,
+    }
+
+
+def snapshot_active_sessions() -> list[dict]:
+    """Serialize every in-flight coordination session for Agent View.
+
+    Pure read of in-memory state; never raises (monitoring must not disturb
+    coordination). Sessions are newest-first.
+    """
+    now = time.time()
+    try:
+        sessions = list(_ACTIVE_SESSIONS.values())
+    except Exception:
+        return []
+
+    out = []
+    for s in sessions:
+        try:
+            workers = [_serialize_worker(w, now) for w in list(s.workers.values())]
+            states = [w["state"] for w in workers]
+            out.append({
+                "coordination_id": s.coordination_id,
+                "session_id": s.session_id,
+                "owner_id": s.owner_id,
+                "created_at": s.created_at,
+                "elapsed_s": round(now - s.created_at, 1),
+                "worker_count": len(workers),
+                "running_count": states.count("running"),
+                "workers": workers,
+            })
+        except Exception:
+            continue
+
+    out.sort(key=lambda d: d["created_at"], reverse=True)
+    return out

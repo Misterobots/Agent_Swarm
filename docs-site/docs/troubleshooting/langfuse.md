@@ -54,6 +54,20 @@ Check agent runtime logs for Langfuse connection errors.
 
 ---
 
+## export_traces Returns 0 Records
+
+**Symptom**: The training pipeline's `export_traces` step returns no records.
+
+**Cause**: No traces have scored above the training-candidate quality threshold (0.80).
+
+**Check**:
+
+1. Is the agent runtime actually writing to Langfuse? `curl http://{{ hopper_ip }}:3000/api/public/health`
+2. Are `LANGFUSE_SECRET_KEY` and `LANGFUSE_PUBLIC_KEY` correct in `execution_plane/.env`?
+3. Open the Langfuse UI at `http://{{ hopper_ip }}:3000` — are any traces present at all?
+
+---
+
 ## High Disk Usage
 
 **Symptom**: PostgreSQL database growing very large from traces.

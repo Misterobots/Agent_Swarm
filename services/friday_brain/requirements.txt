@@ -7,3 +7,6 @@ websockets>=12.0
 # Consult-Claude offload (claude_consult.py). Lazy-imported and a hard no-op unless
 # FRIDAY_CONSULT_ENABLED + ANTHROPIC_API_KEY are set, but installed so the feature can be armed.
 anthropic>=0.69.0
+# Multipart form parsing for the persona editor's image-upload endpoint
+# (POST /api/personas/{model}/visual_ref uses FastAPI's UploadFile/File).
+python-multipart>=0.0.9

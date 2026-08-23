@@ -212,6 +212,36 @@ token = issue_token(
 | `COORDINATE` | `handlers/coordinate.py` | Lamport coordinator |
 | _(default)_ | `handlers/architect.py` | Architect fast-pass or MarsRL |
 
+## ExpertiseTemplate Registry
+
+After `intent_capabilities.py` maps an intent to a `template_id`, `agents/expertise/template_registry.py` resolves the actual agent persona from PostgreSQL (`swarm.expertise_templates`), with full versioning and performance tracking.
+
+### Template Structure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier, e.g., `"coding-expert"` |
+| `name` | string | Human-readable name |
+| `description` | text | Template purpose and behavior summary |
+| `intent` | string | Routed intent: `CODE`, `RESEARCH`, etc. |
+| `system_prompt` | text | The agent's persona prompt |
+| `capabilities` | string[] | Allowed tools: `["file_ops", "terminal"]` |
+| `security_level` | string | `L1_PUBLIC` · `L2_USER` · `L3_ADMIN` · `L4_SYSTEM` — enforced by the JWT-ACE capability gating layer against the issued token |
+| `default_model` | string | e.g., `"qwen3.5:9b"` |
+
+### Versioning & Lifecycle
+
+Versions are tracked in `swarm.expertise_template_versions` with per-version performance metrics (`avg_score`, `total_invocations`, `successful_invocations`):
+
+1. Templates are seeded from `_SEED_TEMPLATES` in `template_registry.py` on first run.
+2. New versions are created via `registry.bump_version(template_id, changes)`.
+3. Performance is recorded after each invocation via `registry.record_performance(record)`.
+4. When a new version's `avg_score` exceeds the previous version by a configurable threshold, it is auto-promoted and `current_version` is bumped.
+
+### Training Linkage
+
+Traces scored `>= 0.90` in Langfuse are tagged `training_candidate=1.0` and become eligible for export into the fine-tuning dataset used to teach the router new intents natively (reducing reliance on the fast-path regex rules above). When a fine-tuned router model is converted and imported into Ollama, an A/B test splits traffic between it and the current baseline, recording per-invocation scores and latency in `swarm.ab_test_results` until a winner is promoted.
+
 ## Configuration
 
 | Setting | Value | Description |

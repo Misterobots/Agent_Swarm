@@ -22,7 +22,7 @@ interface IdentityResponse {
 function parseIdentity(payload: IdentityResponse) {
   const caller = payload?.caller_identity;
   if (!caller || typeof caller === "string") {
-    return { securityLevel: "", username: "", displayName: "", email: "", authenticated: false };
+    return { securityLevel: "", username: "", uid: "", displayName: "", email: "", authenticated: false };
   }
   const level = typeof caller.security_level === "string" ? caller.security_level.toUpperCase() : "";
   return {

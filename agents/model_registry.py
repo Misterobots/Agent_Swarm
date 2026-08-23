@@ -122,6 +122,16 @@ MODELS: dict[str, ModelSpec] = {
         alternatives=["gemma4:26b", "qwen3:14b"],
         available=True,
     ),
+    "qwen3.8-27b-fp8": ModelSpec(
+        name="qwen3.8-27b-fp8",
+        vram_gb=30.9,
+        capabilities=["text", "vision", "code", "reasoning"],
+        roles=_ALL_ROLES,
+        recommended_for_roles=["coder", "researcher", "architect"],
+        description="Qwen 3.8 27B FP8 — experimental multimodal coding/reasoning model; requires a remote inference engine.",
+        alternatives=["qwen3.6:27b", "qwen3-coder:30b"],
+        available=False,  # Not an Ollama model; enabled only when a remote route is configured.
+    ),
     "deepseek-r1:32b": ModelSpec(
         name="deepseek-r1:32b",
         vram_gb=19.9,

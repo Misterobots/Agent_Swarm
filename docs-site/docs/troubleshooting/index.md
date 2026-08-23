@@ -8,6 +8,7 @@ Symptom-based guides for diagnosing and resolving issues. Each page covers a spe
 
 | Component | Common Issues |
 |-----------|--------------|
+| [System Offline](system-offline.md) | Cross-service triage, "System Offline" UI state, Grafana/Prometheus/Loki monitoring stack |
 | [Ollama](ollama.md) | Model load failures, OOM, slow inference |
 | [ComfyUI](comfyui.md) | Workflow errors, VRAM conflicts |
 | [SPIRE](spire.md) | Attestation failures, expired SVIDs |

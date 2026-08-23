@@ -166,6 +166,50 @@ http:
       priority: 50
       service: jellyfin
       middlewares: [globalHeaders@file]
+    # --- Friday Persona Studio (Phase B external route) — NOT YET DEPLOYED ------------------------
+    # Exposes ONLY the persona editor (/personas) + its CRUD API (/api/personas) to the outside,
+    # carved out of the existing memex.shivelymedia.com host (same working CF tunnel + wildcard cert)
+    # at a higher priority than the memex-ext catch-all (20) — same pattern as grafana-memex (30).
+    # Backend is the CROSS-HOST friday_brain on Lovelace (192.168.2.101:8000); Traefik on Turing can
+    # reach it over the LAN (the CF proxy can't, but Traefik->LAN is fine). Gated by authentik@file
+    # (SSO) AND, when set, friday_brain's own FRIDAY_PERSONA_TOKEN — double-gated for external use.
+    # Friday's chat endpoints (/api/chat, /v1/*) are deliberately NOT routed here.
+    # DEPLOY (human, on Turing): sync this dynamic.yml to Turing's traefik bind-mount, set a strong
+    # FRIDAY_PERSONA_TOKEN in execution_plane/.env on Lovelace and recreate friday-brain, then verify
+    # an authenticated browser hit to https://memex.shivelymedia.com/personas. Traefik file provider
+    # hot-reloads — no restart needed. Confirm zero errors in `docker logs traefik` after the sync.
+    friday-personas-secure:
+      rule: "Host(`memex.shivelymedia.com`) && (PathPrefix(`/personas`) || PathPrefix(`/api/personas`))"
+      entryPoints: [websecure]
+      priority: 40
+      service: friday-personas
+      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file, authentik@file]
+      tls:
+        certResolver: cfdns
+    friday-personas-http:
+      rule: "Host(`memex.shivelymedia.com`) && (PathPrefix(`/personas`) || PathPrefix(`/api/personas`))"
+      entryPoints: [web]
+      priority: 40
+      service: friday-personas
+      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file, authentik@file]
+    # Friday image attachments: no Authentik redirect, because the Android Companion
+    # fetches notification images without an interactive browser session. Access is
+    # restricted by agent_runtime's HMAC signature and short expiry; only this path is
+    # exposed, never the generic /delivered_artifacts directory or the rest of the API.
+    friday-images-secure:
+      rule: "Host(`memex.shivelymedia.com`) && PathPrefix(`/v1/public-artifacts/`)"
+      entryPoints: [websecure]
+      priority: 50
+      service: friday-images
+      middlewares: [globalHeaders@file, secureHeaders@file, robotHeaders@file]
+      tls:
+        certResolver: cfdns
+    friday-images-http:
+      rule: "Host(`memex.shivelymedia.com`) && PathPrefix(`/v1/public-artifacts/`)"
+      entryPoints: [web]
+      priority: 50
+      service: friday-images
+      middlewares: [globalHeaders@file, robotHeaders@file, cf-https-proto@file]
   services:
     authentik-cf-http:
       loadBalancer:
@@ -191,3 +235,13 @@ http:
       loadBalancer:
         servers:
           - url: http://jellyfin:8096
+    # Cross-host backend for the Friday Persona Studio (Phase B, see routers above). friday_brain
+    # runs on Lovelace, not Turing, so this is a LAN URL, not a Docker-DNS name.
+    friday-personas:
+      loadBalancer:
+        servers:
+          - url: http://192.168.2.101:8000
+    friday-images:
+      loadBalancer:
+        servers:
+          - url: http://192.168.2.101:8000

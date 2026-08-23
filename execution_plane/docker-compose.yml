@@ -60,13 +60,15 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama_gpu
-    # Enable GPU Support
+    # Shared Code/model lane: GPU 0 only.  GPU 1 is reserved for Friday's
+    # always-warm voice lane below, so a Code request cannot evict or contend
+    # with the speaker assistant.
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ['0']
               capabilities: [ gpu ]
         # Hard cap on system RAM for the Ollama container.
         # Model weights live in VRAM; this RAM budget covers the binary,
@@ -76,7 +78,10 @@ services:
         limits:
           memory: 6g
     environment:
-      # Dual-GPU MoE: Both 5060 Ti GPUs available for expert model serving
+      # Keep shared Ollama off Friday's dedicated GPU 1.  GPU 0 is also the
+      # image card, so GPU-queue mediated image work must yield before a large
+      # Code model is loaded.
+      - CUDA_VISIBLE_DEVICES=GPU-0236956d-3c81-9ccd-d1f5-c12e0745366e
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
       - OLLAMA_NUM_PARALLEL=1          # 1 slot: KV cache halved so 14B models (~14.2 GB) fit on a 16 GB GPU
       - OLLAMA_KEEP_ALIVE=1h            # Unload after 1h idle; cold loads spike WSL2 RAM, keeping warm amortizes that cost
@@ -130,6 +135,14 @@ services:
     ports:
       - "8020:8020"
       - "8100:8020"   # BMO driver (.106, default port 8100) connects here
+    environment:
+      # ALL of Friday's voice path (brain + STT + TTS) lives on the NON-display card GPU-b23f2137
+      # = Task Manager "GPU 0" (nvidia-smi index 1). The monitor is on GPU-0236956d = Task Manager
+      # "GPU 1", which is left to Windows. Friday's full stack ~14.8 GB fits the 16 GB card (~1.2 GB
+      # free); voice_engine (Qwen3-TTS-1.7B + SenseVoice + speaker) is ~5.5 GB warmed, but its CUDA
+      # graphs pre-allocate inference buffers at warmup so synthesis doesn't grow further.
+      # count:all injects both GPUs; CUDA_VISIBLE_DEVICES filters CUDA to Friday's card only.
+      - CUDA_VISIBLE_DEVICES=GPU-b23f2137-ee9f-b8db-84fa-cdb6425d473e  # Task Manager GPU 0 = Friday's card
     deploy:
       resources:
         reservations:
@@ -184,6 +197,14 @@ services:
       context: ../services/wyoming_whisper_gpu
       dockerfile: Dockerfile
     container_name: wyoming_whisper_gpu
+    environment:
+      # Silero VAD gate for the STT decoder (start.sh --vad-threshold). 0.3 default; lower passes
+      # quieter speech but risks silence-hallucinations. The durable fix for quiet audio is the
+      # ESPHome mic gain (google-mini-voice.yaml auto_gain/volume_multiplier), not this.
+      - WHISPER_VAD_THRESHOLD=${WHISPER_VAD_THRESHOLD:-0.3}
+      # STT on Friday's card GPU-b23f2137 = Task Manager "GPU 0" (nvidia-smi index 1), alongside the
+      # brain and TTS. Whisper is only ~1.4 GB. count:all injects both GPUs; this filters to Friday's card.
+      - CUDA_VISIBLE_DEVICES=GPU-b23f2137-ee9f-b8db-84fa-cdb6425d473e  # Task Manager GPU 0 = Friday's card
     ports:
       - "10300:10300"
     deploy:
@@ -221,13 +242,26 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - VAULT_URL=${BMO_VAULT_URL}
-      - VAULT_OWNER=${BMO_VAULT_OWNER}
+      - VAULT_URL=${FRIDAY_VAULT_URL}
+      - VAULT_OWNER=${FRIDAY_VAULT_OWNER}
       - OLLAMA_URL=${BMO_OLLAMA_URL:-http://192.168.2.101:11434}
       - BMO_MODEL=${BMO_MODEL:-qwen3:8b}
       # Swarm delegation: delegate_to_swarm hands heavy research/build tasks to agent_runtime's
       # OpenAI-compatible endpoint (NOT friday_brain's own :8000). The tool short-circuits until set.
       - AGENT_RUNTIME_URL=${BMO_AGENT_RUNTIME_URL}
+      # Friday image delivery: Art Studio generates asynchronously; HA Companion notifications
+      # deliver the resulting URL. No default recipient: aliases must be spoken explicitly.
+      - FRIDAY_IMAGE_RUNTIME_URL=${FRIDAY_IMAGE_RUNTIME_URL:-http://agent-runtime:8000}
+      # Public, signed attachment URL: the HA Companion App fetches this image in the
+      # background on Wi-Fi or cellular. Do not use a private-LAN address here.
+      - FRIDAY_IMAGE_PUBLIC_BASE_URL=${FRIDAY_IMAGE_PUBLIC_BASE_URL:-https://memex.shivelymedia.com}
+      - FRIDAY_IMAGE_SIGNING_SECRET=${FRIDAY_IMAGE_SIGNING_SECRET:-}
+      - FRIDAY_IMAGE_URL_TTL_SECONDS=${FRIDAY_IMAGE_URL_TTL_SECONDS:-86400}
+      - FRIDAY_IMAGE_TARGETS=${FRIDAY_IMAGE_TARGETS:-{"justin phone":"mobile_app_justin_s_phone"}}
+      - FRIDAY_IMAGE_MODEL=${FRIDAY_IMAGE_MODEL:-sdxl-turbo-preview}
+      - FRIDAY_IMAGE_STEPS=${FRIDAY_IMAGE_STEPS:-4}
+      - FRIDAY_IMAGE_WIDTH=${FRIDAY_IMAGE_WIDTH:-768}
+      - FRIDAY_IMAGE_HEIGHT=${FRIDAY_IMAGE_HEIGHT:-768}
       # HA API access for tools.py's device-control tools (self-executing mode) and, new,
       # hass_resolver.py's fuzzy-matching + learned-synonym resolution of area/entity
       # names for HA passthrough mode — previously missing from this container entirely,
@@ -246,6 +280,41 @@ services:
       - FRIDAY_CONSULT_MONTHLY_BUDGET_USD=${FRIDAY_CONSULT_MONTHLY_BUDGET_USD:-5.0}
       - FRIDAY_CONSULT_BUDGET_FILE=/app/data/consult_budget.json
       - FRIDAY_CONSULT_LOG=/app/data/consult_log.jsonl
+      # Proactive announce: slow swarm/Claude consults ack instantly, then speak the result on the
+      # satellite with no wake word. The chime plays first (preannounce_media_id) — upload the mp3 via
+      # HA's Media -> Local Media and it resolves as media-source://media_source/local/<file>. Clear
+      # FRIDAY_ANNOUNCE_CHIME to go back to a silent announcement.
+      - FRIDAY_ANNOUNCE_CHIME=${FRIDAY_ANNOUNCE_CHIME:-media-source://media_source/local/snowpiercer_chime.mp3}
+      - FRIDAY_ANNOUNCE_TARGET=${FRIDAY_ANNOUNCE_TARGET:-assist_satellite.google_mini_voice_assist_satellite}
+      - FRIDAY_SWARM_ANNOUNCE=${FRIDAY_SWARM_ANNOUNCE:-true}
+      # Node -> default speaker map (tools.py's NODE_SPEAKER_MAP): {"model-name": "media_player.x"}.
+      # HA's chat request carries no device_id, so this is keyed off which Ollama-conversation-agent
+      # entry made the request (register one per satellite/Assist pipeline in HA, each naming a
+      # different model from /api/tags — see main.py's ollama_tags()). Lets an unqualified "volume
+      # up" default to that node's own co-located speaker instead of asking which one. Empty/unset =
+      # no behavior change.
+      - FRIDAY_NODE_SPEAKERS=${FRIDAY_NODE_SPEAKERS:-}
+      # Swarm handoff: 'auto' sends no mode flag so agent_runtime's own router picks the depth. The
+      # clarify gate asks ONE question on a vague ask (spoken via start_conversation so the mic reopens)
+      # and parks the original ask for FRIDAY_CLARIFY_TTL seconds awaiting the answer.
+      - FRIDAY_SWARM_MODE=${FRIDAY_SWARM_MODE:-auto}
+      - FRIDAY_SWARM_CLARIFY=${FRIDAY_SWARM_CLARIFY:-true}
+      - FRIDAY_CLARIFY_TTL=${FRIDAY_CLARIFY_TTL:-90}
+      # The container has no system TZ, so datetime.now() is UTC. FRIDAY_TZ is the local IANA zone used
+      # by the get_current_time/date tools and as the fallback for the prompt-injected clock (main.py
+      # prefers HA's own configured time_zone when reachable). Without this, Friday reports UTC (~5h off).
+      - FRIDAY_TZ=${FRIDAY_TZ:-America/Chicago}
+      # Brain swap: "Hey Friday, brain swap" toggles the LLM between BMO_MODEL (default) and this
+      # experimental model. Runtime-only (resets to default on restart). FRIDAY_BRAIN_SWAP=false disables.
+      - FRIDAY_ALT_BRAIN=${FRIDAY_ALT_BRAIN:-goekdenizguelmez/JOSIEFIED-Qwen3:8b}
+      - FRIDAY_BRAIN_SWAP=${FRIDAY_BRAIN_SWAP:-true}
+      # Per-brain persona + memory + visual-reference management. Each brain (default vs the
+      # brain-swap alt) carries its own persona, its own isolated memory namespace, and its own
+      # visual refs — all editable at http://192.168.2.101:8000/personas (mtime-cached, no restart).
+      # personas.json + visual_refs/ live in the bmo_brain_data volume (persist across rebuilds).
+      # FRIDAY_PERSONA_TOKEN guards the LAN editor + CRUD API; empty = open on the LAN (default).
+      # Set a secret before exposing /personas externally via the Turing Traefik route (Phase B).
+      - FRIDAY_PERSONA_TOKEN=${FRIDAY_PERSONA_TOKEN:-}
     volumes:
       - bmo_brain_data:/app/data
     restart: unless-stopped
@@ -351,8 +420,20 @@ services:
       - GPU_LOCK_HOST=http://localhost:8000
       # Home Assistant Integration
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
+      # Used to validate Friday's expiring public image-attachment URLs. Empty falls
+      # back to HOME_ASSISTANT_TOKEN in-process so existing deployments remain safe.
+      - FRIDAY_IMAGE_SIGNING_SECRET=${FRIDAY_IMAGE_SIGNING_SECRET:-}
       # BMO Voice LLM — qwen3:14b fits in VRAM (9.2GB < 15.93GB); latency masked by async ack
       - BMO_LLM_MODEL=qwen3:14b
+      # Warm-pin the voice model so Friday is resident from boot. Roll back: set false
+      # (or remove) + recreate. (gpu_queue.py)
+      - WARM_PIN_PROTECTED_MODELS=true
+      # PROTECT FRIDAY'S ACTUAL BRAIN: qwen3:8b (served by Lovelace), NOT the qwen3:14b
+      # BMO_LLM_MODEL default that PROTECTED_OLLAMA_MODELS would otherwise inherit. Benchmark
+      # 2026-07-14 confirmed qwen3:8b is Friday's deployed brain (median 0.49s warm, 100% tool
+      # reliability); without this the eviction-protection guarded the wrong model and Friday hit
+      # 50-60s reload spikes ("stops at intent") when the swarm evicted her from the shared GPU.
+      - PROTECTED_OLLAMA_MODELS=qwen3:8b
       # BMO Weather location (Open-Meteo, no API key needed)
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}
@@ -496,10 +577,9 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              # device_ids=['1'] = same physical 5060 Ti as ComfyUI. OmniGen2 FP8
-              # (~12 GB) fits with headroom. ComfyUI is evicted in the image zone
-              # before either Klein or OmniGen warms up, so no contention.
-              device_ids: ['1']
+              # GPU 0 is the image card. GPU 1 is reserved for Friday's
+              # Qwen, STT, and TTS services.
+              device_ids: ['0']
               capabilities: [gpu]
     ports:
       - "8291:8190"
@@ -526,7 +606,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['1']
+              # GPU 0 is the dedicated image card; keep Friday's GPU 1 free.
+              device_ids: ['0']
               capabilities: [gpu]
     networks:
       execution_net:
@@ -980,7 +1061,16 @@ services:
       - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3:14b}
       - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
-      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
+      # Hardcoded (not ${COORDINATOR_MODEL:-...}) — deliberately ignores
+      # execution_plane/.env's COORDINATOR_MODEL=gemma4:31b override on THIS
+      # dev instance only. gemma4:31b needs to split across both GPUs, and
+      # GPU 1 is ~92% permanently reserved by Friday's voice stack (see
+      # docker-compose.yml's ollama_friday/voice-engine/wyoming comments) —
+      # there's rarely enough free room left for it to load, which was
+      # crashing swarm test runs with "llama runner process has terminated"
+      # (2026-08-07). qwen3:14b fits on a single GPU. agent-runtime (prod)
+      # is untouched and still reads gemma4:31b from .env as before.
+      - COORDINATOR_MODEL=qwen3:14b
       - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
       - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -988,6 +1078,20 @@ services:
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
       # Bridges the no-Authentik-header gap on Lovelace; Authentik headers take priority if present
       - DEV_OWNER_UID=misterobots
+      # Codex-style task composer + gated GitHub push/PR (2026-08-06) — dev-only for now.
+      # TASKS_DIRECT_CREATE_ENABLED re-enabled 2026-08-07 for Phase C testing of the
+      # per-session-container redesign: repo-linked tasks now provision a fresh,
+      # zero-mount container (coordination/session_sandbox.py) instead of touching
+      # the shared dev_sandbox's /workspace (which is bind-mounted to the live repo —
+      # the original incident's root cause). SESSION_SANDBOX_ENABLED gates that new
+      # mechanism; both flags dev-only until the full phased plan lands.
+      - TASKS_DIRECT_CREATE_ENABLED=true
+      - SESSION_SANDBOX_ENABLED=true
+      # Flipped true 2026-08-09 to test the "Publish to GitHub" flow (blank
+      # project -> new repo) end to end — also un-gates the existing
+      # task-completion push/PR flow, they share one flag by design (both are
+      # "is GitHub write access enabled on this deployment"). Dev-only.
+      - GITHUB_PUSH_ENABLED=true
     volumes:
       - ../agents:/app/agents
       - ../:/workspace

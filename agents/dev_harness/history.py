@@ -252,3 +252,89 @@ class History:
             if isinstance(turn, AssistantMessage):
                 return turn.tool_calls
         return []
+
+    # -- durable checkpoint format -----------------------------------------
+    def to_checkpoint(self) -> dict[str, Any]:
+        """Return a provider-neutral, JSON-safe snapshot of this history.
+
+        Checkpoints deliberately preserve the neutral turn model instead of a
+        provider wire format.  This keeps recovery valid when the router
+        escalates from a local model to GitHub or Anthropic.
+        """
+        turns: list[dict[str, Any]] = []
+        for turn in self.turns:
+            if isinstance(turn, UserMessage):
+                turns.append({"type": "user", "content": turn.content})
+            elif isinstance(turn, AssistantMessage):
+                turns.append({
+                    "type": "assistant",
+                    "content": turn.content,
+                    "tool_calls": [
+                        {"call_id": call.call_id, "name": call.name, "args": call.args}
+                        for call in turn.tool_calls
+                    ],
+                })
+            elif isinstance(turn, ToolResults):
+                turns.append({
+                    "type": "tool_results",
+                    "items": [
+                        {
+                            "call_id": result.call_id,
+                            "name": result.name,
+                            "output": result.output,
+                            "is_error": result.is_error,
+                        }
+                        for result in turn.items
+                    ],
+                })
+        return {"system": self.system, "turns": turns}
+
+    @classmethod
+    def from_checkpoint(cls, payload: dict[str, Any]) -> "History":
+        """Restore a validated checkpoint snapshot.
+
+        Invalid or unknown turn records are rejected rather than silently
+        dropped; partial history is unsafe for tool-call replay.
+        """
+        if not isinstance(payload, dict) or not isinstance(payload.get("turns"), list):
+            raise ValueError("invalid history checkpoint")
+        system = payload.get("system", "")
+        if not isinstance(system, str):
+            raise ValueError("invalid checkpoint system prompt")
+
+        turns: list[Turn] = []
+        for raw in payload["turns"]:
+            if not isinstance(raw, dict):
+                raise ValueError("invalid checkpoint turn")
+            kind = raw.get("type")
+            if kind == "user":
+                if not isinstance(raw.get("content"), str):
+                    raise ValueError("invalid user checkpoint turn")
+                turns.append(UserMessage(raw["content"]))
+            elif kind == "assistant":
+                calls: list[ToolCall] = []
+                for call in raw.get("tool_calls", []):
+                    if not isinstance(call, dict) or not isinstance(call.get("call_id"), str):
+                        raise ValueError("invalid assistant tool call checkpoint")
+                    args = call.get("args", {})
+                    if not isinstance(call.get("name"), str) or not isinstance(args, dict):
+                        raise ValueError("invalid assistant tool call checkpoint")
+                    calls.append(ToolCall(call["call_id"], call["name"], args))
+                content = raw.get("content", "")
+                if not isinstance(content, str):
+                    raise ValueError("invalid assistant checkpoint turn")
+                turns.append(AssistantMessage(content, calls))
+            elif kind == "tool_results":
+                items: list[ToolResult] = []
+                for result in raw.get("items", []):
+                    if not isinstance(result, dict):
+                        raise ValueError("invalid tool result checkpoint")
+                    if not all(isinstance(result.get(key), str) for key in ("call_id", "name", "output")):
+                        raise ValueError("invalid tool result checkpoint")
+                    items.append(ToolResult(
+                        result["call_id"], result["name"], result["output"], bool(result.get("is_error", False))
+                    ))
+                turns.append(ToolResults(items))
+            else:
+                raise ValueError(f"unknown checkpoint turn type: {kind!r}")
+        return cls(system=system, turns=turns)

@@ -58,6 +58,12 @@ Check the expiry timestamp.
 3. Verify the port (8081) is accessible
 4. Check firewall rules
 
+Quick health probe:
+
+```bash
+curl http://{{ hopper_ip }}:8081/health
+```
+
 ---
 
 ## Registration Entry Issues
@@ -71,5 +77,33 @@ docker compose exec spire-server /opt/spire/bin/spire-server entry show
 ```
 
 Verify entries exist for each service with the correct selectors.
+
+**One-time enrollment** (if the workload entry is missing entirely):
+
+```bash
+# Run on the SPIRE server node
+docker exec spire-server spire-server entry create \
+  -spiffeID spiffe://home-ai-lab/agent/runtime \
+  -parentID spiffe://home-ai-lab/agent/node \
+  -selector docker:label:spiffe.io/spiffe-id:spiffe://home-ai-lab/agent/runtime
+```
+
+---
+
+## Agent Runtime Logs "SPIFFE SVID fetch failed"
+
+**Symptom**: `agent-runtime` logs an SVID fetch failure at startup.
+
+**Impact**: Non-fatal in most configurations — the agent runtime continues with degraded mTLS.
+
+**Fix**:
+
+```bash
+docker compose restart spire-agent
+sleep 10
+docker compose restart agent-runtime
+```
+
+If the issue persists after restart, the workload attestation entry may be out of date (e.g. after an image rebuild that changed the container SHA). Re-register the workload entry (see the one-time enrollment command above) on the SPIRE server.
 
 

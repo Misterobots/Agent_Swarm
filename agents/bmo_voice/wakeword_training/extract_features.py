@@ -47,6 +47,13 @@ REAL_SAMPLES_DIR = DATA_DIR / "real_samples"
 BG_DIR = DATA_DIR / "background_audio"
 OUTPUT_DIR = DATA_DIR / "generated_augmented_features"
 REAL_OUTPUT_DIR = DATA_DIR / "real_augmented_features"
+# Optional household HARD-NEGATIVES: your rooms' ambient audio (TV / conversation / music) that has
+# been FALSE-triggering the wake word, pre-sliced into ~1.5 s clips (see slice_negatives.sh and
+# RECORDING_NEGATIVES.md). Featurized with the SAME augmentation chain as the positives — it is the
+# `truth: false` flag in training_parameters.yaml, NOT the extraction, that makes them negatives.
+# Inert until household_negatives/ is populated (extract is a no-op on an empty/absent dir).
+HOUSEHOLD_NEG_DIR = DATA_DIR / "household_negatives"
+HOUSEHOLD_NEG_OUTPUT_DIR = DATA_DIR / "household_negative_features"
 
 
 def log(msg: str) -> None:
@@ -176,6 +183,12 @@ def main() -> None:
     # the real_augmented_features block in training_parameters.yaml so training actually
     # uses them (see that file's comment for the weighting rationale).
     _extract_source("real", REAL_SAMPLES_DIR, REAL_OUTPUT_DIR, augmenter)
+
+    # Optional household hard-negatives — your rooms' false-triggering ambient audio, pre-sliced
+    # to ~1.5 s clips in household_negatives/. Inert if that dir is absent/empty. When you add
+    # clips, also uncomment the household_negative_features block in training_parameters.yaml
+    # (truth: false) so training actually learns to reject them.
+    _extract_source("household_neg", HOUSEHOLD_NEG_DIR, HOUSEHOLD_NEG_OUTPUT_DIR, augmenter)
 
     log(f"Done. Elapsed: {time.time() - start:.0f}s.")
 

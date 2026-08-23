@@ -119,8 +119,15 @@ def init_table() -> None:
 # ---------------------------------------------------------------------------
 
 def create_run(coordination_id: str, session_id: str, owner_id: str,
-               title: str | None, scope: str | None, started_at: int) -> None:
-    """Record a run at dispatch. Idempotent on coordination_id."""
+               title: str | None, scope: str | None, started_at: int,
+               status: str = "running") -> None:
+    """Record a run at dispatch. Idempotent on coordination_id.
+
+    status defaults to "running" (the original, still-typical case: a run
+    starts executing immediately). The single-active-task queue passes
+    status="queued" when the shared sandbox is already held by another run —
+    see set_status() for the later queued->running transition.
+    """
     if not coordination_id or not owner_id:
         return
     try:
@@ -132,14 +139,55 @@ def create_run(coordination_id: str, session_id: str, owner_id: str,
                     INSERT INTO swarm_runs
                         (coordination_id, session_id, owner_id, title, scope,
                          status, started_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, 'running', %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (coordination_id) DO NOTHING
                     """,
                     (coordination_id, session_id, owner_id,
-                     (title or "")[:200], scope, int(started_at or now), now),
+                     (title or "")[:200], scope, status, int(started_at or now), now),
                 )
     except Exception as e:
         logger.warning(f"[SwarmRunStore] create_run failed (non-fatal): {e}")
+
+
+def set_status(coordination_id: str, status: str) -> None:
+    """Flip a run's status without touching phase/summary/etc. — used by the
+    task queue's queued->running transition (create_run's own ON CONFLICT DO
+    NOTHING means it can't update an existing row's status)."""
+    if not coordination_id:
+        return
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE swarm_runs SET status=%s, updated_at=%s WHERE coordination_id=%s",
+                    (status, _now(), coordination_id),
+                )
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] set_status failed (non-fatal): {e}")
+
+
+def reconcile_stale_runs(error: str = "agent_runtime restarted mid-run") -> int:
+    """Startup reconciliation: mark any run still 'running' or 'queued' from
+    before this process started as 'failed'. Without this, a crash mid-task
+    leaves a phantom row that never completes — and, once the task queue is
+    in play, a Redis lock nothing will ever release. Returns the row count
+    fixed (0 on error, fail-open — a stuck row is recoverable manually; a
+    startup crash here would not be)."""
+    try:
+        now = _now()
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE swarm_runs SET status='failed', error=%s, ended_at=%s, updated_at=%s
+                    WHERE status IN ('running', 'queued')
+                    """,
+                    (error, now, now),
+                )
+                return cur.rowcount
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] reconcile_stale_runs failed (non-fatal): {e}")
+        return 0
 
 
 def update_run_phase(coordination_id: str, phase: int, phase_name: str | None) -> None:

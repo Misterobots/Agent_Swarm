@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Friday Assist Continuation",
+        "description": "Choose the existing Friday conversation entity to wrap.",
+        "data": {
+          "target_entity_id": "Friday conversation entity"
+        }
+      }
+    }
+  }
+}

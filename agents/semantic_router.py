@@ -110,6 +110,18 @@ _FAST_PATH_RULES: list[tuple[re.Pattern, str, float]] = [
         r"|\b(make|design|model|create).{0,40}(bracket|mount|enclosure|holder|standoff|bushing|flange)\b",
         re.I,
     ), "CAD", 0.93),
+
+    # ARITHMETIC — bare math expressions ("2+2", "what is 5*3", "10 - 4 =").
+    # Route straight to CONVERSATION (small model). Without this, trivial math
+    # falls through to the slow Tier-4 LLM router, which — being non-deterministic
+    # — occasionally mis-tags it as CODE and routes to a 30B coding model.
+    # Anchored to the whole input so real requests ("improve the code that adds
+    # 2+2", "build a calculator") never match.
+    (re.compile(
+        r"^\s*(what('?s| is| are)?\s+|whats\s+|calculate\s+|compute\s+|how much is\s+|solve\s+)?"
+        r"\d+(\.\d+)?(\s*[+\-*/x^%]\s*\d+(\.\d+)?)+\s*[=?]*\s*$",
+        re.I,
+    ), "CONVERSATION", 0.95),
 ]
 
 # ---------------------------------------------------------------------------

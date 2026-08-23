@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Palette, Code2, ArrowRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { useSettingsStore } from "@/lib/stores/settings-store";
 import type { WorkflowNextStep } from "@/types/chat";
 
 interface WorkflowActionsCardProps {
@@ -28,25 +27,13 @@ const STEP_CONFIG: Record<string, { icon: React.ReactNode; accent: string; bg: s
 
 export function WorkflowActionsCard({ steps, onSend }: WorkflowActionsCardProps) {
   const [pendingMode, setPendingMode] = useState<string | null>(null);
-  const setDesignMode  = useSettingsStore((s) => s.setDesignMode);
-  const setSwarmMode   = useSettingsStore((s) => s.setSwarmMode);
-  const setWorkshopMode = useSettingsStore((s) => s.setWorkshopMode);
 
   const handleStep = (step: WorkflowNextStep) => {
     if (!onSend || pendingMode) return;
     setPendingMode(step.mode);
-    // Switch to the right mode and clear workshop mode
-    setWorkshopMode(false);
     if (step.mode === "design") {
-      setDesignMode(true);
-      setSwarmMode(false);
-      // Prefix with /design so the backend slash-command parser forces design_mode
-      // and clears workshop_mode server-side, regardless of what mode flags the
-      // stale closure may have baked into the request.
       onSend(`/design ${step.prompt}`);
     } else if (step.mode === "swarm") {
-      setSwarmMode(true);
-      setDesignMode(false);
       onSend(`/swarm ${step.prompt}`);
     } else {
       onSend(step.prompt);

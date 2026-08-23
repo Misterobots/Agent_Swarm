@@ -1,6 +1,8 @@
 # Friday — Life-Assistant Capability Map
 
-Companion to `docs/relay_roadmap.md`. That doc tracks the tiered build of the voice
+Companion to `docs/relay_roadmap.md`. The implemented request-origin and image-delivery
+contract is maintained in `docs/architecture/friday_request_origin_and_image_delivery.md`.
+That doc tracks the tiered build of the voice
 pipeline (Tiers 0–3: voice I/O, grounded chat, actions, memory write-back). This doc asks a
 bigger question: **what does Friday need to become a fully functioning life assistant**, not
 just a home-automation voice-command handler — and how much of that already exists in this

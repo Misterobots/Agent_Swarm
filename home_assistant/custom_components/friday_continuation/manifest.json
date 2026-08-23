@@ -1,0 +1,10 @@
+{
+  "domain": "friday_continuation",
+  "name": "Friday Assist Continuation",
+  "codeowners": ["@panca"],
+  "config_flow": true,
+  "dependencies": ["conversation"],
+  "documentation": "https://memex.shivelymedia.com/docs/architecture/friday_request_origin_and_image_delivery",
+  "integration_type": "service",
+  "version": "1.0.0"
+}

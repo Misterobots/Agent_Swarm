@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.shivelymedia.memex",
-      "sha256_cert_fingerprints": ["CF:1A:1C:C3:A8:84:7D:0E:82:84:5B:42:EE:D7:B8:6D:B7:30:0B:AF:05:99:27:F7:63:0C:87:03:D6:5A:EE:90"]
+      "sha256_cert_fingerprints": ["97:FC:95:D6:BF:C7:7C:67:E8:75:C3:F1:3F:CE:F4:80:B8:07:10:5A:CC:90:14:EF:8A:06:B1:7A:22:CE:F2:E5"]
     }
   }
 ]

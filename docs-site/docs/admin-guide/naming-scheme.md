@@ -4,9 +4,9 @@ title: Naming Scheme
 
 # Pioneer Naming Scheme
 
-All infrastructure components use names from Computing Pioneers. Generic tools and widely-used platforms use Pioneer names as their operational handle. Specialized developer projects retain their original names out of respect for the developers.
+Pioneer names apply to the **4 physical nodes** and **externally-facing services** only. Internal infrastructure services use their canonical tool names.
 
-> **Adopted:** April 20, 2026
+> **Adopted:** April 20, 2026 · **Scoped down to nodes + external services:** April 22, 2026 — the original scheme below applied pioneer names to every container; it was narrowed two days later so internal tools stay recognizable by their real names, and only the nodes plus a couple of externally-facing services (`babbage`/Traefik, `hollerith`/Grafana) keep pioneer handles.
 
 ---
 
@@ -18,30 +18,31 @@ graph TB
         direction TB
         T_role["Gateway · Monitoring · Proxy"]
         babbage["babbage / Traefik"]
-        jacquard["jacquard / Prometheus"]
         hollerith["hollerith / Grafana"]
-        knuth["knuth / Loki"]
-        mccarthy["mccarthy / Ollama gateway"]
-        diffie_t["diffie / SPIRE agent"]
+        prometheus["prometheus"]
+        loki["loki"]
+        ollama_t["ollama / gateway"]
+        spire_agent["spire-agent"]
+        redis_t["redis"]
     end
 
     subgraph LOVELACE["Lovelace — 192.168.2.101"]
         direction TB
         L_role["Compute · GPU · AI Inference"]
-        minsky["minsky / Ollama compute"]
-        wozniak["wozniak / ComfyUI"]
-        engelbart["engelbart / OpenHands"]
+        ollama_l["ollama / compute"]
+        comfyui["comfyui"]
+        openhands["openhands"]
     end
 
     subgraph HOPPER["Hopper — 192.168.2.102"]
         direction TB
         H_role["Control Plane · Orchestration"]
-        diffie_h["diffie / SPIRE server"]
-        floyd["floyd / Langfuse"]
-        mempalace["mempalace / MemPalace"]
-        codd["codd / PostgreSQL"]
-        backus["backus / MinIO"]
-        ritchie["ritchie / Redis"]
+        spire_server["spire-server"]
+        langfuse["langfuse-web"]
+        mempalace["mempalace"]
+        postgres["postgres"]
+        minio["minio"]
+        redis_h["redis"]
     end
 
     subgraph BMO["BMO — 192.168.2.106"]
@@ -63,42 +64,51 @@ graph TB
 |---------|-------------|------|----|---------|
 | **Turing** | R730 | Gateway · Monitoring · Reverse Proxy | `192.168.2.103` | `TURING_IP` |
 | **Lovelace** | Justin-PC | Compute · GPU · AI Inference | `192.168.2.101` | `LOVELACE_IP` |
-| **Hopper** | Wyse 5070 | Control Plane · Orchestration | `192.168.2.102` | `HOPPER_IP` |
-| **BMO** | Pi / BMO | Voice · IoT · Edge | `192.168.2.106` | `BMO_IP` |
+| **Hopper** | Wyse 5070 / Controle Node | Control Plane · Orchestration | `192.168.2.102` | `HOPPER_IP` |
+| **BMO** | Pi / BMO *(name retained — separate project)* | Voice · IoT · Edge | `192.168.2.106` | `BMO_IP` |
 
 ---
 
-## Containers by Node
+## Services by Node
 
-### Turing
+### Turing (Gateway/Monitoring)
 
-| Pioneer Name | Tool | Purpose |
+**Externally-facing — Pioneer names:**
+
+| Container | Tool | Purpose |
 |---|---|---|
-| `babbage` | Traefik | Reverse proxy / TLS termination |
-| `jacquard` | Prometheus | Metrics collection |
+| `babbage` | Traefik | Reverse proxy / TLS termination (managed by Saltbox) |
 | `hollerith` | Grafana | Metrics visualization |
-| `knuth` | Loki | Log aggregation |
-| `mccarthy` | Ollama (gateway) | LLM request routing |
-| `diffie` | SPIRE agent | Identity attestation |
+| `hive-ui` | Hive UI (Next.js) | Memex unified interface |
 
-### Lovelace
+**Internal — tool names:**
 
-| Pioneer Name | Tool | Purpose |
+| Container | Tool | Purpose |
 |---|---|---|
-| `minsky` | Ollama (compute) | GPU-backed LLM inference |
-| `wozniak` | ComfyUI | Image/video generation |
-| `engelbart` | OpenHands | AI coding agent |
+| `prometheus` | Prometheus | Metrics collection |
+| `loki` | Loki | Log aggregation |
+| `ollama` | Ollama (gateway) | LLM request routing (Turing GPU) |
+| `spire-agent` | SPIRE agent | Identity attestation |
+| `redis` | Redis | Message bus / cache |
 
-### Hopper
+### Lovelace (Compute/GPU) — tool names
 
-| Pioneer Name | Tool | Purpose |
+| Container | Tool | Purpose |
 |---|---|---|
-| `diffie` | SPIRE server | SPIFFE identity authority |
-| `floyd` | Langfuse | LLM observability/tracing |
-| `mempalace` | MemPalace | Vector memory store *(name retained)* |
-| `codd` | PostgreSQL | Relational database |
-| `backus` | MinIO | Object storage |
-| `ritchie` | Redis | Message bus / cache |
+| `ollama` | Ollama (compute) | GPU-backed LLM inference |
+| `comfyui` | ComfyUI | Image/video generation |
+| `openhands` | OpenHands | AI coding agent |
+
+### Hopper (Control Plane) — tool names
+
+| Container | Tool | Purpose |
+|---|---|---|
+| `spire-server` | SPIRE server | SPIFFE identity authority |
+| `langfuse-web` | Langfuse | LLM observability/tracing |
+| `mempalace` | MemPalace | Vector memory store |
+| `postgres` | PostgreSQL | Relational database |
+| `minio` | MinIO | Object storage |
+| `redis` | Redis | Message bus / cache |
 
 ---
 
@@ -147,41 +157,41 @@ graph LR
 | Category | Rule | Example |
 |---|---|---|
 | Physical nodes | Pioneer name only | `deploy to Turing`, `SSH into Hopper` |
-| Generic infrastructure tools | Pioneer container name | `jacquard` (Prometheus), `ritchie` (Redis) |
-| Popular platforms | Pioneer container name | `wozniak` (ComfyUI), `floyd` (Langfuse) |
-| Specialized developer projects | Retain original name | `mempalace` (MemPalace) |
-| Env vars | Pioneer prefix + `_IP` / `_HOST` | `HOPPER_IP`, `TURING_HOST` |
+| Externally-facing services | Pioneer name | `hollerith` (Grafana), `babbage` (Traefik) |
+| Internal infrastructure | Tool / product name | `prometheus`, `loki`, `redis`, `postgres` |
+| Named AI projects | Project name | MemPalace, ComfyUI, OpenHands |
+| Env vars | Pioneer prefix for nodes | `TURING_IP`, `HOPPER_IP` |
 | Agent files | Pioneer last name | `church.py`, `liskov.py` |
 
 ---
 
 ## Former → Current Quick Reference
 
-| Old Name | Pioneer Name | Type |
+| Old Name | Current Name | Type |
 |---|---|---|
 | R730 | Turing | Node |
 | Justin-PC | Lovelace | Node |
 | Wyse 5070 / Controle Node | Hopper | Node |
-| Pi / BMO | BMO *(retained)* | Node |
+| Pi / BMO | BMO *(name retained — separate project, consumes Memex services)* | Node |
 | `r730_gateway/` | `turing_gateway/` | Directory |
-| traefik | babbage | Container |
-| prometheus | jacquard | Container |
-| grafana | hollerith | Container |
-| loki | knuth | Container |
-| redis | ritchie | Container |
-| ollama (gateway) | mccarthy | Container |
-| ollama (compute) | minsky | Container |
-| ComfyUI container | wozniak | Container |
-| OpenHands container | engelbart | Container |
-| SPIRE | diffie | Container |
-| Langfuse | floyd | Container |
-| MemPalace container | mempalace *(name retained)* | Container |
-| postgres container | codd | Container |
-| minio container | backus | Container |
+| babbage | babbage | Container (Traefik — kept, external) |
+| hollerith | hollerith | Container (Grafana — kept, external) |
+| jacquard *(original scheme, retired 2026-04-22)* | prometheus | Container |
+| knuth *(original scheme, retired 2026-04-22)* | loki | Container |
+| ritchie *(original scheme, retired 2026-04-22)* | redis | Container |
+| mccarthy *(original scheme, retired 2026-04-22)* | ollama | Container |
+| minsky *(original scheme, retired 2026-04-22)* | ollama | Container |
+| wozniak *(original scheme, retired 2026-04-22)* | comfyui | Container |
+| engelbart *(original scheme, retired 2026-04-22)* | openhands | Container |
+| diffie *(original scheme, retired 2026-04-22)* | spire-server / spire-agent | Container |
+| floyd *(original scheme, retired 2026-04-22)* | langfuse-web / langfuse-worker | Container |
+| bush *(original scheme, retired 2026-04-22)* | mempalace | Container |
+| codd *(original scheme, retired 2026-04-22)* | postgres | Container |
+| backus *(original scheme, retired 2026-04-22)* | minio | Container |
 | router.py / herald.py | church.py | Agent |
-| architect_agent.py | leibniz_agent.py | Agent |
-| coordinator.py | lamport.py | Agent |
-| corrector_agent.py | dijkstra_agent.py | Agent |
+| architect_agent.py / kepler_agent.py | leibniz_agent.py | Agent |
+| coordinator.py / orbital.py | lamport.py | Agent |
+| corrector_agent.py / rectus_agent.py | dijkstra_agent.py | Agent |
 | governance.py / aegis.py | liskov.py | Agent |
 | context_manager.py / codex.py | brooks.py | Agent |
-| buddy_service.py | kay_service.py | Agent |
+| buddy_service.py / aether_service.py | kay_service.py | Agent |

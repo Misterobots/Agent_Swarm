@@ -37,6 +37,9 @@ RUN ln -s "${ANDROID_HOME}/cmdline-tools/latest" "${ANDROID_HOME}/tools"
 
 WORKDIR /twa
 COPY . /twa/
-RUN chmod +x /twa/build.sh
+# The repository is also worked on from Windows. Normalize the shell entrypoint
+# inside the Linux image so CRLF checkouts never make `/usr/bin/env bash\r`
+# fail before Bubblewrap starts.
+RUN sed -i 's/\r$//' /twa/build.sh && chmod +x /twa/build.sh
 
 ENTRYPOINT ["/twa/build.sh"]

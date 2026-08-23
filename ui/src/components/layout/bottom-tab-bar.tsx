@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquare, Palette, Wrench, Settings, Menu } from "lucide-react";
+import { MessageSquare, Code2, Search, CalendarClock, Menu } from "lucide-react";
 import { isNavigationItemActive } from "@/lib/config/navigation";
 import { cn } from "@/lib/utils/cn";
 import type { LucideIcon } from "lucide-react";
@@ -16,9 +16,9 @@ interface TabItem {
 
 const TAB_ITEMS: TabItem[] = [
   { label: "Chat", href: "/chat", icon: MessageSquare, matchPrefixes: ["/chat"] },
-  { label: "Art", href: "/art-studio", icon: Palette, matchPrefixes: ["/art-studio", "/media"] },
-  { label: "Tools", href: "/tools", icon: Wrench, matchPrefixes: ["/tools", "/monitoring", "/training", "/operations", "/governance", "/docs"] },
-  { label: "Settings", href: "/settings", icon: Settings, matchPrefixes: ["/settings"] },
+  { label: "Code", href: "/dev", icon: Code2, matchPrefixes: ["/dev"] },
+  { label: "Research", href: "/research", icon: Search, matchPrefixes: ["/research"] },
+  { label: "Routines", href: "/routines", icon: CalendarClock, matchPrefixes: ["/routines"] },
 ];
 
 interface BottomTabBarProps {

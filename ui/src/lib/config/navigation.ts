@@ -4,6 +4,7 @@ import {
   BarChart3,
   BookOpen,
   Castle,
+  CalendarClock,
   Code2,
   FileText,
   GraduationCap,
@@ -16,6 +17,7 @@ import {
   Network,
   Paintbrush,
   Radar,
+  Search,
   Settings,
   Sparkles,
 } from "lucide-react";
@@ -37,8 +39,20 @@ export const primaryNavigation: NavigationItem[] = [
     matchPrefixes: ["/chat"],
   },
   {
-    label: "Media",
-    href: "/media",
+    label: "Research",
+    href: "/research",
+    icon: Search,
+    matchPrefixes: ["/research"],
+  },
+  {
+    label: "Routines",
+    href: "/routines",
+    icon: CalendarClock,
+    matchPrefixes: ["/routines"],
+  },
+  {
+    label: "Design",
+    href: "/art-studio",
     icon: Paintbrush,
     matchPrefixes: ["/media", "/art-studio"],
     children: [
@@ -83,7 +97,7 @@ export const primaryNavigation: NavigationItem[] = [
     ],
   },
   {
-    label: "Dev",
+    label: "Code",
     href: "/dev",
     icon: Code2,
     matchPrefixes: ["/dev"],
@@ -93,7 +107,7 @@ export const primaryNavigation: NavigationItem[] = [
 
 export const secondaryNavigation: NavigationItem[] = [
   {
-    label: "Mission Control",
+    label: "Control Center",
     href: "/mission-control",
     icon: LayoutDashboard,
     matchPrefixes: [
@@ -177,7 +191,14 @@ export const utilityNavigation: NavigationItem[] = [
 
 export function isConversationRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
-  return pathname === "/chat" || pathname.startsWith("/dev");
+  return pathname === "/chat" || pathname.startsWith("/dev") || pathname.startsWith("/research") || pathname.startsWith("/routines");
+}
+
+export function conversationExperienceForPath(pathname: string | null | undefined) {
+  if (pathname?.startsWith("/dev")) return "code" as const;
+  if (pathname?.startsWith("/research")) return "research" as const;
+  if (pathname?.startsWith("/routines")) return "routines" as const;
+  return "chat" as const;
 }
 
 export function isNavigationItemActive(item: NavigationItem, pathname: string | null | undefined): boolean {

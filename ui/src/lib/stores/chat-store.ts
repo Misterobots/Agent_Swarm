@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   ClarificationCard,
   Conversation,
+  ConversationExperience,
   FileChange,
   MediaAttachment,
   ThoughtEvent,
@@ -27,8 +28,11 @@ function generateId(): string {
 interface ChatState {
   conversations: Conversation[];
   activeConversationId: string | null;
+  activeExperience: ConversationExperience;
+  activeConversationIds: Partial<Record<ConversationExperience, string>>;
   activeConversation: () => Conversation | undefined;
-  createConversation: (model?: string) => string;
+  createConversation: (model?: string, experience?: ConversationExperience) => string;
+  setActiveExperience: (experience: ConversationExperience) => void;
   setActiveConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
   replaceConversations: (conversations: Conversation[]) => void;
@@ -62,13 +66,15 @@ export const useChatStore = create<ChatState>()(
     (set, get) => ({
       conversations: [],
       activeConversationId: null,
+      activeExperience: "chat",
+      activeConversationIds: {},
 
       activeConversation: () => {
         const state = get();
         return state.conversations.find((c) => c.id === state.activeConversationId);
       },
 
-      createConversation: (model = "memex") => {
+      createConversation: (model = "memex", experience = get().activeExperience) => {
         const id = generateId();
         const conv: Conversation = {
           id,
@@ -78,35 +84,83 @@ export const useChatStore = create<ChatState>()(
           memoryEnabled: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          experience,
         };
         set((state) => ({
           conversations: [conv, ...state.conversations],
           activeConversationId: id,
+          activeExperience: experience,
+          activeConversationIds: { ...state.activeConversationIds, [experience]: id },
         }));
         return id;
       },
 
-      setActiveConversation: (id) => set({ activeConversationId: id }),
+      setActiveConversation: (id) => set((state) => {
+        const conv = state.conversations.find((item) => item.id === id);
+        const experience = conv?.experience ?? "chat";
+        return {
+          activeConversationId: id,
+          activeExperience: experience,
+          activeConversationIds: { ...state.activeConversationIds, [experience]: id },
+        };
+      }),
+
+      setActiveExperience: (experience) => set((state) => {
+        const remembered = state.activeConversationIds[experience];
+        const rememberedExists = state.conversations.some(
+          (conv) => conv.id === remembered && (conv.experience ?? "chat") === experience
+        );
+        const fallback = state.conversations.find(
+          (conv) => (conv.experience ?? "chat") === experience
+        )?.id ?? null;
+        return {
+          activeExperience: experience,
+          activeConversationId: rememberedExists ? remembered! : fallback,
+          activeConversationIds: fallback && !rememberedExists
+            ? { ...state.activeConversationIds, [experience]: fallback }
+            : state.activeConversationIds,
+        };
+      }),
 
       replaceConversations: (conversations) =>
         set((state) => ({
-          conversations,
+          conversations: conversations.map((conv) => ({
+            ...conv,
+            experience: conv.experience ?? "chat",
+          })),
           // Preserve active conversation if it exists in the new list.
           // If it doesn't (user switch / stale ID), fall back to first or null.
-          activeConversationId: conversations.some((c) => c.id === state.activeConversationId)
+          activeConversationId: conversations.some(
+            (c) => c.id === state.activeConversationId && (c.experience ?? "chat") === state.activeExperience
+          )
             ? state.activeConversationId
-            : (conversations[0]?.id ?? null),
+            : (conversations.find((c) => (c.experience ?? "chat") === state.activeExperience)?.id ?? null),
+          activeConversationIds: Object.fromEntries(
+            (["chat", "code", "research", "routines"] as ConversationExperience[]).flatMap((experience) => {
+              const remembered = state.activeConversationIds[experience];
+              const id = conversations.some((c) => c.id === remembered && (c.experience ?? "chat") === experience)
+                ? remembered
+                : conversations.find((c) => (c.experience ?? "chat") === experience)?.id;
+              return id ? [[experience, id]] : [];
+            })
+          ),
         })),
 
       deleteConversation: (id) =>
         set((state) => {
           const filtered = state.conversations.filter((c) => c.id !== id);
+          const deleted = state.conversations.find((c) => c.id === id);
+          const experience = deleted?.experience ?? "chat";
+          const replacement = filtered.find((c) => (c.experience ?? "chat") === experience)?.id ?? null;
           return {
             conversations: filtered,
             activeConversationId:
               state.activeConversationId === id
-                ? filtered[0]?.id || null
+                ? replacement
                 : state.activeConversationId,
+            activeConversationIds: state.activeConversationIds[experience] === id
+              ? { ...state.activeConversationIds, [experience]: replacement ?? undefined }
+              : state.activeConversationIds,
           };
         }),
 

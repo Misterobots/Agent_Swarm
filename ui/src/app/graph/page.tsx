@@ -1,8 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Network, Brain, RefreshCw, ExternalLink } from "lucide-react";
 import { useAccess } from "@/lib/hooks/use-access";
+
+// WebGL memory graph — client-only (ForceGraph3D touches window/WebGL).
+const MemoryGraph3D = dynamic(
+  () => import("@/components/graph/memory-graph-3d").then((m) => m.MemoryGraph3D),
+  { ssr: false },
+);
 
 // ── Tab config ────────────────────────────────────────────────────────────────
 
@@ -143,9 +150,16 @@ export default function GraphPage() {
         </div>
       </div>
 
-      {/* ── Graph iframe ── */}
-      {/* One iframe per tab, hidden when not active — preserves scroll/zoom state */}
-      {TABS.map((tab) => (
+      {/* ── Graph body ── */}
+      {/* Memory: live WebGL 3D graph. Mounted only when active (re-fetches on
+          revisit; avoids hidden-canvas sizing issues). The classic 2D D3 page
+          stays reachable via "open external". */}
+      {activeTab === "memory" && (
+        <MemoryGraph3D ownerId={ownerId} reloadKey={reloadKey} onLoaded={() => setLoading(false)} />
+      )}
+
+      {/* Codebase: iframe to the standalone HTML graph. */}
+      {TABS.filter((tab) => tab.id !== "memory").map((tab) => (
         <iframe
           key={`${tab.id}-${reloadKey}`}
           ref={tab.id === activeTab ? iframeRef : undefined}

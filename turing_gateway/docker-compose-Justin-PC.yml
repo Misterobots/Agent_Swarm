@@ -100,6 +100,9 @@ services:
     container_name: alertmanager-turing
     hostname: alertmanager-turing
     restart: unless-stopped
+    depends_on:
+      maintenance-router:
+        condition: service_healthy
     volumes:
       - ./config/alertmanager:/etc/alertmanager
       - alertmanager_data:/alertmanager
@@ -124,6 +127,43 @@ services:
       - "traefik.http.routers.alertmanager.rule=PathPrefix(`/alertmanager`)"
       - "traefik.http.routers.alertmanager.entrypoints=web"
       - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+
+  # Alertmanager classification and governed recovery dispatch. This service
+  # belongs to the AI/Memex observability stack; it only observes/acts on
+  # Saltbox through the shared host-level action boundary.
+  maintenance-router:
+    build:
+      context: ../services/maintenance_router
+      dockerfile: Dockerfile
+    image: home-ai-lab/maintenance-router:latest
+    container_name: maintenance-router
+    hostname: maintenance-router
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../config/maintenance:/etc/maintenance:ro
+    environment:
+      - MAINTENANCE_MANIFEST=/etc/maintenance/manifest.yaml
+      - REDIS_HOST=redis-turing
+      - REDIS_PORT=6379
+      - MAINTENANCE_DB_HOST=${HOPPER_IP:-192.168.2.102}
+      - MAINTENANCE_DB_PORT=5432
+      - MAINTENANCE_DB_NAME=${MAINTENANCE_DB_NAME:-maintenance}
+      - MAINTENANCE_DB_USER=${MAINTENANCE_DB_USER:-maintenance}
+      - MAINTENANCE_DB_PASSWORD=${MAINTENANCE_DB_PASSWORD}
+      - LOG_LEVEL=${MAINTENANCE_LOG_LEVEL:-INFO}
+    ports:
+      - "9095:9095"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9095/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - ai_lab_net
 
   blackbox-exporter:
     image: prom/blackbox-exporter:latest
@@ -787,8 +827,21 @@ services:
       - "traefik.http.routers.docs-hive.entrypoints=websecure"
       - "traefik.http.routers.docs-hive.priority=30"
       - "traefik.http.routers.docs-hive.tls=true"
-      - "traefik.http.routers.docs-hive.middlewares=docs-strip"
+      - "traefik.http.routers.docs-hive.tls.certresolver=cfdns"
+      - "traefik.http.routers.docs-hive.tls.domains[0].main=shivelymedia.com"
+      - "traefik.http.routers.docs-hive.tls.domains[0].sans=*.shivelymedia.com"
+      - "traefik.http.routers.docs-hive.tls.options=securetls@file"
+      - "traefik.http.routers.docs-hive.middlewares=docs-strip,globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@file"
       - "traefik.http.routers.docs-hive.service=docs"
+      # External HTTP route — the Cloudflare Tunnel terminates TLS at the edge and delivers plain
+      # HTTP to Traefik's `web` entrypoint, so external traffic never reaches the websecure router
+      # above. Without this, the host-less LAN `docs` router (PathPrefix only, no auth) is what
+      # actually serves memex.shivelymedia.com/docs-site over the tunnel. Mirrors memex-ext-http.
+      - "traefik.http.routers.docs-hive-http.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
+      - "traefik.http.routers.docs-hive-http.entrypoints=web"
+      - "traefik.http.routers.docs-hive-http.priority=30"
+      - "traefik.http.routers.docs-hive-http.middlewares=docs-strip,globalHeaders@file,robotHeaders@file,cf-https-proto@file,authentik@file"
+      - "traefik.http.routers.docs-hive-http.service=docs"
 
 networks:
   ai_lab_net:

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ExternalLink, Download, Hammer, CheckCircle } from "lucide-react";
 import type { DesignArtifact } from "@/types/chat";
-import { useSettingsStore } from "@/lib/stores/settings-store";
 
 interface DesignArtifactCardProps {
   artifact: DesignArtifact;
@@ -13,9 +12,6 @@ interface DesignArtifactCardProps {
 
 export function DesignArtifactCard({ artifact, onSend }: DesignArtifactCardProps) {
   const [approved, setApproved] = useState(false);
-  const setSwarmMode   = useSettingsStore((s) => s.setSwarmMode);
-  const setDesignMode  = useSettingsStore((s) => s.setDesignMode);
-  const setWorkshopMode = useSettingsStore((s) => s.setWorkshopMode);
 
   const handleDownload = () => {
     const blob = new Blob([artifact.html], { type: "text/html" });
@@ -30,10 +26,6 @@ export function DesignArtifactCard({ artifact, onSend }: DesignArtifactCardProps
   const handleApproveBuild = () => {
     if (!onSend || approved) return;
     setApproved(true);
-    setWorkshopMode(false);
-    setDesignMode(false);
-    setSwarmMode(true);
-
     const filename = artifact.filename ?? `design_${artifact.project_id}.html`;
     const prompt = [
       `Implement this project as a complete, fully working application.`,
@@ -47,7 +39,7 @@ export function DesignArtifactCard({ artifact, onSend }: DesignArtifactCardProps
       `4. Ship a fully functional application — not another static HTML file`,
     ].join("\n");
 
-    onSend(prompt);
+    onSend(`/swarm ${prompt}`);
   };
 
   const borderColor = approved ? "border-emerald-500/50" : "border-purple-500/30";

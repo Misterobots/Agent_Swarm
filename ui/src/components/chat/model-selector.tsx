@@ -66,8 +66,11 @@ export function ModelSelector({ compact = false }: { compact?: boolean }) {
 
   // Fetch on mount
   useEffect(() => {
-    loadModels();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Defer the initial fetch so its state updates occur after the effect's
+    // synchronous setup phase, rather than during React's effect flush.
+    const timer = window.setTimeout(() => { void loadModels(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadModels]);
 
   // Re-fetch when user returns to this tab (e.g. after connecting an account
   // in settings or in another tab) — keeps the list fresh without polling
@@ -97,14 +100,14 @@ export function ModelSelector({ compact = false }: { compact?: boolean }) {
           useOptGroups ? (
             <optgroup key={owner} label={groupLabel}>
               {models.map((m) => (
-                <option key={m.id} value={m.id}>
+                <option key={m.id} value={m.id} disabled={m.available === false}>
                   {m.label ?? m.id}
                 </option>
               ))}
             </optgroup>
           ) : (
             models.map((m) => (
-              <option key={m.id} value={m.id}>
+              <option key={m.id} value={m.id} disabled={m.available === false}>
                 {m.label ?? m.id}
               </option>
             ))

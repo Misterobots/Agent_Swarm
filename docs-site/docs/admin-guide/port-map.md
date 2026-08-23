@@ -16,7 +16,8 @@ Complete port registry across all Memex nodes.
 | 5050 | Voice Engine (TTS) | HTTP | LAN |
 | 5060 | BMO Voice Assistant | HTTP | LAN |
 | 3300 | OpenHands | HTTP | LAN |
-| 8081 | cAdvisor | HTTP | Internal |
+| 8081 | cAdvisor | HTTP | Internal |
+| 9000 | Authentik SSO | HTTP | LAN |
 
 ## Control Node â {{ hopper_ip }}
 

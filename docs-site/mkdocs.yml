@@ -257,11 +257,17 @@ nav:
       - Ollama: modules/services/ollama.md
       - OpenHands: modules/services/openhands.md
       - Hive UI: modules/services/hive-ui.md
+  - Security:
+    - Multi-User Scoping: security/multi-user-scoping.md
+    - API Auth Contract: security/api-auth-contract.md
+    - API Auth Examples: security/api-auth-examples.md
   - Procedures:
     - procedures/index.md
     - Add a New Model: procedures/add-model.md
     - Switch Models: procedures/switch-models.md
     - Rotate SPIRE Keys: procedures/rotate-spire-keys.md
+    - Key Compromise Checklist: procedures/key-compromise-checklist.md
+    - Key Compromise Runbook: procedures/key-compromise-runbook.md
     - Configure Alerting: procedures/configure-alerting.md
     - Onboard a User: procedures/onboard-user.md
     - Disaster Recovery: procedures/disaster-recovery.md
@@ -299,8 +305,10 @@ nav:
     - Langfuse: troubleshooting/langfuse.md
     - Docker: troubleshooting/docker.md
     - Voice: troubleshooting/voice.md
+    - System Offline: troubleshooting/system-offline.md
   - Reference:
     - reference/index.md
+    - Component Catalog: reference/component-catalog.md
     - Glossary: reference/glossary.md
     - Environment Variables: reference/environment-variables.md
     - Documentation Standards: reference/doc-standards.md
