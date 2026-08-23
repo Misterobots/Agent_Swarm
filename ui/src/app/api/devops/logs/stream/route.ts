@@ -43,12 +43,7 @@ const NODE_IPS: Record<string, string> = {
 
 const SSH_USER = "misterobots";
 
-const SSH_BINARY =
-  process.platform === "win32"
-    ? require("fs").existsSync("C:\\Windows\\System32\\OpenSSH\\ssh.exe")
-      ? "C:\\Windows\\System32\\OpenSSH\\ssh.exe"
-      : "ssh"
-    : "ssh";
+const SSH_BINARY = process.env.MEMEX_SSH_BINARY ?? "ssh";
 
 // Heuristic: detect log level from a raw log line
 function detectLevel(line: string): "INFO" | "WARN" | "ERROR" | "DEBUG" {
@@ -132,14 +127,14 @@ export async function GET(request: NextRequest) {
       let stdoutBuf = "";
       let stderrBuf = "";
 
-      child.stdout.on("data", (chunk: Buffer) => {
+      child.stdout?.on("data", (chunk: Buffer) => {
         stdoutBuf += chunk.toString();
         const lines = stdoutBuf.split("\n");
         stdoutBuf = lines.pop() ?? "";
         lines.forEach(send);
       });
 
-      child.stderr.on("data", (chunk: Buffer) => {
+      child.stderr?.on("data", (chunk: Buffer) => {
         stderrBuf += chunk.toString();
         const lines = stderrBuf.split("\n");
         stderrBuf = lines.pop() ?? "";

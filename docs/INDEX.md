@@ -14,6 +14,8 @@
 | Document | Description |
 |----------|-------------|
 | [Documentation Governance Standard](governance/documentation_governance_standard.md) | Canonical document classes, metadata requirements, ownership, and review SLAs |
+| [Feature and Capability Documentation Standard](governance/feature_documentation_standard.md) | Standard structure, lifecycle, and definition of done for material capabilities |
+| [Feature Capability Template](templates/feature_capability_template.md) | Reusable canonical template for documenting new and extended capabilities |
 | [Documentation Gap Register](governance/documentation_gap_register.md) | Open documentation coverage gaps with severity, owner, and target date |
 | [Sprint Tracking Board](governance/sprint_tracking_board.md) | Centralized tracking of Sprint 1–3 deliverables, owners, targets, and verification gates |
 
@@ -141,6 +143,7 @@ Located in [`architecture/`](architecture/):
 | [MarsRL Inference Verification Deep Dive](architecture/marsrl_inference_verification_deep_dive.md) | Solver-verifier-corrector control loop and inference-time safety verification architecture |
 | [Memory and Preferences Deep Dive](architecture/memory_preferences_subsystem_deep_dive.md) | Owner-scoped context partitioning, memory recall filtering, and preference isolation model |
 | [Skills and Hooks Pipeline Deep Dive](architecture/skills_hooks_pipeline_deep_dive.md) | Skill dispatch path, hook controls, IoT-sensitive safeguards, and audit observability |
+| [Friday Request Origin and Image Delivery](architecture/friday_request_origin_and_image_delivery.md) | Current device-origin contract, image delivery workflow, configuration, verification, and extension path |
 | [MemPalace Integration Deep Dive](architecture/mempalace_integration_deep_dive.md) | Official MemPalace v3.3.0 library integration, palace hierarchy, hall mapping, KnowledgeGraph |
 | [JWT-ACE Card Lifecycle Deep Dive](architecture/jwt_ace_card_lifecycle_deep_dive.md) | Session cards, active scope narrowing, child card derivation, validation cache |
 

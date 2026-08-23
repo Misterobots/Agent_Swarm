@@ -56,8 +56,10 @@ logger = logging.getLogger("AutoRepair")
 TURING_IP = os.getenv("TURING_IP", "192.168.2.103")
 HOPPER_IP = os.getenv("HOPPER_IP", "192.168.2.102")
 LOVELACE_IP = os.getenv("LOVELACE_IP", "192.168.2.101")
-SSH_USER = "misterobots"
-SSH_BIN = "C:\\Windows\\System32\\OpenSSH\\ssh.exe"
+SSH_USER = os.getenv("AUTO_REPAIR_SSH_USER", "misterobots")
+# Portable: "ssh" resolves via PATH on both Linux (systemd host / container) and
+# Windows (OpenSSH). Override with AUTO_REPAIR_SSH_BIN for a non-standard path.
+SSH_BIN = os.getenv("AUTO_REPAIR_SSH_BIN", "ssh")
 
 # Authentik database credentials
 AUTHENTIK_DB_USER = os.getenv("AUTHENTIK_DB_USER", "misterobots")
@@ -162,8 +164,10 @@ class AutoRepairDaemon:
         """Check Authentik service health."""
         logger.info("Checking Authentik health...")
         
-        # Check if Authentik is responding
-        url = f"http://{TURING_IP}:9000/-/health/live/"
+        # Check if Authentik is responding. Use the public health endpoint (reachable
+        # from Lovelace, where this daemon runs) — TURING_IP:9000 is not host-published,
+        # so the old URL was a permanent false positive that triggered needless repairs.
+        url = os.getenv("AUTHENTIK_HEALTH_URL", "https://auth.shivelymedia.com/-/health/live/")
         healthy, error = self.check_http_endpoint(url)
         
         if healthy:

@@ -1,0 +1,48 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# maintenance_router — Alertmanager → classify → agent-repair / human-queue
+# (P0 of docs/mission_control_ops_console_design.md — the incident-feed engine)
+# ═══════════════════════════════════════════════════════════════════════════
+# Deployed as its own compose PROJECT so it never entangles with the drifted
+# /home/misterobots/docker-compose.yml or turing_gateway stacks. Lives on the
+# existing ai_lab_net so Alertmanager (http://maintenance-router:9095/webhook/
+# alertmanager) and memex_ui's server-side proxy reach it by hostname, and it
+# reaches redis-turing (agent dispatch queue) + Hopper Postgres (human queue).
+#   docker compose -f docker-compose.maintenance-router.yml up -d --build
+# Env (MAINTENANCE_DB_PASSWORD, HOPPER_IP, ...) is loaded from turing_gateway/.env.
+name: maintenance-router
+
+services:
+  maintenance-router:
+    build:
+      context: ../services/maintenance_router
+      dockerfile: Dockerfile
+    image: home-ai-lab/maintenance-router:latest
+    container_name: maintenance-router
+    hostname: maintenance-router
+    restart: unless-stopped
+    volumes:
+      - ../config/maintenance:/etc/maintenance:ro
+    environment:
+      - MAINTENANCE_MANIFEST=/etc/maintenance/manifest.yaml
+      - REDIS_HOST=redis-turing
+      - REDIS_PORT=6379
+      - MAINTENANCE_DB_HOST=${HOPPER_IP:-192.168.2.102}
+      - MAINTENANCE_DB_PORT=5432
+      - MAINTENANCE_DB_NAME=${MAINTENANCE_DB_NAME:-maintenance}
+      - MAINTENANCE_DB_USER=${MAINTENANCE_DB_USER:-maintenance}
+      - MAINTENANCE_DB_PASSWORD=${MAINTENANCE_DB_PASSWORD}
+      - LOG_LEVEL=${MAINTENANCE_LOG_LEVEL:-INFO}
+    ports:
+      - "9095:9095"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9095/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - ai_lab_net
+
+networks:
+  ai_lab_net:
+    external: true

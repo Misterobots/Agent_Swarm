@@ -62,8 +62,8 @@ export default function SettingsPage() {
   const modelAccessMessage = accessLoading
     ? "Checking access level…"
     : isAdmin
-      ? "Admin access verified. Claude models are available for this session."
-      : `Access level: ${securityLevel || "anonymous"}. Claude models are hidden and non-admin sessions use local-model fallback.`;
+      ? "Admin access verified. Choose an approved runtime from the model catalog."
+      : "Memex selects the approved default model. Modes, reasoning effort, memory, and grounding remain available to you.";
 
   return (
     <div className="flex flex-col h-full">
@@ -151,8 +151,8 @@ export default function SettingsPage() {
           </SettingsCard>
 
           <SettingsCard title="Chat">
-            <Field label="Default model">
-              <ModelSelector />
+            <Field label={isAdmin ? "Default model" : "Model policy"}>
+              {isAdmin ? <ModelSelector /> : <span className="text-sm font-medium text-[var(--chat-text)]">Memex default</span>}
               <p className="text-xs text-[var(--chat-muted)] mt-2">{modelAccessMessage}</p>
             </Field>
           </SettingsCard>

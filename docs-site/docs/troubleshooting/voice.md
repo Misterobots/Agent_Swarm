@@ -69,6 +69,29 @@ docker logs piper --tail 30
 
 ---
 
+## BMO Voice Not Responding
+
+**Symptom**: The BMO voice persona doesn't respond, produces silence, or has degraded audio.
+
+**Diagnose**:
+
+```bash
+docker compose ps bmo-voice voice-engine
+docker compose logs bmo-voice --tail 30
+docker compose logs voice-engine --tail 30
+```
+
+**Common causes**:
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `bmo-voice` exits immediately | GPU driver error | Restart the container; check `nvidia-smi` on the GPU node |
+| Voice quality degraded | RVC model not loaded | Check `bmo-voice` logs for model load status |
+| TTS produces silence | Qwen-TTS model not initialized | Restart `voice-engine`; check the HuggingFace cache volume |
+| Long TTS latency | LLM model evicted from VRAM by other workloads | Set `BMO_LLM_MODEL` to a smaller model, or increase `OLLAMA_KEEP_ALIVE` |
+
+---
+
 ## Browser Microphone Issues
 
 **Symptom**: "Microphone not found" or permission denied.

@@ -13,6 +13,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { ServiceWorkerRegistration } from "./sw-register";
 import { useChatStore } from "@/lib/stores/chat-store";
+import type { Conversation } from "@/types/chat";
 
 const AppShell = dynamic(
   () => import("@/components/layout/app-shell").then((m) => m.AppShell),
@@ -23,7 +24,7 @@ const API            = "/api/backend/v1/conversations";
 const IDENTITY_KEY   = "memex-identity";
 const USER_SCOPED    = ["memex-chats", "memex-buddy", "memex-dev", "memex-monitor", "memex-onboarding"];
 
-async function resumeSession(replaceConversations: (c: unknown[]) => void): Promise<void> {
+async function resumeSession(replaceConversations: (c: Conversation[]) => void): Promise<void> {
   // Identify current user
   let currentUser: string | null = null;
   try {
@@ -47,7 +48,7 @@ async function resumeSession(replaceConversations: (c: unknown[]) => void): Prom
     if (!r.ok) return;
     const data = await r.json();
     if (Array.isArray(data?.conversations) && data.conversations.length > 0) {
-      replaceConversations(data.conversations);
+      replaceConversations(data.conversations as Conversation[]);
     }
   } catch {}
 }

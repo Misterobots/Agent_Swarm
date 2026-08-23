@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePairing } from "@/lib/hooks/use-pairing";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { RemoteCadPanel } from "@/components/shared/remote-cad-panel";
 
 interface Props {
   onClose: () => void;
@@ -110,6 +111,7 @@ export function PairingPanel({ onClose }: Props) {
               >
                 Test — send hello to peer
               </button>
+              <RemoteCadPanel state={state} actions={actions} />
             </div>
           )}
 

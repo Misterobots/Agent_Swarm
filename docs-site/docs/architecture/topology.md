@@ -16,6 +16,7 @@ graph LR
         Ctrl["Hopper<br/>192.168.2.102<br/>Low-power x86"]
         GW["Turing<br/>192.168.2.103<br/>RTX 3070 Ti 8GB"]
         iDRAC["iDRAC<br/>192.168.2.104"]
+        BMO["BMO<br/>192.168.2.106<br/>Voice/media node"]
     end
 ```
 
@@ -50,6 +51,26 @@ graph LR
 | **GPU** | NVIDIA RTX 3070 Ti 8GB VRAM |
 | **RAM** | 64GB |
 | **Services** | Traefik, jacquard, hollerith, knuth, AlertManager, Ollama (secondary), Redis |
+
+### BMO -- Voice/Media Node (192.168.2.106)
+
+| Spec | Value |
+|------|-------|
+| **Role** | Voice / media satellite node |
+| **GPU** | None |
+| **Services** | Voice pipeline endpoint |
+
+> Not part of the three-tier compute/control/gateway split -- a dedicated satellite node for voice and media I/O.
+
+## Design Rationale
+
+Why the three tiers are kept on separate physical nodes rather than consolidated:
+
+| Tier | Why Separate? |
+|------|---------------|
+| **Control** (Hopper) | Low-power, always-on node. Stores data and runs identity/auth. Isolated from compute to prevent data exfiltration if the compute node is compromised. |
+| **Compute** (Lovelace) | GPU workloads require isolation. Training, inference, and generation compete for VRAM, coordinated via a Redis-based GPU mutex. |
+| **Gateway** (Turing) | Traffic routing and monitoring must stay independent of compute. If the compute node goes down, you can still see why via the observability stack. The gateway node has larger RAM headroom to absorb sandboxes and media stacks without competing for GPU-adjacent resources. |
 
 ## Service Distribution
 

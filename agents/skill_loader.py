@@ -63,6 +63,18 @@ def _handle_bash_parse(args: Dict[str, Any]) -> Dict[str, Any]:
     return {"isError": False, "content": [{"type": "text", "text": str(result)}]}
 
 
+def _handle_bambu_print(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Route an approved Bambu action to Friday's local print bridge."""
+    from tools.bambu_print import bambu_print_handler
+    return bambu_print_handler(args)
+
+
+def _handle_cad_print(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Call Friday's shared local CAD + print service."""
+    from tools.cad_print import cad_print_handler
+    return cad_print_handler(args)
+
+
 # ---------------------------------------------------------------------------
 # Skill definitions
 # ---------------------------------------------------------------------------
@@ -120,6 +132,35 @@ BUILTIN_SKILLS = [
         required_capabilities=["terminal.parse"],
         min_security_level="L2_USER",
         tags=["bash", "parser", "tree-sitter"],
+    ),
+    Skill(
+        name="bambu_print",
+        category="fabrication",
+        description=("Prepare, inspect, approve, or start an allow-listed Bambu P1S job through "
+                     "Friday's local safety-gated print bridge. Starting or cancelling always requires "
+                     "an explicit expiring approval token and confirmed=true."),
+        handler=_handle_bambu_print,
+        triggers=SkillTriggers(
+            intents=["IOT_DEV"],
+            keywords=["bambu", "p1s", "3d print", "print job", "slice and print"],
+        ),
+        required_capabilities=["fabrication.print"],
+        min_security_level="L3_ADMIN",
+        tags=["fabrication", "3d-printing", "bambu", "safety-gated"],
+    ),
+    Skill(
+        name="cad_print",
+        category="fabrication",
+        description=("Render, export, inspect, and prepare approved Friday Body CAD/print jobs via "
+                     "the same local service used by Memex Desktop. Physical starts require explicit approval."),
+        handler=_handle_cad_print,
+        triggers=SkillTriggers(
+            intents=["IOT_DEV", "CODE"],
+            keywords=["openscad", "render chassis", "export 3mf", "cad model", "print plate"],
+        ),
+        required_capabilities=["fabrication.cad", "fabrication.print"],
+        min_security_level="L3_ADMIN",
+        tags=["fabrication", "cad", "openscad", "bambu", "shared-workflow"],
     ),
 ]
 

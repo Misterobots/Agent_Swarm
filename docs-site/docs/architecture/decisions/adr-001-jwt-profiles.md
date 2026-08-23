@@ -35,6 +35,16 @@ Intent=CONVERSATION → tools=[search], level=L1
 Intent=IOT_CONTROL → tools=[ha_call_service, ha_turn_on], level=L5
 ```
 
+## Token Trust & Validation Rules
+
+JWT-ACE tokens are issued and validated against the production token identity trust standard (`docs/security/identity_token_trust_standard.md`, SEC-IDENT-001):
+
+- **Token profiles must not be mixed**: Workload Identity Token (SPIFFE JWT-SVID, service-to-service) and User Access Token (user-scoped, multi-user routing state) are distinct profiles, validated independently.
+- **Validation requirements**: signature checked against allowlisted algorithms per profile; `iss`, `sub`, `aud`, `exp`, `iat`, `nbf` are all required and verified; token type must match route-class.
+- **Prohibited patterns**: `none` algorithm in production; accepting both HS and RS validation on the same endpoint path; trusting dynamic key URLs from token headers unless explicitly allowlisted.
+- **Route-class policy**: internal workload endpoints accept the workload identity profile only; user interaction endpoints accept the user access profile only; mixed acceptance is prohibited except in an explicit, feature-flagged migration mode.
+- **Rollback-safe migration**: enforcement rolls out parse-only → soft-enforce → hard-enforce; rollback returns to soft-enforce while preserving issuer and audience checks.
+
 ## Consequences
 
 ### Positive

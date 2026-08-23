@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal as TerminalIcon, Wifi, WifiOff, RotateCcw, Monitor } from "lucide-react";
 import { useDesktop } from "@/lib/hooks/use-desktop";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 
 // ---------------------------------------------------------------------------
 // WebSocket helpers (remote server terminal — existing behaviour)
@@ -49,6 +50,7 @@ export function TerminalPane({ sessionId = "default" }: TerminalPaneProps) {
 
   const { inDesktop, bridge } = useDesktop();
   const desktopLocalPath = useSettingsStore((s) => s.desktopLocalPath);
+  const currentProjectId = useDevProjectStore((s) => s.currentProjectId);
 
   // ---------------------------------------------------------------------------
   // WebSocket backend (remote server)
@@ -60,7 +62,9 @@ export function TerminalPane({ sessionId = "default" }: TerminalPaneProps) {
     wsRef.current?.close();
     setConnState("connecting");
 
-    const ws = new WebSocket(`${WS_BASE}/ws/terminal?uid=${encodeURIComponent(uid)}`);
+    const params = new URLSearchParams({ uid, session: sessionId });
+    if (currentProjectId) params.set("projectId", currentProjectId);
+    const ws = new WebSocket(`${WS_BASE}/ws/terminal?${params.toString()}`);
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 

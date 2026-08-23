@@ -126,15 +126,6 @@ const SKILLS: Skill[] = [
 
 const SKILL_CATS: SkillCat[] = ["Daily", "Maintenance", "Memory", "Research", "Build"];
 
-function applyModeForCommand(command: string) {
-  const s = useSettingsStore.getState();
-  s.setWorkshopMode(false);
-  s.setDesignMode(false);
-  s.setSwarmMode(false);
-  if (command === "/design") s.setDesignMode(true);
-  else if (command === "/swarm" || command === "/plan") s.setSwarmMode(true);
-}
-
 function relTime(epochSec?: number): string {
   if (!epochSec) return "—";
   const s = Math.max(0, Math.floor(Date.now() / 1000 - epochSec));
@@ -544,6 +535,41 @@ function ActivitySpark({ data }: { data: { label: string; count: number }[] }) {
       <div className="mt-1 flex justify-between text-[10px] text-[var(--chat-subtle)]">
         {data.map((d, i) => <span key={i}>{d.label}</span>)}
       </div>
+    </div>
+  );
+}
+
+function AgentsTab({ sessions }: { sessions: SwarmSession[] }) {
+  if (!sessions.length) {
+    return (
+      <Card padding="lg" className="text-center">
+        <Cpu size={22} className="mx-auto mb-2 text-[var(--chat-subtle)]" />
+        <p className="text-sm text-[var(--chat-text)]">No active coordinations.</p>
+        <p className="mt-1 text-[12px] text-[var(--chat-muted)]">Launch a Build to watch agents here live.</p>
+      </Card>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {sessions.map((s) => (
+        <div key={s.coordination_id} className="rounded-lg border border-[var(--chat-border)]">
+          <div className="flex items-center justify-between border-b border-[var(--chat-border)] px-4 py-2.5">
+            <span className="text-sm font-semibold text-[var(--chat-text)]">{s.session_id}</span>
+            <span className="flex items-center gap-1.5 text-[11px] text-amber-400"><span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />{s.running_count} running · {s.worker_count} workers</span>
+          </div>
+          <div className="divide-y divide-[var(--chat-border)]">
+            {s.workers.map((w) => (
+              <div key={w.worker_id} className="flex items-center gap-3 px-4 py-2 text-sm">
+                <span className="w-28 shrink-0 truncate font-medium text-[var(--chat-text)]">{w.name || w.worker_id}</span>
+                <span className="w-24 shrink-0 truncate text-[12px] text-[var(--chat-subtle)]">{w.role}</span>
+                <span className="hidden w-32 shrink-0 truncate font-mono text-[11px] text-[var(--chat-accent)] md:inline">{w.model || "—"}</span>
+                <span className="flex-1 truncate text-[12px] text-[var(--chat-muted)]">{w.phase}</span>
+                <span className={cn("rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase", w.state === "running" ? "bg-amber-500/15 text-amber-400" : w.state === "completed" ? "bg-emerald-500/15 text-emerald-400" : w.state === "failed" ? "bg-red-500/15 text-red-400" : "bg-[var(--hover-tint)] text-[var(--chat-subtle)]")}>{w.state}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

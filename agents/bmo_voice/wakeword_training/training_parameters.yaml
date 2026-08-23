@@ -46,12 +46,12 @@ features:
   # a few dozen real clips pull real influence without DOMINATING — which keeps the synthetic
   # set's broad speaker diversity in play so guests / unseen voices still trigger. Drop to 1.0
   # if it starts overfitting to your specific recordings (great on your clips, worse in general).
-  # - features_dir: real_augmented_features
-  #   sampling_weight: 2.0
-  #   penalty_weight: 1.0
-  #   truth: true
-  #   truncation_strategy: truncate_start
-  #   type: mmap
+  - features_dir: real_augmented_features
+    sampling_weight: 2.0
+    penalty_weight: 1.0
+    truth: true
+    truncation_strategy: truncate_start
+    type: mmap
 
   # Negative sets, pre-built by microWakeWord's authors and downloaded by
   # download_negatives.sh from huggingface.co/datasets/kahrendt/microwakeword.
@@ -71,6 +71,23 @@ features:
 
   - features_dir: negative_datasets/no_speech
     sampling_weight: 5.0
+    penalty_weight: 1.0
+    truth: false
+    truncation_strategy: random
+    type: mmap
+
+  # OPTIONAL household HARD-NEGATIVES — YOUR rooms' ambient audio (TV / conversation / music) that
+  # has been FALSE-triggering "Hey Friday", sliced to ~1.5 s clips (see RECORDING_NEGATIVES.md +
+  # slice_negatives.sh). This is the Phase-A fix for premature triggering: the generic sets above
+  # don't cover THIS household's specific voices/rooms/shows, so the model over-accepts them.
+  # sampling_weight is higher than the generic sets (they teach general rejection; these teach the
+  # exact false-fires to kill). UNCOMMENT once household_negatives/ has clips AND
+  # household_negative_features/ has been extracted — model_train_eval crashes on a listed-but-
+  # missing features_dir, so it stays commented until then.
+  # ENABLED 2026-08-02: 1414 household hard-negative clips (35 min ambient) in household_negatives/;
+  # extract_features featurizes them into household_negative_features/ before training reads them.
+  - features_dir: household_negative_features
+    sampling_weight: 12.0
     penalty_weight: 1.0
     truth: false
     truncation_strategy: random

@@ -156,21 +156,30 @@ def _chunk_to_dict(ch) -> dict | None:
     return None
 
 
-def _exec_sandbox(tool_name: str, args: dict, session_queue) -> str:
+def _exec_sandbox(tool_name: str, args: dict, session_queue, container_name: str | None = None) -> str:
     """Run a sandbox tool, route file_change events directly into the session queue.
 
     The file_change sink collects raw dicts ({"type":"file_change","content":{...}})
     and pushes them into session_queue so the orchestrator's drain-and-yield loop
     surfaces them in the UI while the worker is still running.
+
+    container_name (may be None) is set on sandbox_identity for the duration of
+    this call, mirroring the file_change_sink bracketing immediately below —
+    same thread, same "set at the start of the executor-thread function, clear
+    in finally" pattern. None means "use the default" (sandbox_identity falls
+    back to SANDBOX_CONTAINER itself).
     """
     from tools.sandbox_ops import execute_tool as _sandbox_execute
     from tools.file_change_sink import set_file_change_sink
+    from coordination.sandbox_identity import set_current_container
     collected: list[dict] = []
     set_file_change_sink(collected.append)
+    set_current_container(container_name)
     try:
         result = _sandbox_execute(tool_name, args)
     finally:
         set_file_change_sink(None)
+        set_current_container(None)
     for fc in collected:
         try:
             session_queue.put_nowait(fc)
@@ -231,6 +240,7 @@ async def _run_async(
     tool_defs: list,
     prompt: str,
     pioneer: dict | None = None,
+    container_name: str | None = None,
 ):
     """Async core: runs the DevHarness loop and returns (summary_text, [dict_events])."""
     from dev_harness.history import History, UserMessage, StreamChunk
@@ -271,7 +281,7 @@ async def _run_async(
             )
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
-            None, _exec_sandbox, tname, targs, file_change_queue
+            None, _exec_sandbox, tname, targs, file_change_queue, container_name
         )
 
     try:
@@ -311,6 +321,7 @@ def run_devharness_worker(
     scope: str,
     prompt: str,
     all_tool_defs: list,
+    container_name: str | None = None,
 ) -> str:
     """Synchronous worker runner — matches the phidata _run_worker return contract.
 
@@ -318,6 +329,10 @@ def run_devharness_worker(
     main thread (sequential implementation workers).  Updates WorkerState, writes
     the result to the session scratchpad, and drains accumulated agent_event /
     file_change / todo dicts into session.file_change_queue for the SSE generator.
+
+    container_name (may be None — see sandbox_identity.py) scopes every sandbox
+    tool call this worker makes to a specific per-session Docker container
+    instead of the shared default.
     """
     worker = session.workers[worker_id]
     worker.state = WorkerState.RUNNING
@@ -357,6 +372,7 @@ def run_devharness_worker(
             tool_defs,
             prompt,
             pioneer=worker.pioneer,
+            container_name=container_name,
         ))
 
         # Push non-file_change events (agent_event, todo) collected during the run.

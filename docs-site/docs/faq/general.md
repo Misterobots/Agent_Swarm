@@ -54,4 +54,8 @@ Yes, once models are downloaded. All inference, storage, and processing happen o
 - **Extensible** — add custom agents, tools, and workflows
 - **IoT-connected** — controls smart home devices
 
+## Why is the AI taking a long time to respond?
+
+Coding and complex requests go through a Solver → Verifier loop: the Solver generates a first-pass response, and the Verifier checks it for quality and correctness before it's returned. If the check fails, the response is regenerated. This takes longer than a single-pass reply but produces better output. You can watch progress in the chat as status updates appear. If a response takes more than a few minutes, the stream may have stalled — reload and retry.
+
 

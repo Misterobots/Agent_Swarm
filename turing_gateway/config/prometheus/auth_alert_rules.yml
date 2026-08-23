@@ -24,6 +24,17 @@ groups:
           summary: "Agent runtime on {{ $labels.node }} is unreachable"
           description: "Prometheus cannot scrape the agent-runtime metrics endpoint on {{ $labels.node }} for 2 minutes."
 
+      - alert: FridayVaultDisconnected
+        expr: probe_success{job="friday-brain-vault-health"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: friday-brain
+          category: memory
+        annotations:
+          summary: "Friday's memory vault is disconnected"
+          description: "friday_brain's /health has not reported \"vault\": true for 10 minutes (or the endpoint itself is unreachable) — memory recall/write-back is silently disabled. Check FRIDAY_VAULT_URL/FRIDAY_VAULT_OWNER in execution_plane/.env on Lovelace, and confirm Bush (192.168.2.107:8200) is reachable."
+
   - name: auth-key-compromise
     interval: 15s
     rules:

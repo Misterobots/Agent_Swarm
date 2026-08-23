@@ -3,6 +3,25 @@
 > Status: proposed. Successor to the Phase 0–4 dev-harness plan. Land Phase 0/1
 > of the dev harness first (done: commits `998d714`, `be9d17e`, `abb4dff`).
 
+> **⚠️ Container model superseded (Per-Session Sandbox Containers redesign, 2026-08):**
+> This document's "Phase B — substrate reconciliation" and the "Swarm coding
+> output" decision below describe swarm/dev-mode work landing in the single
+> shared `dev_sandbox` container's host-mounted `/workspace` as settled,
+> current architecture. That's no longer true. A near-miss data-loss incident
+> (the shared container's `/workspace` was bind-mounted to the LIVE Agent_Swarm
+> repo, and a "clear workspace before checkout" step nearly deleted it) drove a
+> follow-on redesign: every swarm run, dev-mode chat turn, and dev-terminal
+> session now gets its OWN disposable container
+> (`coordination/session_sandbox.py`), with no host mount at all, UNLESS it's
+> the one deliberately distinguished "Agent_Swarm (live)" project — see
+> `dev_projects/store.py::get_or_create_live_repo_project` — which still
+> bind-mounts the live repo on purpose, exactly as this document originally
+> described, just scoped to that one case instead of every task. Everything
+> else on this page (the DevHarness-as-worker-engine unification itself, the
+> capability-preservation matrix, `kb_search`, the migration phases for
+> *which engine* runs a worker) is unaffected and still accurate — this note
+> only concerns *which container* that engine's tool calls land in.
+
 ## Context
 
 Memex has **two** agent engines today, and they don't share a substrate:
@@ -84,7 +103,7 @@ Replace the worker *construction* and *execution*, keep everything else:
 
 - **Phase A — coder/devops on the sandbox (highest payoff). ✅ DONE (d67c865)**
   Extracted `coordination/devharness_worker.py`. Flag `SWARM_DEVHARNESS_WORKERS` added to executor; all 5 `_run_worker` call sites pass `role=`/`scope=`. `kb_search` host-side tool added. `DEV_TOOL_DEFINITIONS` moved to `dev_harness/tool_defs.py` (shared). Flag default = false; enabled in compose.
-- **Phase B — substrate reconciliation. ✅ DONE (no code change needed)**
+- **Phase B — substrate reconciliation. ✅ DONE (no code change needed)** — ⚠️ container model described here is superseded, see the note at the top of this document.
   Audit finding: `dev_sandbox` and `agent_runtime` both mount `../:/workspace` from the same host bind path, and both run as UID 1000. Files written by DevHarness workers to `/workspace/delivered_artifacts/` inside dev_sandbox are immediately visible in agent_runtime (same inode). The design-revision artifact cache and static file serve work unchanged. Android build pipeline is a future pending task with no existing code to audit. `SWARM_DEVHARNESS_WORKERS=true` is now the default in `execution_plane/docker-compose.yml`.
 - **Phase C — research/analyst lenses. ✅ DONE + VERIFIED (ecbf2d9, 1c974a8)**
   All 6 roles now in `DEVHARNESS_ELIGIBLE_ROLES`. `_ROLE_ALLOWED_TOOLS` restricts researcher to `web + read-only`, analyst to `read-only`, verifier to `glob/grep/read/list`. Pioneer persona (`full_name`, `motto`) prepended to every worker's system prompt inside `_run_async` so the lens is fully embodied. Lens content (`label`, `lens_desc`) carried in `persp_prompt` as the user message — unchanged from the phidata path.
@@ -123,6 +142,6 @@ Replace the worker *construction* and *execution*, keep everything else:
 
 | Decision | Choice | Implication |
 |---|---|---|
-| **Swarm coding output** | `dev_sandbox` (full migration) | Phase B must repoint the design-revision artifact cache (`/workspace/delivered_artifacts/latest_{session_id}.html`) and the Android build pipeline before Phase A workers go fully live. Flag Phase A workers off by default until Phase B lands. |
+| **Swarm coding output** | `dev_sandbox` (full migration) — ⚠️ superseded, see the note at the top of this document | Phase B must repoint the design-revision artifact cache (`/workspace/delivered_artifacts/latest_{session_id}.html`) and the Android build pipeline before Phase A workers go fully live. Flag Phase A workers off by default until Phase B lands. |
 | **Coordinator engine** | Direct LLM (no DevHarness) | `decomposer.py`, `synthesizer.py`, `orchestrator.py` call the LLM directly — no tool loop overhead. This is the existing behavior; no change needed. |
 | **`kb_search` placement** | Host-side tool | `agent_runtime` queries `PgVector` on Hopper directly (same network path as the existing `AGNO_DB_URL`). Worker calls it like `web_search` via `_run_mcp_tool` / `ToolHookRegistry`. No sandbox → Hopper network plumbing required. Add schema to `DEV_TOOL_DEFINITIONS` and wire into coder/architect role tool subsets only. |

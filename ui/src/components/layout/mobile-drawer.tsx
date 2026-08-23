@@ -7,13 +7,14 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import {
   isConversationRoute,
+  conversationExperienceForPath,
   isNavigationItemActive,
   primaryNavigation,
+  utilityNavigation,
 } from "@/lib/config/navigation";
 
-// Items shown in the More drawer (Media + Palace only)
-const MOBILE_MORE_HREFS = new Set(["/media", "/palace"]);
-import { ModeSwitcher } from "./mode-switcher";
+// Product destinations shown behind the fifth mobile tab.
+const MOBILE_MORE_HREFS = new Set(["/art-studio", "/palace"]);
 import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, MessageSquare, X, LogOut, LogIn, User, ChevronDown } from "lucide-react";
 import { useAccess } from "@/lib/hooks/use-access";
@@ -35,9 +36,15 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
   const model = useSettingsStore((s) => s.model);
   const { isAdmin, authenticated, displayName } = useAccess();
   const showConversations = isConversationRoute(pathname);
+  const experience = conversationExperienceForPath(pathname);
+  const experienceConversations = conversations.filter((conv) => (conv.experience ?? "chat") === experience);
+  const experienceLabel = experience === "code" ? "Code" : experience === "research" ? "Research" : experience === "routines" ? "Routine" : "Chat";
 
   const visibleExplore = useMemo(
-    () => primaryNavigation.filter((item) => MOBILE_MORE_HREFS.has(item.href)),
+    () => [
+      ...primaryNavigation.filter((item) => MOBILE_MORE_HREFS.has(item.href)),
+      ...utilityNavigation,
+    ],
     []
   );
 
@@ -99,14 +106,6 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
           <div className="absolute bottom-0 left-3 right-3 divider" />
         </div>
 
-        {/* Mode Switcher — admin only, matches desktop sidebar behaviour */}
-        {isAdmin && (
-          <div className="relative px-3 py-3">
-            <ModeSwitcher />
-            <div className="absolute bottom-0 left-3 right-3 divider" />
-          </div>
-        )}
-
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin">
           <DrawerSection title="Explore">
@@ -126,23 +125,23 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
               <div className="px-3 py-2">
                 <button
                   onClick={() => {
-                    createConversation(model);
+                    createConversation(model, experience);
                     onClose();
                   }}
                   className="btn-secondary w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md"
                 >
                   <Plus size={14} />
-                  <span>New Chat</span>
+                  <span>New {experienceLabel}</span>
                 </button>
               </div>
 
-              <DrawerSection title="Chat History">
-                {conversations.length === 0 ? (
+              <DrawerSection title={`${experienceLabel} History`}>
+                {experienceConversations.length === 0 ? (
                   <p className="px-3 py-2 text-xs text-[var(--chat-muted)]">
                     Start a conversation to see history here.
                   </p>
                 ) : (
-                  conversations.map((conv) => (
+                  experienceConversations.map((conv) => (
                     <div
                       key={conv.id}
                       onClick={() => {
@@ -259,10 +258,7 @@ function DrawerNavItem({
   const hasChildren = item.children && item.children.length > 0;
   const [expanded, setExpanded] = useState(() => active);
 
-  // Auto-expand when navigating to a child route
-  useEffect(() => {
-    if (active && hasChildren) setExpanded(true);
-  }, [active, hasChildren]);
+  const shownExpanded = expanded || active;
 
   if (hasChildren) {
     return (
@@ -283,14 +279,14 @@ function DrawerNavItem({
             size={13}
             className={cn(
               "shrink-0 transition-transform duration-200 text-[var(--chat-subtle)]",
-              expanded && "rotate-180"
+              shownExpanded && "rotate-180"
             )}
           />
         </button>
         <div
           className={cn(
             "overflow-hidden transition-all duration-200",
-            expanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+            shownExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
           )}
         >
           <div className="ml-5 mt-0.5 space-y-px border-l border-[var(--chat-border)] pl-2">

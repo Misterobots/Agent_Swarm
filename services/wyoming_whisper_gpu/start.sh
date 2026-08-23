@@ -34,7 +34,7 @@ python3 -m wyoming_faster_whisper \
     --beam-size "$WHISPER_BEAM_SIZE" \
     --language en \
     --vad-filter \
-    --vad-threshold 0.5 \
+    --vad-threshold "${WHISPER_VAD_THRESHOLD:-0.3}" \
     --vad-min-speech-ms 400 \
     --vad-min-silence-ms 2000 \
     --data-dir /data \

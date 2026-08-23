@@ -43,6 +43,7 @@ class DevHarness:
         router,
         approval=None,
         gate=None,
+        checkpoint=None,
     ):
         """Async generator yielding StreamChunk objects (caller serialises to SSE).
 
@@ -58,6 +59,10 @@ class DevHarness:
         `tool_executor` returns either a result string, or a (string, [extra
         StreamChunks]) tuple for harness tools that also emit UI events
         (e.g. TodoWrite emits a `todo` event alongside its result).
+
+        `checkpoint`, when supplied, is an async callback receiving
+        ``(status, turn, pending_tools, error)``.  A false result is treated
+        as a durability failure and stops before the next tool executes.
         """
         from dev_harness.router import HarnessState
 
@@ -74,6 +79,8 @@ class DevHarness:
                 )
             except Exception as e:  # transport/HTTP failure with no escalation path
                 logger.error("[dev_harness] model call failed (turn %d): %s", state.turn, e, exc_info=True)
+                if checkpoint is not None:
+                    await checkpoint("failed", state.turn, [], str(e))
                 yield StreamChunk(type="error", content=f"Model call failed: {e}")
                 return
 
@@ -82,6 +89,20 @@ class DevHarness:
 
             # Record the assistant turn (text + any tool calls) on the neutral history.
             history.add_assistant(result.text, result.tool_calls)
+
+            pending_tools = [
+                {"call_id": call.call_id, "name": call.name, "args": call.args}
+                for call in result.tool_calls
+            ]
+            checkpoint_status = "awaiting_tools" if pending_tools else "completed"
+            if checkpoint is not None and not await checkpoint(
+                checkpoint_status, state.turn, pending_tools, ""
+            ):
+                yield StreamChunk(
+                    type="error",
+                    content="Durable checkpoint unavailable; no tool was executed.",
+                )
+                return
 
             # Stream any assistant prose (preamble before tools, or the final answer).
             if result.text:
@@ -93,7 +114,18 @@ class DevHarness:
 
             # --- execute tool calls ---
             tool_results: list[ToolResult] = []
-            for call in result.tool_calls:
+            for call_index, call in enumerate(result.tool_calls):
+                if checkpoint is not None and not await checkpoint(
+                    "recovery_required",
+                    state.turn,
+                    pending_tools[call_index:],
+                    "Tool execution may have started; explicit replay approval is required.",
+                ):
+                    yield StreamChunk(
+                        type="error",
+                        content="Durable checkpoint unavailable; tool execution stopped.",
+                    )
+                    return
                 yield StreamChunk(
                     type="tool_start",
                     content=f"Using tool: {call.name}",
@@ -164,9 +196,20 @@ class DevHarness:
                 )
 
             history.add_tool_results(tool_results)
+            if checkpoint is not None and not await checkpoint("running", state.turn, [], ""):
+                yield StreamChunk(
+                    type="error",
+                    content="Durable checkpoint unavailable after tool execution.",
+                )
+                return
 
         # iteration budget exhausted
         yield StreamChunk(
             type="error",
             content=f"Agentic loop exceeded {self.max_iterations} iterations — stopping.",
         )
+        if checkpoint is not None:
+            await checkpoint(
+                "failed", self.max_iterations, [],
+                "Agentic loop iteration budget exhausted.",
+            )
