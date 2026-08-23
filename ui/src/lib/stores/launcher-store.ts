@@ -1,22 +1,28 @@
 import { create } from "zustand";
 
 /**
- * One-shot handoff for tools that launch work in the primary chat workspace.
- * It intentionally is not persisted: a completed launch must never replay on
- * a later app start or in another browser tab.
+ * Transient handoff from the /launcher route to /chat: a launcher tile stashes
+ * the fully-composed message (e.g. "/swarm build a todo app") here, navigates to
+ * /chat, and ChatView consumes it once on mount and fires it. Deliberately NOT
+ * persisted — a stale launch must never replay on a normal chat visit.
  */
+interface PendingLaunch {
+  text: string;
+}
+
 interface LauncherState {
-  pendingLaunch: string | null;
-  setPendingLaunch: (prompt: string) => void;
-  consumePendingLaunch: () => string | null;
+  pending: PendingLaunch | null;
+  setPendingLaunch: (text: string) => void;
+  /** Returns the pending launch (if any) and clears it atomically. */
+  consumePendingLaunch: () => PendingLaunch | null;
 }
 
 export const useLauncherStore = create<LauncherState>((set, get) => ({
-  pendingLaunch: null,
-  setPendingLaunch: (prompt) => set({ pendingLaunch: prompt }),
+  pending: null,
+  setPendingLaunch: (text) => set({ pending: { text } }),
   consumePendingLaunch: () => {
-    const prompt = get().pendingLaunch;
-    set({ pendingLaunch: null });
-    return prompt;
+    const p = get().pending;
+    if (p) set({ pending: null });
+    return p;
   },
 }));
