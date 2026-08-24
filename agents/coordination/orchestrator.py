@@ -184,6 +184,20 @@ def coordinate_task(
     CoordinatorSession generates its usual random id.
     """
     session = CoordinatorSession(session_id, owner_id, coordination_id=coordination_id)
+    workspace_record = None
+    try:
+        from coordination.workspace_ops import create_workspace
+        workspace_record = create_workspace(
+            owner_id=session.owner_id,
+            session_id=session.session_id,
+            task_id=session.coordination_id,
+            repository_ref=(repo_context or {}).get("git_url"),
+            branch=(repo_context or {}).get("branch"),
+            base_branch=(repo_context or {}).get("base_branch", "main"),
+        ) if session.owner_id else None
+    except Exception as _wle:
+        logger.warning(f"[Coordinator] Durable workspace registration failed: {_wle}")
+        workspace_record = None
     # Record the run for the mobile task board (fire-and-forget; no-ops if the
     # caller has no resolvable owner so anonymous runs never appear on a board).
     swarm_run_store.create_run(
@@ -210,6 +224,9 @@ def coordinate_task(
             from coordination.session_sandbox import ensure_session_container
             from coordination.sandbox_identity import set_current_container
             session.container_name, _ = ensure_session_container(session.coordination_id, mode=_resolved_mode)
+            if workspace_record:
+                from coordination.workspace_ops import enter_workspace
+                enter_workspace(worktree_id=workspace_record["worktree_id"], owner_id=session.owner_id)
             set_current_container(session.container_name)
             _session_container_owned = True
             logger.info(f"[Coordinator] Session container ready ({_resolved_mode}): {session.container_name}")
@@ -1468,6 +1485,14 @@ def coordinate_task(
         if repo_context:
             try:
                 local_branch, bundle_bytes = finalize_task_branch(session.coordination_id)
+                if workspace_record:
+                    from coordination.workspace_lifecycle import transition
+                    transition(
+                        worktree_id=workspace_record["worktree_id"],
+                        owner_id=session.owner_id,
+                        status="finalized",
+                        diff_ref=f"swarm:{session.coordination_id}",
+                    )
                 swarm_run_repo_store.set_local_branch(session.coordination_id, local_branch, bundle_bytes)
                 yield {
                     "type": "log",
@@ -1509,3 +1534,13 @@ def coordinate_task(
                 set_current_container(None)
             except Exception as _rce:
                 logger.warning(f"[Coordinator] Session container release failed (non-fatal): {_rce}")
+        if workspace_record:
+            try:
+                from coordination.workspace_ops import exit_workspace
+                exit_workspace(
+                    worktree_id=workspace_record["worktree_id"],
+                    owner_id=session.owner_id,
+                    cleaned=True,
+                )
+            except Exception as _wce:
+                logger.warning(f"[Coordinator] Workspace lifecycle cleanup failed (non-fatal): {_wce}")

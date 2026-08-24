@@ -315,3 +315,19 @@ Invoke-RestMethod -Uri "http://127.0.0.1:2375/containers/agent_runtime/logs?stdo
 - [x] **Design revision degradation** — revisions cold-started a fresh generation with no HTML context; fixed with session-scoped artifact cache (`/workspace/delivered_artifacts/latest_{session_id}.html`) injected on revision, capped at 32 KB (2026-06-04)
 - [x] **MODEL_WINDOWS stale in UI** — all current models (`gemma4:31b`, `qwen3-coder:30b`, `qwen3.6:27b`, etc.) fell through to `default: 8192`, triggering premature compaction; table updated with correct windows (2026-06-04)
 - [x] **Verifier context overflow** — `all_work` passed to verifier with no size cap; added 24 K char limit to stay within `qwen3:14b`'s 16 K context window (2026-06-04)
+
+---
+
+## 🧭 Core Diagnostic Directive
+
+When a fix or verification attempt fails, do not keep making minor variations to the same approach. Stop and reassess the failure mode using the canonical, direct test for the subsystem. Establish which layer is failing—credential, transport, configuration source, process state, or application logic—before changing state again. Never rotate credentials, rewrite configuration, or redeploy repeatedly without evidence that the previous change reached the live target and changed the relevant observation. Report contradictions explicitly, preserve the last known-good state, and ask for the smallest required input when the canonical test requires a secret or interactive action.
+
+### Shell Convention
+
+The user’s default shell is Windows PowerShell. Format commands for PowerShell unless the instruction explicitly says to use Bash or another shell. If a remote command must run in Bash over SSH, explicitly tell the user that Bash is required, explain why, and provide the PowerShell-safe invocation needed to send it remotely.
+
+SSH diagnostic commands must preserve the interactive session. Do not include `exit`, `logout`, `ssh -O exit`, or automatic disconnect/close behavior unless the user explicitly requests disconnection.
+
+For Turing Compose and AGNO credential incidents, follow [the Turing Compose configuration runbook](docs/admin/turing-compose-configuration-runbook.md). The verified live paths are `/home/misterobots/docker-compose.yml` and `/home/network.env`; always use `docker compose --env-file /home/network.env` and verify the effective container state instead of assuming the repository Compose variant is live.
+
+Before calling backend work deployed, verify that the running `agent_runtime` bind mount contains the tested source. Turing’s root Compose project now mounts `/home/misterobots/Agent_Swarm/agents` directly into `/app/agents`, making the repository checkout the canonical runtime source. Confirm the effective mount and revision after every deployment.

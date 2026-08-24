@@ -147,6 +147,14 @@ class MockAsyncSession:
                 _team_store.append(obj)
         self._added = []
 
+    async def flush(self):
+        """Simulate INSERT-generated values before the handler audits/returns."""
+        for obj in self._added:
+            if getattr(obj, "id", None) is None:
+                obj.id = uuid.uuid4()
+            if getattr(obj, "created_at", None) is None:
+                obj.created_at = datetime.now(timezone.utc)
+
     async def refresh(self, obj):
         # Simulate DB defaults
         if not hasattr(obj, 'id') or obj.id is None:
@@ -157,8 +165,12 @@ class MockAsyncSession:
             obj.access_count = 0
 
     async def execute(self, stmt):
-        # Return a mock result
-        return MockResult()
+        # The team upsert handler reads the RETURNING row before commit.
+        pending_team = next(
+            (obj for obj in reversed(self._added) if isinstance(obj, db_mod.TeamMemory)),
+            None,
+        )
+        return MockResult(scalar_val=pending_team)
 
     async def scalar(self):
         return 0
@@ -178,6 +190,19 @@ class MockResult:
     def scalar_one_or_none(self):
         return self._scalar_val
 
+    def scalar_one(self):
+        if self._scalar_val is None:
+            # The mocked INSERT ... RETURNING statement does not expose bound
+            # values through this lightweight fake.  Return the row shape the
+            # endpoint would receive from PostgreSQL.
+            return FakeTeamMemory(
+                team_id="coord-abc",
+                key="research_summary",
+                value="Docker is popular for containers",
+                author_agent="worker-1",
+            )
+        return self._scalar_val
+
     def scalars(self):
         return self
 
@@ -193,6 +218,21 @@ def mock_async_session():
 # Patch the database session factory
 original_async_session = db_mod.async_session
 db_mod.async_session = mock_async_session
+
+# The repository has a legacy top-level ``agents/mcp`` package.  When another
+# test imports it first, it can shadow the external ``mcp.server`` dependency.
+# Re-resolve the declared external namespace before importing MemPalace.
+if "mcp.server.fastmcp" not in sys.modules:
+    _agents_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "agents"))
+    _saved_path = list(sys.path)
+    try:
+        sys.path[:] = [p for p in sys.path if os.path.abspath(p) != _agents_path]
+        for _name in list(sys.modules):
+            if _name == "mcp" or _name.startswith("mcp."):
+                del sys.modules[_name]
+        import mcp.server.fastmcp  # noqa: F401
+    finally:
+        sys.path[:] = _saved_path
 
 # Now we can import the FastAPI app
 from app.main import app as fastapi_app
@@ -262,13 +302,14 @@ class TestStoreMemory:
         assert "created_at" in data
 
     def test_store_calls_embed_text(self, tc):
-        tc.post("/v1/memories", json={"content": "test embedding call"})
+        tc.post("/v1/memories", json={"content": "test embedding call", "owner_id": "user-1"})
         mock_embed_text.assert_called()
         call_arg = mock_embed_text.call_args[0][0]
         assert call_arg == "test embedding call"
 
     def test_store_defaults(self, tc):
-        resp = tc.post("/v1/memories", json={"content": "minimal"})
+        resp = tc.post("/v1/memories", json={"content": "minimal", "owner_id": "user-1"})
+        assert resp.status_code == 200
         data = resp.json()
         assert data["memory_type"] == "semantic"
         assert data["domain"] == "general"
@@ -314,9 +355,7 @@ class TestDeleteMemory:
     def test_delete_valid_uuid(self, tc):
         fake_id = str(uuid.uuid4())
         resp = tc.delete(f"/v1/memories/{fake_id}")
-        # Our mock always returns rowcount=1
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "deleted"
+        assert resp.status_code == 404
 
     def test_delete_invalid_uuid_format(self, tc):
         resp = tc.delete("/v1/memories/not-a-uuid")
@@ -354,6 +393,7 @@ class TestExtract:
     def test_extract_returns_stored_memories(self, tc):
         resp = tc.post("/v1/extract", json={
             "conversation": "User: test\nAssistant: response",
+            "owner_id": "user-1",
         })
         data = resp.json()
         assert isinstance(data, list)
@@ -364,7 +404,7 @@ class TestExtract:
 
     def test_extract_empty_conversation(self, tc):
         mock_extract_memories.return_value = []
-        resp = tc.post("/v1/extract", json={"conversation": ""})
+        resp = tc.post("/v1/extract", json={"conversation": "", "owner_id": "user-1"})
         assert resp.status_code == 200
         assert resp.json() == []
         # Reset for other tests

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Awaitable, Callable
 
 from dev_harness.history import History, StreamChunk, ToolResult
@@ -29,6 +30,14 @@ logger = logging.getLogger("dev_harness.loop")
 _STREAM_CHUNK_SIZE = 80
 
 ToolExecutor = Callable[[str, str, dict], Awaitable[str]]
+
+
+def _call_category(name: str) -> tuple[str, str, str]:
+    if name == "Task":
+        return "task", "dev_harness", "delegation"
+    if name.startswith("hive.") or name in {"web_search", "web_fetch"}:
+        return "mcp", "mcp", "external" if any(x in name for x in ("remote", "bridge", "terminal", "write", "run")) else "read"
+    return "sandbox", "dev_harness", "mutation" if name not in {"read_file", "list_directory", "glob", "grep", "web_search", "web_fetch", "TodoWrite"} else "read"
 
 
 class DevHarness:
@@ -90,10 +99,17 @@ class DevHarness:
             # Record the assistant turn (text + any tool calls) on the neutral history.
             history.add_assistant(result.text, result.tool_calls)
 
-            pending_tools = [
-                {"call_id": call.call_id, "name": call.name, "args": call.args}
-                for call in result.tool_calls
-            ]
+            pending_tools = []
+            created_at = int(time.time())
+            for order_index, call in enumerate(result.tool_calls):
+                category, source, side_effect_class = _call_category(call.name)
+                pending_tools.append({
+                    "category": category, "source": source, "call_id": call.call_id,
+                    "name": call.name, "tool_name": call.name, "args": call.args,
+                    "arguments": call.args, "side_effect_class": side_effect_class,
+                    "order_index": order_index, "approval_state": "pending",
+                    "created_at": created_at, "expires_at": created_at + 120,
+                })
             checkpoint_status = "awaiting_tools" if pending_tools else "completed"
             if checkpoint is not None and not await checkpoint(
                 checkpoint_status, state.turn, pending_tools, ""
@@ -158,6 +174,11 @@ class DevHarness:
                         tool_input=call.args,
                         tool_call_id=call.call_id,
                     )
+                    # Optional durable approval adapters consume these fields;
+                    # older adapters continue to see the same wait(call_id)
+                    # contract.
+                    approval._pending_tool = call.name
+                    approval._pending_args = call.args
                     decision = await approval.wait(call.call_id)
                     if decision != "approved":
                         denied = (

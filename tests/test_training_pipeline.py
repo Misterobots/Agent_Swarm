@@ -381,13 +381,13 @@ class TestGRPOTrainerConfig:
         """U13: Default config has correct values from config.py."""
         from training.grpo_trainer import GRPOTrainingConfig
         cfg = GRPOTrainingConfig()
-        assert cfg.lora_rank == 16
-        assert cfg.lora_alpha == 32
-        assert cfg.batch_size == 1
-        assert cfg.gradient_accumulation == 8
-        assert cfg.learning_rate == pytest.approx(5e-6)
+        assert cfg.lora_rank == 64
+        assert cfg.lora_alpha == 128
+        assert cfg.batch_size == 2
+        assert cfg.gradient_accumulation == 4
+        assert cfg.learning_rate == pytest.approx(2e-5)
         assert cfg.num_epochs == 3
-        assert cfg.max_seq_len == 4096
+        assert cfg.max_seq_len == 8192
         assert cfg.warmup_ratio == 0.1
         assert cfg.group_size == 4
         assert cfg.kl_coeff == 0.05

@@ -107,6 +107,11 @@ class Bridge:
             ),
         }
 
+    def _get_node(self, node_name: str) -> Optional[BridgeNode]:
+        """Resolve node names case-insensitively without duplicating entries."""
+        wanted = (node_name or "").strip().lower()
+        return next((node for name, node in self._nodes.items() if name.lower() == wanted), None)
+
     def list_nodes(self) -> list[dict]:
         """Return all bridge nodes with health status."""
         return [
@@ -120,7 +125,7 @@ class Bridge:
 
     def check_health(self, node_name: str) -> bool:
         """Ping a remote node's API health endpoint."""
-        node = self._nodes.get(node_name.lower())
+        node = self._get_node(node_name)
         if not node:
             return False
 
@@ -165,13 +170,12 @@ class Bridge:
         Returns:
             dict with job_id, status, and any immediate result
         """
-        node_name = target_node.lower()
-        node = self._nodes.get(node_name)
+        node = self._get_node(target_node)
         if not node:
             return {"error": f"Unknown node: {target_node}", "status": "failed"}
 
         job_id = str(uuid.uuid4())
-        job = RemoteJob(job_id=job_id, target_node=node_name, task=task)
+        job = RemoteJob(job_id=job_id, target_node=node.name, task=task)
 
         with self._lock:
             self._jobs[job_id] = job
@@ -203,7 +207,7 @@ class Bridge:
         except Exception as e:
             job.status = "failed"
             job.error = str(e)
-            logger.error(f"[Bridge] Task submission to {node_name} failed: {e}")
+            logger.error(f"[Bridge] Task submission to {node.name} failed: {e}")
             return job.to_dict()
 
     def proxy_request(
@@ -227,7 +231,7 @@ class Bridge:
         Returns:
             dict with status_code, body, and headers
         """
-        node = self._nodes.get(target_node.lower())
+        node = self._get_node(target_node)
         if not node:
             return {"error": f"Unknown node: {target_node}", "status_code": -1}
 

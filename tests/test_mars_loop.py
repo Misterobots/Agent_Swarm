@@ -52,6 +52,10 @@ def no_langfuse(monkeypatch):
     import sys
     langfuse_mock = MagicMock()
     langfuse_mock.Langfuse.return_value = MagicMock()
+    # mars_loop imports observe from the top-level package, not the legacy
+    # langfuse.decorators namespace.  Keep the decorator a transparent
+    # identity so these tests exercise the loop result rather than a mock.
+    langfuse_mock.observe = lambda *args, **kwargs: (lambda f: f)
     sys.modules["langfuse"] = langfuse_mock
     
     class DummyDecorators:

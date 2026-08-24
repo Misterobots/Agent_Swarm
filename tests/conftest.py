@@ -19,6 +19,13 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGENTS_DIR = os.path.join(REPO_ROOT, "agents")
 CONTROL_PLANE_DIR = os.path.join(REPO_ROOT, "control_plane")
 
+# Cache the external FastMCP namespace before adding the repository's legacy
+# top-level agents/mcp path, which otherwise shadows mcp.server.
+try:
+    from mcp.server.fastmcp import FastMCP  # noqa: F401
+except ImportError:
+    pass
+
 for p in [AGENTS_DIR, CONTROL_PLANE_DIR]:
     if p not in sys.path:
         sys.path.insert(0, p)

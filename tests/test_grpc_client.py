@@ -91,7 +91,7 @@ class TestGrpcClientFallback:
         from grpc.client import GrpcClient
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": "nemotron-orchestrator:8b"}]}
         )
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -107,12 +107,12 @@ class TestGrpcClientFallback:
         from grpc.client import GrpcClient
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}, {"name": "qwen3:14b"}]}
+            json=lambda: {"models": [{"name": "nemotron-orchestrator:8b"}, {"name": "qwen3:14b"}]}
         )
         client = GrpcClient(enabled=False)
         models = client.list_models()
         assert len(models) > 0
-        assert any(m["name"] == "nemotron-mini" for m in models)
+        assert any(m["name"] == "nemotron-orchestrator:8b" for m in models)
 
     @patch("grpc.model_router.requests.get")
     def test_health_fallback(self, mock_get):
@@ -193,7 +193,7 @@ class TestOpenClaudeServicer:
         from grpc.server import OpenClaudeServicer
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": "nemotron-orchestrator:8b"}]}
         )
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -209,7 +209,7 @@ class TestOpenClaudeServicer:
         from grpc.server import OpenClaudeServicer
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": "nemotron-orchestrator:8b"}]}
         )
         svc = OpenClaudeServicer()
         models = svc.list_models()

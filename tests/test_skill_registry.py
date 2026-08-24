@@ -208,8 +208,8 @@ class TestSkillLoader:
         try:
             from skill_loader import initialize_skills
             count = initialize_skills()
-            assert count == 4  # web_fetch, web_search, bash_classify, bash_parse
-            assert sr_mod.skill_registry.count == 4
+            assert count == 6  # current builtins include the two safety/tool skills
+            assert sr_mod.skill_registry.count == 6
             assert sr_mod.skill_registry.get("web_fetch") is not None
             assert sr_mod.skill_registry.get("web_search") is not None
             assert sr_mod.skill_registry.get("bash_classify") is not None

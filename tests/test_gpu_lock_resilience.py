@@ -25,6 +25,14 @@ import pytest
 # ---------------------------------------------------------------------------
 def _import_gpu_queue():
     import importlib
+    import sys
+    import types
+    # The coordinator-memory tests install a module-level MagicMock under the
+    # same legacy import name.  Remove that test double before exercising the
+    # real resilience implementation; otherwise reload() receives a mock.
+    cached = sys.modules.get("utils.gpu_queue")
+    if cached is not None and not isinstance(cached, types.ModuleType):
+        sys.modules.pop("utils.gpu_queue", None)
     import utils.gpu_queue as gq  # type: ignore
     importlib.reload(gq)
     return gq

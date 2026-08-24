@@ -38,6 +38,37 @@ class WorkspacePrepError(RuntimeError):
     """Raised when the sandbox checkout for a repo/branch fails."""
 
 
+def create_workspace(*, owner_id: str, session_id: str, task_id: str | None = None,
+                     repository_ref: str | None = None, branch: str | None = None,
+                     base_branch: str | None = None) -> dict:
+    """Create durable ownership metadata for one isolated sandbox workspace."""
+    from coordination.workspace_lifecycle import create
+    return create(owner_id=owner_id, session_id=session_id, task_id=task_id,
+                  repository_ref=repository_ref, branch=branch, base_branch=base_branch)
+
+
+def enter_workspace(*, worktree_id: str, owner_id: str) -> dict:
+    from coordination.workspace_lifecycle import transition
+    row = transition(worktree_id=worktree_id, owner_id=owner_id, status="entered")
+    if not row:
+        raise WorkspacePrepError("workspace not found or owned by another owner")
+    return row
+
+
+def workspace_status(*, worktree_id: str, owner_id: str) -> dict | None:
+    from coordination.workspace_lifecycle import get
+    return get(worktree_id=worktree_id, owner_id=owner_id)
+
+
+def exit_workspace(*, worktree_id: str, owner_id: str, cleaned: bool = False) -> dict:
+    from coordination.workspace_lifecycle import transition
+    row = transition(worktree_id=worktree_id, owner_id=owner_id,
+                     status="cleaned" if cleaned else "exited")
+    if not row:
+        raise WorkspacePrepError("workspace not found or owned by another owner")
+    return row
+
+
 def _sh(cmd: str, timeout: int) -> tuple[int, str, str]:
     return exec_in_sandbox("sh", "-c", cmd, timeout=timeout, user=_SANDBOX_USER)
 

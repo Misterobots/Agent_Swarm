@@ -117,7 +117,7 @@ class TestModelRouterClassify:
         # Mock health check
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": "nemotron-orchestrator:8b"}]}
         )
         # Mock classification call
         mock_post.return_value = MagicMock(
@@ -136,7 +136,7 @@ class TestModelRouterClassify:
         from grpc.model_router import ModelRouter
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": "nemotron-orchestrator:8b"}]}
         )
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -166,7 +166,7 @@ class TestModelRouterClassify:
         from grpc.model_router import ModelRouter
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": "nemotron-orchestrator:8b"}]}
         )
         mock_post.side_effect = Exception("Connection refused")
         router = ModelRouter(ollama_hosts=["http://test:11434"])
@@ -303,13 +303,13 @@ class TestModelRouterModels:
         from grpc.model_router import ModelRouter
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}, {"name": "qwen3:14b"}]}
+            json=lambda: {"models": [{"name": "nemotron-orchestrator:8b"}, {"name": "qwen3:14b"}]}
         )
         router = ModelRouter(ollama_hosts=["http://test:11434"])
         models = router.list_models()
         assert len(models) > 0
         names = [m.name for m in models]
-        assert "nemotron-mini" in names
+        assert "nemotron-orchestrator:8b" in names
 
 
 class TestModelRouterHealth:
@@ -381,6 +381,6 @@ class TestIntentModelMap:
 
     def test_context_windows(self):
         from grpc.model_router import CONTEXT_WINDOWS
-        assert CONTEXT_WINDOWS["nemotron-mini"] == 4096
+        assert CONTEXT_WINDOWS["nemotron-orchestrator:8b"] == 32768
         assert CONTEXT_WINDOWS["qwen3:14b"] == 40960
         assert "default" in CONTEXT_WINDOWS

@@ -30,12 +30,22 @@ META_TOOLS = frozenset({"TodoWrite"})
 # much broader than changing the file the user is reviewing.
 EDIT_TOOLS = frozenset({"write_file", "edit_file"})
 
+# Anything not explicitly read-only is treated as a mutation.  Keeping this
+# deny-by-default is important as new tools are added: they cannot accidentally
+# inherit an approval bypass merely because their name is unfamiliar.
+MUTATING_TOOLS = frozenset({
+    "write_file", "edit_file", "run_command", "git", "Task",
+    "hive.fs.write", "hive.terminal.run", "hive.remote.exec",
+    "hive.bridge.submit", "hive.bridge.proxy", "hive.skill.run",
+})
+
 _VALID_MODES = ("default", "plan", "acceptEdits", "bypass")
 
 
 class PermissionGate:
-    def __init__(self, mode: str = "default"):
+    def __init__(self, mode: str = "default", *, is_admin: bool = False):
         self.mode = mode if mode in _VALID_MODES else "default"
+        self.is_admin = bool(is_admin)
 
     @property
     def plan_mode(self) -> bool:
@@ -47,16 +57,20 @@ class PermissionGate:
 
     def auto_approve(self, tool_name: str) -> bool:
         """Return whether this mode suppresses the interactive approval card."""
-        if self.mode == "bypass":
+        if self.mode == "bypass" and self.is_admin:
             return True
         return self.mode == "acceptEdits" and tool_name in EDIT_TOOLS
 
     def check(self, tool_name: str) -> tuple[bool, str]:
         """Return (allowed, reason).  reason is shown to the model when blocked."""
+        if self.mode == "bypass" and not self.is_admin:
+            return False, "bypass mode requires administrator authorization"
         if self.mode == "plan" and tool_name not in READ_ONLY_TOOLS and tool_name not in META_TOOLS:
             return False, (
                 f"🛑 Plan mode is active — `{tool_name}` is blocked. Investigate with "
                 "read/glob/grep, record your steps with TodoWrite, then present your plan "
                 "and ask the user to approve it (turn off plan mode) before making changes."
             )
+        if self.mode == "acceptEdits" and tool_name in {"run_command", "git", "Task"}:
+            return False, f"acceptEdits does not permit `{tool_name}`; explicit approval is required"
         return True, ""

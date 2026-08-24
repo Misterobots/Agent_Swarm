@@ -6,6 +6,7 @@ import json
 import uuid
 import time
 import threading
+import functools
 import hashlib
 import hmac
 import ipaddress
@@ -195,6 +196,17 @@ async def lifespan(app: FastAPI):
             _dev_checkpoint_store.init_table()
         except Exception as e:
             logger.warning(f"Dev checkpoint store init failed (non-fatal): {e}")
+        try:
+            from dev_harness import approval_service as _approval_store
+            _approval_store.init_table()
+        except Exception as e:
+            logger.warning(f"Durable approval store init failed: {e}")
+        try:
+            from coordination import workspace_lifecycle as _workspace_store
+            _workspace_store.init_table()
+            _workspace_store.reap_abandoned()
+        except Exception as e:
+            logger.warning(f"Isolated workspace registry init/reap failed: {e}")
 
         # 7d. Initialize Dev Projects Store
         try:
@@ -875,16 +887,23 @@ async def approve_tool_call(call_id: str, http_request: Request):
     tool_name = body.get("tool_name", "")
     uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
 
-    pending_owner = _approval_owners.get(call_id)
-    if pending_owner is None:
+    from dev_harness import approval_service
+    pending = approval_service.get_request(uid, call_id)
+    if pending is None:
+        other = approval_service.get_request_any_owner(call_id)
+        if other:
+            raise HTTPException(status_code=403, detail="Approval request belongs to another owner")
         raise HTTPException(status_code=404, detail="Approval request not found or expired")
-    if pending_owner != uid:
+    if pending and pending.get("owner_id") != uid:
         logger.warning(f"[dev_approve] rejected cross-owner approval call_id={call_id} uid={uid}")
         raise HTTPException(status_code=403, detail="Approval request belongs to another owner")
 
     if auto_scope != "none" and tool_name:
         _apply_auto_approve(uid, tool_name, auto_scope)
 
+    decided = approval_service.decide(owner_id=uid, call_id=call_id, decision="approved", decided_by=uid, scope=auto_scope if auto_scope in {"once", "session", "workspace"} else "once")
+    if not decided:
+        raise HTTPException(status_code=503, detail="Approval storage unavailable; request remains blocked")
     _approval_decisions[call_id] = True
     _approval_owners.pop(call_id, None)
     event = _approval_events.pop(call_id, None)
@@ -898,13 +917,20 @@ async def approve_tool_call(call_id: str, http_request: Request):
 async def deny_tool_call(call_id: str, http_request: Request):
     """Deny a pending tool call from the AI agent."""
     uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
-    pending_owner = _approval_owners.get(call_id)
-    if pending_owner is None:
+    from dev_harness import approval_service
+    pending = approval_service.get_request(uid, call_id)
+    if pending is None:
+        other = approval_service.get_request_any_owner(call_id)
+        if other:
+            raise HTTPException(status_code=403, detail="Approval request belongs to another owner")
         raise HTTPException(status_code=404, detail="Approval request not found or expired")
-    if pending_owner != uid:
+    if pending and pending.get("owner_id") != uid:
         logger.warning(f"[dev_approve] rejected cross-owner denial call_id={call_id} uid={uid}")
         raise HTTPException(status_code=403, detail="Approval request belongs to another owner")
 
+    decided = approval_service.decide(owner_id=uid, call_id=call_id, decision="denied", decided_by=uid)
+    if not decided:
+        raise HTTPException(status_code=503, detail="Approval storage unavailable; request remains blocked")
     _approval_decisions[call_id] = False
     _approval_owners.pop(call_id, None)
     event = _approval_events.pop(call_id, None)
@@ -937,6 +963,7 @@ async def clear_auto_approve_rules(http_request: Request):
 
 def _checkpoint_public_view(row: dict) -> dict:
     data = row.get("data") or {}
+    from dev_harness.replay_policy import public_call
     return {
         "session_id": row.get("session_id"),
         "status": row.get("status"),
@@ -944,7 +971,11 @@ def _checkpoint_public_view(row: dict) -> dict:
         "updated_at": row.get("updated_at", 0),
         "model": data.get("model"),
         "permission_mode": data.get("permission_mode"),
-        "pending_tools": data.get("pending_tools", []),
+        # Replay needs ordering metadata, not raw command/file arguments.
+        "pending_tools": [
+            public_call(item) for item in (data.get("pending_tools") or [])
+            if isinstance(item, dict)
+        ],
         "error": data.get("error", ""),
     }
 
@@ -952,6 +983,27 @@ def _checkpoint_public_view(row: dict) -> dict:
 class DevReplayRequest(BaseModel):
     call_id: str
     confirm: bool = False
+
+
+_DEV_REPLAY_LOCKS: dict[str, threading.Lock] = {}
+_DEV_REPLAY_LOCKS_GUARD = threading.Lock()
+
+
+def _serialize_dev_replay(handler):
+    """Serialize replay per owner/session so two requests cannot run one call."""
+    @functools.wraps(handler)
+    async def wrapped(session_id, body, http_request):
+        uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+        key = f"{uid}:{session_id}"
+        with _DEV_REPLAY_LOCKS_GUARD:
+            lock = _DEV_REPLAY_LOCKS.setdefault(key, threading.Lock())
+        acquired = await _asyncio.get_running_loop().run_in_executor(None, lock.acquire)
+        try:
+            return await handler(session_id, body, http_request)
+        finally:
+            if acquired:
+                lock.release()
+    return wrapped
 
 
 @app.get("/api/v1/dev/checkpoints")
@@ -974,6 +1026,7 @@ async def get_dev_checkpoint(session_id: str, http_request: Request):
 
 
 @app.post("/api/v1/dev/checkpoints/{session_id}/replay")
+@_serialize_dev_replay
 async def replay_dev_checkpoint_tool(
     session_id: str,
     body: DevReplayRequest,
@@ -981,9 +1034,8 @@ async def replay_dev_checkpoint_tool(
 ):
     """Explicitly replay the next owner-approved sandbox tool call.
 
-    Only the first pending direct sandbox call can be replayed.  Meta-tools,
-    MCP calls, and subagent delegation require a new DevHarness turn because
-    their original execution context cannot be reconstructed safely here.
+    Only the first pending recorded call can be replayed. Sandbox, Task, and
+    allowlisted MCP calls share the same ordered checkpoint and approval gate.
     """
     if not body.confirm:
         raise HTTPException(status_code=400, detail="Set confirm=true to replay a tool call")
@@ -994,26 +1046,63 @@ async def replay_dev_checkpoint_tool(
     row = get_checkpoint(uid, session_id)
     if not row:
         raise HTTPException(status_code=404, detail="Checkpoint not found")
+    data = row.get("data") or {}
+    prior_results = list(data.get("replay_results") or [])
+    for prior in prior_results:
+        if prior.get("call_id") == body.call_id:
+            return {
+                "ok": True,
+                "session_id": session_id,
+                "call_id": body.call_id,
+                "tool_name": prior.get("name"),
+                "output": prior.get("output", ""),
+                "file_changes": prior.get("file_changes", []),
+                "is_error": bool(prior.get("is_error", False)),
+                "status": row.get("status"),
+                "next_call_id": (data.get("pending_tools") or [{}])[0].get("call_id"),
+            }
     if row.get("status") not in {"awaiting_tools", "recovery_required"}:
         raise HTTPException(
             status_code=409,
             detail=f"Checkpoint is not awaiting replay (status={row.get('status')})",
         )
 
-    data = row.get("data") or {}
     pending = data.get("pending_tools") or []
     if not pending or not isinstance(pending[0], dict):
         raise HTTPException(status_code=409, detail="Checkpoint has no replayable pending tool")
     call = pending[0]
+    from dev_harness.replay_policy import validate_next
+    policy_ok, policy_reason = validate_next(
+        pending=pending,
+        call_id=body.call_id,
+        owner_id=uid,
+        requested_owner_id=uid,
+        permission_mode=data.get("permission_mode") or "default",
+        is_admin=_request_is_admin(http_request),
+        confirm=body.confirm,
+    )
+    if not policy_ok:
+        raise HTTPException(status_code=409, detail=policy_reason)
     if call.get("call_id") != body.call_id:
         raise HTTPException(
             status_code=409,
             detail="Replay must proceed in recorded tool-call order",
         )
 
-    tool_name = call.get("name")
-    args = call.get("args")
-    replayable = {"read_file", "write_file", "list_directory", "run_command", "edit_file", "glob", "grep", "git"}
+    tool_name = call.get("tool_name") or call.get("name")
+    args = call.get("arguments") if isinstance(call.get("arguments"), dict) else call.get("args")
+    category = call.get("category") or (
+        "task" if tool_name == "Task" else
+        "mcp" if tool_name in {"web_search", "web_fetch"} or str(tool_name).startswith("hive.")
+        else "sandbox"
+    )
+    replayable = {"read_file", "write_file", "list_directory", "run_command", "edit_file", "glob", "grep", "git", "Task", "web_search", "web_fetch"}
+    if category == "mcp" and tool_name not in {"web_search", "web_fetch"}:
+        # Replay may only target a tool currently registered by this bridge;
+        # the recorded name is never allowed to select an arbitrary server.
+        registered = {item.get("name") for item in mcp_server.list_tools()}
+        if tool_name not in registered:
+            raise HTTPException(status_code=409, detail="MCP capability is no longer registered")
     if tool_name not in replayable or not isinstance(args, dict):
         raise HTTPException(
             status_code=409,
@@ -1024,9 +1113,23 @@ async def replay_dev_checkpoint_tool(
     if permission_mode == "bypass" and not _request_is_admin(http_request):
         raise HTTPException(status_code=403, detail="Admin authorization is required to replay a bypass-mode tool")
     from dev_harness.permissions import PermissionGate
-    allowed, reason = PermissionGate(permission_mode).check(tool_name)
+    allowed, reason = PermissionGate(
+        permission_mode, is_admin=_request_is_admin(http_request)
+    ).check(tool_name)
     if not allowed:
         raise HTTPException(status_code=403, detail=reason)
+
+    # Auto-approved reads do not have an approval row. Every mutating replay,
+    # including Task and externally-effecting MCP calls, must have the
+    # original durable approval decision before it can be re-executed.
+    if category in {"task", "mcp"} and call.get("side_effect_class") != "read":
+        from dev_harness import approval_service
+        approval = approval_service.get_request(uid, body.call_id)
+        if not approval or approval.get("decision") != "approved":
+            raise HTTPException(
+                status_code=403,
+                detail="Replay requires the original durable approval decision",
+            )
 
     container_name = data.get("container_name")
     if container_name is not None and not isinstance(container_name, str):
@@ -1036,13 +1139,31 @@ async def replay_dev_checkpoint_tool(
 
     try:
         loop = _asyncio.get_running_loop()
-        output, file_changes = await loop.run_in_executor(
-            None,
-            _exec_with_sink,
-            tool_name,
-            args,
-            container_name,
-        )
+        if category == "task":
+            output, _task_events = await _run_subagent(
+                uid,
+                data.get("model") or _DEFAULT_CHAT_MODEL,
+                str(args.get("description", "")),
+                str(args.get("prompt", "")),
+                str(args.get("subagent_type", "general")),
+                PermissionGate(permission_mode, is_admin=_request_is_admin(http_request)),
+                container_name=container_name,
+            )
+            file_changes = []
+        elif category == "mcp":
+            if tool_name in {"web_search", "web_fetch"}:
+                output = await loop.run_in_executor(None, _run_mcp_tool, uid, tool_name, args)
+            else:
+                output = await mcp_server.handle_rpc(
+                    "tools/call",
+                    {"name": tool_name, "arguments": args},
+                    auth_header=http_request.headers.get("Authorization"),
+                )
+            file_changes = []
+        else:
+            output, file_changes = await loop.run_in_executor(
+                None, _exec_with_sink, tool_name, args, container_name
+            )
         is_error = False
     except Exception as exc:
         output = f"Replay failed: {exc}"
@@ -1056,11 +1177,15 @@ async def replay_dev_checkpoint_tool(
         "output": str(output),
         "is_error": is_error,
     })
-    pending = pending[1:]
+    # Failed calls remain pending and move the checkpoint to a terminal
+    # failed state; replay never silently skips a failed side effect.
+    pending = pending if is_error else pending[1:]
     data["pending_tools"] = pending
     data["replay_results"] = replayed
 
-    if pending:
+    if is_error:
+        status = "failed"
+    elif pending:
         status = "recovery_required"
     else:
         from dev_harness.history import History, ToolResult
@@ -1075,7 +1200,8 @@ async def replay_dev_checkpoint_tool(
             data["history"] = restored.to_checkpoint()
         except (KeyError, TypeError, ValueError) as exc:
             raise HTTPException(status_code=409, detail=f"Checkpoint history cannot be restored: {exc}")
-        data.pop("replay_results", None)
+        # Retain the completed result ledger so a duplicate request remains
+        # idempotent even after the checkpoint has become ready_to_resume.
         status = "ready_to_resume"
 
     saved = save_checkpoint(
@@ -1644,6 +1770,22 @@ async def _dev_harness_stream(
             event = _asyncio.Event()
             _approval_events[call_id] = event
             _approval_owners[call_id] = uid
+            from dev_harness import approval_service
+            persisted = await _asyncio.get_running_loop().run_in_executor(
+                None,
+                lambda: approval_service.request_approval(
+                    owner_id=uid,
+                    session_id=checkpoint_session_id,
+                    call_id=call_id,
+                    tool_name=getattr(self, "_pending_tool", "unknown"),
+                    arguments=getattr(self, "_pending_args", {}),
+                    permission_mode=perm_mode,
+                ),
+            )
+            if persisted is None:
+                _approval_events.pop(call_id, None)
+                _approval_owners.pop(call_id, None)
+                return "denied"
             try:
                 await _asyncio.wait_for(event.wait(), timeout=120.0)
             except _asyncio.TimeoutError:
@@ -1654,9 +1796,12 @@ async def _dev_harness_stream(
                 # handles timeout, client disconnect, and unexpected errors.
                 _approval_events.pop(call_id, None)
                 _approval_owners.pop(call_id, None)
+            durable = approval_service.get_request(uid, call_id)
+            if durable and durable.get("decision") == "approved":
+                return "approved"
             return "approved" if _approval_decisions.pop(call_id, False) else "denied"
 
-    gate = PermissionGate(mode=perm_mode)
+    gate = PermissionGate(mode=perm_mode, is_admin=_request_is_admin(request))
 
     # Per-session container this dev-mode chat turn's sandbox tool calls
     # target — same session_sandbox.py mechanism the composer/swarm path
