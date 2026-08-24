@@ -1,10 +1,12 @@
-FROM node:20-alpine AS base
+FROM node:22.13-alpine AS base
+
+RUN corepack enable && corepack prepare pnpm@11.19.0 --activate
 
 # --- Dependencies ---
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # --- Build ---
 FROM base AS builder
@@ -21,7 +23,7 @@ ENV API_BASE_URL=${API_BASE_URL}
 ARG NEXT_PUBLIC_GATEWAY_URL=""
 ENV NEXT_PUBLIC_GATEWAY_URL=${NEXT_PUBLIC_GATEWAY_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN pnpm build
 
 # --- Runtime ---
 FROM base AS runner
