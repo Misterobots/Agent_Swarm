@@ -394,7 +394,7 @@ class TestConfidenceCascade:
         router.host = "http://fake:11434"
         router.agent = mock_agent
 
-        result = router.route("Hello")
+        result = router.route("A vague request with no actionable details")
         assert result["intent"] == "CONVERSATION"
         assert result["confidence"] == 0.0
 
@@ -443,7 +443,7 @@ class TestConfidenceCascade:
         router.host = "http://fake:11434"
         router.agent = mock_agent
 
-        router.route("Some ambiguous input")
+        router.route("A completely novel ambiguous request about an unspecified topic")
 
         assert len(prompts_seen) == 2
         assert "WARNING" in prompts_seen[1]

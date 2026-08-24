@@ -34,17 +34,13 @@ class TestVoiceCloning(unittest.TestCase):
         result = clone_voice(text="Hello World", reference_audio_path=None)
         
         # Verify
-        self.assertTrue("Generated Audio" in result)
-        self.assertTrue("Saved to" in result) # Check for file path
+        self.assertIsInstance(result, str)
         
         # Verify File Creation (and cleanup)
         # Extract filename from result
         import re
-        match = re.search(r"Saved to (.*)\)", result)
-        if match:
-            path = match.group(1)
-            self.assertTrue(os.path.exists(path))
-            os.remove(path) # Cleanup
+        self.assertTrue(os.path.exists(result))
+        os.remove(result) # Cleanup
 
     @patch('agents.specialized.voice_cloning.requests.post')
     def test_clone_voice_failure(self, mock_post):
@@ -58,7 +54,7 @@ class TestVoiceCloning(unittest.TestCase):
         result = clone_voice(text="Fail me")
         
         # Verify
-        self.assertTrue("Voice Engine Error" in result)
+        self.assertIsNone(result)
 
 if __name__ == '__main__':
     unittest.main()

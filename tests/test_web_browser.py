@@ -187,30 +187,22 @@ class TestFetchPage:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestWebSearch:
-    @patch("requests.post")
-    def test_search_returns_results(self, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.text = '''
-        <table>
-        <tr>
-            <td><a rel="nofollow" href="https://example.com/1" class="result-link">Result One</a></td>
-        </tr>
-        <tr>
-            <td class="result-snippet">First result snippet here</td>
-        </tr>
-        </table>
-        '''
-        mock_resp.raise_for_status = MagicMock()
-        mock_post.return_value = mock_resp
-
-        results = web_search("test query")
+    def test_search_returns_results(self):
+        ddgs = MagicMock()
+        ddgs.DDGS.return_value.text.return_value = [{
+            "title": "Result One",
+            "href": "https://example.com/1",
+            "body": "First result snippet here",
+        }]
+        with patch.dict(sys.modules, {"ddgs": ddgs}):
+            results = web_search("test query")
         assert len(results) >= 1
         assert results[0]["title"] == "Result One"
         assert results[0]["url"] == "https://example.com/1"
 
-    @patch("requests.post")
-    def test_search_failure_returns_empty(self, mock_post):
-        mock_post.side_effect = Exception("Network error")
-        results = web_search("test query")
+    def test_search_failure_returns_empty(self):
+        ddgs = MagicMock()
+        ddgs.DDGS.return_value.text.side_effect = Exception("Network error")
+        with patch.dict(sys.modules, {"ddgs": ddgs}):
+            results = web_search("test query")
         assert results == []

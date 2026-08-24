@@ -64,7 +64,16 @@ def test_sensitive_lock_attempt_emits_audit_log(monkeypatch, caplog):
 
 
 def test_sensitive_action_metrics_increment(monkeypatch):
+    # The routing regression fixtures mock prometheus_client globally. Restore
+    # the real package before importing the metrics module in this test.
+    import types
+    if not isinstance(sys.modules.get("prometheus_client"), types.ModuleType):
+        sys.modules.pop("prometheus_client", None)
+        import prometheus_client  # noqa: F401
+    sys.modules.pop("agents.metrics", None)
     from agents.tools import iot_ops
+    import importlib
+    iot_ops = importlib.reload(iot_ops)
     from agents.metrics import IOT_SENSITIVE_ACTIONS_TOTAL, IOT_SENSITIVE_ACTIONS_BLOCKED_TOTAL
 
     monkeypatch.setattr(iot_ops, "MOCK_MODE", True)

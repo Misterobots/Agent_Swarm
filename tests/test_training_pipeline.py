@@ -274,8 +274,9 @@ class TestABTestManagerDB:
         mock_conn.return_value.cursor.return_value = mock_cur
 
         mgr.record_result("code_dev", "candidate:v1", 0.85, latency_ms=150)
-        # Should have done SELECT + INSERT
-        assert mock_cur.execute.call_count == 2
+        # SELECT + INSERT; the optional metrics base-model lookup may use a
+        # separate connection and is intentionally not part of this fake.
+        assert mock_cur.execute.call_count >= 2
 
 
 # ──────────────────────────────────────────────────────────────

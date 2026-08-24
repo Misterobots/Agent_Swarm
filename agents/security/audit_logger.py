@@ -20,7 +20,7 @@ Audit Trail Categories:
 import logging
 import json
 from typing import Any, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 import os
 
@@ -113,7 +113,7 @@ class AuditLogger:
             JSON string of audit event
         """
         event = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'event_type': event_type.value,
             'success': success,
             'agent': {

@@ -1,8 +1,12 @@
 import requests
 import json
 import time
+import os
 
-BASE_URL = "http://localhost:8008"
+# The compatibility endpoint is hosted by Turing in the lab.  Keep an
+# override for local development, but do not silently target an unrelated
+# localhost service.
+BASE_URL = os.getenv("OPENAI_COMPAT_BASE_URL", "http://192.168.2.103:8008")
 
 def test_chat_completions_streaming():
     print("--- Testing /v1/chat/completions (Streaming, Standard Mode) ---")

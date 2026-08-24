@@ -19,7 +19,7 @@ import os
 import sys
 import logging
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
@@ -285,7 +285,7 @@ class TraceExporter:
                 "template_version": metadata.get("template_version"),
                 "intent": metadata.get("intent"),
                 "session_id": trace.get("sessionId"),
-                "exported_at": datetime.utcnow().isoformat(),
+                "exported_at": datetime.now(timezone.utc).isoformat(),
             },
         }
 
@@ -340,7 +340,7 @@ class TraceExporter:
         Returns count of exported trajectories.
         """
         if output_path is None:
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             output_path = str(self.output_dir / f"grpo_traces_{timestamp}.jsonl")
 
         candidates = self.fetch_training_candidates(

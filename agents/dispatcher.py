@@ -218,8 +218,15 @@ class Dispatcher:
                 # Blocking Pop (waits until item available)
                 # Returns (queue_name, data)
                 item = self.redis.blpop(queue_name, timeout=5)
-                
+
                 if item:
+                    if not isinstance(item, (tuple, list)) or len(item) != 2:
+                        logger.warning(
+                            "Ignoring malformed queue item from %s: %r",
+                            queue_name,
+                            item,
+                        )
+                        continue
                     _, data = item
                     print(f"DEBUG DISPATCHER: Popped item from {queue_name}: {str(data)[:50]}...")
                     
@@ -231,10 +238,19 @@ class Dispatcher:
                         
                     self._dispatch_local(event)
                     
-            except redis.ConnectionError:
-                logger.error("Redis connection lost. Retrying...")
-                time.sleep(5)
             except Exception as e:
+                # Some lightweight test doubles expose ConnectionError as a
+                # mock rather than an exception class.  Keep the catch broad
+                # and classify safely instead of raising a TypeError while
+                # handling the original Redis failure.
+                try:
+                    is_redis_error = isinstance(e, redis.ConnectionError)
+                except TypeError:
+                    is_redis_error = False
+                if is_redis_error:
+                    logger.error("Redis connection lost. Retrying...")
+                    time.sleep(5)
+                    continue
                 import traceback
                 logger.error(f"Error in consumer loop {queue_name}: {e}")
                 traceback.print_exc()

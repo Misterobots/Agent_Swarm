@@ -442,7 +442,12 @@ class SemanticRouter:
         """
         from utils.gpu_queue import select_available_model
 
-        self._model_chain = [m for m in self._model_chain if m != self.model_name]
+        # Some callers/tests construct a lightweight router with ``__new__``
+        # to exercise fallback behavior without running model initialization.
+        # Treat a missing chain as a single exhausted current model instead of
+        # raising AttributeError while handling the original inference error.
+        model_chain = getattr(self, "_model_chain", [self.model_name])
+        self._model_chain = [m for m in model_chain if m != self.model_name]
         if not self._model_chain:
             _router_logger.error("[Router] Model chain exhausted; no fallback available.")
             return False
