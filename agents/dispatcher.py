@@ -124,7 +124,18 @@ class Dispatcher:
         
         if REDIS_LIB_AVAILABLE:
             try:
-                self.redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, db=0)
+                # BLPOP waits five seconds when a queue is idle. Keep the socket
+                # timeout strictly longer than that wait; newer redis-py releases
+                # otherwise default the socket timeout to the same five seconds,
+                # producing false consumer errors on every idle poll.
+                self.redis = redis.Redis(
+                    host=REDIS_HOST,
+                    port=REDIS_PORT,
+                    password=REDIS_PASSWORD,
+                    db=0,
+                    socket_connect_timeout=5,
+                    socket_timeout=10,
+                )
                 self.redis.ping()
                 logger.info(f"--- [Dispatcher] Connected to Redis at {REDIS_HOST}:{REDIS_PORT} ---")
                 self.redis_available = True

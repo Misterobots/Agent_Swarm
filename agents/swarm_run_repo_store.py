@@ -164,7 +164,7 @@ def get_many(coordination_ids: list[str]) -> dict[str, dict]:
         with _db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    "SELECT coordination_id, git_url, branch FROM swarm_run_repo "
+                    "SELECT coordination_id, dev_project_id, git_url, branch FROM swarm_run_repo "
                     "WHERE coordination_id = ANY(%s)",
                     (coordination_ids,),
                 )
