@@ -405,7 +405,7 @@ services:
     hostname: execution-node
     restart: unless-stopped
     env_file:
-      - ../network.env
+      - /home/network.env
     environment:
       # Primary: Lovelace (2x RTX 5060Ti, 32GB) — task models (qwen3:14b).
       # Secondary: Turing (RTX 3070Ti, 8GB) — safety (llama-guard3:8b) + embeddings (nomic-embed-text).
@@ -502,7 +502,7 @@ services:
     container_name: memex_ui
     restart: unless-stopped
     env_file:
-      - ../network.env
+      - /home/network.env
     environment:
       - API_BASE_URL=http://agent_runtime:8000
       - MEMPALACE_BASE_URL=http://mempalace:8200
@@ -610,7 +610,7 @@ services:
     hostname: openclaude-grpc
     restart: unless-stopped
     env_file:
-      - ../network.env
+      - /home/network.env
     environment:
       - OLLAMA_HOST=http://ollama-r730:11434
       - SECONDARY_OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
