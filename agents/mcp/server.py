@@ -237,6 +237,9 @@ class MCPBridgeServer:
             "enabled": self.enabled,
             "server_name": self.server_name,
             "tools_registered": len(self._tools),
+            "resources_registered": 0,
+            "prompts_registered": 0,
+            "transports": ["http", "sse", "websocket", "stdio"],
         }
 
     def list_tools(self) -> list[dict[str, Any]]:
@@ -271,6 +274,18 @@ class MCPBridgeServer:
 
         if method == "skills/list":
             return {"skills": self.list_skills()}
+
+        if method == "resources/list":
+            return {"resources": []}
+
+        if method == "resources/read":
+            raise ValueError("No MCP resources are registered")
+
+        if method == "prompts/list":
+            return {"prompts": []}
+
+        if method == "prompts/get":
+            raise ValueError("No MCP prompts are registered")
 
         if method == "tools/call":
             tool_name = params.get("name")

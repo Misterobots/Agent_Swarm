@@ -91,6 +91,7 @@ def init_table() -> None:
                     "CREATE INDEX IF NOT EXISTS idx_swarm_runs_owner "
                     "ON swarm_runs (owner_id, started_at DESC)"
                 )
+                cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS prompt TEXT")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS swarm_workers (
                         worker_id        TEXT PRIMARY KEY,
@@ -164,6 +165,38 @@ def set_status(coordination_id: str, status: str) -> None:
                 )
     except Exception as e:
         logger.warning(f"[SwarmRunStore] set_status failed (non-fatal): {e}")
+
+
+def update_metadata(coordination_id: str, owner_id: str, *, title: str | None = None,
+                    scope: str | None = None, prompt: str | None = None) -> bool:
+    """Update mutable, owner-scoped task metadata without changing lifecycle state."""
+    if not coordination_id or not owner_id:
+        return False
+    fields = []
+    values = []
+    if title is not None:
+        fields.append("title=%s")
+        values.append(title[:200])
+    if scope is not None:
+        fields.append("scope=%s")
+        values.append(scope[:200] if scope else None)
+    if prompt is not None:
+        fields.append("prompt=%s")
+        values.append(prompt[:8000])
+    if not fields:
+        return False
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE swarm_runs SET " + ", ".join(fields) +
+                    ", updated_at=%s WHERE coordination_id=%s AND owner_id=%s",
+                    (*values, _now(), coordination_id, owner_id),
+                )
+                return cur.rowcount > 0
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] update_metadata failed (non-fatal): {e}")
+        return False
 
 
 def reconcile_stale_runs(error: str = "agent_runtime restarted mid-run") -> int:
@@ -305,7 +338,7 @@ def set_approval(coordination_id: str, owner_id: str, approval_state: str) -> bo
 _RUN_LIST_COLS = (
     "coordination_id, session_id, title, status, phase, phase_name, "
     "workers_total, workers_completed, workers_failed, scope, approval_state, "
-    "preview_url, started_at, updated_at, ended_at, "
+    "preview_url, prompt, started_at, updated_at, ended_at, "
     "(diff_text IS NOT NULL) AS has_diff"
 )
 

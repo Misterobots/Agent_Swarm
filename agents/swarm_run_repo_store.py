@@ -113,6 +113,23 @@ def set_local_branch(coordination_id: str, local_branch: str, bundle_data: bytes
         logger.warning(f"[SwarmRunRepoStore] set_local_branch failed (non-fatal): {e}")
 
 
+def update_branch(coordination_id: str, branch: str) -> bool:
+    """Update a run's repository branch, returning whether a row changed."""
+    if not coordination_id or not branch:
+        return False
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE swarm_run_repo SET branch=%s WHERE coordination_id=%s",
+                    (branch[:200], coordination_id),
+                )
+                return cur.rowcount > 0
+    except Exception as e:
+        logger.warning(f"[SwarmRunRepoStore] update_branch failed (non-fatal): {e}")
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Reads
 # ---------------------------------------------------------------------------
