@@ -12,6 +12,7 @@ from dev_harness.loop import _call_category
 from dev_harness.permissions import PermissionGate
 from dev_harness.replay_policy import public_call, validate_next
 from coordination.workspace_lifecycle import _safe
+from mcp.server import MCPBridgeServer
 
 
 def test_permission_mode_matrix_is_fail_closed():
@@ -89,3 +90,27 @@ def test_workspace_inputs_reject_traversal_and_branch_injection():
         _safe("-c", "branch")
     with pytest.raises(ValueError):
         _safe("", "session_id")
+
+
+@pytest.mark.asyncio
+async def test_mcp_health_and_standard_empty_capabilities():
+    server = MCPBridgeServer()
+    health = server.health()
+    assert health["tools_registered"] > 0
+    assert health["resources_registered"] == 0
+    assert health["prompts_registered"] == 0
+    assert set(health["transports"]) == {"http", "sse", "websocket", "stdio"}
+    assert await server.handle_rpc("resources/list", {}) == {"resources": []}
+    assert await server.handle_rpc("prompts/list", {}) == {"prompts": []}
+    with pytest.raises(ValueError):
+        await server.handle_rpc("resources/read", {"uri": "mcp://missing"})
+
+
+def test_replay_order_error_identifies_expected_call():
+    ok, reason = validate_next(
+        pending=[{"call_id": "first"}, {"call_id": "second"}],
+        call_id="second", owner_id="alice", requested_owner_id="alice",
+        permission_mode="default", is_admin=False, confirm=True,
+    )
+    assert not ok
+    assert "expected call_id=first" in reason

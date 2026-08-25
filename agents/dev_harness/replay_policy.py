@@ -36,7 +36,7 @@ def validate_next(*, pending: list[dict[str, Any]], call_id: str,
         return False, "checkpoint has no pending call"
     call = pending[0]
     if call.get("call_id") != call_id:
-        return False, "replay must proceed in exact recorded order"
+        return False, f"replay must proceed in exact recorded order; expected call_id={call.get('call_id')}"
     if call.get("approval_state") in {"completed", "denied", "failed"}:
         return False, "call is already resolved"
     if permission_mode == "bypass" and not is_admin:

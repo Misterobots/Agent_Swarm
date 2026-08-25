@@ -985,6 +985,14 @@ class DevReplayRequest(BaseModel):
     confirm: bool = False
 
 
+class TaskMetadataPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = None
+    scope: str | None = None
+    branch: str | None = None
+    prompt: str | None = None
+
+
 _DEV_REPLAY_LOCKS: dict[str, threading.Lock] = {}
 _DEV_REPLAY_LOCKS_GUARD = threading.Lock()
 
@@ -1086,7 +1094,7 @@ async def replay_dev_checkpoint_tool(
     if call.get("call_id") != body.call_id:
         raise HTTPException(
             status_code=409,
-            detail="Replay must proceed in recorded tool-call order",
+            detail=f"Replay must proceed in recorded tool-call order; expected call_id={call.get('call_id')}",
         )
 
     tool_name = call.get("tool_name") or call.get("name")
@@ -3274,6 +3282,44 @@ async def get_task(coordination_id: str, request: Request):
         if local:
             run["dev_project_id"] = local["dev_project_id"]
     return {"run": run, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
+
+
+@app.patch("/v1/tasks/{coordination_id}")
+async def patch_task(coordination_id: str, body: TaskMetadataPatch, request: Request):
+    """Update owner-scoped mutable task metadata only."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    import swarm_run_repo_store
+
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if run.get("status") in {"completed", "failed", "denied", "cancelled"}:
+        raise HTTPException(status_code=409, detail="Task metadata is immutable after terminal completion")
+    if body.branch is not None:
+        if not body.branch or body.branch.startswith("-") or ".." in body.branch or "@{" in body.branch:
+            raise HTTPException(status_code=422, detail="Invalid branch name")
+        repo = swarm_run_repo_store.get(coordination_id)
+        if not repo:
+            raise HTTPException(status_code=409, detail="Task has no repository branch context")
+        if not swarm_run_repo_store.update_branch(coordination_id, body.branch):
+            raise HTTPException(status_code=409, detail="Task branch could not be updated")
+    if any(value is not None for value in (body.title, body.scope, body.prompt)):
+        if not swarm_run_store.update_metadata(
+            coordination_id, owner_id, title=body.title, scope=body.scope, prompt=body.prompt
+        ):
+            raise HTTPException(status_code=409, detail="Task metadata could not be updated")
+    updated = swarm_run_store.get_run(coordination_id, owner_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found")
+    repo = swarm_run_repo_store.get(coordination_id)
+    if repo:
+        updated["repo_url"] = repo["git_url"]
+        updated["branch"] = repo["branch"]
+        updated["dev_project_id"] = repo.get("dev_project_id")
+    return {"run": updated, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
 
 
 @app.get("/v1/tasks/{coordination_id}/diff")
