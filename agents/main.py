@@ -638,6 +638,7 @@ class ChatRequest(BaseModel):
     dev_mode: bool = False            # Phase 2: enable AI agentic coding tools in dev workspace
     dev_permission_mode: Optional[str] = None  # dev harness gate: default|plan|acceptEdits|bypass (plan = read-only until approved)
     dev_resume: bool = False          # resume a checkpoint after explicitly replaying interrupted tools
+    workspace_key: Optional[str] = None  # stable client workspace identity for approval scope
     grounding_web: bool = False       # inject live web search results (requires governance permission)
     grounding_docs: bool = False      # inject knowledge-base document chunks (requires governance permission)
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
@@ -746,15 +747,15 @@ _approval_decisions: dict[str, bool] = {}
 _approval_owners: dict[str, str] = {}
 
 # Per-user auto-approve rules:
-#   key = uid, value = set of tool names (or "all") that are auto-approved
+#   key = uid, value = workspace-key -> set of tool names (or "all")
 # "session" scope lives here (cleared on restart).
 # "workspace" scope is persisted to a simple JSON file on the same volume.
-_session_auto_approve: dict[str, set[str]] = {}
+_session_auto_approve: dict[str, dict[str, set[str]]] = {}
 
 _WORKSPACE_AUTO_APPROVE_FILE = "/workspace/.hivecode_auto_approve.json"
 
 
-def _load_workspace_auto_approve() -> dict[str, list[str]]:
+def _load_workspace_auto_approve() -> dict[str, object]:
     """Load workspace-scoped auto-approve rules from the JSON file, if present."""
     try:
         import json as _json
@@ -764,7 +765,7 @@ def _load_workspace_auto_approve() -> dict[str, list[str]]:
         return {}
 
 
-def _save_workspace_auto_approve(data: dict[str, list[str]]) -> None:
+def _save_workspace_auto_approve(data: dict[str, object]) -> None:
     try:
         import json as _json
         with open(_WORKSPACE_AUTO_APPROVE_FILE, "w") as f:
@@ -773,33 +774,55 @@ def _save_workspace_auto_approve(data: dict[str, list[str]]) -> None:
         logger.warning(f"[dev_mode] Could not save workspace auto-approve rules: {e}")
 
 
-def _is_auto_approved(uid: str, tool_name: str) -> bool:
-    """Return True if the tool is auto-approved for this user (session or workspace)."""
-    session_rules = _session_auto_approve.get(uid, set())
+def _approval_workspace_key(workspace_key: str | None) -> str:
+    """Normalize a workspace identity without persisting the raw path."""
+    from dev_harness.approval_scope import workspace_key as normalize_workspace
+    return normalize_workspace(workspace_key)
+
+
+def _is_auto_approved(uid: str, tool_name: str, workspace_key: str | None = None) -> bool:
+    """Return True if the tool is auto-approved for this user/workspace."""
+    workspace = _approval_workspace_key(workspace_key)
+    session_rules = _session_auto_approve.get(uid, {}).get(workspace, set())
     if "all" in session_rules or tool_name in session_rules:
         return True
     workspace_rules = _load_workspace_auto_approve()
-    ws_set = set(workspace_rules.get(uid, []))
+    # Legacy list-shaped grants are intentionally not inherited by a named
+    # workspace; old state therefore fails closed instead of crossing scopes.
+    from dev_harness.approval_scope import rules_for_workspace
+    ws_set = rules_for_workspace(
+        workspace_rules if isinstance(workspace_rules, dict) else {}, uid, workspace
+    )
     return "all" in ws_set or tool_name in ws_set
 
 
-def _apply_auto_approve(uid: str, tool_name: str, scope: str) -> None:
+def _apply_auto_approve(uid: str, tool_name: str, scope: str,
+                        workspace_key: str | None = None) -> None:
     """Persist an auto-approve rule for a user+tool at the given scope."""
+    workspace = _approval_workspace_key(workspace_key)
     if scope == "session":
-        _session_auto_approve.setdefault(uid, set()).add(tool_name)
+        _session_auto_approve.setdefault(uid, {}).setdefault(workspace, set()).add(tool_name)
     elif scope == "workspace":
         data = _load_workspace_auto_approve()
-        existing = set(data.get(uid, []))
+        if not isinstance(data, dict):
+            data = {}
+        existing_owner = data.get(uid, {})
+        from dev_harness.approval_scope import rules_for_workspace
+        existing = rules_for_workspace(data, uid, workspace)
         existing.add(tool_name)
-        data[uid] = list(existing)
+        data[uid] = {**(existing_owner if isinstance(existing_owner, dict) else {}), workspace: sorted(existing)}
         _save_workspace_auto_approve(data)
     elif scope == "all_session":
-        _session_auto_approve.setdefault(uid, set()).add("all")
+        _session_auto_approve.setdefault(uid, {}).setdefault(workspace, set()).add("all")
     elif scope == "all_workspace":
         data = _load_workspace_auto_approve()
-        existing = set(data.get(uid, []))
+        if not isinstance(data, dict):
+            data = {}
+        existing_owner = data.get(uid, {})
+        from dev_harness.approval_scope import rules_for_workspace
+        existing = rules_for_workspace(data, uid, workspace)
         existing.add("all")
-        data[uid] = list(existing)
+        data[uid] = {**(existing_owner if isinstance(existing_owner, dict) else {}), workspace: sorted(existing)}
         _save_workspace_auto_approve(data)
 
 
@@ -880,6 +903,7 @@ async def approve_tool_call(call_id: str, http_request: Request):
         body = {}
     auto_scope = body.get("auto", "none")
     tool_name = body.get("tool_name", "")
+    workspace_key = body.get("workspace_key")
     uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
 
     pending_owner = _approval_owners.get(call_id)
@@ -890,7 +914,7 @@ async def approve_tool_call(call_id: str, http_request: Request):
         raise HTTPException(status_code=403, detail="Approval request belongs to another owner")
 
     if auto_scope != "none" and tool_name:
-        _apply_auto_approve(uid, tool_name, auto_scope)
+        _apply_auto_approve(uid, tool_name, auto_scope, workspace_key)
 
     _approval_decisions[call_id] = True
     _approval_owners.pop(call_id, None)
@@ -925,9 +949,14 @@ async def deny_tool_call(call_id: str, http_request: Request):
 async def get_auto_approve_rules(http_request: Request):
     """Return the current auto-approve rules for the calling user."""
     uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
-    session_rules = list(_session_auto_approve.get(uid, set()))
+    workspace_key = http_request.query_params.get("workspace_key")
+    workspace = _approval_workspace_key(workspace_key)
+    session_rules = list(_session_auto_approve.get(uid, {}).get(workspace, set()))
     ws_data = _load_workspace_auto_approve()
-    workspace_rules = ws_data.get(uid, [])
+    from dev_harness.approval_scope import rules_for_workspace
+    workspace_rules = sorted(rules_for_workspace(
+        ws_data if isinstance(ws_data, dict) else {}, uid, workspace
+    ))
     return {"session": session_rules, "workspace": workspace_rules}
 
 
@@ -1749,7 +1778,7 @@ async def _dev_harness_stream(
                 return False
             if self.permission_gate.auto_approve(tool_name):
                 return False
-            return not _is_auto_approved(uid, tool_name)
+            return not _is_auto_approved(uid, tool_name, request.workspace_key)
 
         async def wait(self, call_id: str) -> str:
             event = _asyncio.Event()
