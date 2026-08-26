@@ -1,8 +1,9 @@
 """Opt-in smoke checks for a deployed Agent_Swarm runtime.
 
-Run with ``MEMEX_RUNTIME_URL=https://... pytest -m integration``.  The checks
-are read-only unless an existing task id is supplied through
-``MEMEX_SMOKE_TASK_ID``.
+Run with ``MEMEX_RUNTIME_URL=https://... pytest -m integration``.  For an
+Authentik-protected deployment, pass the already-authenticated session as
+``MEMEX_RUNTIME_COOKIE``.  The checks are read-only unless an existing task id
+is supplied through ``MEMEX_SMOKE_TASK_ID``.
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ import pytest
 RUNTIME_URL = os.getenv("MEMEX_RUNTIME_URL", "").rstrip("/")
 OWNER_ID = os.getenv("MEMEX_OWNER_ID", "").strip()
 TASK_ID = os.getenv("MEMEX_SMOKE_TASK_ID", "").strip()
+RUNTIME_COOKIE = os.getenv("MEMEX_RUNTIME_COOKIE", "").strip()
 
 pytestmark = [
     pytest.mark.integration,
@@ -24,6 +26,8 @@ pytestmark = [
 
 def _client() -> httpx.Client:
     headers = {"X-authentik-username": OWNER_ID} if OWNER_ID else {}
+    if RUNTIME_COOKIE:
+        headers["Cookie"] = RUNTIME_COOKIE
     return httpx.Client(base_url=RUNTIME_URL, headers=headers, timeout=15.0)
 
 
