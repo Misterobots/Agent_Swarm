@@ -13,13 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-c
     && unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools" \
     && mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest" \
     && yes | sdkmanager --licenses >/dev/null \
-    && sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" \
+    && sdkmanager "platform-tools" "platforms;android-35" "build-tools;34.0.0" "build-tools;35.0.0" \
     && rm -f /tmp/cmdline-tools.zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --shell /bin/bash android \
     && mkdir -p /workspace /home/android/.gradle \
-    && chown -R android:android /workspace /home/android
+    && chown -R android:android /opt/android-sdk /workspace /home/android
 
 USER android
 WORKDIR /workspace
