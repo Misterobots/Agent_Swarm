@@ -34,8 +34,9 @@ _VALID_MODES = ("default", "plan", "acceptEdits", "bypass")
 
 
 class PermissionGate:
-    def __init__(self, mode: str = "default"):
+    def __init__(self, mode: str = "default", *, is_admin: bool = False):
         self.mode = mode if mode in _VALID_MODES else "default"
+        self.is_admin = bool(is_admin)
 
     @property
     def plan_mode(self) -> bool:
@@ -47,12 +48,14 @@ class PermissionGate:
 
     def auto_approve(self, tool_name: str) -> bool:
         """Return whether this mode suppresses the interactive approval card."""
-        if self.mode == "bypass":
+        if self.mode == "bypass" and self.is_admin:
             return True
         return self.mode == "acceptEdits" and tool_name in EDIT_TOOLS
 
     def check(self, tool_name: str) -> tuple[bool, str]:
         """Return (allowed, reason).  reason is shown to the model when blocked."""
+        if self.mode == "bypass" and not self.is_admin:
+            return False, "bypass mode requires administrator authorization"
         if self.mode == "plan" and tool_name not in READ_ONLY_TOOLS and tool_name not in META_TOOLS:
             return False, (
                 f"🛑 Plan mode is active — `{tool_name}` is blocked. Investigate with "

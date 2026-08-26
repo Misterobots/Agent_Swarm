@@ -196,6 +196,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Dev checkpoint store init failed (non-fatal): {e}")
 
+        try:
+            from coordination import workspace_lifecycle as _workspace_store
+            _workspace_store.init_table()
+            _workspace_store.reap_abandoned()
+        except Exception as e:
+            logger.warning(f"Workspace lifecycle init/reap failed (non-fatal): {e}")
+
         # 7d. Initialize Dev Projects Store
         try:
             from dev_projects import store as _dev_projects_store

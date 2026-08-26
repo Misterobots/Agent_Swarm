@@ -31,7 +31,8 @@ def test_accept_edits_only_auto_approves_direct_file_edits():
 
 
 def test_bypass_mode_auto_approves_tools_after_route_authorization():
-    gate = PermissionGate("bypass")
+    assert PermissionGate("bypass").check("run_command")[0] is False
+    gate = PermissionGate("bypass", is_admin=True)
 
     assert gate.bypass_mode is True
     assert gate.check("run_command")[0] is True
