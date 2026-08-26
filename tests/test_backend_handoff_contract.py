@@ -73,14 +73,17 @@ def test_replay_policy_preserves_order_and_hides_arguments():
 def test_mcp_capabilities_are_registered_and_implemented():
     server = MCPBridgeServer()
     health = server.health()
-    assert health["transports"] == ["http"]
+    assert health["transports"] == ["http", "sse", "websocket", "stdio"]
     assert health["resources_registered"] == 2
     assert health["prompts_registered"] == 2
     assert health["capabilities"]["resources"]["listChanged"] is False
     config = server.client_config("https://runtime.example")
-    descriptor = config["mcpServers"][server.server_name]
-    assert descriptor["transport"] == "http"
-    assert descriptor["capabilities"] == health["capabilities"]
+    descriptors = config["mcpServers"]
+    assert descriptors[server.server_name]["transport"] == "http"
+    assert descriptors[f"{server.server_name}-sse"]["transport"] == "sse"
+    assert descriptors[f"{server.server_name}-websocket"]["transport"] == "websocket"
+    assert descriptors[f"{server.server_name}-stdio"]["transport"] == "stdio"
+    assert descriptors[server.server_name]["capabilities"] == health["capabilities"]
     resources = asyncio.run(server.handle_rpc("resources/list", {}))
     assert len(resources["resources"]) == 2
     prompt = asyncio.run(server.handle_rpc(

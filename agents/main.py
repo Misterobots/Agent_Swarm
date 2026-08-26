@@ -2532,6 +2532,46 @@ async def mcp_rpc(request: MCPRpcRequest, http_request: Request):
         )
         return internal_error(request.id, e, {"method": request.method}).model_dump()
 
+
+@app.get("/api/v1/mcp/sse")
+async def mcp_sse(request: Request):
+    """MCP SSE discovery stream; JSON-RPC messages continue via the HTTP POST endpoint."""
+    from fastapi.responses import StreamingResponse
+
+    endpoint = str(request.base_url).rstrip("/") + "/api/v1/mcp/rpc"
+
+    async def events():
+        yield f"event: endpoint\ndata: {endpoint}\n\n"
+        while not await request.is_disconnected():
+            await _asyncio.sleep(15)
+            yield ": keepalive\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+
+@app.websocket("/api/v1/mcp/ws")
+async def mcp_websocket(websocket: WebSocket):
+    """Bidirectional MCP JSON-RPC transport over one WebSocket connection."""
+    await websocket.accept()
+    auth_header = websocket.headers.get("Authorization")
+    try:
+        while True:
+            payload = await websocket.receive_json()
+            try:
+                request = MCPRpcRequest.model_validate(payload)
+                result = await mcp_server.handle_rpc(request.method, request.params, auth_header=auth_header)
+                response = ok_response(request.id, result)
+            except ValueError as exc:
+                response = error_response(payload.get("id"), -32601, str(exc))
+            except Exception as exc:
+                response = internal_error(payload.get("id"), exc, {"transport": "websocket"})
+            await websocket.send_json(response.model_dump(exclude_none=True))
+    except WebSocketDisconnect:
+        return
+
 class LogRequest(BaseModel):
     level: str
     message: str

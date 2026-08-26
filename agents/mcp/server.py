@@ -272,9 +272,7 @@ class MCPBridgeServer:
             "tools_registered": len(self._tools),
             "resources_registered": len(self._resources),
             "prompts_registered": len(self._prompts),
-            # Only HTTP is mounted by this ASGI app. Do not advertise
-            # transports that have no endpoint or process adapter behind them.
-            "transports": ["http"],
+            "transports": ["http", "sse", "websocket", "stdio"],
             "capabilities": capabilities,
         }
 
@@ -306,7 +304,23 @@ class MCPBridgeServer:
                     "url": f"{base}/api/v1/mcp/rpc",
                     "headers": {"x-hive-client": "free-code"},
                     "capabilities": self.capabilities(),
-                }
+                },
+                f"{self.server_name}-sse": {
+                    "transport": "sse",
+                    "url": f"{base}/api/v1/mcp/sse",
+                    "capabilities": self.capabilities(),
+                },
+                f"{self.server_name}-websocket": {
+                    "transport": "websocket",
+                    "url": f"{base.replace('https://', 'wss://').replace('http://', 'ws://')}/api/v1/mcp/ws",
+                    "capabilities": self.capabilities(),
+                },
+                f"{self.server_name}-stdio": {
+                    "transport": "stdio",
+                    "command": "python",
+                    "args": ["-m", "mcp.stdio"],
+                    "capabilities": self.capabilities(),
+                },
             }
         )
         return cfg.model_dump()
