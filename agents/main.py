@@ -1640,13 +1640,32 @@ async def _dev_harness_stream(
     from dev_harness.loop import DevHarness
     from dev_harness.router import ModelRouter
     from dev_harness.permissions import PermissionGate
+    from event_contract import stable_event
+
+    stream_run_id = f"dev-{uuid.uuid4().hex}"
+    stream_seq = 0
+
+    def _event_sse(delta: dict) -> str:
+        """Add the canonical event envelope while retaining legacy SSE fields."""
+        nonlocal stream_seq
+        event_type = str(delta.get("type") or "status")
+        event = stable_event(stream_run_id, stream_seq, event_type, delta)
+        stream_seq += 1
+        enriched = dict(delta)
+        enriched.update({
+            "run_id": event["run_id"],
+            "seq": event["seq"],
+            "event_ts": event["ts"],
+            "event": event,
+        })
+        return _dev_sse(request.model, enriched)
 
     # The public Desktop route traverses Cloudflare.  A cold model load or a
     # per-session sandbox provision can take longer than its origin-first-byte
     # deadline, which otherwise turns a healthy Code request into a 524 before
     # the user sees anything.  Yield immediately so the proxy and client both
     # know this stream is alive.
-    yield _dev_sse(request.model, {
+    yield _event_sse({
         "type": "status",
         "content": "Preparing Code workspace…",
     })
@@ -1659,7 +1678,7 @@ async def _dev_harness_stream(
         stored_checkpoint = get_checkpoint(uid, checkpoint_session_id)
         if not stored_checkpoint or stored_checkpoint.get("status") != "ready_to_resume":
             status = stored_checkpoint.get("status") if stored_checkpoint else "missing"
-            yield _dev_sse(request.model, {
+            yield _event_sse({
                 "type": "error",
                 "content": f"Dev checkpoint is not ready to resume (status={status}).",
             })
@@ -1688,7 +1707,7 @@ async def _dev_harness_stream(
         try:
             history = History.from_checkpoint(stored_checkpoint_data["history"])
         except (KeyError, TypeError, ValueError) as exc:
-            yield _dev_sse(request.model, {
+            yield _event_sse({
                 "type": "error",
                 "content": f"Dev checkpoint history is invalid: {exc}",
             })
@@ -1701,7 +1720,7 @@ async def _dev_harness_stream(
         primary, targets = _build_dev_providers(request.model, uid)
     except Exception as e:
         logger.error(f"[dev_harness] provider init failed: {e}", exc_info=True)
-        yield _dev_sse(request.model, {"type": "error", "content": f"Dev harness init failed: {e}"})
+        yield _event_sse({"type": "error", "content": f"Dev harness init failed: {e}"})
         yield "data: [DONE]\n\n"
         return
 
@@ -1790,7 +1809,7 @@ async def _dev_harness_stream(
                     set_current_container(None)
         except Exception as e:
             logger.error(f"[dev_harness] session container setup failed: {e}", exc_info=True)
-            yield _dev_sse(request.model, {"type": "error", "content": f"Dev session setup failed: {e}"})
+            yield _event_sse({"type": "error", "content": f"Dev session setup failed: {e}"})
             yield "data: [DONE]\n\n"
             return
 
@@ -1846,7 +1865,7 @@ async def _dev_harness_stream(
         )
 
     if not await _checkpoint("running", 0, [], ""):
-        yield _dev_sse(request.model, {
+        yield _event_sse({
             "type": "error",
             "content": "Dev session checkpoint unavailable; execution stopped safely.",
         })
@@ -1858,7 +1877,7 @@ async def _dev_harness_stream(
         # receive a complete tool-call envelope.  That means cold model loads
         # otherwise look like a frozen Code tab.  State the phase up front and
         # report elapsed waits below without cancelling useful work.
-        yield _dev_sse(request.model, {
+        yield _event_sse({
             "type": "status",
             "content": f"Workspace ready. Waiting for {request.model}…",
         })
@@ -1877,7 +1896,7 @@ async def _dev_harness_stream(
             if not done:
                 waited_seconds += 15
                 if waited_seconds in wait_notices:
-                    yield _dev_sse(request.model, {
+                    yield _event_sse({
                         "type": "status",
                         "content": (
                             f"Still waiting for {request.model} "
@@ -1907,14 +1926,14 @@ async def _dev_harness_stream(
                 delta["event_type"] = chunk.event_type
             if chunk.data is not None:
                 delta["content"] = chunk.data  # structured payload (e.g. todo)
-            yield _dev_sse(request.model, delta)
+            yield _event_sse(delta)
     except Exception as e:
         logger.error(f"[dev_harness] stream error: {e}", exc_info=True)
         try:
             await _checkpoint("failed", 0, [], str(e))
         except Exception:
             logger.warning("[dev_harness] failed to persist error checkpoint", exc_info=True)
-        yield _dev_sse(request.model, {"type": "error", "content": f"Dev harness error: {e}"})
+        yield _event_sse({"type": "error", "content": f"Dev harness error: {e}"})
     yield "data: [DONE]\n\n"
 
 
