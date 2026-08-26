@@ -52,6 +52,21 @@ const HORZ_HANDLE_CLASS =
 const VERT_HANDLE_CLASS =
   "h-[3px] flex-shrink-0 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors duration-150 cursor-ns-resize";
 
+/**
+ * Keep multiple docked panels usable instead of giving every panel the same
+ * percentage. The main workspace retains its minimum size, while a single
+ * panel keeps the familiar default width/height.
+ */
+function getDockedPanelDefaultSize(
+  panelCount: number,
+  maxSize: number,
+  minSize: number,
+  availableSize = 75,
+): number {
+  if (panelCount <= 0) return maxSize;
+  return Math.min(maxSize, Math.max(minSize, availableSize / panelCount));
+}
+
 // ---------------------------------------------------------------------------
 // DevWorkspace
 // ---------------------------------------------------------------------------
@@ -107,6 +122,8 @@ export function DevWorkspace() {
   const dockedRight = visible.filter((p) => p.position === "right" && isPanelDocked(p.id));
   const dockedBottom = visible.filter((p) => p.position === "bottom" && isPanelDocked(p.id));
   const floating = visible.filter((p) => !isPanelDocked(p.id));
+  const rightPanelDefaultSize = getDockedPanelDefaultSize(dockedRight.length, 40, 15);
+  const bottomPanelDefaultSize = getDockedPanelDefaultSize(dockedBottom.length, 30, 10);
 
   const mainContent = viewMode === "preview" ? <PreviewCanvas /> : <ChatView showDevContext />;
 
@@ -122,7 +139,12 @@ export function DevWorkspace() {
   for (const panel of dockedRight) {
     horzChildren.push(
       <Separator key={`sep-r-${panel.id}`} className={HORZ_HANDLE_CLASS} />,
-      <Panel key={panel.id} id={`ws-r-${panel.id}`} defaultSize={40} minSize={15}>
+      <Panel
+        key={panel.id}
+        id={`ws-r-${panel.id}`}
+        defaultSize={rightPanelDefaultSize}
+        minSize={15}
+      >
         <DockedSurface
           position="right"
           title={panel.title}
@@ -149,7 +171,12 @@ export function DevWorkspace() {
   for (const panel of dockedBottom) {
     vertChildren.push(
       <Separator key={`sep-b-${panel.id}`} className={VERT_HANDLE_CLASS} />,
-      <Panel key={panel.id} id={`ws-b-${panel.id}`} defaultSize={30} minSize={10}>
+      <Panel
+        key={panel.id}
+        id={`ws-b-${panel.id}`}
+        defaultSize={bottomPanelDefaultSize}
+        minSize={10}
+      >
         <DockedSurface
           position="bottom"
           title={panel.title}
