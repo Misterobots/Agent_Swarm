@@ -2,6 +2,7 @@
 
 import os
 import sys
+import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,9 @@ pytest.importorskip("prometheus_client")
 import main
 import swarm_run_repo_store
 import swarm_run_store
+from dev_harness.history import History
+from dev_harness.replay_policy import public_call, validate_next
+from mcp.server import MCPBridgeServer
 
 
 def _patch_test(monkeypatch, status="running"):
@@ -43,3 +47,83 @@ def test_task_patch_rejects_terminal_runs(monkeypatch):
     client = _patch_test(monkeypatch, status="completed")
     response = client.patch("/v1/tasks/run-1", json={"title": "late"})
     assert response.status_code == 409
+
+
+def test_replay_policy_preserves_order_and_hides_arguments():
+    call = {
+        "call_id": "c1", "name": "web_search", "args": {"query": "private"},
+        "category": "mcp", "source": "mcp", "replayable": True,
+    }
+    public = public_call(call)
+    assert public["name"] == "web_search"
+    assert public["args"] == {}
+    assert "private" not in str(public)
+    assert validate_next(
+        pending=[call], call_id="c1", owner_id="alice", requested_owner_id="alice",
+        permission_mode="default", is_admin=False, confirm=True,
+    ) == (True, "")
+    allowed, reason = validate_next(
+        pending=[call], call_id="later", owner_id="alice", requested_owner_id="alice",
+        permission_mode="default", is_admin=False, confirm=True,
+    )
+    assert not allowed
+    assert "c1" in reason
+
+
+def test_mcp_capabilities_are_registered_and_implemented():
+    server = MCPBridgeServer()
+    health = server.health()
+    assert health["transports"] == ["http"]
+    assert health["resources_registered"] == 2
+    assert health["prompts_registered"] == 2
+    assert health["capabilities"]["resources"]["listChanged"] is False
+    config = server.client_config("https://runtime.example")
+    descriptor = config["mcpServers"][server.server_name]
+    assert descriptor["transport"] == "http"
+    assert descriptor["capabilities"] == health["capabilities"]
+    resources = asyncio.run(server.handle_rpc("resources/list", {}))
+    assert len(resources["resources"]) == 2
+    prompt = asyncio.run(server.handle_rpc(
+        "prompts/get", {"name": "memex.research", "arguments": {"query": "q"}}
+    ))
+    assert prompt["messages"][0]["content"]["text"].endswith("\n\nq")
+
+
+def test_checkpoint_replay_dispatches_read_only_mcp_in_order(monkeypatch):
+    import dev_harness.checkpoints as checkpoints
+
+    history = History(system="system", turns=[]).to_checkpoint()
+    pending = [
+        {"call_id": "c1", "name": "web_search", "tool_name": "web_search",
+         "args": {"query": "q"}, "category": "mcp", "replayable": True},
+        {"call_id": "c2", "name": "web_fetch", "tool_name": "web_fetch",
+         "args": {"url": "https://example.invalid"}, "category": "mcp", "replayable": True},
+    ]
+    row = {"session_id": "session-1", "status": "recovery_required", "turn": 1,
+           "data": {"history": history, "pending_tools": pending, "permission_mode": "default"}}
+    saved = {}
+    monkeypatch.setattr(checkpoints, "get_checkpoint", lambda *_args: row)
+    monkeypatch.setattr(
+        checkpoints, "save_checkpoint",
+        lambda _owner, _session, **kwargs: saved.update(kwargs) or True,
+    )
+    monkeypatch.setattr(main, "_run_mcp_tool", lambda _uid, name, _args: f"{name}-ok")
+    client = TestClient(main.app)
+
+    out_of_order = client.post(
+        "/api/v1/dev/checkpoints/session-1/replay",
+        json={"call_id": "c2", "confirm": True},
+        headers={"X-authentik-uid": "alice"},
+    )
+    assert out_of_order.status_code == 409
+    assert "c1" in out_of_order.json()["detail"]
+
+    replayed = client.post(
+        "/api/v1/dev/checkpoints/session-1/replay",
+        json={"call_id": "c1", "confirm": True},
+        headers={"X-authentik-uid": "alice"},
+    )
+    assert replayed.status_code == 200
+    assert replayed.json()["output"] == "web_search-ok"
+    assert replayed.json()["next_call_id"] == "c2"
+    assert saved["status"] == "recovery_required"

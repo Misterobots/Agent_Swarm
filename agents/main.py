@@ -1012,11 +1012,12 @@ async def replay_dev_checkpoint_tool(
     body: DevReplayRequest,
     http_request: Request,
 ):
-    """Explicitly replay the next owner-approved sandbox tool call.
+    """Explicitly replay the next owner-approved recorded tool call.
 
-    Only the first pending direct sandbox call can be replayed.  Meta-tools,
-    MCP calls, and subagent delegation require a new DevHarness turn because
-    their original execution context cannot be reconstructed safely here.
+    Calls are dispatched only after owner, confirmation, permission, and exact
+    recorded-order checks. Sandbox tools use the container executor, read-only
+    MCP tools use the mounted MCP safety stack, and Task calls reconstruct the
+    existing subagent adapter with the checkpoint's model and container.
     """
     if not body.confirm:
         raise HTTPException(status_code=400, detail="Set confirm=true to replay a tool call")
@@ -1051,7 +1052,7 @@ async def replay_dev_checkpoint_tool(
     if not pending or not isinstance(pending[0], dict):
         raise HTTPException(status_code=409, detail="Checkpoint has no replayable pending tool")
     call = pending[0]
-    from dev_harness.replay_policy import validate_next
+    from dev_harness.replay_policy import category, validate_next
     policy_ok, policy_reason = validate_next(
         pending=pending,
         call_id=body.call_id,
@@ -1069,13 +1070,13 @@ async def replay_dev_checkpoint_tool(
             detail=f"Replay must proceed in recorded tool-call order; expected call_id={call.get('call_id')}",
         )
 
-    tool_name = call.get("name")
+    tool_name = call.get("tool_name") or call.get("name")
     args = call.get("args")
-    replayable = {"read_file", "write_file", "list_directory", "run_command", "edit_file", "glob", "grep", "git"}
-    if tool_name not in replayable or not isinstance(args, dict):
+    tool_category = category(call)
+    if not isinstance(tool_name, str) or not isinstance(args, dict):
         raise HTTPException(
             status_code=409,
-            detail=f"Tool {tool_name!r} cannot be safely replayed through this endpoint",
+            detail=f"Tool {tool_name!r} has an invalid recorded replay payload",
         )
 
     permission_mode = data.get("permission_mode") or "default"
@@ -1094,13 +1095,34 @@ async def replay_dev_checkpoint_tool(
 
     try:
         loop = _asyncio.get_running_loop()
-        output, file_changes = await loop.run_in_executor(
-            None,
-            _exec_with_sink,
-            tool_name,
-            args,
-            container_name,
-        )
+        if tool_category == "sandbox":
+            output, file_changes = await loop.run_in_executor(
+                None,
+                _exec_with_sink,
+                tool_name,
+                args,
+                container_name,
+            )
+        elif tool_category == "mcp":
+            output = await loop.run_in_executor(None, _run_mcp_tool, uid, tool_name, args)
+            file_changes = []
+        elif tool_category == "task":
+            gate = PermissionGate(permission_mode)
+            output, emitted = await _run_subagent(
+                uid,
+                data.get("model") or _DEFAULT_CHAT_MODEL,
+                args.get("description", ""),
+                args.get("prompt", ""),
+                args.get("subagent_type", "general"),
+                gate,
+                container_name=container_name,
+            )
+            file_changes = [
+                chunk.data for chunk in emitted
+                if getattr(chunk, "type", None) == "file_change" and getattr(chunk, "data", None)
+            ]
+        else:
+            raise ValueError(f"Unsupported replay category: {tool_category}")
         is_error = False
     except Exception as exc:
         output = f"Replay failed: {exc}"
@@ -1514,6 +1536,10 @@ _DEV_MCP_TOOLS = {
     "web_search": ("hive.browser.search", "browser_search"),
     "web_fetch": ("hive.browser.fetch", "browser_fetch"),
 }
+_DEV_MCP_ALIASES = {
+    "hive.browser.search": "web_search",
+    "hive.browser.fetch": "web_fetch",
+}
 
 
 def _dev_mcp_registry():
@@ -1533,7 +1559,8 @@ def _run_mcp_tool(uid: str, dev_name: str, args: dict) -> str:
     Lazy imports + broad except: a missing dep or runtime error returns a clean
     error string rather than breaking the harness.
     """
-    mapping = _DEV_MCP_TOOLS.get(dev_name)
+    canonical_name = _DEV_MCP_ALIASES.get(dev_name, dev_name)
+    mapping = _DEV_MCP_TOOLS.get(canonical_name)
     if not mapping:
         return f"Unknown MCP tool: {dev_name}"
     hive_name, _cap = mapping

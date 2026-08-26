@@ -1,10 +1,16 @@
 ﻿from __future__ import annotations
 
 import os
+import json
 from typing import Any, Dict, List
 
 from logger_setup import setup_logger
-from mcp.schema import MCPToolDescriptor, MCPSkillDescriptor, MCPClientConfig
+from mcp.schema import (
+    MCPClientConfig,
+    MCPPromptDescriptor,
+    MCPResourceDescriptor,
+    MCPToolDescriptor,
+)
 from mcp.tool_hooks import ToolHookRegistry
 
 logger = setup_logger("MCPBridge")
@@ -22,6 +28,32 @@ class MCPBridgeServer:
         self.server_name = os.getenv("MCP_SERVER_NAME", "home-ai-lab")
         self.base_url = os.getenv("MCP_BASE_URL", "http://localhost:8000")
         self.tool_hooks = ToolHookRegistry()
+        self._resources = [
+            MCPResourceDescriptor(
+                uri=f"memex://{self.server_name}/tools",
+                name="Registered tools",
+                description="JSON descriptor for the tools exposed by this MCP bridge.",
+                mimeType="application/json",
+            ),
+            MCPResourceDescriptor(
+                uri=f"memex://{self.server_name}/skills",
+                name="Registered skills",
+                description="JSON descriptor for the skills currently available to the bridge.",
+                mimeType="application/json",
+            ),
+        ]
+        self._prompts = [
+            MCPPromptDescriptor(
+                name="memex.research",
+                description="Research a question with the bridge's web search and fetch tools.",
+                arguments=[{"name": "query", "description": "Question or topic to research.", "required": True}],
+            ),
+            MCPPromptDescriptor(
+                name="memex.code_review",
+                description="Review code or a change request and return actionable findings.",
+                arguments=[{"name": "request", "description": "Code or review request.", "required": True}],
+            ),
+        ]
 
         self._tools: list[MCPToolDescriptor] = [
             MCPToolDescriptor(
@@ -233,13 +265,24 @@ class MCPBridgeServer:
         ]
 
     def health(self) -> dict[str, Any]:
+        capabilities = self.capabilities()
         return {
             "enabled": self.enabled,
             "server_name": self.server_name,
             "tools_registered": len(self._tools),
-            "resources_registered": 0,
-            "prompts_registered": 0,
-            "transports": ["http", "sse", "websocket", "stdio"],
+            "resources_registered": len(self._resources),
+            "prompts_registered": len(self._prompts),
+            # Only HTTP is mounted by this ASGI app. Do not advertise
+            # transports that have no endpoint or process adapter behind them.
+            "transports": ["http"],
+            "capabilities": capabilities,
+        }
+
+    def capabilities(self) -> dict[str, Any]:
+        return {
+            "tools": {"listChanged": False},
+            "resources": {"listChanged": False},
+            "prompts": {"listChanged": False},
         }
 
     def list_tools(self) -> list[dict[str, Any]]:
@@ -262,6 +305,7 @@ class MCPBridgeServer:
                     "transport": "http",
                     "url": f"{base}/api/v1/mcp/rpc",
                     "headers": {"x-hive-client": "free-code"},
+                    "capabilities": self.capabilities(),
                 }
             }
         )
@@ -276,16 +320,45 @@ class MCPBridgeServer:
             return {"skills": self.list_skills()}
 
         if method == "resources/list":
-            return {"resources": []}
+            return {"resources": [resource.model_dump() for resource in self._resources]}
 
         if method == "resources/read":
-            raise ValueError("No MCP resources are registered")
+            uri = str(params.get("uri", ""))
+            known = {resource.uri: resource for resource in self._resources}
+            resource = known.get(uri)
+            if resource is None:
+                raise ValueError(f"Unknown MCP resource: {uri}")
+            if uri.endswith("/tools"):
+                text = json.dumps(self.list_tools(), separators=(",", ":"))
+            else:
+                text = json.dumps(self.list_skills(), separators=(",", ":"))
+            return {"contents": [{"uri": uri, "mimeType": resource.mimeType, "text": text}]}
 
         if method == "prompts/list":
-            return {"prompts": []}
+            return {"prompts": [prompt.model_dump() for prompt in self._prompts]}
 
         if method == "prompts/get":
-            raise ValueError("No MCP prompts are registered")
+            name = str(params.get("name", ""))
+            prompt = next((item for item in self._prompts if item.name == name), None)
+            if prompt is None:
+                raise ValueError(f"Unknown MCP prompt: {name}")
+            arguments = params.get("arguments") or {}
+            missing = [arg.name for arg in prompt.arguments if arg.required and not arguments.get(arg.name)]
+            if missing:
+                raise ValueError(f"Missing MCP prompt arguments: {', '.join(missing)}")
+            if name == "memex.research":
+                text = (
+                    "Research the following question using web search and fetch, cite the sources, "
+                    f"and distinguish facts from inference:\n\n{arguments.get('query', '')}"
+                )
+            else:
+                text = (
+                    "Review the following code request. Identify correctness, security, and maintainability "
+                    f"issues, then propose focused fixes:\n\n{arguments.get('request', '')}"
+                )
+            return {"description": prompt.description, "messages": [
+                {"role": "user", "content": {"type": "text", "text": text}},
+            ]}
 
         if method == "tools/call":
             tool_name = params.get("name")
@@ -296,6 +369,8 @@ class MCPBridgeServer:
             return {
                 "server": self.server_name,
                 "enabled": self.enabled,
+                "protocolVersion": "2025-06-18",
+                "capabilities": self.capabilities(),
             }
 
         raise ValueError(f"Unsupported MCP method: {method}")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MCPRpcRequest(BaseModel):
@@ -30,6 +30,25 @@ class MCPToolDescriptor(BaseModel):
     name: str
     description: str
     input_schema: Dict[str, Any]
+
+
+class MCPResourceDescriptor(BaseModel):
+    uri: str
+    name: str
+    description: str
+    mimeType: str = "text/plain"
+
+
+class MCPPromptArgument(BaseModel):
+    name: str
+    description: str
+    required: bool = False
+
+
+class MCPPromptDescriptor(BaseModel):
+    name: str
+    description: str
+    arguments: List[MCPPromptArgument] = Field(default_factory=list)
 
 
 class MCPSkillDescriptor(BaseModel):

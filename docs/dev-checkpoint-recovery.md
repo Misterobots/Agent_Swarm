@@ -21,7 +21,10 @@ Look for `status: "recovery_required"` and review the first item in
 
 For `write_file`, `edit_file`, `run_command`, or `git`, inspect the current
 workspace and diff first. The checkpoint means the call was durable before
-execution, not that Docker definitely stopped before its side effect.
+execution, not that Docker definitely stopped before its side effect. Read-only
+MCP calls can be replayed through the mounted MCP safety stack; Task calls are
+reconstructed with the recorded model/container and remain subject to the
+permission gate.
 
 ## 3. Explicitly replay one call
 
@@ -34,9 +37,9 @@ curl -X POST \
 ```
 
 Repeat with `next_call_id` until the response reports
-`status: "ready_to_resume"`. Only direct sandbox tools are replayable;
-`Task`, MCP, web, and other meta-tools are rejected so they cannot be
-reconstructed outside their original approval context.
+`status: "ready_to_resume"`. Unsupported meta-tools remain rejected. The
+server exposes replay metadata without raw arguments, and accepts only the
+oldest pending call for the authenticated owner.
 
 ## 4. Continue the model turn
 

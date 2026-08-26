@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Awaitable, Callable
 
 from dev_harness.history import History, StreamChunk, ToolResult
@@ -27,6 +28,35 @@ from dev_harness.history import History, StreamChunk, ToolResult
 logger = logging.getLogger("dev_harness.loop")
 
 _STREAM_CHUNK_SIZE = 80
+
+
+def _checkpoint_call(call, order_index: int) -> dict:
+    """Serialize a tool call with enough metadata for safe recovery routing."""
+    from dev_harness.replay_policy import category, replayable
+
+    name = call.name
+    kind = category({"name": name})
+    if kind == "task":
+        side_effect_class = "delegation"
+    elif kind == "mcp":
+        side_effect_class = "read_only_external" if replayable({"name": name}) else "external"
+    elif name in {"write_file", "edit_file", "run_command", "git"}:
+        side_effect_class = "workspace_write"
+    else:
+        side_effect_class = "read_only_workspace"
+    return {
+        "call_id": call.call_id,
+        "name": name,
+        "tool_name": name,
+        "args": call.args,
+        "category": kind,
+        "source": kind,
+        "side_effect_class": side_effect_class,
+        "order_index": order_index,
+        "approval_state": "pending",
+        "created_at": int(time.time()),
+        "replayable": replayable({"name": name}),
+    }
 
 ToolExecutor = Callable[[str, str, dict], Awaitable[str]]
 
@@ -91,8 +121,8 @@ class DevHarness:
             history.add_assistant(result.text, result.tool_calls)
 
             pending_tools = [
-                {"call_id": call.call_id, "name": call.name, "args": call.args}
-                for call in result.tool_calls
+                _checkpoint_call(call, index)
+                for index, call in enumerate(result.tool_calls)
             ]
             checkpoint_status = "awaiting_tools" if pending_tools else "completed"
             if checkpoint is not None and not await checkpoint(
