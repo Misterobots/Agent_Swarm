@@ -12,6 +12,7 @@ from config import AGNO_DB_URL
 from event_contract import stable_event
 
 logger = logging.getLogger("agents.swarm_run_event_store")
+_EVENT_TS_FIELD = "_event_ts"
 
 
 @contextmanager
@@ -55,6 +56,10 @@ def append_event(coordination_id: str, owner_id: str, seq: int,
     if not coordination_id or not owner_id or int(seq) < 0:
         return None
     event = stable_event(coordination_id, int(seq), event_type, payload)
+    stored_payload = dict(event["payload"])
+    # Keep the exact envelope timestamp without requiring a schema migration
+    # on installations that already created swarm_run_events.
+    stored_payload[_EVENT_TS_FIELD] = event["ts"]
     try:
         with _db() as conn:
             with conn.cursor() as cur:
@@ -64,7 +69,7 @@ def append_event(coordination_id: str, owner_id: str, seq: int,
                        VALUES (%s, %s, %s, %s, %s, EXTRACT(EPOCH FROM NOW())::BIGINT)
                        ON CONFLICT (coordination_id, seq) DO NOTHING""",
                     (coordination_id, owner_id, int(seq), event["type"],
-                     psycopg2.extras.Json(event["payload"])),
+                     psycopg2.extras.Json(stored_payload)),
                 )
         return event
     except Exception as exc:
@@ -87,8 +92,18 @@ def list_events(coordination_id: str, owner_id: str, *, after_seq: int = -1,
                     (coordination_id, owner_id, int(after_seq), min(max(int(limit), 1), 2000)),
                 )
                 rows = cur.fetchall()
-        return [stable_event(coordination_id, int(row["seq"]), row["type"], row["payload"])
-                for row in rows]
+        events = []
+        for row in rows:
+            payload = dict(row["payload"] or {})
+            timestamp = payload.pop(_EVENT_TS_FIELD, None)
+            events.append(stable_event(
+                coordination_id,
+                int(row["seq"]),
+                row["type"],
+                payload,
+                timestamp=timestamp,
+            ))
+        return events
     except Exception as exc:
         logger.warning("[SwarmRunEventStore] list failed (non-fatal): %s", exc)
         return []

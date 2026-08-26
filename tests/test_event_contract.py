@@ -17,3 +17,11 @@ def test_enrich_delta_preserves_legacy_fields_and_adds_envelope():
     assert delta["run_id"] == "chat-1"
     assert delta["seq"] == 3
     assert delta["event"]["payload"] == {"content": "hello", "type": "message"}
+
+
+def test_stable_event_can_restore_persisted_timestamp():
+    event = stable_event(
+        "run-2", 1, "status", {"content": "ready"},
+        timestamp="2026-08-25T12:00:00+00:00",
+    )
+    assert event["ts"] == "2026-08-25T12:00:00+00:00"
