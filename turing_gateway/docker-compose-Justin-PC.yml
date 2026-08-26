@@ -766,8 +766,8 @@ services:
       - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
       - NTFY_AUTH_DEFAULT_ACCESS=deny-all
-      - NTFY_AUTH_USERS=${NTFY_ADMIN_USER:-ntfyadmin}:${NTFY_ADMIN_PASSWORD_HASH:-$$2a$$10$$YLiO8U21sX1uhZamTLJXHuxgVC0Z/GKISibrKCLohPgtG7yIxSk4C}:admin
-      - NTFY_AUTH_TOKENS=${NTFY_ADMIN_USER:-ntfyadmin}:${NTFY_ALERT_TOKEN:-tk_12345678901234567890123456789}:alertmanager
+      - NTFY_AUTH_USERS=${NTFY_ADMIN_USER:?set NTFY_ADMIN_USER}:${NTFY_ADMIN_PASSWORD_HASH:?set NTFY_ADMIN_PASSWORD_HASH (bcrypt) — see turing_gateway/.env}:admin
+      - NTFY_AUTH_TOKENS=${NTFY_ADMIN_USER}:${NTFY_ALERT_TOKEN:?set NTFY_ALERT_TOKEN — see turing_gateway/.env}:alertmanager
       - NTFY_BEHIND_PROXY=true
       - NTFY_ENABLE_LOGIN=true
       - NTFY_ENABLE_METRICS=true
@@ -818,7 +818,7 @@ services:
       # LAN route
       - "traefik.http.routers.docs.rule=PathPrefix(`/docs-site`)"
       - "traefik.http.routers.docs.entrypoints=web"
-      - "traefik.http.routers.docs.middlewares=docs-strip"
+      - "traefik.http.routers.docs.middlewares=docs-strip,authentik@file"
       - "traefik.http.routers.docs.service=docs"
       - "traefik.http.services.docs.loadbalancer.server.port=80"
       - "traefik.http.middlewares.docs-strip.stripprefix.prefixes=/docs-site"
