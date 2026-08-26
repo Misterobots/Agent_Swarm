@@ -6123,10 +6123,8 @@ async def compact_chat(request: CompactRequest):
         logger.warning(f"[Compact] Summarization failed: {e}")
         summary = f"[Conversation context — {len(messages)} messages]"
 
-    compacted = [
-        {"role": "system", "content": f"[Conversation Summary]: {summary}"},
-        *messages[-3:],
-    ]
+    from conversation_compaction import compact_messages
+    compacted = compact_messages(messages, summary)
     return {"messages": compacted, "summary": summary, "compacted": True}
 
 
