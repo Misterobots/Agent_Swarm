@@ -366,6 +366,23 @@ services:
     networks:
       - execution_net
 
+  # Dedicated Android toolchain. It is profile-gated so the SDK never loads
+  # on ordinary Lovelace startup; the API creates bounded disposable builders
+  # from this image for individual authenticated build requests.
+  android-builder:
+    profiles: ["android"]
+    build:
+      context: .
+      dockerfile: Dockerfile.android-builder
+    image: home-ai-lab/android-builder:latest
+    container_name: android_builder
+    restart: "no"
+    mem_limit: 8g
+    cpus: 4.0
+    pids_limit: 512
+    networks:
+      - execution_net
+
   # AGENT RUNTIME - Custom Python Environment for Agno Agents
   agent-runtime:
     build:
