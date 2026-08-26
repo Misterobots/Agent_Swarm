@@ -1026,6 +1026,7 @@ def _serialize_dev_replay(handler):
             return await handler(session_id, body, http_request)
         finally:
             lock.release()
+    return wrapped
 
 
 @app.get("/api/v1/dev/checkpoints")
