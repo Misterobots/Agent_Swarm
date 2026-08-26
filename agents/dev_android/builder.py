@@ -135,6 +135,7 @@ def build_android_project(uid: str, project_id: str, source_container_name: str 
             command=["sleep", "infinity"],
             detach=True,
             remove=False,
+            user="root",
             network=networks[0] if networks else None,
             mem_limit=os.getenv("ANDROID_BUILD_MEMORY_LIMIT", "8g"),
             nano_cpus=int(float(os.getenv("ANDROID_BUILD_CPUS", "4")) * 1_000_000_000),
@@ -161,7 +162,9 @@ def build_android_project(uid: str, project_id: str, source_container_name: str 
         result = {}
         from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
         pool = ThreadPoolExecutor(max_workers=1)
-        future = pool.submit(builder.exec_run, ["bash", "-lc", command], demux=True)
+        future = pool.submit(
+            builder.exec_run, ["bash", "-lc", command], user="android", demux=True
+        )
         try:
             code, output = future.result(timeout=BUILD_TIMEOUT_SECONDS)
             stdout, stderr = output if output else (b"", b"")
@@ -183,6 +186,7 @@ def build_android_project(uid: str, project_id: str, source_container_name: str 
 
         code, stdout, stderr = builder.exec_run(
             ["bash", "-lc", f"find {__import__('shlex').quote(build_path)} -type f -name '*.apk' -print"],
+            user="android",
             demux=True,
         )
         if code != 0:
