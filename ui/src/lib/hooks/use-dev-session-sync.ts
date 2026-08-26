@@ -82,8 +82,11 @@ export function useDevSessionSync() {
           });
           if (createRes.ok) {
             const created = await createRes.json();
-            sessionIdRef.current = created.id;
-            try { localStorage.setItem(SESSION_ID_KEY, created.id); } catch { /* best-effort */ }
+            const createdSessionId = created.session?.id;
+            if (createdSessionId) {
+              sessionIdRef.current = createdSessionId;
+              try { localStorage.setItem(SESSION_ID_KEY, createdSessionId); } catch { /* best-effort */ }
+            }
           }
         }
       } catch {
