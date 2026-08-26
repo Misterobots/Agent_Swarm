@@ -58,6 +58,17 @@ def _transport_app(server: MCPBridgeServer) -> FastAPI:
     return app
 
 
+def test_mcp_lifecycle_controls_are_idempotent():
+    server = MCPBridgeServer()
+    assert server.running is True
+    stopped = server.stop()
+    assert stopped["status"] == "stopped"
+    assert server.stop()["status"] == "stopped"
+    started = server.start()
+    assert started["status"] == "running"
+    assert server.start()["status"] == "running"
+
+
 def test_sse_discovery_and_websocket_json_rpc():
     client = TestClient(_transport_app(MCPBridgeServer()))
     with client.stream("GET", "/sse") as response:

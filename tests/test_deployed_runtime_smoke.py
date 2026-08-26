@@ -32,6 +32,7 @@ def test_deployed_mcp_health_and_client_config():
         health = client.get("/api/v1/mcp/health")
         assert health.status_code == 200, health.text[:500]
         health_body = health.json()
+        assert health_body.get("status") == "running"
         assert health_body.get("tools_registered") is not None
         assert {"http", "sse", "websocket", "stdio"}.issubset(
             set(health_body.get("transports", []))

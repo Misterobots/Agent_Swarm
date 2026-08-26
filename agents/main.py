@@ -79,6 +79,7 @@ async def lifespan(app: FastAPI):
         # Startup
         print("DEBUG: Entering lifespan...")
         logger.info("Initializing Swarm Engine...")
+        mcp_server.start()
         
         # 0. Initialize SPIFFE Auth (if available) - DISABLED for stability check
         # try:
@@ -334,7 +335,13 @@ async def lifespan(app: FastAPI):
         if template_updater:
             await template_updater.stop()
             logger.info("Async Template Updater stopped")
+        mcp_server.stop()
+        logger.info("MCP Bridge stopped")
     except Exception:
+        try:
+            mcp_server.stop()
+        except Exception:
+            pass
         import traceback
         traceback.print_exc()
         raise

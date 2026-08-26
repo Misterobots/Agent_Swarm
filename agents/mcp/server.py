@@ -2,6 +2,7 @@
 
 import os
 import json
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from logger_setup import setup_logger
@@ -27,6 +28,13 @@ class MCPBridgeServer:
         self.enabled = os.getenv("MCP_BRIDGE_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
         self.server_name = os.getenv("MCP_SERVER_NAME", "home-ai-lab")
         self.base_url = os.getenv("MCP_BASE_URL", "http://localhost:8000")
+        # The bridge has no independent listener; its lifecycle follows the
+        # FastAPI application.  Start-ready preserves the direct stdio/test
+        # adapter behavior while lifespan.start()/stop() makes ownership
+        # explicit for deployed HTTP/SSE/WebSocket operation.
+        self._running = True
+        self._started_at = datetime.now(timezone.utc).isoformat()
+        self._stopped_at: str | None = None
         self.tool_hooks = ToolHookRegistry()
         self._resources = [
             MCPResourceDescriptor(
@@ -268,6 +276,9 @@ class MCPBridgeServer:
         capabilities = self.capabilities()
         return {
             "enabled": self.enabled,
+            "status": "running" if self._running else "stopped",
+            "started_at": self._started_at,
+            "stopped_at": self._stopped_at,
             "server_name": self.server_name,
             "tools_registered": len(self._tools),
             "resources_registered": len(self._resources),
@@ -275,6 +286,27 @@ class MCPBridgeServer:
             "transports": ["http", "sse", "websocket", "stdio"],
             "capabilities": capabilities,
         }
+
+    def start(self) -> dict[str, Any]:
+        """Mark the bridge ready for application-owned transports."""
+        if not self._running:
+            self._started_at = datetime.now(timezone.utc).isoformat()
+        self._running = True
+        self._stopped_at = None
+        logger.info("[MCPBridge] lifecycle started")
+        return self.health()
+
+    def stop(self) -> dict[str, Any]:
+        """Mark the bridge unavailable after application shutdown."""
+        if self._running:
+            self._stopped_at = datetime.now(timezone.utc).isoformat()
+        self._running = False
+        logger.info("[MCPBridge] lifecycle stopped")
+        return self.health()
+
+    @property
+    def running(self) -> bool:
+        return self._running
 
     def capabilities(self) -> dict[str, Any]:
         return {
