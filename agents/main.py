@@ -2502,6 +2502,10 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     "total_tokens":      max(1, (_input_chars + _output_chars) // 4),
                     "prompt_chars":      _input_chars,
                     "completion_chars":  _output_chars,
+                    # This stream is backed by local Ollama execution. Keep
+                    # the field explicit so clients can distinguish a known
+                    # zero-cost local run from a provider with no price data.
+                    "cost_usd":          0.0,
                 },
             }
             yield f"data: {json.dumps(_usage_chunk)}\n\n"
