@@ -211,6 +211,12 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Swarm run store init failed (non-fatal): {e}")
 
+        try:
+            from swarm_run_event_store import init_table as _init_swarm_run_event_table
+            _init_swarm_run_event_table()
+        except Exception as e:
+            logger.warning(f"Swarm run event store init failed (non-fatal): {e}")
+
         # 7g. Initialize Swarm Run Repo Store (New Task composer repo/branch metadata)
         try:
             from swarm_run_repo_store import init_table as _init_swarm_run_repo_table
@@ -3379,6 +3385,25 @@ async def get_task_diff(coordination_id: str, request: Request):
     }
 
 
+@app.get("/v1/tasks/{coordination_id}/events")
+async def get_task_events(coordination_id: str, request: Request, after_seq: int = -1, limit: int = 500):
+    """Return owner-scoped stable task events for inspection or continuation."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_event_store
+    return {
+        "run_id": coordination_id,
+        "events": swarm_run_event_store.list_events(
+            coordination_id, owner_id, after_seq=after_seq, limit=limit,
+        ),
+    }
+
+
 @app.post("/v1/tasks/{coordination_id}/approve")
 async def approve_task(coordination_id: str, request: Request):
     """Record acceptance of a run's result from the phone.
@@ -3448,9 +3473,18 @@ def _dispatch_task_now(coordination_id: str, dispatch_kwargs: dict) -> None:
 
     def _run():
         try:
+            event_seq = 0
+            import swarm_run_event_store
             from coordination.orchestrator import coordinate_task
-            for _ in coordinate_task(**dispatch_kwargs):
-                pass
+            for event in coordinate_task(**dispatch_kwargs):
+                if isinstance(event, dict):
+                    event_type = str(event.get("type") or "status")
+                    payload = {key: value for key, value in event.items() if key != "type"}
+                    swarm_run_event_store.append_event(
+                        coordination_id, dispatch_kwargs.get("owner_id", ""),
+                        event_seq, event_type, payload,
+                    )
+                    event_seq += 1
         except Exception as exc:
             logger.error(f"[TaskQueue] coordinate_task failed for {coordination_id}: {exc}", exc_info=True)
         finally:
