@@ -1028,10 +1028,13 @@ async def replay_dev_checkpoint_tool(
         )
 
     permission_mode = data.get("permission_mode") or "default"
-    if permission_mode == "bypass" and not _request_is_admin(http_request):
+    is_admin = _request_is_admin(http_request)
+    if permission_mode == "bypass" and not is_admin:
         raise HTTPException(status_code=403, detail="Admin authorization is required to replay a bypass-mode tool")
     from dev_harness.permissions import PermissionGate
-    allowed, reason = PermissionGate(permission_mode).check(tool_name)
+    allowed, reason = PermissionGate(
+        permission_mode, is_admin=is_admin
+    ).check(tool_name)
     if not allowed:
         raise HTTPException(status_code=403, detail=reason)
 
@@ -1663,7 +1666,7 @@ async def _dev_harness_stream(
                 _approval_owners.pop(call_id, None)
             return "approved" if _approval_decisions.pop(call_id, False) else "denied"
 
-    gate = PermissionGate(mode=perm_mode)
+    gate = PermissionGate(mode=perm_mode, is_admin=bypass_allowed)
 
     # Per-session container this dev-mode chat turn's sandbox tool calls
     # target — same session_sandbox.py mechanism the composer/swarm path
