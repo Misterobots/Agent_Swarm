@@ -3713,6 +3713,17 @@ async def push_preview(coordination_id: str, request: Request):
     if not repo or not repo.get("local_branch"):
         raise HTTPException(status_code=409, detail="This task has no pushable branch")
 
+    # A retried request after a successful network call must be idempotent:
+    # return the recorded PR instead of opening a second one.
+    previous_push = github_push_audit_store.latest(coordination_id, owner_id)
+    if previous_push and previous_push.get("stage") == "push_succeeded":
+        return {
+            "already_published": True,
+            "pr_number": previous_push.get("pr_number"),
+            "pr_url": previous_push.get("pr_url"),
+            "branch": previous_push.get("target_branch") or repo["local_branch"],
+        }
+
     if not github_push_tokens.get_status(owner_id):
         raise HTTPException(status_code=409, detail="Connect a GitHub push token in Settings first")
 
@@ -3786,24 +3797,24 @@ async def push_confirm(coordination_id: str, body: PushConfirmRequest, request: 
     key = _push_confirm_key(coordination_id)
     try:
         client = get_redis_client()
-        stored_token = client.get(key)
     except Exception as e:
         logger.error(f"[push_confirm] Redis unavailable, cannot validate confirm_token: {e}")
         raise HTTPException(status_code=503, detail="Push confirmation is temporarily unavailable")
 
-    if not stored_token or stored_token != body.confirm_token:
+    try:
+        from publish_state import consume_push_confirm
+        consumed = consume_push_confirm(client, key, body.confirm_token)
+    except Exception as e:
+        logger.error(f"[push_confirm] Redis unavailable, cannot consume confirm_token: {e}")
+        raise HTTPException(status_code=503, detail="Push confirmation is temporarily unavailable")
+
+    if not consumed:
         github_push_audit_store.record(
             coordination_id, owner_id, "confirm_attempted",
             target_repo=repo["git_url"], target_branch=body.branch, base_branch=body.base_branch,
             error="stale or invalid confirm_token",
         )
         raise HTTPException(status_code=409, detail="This push preview has expired — request a new one")
-
-    # Single-use: consume immediately so a retried/duplicated request can't push twice.
-    try:
-        client.delete(key)
-    except Exception:
-        pass
 
     github_push_audit_store.record(
         coordination_id, owner_id, "confirm_attempted",
