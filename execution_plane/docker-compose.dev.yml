@@ -56,7 +56,6 @@ services:
       # FISH_AUDIO_API_KEY comes from env_file (network.env); not set here so the
       # env_file value is not overridden.
       - FISH_AUDIO_MODEL_ID=323847d4c5394c678e5909c2206725f6
-      - BMO_LLM_MODEL=qwen3:14b
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}
       - HOME_CITY=${HOME_CITY:-your area}

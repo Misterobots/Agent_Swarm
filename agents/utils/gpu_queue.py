@@ -68,7 +68,7 @@ TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (2
 #
 # A one-off image / 3D / compose / training job calls evict_ollama(), which frees
 # VRAM by unloading EVERY resident Ollama model. That used to include the
-# Friday/BMO voice LLM (BMO_LLM_MODEL, default qwen3:14b), so a single media
+# Friday voice LLM (FRIDAY_LLM_MODEL, default qwen3:8b), so a single media
 # request bulldozed the voice assistant mid-conversation and the next voice turn
 # ate a 20–30s cold reload. Models listed here are kept resident through the
 # eviction so the latency-critical voice lane stays warm. Comma-separated Ollama
@@ -80,7 +80,7 @@ TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (2
 # confirm the voice model occupies a single card before relying on this under
 # heavy ComfyUI load.
 # ---------------------------------------------------------------------------
-_PROTECTED_RAW = os.getenv("PROTECTED_OLLAMA_MODELS", os.getenv("BMO_LLM_MODEL", "qwen3:14b"))
+_PROTECTED_RAW = os.getenv("PROTECTED_OLLAMA_MODELS", os.getenv("FRIDAY_LLM_MODEL", "qwen3:8b"))
 PROTECTED_OLLAMA_MODELS = frozenset(m.strip() for m in _PROTECTED_RAW.split(",") if m.strip())
 
 

@@ -220,14 +220,12 @@ services:
     networks:
       - execution_net
 
-  # BMO BRAIN - OpenAI-compatible vault-RAG conversational assistant, speaking as BMO/Beemo.
+  # FRIDAY BRAIN - OpenAI-compatible vault-RAG conversational assistant.
   # Recalls personal-vault (MemPalace) memories, injects them as context, and answers via
   # the LLM. Canonical brain for both HA's OpenAI-Conversation agent and the BMO Pi's
-  # bmo_driver.chat() (which targets :8000/v1). Personal vault values live in
+  # the BMO hardware client's chat path (which targets :8000/v1). Personal vault values live in
   # execution_plane/.env (gitignored); vault recall is inert unless BMO_VAULT_URL +
-  # BMO_VAULT_OWNER are set there. To override the character prompt entirely, add
-  # "- BMO_PERSONA=${BMO_PERSONA}" below — not set by default (services/bmo_brain/persona.py
-  # is the default character).
+  # BMO_VAULT_OWNER are set there.
   # FRIDAY BRAIN — the HA-Assist conversation agent (renamed from bmo-brain 2026-07-14).
   # bmo_brain was always Friday's pipeline; the BMO voice HARDWARE lives under agents/bmo_voice
   # and is unrelated. Env var NAMES keep the BMO_ prefix for .env compatibility (the gitignored
@@ -384,9 +382,9 @@ services:
     environment:
       # Lovelace local Ollama — 2x 5060 Ti (32GB VRAM) handles all heavy models
       - OLLAMA_HOST=http://ollama:11434
-      # Local Ollama — BMO voice uses qwen3:14b (9.2GB VRAM, fits alongside other services)
+      # Local Ollama — Friday uses the dedicated qwen3:8b path.
       - BMO_OLLAMA_HOST=http://ollama:11434
-      # Fish Audio cloud TTS for BMO voice (overrides local RVC).
+      # Fish Audio cloud TTS for the shared voice path (overrides local RVC).
       # FISH_AUDIO_API_KEY is injected via env_file (network.env) and intentionally
       # NOT set here — an `environment:` entry would override env_file, and the
       # ${..} form resolves from execution_plane/.env, not network.env.
@@ -423,13 +421,11 @@ services:
       # Used to validate Friday's expiring public image-attachment URLs. Empty falls
       # back to HOME_ASSISTANT_TOKEN in-process so existing deployments remain safe.
       - FRIDAY_IMAGE_SIGNING_SECRET=${FRIDAY_IMAGE_SIGNING_SECRET:-}
-      # BMO Voice LLM — qwen3:14b fits in VRAM (9.2GB < 15.93GB); latency masked by async ack
-      - BMO_LLM_MODEL=qwen3:14b
       # Warm-pin the voice model so Friday is resident from boot. Roll back: set false
       # (or remove) + recreate. (gpu_queue.py)
       - WARM_PIN_PROTECTED_MODELS=true
       # PROTECT FRIDAY'S ACTUAL BRAIN: qwen3:8b (served by Lovelace), NOT the qwen3:14b
-      # BMO_LLM_MODEL default that PROTECTED_OLLAMA_MODELS would otherwise inherit. Benchmark
+      # legacy default that PROTECTED_OLLAMA_MODELS would otherwise inherit. Benchmark
       # 2026-07-14 confirmed qwen3:8b is Friday's deployed brain (median 0.49s warm, 100% tool
       # reliability); without this the eviction-protection guarded the wrong model and Friday hit
       # 50-60s reload spikes ("stops at intent") when the swarm evicted her from the shared GPU.
@@ -1054,7 +1050,6 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - GPU_LOCK_HOST=http://localhost:8000
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
-      - BMO_LLM_MODEL=qwen3:14b
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}
       - HOME_CITY=${HOME_CITY:-your area}

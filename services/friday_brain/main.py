@@ -199,17 +199,12 @@ _SWARM_ASSESS_SYSTEM = (
 # Per-brain personas (personas.py). Each brain (default vs the FRIDAY_ALT_BRAIN "brain swap"
 # target) carries its OWN persona + memory namespace + visual refs, all editable live at GET
 # /personas (mtime-cached, so edits apply with no restart). _compose_persona(model) builds the
-# character prompt for whichever brain is active; a full BMO_PERSONA override still short-circuits
-# the whole thing (testing/experimentation), matching the old single-persona behavior.
-_PERSONA_OVERRIDE = os.getenv("BMO_PERSONA", "")
 # Optional shared-secret guard for the LAN-exposed persona editor + CRUD API. Empty = open on LAN.
 FRIDAY_PERSONA_TOKEN = os.getenv("FRIDAY_PERSONA_TOKEN", "")
 
 
 def _compose_persona(model: str) -> str:
-    """Character system prompt for the given brain — or the raw BMO_PERSONA override if set."""
-    if _PERSONA_OVERRIDE:
-        return _PERSONA_OVERRIDE
+    """Character system prompt for the given Friday brain."""
     try:
         return personas.compose_persona(model)
     except Exception as e:  # noqa: BLE001 — never let a persona read break a voice turn
