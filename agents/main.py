@@ -13,6 +13,7 @@ import ipaddress
 import socket
 import base64
 import re
+import mimetypes
 from urllib.parse import urlparse
 
 # Root logger configuration — most modules in this codebase call
@@ -374,6 +375,13 @@ except Exception as _e:
     import logging as _logging
     _logging.getLogger("main").warning(f"Dev projects router not loaded: {_e}")
 
+try:
+    from dev_android.routes import router as dev_android_router
+    app.include_router(dev_android_router)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger("main").warning(f"Dev Android router not loaded: {_e}")
+
 
 # Remote pairing — WebSocket relay for cross-instance session sharing
 try:
@@ -460,7 +468,9 @@ async def serve_signed_public_artifact(filename: str, exp: int, sig: str):
     full_path = os.path.normpath(os.path.join(artifact_dir, filename))
     if not full_path.startswith(f"{artifact_dir}{os.sep}") or not os.path.isfile(full_path):
         raise HTTPException(status_code=404, detail="Image not found")
-    return FileResponse(full_path, media_type="image/png")
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'} if filename.lower().endswith(".apk") else None
+    return FileResponse(full_path, media_type=media_type, headers=headers)
 
 # Mount Delivered Artifacts for remote downloading (Satellite)
 if os.path.exists("/workspace/delivered_artifacts"):
