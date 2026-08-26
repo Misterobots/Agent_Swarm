@@ -144,6 +144,14 @@ def build_android_project(uid: str, project_id: str, source_container_name: str 
         )
         builder.exec_run(["mkdir", "-p", f"/workspace/{uid}/{project_id}"])
         builder.put_archive(f"/workspace/{uid}/{project_id}", archive)
+        # put_archive writes as root even though the image's normal user is
+        # `android`; Gradle must be able to create its cache and build output.
+        code, _output = builder.exec_run(
+            ["chown", "-R", "android:android", f"/workspace/{uid}/{project_id}"],
+            demux=True,
+        )
+        if code != 0:
+            raise AndroidBuildError("Could not set Android project ownership")
         build_path = f"/workspace/{uid}/{project_id}"
         command = (
             f"cd {__import__('shlex').quote(build_path)} && "
