@@ -127,3 +127,30 @@ def test_checkpoint_replay_dispatches_read_only_mcp_in_order(monkeypatch):
     assert replayed.json()["output"] == "web_search-ok"
     assert replayed.json()["next_call_id"] == "c2"
     assert saved["status"] == "recovery_required"
+
+
+def test_task_stop_is_owner_scoped_and_cooperative(monkeypatch):
+    import coordination.session as session_module
+
+    run = {"coordination_id": "run-stop", "owner_id": "alice", "status": "running"}
+    cancelled = {}
+
+    class Active:
+        def __init__(self):
+            self.called = False
+
+        def cancel(self):
+            self.called = True
+
+    active = Active()
+    monkeypatch.setattr(main, "_resolve_owner_id", lambda *_args: "alice")
+    monkeypatch.setattr(swarm_run_store, "get_run", lambda *_args: dict(run))
+    monkeypatch.setattr(swarm_run_store, "cancel_run", lambda *args: cancelled.setdefault("args", args) or True)
+    monkeypatch.setattr(session_module, "get_active_session", lambda *_args: active)
+    client = TestClient(main.app)
+
+    response = client.post("/v1/tasks/run-stop/stop", headers={"X-authentik-uid": "alice"})
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "status": "cancelled"}
+    assert active.called
+    assert cancelled["args"] == ("run-stop", "alice")

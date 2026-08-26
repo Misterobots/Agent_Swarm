@@ -59,6 +59,17 @@ def _run_worker(
     phidata agent.run() path.  The phidata `agent` argument is ignored in that
     branch — it is still constructed by the caller (for the flag=off fallback).
     """
+    worker = session.workers[worker_id]
+    if session.is_cancelled() or worker.cancel_flag.is_set():
+        worker.state = WorkerState.CANCELLED
+        worker.completed_at = time.time()
+        swarm_run_store.upsert_worker(
+            session.coordination_id, worker_id, worker.role, worker.task,
+            worker.phase, (worker.pioneer or {}).get("name"), status="cancelled",
+            completed_at=worker.completed_at,
+        )
+        return ""
+
     if SWARM_DEVHARNESS_WORKERS and role:
         # Normalize non-standard perspective roles (e.g. "technical", "ethical")
         # to their canonical DevHarness equivalent using scope as the hint.
@@ -80,7 +91,6 @@ def _run_worker(
                 container_name=getattr(session, "container_name", None),
             )
 
-    worker = session.workers[worker_id]
     worker.state = WorkerState.RUNNING
     worker.started_at = time.time()
     swarm_run_store.upsert_worker(
@@ -111,6 +121,16 @@ def _run_worker(
                 "Add the role to DEVHARNESS_ELIGIBLE_ROLES or pass a phidata Agent."
             )
         response: RunResponse = agent.run(prompt)
+
+        if session.is_cancelled() or worker.cancel_flag.is_set():
+            worker.state = WorkerState.CANCELLED
+            worker.completed_at = time.time()
+            swarm_run_store.upsert_worker(
+                session.coordination_id, worker_id, worker.role, worker.task,
+                worker.phase, (worker.pioneer or {}).get("name"), status="cancelled",
+                completed_at=worker.completed_at,
+            )
+            return ""
 
         _raw = response.content if response and response.content else "No output"
         # response.content can be a dict when the model returns valid JSON (phidata auto-parses

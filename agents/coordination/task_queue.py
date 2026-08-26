@@ -102,6 +102,18 @@ def enqueue(coordination_id: str) -> int:
         return 0
 
 
+def remove(coordination_id: str) -> bool:
+    """Remove all queued copies of a run without disturbing the active lock."""
+    if not coordination_id:
+        return False
+    try:
+        client = get_redis_client()
+        return bool(client.lrem(QUEUED_RUNS_KEY, 0, coordination_id))
+    except Exception as e:
+        logger.warning(f"[TaskQueue] remove failed (non-fatal): {e}")
+        return False
+
+
 def pop_next() -> str | None:
     """Pop the next queued coordination_id (FIFO), or None if the queue is empty/unreachable."""
     try:

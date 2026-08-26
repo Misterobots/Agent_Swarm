@@ -3255,6 +3255,48 @@ async def patch_task(coordination_id: str, body: TaskMetadataPatch, request: Req
     return {"run": updated, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
 
 
+@app.post("/v1/tasks/{coordination_id}/stop")
+async def stop_task(coordination_id: str, request: Request):
+    """Owner-scoped cooperative cancellation for queued or active tasks."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if run.get("status") in {"completed", "failed", "denied"}:
+        raise HTTPException(status_code=409, detail="Task is already terminal")
+    if run.get("status") == "cancelled":
+        return {"ok": True, "status": "cancelled"}
+
+    # Signal the live coordinator before changing durable state so a phase
+    # boundary cannot advance after the owner has requested cancellation.
+    try:
+        from coordination.session import get_active_session
+        active = get_active_session(coordination_id)
+        if active:
+            active.cancel()
+    except Exception as exc:
+        logger.warning(f"[TaskQueue] active cancellation signal failed: {exc}")
+
+    if run.get("status") == "queued":
+        from coordination import task_queue as _task_queue
+        _task_queue.remove(coordination_id)
+        with _pending_task_dispatch_lock:
+            _CANCELLED_TASKS.add(coordination_id)
+            _PENDING_TASK_DISPATCH.pop(coordination_id, None)
+    elif run.get("status") == "running":
+        with _pending_task_dispatch_lock:
+            _CANCELLED_TASKS.add(coordination_id)
+
+    if not swarm_run_store.cancel_run(coordination_id, owner_id):
+        latest = swarm_run_store.get_run(coordination_id, owner_id)
+        if not latest or latest.get("status") != "cancelled":
+            raise HTTPException(status_code=409, detail="Task could not be cancelled")
+    return {"ok": True, "status": "cancelled"}
+
+
 @app.get("/v1/tasks/{coordination_id}/diff")
 async def get_task_diff(coordination_id: str, request: Request):
     """Aggregated unified diff for a completed run, for mobile review."""
@@ -3326,6 +3368,7 @@ class CreateTaskRequest(BaseModel):
 # see task_queue.py's module docstring for why that's an accepted tradeoff.
 _PENDING_TASK_DISPATCH: dict = {}
 _pending_task_dispatch_lock = threading.Lock()
+_CANCELLED_TASKS: set[str] = set()
 
 
 def _dispatch_task_now(coordination_id: str, dispatch_kwargs: dict) -> None:
@@ -3335,6 +3378,12 @@ def _dispatch_task_now(coordination_id: str, dispatch_kwargs: dict) -> None:
     so every acquire is guaranteed a matching release."""
     import swarm_run_store
     from coordination import task_queue as _task_queue
+
+    with _pending_task_dispatch_lock:
+        if coordination_id in _CANCELLED_TASKS:
+            _CANCELLED_TASKS.discard(coordination_id)
+            _task_queue.release(coordination_id)
+            return
 
     swarm_run_store.set_status(coordination_id, "running")
 
@@ -3347,6 +3396,8 @@ def _dispatch_task_now(coordination_id: str, dispatch_kwargs: dict) -> None:
             logger.error(f"[TaskQueue] coordinate_task failed for {coordination_id}: {exc}", exc_info=True)
         finally:
             _task_queue.release(coordination_id)
+            with _pending_task_dispatch_lock:
+                _CANCELLED_TASKS.discard(coordination_id)
             _advance_task_queue()
 
     threading.Thread(target=_run, daemon=True, name=f"task-{coordination_id}").start()
@@ -3359,6 +3410,15 @@ def _advance_task_queue() -> None:
 
     next_id = _task_queue.pop_next()
     if not next_id:
+        return
+    cancelled = False
+    with _pending_task_dispatch_lock:
+        if next_id in _CANCELLED_TASKS:
+            _CANCELLED_TASKS.discard(next_id)
+            _PENDING_TASK_DISPATCH.pop(next_id, None)
+            cancelled = True
+    if cancelled:
+        _advance_task_queue()
         return
     with _pending_task_dispatch_lock:
         kwargs = _PENDING_TASK_DISPATCH.pop(next_id, None)

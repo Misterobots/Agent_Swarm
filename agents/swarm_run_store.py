@@ -167,6 +167,27 @@ def set_status(coordination_id: str, status: str) -> None:
         logger.warning(f"[SwarmRunStore] set_status failed (non-fatal): {e}")
 
 
+def cancel_run(coordination_id: str, owner_id: str) -> bool:
+    """Cancel an owner-owned non-terminal run and make the transition durable."""
+    if not coordination_id or not owner_id:
+        return False
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE swarm_runs
+                       SET status='cancelled', error=COALESCE(error, 'Cancelled by owner'),
+                           ended_at=%s, updated_at=%s
+                       WHERE coordination_id=%s AND owner_id=%s
+                         AND status NOT IN ('completed', 'failed', 'cancelled', 'denied')""",
+                    (_now(), _now(), coordination_id, owner_id),
+                )
+                return cur.rowcount > 0
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] cancel_run failed (non-fatal): {e}")
+        return False
+
+
 def update_metadata(coordination_id: str, owner_id: str, *, title: str | None = None,
                     scope: str | None = None, prompt: str | None = None) -> bool:
     """Update mutable, owner-scoped task metadata without changing lifecycle state."""

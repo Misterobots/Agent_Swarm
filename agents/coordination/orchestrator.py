@@ -49,6 +49,15 @@ logger = setup_logger("Lamport")
 SESSION_SANDBOX_ENABLED = os.getenv("SESSION_SANDBOX_ENABLED", "true").lower() in ("1", "true", "yes")
 
 
+class CoordinationCancelled(Exception):
+    """Internal control flow used when the task owner requests a stop."""
+
+
+def _ensure_not_cancelled(session: CoordinatorSession) -> None:
+    if session.is_cancelled():
+        raise CoordinationCancelled()
+
+
 def _drain_file_changes(session) -> list[dict]:
     """Drain all pending file_change events from the session queue.
 
@@ -224,6 +233,7 @@ def coordinate_task(
 
     try:
         # === PHASE 0: WORKSPACE PREP (New Task composer path only) ===
+        _ensure_not_cancelled(session)
         if repo_context and repo_context.get("local_path"):
             # Blank project — seed from its own persisted, git-initialized
             # files instead of cloning a git_url (see workspace_ops.
@@ -274,6 +284,7 @@ def coordinate_task(
             yield {"type": "log", "content": f"[Coordinator] Workspace ready: {_repo_url} @ {_repo_branch}"}
 
         # === PHASE 1: DECOMPOSE ===
+        _ensure_not_cancelled(session)
         swarm_run_store.update_run_phase(session.coordination_id, 1, "Decompose")
         yield {"type": "swarm_phase", "phase_num": 1, "phase_name": "Decompose", "total_phases": 5}
         yield {"type": "status", "content": "🧩 Coordinator: Decomposing task..."}
@@ -685,6 +696,7 @@ def coordinate_task(
 
                 _pending_p = set(futures_p.keys())
                 while _pending_p:
+                    _ensure_not_cancelled(session)
                     _done_p, _pending_p = futures_wait(_pending_p, timeout=20)
                     if not _done_p:
                         yield {"type": "heartbeat", "content": ""}
@@ -769,6 +781,7 @@ def coordinate_task(
             return
 
         # === PHASE 2: RESEARCH (parallel) ===
+        _ensure_not_cancelled(session)
         swarm_run_store.update_run_phase(session.coordination_id, 2, "Research")
         yield {"type": "swarm_phase", "phase_num": 2, "phase_name": "Research", "total_phases": 5}
         yield {
@@ -843,6 +856,7 @@ def coordinate_task(
 
                 _pending_r = set(futures.keys())
                 while _pending_r:
+                    _ensure_not_cancelled(session)
                     _done_r, _pending_r = futures_wait(_pending_r, timeout=20)
                     if not _done_r:
                         yield {"type": "heartbeat", "content": ""}
@@ -930,6 +944,7 @@ def coordinate_task(
                                 yield _fc
 
         # === PHASE 3: SYNTHESIZE (LLM) ===
+        _ensure_not_cancelled(session)
         swarm_run_store.update_run_phase(session.coordination_id, 3, "Synthesize")
         yield {"type": "swarm_phase", "phase_num": 3, "phase_name": "Synthesize", "total_phases": 5}
         yield {"type": "status", "content": "🧠 Coordinator: Synthesizing research findings..."}
@@ -1072,6 +1087,7 @@ def coordinate_task(
         yield {"type": "log", "content": f"[Coordinator] Synthesis: {len(synthesis)} chars, confidence={synth_confidence:.0%}"}
 
         # === PHASE 4: IMPLEMENTATION (serial) ===
+        _ensure_not_cancelled(session)
         swarm_run_store.update_run_phase(session.coordination_id, 4, "Implement")
         yield {"type": "swarm_phase", "phase_num": 4, "phase_name": "Implement", "total_phases": 5}
 
@@ -1299,6 +1315,7 @@ def coordinate_task(
                         )
 
         # === PHASE 5: VERIFICATION ===
+        _ensure_not_cancelled(session)
         swarm_run_store.update_run_phase(session.coordination_id, 5, "Verify")
         yield {"type": "swarm_phase", "phase_num": 5, "phase_name": "Verify", "total_phases": 5}
         yield {"type": "status", "content": "🔍 Coordinator: Verification in progress..."}
@@ -1430,6 +1447,7 @@ def coordinate_task(
 
         _team_store(session.coordination_id, "verification", verify_result, author="verifier")
 
+        _ensure_not_cancelled(session)
         # === FINAL SUMMARY ===
         total_workers = len(session.workers)
         completed = sum(1 for w in session.workers.values() if w.state == WorkerState.COMPLETED)
@@ -1489,6 +1507,13 @@ def coordinate_task(
             workers_failed=failed, summary=synthesis, ended_at=int(time.time()),
         )
 
+    except CoordinationCancelled:
+        logger.info(f"[Coordinator] Coordination {session.coordination_id} cancelled by owner")
+        swarm_run_store.finish_run(
+            session.coordination_id, status="cancelled",
+            error="Cancelled by owner", ended_at=int(time.time()),
+        )
+        yield {"type": "status", "content": "Task cancelled."}
     except Exception as e:
         logger.error(f"[Coordinator] Coordination failed: {e}", exc_info=True)
         swarm_run_store.finish_run(
