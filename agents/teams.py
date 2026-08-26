@@ -6,7 +6,6 @@ from config import get_ollama_options
 # Import Specialized Agents
 from leibniz_agent import get_architect_agent
 from specialized.iot_agent import get_iot_agent
-from specialized.bmo_agent import get_bmo_agent
 
 # Import MarsRL agents
 from verifier_agent import get_verifier
@@ -88,12 +87,9 @@ def get_creative_team(session_id: str = None):
         show_tool_calls=True
     )
     
-    # BMO Voice Agent
-    bmo_agent = get_bmo_agent()
-    
     team = Agent(
         name="Creative Team",
-        team=[art_director, bmo_agent],
+        team=[art_director],
         storage=storage,
         session_id=session_id,
         description="A studio team for generating Images and 3D Models.",
