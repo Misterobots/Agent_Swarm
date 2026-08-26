@@ -24,12 +24,10 @@ Reuses utils.gpu_queue.get_redis_client() and its NX/EX mutex + JSON-list
 queue idiom (see enqueue_large_request/dequeue_large_request in that module)
 rather than a second locking primitive.
 
-Simplification (documented, not silent): the lock key is global, not scoped
-per host. If two independent agent_runtime deployments each had their own
-live_repo project, this would over-serialize them. That's a safe failure mode
-— worst case, an unrelated task waits longer than it needs to — and is
-intentionally accepted rather than plumbing a host-scoped key through every
-caller, since this is a single-host homelab today.
+The lock and FIFO keys are scoped by the shared-resource project id. Two
+independent live_repo projects therefore do not block one another. Callers
+that predate project selection use the stable ``legacy-shared`` scope and
+retain the old conservative behavior.
 
 Dispatch args (the kwargs coordinate_task() needs to actually run a queued
 task) are NOT persisted here — they live in an in-process registry in main.py
@@ -55,6 +53,7 @@ worth knowing which one a given caller gets:
   Same correctness guarantee (no two live_repo runs interleave git ops against
   the shared mount), different UX for the loser.
 """
+import hashlib
 import logging
 
 from utils.gpu_queue import get_redis_client
@@ -64,61 +63,79 @@ logger = logging.getLogger("agents.coordination.task_queue")
 LIVE_REPO_LOCK_KEY = "swarm:live_repo_lock"
 LIVE_REPO_LOCK_TTL = 45 * 60  # seconds — safety valve so a crashed holder can't wedge the queue forever
 QUEUED_RUNS_KEY = "swarm:queued_runs"
+DEFAULT_SCOPE = "legacy-shared"
 
 
-def try_acquire(coordination_id: str) -> bool:
+def _key(prefix: str, scope_id: str | None) -> str:
+    """Return a bounded Redis key for a project/resource scope."""
+    scope = str(scope_id or DEFAULT_SCOPE)
+    digest = hashlib.sha256(scope.encode("utf-8")).hexdigest()[:20]
+    return f"{prefix}:{digest}"
+
+
+def lock_key(scope_id: str | None = None) -> str:
+    return _key("swarm:project_lock", scope_id)
+
+
+def queue_key(scope_id: str | None = None) -> str:
+    return _key("swarm:project_queue", scope_id)
+
+
+def try_acquire(coordination_id: str, scope_id: str | None = None) -> bool:
     """Attempt to claim the live_repo mount for `coordination_id`. Returns True
     if acquired. Fail-open on Redis errors: returns True so a Redis outage
     degrades to "no queueing" (tasks run immediately, same as before this
     module existed) rather than wedging all task creation."""
     try:
         client = get_redis_client()
-        return bool(client.set(LIVE_REPO_LOCK_KEY, coordination_id, nx=True, ex=LIVE_REPO_LOCK_TTL))
+        return bool(client.set(lock_key(scope_id), coordination_id, nx=True, ex=LIVE_REPO_LOCK_TTL))
     except Exception as e:
         logger.warning(f"[TaskQueue] try_acquire failed (fail-open, treating as acquired): {e}")
         return True
 
 
-def release(coordination_id: str) -> None:
+def release(coordination_id: str, scope_id: str | None = None) -> None:
     """Release the live_repo lock IF still held by `coordination_id` — never
     steals another holder's lock (mirrors gpu_queue.request_lock's lock_id
     ownership check before delete)."""
     try:
         client = get_redis_client()
-        if client.get(LIVE_REPO_LOCK_KEY) == coordination_id:
-            client.delete(LIVE_REPO_LOCK_KEY)
+        key = lock_key(scope_id)
+        if client.get(key) == coordination_id:
+            client.delete(key)
     except Exception as e:
         logger.warning(f"[TaskQueue] release failed (non-fatal): {e}")
 
 
-def enqueue(coordination_id: str) -> int:
+def enqueue(coordination_id: str, scope_id: str | None = None) -> int:
     """Append to the FIFO wait list. Returns 1-based queue position (0 on Redis failure)."""
     try:
         client = get_redis_client()
-        client.rpush(QUEUED_RUNS_KEY, coordination_id)
-        return client.llen(QUEUED_RUNS_KEY)
+        key = queue_key(scope_id)
+        client.rpush(key, coordination_id)
+        return client.llen(key)
     except Exception as e:
         logger.warning(f"[TaskQueue] enqueue failed (non-fatal): {e}")
         return 0
 
 
-def remove(coordination_id: str) -> bool:
+def remove(coordination_id: str, scope_id: str | None = None) -> bool:
     """Remove all queued copies of a run without disturbing the active lock."""
     if not coordination_id:
         return False
     try:
         client = get_redis_client()
-        return bool(client.lrem(QUEUED_RUNS_KEY, 0, coordination_id))
+        return bool(client.lrem(queue_key(scope_id), 0, coordination_id))
     except Exception as e:
         logger.warning(f"[TaskQueue] remove failed (non-fatal): {e}")
         return False
 
 
-def pop_next() -> str | None:
+def pop_next(scope_id: str | None = None) -> str | None:
     """Pop the next queued coordination_id (FIFO), or None if the queue is empty/unreachable."""
     try:
         client = get_redis_client()
-        return client.lpop(QUEUED_RUNS_KEY)
+        return client.lpop(queue_key(scope_id))
     except Exception as e:
         logger.warning(f"[TaskQueue] pop_next failed (non-fatal): {e}")
         return None
@@ -133,5 +150,11 @@ def clear_all() -> None:
         client = get_redis_client()
         client.delete(LIVE_REPO_LOCK_KEY)
         client.delete(QUEUED_RUNS_KEY)
+        scan_iter = getattr(client, "scan_iter", None)
+        if scan_iter:
+            for key in scan_iter(match="swarm:project_lock:*"):
+                client.delete(key)
+            for key in scan_iter(match="swarm:project_queue:*"):
+                client.delete(key)
     except Exception as e:
         logger.warning(f"[TaskQueue] clear_all failed (non-fatal): {e}")

@@ -2010,19 +2010,26 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         if request.stream:
             async def github_stream():
                 import time
+                from event_contract import enrich_delta
+                stream_run_id = f"chat-{uuid.uuid4().hex}"
 
                 # NOTE: dev_mode (agentic coding) is handled upstream by
                 # _dev_harness_stream() before the provider dispatch, so this
                 # branch only serves non-agentic GitHub Models chat.
 
                 # --- Standard (non-agentic) GitHub Models streaming ---
-                for chunk in provider.generate_stream(msgs):
+                for stream_seq, chunk in enumerate(provider.generate_stream(msgs)):
+                    delta = enrich_delta(
+                        stream_run_id,
+                        stream_seq,
+                        {"content": chunk.content, "type": chunk.type},
+                    )
                     sse = {
                         "id": "chatcmpl-github",
                         "object": "chat.completion.chunk",
                         "created": int(time.time()),
                         "model": request.model,
-                        "choices": [{"index": 0, "delta": {"content": chunk.content, "type": chunk.type}, "finish_reason": None}],
+                        "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
                     }
                     yield f"data: {json.dumps(sse)}\n\n"
                 yield "data: [DONE]\n\n"
@@ -2053,13 +2060,20 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         if request.stream:
             async def nvidia_stream():
                 import time
-                for chunk in provider.generate_stream(msgs):
+                from event_contract import enrich_delta
+                stream_run_id = f"chat-{uuid.uuid4().hex}"
+                for stream_seq, chunk in enumerate(provider.generate_stream(msgs)):
+                    delta = enrich_delta(
+                        stream_run_id,
+                        stream_seq,
+                        {"content": chunk.content, "type": chunk.type},
+                    )
                     sse = {
                         "id": "chatcmpl-nvidia",
                         "object": "chat.completion.chunk",
                         "created": int(time.time()),
                         "model": request.model,
-                        "choices": [{"index": 0, "delta": {"content": chunk.content, "type": chunk.type}, "finish_reason": None}],
+                        "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
                     }
                     yield f"data: {json.dumps(sse)}\n\n"
                 yield "data: [DONE]\n\n"
@@ -2090,13 +2104,20 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         if request.stream:
             async def google_stream():
                 import time
-                for chunk in provider.generate_stream(msgs):
+                from event_contract import enrich_delta
+                stream_run_id = f"chat-{uuid.uuid4().hex}"
+                for stream_seq, chunk in enumerate(provider.generate_stream(msgs)):
+                    delta = enrich_delta(
+                        stream_run_id,
+                        stream_seq,
+                        {"content": chunk.content, "type": chunk.type},
+                    )
                     sse = {
                         "id": "chatcmpl-google",
                         "object": "chat.completion.chunk",
                         "created": int(time.time()),
                         "model": request.model,
-                        "choices": [{"index": 0, "delta": {"content": chunk.content, "type": chunk.type}, "finish_reason": None}],
+                        "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
                     }
                     yield f"data: {json.dumps(sse)}\n\n"
                 yield "data: [DONE]\n\n"
@@ -3347,10 +3368,12 @@ async def stop_task(coordination_id: str, request: Request):
 
     if run.get("status") == "queued":
         from coordination import task_queue as _task_queue
-        _task_queue.remove(coordination_id)
         with _pending_task_dispatch_lock:
+            pending = _PENDING_TASK_DISPATCH.get(coordination_id)
+            task_scope_id = (pending or {}).get("task_scope_id")
             _CANCELLED_TASKS.add(coordination_id)
             _PENDING_TASK_DISPATCH.pop(coordination_id, None)
+        _task_queue.remove(coordination_id, task_scope_id)
     elif run.get("status") == "running":
         with _pending_task_dispatch_lock:
             _CANCELLED_TASKS.add(coordination_id)
@@ -3466,7 +3489,7 @@ def _dispatch_task_now(coordination_id: str, dispatch_kwargs: dict) -> None:
     with _pending_task_dispatch_lock:
         if coordination_id in _CANCELLED_TASKS:
             _CANCELLED_TASKS.discard(coordination_id)
-            _task_queue.release(coordination_id)
+            _task_queue.release(coordination_id, dispatch_kwargs.get("task_scope_id"))
             return
 
     swarm_run_store.set_status(coordination_id, "running")
@@ -3488,20 +3511,21 @@ def _dispatch_task_now(coordination_id: str, dispatch_kwargs: dict) -> None:
         except Exception as exc:
             logger.error(f"[TaskQueue] coordinate_task failed for {coordination_id}: {exc}", exc_info=True)
         finally:
-            _task_queue.release(coordination_id)
+            task_scope_id = dispatch_kwargs.get("task_scope_id")
+            _task_queue.release(coordination_id, task_scope_id)
             with _pending_task_dispatch_lock:
                 _CANCELLED_TASKS.discard(coordination_id)
-            _advance_task_queue()
+            _advance_task_queue(task_scope_id)
 
     threading.Thread(target=_run, daemon=True, name=f"task-{coordination_id}").start()
 
 
-def _advance_task_queue() -> None:
+def _advance_task_queue(scope_id: str | None = None) -> None:
     """Pop the next queued task (if any) and dispatch it now that the shared
     sandbox lock is free."""
     from coordination import task_queue as _task_queue
 
-    next_id = _task_queue.pop_next()
+    next_id = _task_queue.pop_next(scope_id)
     if not next_id:
         return
     cancelled = False
@@ -3511,7 +3535,7 @@ def _advance_task_queue() -> None:
             _PENDING_TASK_DISPATCH.pop(next_id, None)
             cancelled = True
     if cancelled:
-        _advance_task_queue()
+        _advance_task_queue(scope_id)
         return
     with _pending_task_dispatch_lock:
         kwargs = _PENDING_TASK_DISPATCH.pop(next_id, None)
@@ -3519,14 +3543,15 @@ def _advance_task_queue() -> None:
         # Process restart lost this task's dispatch args — startup
         # reconciliation already marked it 'failed'; nothing to run.
         logger.warning(f"[TaskQueue] Queued task {next_id} had no pending dispatch args — skipping.")
-        _advance_task_queue()
+        _advance_task_queue(scope_id)
         return
-    if not _task_queue.try_acquire(next_id):
+    task_scope_id = kwargs.get("task_scope_id", scope_id)
+    if not _task_queue.try_acquire(next_id, task_scope_id):
         # Lock was somehow re-taken between pop and acquire — put it back and
         # let the current holder's release trigger another advance.
         with _pending_task_dispatch_lock:
             _PENDING_TASK_DISPATCH[next_id] = kwargs
-        _task_queue.enqueue(next_id)
+        _task_queue.enqueue(next_id, task_scope_id)
         return
     _dispatch_task_now(next_id, kwargs)
 
@@ -3607,12 +3632,17 @@ async def create_task(body: CreateTaskRequest, request: Request):
     # runs (fall back to the shared dev_sandbox). An "ephemeral" run has its
     # own fully-isolated container — nothing to serialize, dispatch immediately.
     _needs_live_repo_lock = session_mode != "ephemeral"
+    # Scope the shared-host-path mutex to the live project.  Unlinked legacy
+    # runs retain one conservative shared scope; fully ephemeral projects do
+    # not acquire a lock at all.
+    task_scope_id = body.dev_project_id if session_mode == "live_repo" else "legacy-shared"
+    dispatch_kwargs["task_scope_id"] = task_scope_id
 
     # Create the row synchronously (status set explicitly below) so GET
     # /v1/tasks/{id} works the instant this call returns. coordinate_task()
     # would also call create_run itself, but ON CONFLICT DO NOTHING makes
     # that a safe no-op against the row we create here.
-    if not _needs_live_repo_lock or _task_queue.try_acquire(coordination_id):
+    if not _needs_live_repo_lock or _task_queue.try_acquire(coordination_id, task_scope_id):
         swarm_run_store.create_run(
             coordination_id, session_id, owner_id, title=prompt, scope=None,
             started_at=int(time.time()), status="running",
@@ -3625,7 +3655,7 @@ async def create_task(body: CreateTaskRequest, request: Request):
         )
         with _pending_task_dispatch_lock:
             _PENDING_TASK_DISPATCH[coordination_id] = dispatch_kwargs
-        _task_queue.enqueue(coordination_id)
+        _task_queue.enqueue(coordination_id, task_scope_id)
 
     return {"coordination_id": coordination_id}
 
@@ -3645,6 +3675,12 @@ async def create_task(body: CreateTaskRequest, request: Request):
 
 GITHUB_PUSH_ENABLED = os.getenv("GITHUB_PUSH_ENABLED", "").lower() in ("1", "true", "yes")
 _PUSH_CONFIRM_TTL = 15 * 60  # seconds — how long a preview's confirm_token stays valid
+_PUBLISH_STATE_BY_STAGE = {
+    "preview_shown": "awaiting_confirmation",
+    "confirm_attempted": "confirming",
+    "push_succeeded": "published",
+    "push_failed": "failed",
+}
 
 
 def _push_confirm_key(coordination_id: str) -> str:
@@ -3813,7 +3849,12 @@ async def push_status(coordination_id: str, request: Request):
         raise HTTPException(status_code=401, detail="Authentication required")
     import github_push_audit_store
     latest_row = github_push_audit_store.latest(coordination_id, owner_id)
-    return latest_row or {"stage": None}
+    if not latest_row:
+        return {"stage": None, "state": "not_started"}
+    latest_row["state"] = _PUBLISH_STATE_BY_STAGE.get(
+        latest_row.get("stage"), "unknown"
+    )
+    return latest_row
 
 
 # ═══════════════════════════════════════════════════════════════════════════

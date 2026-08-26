@@ -358,7 +358,8 @@ def handle_pending_context(
         from coordination import task_queue as _task_queue
         coordination_id = f"coord-{_uuid.uuid4().hex[:8]}"
         _needs_live_repo_lock = session_mode != "ephemeral"
-        if _needs_live_repo_lock and not _task_queue.try_acquire(coordination_id):
+        task_scope_id = project.get("id") if session_mode == "live_repo" else "legacy-shared"
+        if _needs_live_repo_lock and not _task_queue.try_acquire(coordination_id, task_scope_id):
             yield {
                 "type": "message",
                 "content": (
@@ -390,7 +391,7 @@ def handle_pending_context(
                 yield chunk
         finally:
             if _needs_live_repo_lock:
-                _task_queue.release(coordination_id)
+                _task_queue.release(coordination_id, task_scope_id)
         result["handled"] = True
         return
 
