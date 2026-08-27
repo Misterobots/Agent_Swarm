@@ -29,9 +29,9 @@ After the one-line registration, all logic lives in your module — no further
 | Module | Prefix | Notes |
 |--------|--------|-------|
 | `goals/routes.py` | `/v1/goals` | Reference implementation |
-| `dev_sessions/routes.py` | `/v1/dev/sessions` | ⚙️ stub — implement task F1 |
-| `dev_files/routes.py` | `/v1/dev/files` | ⚙️ stub — implement task F2 |
-| `dev_projects/routes.py` | `/v1/dev/projects` | ⚙️ stub — implement task F3 |
+| `dev_sessions/routes.py` | `/v1/dev/sessions` | ✅ implemented — deployed end-to-end smoke remains |
+| `dev_files/routes.py` | `/v1/dev/files` | ✅ implemented — deployed end-to-end smoke remains |
+| `dev_projects/routes.py` | `/v1/dev/projects` | ✅ implemented — deployed end-to-end smoke remains |
 
 ---
 
@@ -97,10 +97,10 @@ the lock will cause model eviction and 20–30s cold-reload stalls.
 
 | Task | File | Status |
 |------|------|--------|
-| F1 — Dev sessions | `dev_sessions/routes.py` | ⚙️ stub, blocked on P0 merge |
-| F2 — Dev files | `dev_files/routes.py` | ⚙️ stub, blocked on P0 merge |
-| F3 — Dev projects | `dev_projects/routes.py` | ⚙️ stub, blocked on P0 merge |
+| F1 — Dev sessions | `dev_sessions/routes.py` | ✅ implemented; deployed smoke remains |
+| F2 — Dev files | `dev_files/routes.py` | ✅ implemented; deployed smoke remains |
+| F3 — Dev projects | `dev_projects/routes.py` | ✅ implemented; deployed smoke remains |
 
-Each task has a one-line router mount already in `main.py`. The 501 stubs are
-replaced with real implementations — no merging or file-conflict risk between
-F1, F2, and F3.
+Each task has a one-line router mount already in `main.py`. The former 501 stubs
+are replaced with real implementations — no merging or file-conflict risk
+between F1, F2, and F3.
