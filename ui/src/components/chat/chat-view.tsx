@@ -32,7 +32,6 @@ import { useIsMobile } from "@/lib/hooks/use-mobile";
 import type { ConversationExperience, FileAttachment, FlaggedFollowup } from "@/types/chat";
 import { useFollowupsStore } from "@/lib/stores/followups-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
-import { useLauncherStore } from "@/lib/stores/launcher-store";
 
 function usageBarClass(pct: number): string {
   if (pct >= 0.95) return "bg-red-500";
