@@ -4,12 +4,13 @@ Audited 2026-08-27 from the backend handoff checkout. The repository contains
 28 tracked files whose names end in `-Justin-PC`. Each was compared with the
 same path after removing that suffix, with CRLF normalized to LF.
 
-## Safe-to-review duplicate candidates
+## Removed exact duplicates
 
 These seven files are byte-identical to their canonical counterparts after
-line-ending normalization. They are candidates for owner-approved removal,
-but are intentionally retained until any external deployment or operator
-workflow using the legacy filename is confirmed.
+line-ending normalization. They were removed from the repository after a
+tracked-reference check found no runtime or operator references outside
+generated graph artifacts and this audit document. The canonical counterparts
+were retained.
 
 - `agents/bmo_voice/launch_face-Justin-PC.sh`
 - `agents/bmo_voice/launch_face_fast-Justin-PC.sh`
@@ -56,4 +57,5 @@ Git currently registers eight worktrees. Seven are clean branch checkouts:
 and `codex/turing-gateway-envfix`. The `main` worktree is dirty with unrelated
 user changes and is preserved as-is.
 
-No files or worktrees were deleted or merged during this audit.
+Seven exact duplicate files were deleted in the follow-up cleanup commit. No
+divergent variants or worktrees were deleted or merged.
