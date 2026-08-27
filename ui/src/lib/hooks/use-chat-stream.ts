@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import type { AgentTraceEvent, ClarificationCard, ConversationExperience, FileChange, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment, QueueStatus } from "@/types/chat";
+import type { AgentTraceEvent, ConversationExperience, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
@@ -394,7 +394,7 @@ export function useChatStream(options?: {
             }
           } else if (event.type === "clarification_card") {
             if (event.clarification) {
-              setMessagePendingClarification(convId!, assistantId, event.clarification as ClarificationCard);
+              setMessagePendingClarification(convId!, assistantId, event.clarification);
             }
           } else if (event.type === "media_attachment") {
             // Handle generated media (images, videos, 3D models)
@@ -410,13 +410,13 @@ export function useChatStream(options?: {
             }
           } else if (event.type === "cad_artifact") {
             // CAD artifact from OpenSCAD pipeline
-            if ((event as any).cadArtifact) {
-              setMessageCadArtifact(convId!, assistantId, (event as any).cadArtifact);
+            if (event.cadArtifact) {
+              setMessageCadArtifact(convId!, assistantId, event.cadArtifact);
             }
           } else if (event.type === "workshop_questions") {
             // Workshop Phase-1 discovery question chips
-            const qs = (event as any).workshopQuestions ?? [];
-            const loading = (event as any).workshopQuestionsLoading ?? false;
+            const qs = event.workshopQuestions ?? [];
+            const loading = event.workshopQuestionsLoading ?? false;
             if (loading) {
               setWorkshopQuestionsLoading(convId!, assistantId, true);
             } else if (qs.length > 0) {
@@ -424,8 +424,8 @@ export function useChatStream(options?: {
             }
           } else if (event.type === "workflow_next_steps") {
             // Workshop Phase-2 pipeline continuation buttons
-            if ((event as any).workflowNextSteps?.length > 0) {
-              setMessageWorkflowNextSteps(convId!, assistantId, (event as any).workflowNextSteps);
+            if (event.workflowNextSteps && event.workflowNextSteps.length > 0) {
+              setMessageWorkflowNextSteps(convId!, assistantId, event.workflowNextSteps);
             }
           } else if (event.type === "suggested_followups") {
             // LLM-generated end-of-response chips
@@ -441,8 +441,8 @@ export function useChatStream(options?: {
             }
           } else if (event.type === "set_preview_url") {
             // Agent pushes a URL into the dev workspace preview pane
-            if ((event as any).url) {
-              useDevStore.getState().setPreviewUrl((event as any).url);
+            if (event.url) {
+              useDevStore.getState().setPreviewUrl(event.url);
               // setPreviewUrl already sets showChatPreview=true via the store action
             }
           } else if (event.type === "preview_unavailable") {
@@ -451,7 +451,7 @@ export function useChatStream(options?: {
             useDevStore.getState().setShowChatPreview(true);
           } else if (event.type === "model_queue_status") {
             if (event.queueStatus) {
-              setMessageQueueStatus(convId!, assistantId, event.queueStatus as QueueStatus);
+              setMessageQueueStatus(convId!, assistantId, event.queueStatus);
             }
           } else if (event.type === "stream_mode") {
             const mode = event.streamMode || "responding";
@@ -513,19 +513,19 @@ export function useChatStream(options?: {
             // SSE keep-alive from backend — no-op, just keeps the connection through proxies
           } else if (event.type === "file_change") {
             // File-system activity chip from a swarm worker / dev harness
-            const fc = (event as any).fileChange as FileChange | undefined;
+            const fc = event.fileChange;
             if (fc) {
               appendFileChange(convId!, assistantId, fc);
             }
           } else if (event.type === "todo") {
             // Agent todo list (TodoWrite) — replace the message's todo list
-            const todos = (event as any).todos as import("@/types/chat").TodoItem[] | undefined;
+            const todos = event.todos;
             if (todos) {
               setMessageTodos(convId!, assistantId, todos);
             }
           } else if (event.type === "usage") {
             // Server-side token usage — update session stats AND context bar
-            const u = (event as any).usage as { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined;
+            const u = event.usage;
             if (u) {
               setSessionUsage({
                 promptTokens:     u.prompt_tokens,
