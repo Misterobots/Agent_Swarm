@@ -36,7 +36,6 @@ _MOCK_MODULES = [
     "phi.storage", "phi.storage.agent", "phi.storage.agent.postgres",
     "langfuse", "langfuse.decorators",
     "httpx",
-    "pydantic",
     "requests",
     "prometheus_client",
 ]
@@ -52,6 +51,22 @@ _phi_agent_mod.RunResponse = type("RunResponse", (), {"content": ""})
 # Ensure phi.model.ollama exposes Ollama
 _phi_ollama_mod = sys.modules["phi.model.ollama"]
 _phi_ollama_mod.Ollama = MagicMock
+
+# The dispatcher creates a global instance at import time. Keep this suite
+# offline by making its mocked Redis client fail over to the in-memory queue;
+# otherwise MagicMock.blpop() starts consumer threads that cannot terminate.
+_redis_mod = sys.modules["redis"]
+_redis_mod.ConnectionError = ConnectionError
+
+class _UnavailableRedis:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def ping(self):
+        raise ConnectionError("Redis is intentionally unavailable in this suite")
+
+
+_redis_mod.Redis = _UnavailableRedis
 
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
