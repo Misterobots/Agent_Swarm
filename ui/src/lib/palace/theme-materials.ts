@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 
 export interface PalaceColorTokens {
@@ -56,23 +56,16 @@ const THEME_MOTIF_CONFIG = {
  * `data-theme` attribute on <html> changes.
  */
 export function usePalaceMaterials() {
-  const ref = useRef<ReturnType<typeof buildMaterials> | null>(null);
-
   // Observe theme changes via MutationObserver on data-theme
   const theme = useThemeAttr();
 
-  const materials = useMemo(() => {
-    // Dispose old materials
-    if (ref.current) {
-      Object.values(ref.current).forEach((m) => {
-        if (m instanceof THREE.Material) m.dispose();
-      });
-    }
-    const m = buildMaterials();
-    ref.current = m;
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme]);
+  const materials = useMemo(() => buildMaterials(theme), [theme]);
+
+  useEffect(() => () => {
+    Object.values(materials).forEach((material) => {
+      if (material instanceof THREE.Material) material.dispose();
+    });
+  }, [materials]);
 
   return materials;
 }
@@ -86,11 +79,14 @@ export function usePalaceColors() {
 // ── Internals ─────────────────────────────────────────────────────────────
 
 function useThemeAttr() {
-  const [theme, setTheme] = useState("");
+  const [theme, setTheme] = useState(() =>
+    typeof document === "undefined"
+      ? "memex"
+      : document.documentElement.getAttribute("data-theme") || "memex"
+  );
 
   useEffect(() => {
     const el = document.documentElement;
-    setTheme(el.getAttribute("data-theme") || "memex");
 
     const obs = new MutationObserver(() => {
       const next = el.getAttribute("data-theme") || "memex";
@@ -164,8 +160,8 @@ function buildColorTokens(theme: string): PalaceColorTokens {
   };
 }
 
-function buildMaterials() {
-  const c = buildColorTokens(useThemeFallback());
+function buildMaterials(theme: string) {
+  const c = buildColorTokens(theme);
 
   const wall = new THREE.MeshPhysicalMaterial({
     color: mixColors(c.surface, c.panel, 0.28),
@@ -230,9 +226,4 @@ function buildMaterials() {
   });
 
   return { wall, floor, accent: accentMat, drawer, drawerHighlight, glow, text, colors: c };
-}
-
-function useThemeFallback() {
-  if (typeof document === "undefined") return "ember";
-  return document.documentElement.getAttribute("data-theme") || "memex";
 }
