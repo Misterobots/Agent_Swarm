@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Optional, List
 from phi.agent import Agent
 from phi.model.ollama import Ollama
@@ -19,11 +20,13 @@ from utils.gpu_queue import get_best_host_for_model
 
 DEFAULT_MODEL = os.getenv("SOLVER_MODEL", "qwen2.5-coder:14b-instruct-q4_k_m")
 
-# Shared Storage for persistent sessions
-agent_storage = PgAgentStorage(
-    table_name="architect_sessions",
-    db_url=AGNO_DB_URL
-)
+@lru_cache(maxsize=1)
+def get_agent_storage() -> PgAgentStorage:
+    """Create persistent session storage only when an Architect is requested."""
+    return PgAgentStorage(
+        table_name="architect_sessions",
+        db_url=AGNO_DB_URL,
+    )
 
 def get_architect_agent(session_id: Optional[str] = None, model_name: Optional[str] = None):
     """
@@ -52,7 +55,7 @@ def get_architect_agent(session_id: Optional[str] = None, model_name: Optional[s
             options={"temperature": 0.1},
             client_kwargs={"timeout": 300.0}
         ),
-        storage=agent_storage,
+        storage=get_agent_storage(),
         session_id=session_id,
         add_history_to_messages=True,
         num_history_responses=5,

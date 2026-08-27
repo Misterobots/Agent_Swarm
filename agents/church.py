@@ -13,6 +13,7 @@ Public API preserved:
 
 from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
+from functools import lru_cache
 from leibniz_agent import get_architect_agent
 from security_agent import get_security_agent
 
@@ -61,10 +62,13 @@ except ImportError:
     ANTHROPIC_MODEL = ""
     logger.debug("[Router] Anthropic provider not loaded")
 
-_conv_storage = PgAgentStorage(
-    table_name="conversation_sessions",
-    db_url=AGNO_DB_URL,
-)
+@lru_cache(maxsize=1)
+def _get_conv_storage() -> PgAgentStorage:
+    """Create conversational storage only when a task reaches an agent handler."""
+    return PgAgentStorage(
+        table_name="conversation_sessions",
+        db_url=AGNO_DB_URL,
+    )
 
 # --- JWT-ACE Integration ---
 try:
@@ -1272,7 +1276,7 @@ def chat_swarm(
             "research_mode": research_mode,
             "ultraplan_mode": ultraplan_mode,
             "dev_mode": dev_mode,
-            "conv_storage": _conv_storage,
+            "conv_storage": _get_conv_storage(),
             "is_admin": is_admin,
             "already_steered": _already_steered,
             "intent": intent,

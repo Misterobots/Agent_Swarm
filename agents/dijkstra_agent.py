@@ -8,6 +8,7 @@ Model: qwen3.6:27b (same as PRIMARY_MODEL — same model, different role.)
 """
 
 import os
+from functools import lru_cache
 from typing import Optional
 from phi.agent import Agent, RunResponse
 from phi.model.ollama import Ollama
@@ -45,11 +46,13 @@ Your output is the final corrected response delivered to the user.
 """
 
 
-# Shared Storage for persistent sessions
-agent_storage = PgAgentStorage(
-    table_name="corrector_sessions",
-    db_url=AGNO_DB_URL
-)
+@lru_cache(maxsize=1)
+def get_agent_storage() -> PgAgentStorage:
+    """Create persistent session storage only when the Corrector is used."""
+    return PgAgentStorage(
+        table_name="corrector_sessions",
+        db_url=AGNO_DB_URL,
+    )
 
 class CorrectorAgent:
     """
@@ -73,7 +76,7 @@ class CorrectorAgent:
                     options={"temperature": 0.05},  # Low temp — precise corrections
                     client_kwargs={"timeout": 300.0}
                 ),
-                storage=agent_storage,
+                storage=get_agent_storage(),
                 session_id=self.session_id,
                 add_history_to_messages=True,
                 num_history_responses=5,
