@@ -52,8 +52,18 @@ def no_langfuse(monkeypatch):
     import sys
     langfuse_mock = MagicMock()
     langfuse_mock.Langfuse.return_value = MagicMock()
+    langfuse_mock.observe = lambda *args, **kwargs: (lambda f: f)
     sys.modules["langfuse"] = langfuse_mock
-    
+
+    # mars_loop may have been imported while another test installed a
+    # MagicMock Langfuse module. Reset the already-loaded module's optional
+    # integration state as well as the import hook.
+    mars_module = sys.modules.get("mars_loop")
+    if mars_module is not None:
+        mars_module.observe = langfuse_mock.observe
+        mars_module.USE_LANGFUSE = False
+        mars_module._langfuse = None
+
     class DummyDecorators:
         @staticmethod
         def observe(*args, **kwargs):

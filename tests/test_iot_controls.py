@@ -1,5 +1,6 @@
 import os
 import sys
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -11,7 +12,6 @@ if WORKSPACE_ROOT not in sys.path:
 AGENTS_DIR = os.path.join(WORKSPACE_ROOT, "agents")
 if AGENTS_DIR not in sys.path:
     sys.path.insert(0, AGENTS_DIR)
-
 
 def test_get_states_mock_returns_filtered_domain(monkeypatch):
     from agents.tools import iot_ops
@@ -65,24 +65,24 @@ def test_sensitive_lock_attempt_emits_audit_log(monkeypatch, caplog):
 
 def test_sensitive_action_metrics_increment(monkeypatch):
     from agents.tools import iot_ops
-    from agents.metrics import IOT_SENSITIVE_ACTIONS_TOTAL, IOT_SENSITIVE_ACTIONS_BLOCKED_TOTAL
+
+    total_metric = MagicMock()
+    blocked_metric = MagicMock()
+    monkeypatch.setattr(iot_ops, "IOT_SENSITIVE_ACTIONS_TOTAL", total_metric)
+    monkeypatch.setattr(iot_ops, "IOT_SENSITIVE_ACTIONS_BLOCKED_TOTAL", blocked_metric)
 
     monkeypatch.setattr(iot_ops, "MOCK_MODE", True)
 
-    total_sample = IOT_SENSITIVE_ACTIONS_TOTAL.labels(
+    iot_ops.call_service("lock", "unlock", "lock.front_door")
+
+    total_metric.labels.assert_called_once_with(
         domain="lock",
         service="unlock",
         outcome="blocked_missing_confirmation",
     )
-    blocked_sample = IOT_SENSITIVE_ACTIONS_BLOCKED_TOTAL.labels(domain="lock", service="unlock")
-
-    before_total = total_sample._value.get()
-    before_blocked = blocked_sample._value.get()
-
-    iot_ops.call_service("lock", "unlock", "lock.front_door")
-
-    assert total_sample._value.get() == before_total + 1
-    assert blocked_sample._value.get() == before_blocked + 1
+    total_metric.labels.return_value.inc.assert_called_once_with()
+    blocked_metric.labels.assert_called_once_with(domain="lock", service="unlock")
+    blocked_metric.labels.return_value.inc.assert_called_once_with()
 
 
 def test_sensitive_lock_control_succeeds_after_confirmation(monkeypatch):

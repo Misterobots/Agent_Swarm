@@ -113,11 +113,11 @@ class TestModelRouterClassify:
     @patch("grpc.model_router.requests.get")
     @patch("grpc.model_router.requests.post")
     def test_classify_code(self, mock_post, mock_get):
-        from grpc.model_router import ModelRouter
+        from grpc.model_router import ModelRouter, ROUTER_MODEL
         # Mock health check
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": ROUTER_MODEL}]}
         )
         # Mock classification call
         mock_post.return_value = MagicMock(
@@ -133,10 +133,10 @@ class TestModelRouterClassify:
     @patch("grpc.model_router.requests.get")
     @patch("grpc.model_router.requests.post")
     def test_classify_general(self, mock_post, mock_get):
-        from grpc.model_router import ModelRouter
+        from grpc.model_router import ModelRouter, ROUTER_MODEL
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": ROUTER_MODEL}]}
         )
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -163,10 +163,10 @@ class TestModelRouterClassify:
     @patch("grpc.model_router.requests.get")
     @patch("grpc.model_router.requests.post")
     def test_classify_error(self, mock_post, mock_get):
-        from grpc.model_router import ModelRouter
+        from grpc.model_router import ModelRouter, ROUTER_MODEL
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": ROUTER_MODEL}]}
         )
         mock_post.side_effect = Exception("Connection refused")
         router = ModelRouter(ollama_hosts=["http://test:11434"])
@@ -300,16 +300,16 @@ class TestModelRouterStream:
 class TestModelRouterModels:
     @patch("grpc.model_router.requests.get")
     def test_list_models(self, mock_get):
-        from grpc.model_router import ModelRouter
+        from grpc.model_router import ModelRouter, ROUTER_MODEL
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}, {"name": "qwen3:14b"}]}
+            json=lambda: {"models": [{"name": ROUTER_MODEL}, {"name": "qwen3:14b"}]}
         )
         router = ModelRouter(ollama_hosts=["http://test:11434"])
         models = router.list_models()
         assert len(models) > 0
         names = [m.name for m in models]
-        assert "nemotron-mini" in names
+        assert ROUTER_MODEL in names
 
 
 class TestModelRouterHealth:

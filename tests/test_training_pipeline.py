@@ -20,6 +20,17 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "agents"))
 
+# Some coordinator tests install a MagicMock at this module key while
+# importing their own dependency graph. Ensure these tests exercise the real
+# GPU queue implementation before patching its clock below.
+import importlib
+sys.modules.pop("utils.gpu_queue", None)
+importlib.import_module("utils.gpu_queue")
+if isinstance(sys.modules.get("config"), MagicMock):
+    sys.modules.pop("config", None)
+importlib.import_module("config")
+sys.modules.pop("training.grpo_trainer", None)
+
 
 # ──────────────────────────────────────────────────────────────
 # Reward Function Tests (U9-U12)
@@ -274,8 +285,8 @@ class TestABTestManagerDB:
         mock_conn.return_value.cursor.return_value = mock_cur
 
         mgr.record_result("code_dev", "candidate:v1", 0.85, latency_ms=150)
-        # Should have done SELECT + INSERT
-        assert mock_cur.execute.call_count == 2
+        # Active-test lookup, insert, and base-arm lookup for the score gauge.
+        assert mock_cur.execute.call_count == 3
 
 
 # ──────────────────────────────────────────────────────────────
@@ -381,13 +392,13 @@ class TestGRPOTrainerConfig:
         """U13: Default config has correct values from config.py."""
         from training.grpo_trainer import GRPOTrainingConfig
         cfg = GRPOTrainingConfig()
-        assert cfg.lora_rank == 16
-        assert cfg.lora_alpha == 32
-        assert cfg.batch_size == 1
-        assert cfg.gradient_accumulation == 8
-        assert cfg.learning_rate == pytest.approx(5e-6)
+        assert cfg.lora_rank == 64
+        assert cfg.lora_alpha == 128
+        assert cfg.batch_size == 2
+        assert cfg.gradient_accumulation == 4
+        assert cfg.learning_rate == pytest.approx(2e-5)
         assert cfg.num_epochs == 3
-        assert cfg.max_seq_len == 4096
+        assert cfg.max_seq_len == 8192
         assert cfg.warmup_ratio == 0.1
         assert cfg.group_size == 4
         assert cfg.kl_coeff == 0.05

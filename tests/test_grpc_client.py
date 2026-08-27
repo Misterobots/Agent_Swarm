@@ -89,9 +89,10 @@ class TestGrpcClientFallback:
     @patch("grpc.model_router.requests.post")
     def test_classify_fallback(self, mock_post, mock_get):
         from grpc.client import GrpcClient
+        from grpc.model_router import ROUTER_MODEL
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}]}
+            json=lambda: {"models": [{"name": ROUTER_MODEL}]}
         )
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -105,14 +106,15 @@ class TestGrpcClientFallback:
     @patch("grpc.model_router.requests.get")
     def test_list_models_fallback(self, mock_get):
         from grpc.client import GrpcClient
+        from grpc.model_router import ROUTER_MODEL
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=lambda: {"models": [{"name": "nemotron-mini"}, {"name": "qwen3:14b"}]}
+            json=lambda: {"models": [{"name": ROUTER_MODEL}, {"name": "qwen3:14b"}]}
         )
         client = GrpcClient(enabled=False)
         models = client.list_models()
         assert len(models) > 0
-        assert any(m["name"] == "nemotron-mini" for m in models)
+        assert any(m["name"] == ROUTER_MODEL for m in models)
 
     @patch("grpc.model_router.requests.get")
     def test_health_fallback(self, mock_get):

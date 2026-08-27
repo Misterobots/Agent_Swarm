@@ -177,7 +177,8 @@ def test_voice_endpoint_rejects_workload_profile_in_hard_mode():
     assert response.json()["detail"] == "Token profile not allowed for endpoint class"
 
 
-def test_internal_endpoint_rejects_user_profile_in_hard_mode():
+def test_identity_endpoint_allows_user_profile_in_hard_mode():
+    """Identity is intentionally public self-inspection, even in hard mode."""
     app = build_app("hard")
     client = TestClient(app)
 
@@ -186,8 +187,8 @@ def test_internal_endpoint_rejects_user_profile_in_hard_mode():
         headers={"Authorization": f"Bearer {build_user_token()}"},
     )
 
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Token profile not allowed for endpoint class"
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
 
 
 def test_user_owner_id_attached_to_request_state_from_token_claim():

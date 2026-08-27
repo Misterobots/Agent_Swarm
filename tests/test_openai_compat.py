@@ -1,8 +1,18 @@
 import requests
 import json
 import time
+import pytest
 
 BASE_URL = "http://localhost:8008"
+
+
+@pytest.fixture(autouse=True)
+def require_local_backend():
+    """These checks require the separately running local API process."""
+    try:
+        requests.get(BASE_URL, timeout=1)
+    except requests.RequestException:
+        pytest.skip("local OpenAI-compatible backend is not running")
 
 def test_chat_completions_streaming():
     print("--- Testing /v1/chat/completions (Streaming, Standard Mode) ---")
@@ -15,9 +25,9 @@ def test_chat_completions_streaming():
         ],
         "stream": True
     }
-    
+
     response = requests.post(f"{BASE_URL}/v1/chat/completions", json=payload, stream=True)
-    
+
     if response.status_code != 200:
         print(f"FAILED: Status {response.status_code}")
         print(response.text)
@@ -31,7 +41,7 @@ def test_chat_completions_streaming():
                 data_str = line_str[len("data: "):]
                 if data_str == "[DONE]":
                     break
-                
+
                 try:
                     data = json.loads(data_str)
                     content = data["choices"][0]["delta"].get("content", "")
@@ -45,7 +55,7 @@ def test_chat_completions_streaming():
         print("SUCCESS: History recognized (Name found in response)")
     else:
         print("FAILED: History might be missing (Name not found)")
-        
+
     if "> ⏳" in full_text or "> 🛠️" in full_text:
         print("FAILED: Internal logs detected in output (Standard Mode failure)")
     else:
@@ -60,18 +70,18 @@ def test_chat_completions_non_streaming():
         ],
         "stream": False
     }
-    
+
     response = requests.post(f"{BASE_URL}/v1/chat/completions", json=payload)
-    
+
     if response.status_code != 200:
         print(f"FAILED: Status {response.status_code}")
         print(response.text)
         return
-        
+
     data = response.json()
     content = data["choices"][0]["message"]["content"]
     print(f"Response: {content}")
-    
+
     if "> ⏳" in content or "> 🛠️" in content:
         print("FAILED: Internal logs detected in output")
     else:

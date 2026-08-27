@@ -1,4 +1,4 @@
-﻿"""
+"""
 Phase 8: Tests for MONITOR_TOOL, CONTEXT_COLLAPSE helpers, and VERIFICATION_AGENT UI parsing.
 
 All tests run offline — network calls, Docker, and LLM are mocked.
@@ -7,6 +7,7 @@ All tests run offline — network calls, Docker, and LLM are mocked.
 import json
 import os
 import sys
+import importlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -18,6 +19,13 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGENTS_DIR = os.path.join(REPO_ROOT, "agents")
 if AGENTS_DIR not in sys.path:
     sys.path.insert(0, AGENTS_DIR)
+
+# Coordinator tests use a config MagicMock for their isolated import graph.
+# Restore the real config module before testing token-window constants.
+if isinstance(sys.modules.get("config"), MagicMock):
+    sys.modules.pop("config", None)
+importlib.import_module("config")
+sys.modules.pop("utils.token_counter", None)
 
 # Pre-mock heavy deps
 _MOCK_MODULES = [

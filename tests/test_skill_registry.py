@@ -202,20 +202,26 @@ class TestSkillLoader:
         # Clear any previous state
         from skill_registry import SkillRegistry
         import skill_registry as sr_mod
+        import skill_loader as sl_mod
+        from skill_loader import BUILTIN_SKILLS
         original = sr_mod.skill_registry
-        sr_mod.skill_registry = SkillRegistry()
+        replacement = SkillRegistry()
+        sr_mod.skill_registry = replacement
+        original_loader_registry = sl_mod.skill_registry
+        sl_mod.skill_registry = replacement
 
         try:
             from skill_loader import initialize_skills
             count = initialize_skills()
-            assert count == 4  # web_fetch, web_search, bash_classify, bash_parse
-            assert sr_mod.skill_registry.count == 4
+            assert count == len(BUILTIN_SKILLS)
+            assert sr_mod.skill_registry.count == len(BUILTIN_SKILLS)
             assert sr_mod.skill_registry.get("web_fetch") is not None
             assert sr_mod.skill_registry.get("web_search") is not None
             assert sr_mod.skill_registry.get("bash_classify") is not None
             assert sr_mod.skill_registry.get("bash_parse") is not None
         finally:
             sr_mod.skill_registry = original
+            sl_mod.skill_registry = original_loader_registry
 
     def test_builtin_skills_have_triggers(self):
         from skill_loader import BUILTIN_SKILLS

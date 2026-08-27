@@ -17,7 +17,7 @@ except ImportError:
     sys.modules["phi.agent"] = mock_phi
     sys.modules["phi.model"] = mock_phi
     sys.modules["phi.model.ollama"] = mock_phi
-    
+
 from agents.specialized.voice_cloning import clone_voice
 
 class TestVoiceCloning(unittest.TestCase):
@@ -32,19 +32,13 @@ class TestVoiceCloning(unittest.TestCase):
 
         # Call Tool
         result = clone_voice(text="Hello World", reference_audio_path=None)
-        
+
         # Verify
-        self.assertTrue("Generated Audio" in result)
-        self.assertTrue("Saved to" in result) # Check for file path
-        
-        # Verify File Creation (and cleanup)
-        # Extract filename from result
-        import re
-        match = re.search(r"Saved to (.*)\)", result)
-        if match:
-            path = match.group(1)
-            self.assertTrue(os.path.exists(path))
-            os.remove(path) # Cleanup
+        # The tool returns the generated artifact path directly so callers can
+        # hand it to the audio-delivery path without parsing log text.
+        self.assertIsInstance(result, str)
+        self.assertTrue(os.path.exists(result))
+        os.remove(result)
 
     @patch('agents.specialized.voice_cloning.requests.post')
     def test_clone_voice_failure(self, mock_post):
@@ -56,9 +50,11 @@ class TestVoiceCloning(unittest.TestCase):
 
         # Call Tool
         result = clone_voice(text="Fail me")
-        
+
         # Verify
-        self.assertTrue("Voice Engine Error" in result)
+        # Errors intentionally return no artifact path; the caller logs the
+        # detailed engine error and skips playback.
+        self.assertIsNone(result)
 
 if __name__ == '__main__':
     unittest.main()

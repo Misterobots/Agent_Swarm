@@ -187,22 +187,21 @@ class TestFetchPage:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestWebSearch:
-    @patch("requests.post")
-    def test_search_returns_results(self, mock_post):
+    @patch("requests.get")
+    def test_search_returns_results(self, mock_get, monkeypatch):
+        monkeypatch.setenv("GOOGLE_CSE_API_KEY", "test-key")
+        monkeypatch.setenv("GOOGLE_CSE_ID", "test-cse")
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.text = '''
-        <table>
-        <tr>
-            <td><a rel="nofollow" href="https://example.com/1" class="result-link">Result One</a></td>
-        </tr>
-        <tr>
-            <td class="result-snippet">First result snippet here</td>
-        </tr>
-        </table>
-        '''
         mock_resp.raise_for_status = MagicMock()
-        mock_post.return_value = mock_resp
+        mock_resp.json.return_value = {
+            "items": [{
+                "title": "Result One",
+                "link": "https://example.com/1",
+                "snippet": "First result snippet here",
+            }]
+        }
+        mock_get.return_value = mock_resp
 
         results = web_search("test query")
         assert len(results) >= 1

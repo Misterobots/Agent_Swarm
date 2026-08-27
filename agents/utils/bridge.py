@@ -1,4 +1,4 @@
-﻿"""
+"""
 bridge.py — Cross-Machine Agent Bridge
 
 Provides a relay layer for transparent cross-node agent operations.
@@ -107,6 +107,14 @@ class Bridge:
             ),
         }
 
+    def _get_node(self, node_name: str) -> Optional[BridgeNode]:
+        """Resolve a configured node name without making callers case-sensitive."""
+        normalized = str(node_name or "").casefold()
+        return next(
+            (node for key, node in self._nodes.items() if key.casefold() == normalized),
+            None,
+        )
+
     def list_nodes(self) -> list[dict]:
         """Return all bridge nodes with health status."""
         return [
@@ -120,7 +128,7 @@ class Bridge:
 
     def check_health(self, node_name: str) -> bool:
         """Ping a remote node's API health endpoint."""
-        node = self._nodes.get(node_name.lower())
+        node = self._get_node(node_name)
         if not node:
             return False
 
@@ -166,7 +174,7 @@ class Bridge:
             dict with job_id, status, and any immediate result
         """
         node_name = target_node.lower()
-        node = self._nodes.get(node_name)
+        node = self._get_node(target_node)
         if not node:
             return {"error": f"Unknown node: {target_node}", "status": "failed"}
 
@@ -227,7 +235,7 @@ class Bridge:
         Returns:
             dict with status_code, body, and headers
         """
-        node = self._nodes.get(target_node.lower())
+        node = self._get_node(target_node)
         if not node:
             return {"error": f"Unknown node: {target_node}", "status_code": -1}
 

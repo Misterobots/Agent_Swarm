@@ -25,7 +25,12 @@ import pytest
 # ---------------------------------------------------------------------------
 def _import_gpu_queue():
     import importlib
-    import utils.gpu_queue as gq  # type: ignore
+    import sys
+    # Other test modules install a MagicMock at this key while importing
+    # coordinator dependencies. Remove that test double before loading the
+    # actual module under test.
+    sys.modules.pop("utils.gpu_queue", None)
+    gq = importlib.import_module("utils.gpu_queue")
     importlib.reload(gq)
     return gq
 

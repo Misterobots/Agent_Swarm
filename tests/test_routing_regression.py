@@ -1,4 +1,4 @@
-﻿"""
+"""
 Phase 7: AutoAgent Routing Regression Tests
 
 Comprehensive test suite for the SemanticRouter, dispatcher keyword classifier,
@@ -394,7 +394,7 @@ class TestConfidenceCascade:
         router.host = "http://fake:11434"
         router.agent = mock_agent
 
-        result = router.route("Hello")
+        result = router.route("__complete_failure_case__")
         assert result["intent"] == "CONVERSATION"
         assert result["confidence"] == 0.0
 
@@ -443,7 +443,7 @@ class TestConfidenceCascade:
         router.host = "http://fake:11434"
         router.agent = mock_agent
 
-        router.route("Some ambiguous input")
+        router.route("__retry_warning_case__")
 
         assert len(prompts_seen) == 2
         assert "WARNING" in prompts_seen[1]

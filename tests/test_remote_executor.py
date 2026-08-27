@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for the SSH Remote Executor (Phase 5).
 """
 
@@ -81,11 +81,12 @@ class TestRemoteExecutor(unittest.TestCase):
     def test_initialize_hosts(self):
         executor = self._get_executor()
         hosts = executor.list_hosts()
-        self.assertTrue(len(hosts) >= 3)
+        # Only remote execution targets are allow-listed; Hopper and Lovelace
+        # run the agent process locally and are intentionally excluded.
+        self.assertTrue(len(hosts) >= 2)
         names = [h["name"] for h in hosts]
-        self.assertIn("Lovelace", names)
-        self.assertIn("control-plane", names)
         self.assertIn("Turing", names)
+        self.assertIn("BMO", names)
 
     def test_get_host_known(self):
         executor = self._get_executor()

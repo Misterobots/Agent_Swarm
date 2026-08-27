@@ -1,4 +1,4 @@
-﻿"""
+"""
 tests/test_coordinator_memory.py
 
 Unit tests for the coordinator's MemPalace team memory integration.
@@ -50,6 +50,7 @@ for mod_name, mock_obj in {
 
 
 from lamport import _team_store, _team_clear, WorkerInfo, WorkerState
+from coordination import palace
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -59,49 +60,45 @@ from lamport import _team_store, _team_clear, WorkerInfo, WorkerState
 class TestTeamStoreHelper:
 
     def test_team_store_calls_client(self):
-        mock_mp = MagicMock()
-        with patch.dict(sys.modules, {"mempalace_client": MagicMock(mempalace=mock_mp)}):
+        with patch.object(palace, "_MEMPALACE_URL", "http://mempalace.test"), \
+             patch.object(palace.requests, "post") as mock_post:
             _team_store("coord-abc", "research_summary", "findings text", "worker-1")
-            mock_mp.team_store.assert_called_once_with(
-                "coord-abc", "research_summary", "findings text", author_agent="worker-1"
+            mock_post.assert_called_once_with(
+                "http://mempalace.test/v1/team/coord-abc",
+                json={"key": "research_summary", "value": "findings text", "author_agent": "worker-1"},
+                timeout=5.0,
             )
 
-    def test_team_store_graceful_on_import_error(self):
-        """If mempalace_client can't be imported, no exception should propagate."""
-        # Remove any cached module
-        sys.modules.pop("mempalace_client", None)
-        with patch.dict(sys.modules, {"mempalace_client": None}):
-            # Should not raise
+    def test_team_store_graceful_on_request_error(self):
+        """A MemPalace outage must not fail the coordinator."""
+        with patch.object(palace.requests, "post", side_effect=Exception("Connection refused")):
             _team_store("coord-abc", "key", "value")
 
     def test_team_store_graceful_on_network_error(self):
-        mock_mp = MagicMock()
-        mock_mp.team_store.side_effect = Exception("Connection refused")
-        with patch.dict(sys.modules, {"mempalace_client": MagicMock(mempalace=mock_mp)}):
+        with patch.object(palace.requests, "post", side_effect=Exception("Connection refused")):
             # Should not raise
             _team_store("coord-abc", "key", "value")
 
     def test_team_store_default_author(self):
-        mock_mp = MagicMock()
-        with patch.dict(sys.modules, {"mempalace_client": MagicMock(mempalace=mock_mp)}):
+        with patch.object(palace.requests, "post") as mock_post:
             _team_store("coord-abc", "key", "value")
-            mock_mp.team_store.assert_called_once_with(
-                "coord-abc", "key", "value", author_agent="lamport"
-            )
+            payload = mock_post.call_args.kwargs["json"]
+            assert payload["author_agent"] == "lamport"
 
 
 class TestTeamClearHelper:
 
     def test_team_clear_calls_client(self):
-        mock_mp = MagicMock()
-        with patch.dict(sys.modules, {"mempalace_client": MagicMock(mempalace=mock_mp)}):
+        with patch.object(palace, "_MEMPALACE_URL", "http://mempalace.test"), \
+             patch.object(palace.requests, "delete") as mock_delete:
             _team_clear("coord-abc")
-            mock_mp.team_clear.assert_called_once_with("coord-abc")
+            mock_delete.assert_called_once_with(
+                "http://mempalace.test/v1/team/coord-abc",
+                timeout=5.0,
+            )
 
     def test_team_clear_graceful_on_error(self):
-        mock_mp = MagicMock()
-        mock_mp.team_clear.side_effect = Exception("Connection refused")
-        with patch.dict(sys.modules, {"mempalace_client": MagicMock(mempalace=mock_mp)}):
+        with patch.object(palace.requests, "delete", side_effect=Exception("Connection refused")):
             # Should not raise
             _team_clear("coord-abc")
 
@@ -171,14 +168,13 @@ class TestCoordinatorMemoryPattern:
         assert "synthesis" == "synthesis"  # literal key used in coordinator
 
     def test_multiple_workers_store_unique_keys(self):
-        mock_mp = MagicMock()
-        with patch.dict(sys.modules, {"mempalace_client": MagicMock(mempalace=mock_mp)}):
+        with patch.object(palace.requests, "post") as mock_post:
             _team_store("coord-1", "research_arch_w1", "Architecture findings")
             _team_store("coord-1", "research_sec_w2", "Security findings")
             _team_store("coord-1", "synthesis", "Combined analysis")
 
-            assert mock_mp.team_store.call_count == 3
-            keys = [c.args[1] for c in mock_mp.team_store.call_args_list]
+            assert mock_post.call_count == 3
+            keys = [c.kwargs["json"]["key"] for c in mock_post.call_args_list]
             assert keys == ["research_arch_w1", "research_sec_w2", "synthesis"]
 
     def test_result_truncated_at_2000(self):

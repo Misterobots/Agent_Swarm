@@ -442,7 +442,8 @@ class SemanticRouter:
         """
         from utils.gpu_queue import select_available_model
 
-        self._model_chain = [m for m in self._model_chain if m != self.model_name]
+        model_chain = getattr(self, "_model_chain", [self.model_name])
+        self._model_chain = [m for m in model_chain if m != self.model_name]
         if not self._model_chain:
             _router_logger.error("[Router] Model chain exhausted; no fallback available.")
             return False
@@ -572,6 +573,13 @@ class SemanticRouter:
 
                 # Model-chain fallback: rotate to next model if inference fails
                 lowered = error_str.lower()
+                if "404" in error_str and "not found" in lowered:
+                    return {
+                        "intent": "RESEARCH",
+                        "confidence": 0.0,
+                        "reasoning": f"CRITICAL: Model '{self.model_name}' missing. Please run 'ollama pull {self.model_name}'"
+                    }
+
                 retriable = (
                     "404" in error_str
                     or any(t in lowered for t in (
@@ -584,13 +592,6 @@ class SemanticRouter:
                         "[Router] Inference failure — rotated model chain; retrying."
                     )
                     continue
-
-                if "404" in error_str and "not found" in error_str:
-                    return {
-                        "intent": "RESEARCH",
-                        "confidence": 0.0,
-                        "reasoning": f"CRITICAL: Model '{self.model_name}' missing. Please run 'ollama pull {self.model_name}'"
-                    }
 
         if 'decision' in locals() and isinstance(decision, dict):
             _cache_put(user_input, decision)
