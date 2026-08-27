@@ -105,7 +105,7 @@ function parseSwarmContent(content: string): SwarmParsed | null {
 
   // Split process text into labelled phase blocks
   const processBlocks: { title: string; content: string }[] = [];
-  let remaining = processRaw;
+  const remaining = processRaw;
 
   // Find all phase marker positions
   const positions: { idx: number; title: string; marker: string }[] = [];
@@ -273,6 +273,8 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
   useEffect(() => {
     // Auto-collapse when this message transitions from latest → previous
     if (prevIsLatestRef.current && !isLatest && canCollapse) {
+      // This is an intentional internal-state sync for the latest-message transition.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsCollapsed(true);
     }
     prevIsLatestRef.current = isLatest;
