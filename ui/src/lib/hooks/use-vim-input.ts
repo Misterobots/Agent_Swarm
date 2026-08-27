@@ -67,13 +67,13 @@ export function useVimInput(
     bufferTimer.current = setTimeout(() => dispatch({ type: "RESET" }), 1000);
   }, []);
 
-  const ta = () => textareaRef.current;
+  const ta = useCallback(() => textareaRef.current, [textareaRef]);
 
   const moveCursor = useCallback((pos: number) => {
     const el = ta();
     if (!el) return;
     el.setSelectionRange(pos, pos);
-  }, []);
+  }, [ta]);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const el = ta();
@@ -204,7 +204,7 @@ export function useVimInput(
         dispatch({ type: "KEY", key: e.key });
         resetBuffer();
     }
-  }, [state.mode, state.buffer, moveCursor, onSubmit, resetBuffer]);
+  }, [state.mode, state.buffer, ta, moveCursor, onSubmit, resetBuffer]);
 
   const onKeyUp = useCallback(() => {
     // Buffer auto-resets via timer; nothing extra needed here
