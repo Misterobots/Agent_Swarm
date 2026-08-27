@@ -35,7 +35,6 @@ _MOCK_MODULES = [
     "phi.vectordb", "phi.vectordb.pgvector",
     "phi.storage", "phi.storage.agent", "phi.storage.agent.postgres",
     "langfuse", "langfuse.decorators",
-    "httpx",
     "requests",
     "prometheus_client",
 ]
