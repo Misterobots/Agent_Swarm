@@ -64,7 +64,7 @@ export default function PioneersPage() {
             <p className="text-xs text-[var(--chat-muted)] leading-relaxed">
               Each Pioneer is a specialized AI agent with unique capabilities. Configure their architecture,
               assign tools and knowledge bases, and define their operational parameters. Your team will autonomously
-              collaborate on complex tasks, with each agent contributing their expertise to the swarm's collective intelligence.
+              collaborate on complex tasks, with each agent contributing their expertise to the swarm&apos;s collective intelligence.
             </p>
           </div>
         </div>
