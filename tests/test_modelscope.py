@@ -1,15 +1,28 @@
-import sys
-try:
-    from modelscope.pipelines import pipeline
-    from modelscope.utils.constant import Tasks
-    print("Imported modelscope pipeline")
-    
+"""Opt-in ModelScope text-to-speech pipeline smoke test."""
+
+from __future__ import annotations
+
+import os
+
+import pytest
+
+
+pytestmark = pytest.mark.integration
+
+
+if os.getenv("RUN_MODELSCOPE_TESTS", "").lower() not in {"1", "true", "yes"}:
+    pytest.skip(
+        "ModelScope pipeline smoke test is opt-in; set RUN_MODELSCOPE_TESTS=1",
+        allow_module_level=True,
+    )
+
+modelscope = pytest.importorskip("modelscope")
+
+
+def test_modelscope_tts_pipeline_loads():
     model_id = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
-    print(f"Loading pipeline for {model_id}...")
-    
-    tts_pipeline = pipeline(task=Tasks.text_to_speech, model=model_id)
-    print("Pipeline loaded successfully!")
-    
-except Exception as e:
-    print(f"Error loading pipeline: {e}")
-    sys.exit(1)
+    tts_pipeline = modelscope.pipelines.pipeline(
+        task=modelscope.utils.constant.Tasks.text_to_speech,
+        model=model_id,
+    )
+    assert tts_pipeline is not None
