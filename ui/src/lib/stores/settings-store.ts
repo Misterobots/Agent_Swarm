@@ -205,16 +205,16 @@ export const useSettingsStore = create<SettingsState>()(
         }
         // v5 -> v6: add navLayout and themePickerMode.
         if (fromVersion < 6) {
-          if ((state as any).navLayout === undefined) (state as any).navLayout = "sidebar";
-          if ((state as any).themePickerMode === undefined) (state as any).themePickerMode = "popover";
+          if (state.navLayout === undefined) state.navLayout = "sidebar";
+          if (state.themePickerMode === undefined) state.themePickerMode = "popover";
         }
         // v6 -> v7: add soundEnabled
         if (fromVersion < 7) {
-          if ((state as any).soundEnabled === undefined) (state as any).soundEnabled = true;
+          if (state.soundEnabled === undefined) state.soundEnabled = true;
         }
         // v7 -> v8: add agentTransparency
         if (fromVersion < 8) {
-          if ((state as any).agentTransparency === undefined) (state as any).agentTransparency = "status";
+          if (state.agentTransparency === undefined) state.agentTransparency = "status";
         }
         return state as SettingsState;
       },
