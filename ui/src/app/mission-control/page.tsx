@@ -51,7 +51,6 @@ import type { GovernanceRequest } from "@/types/workspaces";
 import { Button, Card } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAccess } from "@/lib/hooks/use-access";
-import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useLauncherStore } from "@/lib/stores/launcher-store";
 import { streamSSE } from "@/lib/utils/sse-parser";
 
@@ -267,7 +266,6 @@ export default function ControlCenterPage() {
     if (!text) return;
     if (skill.needsInput) {
       // Interactive/creative skills (Build/Plan/Design/Research/Ask) → full chat.
-      applyModeForCommand(skill.command);
       useLauncherStore.getState().setPendingLaunch(text);
       router.push("/chat");
     } else {

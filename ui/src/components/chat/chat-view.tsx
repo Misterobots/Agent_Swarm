@@ -107,8 +107,8 @@ export function ChatView({ showDevContext = false, experience: experienceProp, a
   }, [autoSendPrompt, isStreaming, sendMessage]);
   useEffect(() => {
     if (experience !== "chat" || isStreaming) return;
-    const prompt = consumePendingLaunch();
-    if (prompt) void sendMessage(prompt);
+    const pending = consumePendingLaunch();
+    if (pending) void sendMessage(pending.text);
   }, [consumePendingLaunch, experience, isStreaming, sendMessage]);
   const { activeConversationId, activeConversation, updateConversation, setMessageFlaggedFollowup } = useChatStore();
   const addFollowup = useFollowupsStore((s) => s.addFollowup);
