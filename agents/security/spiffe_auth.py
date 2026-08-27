@@ -12,16 +12,70 @@ Features:
 """
 
 from __future__ import annotations
+import importlib
+from importlib.machinery import PathFinder
 import os
 import logging
+from pathlib import Path
+import sys
 from typing import Optional, Tuple
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
+
+def _load_spiffe_dependencies():
+    """Load py-spiffe with grpcio despite the local OpenClaude grpc package.
+
+    The runtime puts ``agents`` on ``sys.path`` so its legacy ``grpc`` package
+    wins over the installed ``grpcio`` package.  py-spiffe needs grpcio's
+    StatusCode and channel APIs, while the application still imports local
+    modules such as ``grpc.client``.  Load grpcio first, then add the local
+    package directory as an additional submodule path so both contracts work.
+    """
+    agents_dir = Path(__file__).resolve().parents[1]
+    local_grpc_dir = agents_dir / "grpc"
+    original_sys_path = list(sys.path)
+
+    def _resolved_path(entry: str) -> Path:
+        return Path(entry or os.getcwd()).resolve()
+
+    candidate_sys_path = [
+        entry for entry in original_sys_path
+        if _resolved_path(entry) != agents_dir
+    ]
+
+    # Do not disturb the local package when grpcio is not installed.  This is
+    # important for the lightweight desktop/test environment, where the local
+    # OpenClaude modules remain valid but SPIFFE is intentionally unavailable.
+    if PathFinder.find_spec("grpc", candidate_sys_path) is None:
+        return importlib.import_module("spiffe")
+
+    try:
+        loaded_grpc = sys.modules.get("grpc")
+        loaded_grpc_path = Path(getattr(loaded_grpc, "__file__", "")).resolve()
+        if loaded_grpc and loaded_grpc_path.parent == local_grpc_dir:
+            for name in list(sys.modules):
+                if name == "grpc" or name.startswith("grpc."):
+                    del sys.modules[name]
+
+        sys.path[:] = candidate_sys_path
+        grpcio = importlib.import_module("grpc")
+        grpc_path = getattr(grpcio, "__path__", None)
+        if grpc_path is not None and str(local_grpc_dir) not in grpc_path:
+            grpc_path.insert(0, str(local_grpc_dir))
+        return importlib.import_module("spiffe")
+    finally:
+        sys.path[:] = original_sys_path
+
+
 # Check if py-spiffe is available
 try:
-    from spiffe import WorkloadApiClient, X509Svid, JwtSvid, X509Bundle
+    _spiffe = _load_spiffe_dependencies()
+    WorkloadApiClient = _spiffe.WorkloadApiClient
+    X509Svid = _spiffe.X509Svid
+    JwtSvid = _spiffe.JwtSvid
+    X509Bundle = _spiffe.X509Bundle
     SPIFFE_AVAILABLE = True
 except ImportError as e:
     SPIFFE_AVAILABLE = False
