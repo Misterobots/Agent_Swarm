@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDevStore } from "@/lib/stores/dev-store";
+import type { DevPanelState } from "@/lib/stores/dev-panel-store";
 import { FileIcon, FolderIcon, GitBranch, ChevronRight, ChevronDown, FolderOpen, Loader2, Search, X } from "lucide-react";
 
 interface FileNode {
@@ -165,7 +166,7 @@ export function FileTree() {
       <div className="p-2 border-b border-[var(--chat-border)]">
         <select
           value={selectedNode}
-          onChange={(e) => setSelectedNode(e.target.value as any)}
+          onChange={(e) => setSelectedNode(e.target.value as DevPanelState["selectedNode"])}
           className="w-full px-2 py-1 text-xs bg-[var(--chat-input-bg)] text-[var(--chat-text)] border border-[var(--chat-border)] rounded"
         >
           <option value="workspace">Workspace</option>

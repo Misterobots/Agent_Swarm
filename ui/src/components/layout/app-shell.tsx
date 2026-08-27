@@ -21,6 +21,13 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
+declare global {
+  interface Window {
+    __memexImportFile?: (filePath: string) => void;
+    __memexNewConversation?: () => void;
+  }
+}
+
 export function AppShell({ children }: AppShellProps) {
   const { isMobile, isTablet } = useIsMobile();
   const { inDesktop, bridge } = useDesktop();
@@ -114,13 +121,13 @@ export function AppShell({ children }: AppShellProps) {
     });
 
     // File type handler: .memex / .claude skill import
-    (window as any).__memexImportFile = (filePath: string) => {
+    window.__memexImportFile = (filePath: string) => {
       window.dispatchEvent(new CustomEvent("memex:importFile", { detail: filePath }));
       router.push("/settings"); // navigate to settings where skills are managed
     };
 
     // Global shortcut: new conversation
-    (window as any).__memexNewConversation = () => {
+    window.__memexNewConversation = () => {
       const { createConversation, setActiveConversation } = useChatStore.getState();
       const id = createConversation();
       setActiveConversation(id);

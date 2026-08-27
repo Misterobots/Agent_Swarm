@@ -19,13 +19,21 @@ import {
   type ToneSpec,
 } from "./theme-sfx-profiles";
 
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
 // Single shared AudioContext — created lazily on first interaction
 let audioCtx: AudioContext | null = null;
 
 function getContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextCtor = window.AudioContext ?? window.webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    audioCtx = new AudioContextCtor();
   }
   if (audioCtx.state === "suspended") {
     audioCtx.resume();
