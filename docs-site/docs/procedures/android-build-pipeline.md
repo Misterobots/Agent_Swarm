@@ -31,7 +31,8 @@ dev sandbox into the disposable builder; only the resulting APK is copied to
 
 The response contains a signed, 24-hour `download_url`. The build refuses to
 start unless `ARTIFACT_SIGNING_SECRET` (or the existing
-`FRIDAY_IMAGE_SIGNING_SECRET` compatibility fallback) is configured. APK
+`FRIDAY_IMAGE_SIGNING_SECRET` / `HOME_ASSISTANT_TOKEN` compatibility fallback)
+is configured. APK
 downloads use the existing HMAC-verified `/v1/public-artifacts/{filename}`
 route and are returned as attachments.
 

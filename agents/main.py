@@ -447,7 +447,8 @@ app.mount("/metrics", metrics_app)
 # HA token is a safe shared fallback because both trusted runtime containers already
 # receive it and it is never sent to the client.
 _FRIDAY_IMAGE_SIGNING_SECRET = os.getenv(
-    "FRIDAY_IMAGE_SIGNING_SECRET", os.getenv("HOME_ASSISTANT_TOKEN", "")
+    "ARTIFACT_SIGNING_SECRET",
+    os.getenv("FRIDAY_IMAGE_SIGNING_SECRET", os.getenv("HOME_ASSISTANT_TOKEN", "")),
 )
 
 
