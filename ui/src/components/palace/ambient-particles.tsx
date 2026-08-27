@@ -1,9 +1,9 @@
 ﻿"use client";
 
-import { useRef, useMemo } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { usePalaceColors, type PalaceColorTokens } from "@/lib/palace/theme-materials";
+import { usePalaceColors } from "@/lib/palace/theme-materials";
 
 /**
  * Theme-specific ambient particle system using InstancedMesh.
@@ -156,10 +156,14 @@ export function AmbientParticles({ level }: { level: "lobby" | "wing" | "hall" |
   const levelScale = level === "lobby" ? 1 : level === "wing" ? 0.8 : 0.6;
   const count = Math.floor(config.count * levelScale);
 
-  const state = useMemo(() => initParticles({ ...config, count }), [colors.motif, count]);
+  const stateRef = useRef<ParticleState | null>(null);
+
+  useEffect(() => {
+    stateRef.current = initParticles({ ...config, count });
+  }, [colors.motif, count, config]);
 
   // Set up instance colors once
-  useMemo(() => {
+  useEffect(() => {
     if (!meshRef.current) return;
     const accentCol = new THREE.Color(colors.accent);
     const accent2Col = new THREE.Color(colors.accent2 ?? colors.accentStrong);
@@ -186,10 +190,11 @@ export function AmbientParticles({ level }: { level: "lobby" | "wing" | "hall" |
     if (meshRef.current.instanceColor) {
       meshRef.current.instanceColor.needsUpdate = true;
     }
-  }, [colors.motif, colors.accent, colors.accent2, colors.accentStrong, colors.isLight, count]);
+  }, [colors.motif, colors.accent, colors.accent2, colors.accentStrong, colors.isLight, count, isTerminal]);
 
   useFrame((frameState, delta) => {
-    if (!meshRef.current) return;
+    const state = stateRef.current;
+    if (!meshRef.current || !state) return;
     const t = frameState.clock.elapsedTime;
 
     for (let i = 0; i < count; i++) {
