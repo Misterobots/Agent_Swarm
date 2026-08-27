@@ -97,9 +97,14 @@ export default function MonitoringDashboardPage() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    const initial = setTimeout(() => {
+      void refresh();
+    }, 0);
     const interval = setInterval(refresh, REFRESH_MS);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
   }, [refresh]);
 
   const downServices = useMemo(() => health?.control_plane.filter((s) => !s.healthy) ?? [], [health]);

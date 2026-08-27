@@ -125,6 +125,7 @@ export function CameraController() {
     camera.lookAt(finalTarget);
 
     // Subtle camera roll from horizontal mouse position
+    // eslint-disable-next-line react-hooks/immutability -- useFrame is the imperative R3F animation boundary.
     camera.rotation.z += (-mouse.current.x * PARALLAX_ROLL - camera.rotation.z) * delta * 3;
 
     // Detect when transition settles

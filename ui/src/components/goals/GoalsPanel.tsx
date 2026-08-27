@@ -42,8 +42,14 @@ export function GoalsPanel() {
   const [panelSweeping, setPanelSweeping] = useState(false);
   const prevOpen = useRef(panelOpen);
   useEffect(() => {
-    if (!prevOpen.current && panelOpen) setPanelSweeping(true);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (!prevOpen.current && panelOpen) {
+      timer = setTimeout(() => setPanelSweeping(true), 0);
+    }
     prevOpen.current = panelOpen;
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [panelOpen]);
 
   // Nothing to show — render nothing (no toggle tab either)

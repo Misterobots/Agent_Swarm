@@ -89,7 +89,7 @@ export function EditorPane() {
     debounceTimer.current = setTimeout(() => {
       saveFile(content);
     }, 1500);
-  }, [setEditorContent, activeFile, currentProjectId, saveFile]);
+  }, [setEditorContent, activeFile, currentProjectId, saveFile, syncContent]);
 
   const handleMount: OnMount = (editor) => {
     editorRef.current = editor;

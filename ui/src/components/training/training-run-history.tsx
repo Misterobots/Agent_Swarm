@@ -28,6 +28,7 @@ export function TrainingRunHistory() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [liveMetrics, setLiveMetrics] = useState<Record<number, LiveTrainingMetrics>>({});
+  const [now, setNow] = useState(() => Date.now());
 
   const refresh = useCallback(async () => {
     const data = await fetchTrainingRuns(50);
@@ -36,9 +37,17 @@ export function TrainingRunHistory() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    let active = true;
+    void fetchTrainingRuns(50).then((data) => {
+      if (!active) return;
+      setRuns(data);
+      setLoading(false);
+    });
     const interval = setInterval(refresh, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [refresh]);
 
   // Poll live metrics for running runs every 10s
@@ -59,6 +68,13 @@ export function TrainingRunHistory() {
 
     pollLive();
     const interval = setInterval(pollLive, 10000);
+    return () => clearInterval(interval);
+  }, [runs]);
+
+  useEffect(() => {
+    if (!runs.some((run) => run.status === "running")) return;
+
+    const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, [runs]);
 
@@ -123,7 +139,7 @@ export function TrainingRunHistory() {
                     ? Math.max(
                         0,
                         Math.round(
-                          (Date.now() - new Date(run.started_at).getTime()) / 1000
+                          (now - new Date(run.started_at).getTime()) / 1000
                         )
                       )
                     : null;

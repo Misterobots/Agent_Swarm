@@ -12,13 +12,16 @@ export function LCARSTicker() {
       return `${part1}-${part2}`;
     };
 
-    setTicker(generateNumber());
+    const initialTimer = setTimeout(() => setTicker(generateNumber()), 0);
 
     const interval = setInterval(() => {
       setTicker(generateNumber());
     }, 150); // fast strobe
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
   }, []);
 
   return (

@@ -56,7 +56,10 @@ export default function CreatureForgePage() {
   }
 
   useEffect(() => {
-    load();
+    const timer = setTimeout(() => {
+      void load();
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   function selectGalleryImage(item: GalleryItem) {

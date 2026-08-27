@@ -15,7 +15,8 @@ export function useDesktop(): { inDesktop: boolean; bridge: MemexDesktopBridge |
   const [inDesktop, setInDesktop] = useState(false);
 
   useEffect(() => {
-    setInDesktop(isDesktop());
+    const timer = setTimeout(() => setInDesktop(isDesktop()), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   return { inDesktop, bridge: inDesktop ? desktop() : null };

@@ -21,7 +21,12 @@ export function ArtGallery() {
     setLoading(false);
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="flex-1 overflow-y-auto p-6">

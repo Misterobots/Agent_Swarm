@@ -20,7 +20,9 @@ export function GoalStepRow({ step, onSetStatus, readonly }: Props) {
   useEffect(() => {
     const prev = prevStatus.current;
     if (prev !== status && (status === "in_progress" || status === "completed")) {
-      setSweeping(true);
+      const timer = setTimeout(() => setSweeping(true), 0);
+      prevStatus.current = status;
+      return () => clearTimeout(timer);
     }
     prevStatus.current = status;
   }, [status]);

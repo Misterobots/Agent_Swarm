@@ -52,7 +52,7 @@ function accessIntensity(count: number): number {
 }
 
 export function DrawerMesh({ position, memory }: DrawerMeshProps) {
-  const { drawer, drawerHighlight, colors } = usePalaceMaterials();
+  const { colors } = usePalaceMaterials();
   const palaceColors = usePalaceColors();
   const selectMemory = usePalaceStore((s) => s.selectMemory);
   const highlightedIds = usePalaceStore((s) => s.highlightedMemoryIds);
@@ -63,6 +63,7 @@ export function DrawerMesh({ position, memory }: DrawerMeshProps) {
   const slideRef = useRef(0);
   const groupRef = useRef<THREE.Group>(null);
   const pulseRef = useRef(0);
+  const drawerMaterialRef = useRef<THREE.MeshPhysicalMaterial>(null);
   const typeGlowRef = useRef<THREE.Mesh>(null);
 
   const isHighlighted = highlightedIds.has(memory.id);
@@ -105,6 +106,14 @@ export function DrawerMesh({ position, memory }: DrawerMeshProps) {
     // Search highlight pulse
     if (isHighlighted) {
       pulseRef.current = 0.3 + Math.sin(state.clock.elapsedTime * 4) * 0.15;
+    }
+
+    if (drawerMaterialRef.current) {
+      drawerMaterialRef.current.emissiveIntensity = isHighlighted
+        ? pulseRef.current
+        : isActive
+        ? 0.52
+        : vis.intensity * 0.15;
     }
 
     // Type accent glow animation
@@ -152,13 +161,14 @@ export function DrawerMesh({ position, memory }: DrawerMeshProps) {
           receiveShadow
         >
           <meshPhysicalMaterial
+            ref={drawerMaterialRef}
             color={isActive ? colors.accent : colors.border}
             roughness={isActive ? 0.18 : 0.42}
             metalness={isActive ? 0.44 : 0.3}
             clearcoat={isActive ? 0.65 : 0.35}
             clearcoatRoughness={isActive ? 0.22 : 0.5}
             emissive={isActive ? colors.accentStrong : colors.accent}
-            emissiveIntensity={isHighlighted ? pulseRef.current : isActive ? 0.52 : vis.intensity * 0.15}
+            emissiveIntensity={isActive ? 0.52 : vis.intensity * 0.15}
             transparent={isDimmed}
             opacity={isDimmed ? 0.35 : vis.ageOpacity}
           />

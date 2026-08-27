@@ -62,9 +62,14 @@ export function GovernanceWorkflow() {
   }
 
   useEffect(() => {
-    load();
+    const initial = setTimeout(() => {
+      void load();
+    }, 0);
     const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
   }, []);
 
   const filtered = useMemo(() => {

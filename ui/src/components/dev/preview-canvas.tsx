@@ -33,8 +33,11 @@ export function PreviewCanvas() {
 
   useEffect(() => {
     if (previewUrl) {
-      setLoading(true);
-      setIframeKey((prev) => prev + 1);
+      const timer = setTimeout(() => {
+        setLoading(true);
+        setIframeKey((prev) => prev + 1);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [previewUrl]);
 

@@ -114,7 +114,7 @@ export function PalaceHud() {
       setOwnerInput(adminViewingOwner ?? username ?? "");
       setShowOwnerInput(true);
     },
-    [username, adminViewingOwner, setAdminOwner, loadLayout],
+    [username, selfOwnerId, adminViewingOwner, setAdminOwner, loadLayout],
   );
 
   return (

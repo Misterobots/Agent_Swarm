@@ -17,7 +17,7 @@ export function LCARSDataStream({ lines = 5, className }: { lines?: number; clas
     };
 
     const initialData = Array(lines).fill(0).map(generateLine);
-    setData(initialData);
+    const initialTimer = setTimeout(() => setData(initialData), 0);
 
     const interval = setInterval(() => {
       setData((prev) => {
@@ -29,7 +29,10 @@ export function LCARSDataStream({ lines = 5, className }: { lines?: number; clas
       });
     }, 400);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
   }, [lines, isLcars]);
 
   if (!isLcars) return null;

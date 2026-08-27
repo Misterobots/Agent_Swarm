@@ -61,9 +61,14 @@ export function MaintenanceQueue() {
   }
 
   useEffect(() => {
-    load();
+    const initial = setTimeout(() => {
+      void load();
+    }, 0);
     const t = setInterval(load, 15000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(t);
+    };
   }, []);
 
   async function ack(

@@ -55,9 +55,14 @@ export function FleetPanel({
   }, []);
 
   useEffect(() => {
-    loadGpu();
+    const initial = setTimeout(() => {
+      void loadGpu();
+    }, 0);
     const t = setInterval(loadGpu, 5000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(t);
+    };
   }, [loadGpu]);
 
   useEffect(() => {

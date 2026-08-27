@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Network, Brain, RefreshCw, ExternalLink } from "lucide-react";
 import { useAccess } from "@/lib/hooks/use-access";
@@ -57,18 +57,15 @@ export default function GraphPage() {
   const activeTabDef = TABS.find((t) => t.id === activeTab)!;
   const iframeUrl = activeTabDef.getUrl(ownerId);
 
-  // Reset loading state on tab or reload change
-  useEffect(() => {
-    setLoading(true);
-  }, [activeTab, reloadKey]);
-
   function handleTabChange(id: TabId) {
     if (id !== activeTab) {
+      setLoading(true);
       setActiveTab(id);
     }
   }
 
   function handleReload() {
+    setLoading(true);
     setReloadKey((k) => k + 1);
   }
 

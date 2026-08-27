@@ -55,19 +55,25 @@ export function BuddyWidget() {
   /* Reaction bubble auto-hide */
   useEffect(() => {
     if (lastReaction) {
-      setShowReaction(true);
-      const timer = setTimeout(() => setShowReaction(false), 4000);
-      return () => clearTimeout(timer);
+      const showTimer = setTimeout(() => setShowReaction(true), 0);
+      const hideTimer = setTimeout(() => setShowReaction(false), 4000);
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+      };
     }
   }, [lastReaction]);
 
   /* Evolution fanfare */
   useEffect(() => {
     if (evolutionStage > prevStageRef.current) {
-      setShowEvolutionBanner(true);
-      const timer = setTimeout(() => setShowEvolutionBanner(false), 4000);
+      const showTimer = setTimeout(() => setShowEvolutionBanner(true), 0);
+      const hideTimer = setTimeout(() => setShowEvolutionBanner(false), 4000);
       prevStageRef.current = evolutionStage;
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+      };
     }
     prevStageRef.current = evolutionStage;
   }, [evolutionStage]);

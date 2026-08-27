@@ -196,12 +196,20 @@ function TraceInspector({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setDetail(null);
-    setLoading(true);
-    fetchTraceDetail(traceId).then((d) => {
-      setDetail(d);
-      setLoading(false);
-    });
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setDetail(null);
+      setLoading(true);
+      fetchTraceDetail(traceId).then((d) => {
+        if (cancelled) return;
+        setDetail(d);
+        setLoading(false);
+      });
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [traceId]);
 
   if (loading) {
@@ -360,9 +368,14 @@ function LiveAgentsPanel({ refreshTick }: { refreshTick: number }) {
   }, []);
 
   useEffect(() => {
-    load();
+    const initial = setTimeout(() => {
+      void load();
+    }, 0);
     const t = setInterval(load, 3000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(t);
+    };
   }, [load, refreshTick]);
 
   const sessions = data?.sessions ?? [];
@@ -417,7 +430,10 @@ function TracesPanel({ refreshTick }: { refreshTick: number }) {
   }, []);
 
   useEffect(() => {
-    load();
+    const initial = setTimeout(() => {
+      void load();
+    }, 0);
+    return () => clearTimeout(initial);
   }, [load, refreshTick]);
 
   const filtered = useMemo(() => {

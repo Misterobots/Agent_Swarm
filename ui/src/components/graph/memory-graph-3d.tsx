@@ -81,7 +81,7 @@ export function MemoryGraph3D({
   // Fetch + normalize graph data.
   useEffect(() => {
     let cancelled = false;
-    setStatus("loading");
+    const initialTimer = setTimeout(() => setStatus("loading"), 0);
     const params = new URLSearchParams({ mode: "auto", format: "json" });
     if (ownerId) params.set("owner_id", ownerId);
 
@@ -127,6 +127,7 @@ export function MemoryGraph3D({
 
     return () => {
       cancelled = true;
+      clearTimeout(initialTimer);
     };
   }, [ownerId, reloadKey, onLoaded]);
 

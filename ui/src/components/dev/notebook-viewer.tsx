@@ -267,7 +267,13 @@ export function NotebookViewer({ path, onClose }: Props) {
   // Load
   useEffect(() => {
     const bridge = desktop();
-    if (!bridge) { setError("Notebook editing requires the Memex Desktop app."); return; }
+    if (!bridge) {
+      const timer = setTimeout(
+        () => setError("Notebook editing requires the Memex Desktop app."),
+        0,
+      );
+      return () => clearTimeout(timer);
+    }
     bridge.fs.readFile(path)
       .then((text) => {
         const parsed = parseNotebook(text);
