@@ -199,6 +199,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Dev checkpoint store init failed (non-fatal): {e}")
 
+        # Durable tool-approval audit trail (request/decide history). Audit-only:
+        # the live approve/deny handshake still runs on the in-memory + JSON
+        # auto-approve store above; this just records what happened.
+        try:
+            from dev_harness import approval_service as _approval_service
+            _approval_service.init_table()
+        except Exception as e:
+            logger.warning(f"Approval audit store init failed (non-fatal): {e}")
+
         # 7d. Initialize Dev Projects Store
         try:
             from dev_projects import store as _dev_projects_store
@@ -693,11 +702,64 @@ def _request_is_admin(request: Request) -> bool:
     """Only an Authentik group assertion grants model-administration access."""
     return any("admin" in group.lower() for group in _authentik_groups(request))
 
+def _permission_owner(request: Request) -> str:
+    return (request.headers.get("X-authentik-username", "").strip()
+            or request.headers.get("X-authentik-uid", "").strip() or "anonymous")
+
+
+def _require_admin(request: Request) -> None:
+    if not _request_is_admin(request):
+        raise HTTPException(status_code=403, detail="Administrator access is required.")
+
+
+def _enforce_chat_features(request: ChatRequest, http_request: Request) -> None:
+    from user_permissions import user_permissions
+    required = {"chat"}
+    if request.dev_mode: required.add("code")
+    if request.research_mode or request.skill == "research": required.add("research")
+    if request.grounding_web: required.update(("research", "grounding_web"))
+    if request.grounding_docs: required.update(("research", "grounding_docs"))
+    if request.grounding_file or request.attachments: required.add("grounding_files")
+    if request.memory_enabled: required.add("memory")
+    if request.design_mode or request.workshop_mode: required.add("design")
+    denied = sorted(key for key in required if not user_permissions.feature_allowed(_permission_owner(http_request), key))
+    if denied:
+        raise HTTPException(status_code=403, detail=f"Feature access denied: {', '.join(denied)}")
+
+
+_FEATURE_ROUTE_PREFIXES = (
+    ("/api/v1/dev/", "code"),
+    ("/v1/dev/", "code"),
+    ("/api/v1/trigger/", "routines"),
+    ("/v1/goals", "routines"),
+    ("/v1/memory/", "memory"),
+    ("/v1/art/", "art"),
+    ("/api/v1/media/", "art"),
+)
+
+
+@app.middleware("http")
+async def enforce_feature_route_permissions(request: Request, call_next):
+    """Prevent direct API calls from bypassing the desktop feature controls."""
+    if request.method != "OPTIONS":
+        from user_permissions import user_permissions
+        for prefix, feature in _FEATURE_ROUTE_PREFIXES:
+            if request.url.path.startswith(prefix):
+                if not user_permissions.feature_allowed(_permission_owner(request), feature):
+                    from fastapi.responses import JSONResponse
+                    return JSONResponse(status_code=403, content={"detail": f"Feature access denied: {feature}"})
+                break
+    return await call_next(request)
+
 
 def _apply_model_policy(request: ChatRequest, http_request: Request) -> None:
     """Resolve aliases and reject internal, unknown, or unavailable model IDs."""
     requested = (request.model or "").strip()
+    from user_permissions import user_permissions
+    owner = _permission_owner(http_request)
     if requested in _DEFAULT_MODEL_ALIASES:
+        if not (user_permissions.model_allowed(owner, requested or "default") or user_permissions.model_allowed(owner, _DEFAULT_CHAT_MODEL)):
+            raise HTTPException(status_code=403, detail="The default model is not available to this user.")
         request.model = _DEFAULT_CHAT_MODEL
         return
 
@@ -710,7 +772,61 @@ def _apply_model_policy(request: ChatRequest, http_request: Request) -> None:
             status_code=503,
             detail=f"{requested} is not available on this runtime.",
         )
+    if not user_permissions.model_allowed(owner, requested):
+        raise HTTPException(status_code=403, detail="This model is not available to this user.")
     request.model = requested
+
+
+class UserPermissionUpdate(BaseModel):
+    allowed_models: Optional[List[str]] = None
+    features: dict[str, bool] = Field(default_factory=dict)
+
+
+@app.get("/api/v1/permissions")
+async def get_my_permissions(request: Request):
+    from user_permissions import FEATURES, user_permissions
+    policy = user_permissions.get(_permission_owner(request)); policy["feature_labels"] = FEATURES; policy["is_admin"] = _request_is_admin(request)
+    return policy
+
+
+@app.get("/api/v1/admin/user-permissions")
+async def list_user_permissions(request: Request):
+    _require_admin(request)
+    from user_permissions import FEATURES, user_permissions
+    return {"users": user_permissions.list(), "feature_labels": FEATURES}
+
+
+@app.get("/api/v1/admin/user-permissions/{owner_id}")
+async def get_user_permissions(owner_id: str, request: Request):
+    _require_admin(request)
+    from user_permissions import FEATURES, user_permissions
+    policy = user_permissions.get(owner_id); policy["feature_labels"] = FEATURES
+    return policy
+
+
+@app.put("/api/v1/admin/user-permissions/{owner_id}")
+async def update_user_permissions(owner_id: str, body: UserPermissionUpdate, request: Request):
+    _require_admin(request)
+    from user_permissions import user_permissions
+    try: return user_permissions.set(owner_id, body.allowed_models, body.features)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/v1/admin/user-permissions/{owner_id}")
+async def reset_user_permissions(owner_id: str, request: Request):
+    _require_admin(request)
+    from user_permissions import user_permissions
+    return {"ok": True, "removed": user_permissions.delete(owner_id)}
+
+
+@app.get("/api/v1/admin/permission-catalog")
+async def permission_catalog(request: Request):
+    _require_admin(request)
+    from model_registry import get_user_selectable_models
+    from user_permissions import FEATURES
+    models = [{"id": "Home-AI-Swarm", "label": "Memex default", "available": True}]
+    models.extend({"id": s.name, "label": s.name, "description": s.description, "available": s.available} for s in get_user_selectable_models())
+    return {"models": models, "features": FEATURES}
 
 
 # ---------------------------------------------------------------------------
@@ -939,6 +1055,15 @@ async def approve_tool_call(call_id: str, http_request: Request):
     event = _approval_events.pop(call_id, None)
     if event:
         event.set()
+    try:
+        from dev_harness import approval_service
+        approval_service.decide(
+            call_id=call_id, owner_id=uid, approved=True, decided_by=uid,
+            scope=auto_scope if auto_scope != "none" else "once",
+            is_admin=_request_is_admin(http_request),
+        )
+    except Exception as e:
+        logger.warning(f"[dev_approve] approval audit decide failed (non-fatal): {e}")
     logger.info(f"[dev_approve] call_id={call_id} uid={uid} auto={auto_scope} approved")
     return {"ok": True}
 
@@ -959,6 +1084,14 @@ async def deny_tool_call(call_id: str, http_request: Request):
     event = _approval_events.pop(call_id, None)
     if event:
         event.set()
+    try:
+        from dev_harness import approval_service
+        approval_service.decide(
+            call_id=call_id, owner_id=uid, approved=False, decided_by=uid,
+            scope="once", is_admin=_request_is_admin(http_request),
+        )
+    except Exception as e:
+        logger.warning(f"[dev_approve] approval audit decide failed (non-fatal): {e}")
     logger.info(f"[dev_approve] call_id={call_id} uid={uid} denied")
     return {"ok": True}
 
@@ -1327,6 +1460,15 @@ async def list_models(request: Request):
             except Exception as e:
                 logger.warning(f"list_models: provider_keys error: {e}", exc_info=True)
 
+        from user_permissions import user_permissions
+        policy = user_permissions.get(_permission_owner(request))
+        allowed = policy["allowed_models"]
+        if allowed is not None:
+            allowed_set = set(allowed)
+            base_models = [model for model in base_models if (
+                model["id"] in allowed_set
+                or (model["id"] == "Home-AI-Swarm" and _DEFAULT_CHAT_MODEL in allowed_set)
+            )]
         return {"object": "list", "data": base_models}
     except Exception as e:
         logger.error(f"Error in list_models: {e}", exc_info=True)
@@ -1799,7 +1941,17 @@ async def _dev_harness_stream(
                 return False
             return not _is_auto_approved(uid, tool_name, request.workspace_key)
 
-        async def wait(self, call_id: str) -> str:
+        async def wait(self, call_id: str, tool_name: str = "", arguments: dict | None = None) -> str:
+            from dev_harness import approval_service
+            try:
+                approval_service.request(
+                    owner_id=uid, session_id=checkpoint_session_id, task_id=None,
+                    call_id=call_id, tool_name=tool_name, arguments=arguments,
+                    permission_mode=perm_mode, expires_at=int(time.time()) + 120,
+                )
+            except Exception as e:
+                logger.warning(f"[dev_harness] approval audit request failed (non-fatal): {e}")
+
             event = _asyncio.Event()
             _approval_events[call_id] = event
             _approval_owners[call_id] = uid
@@ -1807,6 +1959,13 @@ async def _dev_harness_stream(
                 await _asyncio.wait_for(event.wait(), timeout=120.0)
             except _asyncio.TimeoutError:
                 _approval_decisions.pop(call_id, None)
+                try:
+                    approval_service.decide(
+                        call_id=call_id, owner_id=uid, approved=False,
+                        decided_by="system:timeout", scope="once", is_admin=bypass_allowed,
+                    )
+                except Exception as e:
+                    logger.warning(f"[dev_harness] approval audit timeout-decide failed (non-fatal): {e}")
                 return "timeout"
             finally:
                 # The endpoint removes these on a decision; the finally block
@@ -2024,6 +2183,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     import json
     import asyncio
 
+    _enforce_chat_features(request, http_request)
     _apply_model_policy(request, http_request)
 
     # --- Dev workspace agentic harness (handles dev_mode for ANY model) ---

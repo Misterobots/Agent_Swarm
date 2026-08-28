@@ -46,8 +46,8 @@ class FakeConnection:
         pass
 
 
-def test_get_request_is_owner_scoped(monkeypatch):
-    connection = FakeConnection({"call_id": "c1", "owner_id": "alice"})
+def test_get_is_owner_scoped(monkeypatch):
+    connection = FakeConnection({"call_id": "c1", "owner_id": "alice", "decision": "pending", "expires_at": 2**31})
 
     @contextmanager
     def fake_db():
@@ -55,14 +55,9 @@ def test_get_request_is_owner_scoped(monkeypatch):
 
     monkeypatch.setattr(approvals, "_db", fake_db)
 
-    assert approvals.get_request("alice", "c1")["owner_id"] == "alice"
-    assert "owner_id=%s" in connection.cursor_obj.query
-    assert connection.cursor_obj.params == ("alice", "c1")
-
-
-def test_get_request_rejects_missing_identity():
-    assert approvals.get_request("", "c1") is None
-    assert approvals.get_request("alice", "") is None
+    assert approvals.get("c1", "alice")["owner_id"] == "alice"
+    assert "call_id=%s AND owner_id=%s" in connection.cursor_obj.query
+    assert connection.cursor_obj.params == ("c1", "alice")
 
 
 def test_arguments_hash_is_deterministic_and_does_not_return_raw_arguments():
