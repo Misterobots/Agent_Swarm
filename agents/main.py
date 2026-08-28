@@ -199,6 +199,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Dev checkpoint store init failed (non-fatal): {e}")
 
+        # Durable tool-approval audit trail (request/decide history). Audit-only:
+        # the live approve/deny handshake still runs on the in-memory + JSON
+        # auto-approve store above; this just records what happened.
+        try:
+            from dev_harness import approval_service as _approval_service
+            _approval_service.init_table()
+        except Exception as e:
+            logger.warning(f"Approval audit store init failed (non-fatal): {e}")
+
         # 7d. Initialize Dev Projects Store
         try:
             from dev_projects import store as _dev_projects_store
@@ -1046,6 +1055,15 @@ async def approve_tool_call(call_id: str, http_request: Request):
     event = _approval_events.pop(call_id, None)
     if event:
         event.set()
+    try:
+        from dev_harness import approval_service
+        approval_service.decide(
+            call_id=call_id, owner_id=uid, approved=True, decided_by=uid,
+            scope=auto_scope if auto_scope != "none" else "once",
+            is_admin=_request_is_admin(http_request),
+        )
+    except Exception as e:
+        logger.warning(f"[dev_approve] approval audit decide failed (non-fatal): {e}")
     logger.info(f"[dev_approve] call_id={call_id} uid={uid} auto={auto_scope} approved")
     return {"ok": True}
 
@@ -1066,6 +1084,14 @@ async def deny_tool_call(call_id: str, http_request: Request):
     event = _approval_events.pop(call_id, None)
     if event:
         event.set()
+    try:
+        from dev_harness import approval_service
+        approval_service.decide(
+            call_id=call_id, owner_id=uid, approved=False, decided_by=uid,
+            scope="once", is_admin=_request_is_admin(http_request),
+        )
+    except Exception as e:
+        logger.warning(f"[dev_approve] approval audit decide failed (non-fatal): {e}")
     logger.info(f"[dev_approve] call_id={call_id} uid={uid} denied")
     return {"ok": True}
 
@@ -1915,7 +1941,17 @@ async def _dev_harness_stream(
                 return False
             return not _is_auto_approved(uid, tool_name, request.workspace_key)
 
-        async def wait(self, call_id: str) -> str:
+        async def wait(self, call_id: str, tool_name: str = "", arguments: dict | None = None) -> str:
+            from dev_harness import approval_service
+            try:
+                approval_service.request(
+                    owner_id=uid, session_id=checkpoint_session_id, task_id=None,
+                    call_id=call_id, tool_name=tool_name, arguments=arguments,
+                    permission_mode=perm_mode, expires_at=int(time.time()) + 120,
+                )
+            except Exception as e:
+                logger.warning(f"[dev_harness] approval audit request failed (non-fatal): {e}")
+
             event = _asyncio.Event()
             _approval_events[call_id] = event
             _approval_owners[call_id] = uid
@@ -1923,6 +1959,13 @@ async def _dev_harness_stream(
                 await _asyncio.wait_for(event.wait(), timeout=120.0)
             except _asyncio.TimeoutError:
                 _approval_decisions.pop(call_id, None)
+                try:
+                    approval_service.decide(
+                        call_id=call_id, owner_id=uid, approved=False,
+                        decided_by="system:timeout", scope="once", is_admin=bypass_allowed,
+                    )
+                except Exception as e:
+                    logger.warning(f"[dev_harness] approval audit timeout-decide failed (non-fatal): {e}")
                 return "timeout"
             finally:
                 # The endpoint removes these on a decision; the finally block

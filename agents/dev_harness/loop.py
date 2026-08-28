@@ -188,7 +188,7 @@ class DevHarness:
                         tool_input=call.args,
                         tool_call_id=call.call_id,
                     )
-                    decision = await approval.wait(call.call_id)
+                    decision = await approval.wait(call.call_id, call.name, call.args)
                     if decision != "approved":
                         denied = (
                             f"Tool {call.name!r} approval timed out — skipped."

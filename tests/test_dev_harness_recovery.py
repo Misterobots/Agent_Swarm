@@ -30,7 +30,7 @@ class Approval:
     def needs(self, name):
         return name == "write_file"
 
-    async def wait(self, _call_id):
+    async def wait(self, _call_id, _tool_name="", _arguments=None):
         return "approved"
 
 
