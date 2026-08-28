@@ -888,7 +888,7 @@ services:
 
 networks:
   ai_lab_net:
-    driver: bridge
+    external: true
     name: ai_lab_net
   # saltbox intentionally not declared here — Memex containers are isolated on
   # ai_lab_net only. Traefik bridges both networks; it is the only entry point.

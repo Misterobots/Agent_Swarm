@@ -845,7 +845,7 @@ services:
 
 networks:
   ai_lab_net:
-    driver: bridge
+    external: true
     name: ai_lab_net
   saltbox:
     external: true

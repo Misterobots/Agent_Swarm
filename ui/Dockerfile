@@ -1,6 +1,8 @@
 FROM node:22.13-alpine AS base
 
-RUN corepack enable && corepack prepare pnpm@11.19.0 --activate
+RUN npm install --global --no-audit --no-fund corepack@0.31.0 \
+    && corepack enable \
+    && corepack prepare pnpm@11.19.0 --activate
 
 # --- Dependencies ---
 FROM base AS deps
