@@ -111,6 +111,28 @@ _WARM_PIN_PROTECTED = os.getenv("WARM_PIN_PROTECTED_MODELS", "false").lower() in
 # idle-unload (mirror of the ollama container's OLLAMA_KEEP_ALIVE).
 _UNPIN_KEEP_ALIVE = os.getenv("UNPIN_KEEP_ALIVE", "5m")
 
+_TURING_MODEL_MARKERS = (
+    "llama-guard",
+    "nomic-embed",
+    "llama3.2:3b",
+    "qwen3:8b",
+)
+
+
+def _model_can_run_on_turing(model_name: str) -> bool:
+    """Only explicitly approved small models may use Turing's 8 GB GPU."""
+    normalized = (model_name or "").lower()
+    return any(marker in normalized for marker in _TURING_MODEL_MARKERS)
+
+
+def _host_can_run_model(host: str, model_name: str) -> bool:
+    return host != SECONDARY_OLLAMA_HOST or _model_can_run_on_turing(model_name)
+
+
+def _compatible_hosts(hosts: list[str], model_name: str) -> list[str]:
+    return [host for host in hosts if _host_can_run_model(host, model_name)]
+
+
 def _get_preferred_host(model_name: str) -> str:
     """
     Static hardware-aware routing (no health checks).
@@ -135,9 +157,7 @@ def _get_preferred_host(model_name: str) -> str:
     # OLLAMA_HOST = local).  The routing below is consistent with BOTH:
     # - On Lovelace: SECONDARY_OLLAMA_HOST = Turing, these models are routed there ✓
     # - On Turing:   SECONDARY_OLLAMA_HOST = local ollama, these models are local ✓
-    turing_models = ["llama-guard", "nomic-embed", "llama3.2:3b", "qwen3:8b"]
-
-    if any(m in model_name for m in turing_models):
+    if _model_can_run_on_turing(model_name):
         return SECONDARY_OLLAMA_HOST  # Turing fast path: safety, embeds, nano/small
     # Everything larger (gemma4, qwen3-coder:30b, qwen3.6:27b, qwen3:14b, etc.)
     # → Lovelace (dual 5060 Ti, 32 GB VRAM)
@@ -169,7 +189,7 @@ def get_ollama_host(model_name: str) -> str:
 
     logger.warning(f"[GPU Queue] Preferred host {preferred} is DOWN for '{model_name}'.")
 
-    if monitor.is_healthy(fallback):
+    if _host_can_run_model(fallback, model_name) and monitor.is_healthy(fallback):
         logger.info(f"[GPU Queue] Falling back to {fallback} for '{model_name}'.")
         return fallback
 
@@ -187,7 +207,7 @@ def get_best_host_for_model(model_name: str) -> str:
     monitor = get_node_monitor()
 
     # Best case: model is already loaded in VRAM somewhere
-    loaded_hosts = monitor.get_hosts_with_model_loaded(model_name)
+    loaded_hosts = _compatible_hosts(monitor.get_hosts_with_model_loaded(model_name), model_name)
     if loaded_hosts:
         # Prefer the statically-preferred host if it has the model loaded
         preferred = _get_preferred_host(model_name)
@@ -199,7 +219,7 @@ def get_best_host_for_model(model_name: str) -> str:
         return host
 
     # Next: model is available on disk on a healthy host
-    available_hosts = monitor.get_hosts_with_model(model_name)
+    available_hosts = _compatible_hosts(monitor.get_hosts_with_model(model_name), model_name)
     if available_hosts:
         preferred = _get_preferred_host(model_name)
         if preferred in available_hosts:
@@ -254,7 +274,7 @@ def get_swarm_worker_host(model_name: str) -> str:
         # swarm workers degrade gracefully instead of routing to a dead host.
         # e.g. Turing (SECONDARY) offline → fall back to Lovelace Ollama container.
         fallback_candidates = [h for h in [OLLAMA_HOST, SECONDARY_OLLAMA_HOST]
-                               if h and h not in candidates]
+                               if h and h not in candidates and _host_can_run_model(h, model_name)]
         try:
             monitor = get_node_monitor() if 'monitor' not in dir() else monitor
             healthy = [h for h in fallback_candidates if monitor.is_healthy(h)]
@@ -304,7 +324,7 @@ def select_available_model(preferred: str, fallbacks: list) -> tuple:
     # Pass 1: prefer anything already hot in VRAM (zero load cost)
     for model in chain:
         try:
-            loaded = monitor.get_hosts_with_model_loaded(model)
+            loaded = _compatible_hosts(monitor.get_hosts_with_model_loaded(model), model)
         except Exception:
             loaded = []
         if loaded:
@@ -315,7 +335,7 @@ def select_available_model(preferred: str, fallbacks: list) -> tuple:
 
     # Pass 2: preferred model on disk (accept cold start)
     try:
-        avail = monitor.get_hosts_with_model(preferred)
+        avail = _compatible_hosts(monitor.get_hosts_with_model(preferred), preferred)
     except Exception:
         avail = []
     if avail:
@@ -327,7 +347,7 @@ def select_available_model(preferred: str, fallbacks: list) -> tuple:
     # Pass 3: any fallback on disk
     for model in fallbacks:
         try:
-            avail = monitor.get_hosts_with_model(model)
+            avail = _compatible_hosts(monitor.get_hosts_with_model(model), model)
         except Exception:
             avail = []
         if avail:
