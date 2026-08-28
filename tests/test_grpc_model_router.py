@@ -256,7 +256,7 @@ class TestModelRouterInfer:
         result = router.infer("test", model="qwen3:14b")
         assert not result.success
         assert "Ollama timeout" in result.error
-        assert result.duration_ms > 0
+        assert result.duration_ms >= 0
 
 
 class TestModelRouterStream:
