@@ -35,32 +35,22 @@ the same reference check. Their canonical counterparts remain available.
 - `tests/test_router_phase2-Justin-PC.py`
 - `tests/test_routing_regression-Justin-PC.py`
 
-## Divergent variants requiring review
+## Retained deployment variant
 
-The remaining 10 files differ from their canonical counterparts. They must
-not be bulk-merged or deleted: several are historical repair scripts, while
-the Turing gateway compose file is an intentional deployment variant.
+The only retained `-Justin-PC` variant is the Turing gateway compose file. It
+is the intentional live deployment variant and must remain the source used by
+Turing until the deployment is migrated to a canonical compose file.
 
-- `agents/bmo_voice/bmo-Justin-PC.service`
-- `agents/church-Justin-PC.py`
-- `agents/grpc/generate-Justin-PC.sh`
-- `agents/kay_service-Justin-PC.py`
-- `agents/main-Justin-PC.py`
-- `control_plane/docker-compose-Justin-PC.yml`
-- `scripts/bmo_sandbox-Justin-PC.py`
-- `scripts/deploy_mission_control_home_assistant-Justin-PC.sh`
-- `services/home_assistant/addons/mission-control/run-Justin-PC.sh`
 - `turing_gateway/docker-compose-Justin-PC.yml`
 
 ## Worktree state
 
-Git currently registers eight worktrees. Seven are clean branch checkouts:
-`codex/android-pipeline`, `codex/backend-handoff-contract`,
-`codex/backend-handoff-current`, `codex/integration-backend-gateway`,
-`codex/runtime-backend-gateway-integration`, `codex/runtime-core-current`,
-and `codex/turing-gateway-envfix`. The `main` worktree is dirty with unrelated
-user changes and is preserved as-is.
+Git now registers two worktrees: the dirty primary `main` worktree, which is
+preserved as-is, and the active consolidated worktree. Historical branch refs
+remain available without checkout directories; they can be recreated with
+`git worktree add` if a specific branch is needed again.
 
-Eighteen obsolete suffixed files were deleted in the follow-up cleanup
-commits. No active runtime/deployment variant or worktree was deleted or
-merged.
+Twenty-seven obsolete suffixed files were deleted after tracked-reference and
+deployment checks. The live Turing deployment variant was retained. Eight
+redundant clean worktree directories were removed; their branch refs were
+retained.
