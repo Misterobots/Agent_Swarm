@@ -4,6 +4,7 @@ import threading
 import json
 import time
 import os
+import socket
 from typing import Callable, Dict, List
 from enum import Enum
 from logger_setup import setup_logger
@@ -13,6 +14,27 @@ from metrics import REDIS_CONNECTED
 REDIS_HOST = os.getenv("REDIS_HOST", "redis_queue")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD") or None
+REDIS_CONNECT_TIMEOUT = float(os.getenv("REDIS_CONNECT_TIMEOUT", "2.0"))
+REDIS_SOCKET_TIMEOUT = float(os.getenv("REDIS_SOCKET_TIMEOUT", "2.0"))
+
+
+def _resolves_within_timeout(host: str, timeout: float) -> bool:
+    """Bound DNS resolution so startup cannot hang on an unavailable Redis name."""
+    if not host:
+        return False
+    result = []
+
+    def resolve():
+        try:
+            socket.getaddrinfo(host, REDIS_PORT, type=socket.SOCK_STREAM)
+            result.append(True)
+        except OSError:
+            result.append(False)
+
+    worker = threading.Thread(target=resolve, name="redis-dns-preflight", daemon=True)
+    worker.start()
+    worker.join(max(0.1, timeout))
+    return bool(result and result[0])
 
 # --- SELF-HEALING: Mock Redis for Fallback ---
 class MockRedis:
@@ -124,7 +146,18 @@ class Dispatcher:
         
         if REDIS_LIB_AVAILABLE:
             try:
-                self.redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, db=0)
+                if not _resolves_within_timeout(REDIS_HOST, REDIS_CONNECT_TIMEOUT):
+                    raise TimeoutError(
+                        f"Redis hostname did not resolve within {REDIS_CONNECT_TIMEOUT:.1f}s"
+                    )
+                self.redis = redis.Redis(
+                    host=REDIS_HOST,
+                    port=REDIS_PORT,
+                    password=REDIS_PASSWORD,
+                    db=0,
+                    socket_connect_timeout=REDIS_CONNECT_TIMEOUT,
+                    socket_timeout=REDIS_SOCKET_TIMEOUT,
+                )
                 self.redis.ping()
                 logger.info(f"--- [Dispatcher] Connected to Redis at {REDIS_HOST}:{REDIS_PORT} ---")
                 self.redis_available = True
