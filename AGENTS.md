@@ -50,7 +50,7 @@ redis-turing      running
 authentik         running   (SSO)
 ```
 
-> ⚠️ Turing uses `docker-compose-Justin-PC.yml`, not the canonical `docker-compose.yml`. Both files are in `turing_gateway/` and must be kept in sync.
+> Turing's live Compose project is owned by `/home/misterobots/docker-compose.yml` and reads `/home/network.env`. The tracked deployment template is `turing_gateway/docker-compose.yml`; copy the validated template to the live root path when deploying. The retired `docker-compose-Justin-PC.yml` fork must not be used.
 
 **Traefik auth middleware:** `authentik@file` — requests to `memex.shivelymedia.com` go through Authentik SSO.
 
@@ -154,7 +154,6 @@ Agent_Swarm/
 │   └── docker-compose.yml     ← Lovelace containers (hive_ui, agent_runtime workers)
 └── turing_gateway/            ← Traefik + Cloudflare tunnel config (on Turing)
     ├── docker-compose.yml               ← canonical
-    ├── docker-compose-Justin-PC.yml     ← ACTUALLY DEPLOYED on Turing (see gotcha below)
     └── kiosk/                           ← Memex Brain rack-display kiosk (separate feature)
 ```
 
@@ -230,9 +229,9 @@ docker restart agent_runtime
 # UI changes (must rebuild), and ANY new Traefik labels (they live on the
 # memex-ui service block, so recreating it is also how Traefik picks up new
 # routers e.g. pairing-ws) — SSH to Turing first
-cd /home/misterobots/Agent_Swarm/turing_gateway
-docker compose -f docker-compose-Justin-PC.yml build memex-ui
-docker compose -f docker-compose-Justin-PC.yml up -d memex-ui
+cd /home/misterobots
+# From the clean /home/misterobots/Agent_Swarm-deploy checkout:
+/home/misterobots/Agent_Swarm-deploy/turing_gateway/deploy.sh
 ```
 Verifying a new Traefik router actually registered is hard from outside: Authentik's forward-auth middleware intercepts every path under `memex.shivelymedia.com` identically before any backend routing happens, so an unauthenticated `curl` to a new route and to a nonsense path both 302 to Authentik — that is NOT evidence the router works or doesn't. Confirm instead via (a) valid label YAML, (b) zero errors in `docker logs traefik` after the recreate, and (c) an authenticated end-to-end test through the browser.
 
@@ -296,7 +295,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:2375/containers/agent_runtime/logs?stdo
 - [ ] **Turing small-model warm latency is higher than expected** — `llama3.2:3b` measured ~10s warm-inference for a few tokens on the 3070Ti. GPU is confirmed engaged (100% VRAM via `/api/ps`), so this isn't a CPU fallback — likely a tuning/contention question, worth investigating before relying on the fast path for latency-sensitive calls.
 - [ ] **Pairing end-to-end test needs a human** — the WS routing fix and Traefik `pairing-ws` router were verified by config/log inspection only; Authentik's forward-auth intercepts every path identically, so it cannot be confirmed via unauthenticated curl. Needs two authenticated browser sessions (host + guest) to actually confirm the relay.
 - [ ] **"Agent View" live session registry** — an in-progress feature in `agents/coordination/session.py` (`_ACTIVE_SESSIONS` weakref registry) found uncommitted on the main checkout during a 2026-07-06 branch reconciliation. Preserved as-is (not reviewed, not finished) — pick up wherever it was left off.
-- [ ] **`-Justin-PC` fork file sprawl + worktree sprawl** — 29+ tracked `*-Justin-PC*` duplicate files (only `turing_gateway/docker-compose-Justin-PC.yml` is an intentional live variant) and 50+ `.Codex/worktrees/` directories accumulated. Flagged in the 2026-07-03 deep review as real maintainability debt; not yet triaged.
+- [ ] **`-Justin-PC` fork file sprawl + worktree sprawl** — the obsolete Turing compose fork was retired in 2026-08; other duplicate files and accumulated worktrees still need triage.
 - [ ] **Unverified from the 2026-07-03 review**: docs-site Traefik router may be missing `authentik@file` middleware (would serve internal docs unauthenticated); ntfy compose has a bcrypt-hash fallback default instead of required-var syntax. Neither independently re-verified since.
 - [ ] **Android build pipeline** — add a `./gradlew assembleRelease` step to the execution plane so Swarm-generated Kotlin projects can be compiled to an APK and sideloaded to a tablet without leaving Memex. Triggered by the Hitchhiker's Guide project.
 - [ ] **Dev workspace session continuity review** — spawned chip, awaiting approval

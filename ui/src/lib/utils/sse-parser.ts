@@ -87,7 +87,7 @@ function deltaToStreamEvent(
       tool_name: delta.tool_name,
       tool_call_id: delta.tool_call_id,
       tool_input: delta.tool_input,
-      tool_state: "queued",
+      tool_state: delta.tool_state || "queued",
     };
   }
   if (delta.type === "tool_progress") {
@@ -96,8 +96,8 @@ function deltaToStreamEvent(
       content: delta.content || `${delta.tool_name} in progress...`,
       tool_name: delta.tool_name,
       tool_call_id: delta.tool_call_id,
-      tool_state: "executing",
-      tool_progress: delta.tool_progress || 0,
+      tool_state: delta.tool_state || "executing",
+      tool_progress: delta.tool_progress ?? 0,
     };
   }
   if (delta.type === "tool_result") {
@@ -107,7 +107,7 @@ function deltaToStreamEvent(
       tool_name: delta.tool_name,
       tool_call_id: delta.tool_call_id,
       tool_output: delta.tool_output,
-      tool_state: "completed",
+      tool_state: delta.tool_state || "completed",
       artifacts: delta.artifacts as any,
     };
   }

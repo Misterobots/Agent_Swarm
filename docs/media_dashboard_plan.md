@@ -86,7 +86,7 @@ All monitoring containers run from **`/home/misterobots/docker-compose.yml`** (n
 | G3 | blackbox probes only 2 internal endpoints | **The stale-A-record / tunnel / Traefik outage class is not caught** |
 | G4 | `maintenance-router` receiver is dead | Alerts to that route silently fail; auto-repair path inert |
 | G5 | No dev-restart vs. crash distinction | Any restart would cry wolf (once G1 exists) |
-| G6 | Deploy hygiene: stack runs from an untracked `/home/misterobots/docker-compose.yml`; `created` containers aren't rescued by `restart:` | **Root cause of "we keep losing containers"** |
+| G6 | Deploy hygiene: the live stack runs from `/home/misterobots/docker-compose.yml`; keep it synchronized with tracked `turing_gateway/docker-compose.yml` and reconcile with full-project `up -d` | **Root cause of "we keep losing containers"** |
 
 ---
 
@@ -173,7 +173,7 @@ Net rule: *brief gap + returns healthy + exit 0* → info/silent (assume dev res
 Root-causes G2 + G6 and gets the existing investment working before adding anything.
 1. `docker start hollerith-turing` (Grafana). Confirm it comes up; check its provisioning (datasource → Prometheus `:9090` internal, dashboards from `turing_gateway/dashboards/`). Investigate *why* it was never started (compose subset? failed dependency?).
 2. Decide the fate of `open-webui-turing` (start or remove — don't leave zombies).
-3. **Reconcile the deploy source (G6):** the live stack runs from `/home/misterobots/docker-compose.yml`, which is *not* in the repo. Get it (and `/home/misterobots/config/*`) into version control, or document it as the source of truth, so config drift (repo `turing_gateway/config` vs. live `/home/misterobots/config`) stops. This is the actual fix for "we keep losing containers": a single tracked compose + `docker compose up -d` (full, not selective) so nothing is left in `created`.
+3. **Maintain the deploy source (G6):** the live project remains `/home/misterobots/docker-compose.yml`, mirrored by tracked `turing_gateway/docker-compose.yml`. Validate and copy the tracked template to the root path, then use full-project `docker compose up -d` so nothing is left in `created`. The live `/home/misterobots/config/*` versus tracked `turing_gateway/config/*` drift still needs the same treatment.
 4. Confirm the `dash.shivelymedia.com` 500 is benign or fix it.
 - **Acceptance:** Grafana reachable and showing the existing infra dashboard with live cAdvisor data; no containers stuck in `created`; deploy source tracked.
 
@@ -220,7 +220,7 @@ Fills G1/G3/G5 in the power tier so it's not just Kuma.
 
 - **Deploy hygiene is the actual root cause (G6).** Until the live compose is tracked and brought up as a full unit, containers will keep landing in `created`. Phase 0 addresses this; it's arguably higher-value than any dashboard.
 - **Socket-proxy is read-only + `EVENTS=0`.** MVP works within this (Kuma polls `CONTAINERS`). Real-time events or any auto-remediation needs a scoped config change — deliberately deferred.
-- **Config source-of-truth drift.** Deployed configs live in `/home/misterobots/config/`; the repo has a parallel copy in `turing_gateway/config/`. They can diverge (same class as the `-Justin-PC.yml` compose drift). Pick one as canonical in Phase 0.
+- **Config source-of-truth drift.** Deployed configs live in `/home/misterobots/config/`; the repo has a parallel copy in `turing_gateway/config/`. They can still diverge even though the obsolete `-Justin-PC.yml` compose fork has been retired. Pick one as canonical in Phase 0.
 - **Traefik router verification is hard behind Authentik** — every path 302s to Authentik identically, so an unauthenticated curl proves nothing. Verify new routers via valid label YAML + zero `docker logs traefik` errors + an authenticated browser test (per CLAUDE.md).
 - **Two Seerr-family containers** (`seerr` + `overseerr`) — confirm which is canonical so the monitor set isn't ambiguous.
 

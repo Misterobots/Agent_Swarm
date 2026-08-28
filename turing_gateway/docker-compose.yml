@@ -1,13 +1,12 @@
-﻿# Turing Gateway & Ops Hub Docker Compose
+# Turing Gateway & Ops Hub Docker Compose
 # Routing handled by Saltbox's Traefik (connected to ai_lab_net externally)
 # Hosts: Monitoring (prometheus, loki, hollerith/Grafana), ollama (Turing GPU)
 # Compute services (Ollama, ComfyUI, etc.) remain on the Lovelace Execution Node
 
+name: misterobots
+
 services:
-  # Docker Socket Proxy - exposes container metadata for cross-node health checks
-  # Access restricted to Lovelace (192.168.2.101) via iptables DOCKER-USER rules on the host.
-  # POST=1 enables container restart/exec for management; safe only because iptables limits
-  # who can reach port 2375 to trusted nodes. Windows management: use SSH tunnel.
+  # Docker Sidecar Probe - exposes read-only container metadata for central monitoring
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
     container_name: docker-socket-proxy-turing
@@ -33,6 +32,17 @@ services:
       - ai_lab_net
 
   # ═══════════════════════════════════════════════════════════════════════════════
+  # CLOUDFLARE TUNNEL (outbound — no port forwarding required)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}
+    networks:
+      - saltbox
+
   # WORKLOAD IDENTITY (SPIRE Agent)
   # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -41,12 +51,6 @@ services:
     container_name: spire-agent-turing
     hostname: spire-agent-turing
     restart: unless-stopped
-    # pid: host is required for the Docker WorkloadAttestor to resolve caller PIDs.
-    # When agent_runtime (a separate container) connects to the SPIRE socket, SO_PEERCRED
-    # returns the HOST-level PID of the calling process. Without host PID namespace access,
-    # the SPIRE agent container's /proc only sees its own PIDs and cannot look up
-    # /proc/<host_pid>/cgroup → "could not resolve caller information" error.
-    pid: host
     volumes:
       - ./config/spire:/etc/spire/agent
       - spire_agent_data:/run/spire/agent
@@ -77,12 +81,10 @@ services:
       - prometheus_data:/prometheus
     ports:
       - "9091:9090"
-    mem_limit: 2g
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=15d'   # 15 days is plenty for a home lab
-      - '--storage.tsdb.retention.size=3GB'   # Hard cap — evicts oldest blocks first
+      - '--storage.tsdb.retention.time=90d'  # Keep 3 months of metrics
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
@@ -101,35 +103,16 @@ services:
     hostname: alertmanager-turing
     restart: unless-stopped
     depends_on:
-      - maintenance-router    # webhook receiver must be reachable before alerts fire
+      maintenance-router:
+        condition: service_healthy
     volumes:
       - ./config/alertmanager:/etc/alertmanager
       - alertmanager_data:/alertmanager
     ports:
       - "9093:9093"
-    # Materialize $ALERT_SMTP_PASSWORD to /tmp/secrets/smtp_password (tmpfs)
-    # before alertmanager starts, so alertmanager.yml can use auth_password_file
-    # and the secret never appears on the filesystem outside the container.
-    # /tmp is used because the alertmanager image runs as `nobody` and cannot
-    # write to /run/secrets when mounted as tmpfs.
-    entrypoint: ["/bin/sh", "-c"]
     command:
-      - |
-        set -e
-        mkdir -p /tmp/secrets
-        if [ -z "$$ALERT_SMTP_PASSWORD" ] || [ "$$ALERT_SMTP_PASSWORD" = "CHANGE_ME_APP_PASSWORD" ]; then
-          echo "WARN: ALERT_SMTP_PASSWORD is not set; email alerts will fail to authenticate." >&2
-        fi
-        printf '%s' "$$ALERT_SMTP_PASSWORD" > /tmp/secrets/smtp_password
-        chmod 0400 /tmp/secrets/smtp_password
-        if [ -z "$$NTFY_ALERT_TOKEN" ]; then
-          echo "WARN: NTFY_ALERT_TOKEN is not set; ntfy webhook will return 403." >&2
-        fi
-        printf '%s' "$$NTFY_ALERT_TOKEN" > /tmp/secrets/ntfy_token
-        chmod 0400 /tmp/secrets/ntfy_token
-        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
-    tmpfs:
-      - /tmp/secrets:size=64k,mode=1777
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
     environment:
       - ALERT_SMTP_HOST=${ALERT_SMTP_HOST:-smtp.zoho.com}
       - ALERT_SMTP_PORT=${ALERT_SMTP_PORT:-587}
@@ -147,18 +130,10 @@ services:
       - "traefik.http.routers.alertmanager.entrypoints=web"
       - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
 
-  # ═══════════════════════════════════════════════════════════════════════════════
-  # MAINTENANCE ROUTER — Alertmanager → (auto_repair_daemon | Mission Control queue)
-  # ═══════════════════════════════════════════════════════════════════════════════
-  # Classifies incoming alerts using config/maintenance/manifest.yaml and
-  # dispatches to either Redis (agent path → auto_repair_daemon) or the
-  # Postgres-backed human queue surfaced in Mission Control.
-  # Audit log: maintenance_dispatch table on Hopper Postgres.
-  # ═══════════════════════════════════════════════════════════════════════════════
-
+  # Alert classification and governed recovery dispatch for the Memex stack.
   maintenance-router:
     build:
-      context: ../services/maintenance_router
+      context: /home/misterobots/Agent_Swarm/services/maintenance_router
       dockerfile: Dockerfile
     image: home-ai-lab/maintenance-router:latest
     container_name: maintenance-router
@@ -168,7 +143,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ../config/maintenance:/etc/maintenance:ro
+      - /home/misterobots/Agent_Swarm/config/maintenance:/etc/maintenance:ro
     environment:
       - MAINTENANCE_MANIFEST=/etc/maintenance/manifest.yaml
       - REDIS_HOST=redis-turing
@@ -189,12 +164,6 @@ services:
       start_period: 15s
     networks:
       - ai_lab_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.maintenance-router.rule=PathPrefix(`/maintenance`)"
-      - "traefik.http.routers.maintenance-router.entrypoints=web"
-      - "traefik.http.services.maintenance-router.loadbalancer.server.port=9095"
-
   blackbox-exporter:
     image: prom/blackbox-exporter:latest
     container_name: blackbox-exporter-turing
@@ -262,8 +231,8 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
-    # /dev/kmsg removed: Ubuntu 22.04+ AppArmor blocks it even when passed through;
-    # causes startup warning "operation not permitted" — OOM events disabled regardless
+    devices:
+      - /dev/kmsg
     networks:
       - ai_lab_net
     labels:
@@ -358,6 +327,7 @@ services:
     container_name: ollama-turing
     hostname: ollama-turing
     restart: always
+    runtime: nvidia
     depends_on:
       spire-agent:
         condition: service_started
@@ -371,7 +341,8 @@ services:
     environment:
       # RTX 3070 Ti settings (8GB VRAM) — safety + embeddings only
       - OLLAMA_HOST=0.0.0.0:11434
-      - OLLAMA_GPU_OVERHEAD=512MiB
+      - OLLAMA_GPU_OVERHEAD=536870912
+      - OLLAMA_LLM_LIBRARY=cuda_v12
       - OLLAMA_FLASH_ATTENTION=1
       - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_KEEP_ALIVE=-1            # Pin safety model permanently (fits in 8GB)
@@ -432,32 +403,23 @@ services:
   agent-runtime:
     image: home-ai-lab/agent-runtime:latest
     container_name: agent_runtime
-    hostname: execution-node
     restart: unless-stopped
     env_file:
       - ../network.env
     environment:
-      # OLLAMA_HOST = Lovelace (2× RTX 5060 Ti, 32 GB VRAM) — primary large-model host
-      # SECONDARY_OLLAMA_HOST = Turing local ollama (RTX 3070 Ti, 8 GB) — guard + embeddings only
-      - OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
-      - SECONDARY_OLLAMA_HOST=http://ollama:11434
-      - COMFYUI_HOST=http://${LOVELACE_IP:-192.168.2.101}:8188
+      # Primary: Lovelace (2x RTX 5060Ti, 32GB) — task models (qwen3:14b).
+      # Secondary: Turing (RTX 3070Ti, 8GB) — safety (llama-guard3:8b) + embeddings (nomic-embed-text).
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://${LOVELACE_IP:-192.168.2.101}:11434}
+      - SECONDARY_OLLAMA_HOST=${SECONDARY_OLLAMA_HOST:-http://192.168.2.103:11434}
       - PYTHONPATH=/app
       - MEMPALACE_API_URL=http://mempalace:8200
       - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
       - REDIS_PORT=6379
-      # GPU peer lock — Turing's own agent_runtime hosts /internal/gpu-lock/.
-      # localhost:8000 is correct (same container, single-node setup).  If a second
-      # agent_runtime is added on another host, point THAT host's GPU_LOCK_HOST at
-      # Turing's external port: http://${TURING_IP}:8008.  GPU_LOCK_SECRET via network.env.
       - GPU_LOCK_HOST=http://localhost:8000
-      # ── Model specialization (must match config.py defaults) ──────────────────
-      # All large models live on Lovelace; OLLAMA_HOST above routes them there.
-      # Turing local ollama only hosts llama-guard3:8b and nomic-embed-text.
       - PRIMARY_MODEL=${PRIMARY_MODEL:-qwen3.6:27b}
       - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
-      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-gemma4:31b}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3-coder:30b}
+      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-gemma4:31b}
       - CODER_MODEL=${CODER_MODEL:-qwen3-coder:30b}
       - DEVOPS_MODEL=${DEVOPS_MODEL:-qwen3-coder:30b}
       - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3.6:27b}
@@ -475,16 +437,45 @@ services:
       - GOOGLE_CSE_API_KEY=${GOOGLE_CSE_API_KEY:-}
       - GOOGLE_CSE_ID=${GOOGLE_CSE_ID:-}
       - 'VALID_API_KEYS={"sk-coder-identity":"memex_ui","sk-devops-identity":"devops_agent"}'
+      # Image generation backends live on Lovelace (GPU host); Turing's agent_runtime
+      # calls out via LAN. Without these, KLEIN_HOST defaults to docker DNS
+      # `klein_service:8189` (only resolvable on Lovelace) and COMFYUI_HOST to
+      # `host.docker.internal:8188` (Turing has no checkpoints), so image
+      # generation fails with "checkpoints: none".
+      - KLEIN_HOST=${KLEIN_HOST:-http://${LOVELACE_IP:-192.168.2.101}:8290}
+      - COMFYUI_HOST=${COMFYUI_HOST:-http://${LOVELACE_IP:-192.168.2.101}:8188}
+      # Graphify codebase knowledge graph — repo is mounted at /workspace, agents subdir has the graph
+      - GRAPHIFY_GRAPH_DIR=/workspace/agents/graphify-out
     extra_hosts:
       - "mempalace:${HOPPER_IP:-192.168.2.102}"
     volumes:
-      - ../agents:/app/agents
-      - ../:/workspace
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - spire_socket:/var/run/spire:ro  # SPIRE workload API socket (read-only consumer)
+      - /home/misterobots/Agent_Swarm/agents:/app/agents
+      - /home/misterobots/Agent_Swarm:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock  # rw required; docker SDK needs write access
+    group_add:
+      - "988"  # docker GID on Turing — lets non-root 'app' user connect to the socket
     command: ["uvicorn", "agents.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
     ports:
-      - "8008:8000"
+      - "127.0.0.1:8008:8000"
+    networks:
+      - ai_lab_net
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # DEV SANDBOX (coding environment for agent_runtime project workflows)
+  # agent_runtime reaches this via docker.from_env() + container.exec_run()
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  dev-sandbox:
+    build:
+      context: /home/misterobots/Agent_Swarm/execution_plane
+      dockerfile: Dockerfile.dev-sandbox
+    image: home-ai-lab/dev-sandbox:latest
+    container_name: dev_sandbox
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    volumes:
+      - /home/misterobots/Agent_Swarm:/workspace  # same workspace mount as agent_runtime
     networks:
       - ai_lab_net
 
@@ -532,7 +523,7 @@ services:
       # Internal LAN route (with Authentik auth)
       - "traefik.http.routers.memex-ui.rule=PathPrefix(`/memex`)"
       - "traefik.http.routers.memex-ui.entrypoints=web"
-      - "traefik.http.routers.memex-ui.middlewares=authentik@docker"
+      - "traefik.http.routers.memex-ui.middlewares=authentik@file"
       - "traefik.http.routers.memex-ui.service=memex-ui"
       - "traefik.http.services.memex-ui.loadbalancer.server.port=3000"
       # External HTTPS route: memex.shivelymedia.com (behind Authentik)
@@ -547,118 +538,55 @@ services:
       - "traefik.http.routers.memex-ext.service=memex-ext"
       - "traefik.http.routers.memex-ext.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@file"
       - "traefik.http.services.memex-ext.loadbalancer.server.port=3000"
-      # External HTTP route: CF tunnel delivers traffic on web entrypoint — inject X-Forwarded-Proto and authenticate
+      # External HTTP route: redirect + Authentik (Cloudflare forwards here on port 80)
       - "traefik.http.routers.memex-ext-http.rule=Host(`memex.shivelymedia.com`)"
       - "traefik.http.routers.memex-ext-http.entrypoints=web"
       - "traefik.http.routers.memex-ext-http.priority=20"
       - "traefik.http.routers.memex-ext-http.service=memex-ext-http"
-      - "traefik.http.routers.memex-ext-http.middlewares=globalHeaders@file,cf-https-proto@file,robotHeaders@file,authentik@file"
+      - "traefik.http.routers.memex-ext-http.middlewares=globalHeaders@file,robotHeaders@file,cf-https-proto@file,authentik@file"
       - "traefik.http.services.memex-ext-http.loadbalancer.server.port=3000"
-      # Static asset bypass — no auth for Next.js assets to prevent post-login redirect to /manifest.json
-      # Browser fetches these in the background; without bypass they hijack the Authentik redirect state
-      # HTTPS bypass (websecure): static assets served directly, no ForwardAuth
-      - "traefik.http.routers.memex-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
-      - "traefik.http.routers.memex-static.entrypoints=websecure"
-      - "traefik.http.routers.memex-static.priority=30"
-      - "traefik.http.routers.memex-static.tls=true"
-      - "traefik.http.routers.memex-static.service=memex-ext"
-      # HTTP bypass (web): same paths on port 80 — redirect to HTTPS only, no authentik
-      # Static HTTP bypass: inject X-Forwarded-Proto for CF tunnel, no auth gate
-      - "traefik.http.routers.memex-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
-      - "traefik.http.routers.memex-static-http.entrypoints=web"
-      - "traefik.http.routers.memex-static-http.priority=30"
-      - "traefik.http.routers.memex-static-http.middlewares=cf-https-proto@file"
-      - "traefik.http.routers.memex-static-http.service=memex-ext-http"
       # WebSocket terminal — bypasses Next.js, routes directly to execution-node backend
       # LAN: ws://[gateway]/ws/terminal  HTTPS: wss://memex.shivelymedia.com/ws/terminal
       - "traefik.http.routers.terminal-ws.rule=PathPrefix(`/ws/terminal`)"
       - "traefik.http.routers.terminal-ws.entrypoints=web"
       - "traefik.http.routers.terminal-ws.priority=30"
       - "traefik.http.routers.terminal-ws.service=terminal-ws"
-      - "traefik.http.routers.terminal-ws.middlewares=authentik@docker"
+      - "traefik.http.routers.terminal-ws.middlewares=authentik@file"
       - "traefik.http.services.terminal-ws.loadbalancer.server.url=http://agent_runtime:8000"
       - "traefik.http.routers.terminal-ws-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/ws/terminal`)"
       - "traefik.http.routers.terminal-ws-ext.entrypoints=websecure"
       - "traefik.http.routers.terminal-ws-ext.priority=30"
       - "traefik.http.routers.terminal-ws-ext.tls=true"
       - "traefik.http.routers.terminal-ws-ext.service=terminal-ws"
-      - "traefik.http.routers.terminal-ws-ext.middlewares=globalHeaders@file,authentik@docker"
+      - "traefik.http.routers.terminal-ws-ext.middlewares=globalHeaders@file,authentik@file"
       # WebSocket pairing relay — bypasses Next.js (its /api/backend proxy cannot
-      # upgrade WebSockets), routes directly to execution-node backend like
-      # terminal-ws above. REST create/join/leave still go via /api/backend.
+      # upgrade WebSockets), routes directly to agent_runtime. REST create/join/leave
+      # continues through the Next.js backend proxy.
       - "traefik.http.routers.pairing-ws.rule=PathPrefix(`/api/v1/pairing/ws`)"
       - "traefik.http.routers.pairing-ws.entrypoints=web"
       - "traefik.http.routers.pairing-ws.priority=30"
       - "traefik.http.routers.pairing-ws.service=pairing-ws"
-      - "traefik.http.routers.pairing-ws.middlewares=authentik@docker"
+      - "traefik.http.routers.pairing-ws.middlewares=authentik@file"
       - "traefik.http.routers.pairing-ws-ext.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/api/v1/pairing/ws`)"
       - "traefik.http.routers.pairing-ws-ext.entrypoints=websecure"
       - "traefik.http.routers.pairing-ws-ext.priority=30"
       - "traefik.http.routers.pairing-ws-ext.tls=true"
       - "traefik.http.routers.pairing-ws-ext.service=pairing-ws"
-      - "traefik.http.routers.pairing-ws-ext.middlewares=globalHeaders@file,authentik@docker"
+      - "traefik.http.routers.pairing-ws-ext.middlewares=globalHeaders@file,authentik@file"
       - "traefik.http.services.pairing-ws.loadbalancer.server.url=http://agent_runtime:8000"
+      # Static asset bypass — no Authentik for Next.js chunks (prevents OAuth redirect hijack)
+      - "traefik.http.routers.memex-static.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.memex-static.entrypoints=websecure"
+      - "traefik.http.routers.memex-static.priority=30"
+      - "traefik.http.routers.memex-static.tls=true"
+      - "traefik.http.routers.memex-static.service=memex-ext"
+      - "traefik.http.routers.memex-static-http.rule=Host(`memex.shivelymedia.com`) && (PathPrefix(`/_next/`) || PathPrefix(`/icons/`) || PathPrefix(`/.well-known/`) || Path(`/manifest.json`) || Path(`/apple-touch-icon.png`) || Path(`/favicon.ico`) || Path(`/robots.txt`) || Path(`/sitemap.xml`))"
+      - "traefik.http.routers.memex-static-http.entrypoints=web"
+      - "traefik.http.routers.memex-static-http.priority=30"
+      - "traefik.http.routers.memex-static-http.middlewares=cf-https-proto@file"
+      - "traefik.http.routers.memex-static-http.service=memex-ext-http"
 
-  # ═══════════════════════════════════════════════════════════════════════════════
-  # OPENCLAUDE gRPC INFERENCE GATEWAY (Phase 6)
-  # ═══════════════════════════════════════════════════════════════════════════════
 
-  openclaude-grpc:
-    build:
-      context: ..
-      dockerfile: agents/grpc/Dockerfile
-    image: home-ai-lab/openclaude-grpc:latest
-    pull_policy: build
-    container_name: openclaude_grpc
-    hostname: openclaude-grpc
-    restart: unless-stopped
-    env_file:
-      - ../network.env
-    environment:
-      - OLLAMA_HOST=http://${LOVELACE_IP:-192.168.2.101}:11434
-      - SECONDARY_OLLAMA_HOST=http://ollama:11434
-      - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3-coder:30b}
-      - COORDINATOR_MODEL=${COORDINATOR_MODEL:-gemma4:31b}
-      - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3.6:27b}
-      - GRPC_PORT=50051
-      - GRPC_MAX_WORKERS=4
-      - GRPC_AUTH_ENABLED=${GRPC_AUTH_ENABLED:-true}
-      - AUTHENTIK_URL=${AUTHENTIK_URL:-http://authentik:9000}
-    ports:
-      - "50051:50051"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-      - "${LOVELACE_HOST:-lovelace}:${LOVELACE_IP:-192.168.2.101}"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=3)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
-    networks:
-      - ai_lab_net
-    labels:
-      - "traefik.enable=true"
-      # gRPC uses HTTP/2, Traefik routes via h2c for internal LAN
-      - "traefik.http.routers.openclaude-grpc.rule=PathPrefix(`/grpc`)"
-      - "traefik.http.routers.openclaude-grpc.entrypoints=web"
-      - "traefik.http.routers.openclaude-grpc.service=openclaude-grpc"
-      - "traefik.http.services.openclaude-grpc.loadbalancer.server.port=50051"
-      - "traefik.http.services.openclaude-grpc.loadbalancer.server.scheme=h2c"
-      # External HTTPS route: grpc.shivelymedia.com (behind Authentik)
-      - "traefik.http.routers.openclaude-ext.rule=Host(`grpc.shivelymedia.com`)"
-      - "traefik.http.routers.openclaude-ext.entrypoints=websecure"
-      - "traefik.http.routers.openclaude-ext.tls=true"
-      - "traefik.http.routers.openclaude-ext.tls.certresolver=cfdns"
-      - "traefik.http.routers.openclaude-ext.tls.domains[0].main=shivelymedia.com"
-      - "traefik.http.routers.openclaude-ext.tls.domains[0].sans=*.shivelymedia.com"
-      - "traefik.http.routers.openclaude-ext.middlewares=globalHeaders@file,secureHeaders@file,authentik@docker"
-      - "traefik.http.routers.openclaude-ext.service=openclaude-ext"
-      - "traefik.http.services.openclaude-ext.loadbalancer.server.port=50051"
-      - "traefik.http.services.openclaude-ext.loadbalancer.server.scheme=h2c"
-      - "spiffe.io/spiffe-id=spiffe://home-ai-lab/inference/openclaude-grpc"
-
-  # ═══════════════════════════════════════════════════════════════════════════════
   # IDENTITY — Authentik SSO is now managed by Saltbox (Phase 8B)
   # Container names: authentik, authentik-worker, authentik-postgres
   # Network: saltbox (Traefik bridges both saltbox and ai_lab_net)
@@ -688,10 +616,11 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.openhands.rule=PathPrefix(`/hands`)"
-      - "traefik.http.routers.openhands.entrypoints=web"
-      - "traefik.http.routers.openhands.middlewares=strip-hands,authentik@docker"
-      - "traefik.http.middlewares.strip-hands.stripprefix.prefixes=/hands"
+      # External: hands.shivelymedia.com (CF Tunnel → port 80, subdomain avoids base-path issues)
+      - "traefik.http.routers.hands-ext.rule=Host(`hands.shivelymedia.com`)"
+      - "traefik.http.routers.hands-ext.entrypoints=web"
+      - "traefik.http.routers.hands-ext.middlewares=globalHeaders@file,robotHeaders@file,cf-https-proto@file,authentik@file"
+      - "traefik.http.routers.hands-ext.service=openhands"
       - "traefik.http.services.openhands.loadbalancer.server.port=3000"
 
   # VS CODE SERVER (DevOps - Full Access, Protected by Authentik SSO)
@@ -718,10 +647,10 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ide-devops.rule=PathPrefix(`/devops`)"
+      # External: devops.shivelymedia.com (subdomain, no base-path stripping needed)
+      - "traefik.http.routers.ide-devops.rule=Host(`devops.shivelymedia.com`)"
       - "traefik.http.routers.ide-devops.entrypoints=web"
-      - "traefik.http.routers.ide-devops.middlewares=strip-devops,authentik@docker"
-      - "traefik.http.middlewares.strip-devops.stripprefix.prefixes=/devops"
+      - "traefik.http.routers.ide-devops.middlewares=globalHeaders@file,robotHeaders@file,cf-https-proto@file,authentik@file"
       - "traefik.http.services.ide-devops.loadbalancer.server.port=8443"
 
   # VS CODE SERVER (Coding - Restricted Sandbox, Protected by Authentik SSO)
@@ -748,52 +677,11 @@ services:
       - ai_lab_net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ide-coding.rule=PathPrefix(`/code`)"
+      # External: code.shivelymedia.com (subdomain, no base-path stripping needed)
+      - "traefik.http.routers.ide-coding.rule=Host(`code.shivelymedia.com`)"
       - "traefik.http.routers.ide-coding.entrypoints=web"
-      - "traefik.http.routers.ide-coding.middlewares=strip-code,authentik@docker"
-      - "traefik.http.middlewares.strip-code.stripprefix.prefixes=/code"
+      - "traefik.http.routers.ide-coding.middlewares=globalHeaders@file,robotHeaders@file,cf-https-proto@file,authentik@file"
       - "traefik.http.services.ide-coding.loadbalancer.server.port=8443"
-
-  # ═══════════════════════════════════════════════════════════════════════════════
-  # OPS PORTAL — Admin Dashboard (migrated from Lovelace, Phase 8)
-  # ═══════════════════════════════════════════════════════════════════════════════
-
-  ops-portal:
-    image: home-ai-lab/agent-runtime:latest
-    container_name: ops_portal
-    restart: unless-stopped
-    user: "0"
-    env_file:
-      - ../network.env
-    environment:
-      - AGNO_DB_URL=${AGNO_DB_URL}
-      - LANGFUSE_HOST=${LANGFUSE_HOST}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
-    volumes:
-      - ../agents:/app/agents
-      - ../docs:/app/docs
-      - ../:/workspace
-      - /var/run/docker.sock:/var/run/docker.sock
-    working_dir: /workspace
-    command: ["streamlit", "run", "agents/ops_dashboard.py", "--server.port=8502", "--server.address=0.0.0.0"]
-    ports:
-      - "8502:8502"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8502/_stcore/health', timeout=5)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 45s
-    networks:
-      - ai_lab_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.ops-portal.rule=PathPrefix(`/ops`)"
-      - "traefik.http.routers.ops-portal.entrypoints=web"
-      - "traefik.http.routers.ops-portal.middlewares=strip-ops,authentik@docker"
-      - "traefik.http.middlewares.strip-ops.stripprefix.prefixes=/ops"
-      - "traefik.http.services.ops-portal.loadbalancer.server.port=8502"
 
   ntfy:
     image: binwiederhier/ntfy:latest
@@ -809,8 +697,8 @@ services:
       - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
       - NTFY_AUTH_DEFAULT_ACCESS=deny-all
-      - NTFY_AUTH_USERS=${NTFY_ADMIN_USER:?set NTFY_ADMIN_USER}:${NTFY_ADMIN_PASSWORD_HASH:?set NTFY_ADMIN_PASSWORD_HASH (bcrypt) — see turing_gateway/.env}:admin
-      - NTFY_AUTH_TOKENS=${NTFY_ADMIN_USER}:${NTFY_ALERT_TOKEN:?set NTFY_ALERT_TOKEN — see turing_gateway/.env}:alertmanager
+      - NTFY_AUTH_USERS=${NTFY_ADMIN_USER:?set NTFY_ADMIN_USER}:${NTFY_ADMIN_PASSWORD_HASH:?set NTFY_ADMIN_PASSWORD_HASH (bcrypt) - see turing_gateway/.env}:admin
+      - NTFY_AUTH_TOKENS=${NTFY_ADMIN_USER}:${NTFY_ALERT_TOKEN:?set NTFY_ALERT_TOKEN - see turing_gateway/.env}:alertmanager
       - NTFY_BEHIND_PROXY=true
       - NTFY_ENABLE_LOGIN=true
       - NTFY_ENABLE_METRICS=true
@@ -842,13 +730,13 @@ services:
       - "traefik.http.routers.ntfy-http.rule=Host(`notify.shivelymedia.com`)"
       - "traefik.http.routers.ntfy-http.entrypoints=web"
       - "traefik.http.routers.ntfy-http.priority=20"
-      - "traefik.http.routers.ntfy-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file"
+      - "traefik.http.routers.ntfy-http.middlewares=globalHeaders@file,robotHeaders@file"
       - "traefik.http.routers.ntfy-http.service=ntfy"
 
   # ── Documentation Site ──────────────────────────────────────────
   docs-site:
     build:
-      context: ../docs-site
+      context: /home/misterobots/Agent_Swarm/docs-site
       dockerfile: Dockerfile
     container_name: docs-site
     hostname: docs-site
@@ -861,80 +749,72 @@ services:
       # LAN route
       - "traefik.http.routers.docs.rule=PathPrefix(`/docs-site`)"
       - "traefik.http.routers.docs.entrypoints=web"
-      - "traefik.http.routers.docs.middlewares=docs-strip"
+      - "traefik.http.routers.docs.middlewares=docs-strip,authentik@file"
       - "traefik.http.routers.docs.service=docs"
       - "traefik.http.services.docs.loadbalancer.server.port=80"
       - "traefik.http.middlewares.docs-strip.stripprefix.prefixes=/docs-site"
       # External HTTPS route (memex.shivelymedia.com/docs-site)
-      - "traefik.http.routers.docs-memex.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
-      - "traefik.http.routers.docs-memex.entrypoints=websecure"
-      - "traefik.http.routers.docs-memex.priority=30"
-      - "traefik.http.routers.docs-memex.tls=true"
-      - "traefik.http.routers.docs-memex.tls.certresolver=cfdns"
-      - "traefik.http.routers.docs-memex.tls.domains[0].main=shivelymedia.com"
-      - "traefik.http.routers.docs-memex.tls.domains[0].sans=*.shivelymedia.com"
-      - "traefik.http.routers.docs-memex.tls.options=securetls@file"
-      - "traefik.http.routers.docs-memex.middlewares=docs-strip,globalHeaders@file,secureHeaders@file,robotHeaders@file,authentik@file"
-      - "traefik.http.routers.docs-memex.service=docs"
-      # External HTTP route — the Cloudflare Tunnel terminates TLS at the edge and delivers plain
-      # HTTP to Traefik's `web` entrypoint, so external traffic never reaches the websecure router
-      # above. Without this, the host-less LAN `docs` router (PathPrefix only, no auth) is what
-      # actually serves memex.shivelymedia.com/docs-site over the tunnel. Mirrors memex-ext-http.
-      - "traefik.http.routers.docs-memex-http.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
-      - "traefik.http.routers.docs-memex-http.entrypoints=web"
-      - "traefik.http.routers.docs-memex-http.priority=30"
-      - "traefik.http.routers.docs-memex-http.middlewares=docs-strip,globalHeaders@file,robotHeaders@file,cf-https-proto@file,authentik@file"
-      - "traefik.http.routers.docs-memex-http.service=docs"
+      - "traefik.http.routers.docs-hive.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
+      - "traefik.http.routers.docs-hive.entrypoints=websecure"
+      - "traefik.http.routers.docs-hive.priority=30"
+      - "traefik.http.routers.docs-hive.tls=true"
+      - "traefik.http.routers.docs-hive.middlewares=docs-strip,authentik@file"
+      - "traefik.http.routers.docs-hive.service=docs"
+      # Cloudflare Tunnel terminates TLS and forwards to Traefik's web entrypoint.
+      - "traefik.http.routers.docs-hive-http.rule=Host(`memex.shivelymedia.com`) && PathPrefix(`/docs-site`)"
+      - "traefik.http.routers.docs-hive-http.entrypoints=web"
+      - "traefik.http.routers.docs-hive-http.priority=30"
+      - "traefik.http.routers.docs-hive-http.middlewares=docs-strip,globalHeaders@file,robotHeaders@file,cf-https-proto@file,authentik@file"
+      - "traefik.http.routers.docs-hive-http.service=docs"
+
+
+  aha-site:
+    image: nginx:alpine
+    container_name: aha-site
+    hostname: aha-site
+    restart: unless-stopped
+    volumes:
+      - /home/misterobots/sites/aha:/usr/share/nginx/html:ro
+    networks:
+      - saltbox
 
 networks:
   ai_lab_net:
-    driver: bridge
+    external: true
     name: ai_lab_net
-  # saltbox intentionally not declared here — Memex containers are isolated on
-  # ai_lab_net only. Traefik bridges both networks; it is the only entry point.
+  saltbox:
+    external: true
+    name: saltbox
 
 volumes:
   spire_agent_data:
-    external: true
-    name: turing_gateway_spire_agent_data
+    driver: local
   spire_socket:
-    external: true
-    name: turing_gateway_spire_socket
+    driver: local
   prometheus_data:
-    external: true
-    name: r730_gateway_prometheus_data
+    driver: local
   alertmanager_data:
-    external: true
-    name: r730_gateway_alertmanager_data
+    driver: local
   loki_data:
-    external: true
-    name: r730_gateway_loki_data
+    driver: local
   grafana_data:
-    external: true
-    name: r730_gateway_grafana_data
+    driver: local
   redis_data:
-    external: true
-    name: r730_gateway_redis_data
+    driver: local
   ntfy_data:
-    external: true
-    name: r730_gateway_ntfy_data
+    driver: local
   ollama_models:
-    external: true
-    name: r730_gateway_ollama_models
+    driver: local
   open-webui_data:
-    external: true
-    name: r730_gateway_open-webui_data
+    driver: local
   # Authentik volumes removed — now managed by Saltbox (Phase 8B)
   openhands_data:
-    external: true
-    name: r730_gateway_openhands_data
+    driver: local
   # Code Servers (migrated from Lovelace)
   vscode_config_devops:
-    external: true
-    name: r730_gateway_vscode_config_devops
+    driver: local
   vscode_config_coding:
-    external: true
-    name: r730_gateway_vscode_config_coding
+    driver: local
 
 
 

@@ -116,7 +116,7 @@ def handle_conversation(user_input: str, ctx: dict):
             "You are Hive Mind, a friendly AI assistant.\n\n"
             "YOUR CAPABILITIES:\n"
             "- Answer questions and explain concepts clearly\n"
-            "- Provide research and analysis\n"
+            "- Analyze information supplied in conversation or grounding context\n"
             "- Have natural conversations\n"
             "- Route complex tasks to specialized agents:\n"
             "  * CODE: Software engineering, debugging, scripts\n"
@@ -129,6 +129,7 @@ def handle_conversation(user_input: str, ctx: dict):
             "- Direct file system access (requires developer mode)\n"
             "- Execute terminal commands (requires developer mode)\n"
             "- Git operations (requires admin access)\n\n"
+            "EVIDENCE: Never imply browsing unless web grounding context is present. For current model catalogs, specifications, compatibility, or VRAM guidance, cite supplied URLs. Never invent model names or rationalize contradictions; when grounding is unavailable, disclose that and do not present unsupported claims as facts.\n\n"
             "Keep responses concise and friendly."
         )
         yield {"type": "log", "content": "[Conversationalist] Regular user mode - conversation only"}

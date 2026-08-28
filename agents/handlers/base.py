@@ -134,13 +134,22 @@ _WEB_GROUNDING_KEYWORDS = frozenset([
     "latest", "current", "today", "now", "news", "recent", "recently",
     "yesterday", "this week", "this month", "this year", "2024", "2025",
     "who won", "what is the price", "stock price", "weather", "trending",
-    "breaking", "just announced", "released", "update", "version",
+    "breaking", "just announced", "released", "update", "version", "2026",
 ])
+
+
+_VOLATILE_TECH_RE = re.compile(
+    r"\b(?:recommend(?:ation)?|best|newest|available|supported|compatible|catalog|model(?:s)?|variant(?:s)?|release(?:d)?|spec(?:ification)?s?|requirements?)\b[\s\S]{0,100}\b(?:qwen|llama|gemma|mistral|ollama|gpu|vram|cuda|hardware)\b|"
+    r"\b(?:qwen|llama|gemma|mistral|ollama|gpu|vram|cuda|hardware)\b[\s\S]{0,100}\b(?:recommend(?:ation)?|best|newest|available|supported|compatible|catalog|model(?:s)?|variant(?:s)?|release(?:d)?|spec(?:ification)?s?|requirements?)\b",
+    re.IGNORECASE,
+)
 
 
 def _needs_web_grounding(query: str) -> bool:
     q = query.lower()
-    return any(kw in q for kw in _WEB_GROUNDING_KEYWORDS)
+    return bool(_VOLATILE_TECH_RE.search(query)) or any(
+        re.search(rf"\b{re.escape(kw)}\b", q) for kw in _WEB_GROUNDING_KEYWORDS
+    )
 
 
 def _retrieve_doc_context(query: str, owner_id, limit: int = 5) -> list:

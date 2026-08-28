@@ -705,13 +705,16 @@ def chat_swarm(
 
         # Web grounding — each snippet is trust-scanned inside web_browser.web_search()
         # before it is returned, so no additional scan is needed here.
-        if grounding_web:
+        from handlers.base import _needs_web_grounding
+        _web_required = _needs_web_grounding(user_input)
+        if grounding_web or _web_required:
             try:
                 from grounding_permissions import grounding_permissions as _gp
-                from handlers.base import _needs_web_grounding
                 if _gp.is_permitted(owner_id or "", "web_grounding"):
-                    if _needs_web_grounding(user_input):
+                    if _web_required or grounding_web:
                         from tools.web_browser import web_search as _web_search
+                        _web_call_id = f"web-grounding-{turn_id}"
+                        yield {"type": "tool_start", "tool_name": "web_search", "tool_call_id": _web_call_id, "tool_state": "executing", "tool_input": {"query": user_input}, "content": "Searching current sources"}
                         yield {"type": "status", "content": "🌐 Web Grounding: Searching..."}
                         results = _web_search(user_input, num_results=5)
                         if results:
@@ -719,8 +722,11 @@ def chat_swarm(
                             history = list(history or []) + [{"role": "system", "content": f"[Web Grounding Context]\n{snippets}"}]
                             web_ctx = snippets
                             extracted_context = (extracted_context + f"\n\n[Web Grounding Results]\n{web_ctx}") if extracted_context else f"[Web Grounding Results]\n{web_ctx}"
+                            yield {"type": "tool_result", "tool_name": "web_search", "tool_call_id": _web_call_id, "tool_state": "completed", "tool_output": f"Found {len(results)} sources", "content": f"Web grounding found {len(results)} sources"}
                             yield _t(f"→ Web grounding: {len(results)} results injected")
                         else:
+                            extracted_context += "\n\n[Grounding unavailable] Live verification returned no sources. Do not state current model, specification, compatibility, or VRAM claims as facts."
+                            yield {"type": "tool_result", "tool_name": "web_search", "tool_call_id": _web_call_id, "tool_state": "error", "tool_output": "No sources returned", "content": "Web grounding returned no sources"}
                             yield _t("→ Web grounding: no results returned")
                     else:
                         yield _t("→ Web grounding: skipped (query does not need live data)")
@@ -1249,6 +1255,14 @@ def chat_swarm(
         # throw()" and surface a backend error in the chat UI.
         _handler_model = model if (model and ":" in model and model != "hive-fast") else None
 
+        # Rebuild after project/docs/file grounding appended system messages.
+        history_context = ""
+        if history:
+            history_context = "\n\n[Previous Conversation and Grounding Context]:\n"
+            for _msg in history:
+                _role = _msg.get("role", "user") if isinstance(_msg, dict) else getattr(_msg, "role", "user")
+                _content = _msg.get("content", "") if isinstance(_msg, dict) else getattr(_msg, "content", "")
+                history_context += f"- {_role.upper()}: {_content}\n"
         ctx = {
             "session_id": session_id,
             "owner_id": owner_id,

@@ -43,7 +43,8 @@ def handle_research(user_input: str, ctx: dict):
             "Your goal is to provide deep historical context, literary analysis, and general knowledge.\n"
             "You are the guardian of facts and culture. Focus on: History, Literature, Philosophy, Science, and Factual Explanations.\n"
             "If the user asks for code, decline and suggest they ask the Architect.\n"
-            "If the user asks for images, decline and suggest they ask the Art Director."
+            "If the user asks for images, decline and suggest they ask the Art Director.\n"
+            "Never claim browsing unless web grounding context is present. For current model catalogs, specifications, compatibility, or VRAM guidance, cite supplied URLs. Never invent model names; when grounding is unavailable, disclose that and do not present unsupported claims as facts."
         ),
         show_tool_calls=False,
     )
