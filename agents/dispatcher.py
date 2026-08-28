@@ -15,7 +15,9 @@ REDIS_HOST = os.getenv("REDIS_HOST", "redis_queue")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD") or None
 REDIS_CONNECT_TIMEOUT = float(os.getenv("REDIS_CONNECT_TIMEOUT", "2.0"))
-REDIS_SOCKET_TIMEOUT = float(os.getenv("REDIS_SOCKET_TIMEOUT", "2.0"))
+# Consumers use BLPOP(timeout=5); the socket read timeout must exceed that
+# interval or an idle queue produces noisy false-error tracebacks.
+REDIS_SOCKET_TIMEOUT = float(os.getenv("REDIS_SOCKET_TIMEOUT", "10.0"))
 
 
 def _resolves_within_timeout(host: str, timeout: float) -> bool:
