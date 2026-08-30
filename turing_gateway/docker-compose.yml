@@ -443,6 +443,9 @@ services:
       - SECONDARY_OLLAMA_HOST=http://ollama:11434
       - COMFYUI_HOST=http://${LOVELACE_IP:-192.168.2.101}:8188
       - PYTHONPATH=/app
+      # Enable the owner-authenticated New Task composer. Set the variable to
+      # false in network.env for an emergency rollback without editing compose.
+      - TASKS_DIRECT_CREATE_ENABLED=${TASKS_DIRECT_CREATE_ENABLED:-true}
       - MEMPALACE_API_URL=http://mempalace:8200
       - REDIS_HOST=${HOPPER_IP:-192.168.2.102}
       - REDIS_PORT=6379
@@ -888,7 +891,7 @@ services:
 
 networks:
   ai_lab_net:
-    driver: bridge
+    external: true
     name: ai_lab_net
   # saltbox intentionally not declared here — Memex containers are isolated on
   # ai_lab_net only. Traefik bridges both networks; it is the only entry point.
