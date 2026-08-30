@@ -74,6 +74,10 @@ class CoordinatorSession:
         # The SSE generator drains this between future-wait timeouts so chips
         # appear in the UI as files are written, not just at the end of a phase.
         self.file_change_queue: queue.Queue = queue.Queue()
+        # Cooperative cancellation requested by the owner-scoped task stop
+        # endpoint.  Workers observe this between model/tool calls; the
+        # orchestrator's finally block records the durable terminal state.
+        self.stop_event = threading.Event()
         # Accumulated file_change payloads ({op, path, size, diff?}) across all
         # phases — joined into the run's aggregate diff for the mobile task board.
         self.file_changes: list[dict] = []
@@ -90,6 +94,16 @@ class CoordinatorSession:
         pioneer = _pick_unique_pioneer(role, used_names)
         self.workers[worker_id] = WorkerInfo(worker_id, role, task, phase, pioneer=pioneer)
         return worker_id
+
+    def cancel(self) -> None:
+        """Request cooperative cancellation for this coordination session."""
+        self.stop_event.set()
+        for worker in list(self.workers.values()):
+            worker.cancel()
+
+    @property
+    def cancel_requested(self) -> bool:
+        return self.stop_event.is_set()
 
     def write_to_scratchpad(self, filename: str, content: str):
         safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in filename)
@@ -167,3 +181,15 @@ def snapshot_active_sessions() -> list[dict]:
 
     out.sort(key=lambda d: d["created_at"], reverse=True)
     return out
+
+
+def cancel_active_session(coordination_id: str) -> bool:
+    """Request cancellation for a live session, if it is still registered."""
+    try:
+        session = _ACTIVE_SESSIONS.get(coordination_id)
+        if session is None:
+            return False
+        session.cancel()
+        return True
+    except Exception:
+        return False

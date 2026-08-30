@@ -1522,6 +1522,15 @@ def coordinate_task(
         )
         yield {"type": "error", "content": f"Coordination failed: {e}"}
     finally:
+        if session.cancel_requested:
+            # The stop endpoint only requests cancellation; this finalizes the
+            # durable task after the current cooperative worker call unwinds.
+            swarm_run_store.finish_run(
+                session.coordination_id,
+                status="cancelled",
+                error="Stopped by owner request",
+                ended_at=int(time.time()),
+            )
         # Covers every exit from the try/except above — success, an early
         # `return` inside the try (e.g. a clarification card), or the
         # exception handler itself — so a container we created is always

@@ -91,6 +91,9 @@ def init_table() -> None:
                     "CREATE INDEX IF NOT EXISTS idx_swarm_runs_owner "
                     "ON swarm_runs (owner_id, started_at DESC)"
                 )
+                cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS prompt TEXT")
+                cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS stop_requested BOOLEAN NOT NULL DEFAULT FALSE")
+                cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS stop_reason TEXT")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS swarm_workers (
                         worker_id        TEXT PRIMARY KEY,
@@ -108,6 +111,27 @@ def init_table() -> None:
                 cur.execute(
                     "CREATE INDEX IF NOT EXISTS idx_swarm_workers_coord "
                     "ON swarm_workers (coordination_id)"
+                )
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS swarm_run_event_counters (
+                        coordination_id TEXT PRIMARY KEY,
+                        next_seq BIGINT NOT NULL DEFAULT 0
+                    )
+                """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS swarm_run_events (
+                        coordination_id TEXT NOT NULL,
+                        seq BIGINT NOT NULL,
+                        owner_id TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        created_at BIGINT NOT NULL,
+                        PRIMARY KEY (coordination_id, seq)
+                    )
+                """)
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_swarm_run_events_owner "
+                    "ON swarm_run_events (owner_id, coordination_id, seq)"
                 )
         logger.info("[SwarmRunStore] Tables swarm_runs + swarm_workers ready.")
     except Exception as e:
@@ -132,6 +156,7 @@ def create_run(coordination_id: str, session_id: str, owner_id: str,
         return
     try:
         now = _now()
+        inserted = False
         with _db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -145,6 +170,9 @@ def create_run(coordination_id: str, session_id: str, owner_id: str,
                     (coordination_id, session_id, owner_id,
                      (title or "")[:200], scope, status, int(started_at or now), now),
                 )
+                inserted = cur.rowcount > 0
+        if inserted:
+            record_event(coordination_id, "status", {"status": status}, owner_id=owner_id)
     except Exception as e:
         logger.warning(f"[SwarmRunStore] create_run failed (non-fatal): {e}")
 
@@ -162,8 +190,41 @@ def set_status(coordination_id: str, status: str) -> None:
                     "UPDATE swarm_runs SET status=%s, updated_at=%s WHERE coordination_id=%s",
                     (status, _now(), coordination_id),
                 )
+        record_event(coordination_id, "status", {"status": status})
     except Exception as e:
         logger.warning(f"[SwarmRunStore] set_status failed (non-fatal): {e}")
+
+
+def update_metadata(coordination_id: str, owner_id: str, *, title: str | None = None,
+                    scope: str | None = None, prompt: str | None = None) -> bool:
+    """Update mutable, owner-scoped task metadata without changing lifecycle state."""
+    if not coordination_id or not owner_id:
+        return False
+    fields = []
+    values = []
+    if title is not None:
+        fields.append("title=%s")
+        values.append(title[:200])
+    if scope is not None:
+        fields.append("scope=%s")
+        values.append(scope[:200] if scope else None)
+    if prompt is not None:
+        fields.append("prompt=%s")
+        values.append(prompt[:8000])
+    if not fields:
+        return False
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE swarm_runs SET " + ", ".join(fields) +
+                    ", updated_at=%s WHERE coordination_id=%s AND owner_id=%s",
+                    (*values, _now(), coordination_id, owner_id),
+                )
+                return cur.rowcount > 0
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] update_metadata failed (non-fatal): {e}")
+        return False
 
 
 def reconcile_stale_runs(error: str = "agent_runtime restarted mid-run") -> int:
@@ -201,6 +262,7 @@ def update_run_phase(coordination_id: str, phase: int, phase_name: str | None) -
                     "WHERE coordination_id=%s",
                     (int(phase or 0), phase_name, _now(), coordination_id),
                 )
+        record_event(coordination_id, "todo", {"phase": int(phase or 0), "phase_name": phase_name})
     except Exception as e:
         logger.warning(f"[SwarmRunStore] update_run_phase failed (non-fatal): {e}")
 
@@ -231,6 +293,9 @@ def upsert_worker(coordination_id: str, worker_id: str, role: str | None,
                      int(started_at) if started_at else None,
                      int(completed_at) if completed_at else None),
                 )
+        record_event(coordination_id, "agent_event", {
+            "worker_id": worker_id, "status": status, "role": role, "phase": phase,
+        })
     except Exception as e:
         logger.warning(f"[SwarmRunStore] upsert_worker failed (non-fatal): {e}")
 
@@ -258,6 +323,11 @@ def finish_run(coordination_id: str, status: str, workers_total: int = 0,
                      preview_url, (error[:2000] if error else None),
                      int(ended_at or now), now, coordination_id),
                 )
+        record_event(coordination_id, "done" if status == "completed" else "error" if status == "failed" else "status", {
+            "status": status,
+            "summary": summary[:8000] if summary else None,
+            "error": error[:2000] if error else None,
+        })
     except Exception as e:
         logger.warning(f"[SwarmRunStore] finish_run failed (non-fatal): {e}")
 
@@ -276,6 +346,7 @@ def set_diff(coordination_id: str, diff_text: str | None) -> None:
                     "UPDATE swarm_runs SET diff_text=%s, updated_at=%s WHERE coordination_id=%s",
                     (diff_text, _now(), coordination_id),
                 )
+        record_event(coordination_id, "file_change", {"has_diff": True, "truncated": truncated})
     except Exception as e:
         logger.warning(f"[SwarmRunStore] set_diff failed (non-fatal): {e}")
 
@@ -292,7 +363,10 @@ def set_approval(coordination_id: str, owner_id: str, approval_state: str) -> bo
                     "WHERE coordination_id=%s AND owner_id=%s",
                     (approval_state, _now(), coordination_id, owner_id),
                 )
-                return cur.rowcount > 0
+                changed = cur.rowcount > 0
+        if changed:
+            record_event(coordination_id, "approval", {"approval_state": approval_state}, owner_id=owner_id)
+        return changed
     except Exception as e:
         logger.warning(f"[SwarmRunStore] set_approval failed (non-fatal): {e}")
         return False
@@ -305,7 +379,7 @@ def set_approval(coordination_id: str, owner_id: str, approval_state: str) -> bo
 _RUN_LIST_COLS = (
     "coordination_id, session_id, title, status, phase, phase_name, "
     "workers_total, workers_completed, workers_failed, scope, approval_state, "
-    "preview_url, started_at, updated_at, ended_at, "
+    "preview_url, prompt, stop_requested, stop_reason, started_at, updated_at, ended_at, "
     "(diff_text IS NOT NULL) AS has_diff"
 )
 
@@ -386,4 +460,82 @@ def get_workers(coordination_id: str, owner_id: str) -> list[dict]:
                 return [dict(r) for r in cur.fetchall()]
     except Exception as e:
         logger.warning(f"[SwarmRunStore] get_workers failed: {e}")
+        return []
+
+
+def request_stop(coordination_id: str, owner_id: str, reason: str | None = None) -> dict | None:
+    """Durably request cooperative stop for an owner-scoped run."""
+    if not coordination_id or not owner_id:
+        return None
+    try:
+        with _db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT status FROM swarm_runs WHERE coordination_id=%s AND owner_id=%s FOR UPDATE",
+                    (coordination_id, owner_id),
+                )
+                row = cur.fetchone()
+                if not row or row["status"] in {"completed", "failed", "denied", "cancelled"}:
+                    return None
+                next_status = "cancelled" if row["status"] == "queued" else "stopping"
+                cur.execute(
+                    "UPDATE swarm_runs SET stop_requested=TRUE, stop_reason=%s, status=%s, updated_at=%s "
+                    "WHERE coordination_id=%s AND owner_id=%s",
+                    ((reason or "owner requested stop")[:500], next_status, _now(), coordination_id, owner_id),
+                )
+        record_event(coordination_id, "status", {"status": next_status, "stop_requested": True}, owner_id=owner_id)
+        return {"status": next_status, "stop_requested": True}
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] request_stop failed: {e}")
+        return None
+
+
+def record_event(coordination_id: str, event_type: str, payload: dict | None = None,
+                 owner_id: str | None = None) -> dict | None:
+    """Append a per-run, owner-scoped event with a monotonic sequence."""
+    if not coordination_id or not event_type:
+        return None
+    try:
+        import json
+        with _db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if owner_id is None:
+                    cur.execute("SELECT owner_id FROM swarm_runs WHERE coordination_id=%s", (coordination_id,))
+                    run = cur.fetchone()
+                    owner_id = run["owner_id"] if run else None
+                if not owner_id:
+                    return None
+                cur.execute(
+                    "INSERT INTO swarm_run_event_counters(coordination_id, next_seq) VALUES (%s, 1) "
+                    "ON CONFLICT (coordination_id) DO UPDATE SET next_seq="
+                    "swarm_run_event_counters.next_seq + 1 RETURNING next_seq",
+                    (coordination_id,),
+                )
+                seq = int(cur.fetchone()["next_seq"])
+                cur.execute(
+                    "INSERT INTO swarm_run_events(coordination_id, seq, owner_id, event_type, payload, created_at) "
+                    "VALUES (%s, %s, %s, %s, %s::jsonb, %s)",
+                    (coordination_id, seq, owner_id, event_type, json.dumps(payload or {}), _now()),
+                )
+                return {"type": event_type, "run_id": coordination_id, "seq": seq, "payload": payload or {}}
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] record_event failed (non-fatal): {e}")
+        return None
+
+
+def list_events(coordination_id: str, owner_id: str, after_seq: int = 0, limit: int = 100) -> list[dict]:
+    if not coordination_id or not owner_id:
+        return []
+    try:
+        with _db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT seq, event_type, payload, created_at FROM swarm_run_events "
+                    "WHERE coordination_id=%s AND owner_id=%s AND seq>%s ORDER BY seq ASC LIMIT %s",
+                    (coordination_id, owner_id, max(int(after_seq), 0), min(max(int(limit), 1), 500)),
+                )
+                return [{"type": r["event_type"], "run_id": coordination_id, "seq": int(r["seq"]),
+                         "payload": r["payload"], "created_at": r["created_at"]} for r in cur.fetchall()]
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] list_events failed: {e}")
         return []

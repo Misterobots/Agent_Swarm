@@ -985,6 +985,14 @@ class DevReplayRequest(BaseModel):
     confirm: bool = False
 
 
+class TaskMetadataPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = None
+    scope: str | None = None
+    branch: str | None = None
+    prompt: str | None = None
+
+
 _DEV_REPLAY_LOCKS: dict[str, threading.Lock] = {}
 _DEV_REPLAY_LOCKS_GUARD = threading.Lock()
 
@@ -1086,7 +1094,7 @@ async def replay_dev_checkpoint_tool(
     if call.get("call_id") != body.call_id:
         raise HTTPException(
             status_code=409,
-            detail="Replay must proceed in recorded tool-call order",
+            detail=f"Replay must proceed in recorded tool-call order; expected call_id={call.get('call_id')}",
         )
 
     tool_name = call.get("tool_name") or call.get("name")
@@ -2724,10 +2732,33 @@ class GroundingRequestModel(BaseModel):
     permission: str  # "web_grounding", "docs_grounding", or "file_grounding"
     reason: str = ""
 
+
+def _sync_approved_grounding_permissions() -> None:
+    """Materialize grants for both manual and automatically approved requests.
+
+    GovernanceManager auto-approves SAFE requests during submission, while the historical grant
+    hook lived only in the manual status-update endpoint.  Reconcile here so an approved request
+    can never leave the UI locked, including approvals created before this fix.
+    """
+    type_to_permission = {
+        "GROUNDING_WEB": "web_grounding",
+        "GROUNDING_DOCS": "docs_grounding",
+        "GROUNDING_FILE": "file_grounding",
+    }
+    try:
+        for item in governance_manager.get_all_requests():
+            req_type = item.type.value if hasattr(item.type, "value") else str(item.type)
+            permission = type_to_permission.get(req_type)
+            if permission and item.status == RequestStatus.APPROVED:
+                _grounding_perm_store.grant(item.user, permission)
+    except Exception as exc:  # pragma: no cover - permissions must not take down chat
+        logger.error("[Grounding] Failed to reconcile approved permissions: %s", exc)
+
 @app.get("/api/v1/grounding/status")
 async def grounding_status(http_request: Request):
     """Return the current grounding permissions for the authenticated user."""
     owner_id = _resolve_owner_id(None, http_request)
+    _sync_approved_grounding_permissions()
     _grounding_perm_store.reload()
     return _grounding_perm_store.get_status(owner_id)
 
@@ -2759,6 +2790,8 @@ async def request_grounding_permission(
     )
     try:
         item = governance_manager.submit_request(gov_type, description, owner_id)
+        if item.status == RequestStatus.APPROVED:
+            _sync_approved_grounding_permissions()
         return {"status": "submitted", "request_id": item.id, "permission": req.permission}
     except Exception as exc:
         logger.error("[Grounding] Failed to submit governance request: %s", exc)
@@ -3276,6 +3309,44 @@ async def get_task(coordination_id: str, request: Request):
     return {"run": run, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
 
 
+@app.patch("/v1/tasks/{coordination_id}")
+async def patch_task(coordination_id: str, body: TaskMetadataPatch, request: Request):
+    """Update owner-scoped mutable task metadata only."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    import swarm_run_repo_store
+
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if run.get("status") in {"completed", "failed", "denied", "cancelled"}:
+        raise HTTPException(status_code=409, detail="Task metadata is immutable after terminal completion")
+    if body.branch is not None:
+        if not body.branch or body.branch.startswith("-") or ".." in body.branch or "@{" in body.branch:
+            raise HTTPException(status_code=422, detail="Invalid branch name")
+        repo = swarm_run_repo_store.get(coordination_id)
+        if not repo:
+            raise HTTPException(status_code=409, detail="Task has no repository branch context")
+        if not swarm_run_repo_store.update_branch(coordination_id, body.branch):
+            raise HTTPException(status_code=409, detail="Task branch could not be updated")
+    if any(value is not None for value in (body.title, body.scope, body.prompt)):
+        if not swarm_run_store.update_metadata(
+            coordination_id, owner_id, title=body.title, scope=body.scope, prompt=body.prompt
+        ):
+            raise HTTPException(status_code=409, detail="Task metadata could not be updated")
+    updated = swarm_run_store.get_run(coordination_id, owner_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found")
+    repo = swarm_run_repo_store.get(coordination_id)
+    if repo:
+        updated["repo_url"] = repo["git_url"]
+        updated["branch"] = repo["branch"]
+        updated["dev_project_id"] = repo.get("dev_project_id")
+    return {"run": updated, "workers": swarm_run_store.get_workers(coordination_id, owner_id)}
+
+
 @app.get("/v1/tasks/{coordination_id}/diff")
 async def get_task_diff(coordination_id: str, request: Request):
     """Aggregated unified diff for a completed run, for mobile review."""
@@ -3297,6 +3368,50 @@ async def get_task_diff(coordination_id: str, request: Request):
         "diff_text": diff_text,
         "truncated": "[...diff truncated...]" in diff_text,
     }
+
+
+@app.post("/v1/tasks/{coordination_id}/stop")
+async def stop_task(coordination_id: str, request: Request):
+    """Request an owner-scoped, durable cooperative stop for a task."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    import coordination.session as session_registry
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    result = swarm_run_store.request_stop(coordination_id, owner_id, body.get("reason"))
+    if not result:
+        raise HTTPException(status_code=404, detail="Task not found or already terminal")
+
+    # Remove the in-process dispatch arguments for queued work.  The Redis
+    # queue entry may remain until popped; _advance_task_queue treats a
+    # missing dispatch entry as cancelled and never starts the task.
+    with _pending_task_dispatch_lock:
+        _PENDING_TASK_DISPATCH.pop(coordination_id, None)
+    active = session_registry.cancel_active_session(coordination_id)
+    if not active and result["status"] == "stopping":
+        swarm_run_store.finish_run(coordination_id, status="cancelled", error="Stopped before execution completed")
+        result["status"] = "cancelled"
+    return {"ok": True, "coordination_id": coordination_id, **result}
+
+
+@app.get("/v1/tasks/{coordination_id}/events")
+async def get_task_events(coordination_id: str, request: Request, after_seq: int = 0, limit: int = 100):
+    """Read the stable, owner-scoped event stream for a task."""
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    import swarm_run_store
+    if not swarm_run_store.get_run(coordination_id, owner_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    events = swarm_run_store.list_events(coordination_id, owner_id, after_seq=after_seq, limit=limit)
+    next_after_seq = events[-1]["seq"] if events else max(int(after_seq), 0)
+    return {"coordination_id": coordination_id, "events": events, "next_after_seq": next_after_seq}
 
 
 @app.post("/v1/tasks/{coordination_id}/approve")
