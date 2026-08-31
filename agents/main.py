@@ -3514,6 +3514,40 @@ def _advance_task_queue() -> None:
     _dispatch_task_now(next_id, kwargs)
 
 
+def _schedule_direct_task(*, prompt: str, owner_id: str, repo_context: dict | None,
+                          session_mode: str | None, ultraplan_mode: bool = False,
+                          research_mode: bool = False) -> str:
+    """Create and queue one owner-scoped direct task.
+
+    This is shared by the composer and retry endpoint so retries preserve the
+    same serialization and session-sandbox rules as first attempts.
+    """
+    import swarm_run_store
+    from coordination import task_queue as _task_queue
+
+    coordination_id = f"coord-{uuid.uuid4().hex[:8]}"
+    session_id = f"task-{uuid.uuid4().hex[:12]}"
+    dispatch_kwargs = dict(
+        user_input=prompt, session_id=session_id, owner_id=owner_id,
+        dev_mode=True, skip_project_gate=True, ultraplan_mode=ultraplan_mode,
+        research_mode=research_mode, repo_context=repo_context,
+        session_mode=session_mode, coordination_id=coordination_id,
+    )
+    needs_live_repo_lock = session_mode != "ephemeral"
+    status = "running" if not needs_live_repo_lock or _task_queue.try_acquire(coordination_id) else "queued"
+    swarm_run_store.create_run(
+        coordination_id, session_id, owner_id, title=prompt, scope=None,
+        started_at=int(time.time()), status=status, prompt=prompt,
+    )
+    if status == "running":
+        _dispatch_task_now(coordination_id, dispatch_kwargs)
+    else:
+        with _pending_task_dispatch_lock:
+            _PENDING_TASK_DISPATCH[coordination_id] = dispatch_kwargs
+        _task_queue.enqueue(coordination_id)
+    return coordination_id
+
+
 @app.post("/v1/tasks", status_code=202)
 async def create_task(body: CreateTaskRequest, request: Request):
     """Direct task creation for the "New Task" composer — bypasses chat entirely.
@@ -3566,51 +3600,65 @@ async def create_task(body: CreateTaskRequest, request: Request):
             repo_context = {"dev_project_id": project["id"], "local_path": project["path"]}
             session_mode = "local"
 
-    import swarm_run_store
-    from coordination import task_queue as _task_queue
-
-    coordination_id = f"coord-{uuid.uuid4().hex[:8]}"
-    session_id = f"task-{uuid.uuid4().hex[:12]}"
-
-    dispatch_kwargs = dict(
-        user_input=prompt,
-        session_id=session_id,
-        owner_id=owner_id,
-        dev_mode=True,
-        skip_project_gate=True,
-        ultraplan_mode=body.ultraplan_mode,
+    return {"coordination_id": _schedule_direct_task(
+        prompt=prompt, owner_id=owner_id, repo_context=repo_context,
+        session_mode=session_mode, ultraplan_mode=body.ultraplan_mode,
         research_mode=body.research_mode,
-        repo_context=repo_context,
-        session_mode=session_mode,
-        coordination_id=coordination_id,
-    )
+    )}
 
-    # The live_repo lock only protects the one shared-host-path resource:
-    # live_repo mode (multiple containers, same mount) and no-project-linked
-    # runs (fall back to the shared dev_sandbox). An "ephemeral" run has its
-    # own fully-isolated container — nothing to serialize, dispatch immediately.
-    _needs_live_repo_lock = session_mode != "ephemeral"
 
-    # Create the row synchronously (status set explicitly below) so GET
-    # /v1/tasks/{id} works the instant this call returns. coordinate_task()
-    # would also call create_run itself, but ON CONFLICT DO NOTHING makes
-    # that a safe no-op against the row we create here.
-    if not _needs_live_repo_lock or _task_queue.try_acquire(coordination_id):
-        swarm_run_store.create_run(
-            coordination_id, session_id, owner_id, title=prompt, scope=None,
-            started_at=int(time.time()), status="running",
-        )
-        _dispatch_task_now(coordination_id, dispatch_kwargs)
+@app.post("/v1/tasks/{coordination_id}/retry", status_code=202)
+async def retry_task(coordination_id: str, request: Request):
+    """Start a fresh owner-scoped attempt while preserving the original run.
+
+    Retry is intentionally terminal-run-only. It reconstructs the project
+    context from the durable local/repo mapping, rather than relying on the
+    in-process dispatch registry (which is lost on restart).
+    """
+    if not TASKS_DIRECT_CREATE_ENABLED:
+        raise HTTPException(status_code=404, detail="Direct task creation is not enabled")
+    owner_id = _resolve_owner_id(None, request)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Could not resolve an authenticated owner")
+    import swarm_run_store
+    import swarm_run_repo_store
+    import swarm_run_local_store
+    run = swarm_run_store.get_run(coordination_id, owner_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if run.get("status") not in {"completed", "failed", "cancelled"}:
+        raise HTTPException(status_code=409, detail="Only a terminal task can be retried")
+    prompt = (run.get("prompt") or run.get("title") or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=409, detail="Original task prompt is unavailable")
+
+    repo = swarm_run_repo_store.get(coordination_id)
+    local = swarm_run_local_store.get(coordination_id) if not repo else None
+    if repo:
+        repo_context = {
+            "dev_project_id": repo.get("dev_project_id"),
+            "git_url": repo.get("git_url"), "branch": repo.get("branch"),
+            "base_branch": repo.get("base_branch", "main"),
+        }
+        session_mode = "ephemeral"
+    elif local:
+        repo_context = {
+            "dev_project_id": local.get("dev_project_id"),
+            "local_path": local.get("source_path"),
+        }
+        session_mode = "local"
     else:
-        swarm_run_store.create_run(
-            coordination_id, session_id, owner_id, title=prompt, scope=None,
-            started_at=int(time.time()), status="queued",
-        )
-        with _pending_task_dispatch_lock:
-            _PENDING_TASK_DISPATCH[coordination_id] = dispatch_kwargs
-        _task_queue.enqueue(coordination_id)
+        repo_context = None
+        session_mode = None
 
-    return {"coordination_id": coordination_id}
+    new_id = _schedule_direct_task(
+        prompt=prompt, owner_id=owner_id, repo_context=repo_context,
+        session_mode=session_mode,
+    )
+    swarm_run_store.record_event(coordination_id, "retry", {
+        "retry_coordination_id": new_id,
+    }, owner_id=owner_id)
+    return {"coordination_id": new_id, "retried_from": coordination_id}
 
 
 # ---------------------------------------------------------------------------

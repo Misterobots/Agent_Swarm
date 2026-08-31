@@ -207,7 +207,7 @@ def checkout_local_project(source_path: str) -> dict:
 MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 
 
-def finalize_task_branch(coordination_id: str) -> tuple[str, bytes]:
+def finalize_task_branch(coordination_id: str) -> tuple[str, bytes, str]:
     """
     Commit whatever is dirty in the shared sandbox /workspace onto a fresh
     local branch named memex/<coordination_id>, then export that branch as a
@@ -220,7 +220,7 @@ def finalize_task_branch(coordination_id: str) -> tuple[str, bytes]:
     call, once a human reviews and approves) never depends on /workspace's
     state at that later time.
 
-    Returns (local_branch, bundle_bytes). Raises WorkspacePrepError on failure.
+    Returns (local_branch, bundle_bytes, diff_text). Raises WorkspacePrepError on failure.
     """
     root = WORKSPACE_ROOT
     local_branch = f"memex/{coordination_id}"
@@ -234,12 +234,31 @@ def finalize_task_branch(coordination_id: str) -> tuple[str, bytes]:
     # transient failure doesn't collide with a branch this call left behind.
     rc, out, err = _sh(
         f"cd {root} && git checkout -B {q_branch} 2>&1 "
-        f"&& git add -A 2>&1 "
-        f"&& (git diff --cached --quiet || git commit -m 'Memex task {coordination_id}' 2>&1)",
+        f"&& git add -A 2>&1",
         timeout=60,
     )
     if rc != 0:
         raise WorkspacePrepError(f"failed to finalize branch {local_branch!r}: {(err or out).strip()[:500]}")
+
+    # Capture the review artifact before committing. This applies to both
+    # remote-repository tasks and blank/local projects: both are initialized
+    # Git workspaces, but only the former has a swarm_run_repo row for the
+    # push bundle. The task board's diff lives in swarm_runs.diff_text.
+    rc, diff_text, err = _sh(f"cd {root} && git diff --cached --binary", timeout=60)
+    if rc != 0:
+        raise WorkspacePrepError(f"failed to capture task diff: {(err or diff_text).strip()[:500]}")
+    diff_text = diff_text or ""
+    if len(diff_text.encode("utf-8")) > MAX_BUNDLE_BYTES:
+        raise WorkspacePrepError(
+            f"diff too large ({len(diff_text.encode('utf-8'))} bytes > {MAX_BUNDLE_BYTES} limit)"
+        )
+
+    rc, out, err = _sh(
+        f"cd {root} && (git diff --cached --quiet || git commit -m 'Memex task {coordination_id}' 2>&1)",
+        timeout=60,
+    )
+    if rc != 0:
+        raise WorkspacePrepError(f"failed to commit branch {local_branch!r}: {(err or out).strip()[:500]}")
 
     bundle_path = f"/tmp/{coordination_id}.bundle"
     q_bundle = shlex.quote(bundle_path)
@@ -267,4 +286,4 @@ def finalize_task_branch(coordination_id: str) -> tuple[str, bytes]:
     import base64 as _base64
     bundle_bytes = _base64.b64decode(b64_out.strip())
     logger.info(f"[workspace_ops] Bundled {local_branch} ({len(bundle_bytes)} bytes)")
-    return local_branch, bundle_bytes
+    return local_branch, bundle_bytes, diff_text

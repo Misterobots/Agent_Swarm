@@ -1484,7 +1484,9 @@ def coordinate_task(
         # this task", not a failed run.
         if repo_context:
             try:
-                local_branch, bundle_bytes = finalize_task_branch(session.coordination_id)
+                local_branch, bundle_bytes, finalized_diff = finalize_task_branch(session.coordination_id)
+                if finalized_diff:
+                    swarm_run_store.set_diff(session.coordination_id, finalized_diff)
                 if workspace_record:
                     from coordination.workspace_lifecycle import transition
                     transition(

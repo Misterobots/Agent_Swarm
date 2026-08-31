@@ -144,7 +144,7 @@ def init_table() -> None:
 
 def create_run(coordination_id: str, session_id: str, owner_id: str,
                title: str | None, scope: str | None, started_at: int,
-               status: str = "running") -> None:
+               status: str = "running", prompt: str | None = None) -> None:
     """Record a run at dispatch. Idempotent on coordination_id.
 
     status defaults to "running" (the original, still-typical case: a run
@@ -163,12 +163,13 @@ def create_run(coordination_id: str, session_id: str, owner_id: str,
                     """
                     INSERT INTO swarm_runs
                         (coordination_id, session_id, owner_id, title, scope,
-                         status, started_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                         prompt, status, started_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (coordination_id) DO NOTHING
                     """,
                     (coordination_id, session_id, owner_id,
-                     (title or "")[:200], scope, status, int(started_at or now), now),
+                     (title or "")[:200], scope, (prompt or "")[:8000], status,
+                     int(started_at or now), now),
                 )
                 inserted = cur.rowcount > 0
         if inserted:
