@@ -69,6 +69,15 @@ def test_mcp_lifecycle_controls_are_idempotent():
     assert server.start()["status"] == "running"
 
 
+def test_initialize_returns_a_protocol_compliant_server_identity():
+    server = MCPBridgeServer()
+    result = asyncio.run(server.handle_rpc("initialize", {}))
+
+    assert result["protocolVersion"] == "2025-06-18"
+    assert result["serverInfo"] == {"name": "home-ai-lab", "version": "1.0.0"}
+    assert result["capabilities"] == server.capabilities()
+
+
 def test_sse_discovery_and_websocket_json_rpc():
     client = TestClient(_transport_app(MCPBridgeServer()))
     with client.stream("GET", "/sse") as response:
