@@ -411,13 +411,15 @@ class MCPBridgeServer:
             arguments = params.get("arguments", {})
             return self.tool_hooks.execute(str(tool_name), arguments, auth_header)
 
-        if method in {"initialize", "ping"}:
+        if method == "initialize":
             return {
-                "server": self.server_name,
-                "enabled": self.enabled,
                 "protocolVersion": "2025-06-18",
                 "capabilities": self.capabilities(),
+                "serverInfo": {"name": self.server_name, "version": "1.0.0"},
             }
+
+        if method == "ping":
+            return {}
 
         raise ValueError(f"Unsupported MCP method: {method}")
 
