@@ -42,7 +42,7 @@ Use `;` to chain commands in SSH strings, never `&&` at the PowerShell level.
 
 **UI changes (ui/src/**)** → Rebuild required. `docker compose build hive-ui` takes ~45s.
 
-**package.json/package-lock.json changed** → Full `--no-cache` rebuild (npm ci will re-run). Takes ~90s.
+**package.json/pnpm-lock.yaml changed** → Full `--no-cache` rebuild (pnpm install --frozen-lockfile will re-run).
 
 **docker-compose.yml changed** → `docker compose up -d` re-creates only affected services.
 

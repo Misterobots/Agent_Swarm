@@ -922,7 +922,10 @@ script:
               auto alarm_minute = std::stoi(set_alarm_time.substr(3, 2));
               auto time_now = id(rtc).now();
               if (time_now.hour == alarm_hour && time_now.minute == alarm_minute) {
-                auto action = id(alarm_action).state;
+                // Template selects no longer expose `.state` in ESPHome 2026.7.x.
+                // `saved_alarm_action` is kept in sync by alarm_action.on_value and
+                // is also restored across reboots, so it is the canonical value here.
+                const auto &action = id(saved_alarm_action);
                 if (action == "Play sound") {
                   id(timer_ringing).turn_on();
                 } else if (action == "Send event") {

@@ -2395,6 +2395,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 return
 
             update_count = 0
+            last_runtime_update_at = time.monotonic()
             response_parts = []  # Collect response text for memory extraction
             _in_think_block = False  # Track <think> tag state across chunks
             _input_chars  = sum(len(m.get("content") or "") for m in history or []) + len(last_msg)
@@ -2427,13 +2428,31 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             try:
                 while True:
                     try:
-                        update = await _aio_sg.wait_for(_update_q.get(), timeout=30.0)
+                        update = await _aio_sg.wait_for(_update_q.get(), timeout=10.0)
                     except _aio_sg.TimeoutError:
-                        # SSE comment — ignored by clients but resets Cloudflare/Traefik idle timer
-                        yield ": keepalive\n\n"
+                        # A real typed heartbeat reaches clients as an honest activity
+                        # update.  The previous SSE comment kept proxies alive but made
+                        # the UI appear frozen whenever a handler was blocked in a model
+                        # call or external tool.
+                        quiet_for = int(time.monotonic() - last_runtime_update_at)
+                        heartbeat_chunk = {
+                            "id": "chatcmpl-swarm",
+                            "object": "chat.completion.chunk",
+                            "created": int(time.time()),
+                            "model": request.model,
+                            "choices": [{"index": 0, "delta": {
+                                "type": "status",
+                                "content": (
+                                    "Runtime is still waiting for the active operation "
+                                    f"({quiet_for}s since the last server update)."
+                                ),
+                            }, "finish_reason": None}],
+                        }
+                        yield f"data: {json.dumps(heartbeat_chunk)}\n\n"
                         continue
                     if update is _GEN_DONE:
                         break
+                    last_runtime_update_at = time.monotonic()
                     update_count += 1
                     logger.debug(f"[Stream] update #{update_count}: {update}")
                     # Update is expected to be a dict: {"type": ..., "content": ...}
@@ -2763,6 +2782,8 @@ async def mcp_client_config(request: Request):
     return mcp_server.client_config(host_hint=host)
 
 
+from mcp.routes import router as mcp_http_router; app.include_router(mcp_http_router)
+
 @app.post("/api/v1/mcp/rpc")
 async def mcp_rpc(request: MCPRpcRequest, http_request: Request):
     try:
@@ -2963,10 +2984,28 @@ class GroundingRequestModel(BaseModel):
     permission: str  # "web_grounding", "docs_grounding", or "file_grounding"
     reason: str = ""
 
+
+def _sync_approved_grounding_permissions() -> None:
+    """Materialize grants for both manual and automatically approved requests."""
+    type_to_permission = {
+        "GROUNDING_WEB": "web_grounding",
+        "GROUNDING_DOCS": "docs_grounding",
+        "GROUNDING_FILE": "file_grounding",
+    }
+    try:
+        for item in governance_manager.get_all_requests():
+            req_type = item.type.value if hasattr(item.type, "value") else str(item.type)
+            permission = type_to_permission.get(req_type)
+            if permission and item.status == RequestStatus.APPROVED:
+                _grounding_perm_store.grant(item.user, permission)
+    except Exception as exc:
+        logger.error("[Grounding] Failed to reconcile approved permissions: %s", exc)
+
 @app.get("/api/v1/grounding/status")
 async def grounding_status(http_request: Request):
     """Return the current grounding permissions for the authenticated user."""
     owner_id = _resolve_owner_id(None, http_request)
+    _sync_approved_grounding_permissions()
     _grounding_perm_store.reload()
     return _grounding_perm_store.get_status(owner_id)
 
@@ -2998,6 +3037,8 @@ async def request_grounding_permission(
     )
     try:
         item = governance_manager.submit_request(gov_type, description, owner_id)
+        if item.status == RequestStatus.APPROVED:
+            _sync_approved_grounding_permissions()
         return {"status": "submitted", "request_id": item.id, "permission": req.permission}
     except Exception as exc:
         logger.error("[Grounding] Failed to submit governance request: %s", exc)
@@ -7783,7 +7824,5 @@ async def terminal_ws(websocket: WebSocket):
             await websocket.close(code=1011)
         except Exception:
             pass
-
-
 
 

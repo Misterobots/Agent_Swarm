@@ -1273,6 +1273,39 @@ _INFO_TOOL_NAMES = frozenset({"web_search", "get_current_weather", "get_weather_
                               "get_hourly_forecast", "get_news_headlines"})
 _INFO_SCHEMAS = [t for t in TOOL_SCHEMAS if (t.get("function") or {}).get("name") in _INFO_TOOL_NAMES]
 
+# qwen3:8b is much more reliable when it sees the one relevant information tool instead of
+# all five.  The old voice-search path exposed only web_search; the later weather/news expansion
+# diluted tool selection and recent turns started answering from memory with zero tool calls.
+_WEB_SEARCH_INTENT_RE = re.compile(
+    r"\b(?:search|look\s*up|lookup|google|find\s+out|latest|current|news|today|tonight|"
+    r"this\s+(?:week|weekend|month)|near\s+me|nearby|hours|open|price|cost|best|recommend|"
+    r"book|author|movie|restaurant|event|who\s+is|what\s+is|when\s+is|where\s+is|"
+    r"how\s+much)\b", re.I)
+_HA_COMMAND_RE = re.compile(
+    r"\b(?:turn|switch|toggle|set|dim|brighten|volume|louder|quieter|pause|resume|"
+    r"play|stop|skip|light|lights|lamp|fan|lock|unlock|door|thermostat|temperature\s+"
+    r"(?:up|down)|device|speaker|media_player)\b", re.I)
+
+
+def _info_schemas_for_query(query: str) -> list:
+    """Return only the information schemas relevant to this utterance."""
+    q = query or ""
+    if re.search(r"\b(?:news|headlines|current\s+events)\b", q, re.I):
+        names = {"get_news_headlines"}
+    elif re.search(r"\b(?:weather|forecast|temperature|hot|cold|rain|snow)\b", q, re.I):
+        names = {"get_current_weather", "get_weather_forecast", "get_hourly_forecast"}
+    else:
+        names = {"web_search"}
+    return [t for t in _INFO_SCHEMAS if (t.get("function") or {}).get("name") in names]
+
+
+def _should_force_web_search(query: str) -> bool:
+    """Identify clear web/current-fact requests the small model has repeatedly missed."""
+    q = (query or "").strip()
+    if not q or _HA_COMMAND_RE.search(q):
+        return False
+    return bool(_WEB_SEARCH_INTENT_RE.search(q))
+
 
 def _split_info_calls(tool_calls):
     """Partition tool_calls into (info-owned we execute here, HA-owned handed back to HA untouched).
@@ -1290,7 +1323,8 @@ async def _passthrough_with_info(messages, tools):
     (returned UNEXECUTED for HA). Lets live-info questions answer with REAL DATA (a weather ask hits
     Open-Meteo, not a link dump). Falls back to plain passthrough if none are found. Returns
     (text, tool_calls) matching _answer's contract."""
-    all_tools = list(tools) + _INFO_SCHEMAS
+    last_user = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
+    all_tools = list(tools) + _info_schemas_for_query(last_user)
     convo = list(messages)
     text, tool_calls = "", None
     for _round in range(WEB_MAX_ROUNDS):
@@ -1314,6 +1348,24 @@ async def _passthrough_with_info(messages, tools):
         return text, None  # no tool_calls -> final text answer
     print(f"[bmo-brain] info passthrough loop exhausted {WEB_MAX_ROUNDS} rounds", flush=True)
     return (text or "I looked but couldn't pull that together — want me to try again?"), None
+
+
+async def _forced_web_search_answer(messages, query: str):
+    """Search first, then ask the model only to turn the result into spoken text.
+
+    This is the reliability fallback for the HA passthrough path.  It preserves the normal
+    conversational answer, but removes the small model's opportunity to skip web_search entirely.
+    """
+    result = await call_tool("web_search", {"query": query})
+    print(f"[bmo-brain] forced info tool=web_search args={{'query': {query!r}}} "
+          f"-> {str(result)[:160]!r}", flush=True)
+    tool_call = {"function": {"name": "web_search", "arguments": {"query": query}}}
+    search_messages = list(messages) + [
+        {"role": "assistant", "content": "", "tool_calls": [tool_call]},
+        {"role": "tool", "content": result},
+    ]
+    text, _ = await _ollama_chat(search_messages, tools=None)
+    return text or "I searched, but I couldn't turn up a useful answer just now.", None
 
 
 # friday_brain's own media-control tools (transport + volume + stream play), executed locally via HA's
@@ -2583,6 +2635,10 @@ async def _answer(client_messages, tools=None, model: str = ""):
         # case does, so the model doesn't just retry the doomed HA call again.
         text, tool_calls = await _passthrough_with_media(
             messages, tools, state_fallback=_ha_offers_media(tools))
+    elif tools and _should_force_web_search(last_user):
+        # The old voice-search implementation relied on the model to select web_search.  Keep
+        # that route for ambiguous turns, but guarantee a search for explicit/current-fact asks.
+        text, tool_calls = await _forced_web_search_answer(messages, last_user)
     elif tools:
         # HA-driven turn. Offer friday_brain's read-only info tools (web_search + weather + news)
         # alongside HA's tools, executed locally, so live-info questions answer with REAL DATA instead

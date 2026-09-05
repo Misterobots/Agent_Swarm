@@ -9,12 +9,16 @@ file-upload endpoint is not available in v0.5.0).
 
 import logging
 import os
+import queue
+import threading
 import time
 import uuid
+from urllib.parse import urlparse
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
 from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
 from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace, _langfuse_span
+from utils.inference_metrics import design_token_metrics
 
 logger = logging.getLogger("Router")
 
@@ -24,6 +28,49 @@ _OD_WEB_URL = os.getenv("OPEN_DESIGN_WEB_URL", "http://192.168.2.101:17573")
 _SKILL_ID_MAP: dict[str, str] = {
     "guizang-ppt": "html-ppt-pitch-deck",
 }
+
+
+def _display_host_name(host: str) -> str:
+    """Return a stable, user-friendly GPU host label without exposing its URL."""
+    hostname = (urlparse(host).hostname or host).lower()
+    if hostname in {"ollama", "lovelace", "192.168.2.101"}:
+        return "Lovelace"
+    if hostname in {"turing", "192.168.2.103"}:
+        return "Turing"
+    return hostname or "the selected GPU host"
+
+
+def _stream_ollama_events(response, heartbeat_seconds: float = 8.0):
+    """Yield Ollama lines without leaving the SSE client blind during a quiet read.
+
+    ``requests.Response.iter_lines`` blocks until Ollama emits a token.  Reading
+    it on a small daemon thread lets the request generator emit an honest
+    ``None`` heartbeat while it is still waiting for the model, rather than
+    pretending that an unseen reasoning step has happened.
+    """
+    events: queue.Queue[tuple[str, object]] = queue.Queue()
+
+    def _read() -> None:
+        try:
+            for line in response.iter_lines():
+                events.put(("line", line))
+        except Exception as exc:  # propagate stream transport failures to the handler
+            events.put(("error", exc))
+        finally:
+            events.put(("done", None))
+
+    threading.Thread(target=_read, name="design-ollama-stream", daemon=True).start()
+    while True:
+        try:
+            kind, payload = events.get(timeout=heartbeat_seconds)
+        except queue.Empty:
+            yield None
+            continue
+        if kind == "error":
+            raise payload  # type: ignore[misc]
+        if kind == "done":
+            return
+        yield payload
 
 
 def handle_design(user_input: str, ctx: dict):
@@ -81,6 +128,11 @@ def handle_design(user_input: str, ctx: dict):
     skill_sys_prompt = get_skill_system_prompt(internal_skill)
     resolved_model = CODER_MODEL
     resolved_host = get_best_host_for_model(resolved_model)
+    host_label = _display_host_name(resolved_host)
+    yield {
+        "type": "status",
+        "content": f"Design Studio: Ready to generate with {resolved_model} on {host_label}'s GPU.",
+    }
 
     # Session-scoped artifact cache — stores the most recent HTML for this session
     # so revision prompts can inject it and the model can make targeted edits
@@ -215,12 +267,23 @@ def handle_design(user_input: str, ctx: dict):
         ]
         _opts = get_ollama_options(resolved_model)
 
+        request_started_at = time.monotonic()
+        yield {"type": "status", "content": f"Design Studio: Waiting for a GPU slot on {host_label}..."}
         with _langfuse_span(
             "design_generation", "DesignStudio", resolved_model, final_input,
             langfuse=langfuse, use_langfuse=use_langfuse,
         ) as span_result:
             with request_lock(context="text"):
+                queue_wait_s = time.monotonic() - request_started_at
+                yield {
+                    "type": "status",
+                    "content": (
+                        f"Design Studio: GPU slot acquired after {queue_wait_s:.1f}s. "
+                        f"Connecting to {resolved_model}..."
+                    ),
+                }
                 yield _emit_stream_mode("responding")
+                connection_started_at = time.monotonic()
                 _resp = _req.post(
                     f"{resolved_host}/api/chat",
                     json={
@@ -233,11 +296,46 @@ def handle_design(user_input: str, ctx: dict):
                     timeout=300,
                 )
                 _resp.raise_for_status()
+                connection_s = time.monotonic() - connection_started_at
+                yield {
+                    "type": "status",
+                    "content": (
+                        f"Design Studio: Connected to {host_label} in {connection_s:.1f}s; "
+                        "waiting for the first generated token..."
+                    ),
+                }
                 # Prepend the prefill we injected so parse_artifact_html sees a
                 # complete document from the very first character.
                 full_output = "<!DOCTYPE html>\n<html lang=\"en\">"
                 import json as _json
-                for _line in _resp.iter_lines():
+                generation_started_at = time.monotonic()
+                first_token_at: float | None = None
+                generated_chars = 0
+                last_progress_at = generation_started_at
+                last_progress_chars = 0
+                completion_metrics: dict = {}
+                for _line in _stream_ollama_events(_resp):
+                    now = time.monotonic()
+                    if _line is None:
+                        elapsed_s = now - generation_started_at
+                        if first_token_at is None:
+                            yield {
+                                "type": "status",
+                                "content": (
+                                    f"Design Studio: Still waiting for {resolved_model}'s first token "
+                                    f"on {host_label} ({elapsed_s:.0f}s elapsed)."
+                                ),
+                            }
+                        else:
+                            yield {
+                                "type": "status",
+                                "content": (
+                                    f"Design Studio: The model is still generating HTML — "
+                                    f"{elapsed_s:.0f}s elapsed; provider token measurements "
+                                    "will be available on completion."
+                                ),
+                            }
+                        continue
                     if not _line:
                         continue
                     try:
@@ -247,9 +345,63 @@ def handle_design(user_input: str, ctx: dict):
                     _token = _evt.get("message", {}).get("content", "")
                     if _token:
                         full_output += _token
+                        generated_chars += len(_token)
+                        if first_token_at is None:
+                            first_token_at = now
+                            yield {
+                                "type": "status",
+                                "content": (
+                                    f"Design Studio: First token received after "
+                                    f"{now - generation_started_at:.1f}s — generating HTML..."
+                                ),
+                            }
+                        if (
+                            generated_chars - last_progress_chars >= 4096
+                            or now - last_progress_at >= 15
+                        ):
+                            elapsed_s = max(now - generation_started_at, 0.1)
+                            yield {
+                                "type": "status",
+                                "content": (
+                                    f"Design Studio: Generating HTML — {elapsed_s:.0f}s elapsed; "
+                                    "provider token measurements will be available on completion."
+                                ),
+                            }
+                            last_progress_at = now
+                            last_progress_chars = generated_chars
                     if _evt.get("done"):
+                        completion_metrics = {
+                            key: _evt[key]
+                            for key in (
+                                "total_duration", "load_duration", "prompt_eval_count",
+                                "prompt_eval_duration", "eval_count", "eval_duration",
+                            )
+                            if key in _evt
+                        }
                         break
-            span_result["output"] = full_output[:500]
+                yield design_token_metrics(completion_metrics, resolved_model)
+                total_generation_s = time.monotonic() - generation_started_at
+                first_token_s = (
+                    first_token_at - generation_started_at
+                    if first_token_at is not None else None
+                )
+                span_result["output"] = full_output[:500]
+                span_result["metadata"] = {
+                    "gpu_host": host_label,
+                    "queue_wait_s": round(queue_wait_s, 3),
+                    "connection_s": round(connection_s, 3),
+                    "first_token_s": round(first_token_s, 3) if first_token_s is not None else None,
+                    "generation_s": round(total_generation_s, 3),
+                    "generated_chars": generated_chars,
+                    **completion_metrics,
+                }
+                logger.info(
+                    "[DesignStudio] generation host=%s model=%s queue_wait=%.2fs "
+                    "connection=%.2fs ttft=%s generation=%.2fs chars=%d",
+                    host_label, resolved_model, queue_wait_s, connection_s,
+                    f"{first_token_s:.2f}s" if first_token_s is not None else "none",
+                    total_generation_s, generated_chars,
+                )
 
     except Exception as e:
         AGENT_STATE.labels(agent_name="DesignStudio").set(1)
@@ -258,6 +410,7 @@ def handle_design(user_input: str, ctx: dict):
         yield {"type": "error", "content": f"Design Studio failed: {e}"}
         return
 
+    yield {"type": "status", "content": "Design Studio: Validating generated HTML..."}
     html_content = parse_artifact_html(full_output)
     if not html_content:
         # parse_artifact_html already handles plain HTML as fallback; if we're
@@ -273,6 +426,7 @@ def handle_design(user_input: str, ctx: dict):
     os.makedirs(delivery_dir, exist_ok=True)
     filename = f"design_{project_id}.html"
     try:
+        yield {"type": "status", "content": "Design Studio: Saving the design artifact..."}
         with open(os.path.join(delivery_dir, filename), "w", encoding="utf-8") as fh:
             fh.write(html_content)
         yield {"type": "log", "content": f"[DesignStudio] Saved: {filename}"}

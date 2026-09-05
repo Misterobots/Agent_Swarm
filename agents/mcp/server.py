@@ -316,7 +316,7 @@ class MCPBridgeServer:
         }
 
     def list_tools(self) -> list[dict[str, Any]]:
-        return [t.model_dump() for t in self._tools]
+        return [dict(name=t.name, description=t.description, inputSchema=t.input_schema) for t in self._tools]
 
     def list_skills(self) -> list[dict[str, Any]]:
         """Return all registered skills from the SkillRegistry."""
