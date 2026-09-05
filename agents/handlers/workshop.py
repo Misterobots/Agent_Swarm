@@ -217,9 +217,9 @@ def handle_workshop(user_input: str, ctx: dict):
     if owner_id:
         from brooks import save_workshop_state, clear_workshop_state
         if not _in_answer_phase:
-            save_workshop_state(full_content, user_input, owner_id)
+            save_workshop_state(full_content, user_input, owner_id, ctx.get("session_id"))
         else:
-            clear_workshop_state(owner_id)
+            clear_workshop_state(owner_id, ctx.get("session_id"))
 
     # Phase 1: parse questions into structured chips for the UI.
     if not _in_answer_phase:

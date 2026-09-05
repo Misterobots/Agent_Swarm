@@ -73,6 +73,12 @@ def _stream_ollama_events(response, heartbeat_seconds: float = 8.0):
         yield payload
 
 
+def resolve_design_model(ctx: dict, default_model: str) -> str:
+    """Prefer the request-layer validated model over the Design default."""
+    selected = ctx.get("model")
+    return selected if isinstance(selected, str) and selected else default_model
+
+
 def handle_design(user_input: str, ctx: dict):
     """Generator — generate HTML via Ollama, upload project to OD, stream artifact."""
     turn_id = ctx["turn_id"]
@@ -126,7 +132,10 @@ def handle_design(user_input: str, ctx: dict):
     # Prefilling the assistant turn with "<!DOCTYPE html>" forces the model to begin
     # generating HTML immediately — no preamble, no explanation, no wasted tokens.
     skill_sys_prompt = get_skill_system_prompt(internal_skill)
-    resolved_model = CODER_MODEL
+    # `ctx["model"]` is validated against the curated catalog by the request
+    # layer. Preserve an explicit selection; use the coding default only when
+    # the user chose the Memex-default model.
+    resolved_model = resolve_design_model(ctx, CODER_MODEL)
     resolved_host = get_best_host_for_model(resolved_model)
     host_label = _display_host_name(resolved_host)
     yield {

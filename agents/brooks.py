@@ -94,26 +94,27 @@ def clear_context(session_id: str = "default", owner_id: str | None = None):
 
 
 # ---------------------------------------------------------------------------
-# Cross-session workshop state
-# Persists Phase 1 output keyed ONLY by owner_id (no session_id dependency)
-# so a user can resume their workshop from a different machine or browser tab.
+# Session-scoped workshop state
+# Persists Phase 1 output by owner and session.  A different tab must not be
+# interpreted as a Workshop continuation merely because it shares an owner.
 # TTL is 24 h — long enough for an async workshop, shorter than session context.
 # ---------------------------------------------------------------------------
 
 _WORKSHOP_TTL_SECONDS = 86_400  # 24 hours
 
 
-def _workshop_file(owner_id: str) -> str:
+def _workshop_file(owner_id: str, session_id: str | None = None) -> str:
     safe_owner = _safe_component(owner_id, "anonymous")
     owner_dir = os.path.join(CONTEXT_DIR, safe_owner)
     os.makedirs(owner_dir, exist_ok=True)
-    return os.path.join(owner_dir, "workshop_pending.json")
+    safe_session = _safe_component(session_id or "legacy", "legacy")
+    return os.path.join(owner_dir, f"workshop_pending_{safe_session}.json")
 
 
-def save_workshop_state(phase1_output: str, original_idea: str, owner_id: str) -> None:
-    """Persist Phase 1 workshop output cross-session for the given owner."""
+def save_workshop_state(phase1_output: str, original_idea: str, owner_id: str, session_id: str | None = None) -> None:
+    """Persist Phase 1 workshop output for its owning conversation."""
     try:
-        path = _workshop_file(owner_id)
+        path = _workshop_file(owner_id, session_id)
         with open(path, "w") as fh:
             json.dump(
                 {
@@ -124,15 +125,15 @@ def save_workshop_state(phase1_output: str, original_idea: str, owner_id: str) -
                 },
                 fh,
             )
-        logger.info("[Brooks] Workshop Phase 1 saved cross-session for owner=%s", owner_id)
+        logger.info("[Brooks] Workshop Phase 1 saved for owner=%s session=%s", owner_id, session_id)
     except Exception as exc:
         logger.error("[Brooks] Failed to save workshop state: %s", exc)
 
 
-def get_workshop_state(owner_id: str) -> dict | None:
-    """Retrieve pending cross-session workshop state if it is still fresh."""
+def get_workshop_state(owner_id: str, session_id: str | None = None) -> dict | None:
+    """Retrieve a pending workshop only for its owning conversation."""
     try:
-        path = _workshop_file(owner_id)
+        path = _workshop_file(owner_id, session_id)
         if not os.path.exists(path):
             return None
         with open(path) as fh:
@@ -148,10 +149,10 @@ def get_workshop_state(owner_id: str) -> dict | None:
         return None
 
 
-def clear_workshop_state(owner_id: str) -> None:
-    """Delete the cross-session workshop state (call after Phase 2 completes)."""
+def clear_workshop_state(owner_id: str, session_id: str | None = None) -> None:
+    """Delete this session's pending workshop state after Phase 2 completes."""
     try:
-        path = _workshop_file(owner_id)
+        path = _workshop_file(owner_id, session_id)
         if os.path.exists(path):
             os.remove(path)
             logger.info("[Brooks] Workshop state cleared for owner=%s", owner_id)

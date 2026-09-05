@@ -488,9 +488,9 @@ async def serve_signed_public_artifact(filename: str, exp: int, sig: str):
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'} if filename.lower().endswith(".apk") else None
     return FileResponse(full_path, media_type=media_type, headers=headers)
 
-# Mount Delivered Artifacts for remote downloading (Satellite)
-if os.path.exists("/workspace/delivered_artifacts"):
-    app.mount("/delivered_artifacts", StaticFiles(directory="/workspace/delivered_artifacts"), name="artifacts")
+# Delivered artifacts are served by ``serve_delivered_artifact`` below.  Do not
+# mount StaticFiles here: Starlette resolves that earlier mount first, which
+# makes ``?dl=1`` silently lose its Content-Disposition attachment header.
 
 # Mount User Projects — agents write web apps here; served at /projects/<name>/
 os.makedirs("/workspace/user_projects", exist_ok=True)
