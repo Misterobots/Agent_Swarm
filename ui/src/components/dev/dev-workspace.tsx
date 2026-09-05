@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useRef, useCallback, useState } from "react";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { ChatView } from "@/components/chat/chat-view";
 import { TabbedEditor } from "./tabbed-editor";
 import { TabbedTerminal } from "./tabbed-terminal";
@@ -52,12 +52,17 @@ const HORZ_HANDLE_CLASS =
 const VERT_HANDLE_CLASS =
   "h-[3px] flex-shrink-0 bg-[var(--chat-border)] hover:bg-[var(--chat-accent)] transition-colors duration-150 cursor-ns-resize";
 
+const SERVER_LAYOUT_STORAGE = {
+  getItem: () => null,
+  setItem: () => undefined,
+};
+
 // ---------------------------------------------------------------------------
 // DevWorkspace
 // ---------------------------------------------------------------------------
 
 export function DevWorkspace() {
-  const { isMobile } = useIsMobile();
+  const { isMobile, isTablet } = useIsMobile();
   const router = useRouter();
   const {
     viewMode,
@@ -70,6 +75,8 @@ export function DevWorkspace() {
     setShowTerminalPanel,
     panelDocked,
     setPanelDocked,
+    activeDockedPanel,
+    setActiveDockedPanel,
   } = useDevPanelStore();
 
   const sessionFileChangeCount = useChatStore((s) => {
@@ -81,8 +88,6 @@ export function DevWorkspace() {
     }
     return paths.size;
   });
-
-  if (isMobile) return <MobileDevView />;
 
   const panels = getRegisteredPanels();
 
@@ -97,16 +102,63 @@ export function DevWorkspace() {
     return panelDocked[id] ?? true;
   }
 
-  function closeFn(panel: PanelRegistration): () => void {
-    if (panel.id === "editor") return () => setShowEditorPanel(false);
-    if (panel.id === "terminal") return () => setShowTerminalPanel(false);
-    return () => togglePanel(panel.id);
+  function setPanelVisible(panel: PanelRegistration, next: boolean) {
+    if (panel.id === "editor") return setShowEditorPanel(next);
+    if (panel.id === "terminal") return setShowTerminalPanel(next);
+    if ((showPanel[panel.id] ?? false) !== next) togglePanel(panel.id);
   }
 
   const visible = panels.filter((p) => isPanelVisible(p));
-  const dockedRight = visible.filter((p) => p.position === "right" && isPanelDocked(p.id));
-  const dockedBottom = visible.filter((p) => p.position === "bottom" && isPanelDocked(p.id));
-  const floating = visible.filter((p) => !isPanelDocked(p.id));
+  const activeDockedFor = (position: PanelRegistration["position"]) => {
+    const candidates = visible.filter((p) => p.position === position && isPanelDocked(p.id));
+    return candidates.find((p) => p.id === activeDockedPanel[position]) ?? candidates[0];
+  };
+  const dockedRight = activeDockedFor("right");
+  const dockedBottom = activeDockedFor("bottom");
+  const activeDockedIds = new Set([dockedRight?.id, dockedBottom?.id]);
+  // Older persisted sessions can contain several docked panels on the same edge.
+  // Keep the extras accessible as overlays instead of silently hiding them.
+  const floating = visible.filter((p) => !isPanelDocked(p.id) || !activeDockedIds.has(p.id));
+
+  const layoutStorage = typeof window === "undefined" ? SERVER_LAYOUT_STORAGE : window.localStorage;
+  const horizontalPanelIds = ["workspace-main", ...(dockedRight ? [`ws-r-${dockedRight.id}`] : [])];
+  const verticalPanelIds = ["workspace-top", ...(dockedBottom ? [`ws-b-${dockedBottom.id}`] : [])];
+  const horizontalLayout = useDefaultLayout({
+    id: `memex-dev-horizontal-${dockedRight?.id ?? "main"}`,
+    panelIds: horizontalPanelIds,
+    storage: layoutStorage,
+  });
+  const verticalLayout = useDefaultLayout({
+    id: `memex-dev-vertical-${dockedBottom?.id ?? "main"}`,
+    panelIds: verticalPanelIds,
+    storage: layoutStorage,
+  });
+
+  function closePanel(panel: PanelRegistration) {
+    setPanelVisible(panel, false);
+    if (activeDockedFor(panel.position)?.id === panel.id) {
+      setActiveDockedPanel(panel.position, undefined);
+    }
+  }
+
+  function toggleWorkspacePanel(panel: PanelRegistration) {
+    const active = activeDockedFor(panel.position);
+    const visibleNow = isPanelVisible(panel);
+
+    if (visibleNow && isPanelDocked(panel.id) && active?.id === panel.id) {
+      setPanelVisible(panel, false);
+      setActiveDockedPanel(panel.position, undefined);
+      return;
+    }
+
+    if (active && active.id !== panel.id) setPanelVisible(active, false);
+    setPanelVisible(panel, true);
+    setPanelDocked(panel.id, true, panel.position);
+  }
+
+  // The multi-pane editor needs more room than a tablet can reliably provide.
+  // The read-only overview keeps Dev useful without permitting collapsed docks.
+  if (isMobile || isTablet) return <MobileDevView />;
 
   const mainContent = viewMode === "preview" ? <PreviewCanvas /> : <ChatView showDevContext />;
 
@@ -119,16 +171,17 @@ export function DevWorkspace() {
       <div className="h-full overflow-hidden">{mainContent}</div>
     </Panel>,
   ];
-  for (const panel of dockedRight) {
+  if (dockedRight) {
+    const panel = dockedRight;
     horzChildren.push(
       <Separator key={`sep-r-${panel.id}`} className={HORZ_HANDLE_CLASS} />,
-      <Panel key={panel.id} id={`ws-r-${panel.id}`} defaultSize={40} minSize={15}>
+      <Panel key={panel.id} id={`ws-r-${panel.id}`} defaultSize="420px" minSize="320px" maxSize="55%">
         <DockedSurface
           position="right"
           title={panel.title}
           icon={panel.icon}
-          onClose={closeFn(panel)}
-          onFloat={() => setPanelDocked(panel.id, false)}
+          onClose={() => closePanel(panel)}
+          onFloat={() => setPanelDocked(panel.id, false, panel.position)}
         >
           <panel.component />
         </DockedSurface>
@@ -141,21 +194,28 @@ export function DevWorkspace() {
   // ---------------------------------------------------------------------------
   const vertChildren: ReactNode[] = [
     <Panel key="top" id="workspace-top" minSize={15}>
-      <Group orientation="horizontal" className="h-full" id="dev-h">
+      <Group
+        orientation="horizontal"
+        className="h-full"
+        id={`dev-h-${dockedRight?.id ?? "main"}`}
+        defaultLayout={horizontalLayout.defaultLayout}
+        onLayoutChanged={horizontalLayout.onLayoutChanged}
+      >
         {horzChildren}
       </Group>
     </Panel>,
   ];
-  for (const panel of dockedBottom) {
+  if (dockedBottom) {
+    const panel = dockedBottom;
     vertChildren.push(
       <Separator key={`sep-b-${panel.id}`} className={VERT_HANDLE_CLASS} />,
-      <Panel key={panel.id} id={`ws-b-${panel.id}`} defaultSize={30} minSize={10}>
+      <Panel key={panel.id} id={`ws-b-${panel.id}`} defaultSize="320px" minSize="180px" maxSize="65%">
         <DockedSurface
           position="bottom"
           title={panel.title}
           icon={panel.icon}
-          onClose={closeFn(panel)}
-          onFloat={() => setPanelDocked(panel.id, false)}
+          onClose={() => closePanel(panel)}
+          onFloat={() => setPanelDocked(panel.id, false, panel.position)}
         >
           <panel.component />
         </DockedSurface>
@@ -184,7 +244,7 @@ export function DevWorkspace() {
           {panels.map((panel) => (
             <ToolbarButton
               key={panel.id}
-              onClick={() => togglePanel(panel.id)}
+              onClick={() => toggleWorkspacePanel(panel)}
               active={isPanelVisible(panel)}
               title={isPanelVisible(panel) ? `Hide ${panel.title.toLowerCase()}` : `Show ${panel.title.toLowerCase()}`}
               icon={panel.icon}
@@ -200,7 +260,13 @@ export function DevWorkspace() {
       {/* Main workspace — docked panels in resizable Groups                 */}
       {/* ----------------------------------------------------------------- */}
       <div className="flex-1 overflow-hidden relative">
-        <Group orientation="vertical" className="h-full" id="dev-v">
+        <Group
+          orientation="vertical"
+          className="h-full"
+          id={`dev-v-${dockedBottom?.id ?? "main"}`}
+          defaultLayout={verticalLayout.defaultLayout}
+          onLayoutChanged={verticalLayout.onLayoutChanged}
+        >
           {vertChildren}
         </Group>
 
@@ -211,8 +277,12 @@ export function DevWorkspace() {
             position={panel.position}
             title={panel.title}
             icon={panel.icon}
-            onClose={closeFn(panel)}
-            onDock={() => setPanelDocked(panel.id, true)}
+            onClose={() => closePanel(panel)}
+            onDock={() => {
+              const active = activeDockedFor(panel.position);
+              if (active && active.id !== panel.id) setPanelVisible(active, false);
+              setPanelDocked(panel.id, true, panel.position);
+            }}
           >
             <panel.component />
           </FlyoutSurface>

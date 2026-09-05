@@ -12,6 +12,8 @@ interface TerminalTabInfo {
   title: string;
 }
 
+export type DevPanelPosition = "right" | "bottom";
+
 export interface DevPanelState {
   // Flyout panels (Gemini-style)
   showEditorPanel: boolean;
@@ -20,6 +22,8 @@ export interface DevPanelState {
   showPanel: Record<string, boolean>;
   /** Whether each panel is docked (inline layout) vs floating (overlay). Default: true (docked). */
   panelDocked: Record<string, boolean>;
+  /** The one panel occupying each dock edge. */
+  activeDockedPanel: Partial<Record<DevPanelPosition, string>>;
 
   // View mode: 'preview' (live output) or 'code' (editor + file tree)
   viewMode: "preview" | "code";
@@ -49,7 +53,8 @@ export interface DevPanelState {
   /** Toggle any panel by id — works for both built-in and registry panels */
   togglePanel: (id: string) => void;
   /** Set whether a panel is docked (inline) or floating (overlay) */
-  setPanelDocked: (id: string, docked: boolean) => void;
+  setPanelDocked: (id: string, docked: boolean, position?: DevPanelPosition) => void;
+  setActiveDockedPanel: (position: DevPanelPosition, id: string | undefined) => void;
   setViewMode: (mode: "preview" | "code") => void;
 
   // Terminal tab actions
@@ -76,6 +81,7 @@ export const useDevPanelStore = create<DevPanelState>()(
       showTerminalPanel: false,
       showPanel: {},
       panelDocked: {},   // empty = "use default" → all panels default to docked (true)
+      activeDockedPanel: {},
       viewMode: "code",
       terminalTabs: [],
       activeTerminalId: "",
@@ -109,8 +115,22 @@ export const useDevPanelStore = create<DevPanelState>()(
           if (id === "terminal") update.showTerminalPanel = next;
           return update;
         }),
-      setPanelDocked: (id, docked) =>
-        set((s) => ({ panelDocked: { ...s.panelDocked, [id]: docked } })),
+      setPanelDocked: (id, docked, position) =>
+        set((s) => {
+          const activeDockedPanel = { ...s.activeDockedPanel };
+          if (position) {
+            if (docked) activeDockedPanel[position] = id;
+            else if (activeDockedPanel[position] === id) delete activeDockedPanel[position];
+          }
+          return { panelDocked: { ...s.panelDocked, [id]: docked }, activeDockedPanel };
+        }),
+      setActiveDockedPanel: (position, id) =>
+        set((s) => {
+          const activeDockedPanel = { ...s.activeDockedPanel };
+          if (id) activeDockedPanel[position] = id;
+          else delete activeDockedPanel[position];
+          return { activeDockedPanel };
+        }),
       setViewMode: (mode) => set({ viewMode: mode }),
 
       addTerminalTab: (id, title) =>
@@ -146,6 +166,7 @@ export const useDevPanelStore = create<DevPanelState>()(
         // showPanel keys are persisted so registry panels survive reloads
         showPanel: state.showPanel,
         panelDocked: state.panelDocked,
+        activeDockedPanel: state.activeDockedPanel,
       }),
     }
   )
