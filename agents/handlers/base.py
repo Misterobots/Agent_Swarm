@@ -190,7 +190,7 @@ def _score_trace(lf_trace, langfuse_inst, score: float, output: str = None, use_
 @contextmanager
 def _langfuse_span(name: str, agent_name: str, model_id: str, input_text: str,
                    *, langfuse=None, use_langfuse: bool = False):
-    """Create a Langfuse generation span. Yields a dict for the caller to fill 'output'.
+    """Create a Langfuse generation span. Yields a dict for the caller to fill output/metadata.
 
     Design invariant: exactly ONE yield in every code path so that
     @contextmanager's generator protocol is always satisfied, even when the
@@ -203,7 +203,7 @@ def _langfuse_span(name: str, agent_name: str, model_id: str, input_text: str,
         RuntimeError: generator didn't stop after throw()
     Fix: separate setup (try/except before yield) from teardown (finally after).
     """
-    result = {"output": ""}
+    result = {"output": "", "metadata": {}}
     if use_langfuse and langfuse:
         # ── Phase 1: setup (before yield) ─────────────────────────────────
         # Failures here are non-fatal; we fall through to yield without a span.
@@ -227,9 +227,13 @@ def _langfuse_span(name: str, agent_name: str, model_id: str, input_text: str,
             # ── Phase 3: teardown (always runs, success or exception) ──────
             if ctx is not None:
                 try:
+                    metadata = {"response_len": len(result["output"])}
+                    supplied_metadata = result.get("metadata")
+                    if isinstance(supplied_metadata, dict):
+                        metadata.update(supplied_metadata)
                     langfuse.update_current_observation(
                         output={"response": result["output"][:4000]},
-                        metadata={"response_len": len(result["output"])},
+                        metadata=metadata,
                     )
                 except Exception:
                     pass
