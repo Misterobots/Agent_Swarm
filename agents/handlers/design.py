@@ -20,7 +20,10 @@ from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace, 
 
 logger = logging.getLogger("Router")
 
-_OD_WEB_URL = os.getenv("OPEN_DESIGN_WEB_URL", "http://192.168.2.101:17573")
+# Open Design serves its web UI from the same daemon port as its REST API.
+# Keep this LAN fallback accurate; a public, authenticated route must be
+# explicitly configured through OPEN_DESIGN_WEB_URL rather than guessed here.
+_OD_WEB_URL = os.getenv("OPEN_DESIGN_WEB_URL", "http://192.168.2.101:7456")
 
 # Internal skill name → OD daemon skill ID (where they differ)
 _SKILL_ID_MAP: dict[str, str] = {

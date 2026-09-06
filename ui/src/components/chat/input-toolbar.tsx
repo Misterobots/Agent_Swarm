@@ -1,12 +1,9 @@
 "use client";
 
 import type { FileAttachment } from "@/types/chat";
-import { Paperclip, X, Brain, Zap } from "lucide-react";
-import { Fragment, useRef } from "react";
-import { useSettingsStore } from "@/lib/stores/settings-store";
-import { cn } from "@/lib/utils/cn";
-import { FeatureCalloutBadge } from "@/components/onboarding/FeatureCalloutBadge";
-import type { FeatureKey } from "@/lib/onboarding/feature-registry";
+import { Paperclip, X } from "lucide-react";
+import { useRef } from "react";
+import { useFeaturePermissions } from "@/lib/hooks/use-feature-permissions";
 
 interface InputToolbarProps {
   attachments: FileAttachment[];
@@ -16,10 +13,8 @@ interface InputToolbarProps {
 
 export function InputToolbar({ attachments, onAttachmentsChange, disabled }: InputToolbarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const groundingDocs = useSettingsStore((s) => s.groundingDocs);
-  const setGroundingDocs = useSettingsStore((s) => s.setGroundingDocs);
-  const swarmMode = useSettingsStore((s) => s.swarmMode);
-  const setSwarmMode = useSettingsStore((s) => s.setSwarmMode);
+  const { isAllowed } = useFeaturePermissions();
+  const canAttachFiles = isAllowed("grounding_files");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -45,31 +40,6 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
     onAttachmentsChange(attachments.filter((a) => a.name !== name));
   };
 
-  const chips: Array<{
-    key: string;
-    label: string;
-    icon: typeof Brain;
-    active: boolean;
-    onToggle: () => void;
-    feature?: FeatureKey;
-  }> = [
-    {
-      key: "memory",
-      label: "Memory",
-      icon: Brain,
-      active: groundingDocs,
-      onToggle: () => setGroundingDocs(!groundingDocs),
-    },
-    {
-      key: "swarm",
-      label: "Swarm",
-      icon: Zap,
-      active: swarmMode,
-      onToggle: () => setSwarmMode(!swarmMode),
-      feature: "swarm_v1",
-    },
-  ];
-
   return (
     <div className="flex flex-col gap-1 max-w-5xl mx-auto w-full">
       {/* Attachment chips */}
@@ -89,49 +59,20 @@ export function InputToolbar({ attachments, onAttachmentsChange, disabled }: Inp
         </div>
       )}
 
-      {/* Mode chips + attach button row */}
+      {/* Attachments use the same server-enforced feature policy as file grounding. */}
       <div className="flex items-center gap-1.5 px-4 py-1">
         {/* Attach */}
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || !canAttachFiles}
           onClick={() => fileRef.current?.click()}
           className="inline-flex items-center gap-1.5 text-xs text-[var(--chat-muted)] hover:text-[var(--chat-text)] transition-colors disabled:opacity-40 mr-1"
-          title="Attach file"
+          title={canAttachFiles ? "Attach file" : "File attachments are disabled by your administrator"}
         >
           <Paperclip size={13} />
         </button>
         <input ref={fileRef} type="file" multiple hidden onChange={handleFileChange} />
 
-        {/* Divider */}
-        <div className="w-px h-4 bg-[var(--chat-border)] mx-0.5" />
-
-        {/* Mode chips */}
-        {chips.map(({ key, label, icon: Icon, active, onToggle, feature }) => {
-          const button = (
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={onToggle}
-              className={cn(
-                "inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 sm:py-0.5 rounded-full border transition-all",
-                active
-                  ? "bg-[color:color-mix(in_srgb,var(--chat-accent)_15%,transparent)] border-[color:color-mix(in_srgb,var(--chat-accent)_50%,transparent)] text-[var(--chat-accent)]"
-                  : "border-[var(--chat-border)] text-[var(--chat-muted)] hover:text-[var(--chat-text)] hover:border-[color:color-mix(in_srgb,var(--chat-border)_80%,var(--chat-text))]"
-              )}
-            >
-              <Icon size={12} />
-              {label}
-            </button>
-          );
-          return feature ? (
-            <FeatureCalloutBadge key={key} feature={feature}>
-              {button}
-            </FeatureCalloutBadge>
-          ) : (
-            <Fragment key={key}>{button}</Fragment>
-          );
-        })}
       </div>
     </div>
   );

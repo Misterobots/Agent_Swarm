@@ -720,6 +720,8 @@ def _enforce_chat_features(request: ChatRequest, http_request: Request) -> None:
     if request.grounding_web: required.update(("research", "grounding_web"))
     if request.grounding_docs: required.update(("research", "grounding_docs"))
     if request.grounding_file or request.attachments: required.add("grounding_files")
+    if request.ultraplan_mode: required.add("planning")
+    if request.swarm_mode: required.add("swarm")
     if request.memory_enabled: required.add("memory")
     if request.design_mode or request.workshop_mode: required.add("design")
     denied = sorted(key for key in required if not user_permissions.feature_allowed(_permission_owner(http_request), key))
@@ -1387,12 +1389,14 @@ async def list_models(request: Request):
         }]
         # A curated operational catalog is safer than accepting arbitrary
         # Ollama names. This remains independent from role assignments.
-        from model_registry import get_user_selectable_models
-        for spec in get_user_selectable_models():
+        from model_registry import get_catalog_models
+        for spec in get_catalog_models():
             base_models.append({
                 "id": spec.name, "object": "model", "created": _ts,
-                "owned_by": "MarsRL", "label": spec.name,
+                "owned_by": spec.provider, "label": spec.name,
                 "description": spec.description, "available": spec.available,
+                "context_window": spec.context_window,
+                "source_url": spec.source_url,
             })
 
         uid = request.headers.get("X-authentik-uid", "").strip()

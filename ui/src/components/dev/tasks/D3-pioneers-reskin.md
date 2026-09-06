@@ -1,6 +1,6 @@
 # Task D3 — Pioneers reskin
 
-**Status:** Ready (no blockers)  
+**Status:** Complete — implemented in `fc785c2` / `de66758`
 **Conflict zones touched:** none (`pioneers/page.tsx` is not in the conflict-zone table)  
 **Estimated effort:** 2–4 hours  
 **Dependencies:** none (purely visual)
@@ -323,12 +323,12 @@ File a follow-up task once `TeamBuilderSettings`'s data API is known.
 
 ## Acceptance criteria
 
-- [ ] No hardcoded color gradients (`from-*-500`, `to-*-500`) anywhere in the file
-- [ ] No `animate-pulse` on the Sparkles icon (ok to keep on status dots)
-- [ ] No `@keyframes gridScroll` or animated background grid
-- [ ] No "consciousness parameters", "SYNCHRONIZED", "Neural Core" copy
-- [ ] Agent cards are rendered from a data array, not 7 individual JSX blocks
-- [ ] Page looks at home when navigated to from the sidebar (matches Memex light
+- [x] No hardcoded color gradients (`from-*-500`, `to-*-500`) anywhere in the file
+- [x] No `animate-pulse` on the Sparkles icon (ok to keep on status dots)
+- [x] No `@keyframes gridScroll` or animated background grid
+- [x] No "consciousness parameters", "SYNCHRONIZED", "Neural Core" copy
+- [x] Agent cards are rendered from a data array, not 7 individual JSX blocks
+- [x] Page looks at home when navigated to from the sidebar (matches Memex light
   and dark modes, and LCARS)
-- [ ] `<TeamBuilderSettings />` still renders correctly below the roster
-- [ ] TypeScript clean, `npm run build` passes
+- [x] `<TeamBuilderSettings />` still renders correctly below the roster
+- [x] TypeScript clean, `npm run build` passes

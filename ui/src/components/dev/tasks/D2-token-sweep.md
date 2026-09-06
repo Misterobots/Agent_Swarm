@@ -1,6 +1,6 @@
 # Task D2 — Token sweep in page.tsx
 
-**Status:** Ready (no blockers, but `../../app/dev/page.tsx` is a conflict-zone file — claim it in the tracker before branching)  
+**Status:** Complete — implemented in `fc785c2` / `de66758`
 **Conflict zones touched:** `../../app/dev/page.tsx`  
 **Estimated effort:** 30 minutes  
 **Dependencies:** none
@@ -164,13 +164,13 @@ the start.
 
 ## Acceptance criteria
 
-- [ ] "Agent Mode" active state uses teal/accent colour matching the chat mode
+- [x] "Agent Mode" active state uses teal/accent colour matching the chat mode
   toggles — not green
-- [ ] No `text-white` in the toolbar
-- [ ] "Files" button is gone
-- [ ] Gear Settings button is gone
-- [ ] No TypeScript errors (all removed imports and destructures cleaned up)
-- [ ] `npm run build` passes
-- [ ] Switching to Memex light theme: Agent Mode still readable (accent-strong
+- [x] No `text-white` in the toolbar
+- [x] "Files" button is gone
+- [x] Gear Settings button is gone
+- [x] No TypeScript errors (all removed imports and destructures cleaned up)
+- [x] `npm run build` passes
+- [x] Switching to Memex light theme: Agent Mode still readable (accent-strong
   is dark on light backgrounds)
-- [ ] Switching to LCARS amber: Agent Mode takes on the purple accent
+- [x] Switching to LCARS amber: Agent Mode takes on the purple accent

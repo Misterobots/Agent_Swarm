@@ -180,6 +180,11 @@ CONTEXT_WINDOWS: dict[str, int] = {
     # Reasoning / other
     "phi4-reasoning:14b": 16384,
     "deepseek-r1:32b": 32768,
+    # Hugging Face catalog entries (native/deployment context advertised by
+    # their model cards; they require a compatible remote serving backend).
+    "IFM/K2-Horizon-32B": 524288,
+    "IFM/K2-Horizon-7B": 524288,
+    "inclusionAI/Ling-3.0-tiny": 262144,
     "minicpm-v:latest": 8192,
     "llama3.2:3b": 8192,
     "default": 8192,

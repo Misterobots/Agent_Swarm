@@ -22,6 +22,8 @@ FEATURES: dict[str, str] = {
     "grounding_web": "Web grounding",
     "grounding_docs": "Document grounding",
     "grounding_files": "File grounding",
+    "planning": "Planning",
+    "swarm": "Swarm coordination",
     "memory": "Memory",
     "routines": "Routines and scheduled work",
     "design": "Design",

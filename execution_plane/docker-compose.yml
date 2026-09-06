@@ -420,6 +420,8 @@ services:
       - "VALID_API_KEYS={\"sk-coder-identity\": \"coding_user\", \"sk-devops-identity\": \"devops_user\"}"
       # Open Design daemon (LAN-accessible from agent_runtime on same execution_net)
       - OPEN_DESIGN_URL=http://open_design:7456
+      # Browser-facing Studio URL; override only with an authenticated gateway URL.
+      - OPEN_DESIGN_WEB_URL=http://192.168.2.101:7456
       # SPIFFE Workload API socket path
       - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
       - PYTHONPATH=/app
@@ -1060,6 +1062,7 @@ services:
       - EVICT_CONTAINER_RESTART=true
       - "VALID_API_KEYS={\"sk-coder-identity\": \"coding_user\", \"sk-devops-identity\": \"devops_user\"}"
       - OPEN_DESIGN_URL=http://open_design:7456
+      - OPEN_DESIGN_WEB_URL=http://192.168.2.101:7456
       - SWARM_DEVHARNESS_WORKERS=true
       - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent.sock
       - PYTHONPATH=/app
