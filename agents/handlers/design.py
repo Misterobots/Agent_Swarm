@@ -9,6 +9,8 @@ file-upload endpoint is not available in v0.5.0).
 
 import logging
 import os
+import queue
+import threading
 import time
 import uuid
 
@@ -74,6 +76,10 @@ def handle_design(user_input: str, ctx: dict):
         yield {"type": "log", "content": f"[DesignStudio] OD project: {project_id}"}
     except Exception as _e:
         logger.warning("[DesignStudio] OD project creation failed (non-fatal): %s", _e)
+        yield {
+            "type": "status",
+            "content": "🎨 Design Studio: Studio link is unavailable; continuing with a standalone design artifact.",
+        }
 
     # Generate HTML locally via Ollama (direct chat API with assistant prefill).
     # Prefilling the assistant turn with "<!DOCTYPE html>" forces the model to begin
@@ -221,34 +227,84 @@ def handle_design(user_input: str, ctx: dict):
         ) as span_result:
             with request_lock(context="text"):
                 yield _emit_stream_mode("responding")
-                _resp = _req.post(
-                    f"{resolved_host}/api/chat",
-                    json={
-                        "model": resolved_model,
-                        "messages": _messages,
-                        "stream": True,
-                        "options": _opts,
-                    },
-                    stream=True,
-                    timeout=300,
-                )
-                _resp.raise_for_status()
+                # The model can spend minutes connecting or producing a detailed
+                # artifact. Read it in a worker so this generator can keep the
+                # browser connection alive and report tangible progress.
+                _stream_events: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=64)
+                _STREAM_DONE = object()
+
+                def _read_model_stream() -> None:
+                    try:
+                        with _req.post(
+                            f"{resolved_host}/api/chat",
+                            json={
+                                "model": resolved_model,
+                                "messages": _messages,
+                                "stream": True,
+                                "options": _opts,
+                            },
+                            stream=True,
+                            timeout=300,
+                        ) as _response:
+                            _response.raise_for_status()
+                            for _line in _response.iter_lines():
+                                _stream_events.put(("line", _line))
+                    except Exception as _stream_error:
+                        _stream_events.put(("error", _stream_error))
+                    finally:
+                        _stream_events.put(("done", _STREAM_DONE))
+
+                threading.Thread(
+                    target=_read_model_stream,
+                    daemon=True,
+                    name="design-model-stream",
+                ).start()
+
                 # Prepend the prefill we injected so parse_artifact_html sees a
                 # complete document from the very first character.
                 full_output = "<!DOCTYPE html>\n<html lang=\"en\">"
                 import json as _json
-                for _line in _resp.iter_lines():
-                    if not _line:
+                _started_at = time.monotonic()
+                _last_progress_at = _started_at
+                _model_finished = False
+                while not _model_finished:
+                    try:
+                        _kind, _payload = _stream_events.get(timeout=15.0)
+                    except queue.Empty:
+                        _elapsed = int(time.monotonic() - _started_at)
+                        yield {"type": "heartbeat"}
+                        yield {
+                            "type": "status",
+                            "content": f"🎨 Design Studio: Generating design… {_elapsed}s elapsed; waiting for model output.",
+                        }
+                        _last_progress_at = time.monotonic()
+                        continue
+
+                    if _kind == "error":
+                        raise _payload  # handled by the Design Studio error path below
+                    if _kind == "done":
+                        _model_finished = True
+                        continue
+                    if not _payload:
                         continue
                     try:
-                        _evt = _json.loads(_line)
+                        _evt = _json.loads(_payload)
                     except Exception:
                         continue
                     _token = _evt.get("message", {}).get("content", "")
                     if _token:
                         full_output += _token
+                    _now = time.monotonic()
+                    if _now - _last_progress_at >= 15.0:
+                        _elapsed = int(_now - _started_at)
+                        yield {"type": "heartbeat"}
+                        yield {
+                            "type": "status",
+                            "content": f"🎨 Design Studio: Drafting artifact… {_elapsed}s elapsed; {len(full_output):,} characters received.",
+                        }
+                        _last_progress_at = _now
                     if _evt.get("done"):
-                        break
+                        _model_finished = True
             span_result["output"] = full_output[:500]
 
     except Exception as e:
