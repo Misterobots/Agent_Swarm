@@ -1,6 +1,6 @@
 # Task D0 — Delete orphaned files
 
-**Status:** Ready (no blockers)  
+**Status:** Partially completed — legacy workspace scaffold removed
 **Conflict zones touched:** none  
 **Estimated effort:** 5 minutes
 
@@ -14,9 +14,9 @@ Keeping them causes two problems:
 
 1. An agent reading the directory thinks these components are active and may
    edit them instead of the real live files.
-2. `dev-workspace-working.tsx` imports `FileTree`, `DevOpsPanel`, `GitPanel`,
-   and `LogViewer`, making them appear "used" when the file itself is never
-   imported by anything.
+2. `dev-workspace-working.tsx` previously imported `FileTree`, `DevOpsPanel`,
+   `GitPanel`, and `LogViewer`, making them appear "used" when the file itself
+   was never imported by anything. DevOps, Git, and Logs are now registry panels.
 
 ---
 
@@ -39,16 +39,15 @@ These are referenced by nothing:
 | `ui/src/components/chat/doc-grounding-toggle-Justin-PC.tsx` | Editor-conflict copy |
 | `ui/src/components/chat/file-grounding-toggle-Justin-PC.tsx` | Editor-conflict copy |
 
-### Delete ONLY after P0 is confirmed merged
+### Completed migration
 
-`dev-workspace-working.tsx` is the P0 integration scaffold. It imports the
-stub panels (file-tree, git-panel, devops-panel, log-viewer) that W1/Q2/Q3/Q7
-will revive. Delete it only after those tasks have migrated their panels to the
-registry and P0 marks the scaffold done.
+`dev-workspace-working.tsx` was the P0 integration scaffold. Its DevOps, Git,
+and Logs sidebar has been migrated to the panel registry; its stale quick-action
+toolbar was retired rather than exposing incomplete deployment commands.
 
 | File | Wait for |
 |------|----------|
-| `ui/src/components/dev/dev-workspace-working.tsx` | P0 merged |
+| `ui/src/components/dev/dev-workspace-working.tsx` | Removed |
 
 ---
 
@@ -68,8 +67,8 @@ registry and P0 marks the scaffold done.
    chore(dev): remove orphaned workspace files and editor-conflict copies
    ```
 
-4. Do **not** delete `dev-workspace-working.tsx` — add a comment to the top if
-   you want to signal it is pending P0, but leave the file.
+4. Verify the active `dev-workspace.tsx` imports each migrated panel for its
+   registry side effect before deleting the scaffold.
 
 ---
 

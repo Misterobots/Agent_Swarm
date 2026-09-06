@@ -136,11 +136,13 @@ export const useDevPanelStore = create<DevPanelState>()(
       addTerminalTab: (id, title) =>
         set((s) => ({ terminalTabs: [...s.terminalTabs, { id, title }] })),
       removeTerminalTab: (id) =>
-        set((s) => ({
-          terminalTabs: s.terminalTabs.filter((t) => t.id !== id),
-          activeTerminalId:
-            s.activeTerminalId === id ? (s.terminalTabs[0]?.id || "") : s.activeTerminalId,
-        })),
+        set((s) => {
+          const terminalTabs = s.terminalTabs.filter((tab) => tab.id !== id);
+          return {
+            terminalTabs,
+            activeTerminalId: s.activeTerminalId === id ? (terminalTabs[0]?.id || "") : s.activeTerminalId,
+          };
+        }),
       setActiveTerminal: (id) => set({ activeTerminalId: id }),
 
       setSelectedNode: (node) => set({ selectedNode: node }),

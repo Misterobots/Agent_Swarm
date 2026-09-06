@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { createElement, useState, useEffect, useCallback } from "react";
 import { 
   Server, 
   Play, 
-  Square, 
   RotateCw, 
   Terminal as TerminalIcon, 
   Activity,
@@ -13,7 +12,7 @@ import {
   Circle,
   ExternalLink
 } from "lucide-react";
-import { useDevStore } from "@/lib/stores/dev-store";
+import { registerPanel } from "./dev-panels-registry";
 
 interface PioneerNode {
   name: string;
@@ -34,7 +33,6 @@ const PIONEER_NODES: PioneerNode[] = [
   { name: "Lovelace", ip: "192.168.2.101", status: "unknown", isLocal: true },
   { name: "Turing", ip: "192.168.2.103", status: "unknown", isLocal: false },
   { name: "Hopper", ip: "192.168.2.102", status: "unknown", isLocal: false },
-  { name: "BMO", ip: "192.168.2.106", status: "unknown", isLocal: false },
 ];
 
 const SERVICES: Service[] = [
@@ -43,15 +41,15 @@ const SERVICES: Service[] = [
   { name: "PostgreSQL", container: "postgres", node: "Hopper", status: "unknown", port: 5432 },
   { name: "Redis", container: "redis", node: "Hopper", status: "unknown", port: 6379 },
   { name: "Langfuse", container: "langfuse", node: "Hopper", status: "unknown", port: 3000 },
-  { name: "Ollama", container: "ollama", node: "Turing", status: "unknown", port: 11434 },
+  { name: "Ollama (Turing)", container: "ollama-turing", node: "Turing", status: "unknown", port: 11434 },
   { name: "Ollama (Lovelace)", node: "Lovelace", status: "unknown", port: 11434 },
 ];
 
 export function DevOpsPanel() {
-  const { selectedNode } = useDevStore();
   const [nodes, setNodes] = useState<PioneerNode[]>(PIONEER_NODES);
   const [services, setServices] = useState<Service[]>(SERVICES);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -68,23 +66,26 @@ export function DevOpsPanel() {
     }
   };
 
-  const refreshStatus = async () => {
+  const refreshStatus = useCallback(async () => {
     setLoading(true);
     try {
-      // TODO: Call backend API to get real status
-      // For now, simulate network check
       const response = await fetch("/api/devops/status");
       if (response.ok) {
         const data = await response.json();
-        setNodes(data.nodes || nodes);
-        setServices(data.services || services);
+        setNodes(data.nodes || PIONEER_NODES);
+        setServices(data.services || SERVICES);
+        setMessage(null);
+      } else if (response.status === 403) {
+        setMessage("Administrator access is required to view infrastructure status.");
+      } else {
+        setMessage("Could not refresh infrastructure status.");
       }
     } catch (error) {
       console.error("Failed to refresh status:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const executeSSH = async (node: string, command: string) => {
     try {
@@ -94,8 +95,7 @@ export function DevOpsPanel() {
         body: JSON.stringify({ node, command }),
       });
       const data = await response.json();
-      console.log("SSH result:", data);
-      // TODO: Show result in terminal or notification
+      setMessage(response.ok && data.success ? `${node}: ${data.stdout?.trim() || "Command completed."}` : data.stderr?.trim() || data.error || "Command failed.");
     } catch (error) {
       console.error("SSH command failed:", error);
     }
@@ -103,6 +103,7 @@ export function DevOpsPanel() {
 
   const restartService = async (service: Service) => {
     if (!service.container) return;
+    if (!window.confirm(`Restart ${service.name} on ${service.node}?`)) return;
     
     const node = service.node.toLowerCase();
     const command = `docker restart ${service.container}`;
@@ -112,22 +113,11 @@ export function DevOpsPanel() {
     setTimeout(refreshStatus, 2000);
   };
 
-  const rebuildService = async (service: Service) => {
-    if (!service.container) return;
-    
-    const node = service.node.toLowerCase();
-    const serviceName = service.container.replace("_", "-"); // Convert to compose service name
-    const command = `cd /home/misterobots/Home_AI_Lab && docker compose -f turing_gateway/docker-compose.yml build ${serviceName} && docker compose -f turing_gateway/docker-compose.yml up -d ${serviceName}`;
-    await executeSSH(node, command);
-    
-    setTimeout(refreshStatus, 5000);
-  };
-
   useEffect(() => {
     refreshStatus();
     const interval = setInterval(refreshStatus, 30000); // Refresh every 30s
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshStatus]);
 
   return (
     <div className="flex flex-col h-full bg-[var(--chat-bg)] overflow-hidden">
@@ -151,6 +141,7 @@ export function DevOpsPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
+        {message && <div className="px-3 py-2 text-xs text-[var(--chat-muted)] bg-[var(--chat-input-bg)] border border-[var(--chat-border)] rounded">{message}</div>}
         {/* Pioneer Nodes Section */}
         <section>
           <h3 className="text-xs font-semibold text-[var(--chat-muted)] uppercase mb-2 flex items-center gap-2">
@@ -236,13 +227,6 @@ export function DevOpsPanel() {
                       >
                         <RotateCw size={14} className="text-[var(--chat-accent)]" />
                       </button>
-                      <button
-                        onClick={() => rebuildService(service)}
-                        className="p-1.5 rounded hover:bg-[var(--chat-hover)] transition-colors"
-                        title="Rebuild & restart"
-                      >
-                        <Play size={14} className="text-green-500" />
-                      </button>
                     </>
                   )}
                 </div>
@@ -251,39 +235,16 @@ export function DevOpsPanel() {
           </div>
         </section>
 
-        {/* Quick Actions Section */}
-        <section>
-          <h3 className="text-xs font-semibold text-[var(--chat-muted)] uppercase mb-2">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => executeSSH("turing", "cd /home/misterobots/Home_AI_Lab && git pull")}
-              className="px-3 py-2 text-xs bg-[var(--chat-input-bg)] hover:bg-[var(--chat-hover)] border border-[var(--chat-border)] rounded transition-colors text-left"
-            >
-              Git Pull (Turing)
-            </button>
-            <button
-              onClick={() => executeSSH("turing", "docker compose -f /home/misterobots/Home_AI_Lab/turing_gateway/docker-compose.yml restart")}
-              className="px-3 py-2 text-xs bg-[var(--chat-input-bg)] hover:bg-[var(--chat-hover)] border border-[var(--chat-border)] rounded transition-colors text-left"
-            >
-              Restart All Services
-            </button>
-            <button
-              onClick={() => executeSSH("hopper", "docker logs -f postgres")}
-              className="px-3 py-2 text-xs bg-[var(--chat-input-bg)] hover:bg-[var(--chat-hover)] border border-[var(--chat-border)] rounded transition-colors text-left"
-            >
-              View PostgreSQL Logs
-            </button>
-            <button
-              onClick={() => executeSSH("turing", "docker logs -f agent_runtime")}
-              className="px-3 py-2 text-xs bg-[var(--chat-input-bg)] hover:bg-[var(--chat-hover)] border border-[var(--chat-border)] rounded transition-colors text-left"
-            >
-              View Agent Runtime Logs
-            </button>
-          </div>
-        </section>
       </div>
     </div>
   );
 }
+
+registerPanel({
+  id: "devops",
+  title: "DevOps",
+  position: "right",
+  icon: createElement(Activity, { size: 14 }),
+  component: DevOpsPanel,
+  toolbarOrder: 50,
+});

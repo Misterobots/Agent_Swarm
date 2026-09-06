@@ -1,96 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Socket } from "node:net";
 
-const PIONEER_NODES = {
+type ServiceStatus = "running" | "stopped" | "error" | "unknown";
+
+const NODES = {
   lovelace: { ip: "192.168.2.101", isLocal: true },
   turing: { ip: "192.168.2.103", isLocal: false },
   hopper: { ip: "192.168.2.102", isLocal: false },
-  bmo: { ip: "192.168.2.106", isLocal: false },
-};
+} as const;
 
 const SERVICES = [
-  { name: "Agent Runtime", container: "agent_runtime", node: "turing", port: 5001 },
-  { name: "Memex UI", container: "memex_ui", node: "turing", port: 3000 },
+  { name: "Agent Runtime", container: "agent_runtime", node: "turing", port: 8008 },
+  { name: "Memex UI", container: "memex_ui", node: "turing", port: 3200 },
+  { name: "Ollama (Turing)", container: "ollama-turing", node: "turing", port: 11434 },
   { name: "PostgreSQL", container: "postgres", node: "hopper", port: 5432 },
   { name: "Redis", container: "redis", node: "hopper", port: 6379 },
-  { name: "Langfuse", container: "langfuse", node: "hopper", port: 3001 },
-  { name: "Ollama", container: "ollama", node: "turing", port: 11434 },
-  { name: "Ollama (Lovelace)", node: "lovelace", port: 11434 },
-];
+  { name: "Langfuse", container: "langfuse", node: "hopper", port: 3000 },
+  { name: "Ollama (Lovelace)", container: "ollama", node: "lovelace", port: 11434 },
+] as const;
 
-async function checkNodeStatus(node: string, ip: string): Promise<"online" | "offline"> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
-    
-    // Try to ping the node (you might need to adjust this based on your setup)
-    const response = await fetch(`http://${ip}:11434/api/tags`, {
-      signal: controller.signal,
-    }).catch(() => null);
-    
-    clearTimeout(timeout);
-    return response?.ok ? "online" : "offline";
-  } catch {
-    return "offline";
-  }
+function isAdmin(request: NextRequest) {
+  const groups = request.headers.get("x-authentik-groups") ?? "";
+  return ["memex-admin", "authentik Admins"].some((group) => groups.includes(group));
 }
 
-async function checkServiceStatus(
-  service: typeof SERVICES[0]
-): Promise<"running" | "stopped" | "error" | "unknown"> {
-  const node = PIONEER_NODES[service.node as keyof typeof PIONEER_NODES];
-  if (!node) return "unknown";
-
-  // If it's a service without a container (like Ollama on Lovelace), just check the port
-  if (!service.container) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 1000);
-      
-      const response = await fetch(`http://${node.ip}:${service.port}`, {
-        signal: controller.signal,
-      }).catch(() => null);
-      
-      clearTimeout(timeout);
-      return response ? "running" : "stopped";
-    } catch {
-      return "stopped";
-    }
-  }
-
-  // For containerized services, we'd need to SSH and check docker ps
-  // For now, return unknown - this will be implemented with the SSH endpoint
-  return "unknown";
+function probePort(host: string, port: number, timeoutMs = 1500): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new Socket();
+    const finish = (result: boolean) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+    socket.connect(port, host);
+  });
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    // Check node status
-    const nodeChecks = await Promise.all(
-      Object.entries(PIONEER_NODES).map(async ([name, { ip, isLocal }]) => ({
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        ip,
-        status: await checkNodeStatus(name, ip),
-        isLocal,
-      }))
-    );
+  if (!isAdmin(request)) return NextResponse.json({ error: "Administrator access required" }, { status: 403 });
 
-    // Check service status
-    const serviceChecks = await Promise.all(
-      SERVICES.map(async (service) => ({
-        ...service,
-        status: await checkServiceStatus(service),
-      }))
-    );
+  const services = await Promise.all(SERVICES.map(async (service) => {
+    const node = NODES[service.node];
+    const reachable = await probePort(node.ip, service.port);
+    return { ...service, node: service.node[0].toUpperCase() + service.node.slice(1), status: reachable ? "running" : "stopped" as ServiceStatus };
+  }));
+  const nodes = Object.entries(NODES).map(([name, node]) => ({
+    name: name[0].toUpperCase() + name.slice(1),
+    ip: node.ip,
+    isLocal: node.isLocal,
+    status: services.some((service) => service.node.toLowerCase() === name && service.status === "running") ? "online" : "offline",
+  }));
 
-    return NextResponse.json({
-      nodes: nodeChecks,
-      services: serviceChecks,
-    });
-  } catch (error) {
-    console.error("DevOps status check failed:", error);
-    return NextResponse.json(
-      { error: "Failed to check status" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({ nodes, services, checkedAt: new Date().toISOString() });
 }

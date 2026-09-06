@@ -19,6 +19,9 @@ import { ProjectSwitcher } from "./project-switcher";
 import { MobileDevView } from "./mobile-dev-view";
 import "./goals-panel"; // register Goals panel (side-effect)
 import "./notes-panel"; // register Notes panel (side-effect)
+import "./devops-panel"; // register DevOps panel (side-effect)
+import "./git-panel"; // register Git panel (side-effect)
+import "./log-viewer"; // register Logs panel (side-effect)
 
 // ---------------------------------------------------------------------------
 // Built-in panel registrations (Editor + Terminal)
