@@ -673,6 +673,8 @@ class ChatRequest(BaseModel):
     swarm_mode: bool = False          # route through Lamport multi-agent coordinator
     design_mode: bool = False         # route through Open Design Studio
     workshop_mode: bool = False       # route through Product Workshop (Grill Me)
+    gauntlet_mode: bool = False       # Pioneer-backed builder/critic loop against a supplied quality bar
+    gauntlet_bar: Optional[str] = None  # named, fetchable reference used by the independent critic
     solving_max_iter: Optional[int] = None  # MarsRL max iterations (0 = unlimited, overrides config)
     solving_max_time: Optional[int] = None  # MarsRL max time in seconds (0 = unlimited, overrides config)
     # Developer-mode granular per-agent budgets. Each overrides the overall budget for that agent.
@@ -691,6 +693,29 @@ class ChatRequest(BaseModel):
 # a convenience only; API callers can otherwise submit arbitrary model IDs.
 _DEFAULT_CHAT_MODEL = os.getenv("MEMEX_DEFAULT_MODEL", "qwen3:14b")
 _DEFAULT_MODEL_ALIASES = {"", "default", "memex-default", "Home-AI-Swarm", "swarm-standard"}
+
+
+def _gauntlet_prompt(goal: str, bar: str) -> str:
+    """Frame a Collective run as a measurable builder-versus-critic loop.
+
+    Pioneer assignment remains the coordinator's responsibility: it selects
+    distinct personas for the builder, researcher, and verifier roles and
+    streams their identities to the client.
+    """
+    return f"""[GAUNTLET LOOP]
+Goal: {goal}
+
+Quality bar: {bar}
+
+First obtain the named bar and verify it is fetchable and comparable. Break the
+goal into the smallest independently judgeable pieces. For each piece, use
+separate Pioneer-backed builder and critic/verifier workers with fresh context.
+The critic must inspect the actual output beside the real bar with labels
+removed, choose the stronger result, and state one concrete remaining gap. Do
+not let a builder judge its own work. Iterate until the critic selects ours, or
+the user stops the run. Keep the live activity trace current with the Pioneer,
+phase, comparison result, and next gap. Do not stop after an arbitrary round
+count."""
 
 
 def _authentik_groups(request: Request) -> list[str]:
@@ -2185,6 +2210,15 @@ async def chat_completions(request: ChatRequest, http_request: Request):
 
     _enforce_chat_features(request, http_request)
     _apply_model_policy(request, http_request)
+    if request.gauntlet_mode:
+        bar = (request.gauntlet_bar or "").strip()
+        if not bar:
+            raise HTTPException(
+                status_code=422,
+                detail="Gauntlet mode requires a named, fetchable quality bar (URL, product, repository, or publication).",
+            )
+        request.gauntlet_bar = bar
+        request.swarm_mode = True
 
     # --- Dev workspace agentic harness (handles dev_mode for ANY model) ---
     # Must precede the provider_for() dispatch below: local Ollama models resolve
@@ -2344,6 +2378,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     history = [{"role": m.role, "content": m.content} for m in request.messages[:-1]]
     # Extract latest prompt
     last_msg = request.messages[-1].content
+    if request.gauntlet_mode:
+        last_msg = _gauntlet_prompt(last_msg, request.gauntlet_bar or "")
     
     # Check for "Standard Mode" (OpenAI Compatibility)
     # Suppresses internal logs/status updates
