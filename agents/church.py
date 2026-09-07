@@ -784,7 +784,19 @@ def chat_swarm(
                         for _root, _dirs, _files in os.walk(_workspace_root):
                             _dirs[:] = [d for d in _dirs if not d.startswith(".") and d not in ("__pycache__", "node_modules", ".git", ".venv", "venv")]
                             for _fname in _files:
-                                if not _fname.endswith((".py", ".md", ".txt", ".json", ".yaml", ".yml", ".sh", ".env")):
+                                # File grounding is for user-owned source and documentation,
+                                # never credentials or deployment secrets.  Dotfiles are already
+                                # pruned above; retain this explicit guard for files such as .env
+                                # that can live at the workspace root.
+                                _lower_name = _fname.lower()
+                                if (
+                                    _lower_name == ".env"
+                                    or _lower_name.startswith(".env.")
+                                    or any(token in _lower_name for token in ("credential", "secret", "private_key"))
+                                    or _lower_name.endswith((".pem", ".key", ".p12", ".pfx"))
+                                ):
+                                    continue
+                                if not _lower_name.endswith((".py", ".md", ".txt", ".json", ".yaml", ".yml", ".sh")):
                                     continue
                                 _fpath = os.path.join(_root, _fname)
                                 _rel = os.path.relpath(_fpath, _workspace_root)

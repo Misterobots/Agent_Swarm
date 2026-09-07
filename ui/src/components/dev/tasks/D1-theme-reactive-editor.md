@@ -1,6 +1,6 @@
 # Task D1 — Theme-reactive editor + terminal
 
-**Status:** Ready (no blockers)  
+**Status:** Complete — implemented in `0729d2a` / `4d46489`
 **Conflict zones touched:** `tabbed-editor.tsx`, `tabbed-terminal.tsx` (both owned by this task — claim before branching)  
 **Estimated effort:** 2–3 hours  
 **Dependencies:** none (pure UI, no backend)
@@ -258,11 +258,11 @@ const term = new Terminal({
 
 ## Acceptance criteria
 
-- [ ] In Memex dark theme: editor and terminal have a near-black background
+- [x] In Memex dark theme: editor and terminal have a near-black background
   matching `--chat-bg`, teal accent cursor, readable text
-- [ ] In Memex light theme: editor background is `#f8f8fa`, not black
-- [ ] Switching themes in the sidebar theme picker updates both panels without
+- [x] In Memex light theme: editor background is `#f8f8fa`, not black
+- [x] Switching themes in the sidebar theme picker updates both panels without
   a page reload
-- [ ] In LCARS theme: purple accent drives cursor and keyword highlights
-- [ ] No TypeScript errors
-- [ ] `npm run build` completes cleanly
+- [x] In LCARS theme: purple accent drives cursor and keyword highlights
+- [x] No TypeScript errors
+- [x] `npm run build` completes cleanly

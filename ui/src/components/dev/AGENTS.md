@@ -97,8 +97,7 @@ automatically. **Never set auth headers manually** in client-side fetch calls.
 | `/api/v1/dev/approve/{call_id}` | tool approval | ✅ live |
 | `/api/v1/dev/deny/{call_id}` | tool denial | ✅ live |
 | `/ws/terminal` | terminal-pane | ✅ live |
-| `/api/devops/git/*` | git-panel, quick-actions-toolbar | ⚠️ partial (Q2, Q3) |
-| `/api/devops/ssh` | quick-actions-toolbar | ✅ live |
+| `/api/devops/git/*` | git-panel | ⚠️ partial (Q2, Q3) |
 | `/api/devops/logs/stream` | log-viewer | ⚠️ stub (Q7) |
 
 ---
@@ -169,8 +168,8 @@ Files no active task references. Verify nothing new imports them before deleting
 
 - `dev-workspace-old.tsx.bak`
 - `dev-workspace-flyout.tsx`
-- `dev-workspace-working.tsx` — only after W1/W2/W3/W4 panels have migrated to
-  the registry and P0 is confirmed merged; it is the integration scaffold
+- `dev-workspace-working.tsx` — removed after its DevOps, Git, and Logs sidebar
+  were migrated into the panel registry
 - `../../app/dev/page_stub.tsx`
 - `dev-error-boundary.tsx` — exported but never imported anywhere
 - `../../components/chat/chat-view-Justin-PC.tsx` and all other `*-Justin-PC.*`

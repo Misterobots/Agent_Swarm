@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { createElement, useState, useEffect, useRef } from "react";
 import { 
   FileText, 
   Search, 
@@ -12,8 +12,8 @@ import {
   AlertCircle,
   Info,
   AlertTriangle,
-  X
 } from "lucide-react";
+import { registerPanel } from "./dev-panels-registry";
 
 interface LogEntry {
   timestamp: string;
@@ -49,6 +49,17 @@ export function LogViewer() {
   const [showFilters, setShowFilters] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const logsContainerRef = useRef<HTMLDivElement>(null);
+  const controllersRef = useRef<Map<string, AbortController>>(new Map());
+  const pausedRef = useRef(isPaused);
+
+  useEffect(() => {
+    pausedRef.current = isPaused;
+  }, [isPaused]);
+
+  useEffect(() => () => {
+    controllersRef.current.forEach((controller) => controller.abort());
+    controllersRef.current.clear();
+  }, []);
 
   const getLevelIcon = (level: string) => {
     switch (level) {
@@ -84,9 +95,9 @@ export function LogViewer() {
     );
   };
 
-  const streamLogs = async (sourceId: string) => {
+  const streamLogs = async (sourceId: string, controller: AbortController) => {
     try {
-      const response = await fetch(`/api/devops/logs/stream?source=${sourceId}`);
+      const response = await fetch(`/api/devops/logs/stream?source=${sourceId}`, { signal: controller.signal });
       if (!response.ok) return;
 
       const reader = response.body?.getReader();
@@ -116,10 +127,10 @@ export function LogViewer() {
               source: raw.source ?? sourceId,
               message: raw.message ?? jsonStr,
             };
-            if (!isPaused) {
+            if (!pausedRef.current) {
               setLogs((prev) => [...prev.slice(-999), entry]); // Keep last 1000 logs
             }
-          } catch (e) {
+          } catch {
             // Plain text log line
             const entry: LogEntry = {
               timestamp: new Date().toISOString(),
@@ -127,30 +138,19 @@ export function LogViewer() {
               source: sourceId,
               message: jsonStr,
             };
-            if (!isPaused) {
+            if (!pausedRef.current) {
               setLogs((prev) => [...prev.slice(-999), entry]);
             }
           }
         }
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error(`Failed to stream logs from ${sourceId}:`, error);
-    }
-  };
-
-  const fetchLogs = async () => {
-    const activeSources = sources.filter((s) => s.active);
-    if (activeSources.length === 0) return;
-
-    try {
-      const sourceIds = activeSources.map((s) => s.id).join(",");
-      const response = await fetch(`/api/devops/logs?sources=${sourceIds}&limit=100`);
-      if (response.ok) {
-        const data = await response.json();
-        setLogs(data.logs || []);
+    } finally {
+      if (controllersRef.current.get(sourceId) === controller) {
+        controllersRef.current.delete(sourceId);
       }
-    } catch (error) {
-      console.error("Failed to fetch logs:", error);
     }
   };
 
@@ -192,12 +192,20 @@ export function LogViewer() {
   }, [filteredLogs, autoScroll]);
 
   useEffect(() => {
-    // Start streaming for active sources
-    const activeSources = sources.filter((s) => s.active);
-    activeSources.forEach((source) => {
-      streamLogs(source.id);
+    const activeIds = new Set(sources.filter((source) => source.active).map((source) => source.id));
+    controllersRef.current.forEach((controller, sourceId) => {
+      if (!activeIds.has(sourceId)) {
+        controller.abort();
+        controllersRef.current.delete(sourceId);
+      }
     });
-  }, [sources.map((s) => s.active).join(",")]);
+    activeIds.forEach((sourceId) => {
+      if (controllersRef.current.has(sourceId)) return;
+      const controller = new AbortController();
+      controllersRef.current.set(sourceId, controller);
+      void streamLogs(sourceId, controller);
+    });
+  }, [sources]);
 
   const activeSources = sources.filter((s) => s.active);
 
@@ -372,3 +380,12 @@ export function LogViewer() {
     </div>
   );
 }
+
+registerPanel({
+  id: "logs",
+  title: "Logs",
+  position: "right",
+  icon: createElement(FileText, { size: 14 }),
+  component: LogViewer,
+  toolbarOrder: 70,
+});

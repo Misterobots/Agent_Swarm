@@ -9,6 +9,8 @@ def test_missing_policy_preserves_existing_access(tmp_path):
     assert policy["configured"] is False
     assert policy["allowed_models"] is None
     assert all(policy["features"].values())
+    assert policy["features"]["planning"] is True
+    assert policy["features"]["swarm"] is True
     assert store.model_allowed("alice", "qwen3:14b")
 
 

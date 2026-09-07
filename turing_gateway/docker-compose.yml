@@ -503,7 +503,10 @@ services:
     env_file:
       - ../network.env
     environment:
-      - API_BASE_URL=http://agent_runtime:8000
+      # Web chat executes on Lovelace, where the primary GPU runtime lives.
+      # The name is pinned by extra_hosts below so this remains stable across
+      # the Turing compose network.
+      - API_BASE_URL=http://lovelace:8008
       - MEMPALACE_BASE_URL=http://mempalace:8200
       - LANGFUSE_URL=http://${HOPPER_IP:-192.168.2.102}:3000
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}

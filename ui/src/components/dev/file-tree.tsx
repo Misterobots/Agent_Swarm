@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useDevStore } from "@/lib/stores/dev-store";
 import type { DevPanelState } from "@/lib/stores/dev-panel-store";
+import { useAccess } from "@/lib/hooks/use-access";
 import { FileIcon, FolderIcon, GitBranch, ChevronRight, ChevronDown, FolderOpen, Loader2, Search, X } from "lucide-react";
 
 interface FileNode {
@@ -46,6 +47,13 @@ export function FileTree() {
   const [loading, setLoading] = useState(false);
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const { isAdmin, loading: accessLoading } = useAccess();
+
+  useEffect(() => {
+    if (!accessLoading && !isAdmin && selectedNode !== "workspace") {
+      setSelectedNode("workspace");
+    }
+  }, [accessLoading, isAdmin, selectedNode, setSelectedNode]);
 
   // Fetch file tree whenever the project changes
   useEffect(() => {
@@ -162,7 +170,7 @@ export function FileTree() {
 
   return (
     <div className="flex flex-col h-full bg-[var(--chat-bg)] border-r border-[var(--chat-border)]">
-      {/* Node Selector (admin only - TODO: check user role) */}
+      {/* Remote node targets are reserved for administrators. */}
       <div className="p-2 border-b border-[var(--chat-border)]">
         <select
           value={selectedNode}
@@ -170,9 +178,9 @@ export function FileTree() {
           className="w-full px-2 py-1 text-xs bg-[var(--chat-input-bg)] text-[var(--chat-text)] border border-[var(--chat-border)] rounded"
         >
           <option value="workspace">Workspace</option>
-          <option value="lovelace">Lovelace</option>
-          <option value="turing">Turing</option>
-          <option value="hopper">Hopper</option>
+          {isAdmin && <option value="lovelace">Lovelace</option>}
+          {isAdmin && <option value="turing">Turing</option>}
+          {isAdmin && <option value="hopper">Hopper</option>}
         </select>
       </div>
 

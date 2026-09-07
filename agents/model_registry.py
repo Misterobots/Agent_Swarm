@@ -54,6 +54,9 @@ class ModelSpec:
     alternatives: List[str] = field(default_factory=list)   # faster/lighter options
     available: bool = True                # False = not pulled locally yet
     recommended_for_roles: List[str] = field(default_factory=list)  # top pick for these roles
+    provider: str = "ollama"             # serving/catalog provider
+    source_url: Optional[str] = None      # upstream model or documentation URL
+    context_window: Optional[int] = None  # advertised native/deployment context
 
     @property
     def tier(self) -> str:
@@ -79,6 +82,9 @@ class ModelSpec:
             "alternatives": self.alternatives,
             "available": self.available,
             "estimated_load_seconds": self.estimated_load_seconds,
+            "provider": self.provider,
+            "source_url": self.source_url,
+            "context_window": self.context_window,
         }
 
 
@@ -233,6 +239,49 @@ MODELS: dict[str, ModelSpec] = {
         alternatives=[],
         available=True,
     ),
+    # ── Hugging Face catalog entries (not locally served yet) ─────────────
+    # These are intentionally unavailable until a compatible vLLM/SGLang
+    # endpoint is configured. They remain visible in /v1/models so the UI can
+    # distinguish cataloged candidates from runnable local Ollama models.
+    "IFM/K2-Horizon-32B": ModelSpec(
+        name="IFM/K2-Horizon-32B",
+        vram_gb=70.0,
+        capabilities=["text", "code", "reasoning"],
+        roles=_ALL_ROLES,
+        recommended_for_roles=["coordinator", "architect", "researcher"],
+        description="IFM K2-Horizon 32B dense reasoning model — native 512K context; HF/vLLM or SGLang required.",
+        alternatives=["qwen3.6:27b", "deepseek-r1:32b"],
+        available=False,
+        provider="huggingface",
+        source_url="https://huggingface.co/IFM/K2-Horizon-32B",
+        context_window=524288,
+    ),
+    "IFM/K2-Horizon-7B": ModelSpec(
+        name="IFM/K2-Horizon-7B",
+        vram_gb=14.0,
+        capabilities=["text", "code", "reasoning"],
+        roles=_ALL_ROLES,
+        recommended_for_roles=["coder", "researcher", "analyst"],
+        description="IFM K2-Horizon 7B dense reasoning model — native 512K context; HF/vLLM or SGLang required.",
+        alternatives=["qwen3:14b", "qwen3:8b"],
+        available=False,
+        provider="huggingface",
+        source_url="https://huggingface.co/IFM/K2-Horizon-7B",
+        context_window=524288,
+    ),
+    "inclusionAI/Ling-3.0-tiny": ModelSpec(
+        name="inclusionAI/Ling-3.0-tiny",
+        vram_gb=16.0,
+        capabilities=["text", "code", "reasoning"],
+        roles=_ALL_ROLES,
+        recommended_for_roles=["router", "analyst", "researcher"],
+        description="Ling 3.0 tiny hybrid-linear MoE — 7.9B total/1.3B active; HF/vLLM or SGLang required.",
+        alternatives=["qwen3:8b", "qwen3:14b"],
+        available=False,
+        provider="huggingface",
+        source_url="https://huggingface.co/inclusionAI/Ling-3.0-tiny",
+        context_window=262144,
+    ),
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -256,6 +305,11 @@ def get_models_for_role(role: str) -> List[ModelSpec]:
 def get_user_selectable_models() -> List[ModelSpec]:
     """Return models that users can assign in the team builder (have at least one role)."""
     return [m for m in MODELS.values() if m.roles and m.available]
+
+
+def get_catalog_models() -> List[ModelSpec]:
+    """Return all role-capable catalog entries, including unavailable candidates."""
+    return [m for m in MODELS.values() if m.roles]
 
 
 def is_large_model(name: str) -> bool:

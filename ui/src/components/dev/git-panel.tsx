@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { createElement, useState, useEffect, useCallback } from "react";
 import { 
   GitBranch, 
   GitCommit, 
-  GitPullRequest, 
   Upload, 
   Download, 
   RefreshCw,
@@ -13,11 +12,11 @@ import {
   Minus,
   CheckCircle,
   Circle,
-  AlertCircle,
   ExternalLink,
   Wifi
 } from "lucide-react";
 import { useDevStore } from "@/lib/stores/dev-store";
+import { registerPanel } from "./dev-panels-registry";
 
 interface GitStatus {
   branch: string;
@@ -52,7 +51,7 @@ export function GitPanel() {
     connected: false,
   });
 
-  const refreshGitStatus = async () => {
+  const refreshGitStatus = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/devops/git/status?node=${selectedNode}`);
@@ -65,9 +64,9 @@ export function GitPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedNode]);
 
-  const checkRemoteTunnel = async () => {
+  const checkRemoteTunnel = useCallback(async () => {
     try {
       const response = await fetch("/api/devops/git/tunnel");
       if (response.ok) {
@@ -77,7 +76,7 @@ export function GitPanel() {
     } catch (error) {
       console.error("Failed to check remote tunnel:", error);
     }
-  };
+  }, []);
 
   const connectRemoteTunnel = async () => {
     try {
@@ -191,7 +190,7 @@ export function GitPanel() {
       checkRemoteTunnel();
     }, 15000);
     return () => clearInterval(interval);
-  }, [selectedNode]);
+  }, [checkRemoteTunnel, refreshGitStatus]);
 
   const totalChanges = 
     status.modified.length + 
@@ -424,3 +423,12 @@ export function GitPanel() {
     </div>
   );
 }
+
+registerPanel({
+  id: "git",
+  title: "Git",
+  position: "right",
+  icon: createElement(GitBranch, { size: 14 }),
+  component: GitPanel,
+  toolbarOrder: 60,
+});
