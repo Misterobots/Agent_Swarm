@@ -464,6 +464,12 @@ services:
       - ROUTER_MODEL=${ROUTER_MODEL:-qwen3:8b}
       - ARCHITECT_MODEL=${ARCHITECT_MODEL:-qwen3:14b}
       - COORDINATOR_MODEL=${COORDINATOR_MODEL:-qwen3:14b}
+      # Gauntlet-safe roles: every selected model fits one 16 GiB card. The
+      # former 30B coder default needed more VRAM than either physical GPU.
+      - CODER_MODEL=${CODER_MODEL:-qwen2.5-coder:14b}
+      - DEVOPS_MODEL=${DEVOPS_MODEL:-qwen2.5-coder:14b}
+      - VERIFIER_MODEL=${VERIFIER_MODEL:-qwen3:14b}
+      - SWARM_ARCHITECT_MODEL=${SWARM_ARCHITECT_MODEL:-qwen3:14b}
       - LIBRARIAN_MODEL=${LIBRARIAN_MODEL:-qwen3:14b}
       - CONV_MODEL=${CONV_MODEL:-qwen3:14b}
       # Swarm-on-DevHarness: route coder/architect/devops workers through DevHarness

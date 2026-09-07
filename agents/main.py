@@ -673,6 +673,8 @@ class ChatRequest(BaseModel):
     swarm_mode: bool = False          # route through Lamport multi-agent coordinator
     design_mode: bool = False         # route through Open Design Studio
     workshop_mode: bool = False       # route through Product Workshop (Grill Me)
+    gauntlet_mode: bool = False       # Pioneer builder/critic loop for Code work
+    gauntlet_bar: Optional[str] = None  # named, fetchable quality reference
     solving_max_iter: Optional[int] = None  # MarsRL max iterations (0 = unlimited, overrides config)
     solving_max_time: Optional[int] = None  # MarsRL max time in seconds (0 = unlimited, overrides config)
     # Developer-mode granular per-agent budgets. Each overrides the overall budget for that agent.
@@ -691,6 +693,21 @@ class ChatRequest(BaseModel):
 # a convenience only; API callers can otherwise submit arbitrary model IDs.
 _DEFAULT_CHAT_MODEL = os.getenv("MEMEX_DEFAULT_MODEL", "qwen3:14b")
 _DEFAULT_MODEL_ALIASES = {"", "default", "memex-default", "Home-AI-Swarm", "swarm-standard"}
+
+
+def _gauntlet_prompt(goal: str, bar: str) -> str:
+    """Make the acceptance standard explicit to the Pioneer Collective."""
+    return f"""[GAUNTLET LOOP]
+Goal: {goal}
+
+Quality bar: {bar}
+
+Work as a Pioneer Collective. First make a concrete plan, then have a builder
+implement it in the project workspace. A separate critic must compare the result
+to the quality bar, name specific gaps, and require another builder pass until
+the acceptance criteria are met. Keep all edits reviewable and report the final
+evidence against the quality bar.
+[/GAUNTLET LOOP]"""
 
 
 def _authentik_groups(request: Request) -> list[str]:
@@ -2189,12 +2206,18 @@ async def chat_completions(request: ChatRequest, http_request: Request):
 
     _enforce_chat_features(request, http_request)
     _apply_model_policy(request, http_request)
+    if request.gauntlet_mode:
+        bar = (request.gauntlet_bar or "").strip()
+        if not bar:
+            raise HTTPException(status_code=422, detail="Gauntlet mode requires a named, fetchable quality bar (URL, product, repository, or publication).")
+        request.gauntlet_bar = bar
+        request.swarm_mode = True
 
     # --- Dev workspace agentic harness (handles dev_mode for ANY model) ---
     # Must precede the provider_for() dispatch below: local Ollama models resolve
     # to provider=None and would otherwise fall through to the swarm path, never
     # reaching the coding loop.  DevHarness picks Ollama/GitHub/Anthropic itself.
-    if request.dev_mode and request.stream:
+    if request.dev_mode and request.stream and not request.gauntlet_mode:
         _dev_uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
         return StreamingResponse(
             _dev_harness_stream(
@@ -2348,6 +2371,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     history = [{"role": m.role, "content": m.content} for m in request.messages[:-1]]
     # Extract latest prompt
     last_msg = request.messages[-1].content
+    if request.gauntlet_mode:
+        last_msg = _gauntlet_prompt(last_msg, request.gauntlet_bar or "")
     
     # Check for "Standard Mode" (OpenAI Compatibility)
     # Suppresses internal logs/status updates
