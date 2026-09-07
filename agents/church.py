@@ -460,6 +460,7 @@ def chat_swarm(
     solving_corrector_max_time: int | None = None,
     current_project_id: str | None = None,
     active_file: str | None = None,
+    coordination_id: str | None = None,
 ):
     """Generator: yield status/message/error events for the UI."""
     AGENT_STATE.labels(agent_name="Router").set(2)
@@ -1303,6 +1304,7 @@ def chat_swarm(
             "solving_corrector_n_passes": solving_corrector_n_passes,
             "solving_corrector_max_time": solving_corrector_max_time,
             "swarm_mode": swarm_mode,
+            "coordination_id": coordination_id,
         }
 
         # ---------------------------------------------------------------------------

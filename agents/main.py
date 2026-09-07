@@ -675,6 +675,11 @@ class ChatRequest(BaseModel):
     workshop_mode: bool = False       # route through Product Workshop (Grill Me)
     gauntlet_mode: bool = False       # Pioneer-backed builder/critic loop against a supplied quality bar
     gauntlet_bar: Optional[str] = None  # named, fetchable reference used by the independent critic
+    # Desktop-owned contract. `id` is deliberately used as the coordinator's
+    # durable task ID so reconnect/status reads never depend on an ephemeral
+    # SSE stream ID. The remaining fields stay available to the coordinator
+    # as explicit context rather than being inferred from "please resume".
+    gauntlet_handoff: Optional[dict] = None
     solving_max_iter: Optional[int] = None  # MarsRL max iterations (0 = unlimited, overrides config)
     solving_max_time: Optional[int] = None  # MarsRL max time in seconds (0 = unlimited, overrides config)
     # Developer-mode granular per-agent budgets. Each overrides the overall budget for that agent.
@@ -2223,6 +2228,9 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             )
         request.gauntlet_bar = bar
         request.swarm_mode = True
+        handoff_id = str((request.gauntlet_handoff or {}).get("id") or "").strip()
+        if handoff_id and not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", handoff_id):
+            raise HTTPException(status_code=422, detail="Invalid Gauntlet handoff id")
 
     # --- Dev workspace agentic harness (handles dev_mode for ANY model) ---
     # Must precede the provider_for() dispatch below: local Ollama models resolve
@@ -2384,6 +2392,16 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     last_msg = request.messages[-1].content
     if request.gauntlet_mode:
         last_msg = _gauntlet_prompt(last_msg, request.gauntlet_bar or "")
+        if request.gauntlet_handoff:
+            contract = request.gauntlet_handoff
+            last_msg += (
+                "\n\n[DESKTOP GAUNTLET CONTRACT — immutable]\n"
+                f"Checkpoint: {contract.get('id', '')}\n"
+                f"Original goal: {contract.get('goal', '')}\n"
+                f"Quality bar: {contract.get('qualityBar', request.gauntlet_bar or '')}\n"
+                f"Effort policy: {contract.get('effort', {})}\n"
+                "Do not replace this contract with the latest shorthand user message."
+            )
     
     # Check for "Standard Mode" (OpenAI Compatibility)
     # Suppresses internal logs/status updates
@@ -2427,6 +2445,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     solving_corrector_max_time=request.solving_corrector_max_time,
                     current_project_id=request.current_project_id,
                     active_file=request.active_file,
+                    coordination_id=(str((request.gauntlet_handoff or {}).get("id") or "").strip() or None),
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -2435,6 +2454,23 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 return
 
             update_count = 0
+            # A Gauntlet's desktop checkpoint is the coordinator ID. Persist
+            # the same SSE chronology against it so a new client can inspect
+            # or reattach after a transport cut instead of guessing from UI
+            # history. This is intentionally best-effort: observability must
+            # never stop an active coordinator.
+            gauntlet_run_id = str((request.gauntlet_handoff or {}).get("id") or "").strip()
+            gauntlet_event_seq = 0
+            def _record_gauntlet_event(event_type: str, payload: dict) -> None:
+                nonlocal gauntlet_event_seq
+                if not gauntlet_run_id:
+                    return
+                try:
+                    import swarm_run_event_store
+                    swarm_run_event_store.append_event(gauntlet_run_id, owner_id, gauntlet_event_seq, event_type, payload)
+                    gauntlet_event_seq += 1
+                except Exception as exc:
+                    logger.warning("[Gauntlet] event persistence failed: %s", exc)
             last_runtime_update_at = time.monotonic()
             response_parts = []  # Collect response text for memory extraction
             _in_think_block = False  # Track <think> tag state across chunks
@@ -2488,6 +2524,10 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                                 ),
                             }, "finish_reason": None}],
                         }
+                        _record_gauntlet_event("heartbeat", {
+                            "quiet_for_seconds": quiet_for,
+                            "content": heartbeat_chunk["choices"][0]["delta"]["content"],
+                        })
                         yield f"data: {json.dumps(heartbeat_chunk)}\n\n"
                         continue
                     if update is _GEN_DONE:
@@ -2501,6 +2541,9 @@ async def chat_completions(request: ChatRequest, http_request: Request):
 
                     msg_type = update.get("type", "response")
                     raw_content = update.get("content", "")
+                    _record_gauntlet_event(msg_type, {
+                        key: value for key, value in update.items() if key != "type"
+                    })
                     # DEBUG: log swarm-type events at INFO level
                     if msg_type in ("swarm_phase", "swarm_worker_created", "swarm_task_list"):
                         logger.info(f"[Stream] SWARM_EVENT: type={msg_type!r} is_standard={is_standard_mode} content={repr(raw_content)[:80]}")
@@ -2703,6 +2746,10 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 yield f"data: {json.dumps({'id':'chatcmpl-swarm','object':'chat.completion.chunk','created':0,'model':request.model,'choices':[{'index':0,'delta':{'content':err_msg},'finish_reason':None}]})}\n\n"
 
             logger.info(f"[Stream] Completed with {update_count} updates")
+            _record_gauntlet_event("execution_ended", {
+                "outcome": "response" if response_parts else "no_response",
+                "update_count": update_count,
+            })
 
             # Background memory extraction (fire-and-forget)
             if request.memory_enabled and response_parts:

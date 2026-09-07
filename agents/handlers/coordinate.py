@@ -29,6 +29,7 @@ def handle_coordinate(user_input: str, ctx: dict):
     langfuse = ctx["langfuse"]
     use_langfuse = ctx["use_langfuse"]
     already_steered = ctx.get("already_steered", False)
+    coordination_id = ctx.get("coordination_id")
 
     # --- DEV MODE GATE ---
     # Intercept build/project requests when dev_mode is off and not in research/plan mode.
@@ -114,6 +115,7 @@ def handle_coordinate(user_input: str, ctx: dict):
             plan_mode=ultraplan_mode,
             research_mode=research_mode,
             already_steered=already_steered,
+            coordination_id=coordination_id,
         ):
             yield update
             # Mirror key events as structured agent_event so the UI can render
