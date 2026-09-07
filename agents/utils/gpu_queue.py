@@ -56,6 +56,8 @@ KLEIN_HOST = os.getenv("KLEIN_HOST", "http://klein_service:8189")
 OMNIGEN_HOST = os.getenv("OMNIGEN_HOST", "http://omnigen_service:8190")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
+GAUNTLET_COORDINATOR_HOST = os.getenv("GAUNTLET_COORDINATOR_HOST", "")
+GAUNTLET_COORDINATOR_MODEL = os.getenv("GAUNTLET_COORDINATOR_MODEL", "qwen3:14b")
 # GPU peer lock: Turing's agent_runtime hosts the lock server on its own uvicorn port.
 # Default localhost:8000 is correct for single-node (same container).  A second
 # agent_runtime on another host would set GPU_LOCK_HOST=http://<turing-ip>:8008.
@@ -157,6 +159,8 @@ def _get_preferred_host(model_name: str) -> str:
     # OLLAMA_HOST = local).  The routing below is consistent with BOTH:
     # - On Lovelace: SECONDARY_OLLAMA_HOST = Turing, these models are routed there ✓
     # - On Turing:   SECONDARY_OLLAMA_HOST = local ollama, these models are local ✓
+    if GAUNTLET_COORDINATOR_HOST and model_name == GAUNTLET_COORDINATOR_MODEL:
+        return GAUNTLET_COORDINATOR_HOST
     if _model_can_run_on_turing(model_name):
         return SECONDARY_OLLAMA_HOST  # Turing fast path: safety, embeds, nano/small
     # Everything larger (gemma4, qwen3-coder:30b, qwen3.6:27b, qwen3:14b, etc.)
@@ -251,6 +255,8 @@ def get_swarm_worker_host(model_name: str) -> str:
     - Large models (>8B): Lovelace only (Turing has 8GB VRAM, not enough)
     """
     preferred = _get_preferred_host(model_name)
+    if GAUNTLET_COORDINATOR_HOST and model_name == GAUNTLET_COORDINATOR_MODEL:
+        return GAUNTLET_COORDINATOR_HOST
 
     if preferred == SECONDARY_OLLAMA_HOST:
         # Small model — fits on Turing; can also run on Lovelace, so round-robin for parallelism
