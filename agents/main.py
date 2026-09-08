@@ -2407,6 +2407,28 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     # Suppresses internal logs/status updates
     is_standard_mode = request.model.startswith("swarm-") or request.model == "default"
     owner_id = _resolve_owner_id(request.user_id, http_request)
+
+    # The desktop checkpoint must become observable before any model or router
+    # work begins.  Waiting for coordinate_task() to enter meant a queue
+    # failure, early router exit, or severed stream could leave the UI with a
+    # locally preserved checkpoint but no remote task to inspect or resume.
+    # create_run is idempotent, so the coordinator can safely create/update the
+    # same record once it starts doing useful work.
+    if request.gauntlet_mode and request.gauntlet_handoff:
+        checkpoint_id = str(request.gauntlet_handoff.get("id") or "").strip()
+        if checkpoint_id:
+            try:
+                import swarm_run_store
+                swarm_run_store.create_run(
+                    checkpoint_id,
+                    request.session_id or "default_session",
+                    owner_id,
+                    title=str(request.gauntlet_handoff.get("goal") or request.messages[-1].content),
+                    scope="gauntlet",
+                    started_at=int(time.time()),
+                )
+            except Exception as exc:
+                logger.warning("[Gauntlet] checkpoint persistence failed: %s", exc)
     
     if request.stream:
         async def stream_generator():
