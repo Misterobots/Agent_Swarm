@@ -165,7 +165,10 @@ ARCHETYPE_TRAINING_CONFIGS: dict[str, dict] = {
 # ---------------------------------------------------------------------------
 CONTEXT_WINDOWS: dict[str, int] = {
     # Gemma
-    "gemma4:31b": 32768,
+    # 31B Q4 occupies ~13.7 GB on Lovelace's 16 GB GPU.  A 32K KV cache
+    # terminates the llama runner; keep the coordinator on its proven 4K
+    # loaded profile and let the task's coding workers use their own model.
+    "gemma4:31b": 4096,
     "gemma4:26b": 32768,
     # Qwen3 family
     "qwen3-coder:30b": 32768,

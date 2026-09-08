@@ -78,4 +78,5 @@ def test_worker_models_use_an_installed_catalog_default_and_resolved_host():
     worker = (root / "agents" / "coordination" / "devharness_worker.py").read_text(encoding="utf-8")
 
     assert 'RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     "gemma4:31b")' in config
+    assert '"gemma4:31b": 4096' in config
     assert "OllamaProvider(model=model, host=get_swarm_worker_host(model))" in worker
