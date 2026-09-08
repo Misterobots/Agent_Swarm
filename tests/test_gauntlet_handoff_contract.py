@@ -40,3 +40,11 @@ def test_project_routing_keeps_the_desktop_checkpoint_id():
     assert '"coordination_id": session.coordination_id' in orchestrator
     assert 'preserved_coordination_id = str(pending_ctx.get("coordination_id") or "").strip()' in gates
     assert 'coordination_id = preserved_coordination_id or f"coord-{_uuid.uuid4().hex[:8]}"' in gates
+
+
+def test_resuming_a_gauntlet_run_clears_pause_end_time_without_reviving_terminal_runs():
+    root = Path(__file__).resolve().parents[1]
+    store = (root / "agents" / "swarm_run_store.py").read_text(encoding="utf-8")
+
+    assert "ended_at=CASE WHEN %s IN ('queued', 'running') THEN NULL ELSE ended_at END" in store
+    assert "status NOT IN ('completed', 'failed', 'cancelled', 'denied')" in store

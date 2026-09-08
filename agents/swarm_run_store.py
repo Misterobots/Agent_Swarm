@@ -151,17 +151,26 @@ def create_run(coordination_id: str, session_id: str, owner_id: str,
 
 
 def set_status(coordination_id: str, status: str) -> None:
-    """Flip a run's status without touching phase/summary/etc. — used by the
-    task queue's queued->running transition (create_run's own ON CONFLICT DO
-    NOTHING means it can't update an existing row's status)."""
+    """Advance a non-terminal run while preserving durable lifecycle truth.
+
+    A clarification is a pause, not a completion.  Therefore resuming it must
+    clear ``ended_at``.  Conversely, stale re-entry must never revive a run
+    that has already reached a terminal state.
+    """
     if not coordination_id:
         return
     try:
         with _db() as conn:
             with conn.cursor() as cur:
+                now = _now()
                 cur.execute(
-                    "UPDATE swarm_runs SET status=%s, updated_at=%s WHERE coordination_id=%s",
-                    (status, _now(), coordination_id),
+                    """UPDATE swarm_runs
+                       SET status=%s,
+                           ended_at=CASE WHEN %s IN ('queued', 'running') THEN NULL ELSE ended_at END,
+                           updated_at=%s
+                       WHERE coordination_id=%s
+                         AND status NOT IN ('completed', 'failed', 'cancelled', 'denied')""",
+                    (status, status, now, coordination_id),
                 )
     except Exception as e:
         logger.warning(f"[SwarmRunStore] set_status failed (non-fatal): {e}")
