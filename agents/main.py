@@ -2232,11 +2232,15 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         if handoff_id and not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", handoff_id):
             raise HTTPException(status_code=422, detail="Invalid Gauntlet handoff id")
 
-    # --- Dev workspace agentic harness (handles dev_mode for ANY model) ---
+    # --- Dev workspace agentic harness (handles dev_mode for ordinary code turns) ---
     # Must precede the provider_for() dispatch below: local Ollama models resolve
     # to provider=None and would otherwise fall through to the swarm path, never
     # reaching the coding loop.  DevHarness picks Ollama/GitHub/Anthropic itself.
-    if request.dev_mode and request.stream:
+    # Gauntlet deliberately takes precedence: it needs the coordinator's
+    # durable checkpoint, Pioneer roles, and critic loop.  Letting dev_mode
+    # intercept it turns a requested Gauntlet into a single DevHarness loop
+    # and leaves no coordinator record to resume after a stream failure.
+    if request.dev_mode and request.stream and not request.gauntlet_mode:
         _dev_uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
         return StreamingResponse(
             _dev_harness_stream(
