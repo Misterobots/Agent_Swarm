@@ -37,6 +37,7 @@ import {
   fetchSwarmSessions,
   fetchSwarmRuns,
   fetchServiceChecks,
+  runJanitor,
 } from "@/lib/api/ops";
 import { fetchGovernanceRequests } from "@/lib/api/workspaces";
 import { fetchMaintenanceQueue } from "@/lib/api/maintenance";
@@ -98,6 +99,8 @@ const SKILLS: Skill[] = [
   { id: "sweep", label: "Container Sweep", cat: "Maintenance", icon: Boxes, command: "",
     task: "List any stopped or unhealthy containers across the cluster and recommend which to restart.",
     desc: "Stopped / unhealthy" },
+  { id: "janitor", label: "Janitor (dry run)", cat: "Maintenance", icon: Wrench, command: "",
+    desc: "Report reclaimable Docker cache; never touches volumes" },
 
   { id: "kbstatus", label: "KB Status", cat: "Memory", icon: HeartPulse, command: "",
     task: "Summarize my MemPalace memory store: total memories, top domains, recent additions, and entity-graph coverage.",
@@ -256,6 +259,19 @@ export default function ControlCenterPage() {
   }
 
   function fireSkill(skill: Skill) {
+    if (skill.id === "janitor") {
+      abortRef.current?.abort();
+      setTaskRun({ label: "Janitor", status: "Queued…", output: "", running: true });
+      runJanitor("lovelace", "dry_run").then((result) => {
+        setTaskRun({
+          label: "Janitor",
+          status: result.status === "error" ? "Error" : "Queued",
+          output: result.detail || JSON.stringify(result, null, 2),
+          running: false,
+        });
+      });
+      return;
+    }
     const p = prompt.trim();
     if (skill.needsInput && !p) {
       taRef.current?.focus();

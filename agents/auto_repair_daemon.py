@@ -297,6 +297,43 @@ class AutoRepairDaemon:
             success=success,
             details=output if not success else "Container restarted"
         )
+
+    def janitor_cleanup(
+        self,
+        node_ip: str,
+        *,
+        mode: str = "dry_run",
+        include_stopped: bool = False,
+    ) -> RepairAction:
+        """Report or reclaim Docker cache without touching named volumes.
+
+        The command set is deliberately narrow: build cache is always safe to
+        recreate, and stopped-container removal is opt-in with a seven-day
+        age filter. Images, networks, volumes, and active containers are not
+        pruned by this action.
+        """
+
+        mode_key = (mode or "dry_run").lower()
+        if mode_key == "dry_run":
+            command = "docker system df"
+        elif mode_key == "execute":
+            commands = ["docker builder prune -af"]
+            if include_stopped:
+                commands.append("docker container prune -f --filter until=168h")
+            command = " && ".join(commands)
+        else:
+            return RepairAction(
+                timestamp=datetime.now(), issue_type="janitor", service=node_ip,
+                action="janitor_cleanup", success=False,
+                details=f"Invalid mode: {mode_key}",
+            )
+
+        success, output = self.run_ssh_command(node_ip, command)
+        return RepairAction(
+            timestamp=datetime.now(), issue_type="janitor", service=node_ip,
+            action="janitor_cleanup", success=success,
+            details=(f"mode={mode_key}; include_stopped={include_stopped}\n{output}"),
+        )
     
     def check_redis_health(self) -> ServiceHealth:
         """Check Redis health."""
@@ -451,6 +488,18 @@ class AutoRepairDaemon:
                 )
                 return None
             return self.restart_container(node_ip, container)
+
+        if action == "janitor_cleanup":
+            node = args.get("node")
+            node_ip = NODE_IPS.get(node) if node else None
+            if node not in {"turing", "lovelace"} or not node_ip:
+                logger.error("janitor_cleanup rejected unsupported node=%r", node)
+                return None
+            return self.janitor_cleanup(
+                node_ip,
+                mode=args.get("mode", "dry_run"),
+                include_stopped=str(args.get("include_stopped", "false")).lower() == "true",
+            )
 
         logger.warning("routed alert specifies unknown action %r — ignoring", action)
         return None

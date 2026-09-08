@@ -159,3 +159,23 @@ export async function fetchContainerLogs(
     return { error: String(e) };
   }
 }
+
+export async function runJanitor(
+  node = "lovelace",
+  mode: "dry_run" | "execute" = "dry_run",
+  includeStopped = false,
+  confirm = false,
+): Promise<FleetActionResult & { request_id?: string; detail?: string; mode?: string }> {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/ops/janitor`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ node, mode, include_stopped: includeStopped, confirm }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { status: "error", detail: data.detail || `HTTP ${response.status}` };
+    return data;
+  } catch (e) {
+    return { status: "error", detail: String(e) };
+  }
+}
