@@ -211,6 +211,7 @@ def handle_pending_context(
     # -----------------------------------------------------------------------
     if ctx_type == "dev_project_clarification":
         original_prompt = pending_ctx.get("prompt", "")
+        coordination_id = str(pending_ctx.get("coordination_id") or "").strip()
         from brooks import clear_context
         clear_context(session_id=session_id, owner_id=owner_id)
 
@@ -257,7 +258,7 @@ def handle_pending_context(
             try:
                 from brooks import save_pending_context as _save_ctx
                 _save_ctx(
-                    {"type": "dev_project_picker", "prompt": original_prompt, "visual_context": _saved_visual},
+                    {"type": "dev_project_picker", "prompt": original_prompt, "visual_context": _saved_visual, "coordination_id": coordination_id},
                     session_id=session_id, owner_id=owner_id,
                 )
             except Exception as _e:
@@ -280,7 +281,7 @@ def handle_pending_context(
             try:
                 from brooks import save_pending_context as _save_ctx
                 _save_ctx(
-                    {"type": "dev_project_new_name", "prompt": original_prompt, "visual_context": _saved_visual},
+                    {"type": "dev_project_new_name", "prompt": original_prompt, "visual_context": _saved_visual, "coordination_id": coordination_id},
                     session_id=session_id, owner_id=owner_id,
                 )
             except Exception as _e:
@@ -313,6 +314,7 @@ def handle_pending_context(
     # -----------------------------------------------------------------------
     if ctx_type == "dev_project_picker":
         original_prompt = pending_ctx.get("prompt", "")
+        preserved_coordination_id = str(pending_ctx.get("coordination_id") or "").strip()
         _saved_visual = pending_ctx.get("visual_context", "")
         _restored_ctx = (
             (extracted_context + "\n\n" + _saved_visual).strip() if _saved_visual else extracted_context
@@ -356,7 +358,10 @@ def handle_pending_context(
         # rather than silently proceeding.
         import uuid as _uuid
         from coordination import task_queue as _task_queue
-        coordination_id = f"coord-{_uuid.uuid4().hex[:8]}"
+        # This can be a resumed Gauntlet.  Its desktop checkpoint is the
+        # coordinator ID, so creating a second ID here used to make a healthy
+        # run invisible to the card that is responsible for reconnecting it.
+        coordination_id = preserved_coordination_id or f"coord-{_uuid.uuid4().hex[:8]}"
         _needs_live_repo_lock = session_mode != "ephemeral"
         task_scope_id = project.get("id") if session_mode == "live_repo" else "legacy-shared"
         if _needs_live_repo_lock and not _task_queue.try_acquire(coordination_id, task_scope_id):
@@ -406,6 +411,7 @@ def handle_pending_context(
     # -----------------------------------------------------------------------
     if ctx_type == "dev_project_new_name":
         original_prompt = pending_ctx.get("prompt", "")
+        coordination_id = str(pending_ctx.get("coordination_id") or "").strip() or None
         _saved_visual = pending_ctx.get("visual_context", "")
         _restored_ctx = (
             (extracted_context + "\n\n" + _saved_visual).strip() if _saved_visual else extracted_context
@@ -449,6 +455,7 @@ def handle_pending_context(
             skip_project_gate=True,
             repo_context=None,
             session_mode="ephemeral",
+            coordination_id=coordination_id,
         ):
             yield chunk
         result["handled"] = True

@@ -199,6 +199,11 @@ def coordinate_task(
         session.coordination_id, session.session_id, session.owner_id,
         title=user_input, scope=None, started_at=int(session.created_at),
     )
+    # A clarification pauses the existing durable run as needs_input.  When
+    # its answer re-enters this coordinator with the same ID, move that same
+    # record back to running rather than leaving the task board and desktop
+    # checkpoint stranded on the old paused state.
+    swarm_run_store.set_status(session.coordination_id, "running")
     logger.info(
         f"[Coordinator] Starting coordination {session.coordination_id} "
         f"for session {session_id}"
@@ -514,6 +519,7 @@ def coordinate_task(
                         "prompt": user_input,
                         "summary": summary,
                         "visual_context": _visual_context,
+                        "coordination_id": session.coordination_id,
                     },
                     session_id=session_id,
                     owner_id=owner_id,

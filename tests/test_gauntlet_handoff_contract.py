@@ -1,6 +1,7 @@
 """Regression contract for desktop-owned Gauntlet continuation IDs."""
 import os
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "agents"))
 
@@ -28,3 +29,14 @@ def test_gauntlet_prompt_keeps_the_named_bar_visible_to_workers():
     assert "Build the vertical slice" in prompt
     assert "https://example.test/bar" in prompt
     assert "separate Pioneer-backed builder and critic" in prompt
+
+
+def test_project_routing_keeps_the_desktop_checkpoint_id():
+    """A project picker must resume the original Gauntlet task, not fork it."""
+    root = Path(__file__).resolve().parents[1]
+    orchestrator = (root / "agents" / "coordination" / "orchestrator.py").read_text(encoding="utf-8")
+    gates = (root / "agents" / "routing" / "gates.py").read_text(encoding="utf-8")
+
+    assert '"coordination_id": session.coordination_id' in orchestrator
+    assert 'preserved_coordination_id = str(pending_ctx.get("coordination_id") or "").strip()' in gates
+    assert 'coordination_id = preserved_coordination_id or f"coord-{_uuid.uuid4().hex[:8]}"' in gates
