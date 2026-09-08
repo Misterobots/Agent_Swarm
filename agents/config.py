@@ -71,7 +71,7 @@ GPU_LOCK_HOST        = os.getenv("GPU_LOCK_HOST",        f"http://{LOVELACE_IP}:
 #            Turing:   RTX 3070 Ti (8 GB)
 #
 # Role → default model:
-#   COORDINATOR  gemma4:31b        (19 GB) — Google Gemma for synthesis/planning;
+#   COORDINATOR  gemma4:e4b        (9 GB)  — resident planning/research model
 #                                    holistic reasoning & steering questions
 #   CODER        qwen3-coder:30b   (18 GB) — Qwen3 Coder; best code generation
 #   ARCHITECT    qwen3-coder:30b   (18 GB) — code-solver default for the MarsRL
@@ -81,7 +81,7 @@ GPU_LOCK_HOST        = os.getenv("GPU_LOCK_HOST",        f"http://{LOVELACE_IP}:
 #   DEVOPS       qwen3-coder:30b   (18 GB) — infra scripts, Dockerfiles, YAML
 #   PRIMARY /    qwen3.6:27b       (17 GB) — general Qwen3.6; conversation,
 #   LIBRARIAN /                              research, documentation, analysis
-#   RESEARCHER / gemma4:31b        — installed Gemma reasoning model for
+#   RESEARCHER / gemma4:e4b        — installed Gemma reasoning model for
 #   ANALYST                                  fast inference for parallel research
 #                                            fan-out; falls back to PRIMARY.
 #   ROUTER       qwen3:8b          (5 GB)  — lightweight; LLM router fallback
@@ -91,20 +91,20 @@ GPU_LOCK_HOST        = os.getenv("GPU_LOCK_HOST",        f"http://{LOVELACE_IP}:
 # ---------------------------------------------------------------------------
 PRIMARY_MODEL        = os.getenv("PRIMARY_MODEL",        "qwen3.6:27b")
 ROUTER_MODEL         = os.getenv("ROUTER_MODEL",         "qwen3:8b")
-COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    "gemma4:31b")
+COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    "gemma4:e4b")
 CODER_MODEL          = os.getenv("CODER_MODEL",          "qwen3-coder:30b")
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      "qwen3-coder:30b")
 DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         "qwen3-coder:30b")
 LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
-RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     "gemma4:31b")
-ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        "gemma4:31b")
+RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     "gemma4:e4b")
+ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        "gemma4:e4b")
 VERIFIER_MODEL       = os.getenv("VERIFIER_MODEL",       "qwen3:14b")
 
 # Swarm architect runs a *reasoning* model (design/planning), decoupled from
 # ARCHITECT_MODEL which is the MarsRL code-solver default.  Defaults to the
 # coordinator's model so the planning phase (coordinator + architect) shares a
 # single resident model load — no GPU swap between decompose and design.
-SWARM_ARCHITECT_MODEL = os.getenv("SWARM_ARCHITECT_MODEL", COORDINATOR_MODEL)
+SWARM_ARCHITECT_MODEL = os.getenv("SWARM_ARCHITECT_MODEL", "qwen3:14b")
 
 # ---------------------------------------------------------------------------
 # ExpertiseTemplate Database (swarm schema in langfuse DB)
