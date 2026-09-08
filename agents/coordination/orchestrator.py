@@ -1410,15 +1410,68 @@ def coordinate_task(
                 "content": f"Gauntlet critic verdict: {_gauntlet_verdict.upper()}",
             }
             if not _gauntlet_pass:
-                swarm_run_store.finish_run(
-                    session.coordination_id, status="needs_input",
-                    workers_total=len(session.workers),
-                    workers_completed=sum(1 for w in session.workers.values() if w.state == WorkerState.COMPLETED),
-                    workers_failed=sum(1 for w in session.workers.values() if w.state == WorkerState.FAILED),
-                    error="Independent Gauntlet critic did not approve the quality bar.", ended_at=int(time.time()),
+                # A Gauntlet critic failure is work to do, not a user-facing
+                # dead end.  Keep the same scoped desktop container alive and
+                # dispatch a repair worker with the recorded gap before asking
+                # the critic again.  The bounded pass prevents an accidental
+                # runaway model loop; a second non-pass remains durable and
+                # explicitly resumable with its evidence intact.
+                yield {"type": "status", "content": "Gauntlet critic found a gap; starting an automatic repair pass in the selected workspace…"}
+                repair_task = "Repair the critic's concrete gap and produce verifiable workspace changes"
+                repair_worker_id = session.register_worker("coder", repair_task, "repair")
+                repair_pioneer = session.workers[repair_worker_id].pioneer
+                yield {
+                    "type": "swarm_worker_created", "worker_id": repair_worker_id,
+                    "role": "coder", "pioneer_name": repair_pioneer["name"],
+                    "pioneer_full_name": repair_pioneer["full_name"], "pioneer_motto": repair_pioneer["motto"],
+                    "task": repair_task, "phase": "repair", "content": f"Spawned {repair_pioneer['name']} (Gauntlet repair)",
+                }
+                repair_prompt = (
+                    f"[GAUNTLET REPAIR — EXECUTION REQUIRED]\nQuality bar: {gauntlet_bar}\n"
+                    f"Original goal: {user_input}\n\nIndependent critic finding:\n{verify_result}\n\n"
+                    "Work directly in the selected workspace. Do not return a plan or TodoWrite-only answer. "
+                    "Create or modify the concrete files needed to close the gap, then run the most relevant available check "
+                    "and report the changed paths and result."
                 )
-                yield {"type": "status", "content": "Gauntlet quality bar not yet met; preserving the critic brief for the next repair pass."}
-                return
+                repair_agent = _get_agent_for_role("coder", session_id=session_id, scope=scope)
+                repair_result = _run_worker(
+                    session, repair_worker_id, repair_agent, repair_prompt,
+                    child_token=_derive_worker_token(ace_token, "coder", repair_task), role="coder", scope=scope,
+                )
+                yield {"type": "swarm_task_list", "content": "Gauntlet repair pass complete", "workers": [{
+                    "worker_id": repair_worker_id, "pioneer_name": repair_pioneer["name"], "role": "coder",
+                    "task": repair_task, "state": session.workers[repair_worker_id].state.value,
+                }]}
+                repair_work = session.get_all_scratchpad_content()
+                if len(repair_work) > _MAX_VERIFY_CHARS:
+                    repair_work = repair_work[:_MAX_VERIFY_CHARS] + "\n\n[...work product truncated for context window...]"
+                recheck_prompt = verify_prompt.replace(all_work, repair_work) + "\n\nThis is the post-repair recheck; inspect actual changed paths and test evidence."
+                recheck_id = session.register_worker("verifier", "Gauntlet repair verification", "verification")
+                recheck_pioneer = session.workers[recheck_id].pioneer
+                yield {"type": "swarm_worker_created", "worker_id": recheck_id, "role": "verifier",
+                       "pioneer_name": recheck_pioneer["name"], "pioneer_full_name": recheck_pioneer["full_name"],
+                       "pioneer_motto": recheck_pioneer["motto"], "task": "Gauntlet repair verification",
+                       "phase": "verification", "content": f"Spawned {recheck_pioneer['name']} (repair critic)"}
+                recheck_result = _run_worker(
+                    session, recheck_id, _get_agent_for_role("verifier"), recheck_prompt,
+                    child_token=_derive_worker_token(ace_token, "verifier", "Gauntlet repair verification"),
+                    role="verifier", scope=scope,
+                )
+                _recheck_pass = bool(re.search(r"(?:^|\\n)VERDICT:\\s*PASS\\b", recheck_result, re.IGNORECASE))
+                swarm_run_store.record_gauntlet_review(
+                    session.coordination_id, gauntlet_bar, "pass" if _recheck_pass else "fail", recheck_result,
+                )
+                yield {"type": "gauntlet_critic_verdict", "verdict": "pass" if _recheck_pass else "fail",
+                       "quality_bar": gauntlet_bar, "content": f"Gauntlet repair critic verdict: {'PASS' if _recheck_pass else 'FAIL'}"}
+                if not _recheck_pass:
+                    swarm_run_store.finish_run(
+                        session.coordination_id, status="needs_input", workers_total=len(session.workers),
+                        workers_completed=sum(1 for w in session.workers.values() if w.state == WorkerState.COMPLETED),
+                        workers_failed=sum(1 for w in session.workers.values() if w.state == WorkerState.FAILED),
+                        error="Gauntlet repair pass did not meet the quality bar.", ended_at=int(time.time()),
+                    )
+                    yield {"type": "status", "content": "Gauntlet repair pass did not meet the bar; critic evidence is preserved for resume."}
+                    return
 
         # Auto-retry if verification failed on plan-only
         _verify_lower = verify_result.lower()

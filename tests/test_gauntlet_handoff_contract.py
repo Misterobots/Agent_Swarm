@@ -70,6 +70,8 @@ def test_gauntlet_completion_requires_a_persisted_independent_critic_verdict():
     assert "record_gauntlet_review" in orchestrator
     assert "VERDICT: PASS" in orchestrator
     assert 'status="needs_input"' in orchestrator
+    assert "starting an automatic repair pass" in orchestrator
+    assert "GAUNTLET REPAIR — EXECUTION REQUIRED" in orchestrator
 
 
 def test_worker_models_use_an_installed_catalog_default_and_resolved_host():
