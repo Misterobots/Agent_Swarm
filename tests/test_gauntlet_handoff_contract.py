@@ -83,3 +83,4 @@ def test_worker_models_use_an_installed_catalog_default_and_resolved_host():
     assert 'COORDINATOR_MODEL    = os.getenv("COORDINATOR_MODEL",    "gemma4:e4b")' in config
     assert 'SWARM_ARCHITECT_MODEL = os.getenv("SWARM_ARCHITECT_MODEL", "qwen3:14b")' in config
     assert "OllamaProvider(model=model, host=get_swarm_worker_host(model))" in worker
+    assert "No workspace file changes were produced by this execution worker." in worker

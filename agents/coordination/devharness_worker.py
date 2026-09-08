@@ -389,6 +389,27 @@ def run_devharness_worker(
                     pass
 
         worker.result = summary
+        # A Code/Gauntlet implementation turn that only returns a plan or a
+        # TodoWrite payload is not a completed build.  The critic will still
+        # receive its text, but lifecycle state must tell the coordinator to
+        # repair it instead of falsely claiming a successful worker.
+        file_changes = [d for d in event_dicts if d.get("type") == "file_change"]
+        requires_artifact = worker.phase in ("implementation", "repair") and role_lower in ("architect", "coder", "devops")
+        if requires_artifact and not file_changes:
+            import swarm_run_store
+            worker.state = WorkerState.FAILED
+            worker.error = "No workspace file changes were produced by this execution worker."
+            worker.completed_at = time.time()
+            swarm_run_store.upsert_worker(
+                session.coordination_id, worker_id, worker.role, worker.task,
+                worker.phase, (worker.pioneer or {}).get("name"), status="failed",
+                output=worker.error, completed_at=worker.completed_at,
+            )
+            session.write_to_scratchpad(
+                f"{worker.phase}_{role_lower}_{worker_id}.md",
+                f"# {role} — execution failed\n\n{worker.error}\n\n{summary}",
+            )
+            return f"ERROR: {worker.error}\n{summary}"
         worker.state = WorkerState.COMPLETED
         worker.completed_at = time.time()
         try:
