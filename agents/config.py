@@ -81,7 +81,7 @@ GPU_LOCK_HOST        = os.getenv("GPU_LOCK_HOST",        f"http://{LOVELACE_IP}:
 #   DEVOPS       qwen3-coder:30b   (18 GB) — infra scripts, Dockerfiles, YAML
 #   PRIMARY /    qwen3.6:27b       (17 GB) — general Qwen3.6; conversation,
 #   LIBRARIAN /                              research, documentation, analysis
-#   RESEARCHER / gemma4:26b        (18 GB) — Gemma 4 26B MoE (~3.8B active):
+#   RESEARCHER / gemma4:31b        — installed Gemma reasoning model for
 #   ANALYST                                  fast inference for parallel research
 #                                            fan-out; falls back to PRIMARY.
 #   ROUTER       qwen3:8b          (5 GB)  — lightweight; LLM router fallback
@@ -96,8 +96,8 @@ CODER_MODEL          = os.getenv("CODER_MODEL",          "qwen3-coder:30b")
 ARCHITECT_MODEL      = os.getenv("ARCHITECT_MODEL",      "qwen3-coder:30b")
 DEVOPS_MODEL         = os.getenv("DEVOPS_MODEL",         "qwen3-coder:30b")
 LIBRARIAN_MODEL      = os.getenv("LIBRARIAN_MODEL",      PRIMARY_MODEL)
-RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     "gemma4:26b")
-ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        "gemma4:26b")
+RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     "gemma4:31b")
+ANALYST_MODEL        = os.getenv("ANALYST_MODEL",        "gemma4:31b")
 VERIFIER_MODEL       = os.getenv("VERIFIER_MODEL",       "qwen3:14b")
 
 # Swarm architect runs a *reasoning* model (design/planning), decoupled from

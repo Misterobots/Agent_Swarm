@@ -70,3 +70,12 @@ def test_gauntlet_completion_requires_a_persisted_independent_critic_verdict():
     assert "record_gauntlet_review" in orchestrator
     assert "VERDICT: PASS" in orchestrator
     assert 'status="needs_input"' in orchestrator
+
+
+def test_worker_models_use_an_installed_catalog_default_and_resolved_host():
+    root = Path(__file__).resolve().parents[1]
+    config = (root / "agents" / "config.py").read_text(encoding="utf-8")
+    worker = (root / "agents" / "coordination" / "devharness_worker.py").read_text(encoding="utf-8")
+
+    assert 'RESEARCHER_MODEL     = os.getenv("RESEARCHER_MODEL",     "gemma4:31b")' in config
+    assert "OllamaProvider(model=model, host=get_swarm_worker_host(model))" in worker

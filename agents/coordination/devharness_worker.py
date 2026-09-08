@@ -254,7 +254,11 @@ async def _run_async(
             + system_prompt
         )
     history = History(system=system_prompt, turns=[UserMessage(prompt)])
-    primary = OllamaProvider(model=model)
+    # The coordinator chooses roles from the distributed catalog.  Resolve the
+    # matching host here as well; falling back to OLLAMA_HOST silently sends a
+    # valid worker model to the wrong node.
+    from utils.gpu_queue import get_swarm_worker_host
+    primary = OllamaProvider(model=model, host=get_swarm_worker_host(model))
     # Workers don't escalate — the coordinator assigns their model, not the harness.
     router = ModelRouter(primary=primary, escalation_targets=[], enabled=False)
 
