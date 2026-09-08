@@ -97,12 +97,16 @@ NUM_PREDICT    = int(os.getenv("FRIDAY_NUM_PREDICT", "2048"))
 # gentle penalty (protect HA targeting accuracy); pure-speech turns keep the strong one.
 REPEAT_PENALTY_TOOLS = float(os.getenv("FRIDAY_REPEAT_PENALTY_TOOLS", "1.1"))
 # ollama_friday (GPU 1) is DEDICATED to Friday — nothing else uses that card — so pin qwen3:8b
-# resident indefinitely (keep_alive=-1). A finite window (was "30m") let it idle-unload, and the
-# next voice request paid a ~12s cold reload = flaky voice pickup / "can't reach the model".
+# resident indefinitely at request time (keep_alive=-1). The container-level keep-alive is finite
+# so a Gauntlet coordinator model can relinquish the lane after it goes idle.
 # Overridable via BMO_KEEP_ALIVE ("-1" / "0" / a duration like "30m"); note an explicit
 # per-request keep_alive always wins over the container's OLLAMA_KEEP_ALIVE default.
 _KA_RAW = os.getenv("BMO_KEEP_ALIVE", "-1").strip()
 KEEP_ALIVE = int(_KA_RAW) if _KA_RAW.lstrip("-").isdigit() else _KA_RAW
+# The dedicated Ollama lane can temporarily host a Gauntlet/coordinator model.
+# Recovering Friday must be explicit because Ollama will not automatically swap a
+# foreign model back in after a test releases the GPU.
+RECOVER_FOREIGN_MODELS = os.getenv("FRIDAY_RECOVER_FOREIGN_MODELS", "true").lower() in ("1", "true", "yes")
 
 # --- Brain swap: toggle Friday's LLM between the default and an experimental model by voice ----------
 # "Hey Friday, brain swap" flips _current_model between MODEL and FRIDAY_ALT_BRAIN. The two 8B brains
@@ -854,6 +858,13 @@ async def _with_location_context(task: str) -> str:
 
 
 app = FastAPI(title="Friday Brain (vault-RAG assistant)")
+
+
+@app.on_event("startup")
+async def _recover_friday_model_on_startup() -> None:
+    """Begin restoring Friday's model without delaying HTTP readiness."""
+    if RECOVER_FOREIGN_MODELS:
+        asyncio.create_task(_ensure_current_model_loaded())
 app.get("/v1/public-artifacts/{filename}")(proxy_signed_artifact)
 
 
@@ -1126,6 +1137,7 @@ async def _live_status() -> str:
 async def _ollama_chat(messages: list, tools=None):
     """One raw call to Ollama's /api/chat. Returns (text, tool_calls) — tool_calls is
     Ollama's native shape (list of {"function": {"name", "arguments"}}) or None."""
+    await _ensure_current_model_loaded()
     # keep_alive pins qwen3:8b resident in VRAM between calls (KEEP_ALIVE=-1 by default now that
     # ollama_friday's GPU is dedicated to Friday) so a voice turn never pays a cold reload.
     penalty = REPEAT_PENALTY_TOOLS if tools else REPEAT_PENALTY
@@ -1157,6 +1169,47 @@ async def _ollama_chat(messages: list, tools=None):
     text = _strip_think(message.get("content", "") or "")
     tool_calls = message.get("tool_calls") or None
     return text, tool_calls
+
+
+async def _ensure_current_model_loaded() -> None:
+    """Restore Friday's active model after a Gauntlet/test lane release.
+
+    The dedicated Ollama container may still have a different coordinator model
+    resident after testing.  When recovery is enabled, unload only those foreign
+    residents and issue a zero-prompt warm-up for Friday's current brain.  This is
+    deliberately best-effort: the actual chat call remains the source of truth if
+    Ollama is unavailable or the GPU is still genuinely busy.
+    """
+    if not RECOVER_FOREIGN_MODELS:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as c:
+            ps = await c.get(f"{OLLAMA_URL}/api/ps")
+            if ps.status_code != 200:
+                return
+            resident = [m.get("name", "") for m in ps.json().get("models", [])]
+            if _current_model in resident:
+                return
+            for name in resident:
+                if name and name != _current_model:
+                    await c.post(
+                        f"{OLLAMA_URL}/api/generate",
+                        json={"model": name, "keep_alive": 0},
+                    )
+                    print(f"[bmo-brain] recovery: unloaded foreign model {name}", flush=True)
+            await c.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={
+                    "model": _current_model,
+                    "prompt": "",
+                    "keep_alive": KEEP_ALIVE,
+                    "options": {"num_ctx": NUM_CTX},
+                },
+                timeout=180.0,
+            )
+            print(f"[bmo-brain] recovery: warmed {_current_model}", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[bmo-brain] recovery warm-up deferred (non-fatal): {e}", flush=True)
 
 
 async def _do_brain_swap(old_model: str, new_model: str) -> None:
