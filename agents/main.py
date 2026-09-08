@@ -691,6 +691,7 @@ class ChatRequest(BaseModel):
     solving_corrector_max_time: Optional[int] = None    # Per-call corrector wall-clock (seconds)
     current_project_id: Optional[str] = None            # Active dev project ID (injects .memex/notes.md into system prompt)
     active_file: Optional[str] = None                   # Currently open file path in the dev workspace editor
+    workspace_key: Optional[str] = None                 # Desktop-selected local project root (Code only)
 
 
 # Model choice is available to authenticated users, but the submitted value
@@ -2471,6 +2472,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     solving_corrector_max_time=request.solving_corrector_max_time,
                     current_project_id=request.current_project_id,
                     active_file=request.active_file,
+                    workspace_key=request.workspace_key,
+                    gauntlet_bar=request.gauntlet_bar if request.gauntlet_mode else None,
                     coordination_id=(str((request.gauntlet_handoff or {}).get("id") or "").strip() or None),
                 )
             except Exception as e:

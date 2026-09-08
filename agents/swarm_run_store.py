@@ -92,6 +92,7 @@ def init_table() -> None:
                     "ON swarm_runs (owner_id, started_at DESC)"
                 )
                 cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS prompt TEXT")
+                cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS gauntlet_bar TEXT")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS swarm_workers (
                         worker_id        TEXT PRIMARY KEY,
@@ -110,6 +111,16 @@ def init_table() -> None:
                     "CREATE INDEX IF NOT EXISTS idx_swarm_workers_coord "
                     "ON swarm_workers (coordination_id)"
                 )
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS swarm_gauntlet_reviews (
+                        coordination_id TEXT NOT NULL,
+                        iteration INT NOT NULL,
+                        verdict TEXT NOT NULL,
+                        critic_output TEXT,
+                        created_at BIGINT NOT NULL,
+                        PRIMARY KEY (coordination_id, iteration)
+                    )
+                """)
         logger.info("[SwarmRunStore] Tables swarm_runs + swarm_workers ready.")
     except Exception as e:
         logger.warning(f"[SwarmRunStore] init_table failed (non-fatal): {e}")
@@ -266,6 +277,26 @@ def update_run_phase(coordination_id: str, phase: int, phase_name: str | None) -
                 )
     except Exception as e:
         logger.warning(f"[SwarmRunStore] update_run_phase failed (non-fatal): {e}")
+
+
+def record_gauntlet_review(coordination_id: str, quality_bar: str, verdict: str, critic_output: str) -> None:
+    """Persist the independent critic's verdict before a Gauntlet can finish."""
+    if not coordination_id:
+        return
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE swarm_runs SET gauntlet_bar=%s, updated_at=%s WHERE coordination_id=%s",
+                            (quality_bar[:2000], _now(), coordination_id))
+                cur.execute("SELECT COALESCE(MAX(iteration), 0) + 1 FROM swarm_gauntlet_reviews WHERE coordination_id=%s",
+                            (coordination_id,))
+                iteration = int(cur.fetchone()[0])
+                cur.execute("""INSERT INTO swarm_gauntlet_reviews
+                               (coordination_id, iteration, verdict, critic_output, created_at)
+                               VALUES (%s, %s, %s, %s, %s)""",
+                            (coordination_id, iteration, verdict, critic_output[:8000], _now()))
+    except Exception as e:
+        logger.warning(f"[SwarmRunStore] record_gauntlet_review failed (non-fatal): {e}")
 
 
 def upsert_worker(coordination_id: str, worker_id: str, role: str | None,

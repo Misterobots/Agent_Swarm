@@ -48,3 +48,24 @@ def test_resuming_a_gauntlet_run_clears_pause_end_time_without_reviving_terminal
 
     assert "ended_at=CASE WHEN %s IN ('queued', 'running') THEN NULL ELSE ended_at END" in store
     assert "status NOT IN ('completed', 'failed', 'cancelled', 'denied')" in store
+
+
+def test_desktop_code_workspace_uses_a_scoped_session_container():
+    root = Path(__file__).resolve().parents[1]
+    sandbox = (root / "agents" / "coordination" / "session_sandbox.py").read_text(encoding="utf-8")
+    handler = (root / "agents" / "handlers" / "coordinate.py").read_text(encoding="utf-8")
+
+    assert '"desktop_local"' in sandbox
+    assert "MEMEX_DESKTOP_WORKSPACE_ROOT" in sandbox
+    assert 'session_mode="desktop_local" if workspace_key else None' in handler
+
+
+def test_gauntlet_completion_requires_a_persisted_independent_critic_verdict():
+    root = Path(__file__).resolve().parents[1]
+    store = (root / "agents" / "swarm_run_store.py").read_text(encoding="utf-8")
+    orchestrator = (root / "agents" / "coordination" / "orchestrator.py").read_text(encoding="utf-8")
+
+    assert "swarm_gauntlet_reviews" in store
+    assert "record_gauntlet_review" in orchestrator
+    assert "VERDICT: PASS" in orchestrator
+    assert 'status="needs_input"' in orchestrator

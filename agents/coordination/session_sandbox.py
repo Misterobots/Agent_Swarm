@@ -94,6 +94,7 @@ manual verification of this phase):
 from __future__ import annotations
 
 import logging
+import ntpath
 import os
 import socket
 
@@ -206,7 +207,27 @@ def _resolve_own_workspace_mount(client) -> str:
     )
 
 
-def ensure_session_container(coordination_id: str, mode: str = "ephemeral") -> tuple[str, bool]:
+def _resolve_desktop_workspace_mount(client, workspace_path: str) -> str:
+    """Validate an explicitly selected desktop project before Docker mounts it.
+
+    The runtime must never treat arbitrary request text as a host mount.  A
+    desktop project is allowed only below the configured root (or, by default,
+    the sibling projects directory that contains this checked-out runtime).
+    """
+    candidate = (workspace_path or "").strip()
+    if not candidate or not ntpath.isabs(candidate):
+        raise RuntimeError("Desktop workspace path must be an absolute path")
+    own_workspace = _resolve_own_workspace_mount(client)
+    default_root = ntpath.dirname(own_workspace)
+    allowed_root = os.getenv("MEMEX_DESKTOP_WORKSPACE_ROOT", default_root).strip()
+    normalized_candidate = ntpath.normcase(ntpath.normpath(candidate))
+    normalized_root = ntpath.normcase(ntpath.normpath(allowed_root))
+    if normalized_candidate == normalized_root or not normalized_candidate.startswith(normalized_root + "\\"):
+        raise RuntimeError(f"Desktop workspace must be inside the configured projects root: {allowed_root}")
+    return candidate
+
+
+def ensure_session_container(coordination_id: str, mode: str = "ephemeral", *, workspace_path: str | None = None) -> tuple[str, bool]:
     """Idempotently ensure a per-session Docker container exists for
     `coordination_id`, and return (name, created).
 
@@ -253,7 +274,7 @@ def ensure_session_container(coordination_id: str, mode: str = "ephemeral") -> t
     """
     if not coordination_id:
         raise ValueError("coordination_id must not be empty")
-    if mode not in ("ephemeral", "local", "live_repo"):
+    if mode not in ("ephemeral", "local", "live_repo", "desktop_local"):
         raise ValueError(f"Unknown session container mode: {mode!r}")
 
     name = _container_name(coordination_id)
@@ -292,6 +313,13 @@ def ensure_session_container(coordination_id: str, mode: str = "ephemeral") -> t
         run_kwargs["volumes"] = {host_workspace: {"bind": "/workspace", "mode": "rw"}}
         logger.info(
             f"[SessionSandbox] Creating live_repo session container '{name}' "
+            f"(image={SESSION_IMAGE}, network={primary_network}, mount={host_workspace})."
+        )
+    elif mode == "desktop_local":
+        host_workspace = _resolve_desktop_workspace_mount(client, workspace_path or "")
+        run_kwargs["volumes"] = {host_workspace: {"bind": "/workspace", "mode": "rw"}}
+        logger.info(
+            f"[SessionSandbox] Creating scoped desktop session '{name}' "
             f"(image={SESSION_IMAGE}, network={primary_network}, mount={host_workspace})."
         )
     else:

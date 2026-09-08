@@ -164,6 +164,8 @@ def coordinate_task(
     already_steered: bool = False,
     repo_context: Optional[dict] = None,
     session_mode: Optional[str] = None,
+    desktop_workspace_path: Optional[str] = None,
+    gauntlet_bar: Optional[str] = None,
     coordination_id: Optional[str] = None,
 ) -> Generator[dict, None, None]:
     """
@@ -223,7 +225,9 @@ def coordinate_task(
         try:
             from coordination.session_sandbox import ensure_session_container
             from coordination.sandbox_identity import set_current_container
-            session.container_name, _ = ensure_session_container(session.coordination_id, mode=_resolved_mode)
+            session.container_name, _ = ensure_session_container(
+                session.coordination_id, mode=_resolved_mode, workspace_path=desktop_workspace_path,
+            )
             set_current_container(session.container_name)
             _session_container_owned = True
             logger.info(f"[Coordinator] Session container ready ({_resolved_mode}): {session.container_name}")
@@ -1342,6 +1346,13 @@ def coordinate_task(
             f"Verification Criteria:\n{criteria_text}\n\n"
             f"Work Product:\n{all_work}"
         )
+        if gauntlet_bar:
+            verify_prompt += (
+                f"\n\n[GAUNTLET INDEPENDENT CRITIC]\nQuality bar: {gauntlet_bar}\n"
+                "You are independent from the builders. Inspect the actual work against the named bar. "
+                "End with exactly `VERDICT: PASS` only when it meets the bar, otherwise `VERDICT: FAIL`, "
+                "followed by `GAP: <one concrete remaining gap>`."
+            )
 
         verify_worker_id = session.register_worker("verifier", "Final verification", "verification")
         _verify_pioneer = session.workers[verify_worker_id].pioneer
@@ -1383,6 +1394,31 @@ def coordinate_task(
         }
 
         yield {"type": "message", "content": f"**🔍 Verification**\n\n{verify_result}\n\n"}
+
+        if gauntlet_bar:
+            # The final critic is a hard quality gate, not an aspirational
+            # prompt.  Persist its evidence before exposing any completion.
+            _gauntlet_pass = bool(re.search(r"(?:^|\\n)VERDICT:\\s*PASS\\b", verify_result, re.IGNORECASE))
+            _gauntlet_verdict = "pass" if _gauntlet_pass else "fail"
+            swarm_run_store.record_gauntlet_review(
+                session.coordination_id, gauntlet_bar, _gauntlet_verdict, verify_result,
+            )
+            yield {
+                "type": "gauntlet_critic_verdict",
+                "verdict": _gauntlet_verdict,
+                "quality_bar": gauntlet_bar,
+                "content": f"Gauntlet critic verdict: {_gauntlet_verdict.upper()}",
+            }
+            if not _gauntlet_pass:
+                swarm_run_store.finish_run(
+                    session.coordination_id, status="needs_input",
+                    workers_total=len(session.workers),
+                    workers_completed=sum(1 for w in session.workers.values() if w.state == WorkerState.COMPLETED),
+                    workers_failed=sum(1 for w in session.workers.values() if w.state == WorkerState.FAILED),
+                    error="Independent Gauntlet critic did not approve the quality bar.", ended_at=int(time.time()),
+                )
+                yield {"type": "status", "content": "Gauntlet quality bar not yet met; preserving the critic brief for the next repair pass."}
+                return
 
         # Auto-retry if verification failed on plan-only
         _verify_lower = verify_result.lower()

@@ -30,6 +30,8 @@ def handle_coordinate(user_input: str, ctx: dict):
     use_langfuse = ctx["use_langfuse"]
     already_steered = ctx.get("already_steered", False)
     coordination_id = ctx.get("coordination_id")
+    workspace_key = str(ctx.get("workspace_key") or "").strip()
+    gauntlet_bar = str(ctx.get("gauntlet_bar") or "").strip()
 
     # --- DEV MODE GATE ---
     # Intercept build/project requests when dev_mode is off and not in research/plan mode.
@@ -116,6 +118,12 @@ def handle_coordinate(user_input: str, ctx: dict):
             research_mode=research_mode,
             already_steered=already_steered,
             coordination_id=coordination_id,
+            # A Code desktop session carries its selected project root.  It is
+            # mounted only in this run's dedicated container; no selected path
+            # can fall through to the shared Agent_Swarm workspace.
+            session_mode="desktop_local" if workspace_key else None,
+            desktop_workspace_path=workspace_key or None,
+            gauntlet_bar=gauntlet_bar or None,
         ):
             yield update
             # Mirror key events as structured agent_event so the UI can render
