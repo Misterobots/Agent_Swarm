@@ -58,6 +58,7 @@ def test_desktop_code_workspace_uses_a_scoped_session_container():
     assert '"desktop_local"' in sandbox
     assert "MEMEX_DESKTOP_WORKSPACE_ROOT" in sandbox
     assert 'session_mode="desktop_local" if workspace_key else None' in handler
+    assert "skip_project_gate=bool(workspace_key)" in handler
 
 
 def test_gauntlet_completion_requires_a_persisted_independent_critic_verdict():

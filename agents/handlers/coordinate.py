@@ -123,6 +123,9 @@ def handle_coordinate(user_input: str, ctx: dict):
             # can fall through to the shared Agent_Swarm workspace.
             session_mode="desktop_local" if workspace_key else None,
             desktop_workspace_path=workspace_key or None,
+            # Selecting a Code workspace in the desktop app is the project
+            # decision. Never ask the legacy server-side picker again.
+            skip_project_gate=bool(workspace_key),
             gauntlet_bar=gauntlet_bar or None,
         ):
             yield update
