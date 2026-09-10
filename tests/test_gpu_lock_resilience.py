@@ -148,7 +148,7 @@ def test_circuit_breaker_short_circuits_post(monkeypatch):
 def test_circuit_breaker_half_open_probe(monkeypatch):
     gq = _import_gpu_queue()
     cb = gq._circuit_breaker
-    key = ("http://test2:0", "omnigen")
+    key = ("http://test2:0", "test-media-service")
     cb._circuits.pop(key, None)
 
     # Drive it open

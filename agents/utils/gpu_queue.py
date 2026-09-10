@@ -53,7 +53,6 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
 KLEIN_HOST = os.getenv("KLEIN_HOST", "http://klein_service:8189")
-OMNIGEN_HOST = os.getenv("OMNIGEN_HOST", "http://omnigen_service:8190")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
 GAUNTLET_COORDINATOR_HOST = os.getenv("GAUNTLET_COORDINATOR_HOST", "")
@@ -78,7 +77,7 @@ TRAINING_WINDOW_END   = int(os.getenv("TRAINING_WINDOW_END",   "6"))   # hour (2
 # restore the old evict-everything behaviour.
 #
 # NOTE (VRAM): keeping the voice model resident is OOM-safe when the incoming
-# media backend uses only GPU 1 (Klein/OmniGen). ComfyUI uses BOTH cards, so
+# media backend uses only GPU 1 (Klein). ComfyUI uses BOTH cards, so
 # confirm the voice model occupies a single card before relying on this under
 # heavy ComfyUI load.
 # ---------------------------------------------------------------------------
@@ -493,7 +492,7 @@ ZONE_KEY = "swarm_gpu_zone"  # Track whether VRAM is currently dedicated to "tex
 # ---------------------------------------------------------------------------
 # Circuit breaker for eviction / warmup HTTP calls.
 #
-# A flapping Klein/ComfyUI/OmniGen service that times out every call would
+# A flapping Klein or ComfyUI service that times out every call would
 # otherwise pin every GPU-using request inside a long evict→warmup→fail
 # loop, then immediately retry on the next request — itself a GPU thrash
 # path that ends in OOM. The breaker short-circuits known-bad endpoints
@@ -733,48 +732,6 @@ def warmup_klein():
             logger.info("[GPU Queue] Klein warmup failed — waiting 20s for WDDM page reclaim, then retrying...")
             time.sleep(20)
 
-def evict_omnigen():
-    """Unloads OmniGen2 weights via POST /evict. Used in the Klein↔OmniGen swap
-    inside the image zone. Mirrors evict_klein's graceful-only approach — we
-    don't restart the container because OmniGen runs on a single GPU and
-    torch.cuda.empty_cache() is typically sufficient (no dual-GPU WDDM trap)."""
-    logger.info("[GPU Queue] Evicting OmniGen2 model from VRAM (graceful)...")
-    response = _guarded_post(OMNIGEN_HOST, "omnigen", "/evict", timeout=180)
-    if response is not None:
-        if response.status_code == 200:
-            logger.info("[GPU Queue] OmniGen2 VRAM evicted.")
-        else:
-            logger.warning(f"[GPU Queue] OmniGen2 /evict returned status {response.status_code}.")
-
-
-def _omnigen_is_healthy() -> bool:
-    """Health check analog to Klein's. Returns True if the service is reachable
-    and reports pipeline_loaded OR is loadable (mirroring the Klein cold-start
-    fix — explicit /warmup call before /compose handles the actual load)."""
-    try:
-        r = requests.get(f"{OMNIGEN_HOST}/health", timeout=3)
-        if r.status_code != 200:
-            return False
-        data = r.json()
-        return bool(data.get("pipeline_loaded") or data.get("model") is not None)
-    except Exception:
-        return False
-
-
-def warmup_omnigen():
-    """Pre-load OmniGen2 weights. First load from HF cache ~200s; warm ~30s."""
-    for attempt in range(2):
-        logger.info(f"[GPU Queue] Warming up OmniGen2 pipeline (attempt {attempt + 1})...")
-        response = _guarded_post(OMNIGEN_HOST, "omnigen", "/warmup", timeout=600)
-        if response is not None:
-            if response.status_code == 200:
-                logger.info("[GPU Queue] OmniGen2 pipeline warm.")
-                return
-            logger.warning(f"[GPU Queue] OmniGen2 /warmup returned status {response.status_code}.")
-        if attempt == 0:
-            time.sleep(20)
-
-
 def _set_model_keep_alive(host: str, model_name: str, keep_alive, timeout: float = 10) -> None:
     """Best-effort: set an Ollama model's keep_alive without generating tokens.
     keep_alive=-1 pins it resident; a duration string (e.g. '5m') restores normal
@@ -814,7 +771,7 @@ def evict_ollama():
     """Unload resident Ollama models via keep_alive=0 to free VRAM for the next zone.
 
     By default only OLLAMA_HOST (Lovelace) is touched — it shares physical GPUs with
-    ComfyUI/Klein/OmniGen. The SECONDARY host (Turing's 8 GB fast path) is left alone;
+    ComfyUI/Klein. The SECONDARY host (Turing's 8 GB fast path) is left alone;
     it doesn't share those GPUs, so evicting it is pure collateral. Set
     EVICT_SECONDARY_OLLAMA=true to also free the secondary host.
 
@@ -891,13 +848,11 @@ def _run_zone_switch(context: str, current_zone):
         # Switching to text -> evict image backends so Ollama can use both GPUs.
         evict_comfyui()
         evict_klein()
-        evict_omnigen()
     elif context == "image":
-        # Switching to image -> evict Ollama + ComfyUI + OmniGen to clear both GPUs,
+        # Switching to image -> evict Ollama + ComfyUI to clear both GPUs,
         # then warm Klein (needs GPU 1's full 15 GiB free to load).
         evict_ollama()
         evict_comfyui()
-        evict_omnigen()
         warmup_klein()
     elif context == "image_fast":
         # Friday's delivery path uses ComfyUI on the non-Friday 5060 Ti.
@@ -906,20 +861,11 @@ def _run_zone_switch(context: str, current_zone):
         # the shared Ollama endpoint, not Friday's separate Ollama service.
         evict_ollama()
         evict_klein()
-        evict_omnigen()
-    elif context == "compose":
-        # OmniGen2 multi-image composition zone. Mutually exclusive with Klein
-        # at the GPU layer — both target physical GPU 1.
-        evict_ollama()
-        evict_comfyui()
-        evict_klein()
-        warmup_omnigen()
     elif context == "training":
         # Training needs exclusive VRAM — evict everything
         evict_ollama()
         evict_comfyui()
         evict_klein()
-        evict_omnigen()
     else:
         logger.warning(f"[GPU Queue] Unknown context '{context}'.")
 
@@ -928,7 +874,7 @@ def _run_zone_switch(context: str, current_zone):
 def request_lock(context: str, timeout: int = 300):
     """
     Acquires a global Mutex lock for the GPU and handles VRAM eviction for context switching.
-    context must be one of "text", "image", "image_fast", "compose", or "training".
+    context must be one of "text", "image", "image_fast", or "training".
 
     Two-layer locking:
       1. Cross-process: a Redis NX/EX mutex coordinates between agent_runtimes.
