@@ -1872,6 +1872,7 @@ async def _dev_harness_stream(
     from dev_harness.router import ModelRouter
     from dev_harness.permissions import PermissionGate
     from dev_harness.activity import tool_activity_events
+    from dev_harness.workspace import session_workspace_spec
     from event_contract import stable_event
 
     stream_run_id = f"dev-{uuid.uuid4().hex}"
@@ -2041,9 +2042,19 @@ async def _dev_harness_stream(
                 # instead of the shared one.
                 _project = _dev_projects_store.get_or_create_live_repo_project(uid)
 
-            _mode = "live_repo" if _project.get("source") == "live_repo" else "ephemeral"
+            # A Code desktop request is already scoped to the folder the user
+            # opened. That selection must override the server's live-repo
+            # default; otherwise every ordinary Code turn mounts Agent_Swarm
+            # regardless of the project shown in the desktop sidebar.
+            _mode, _desktop_workspace = session_workspace_spec(
+                request.workspace_key, _project.get("source")
+            )
             _session_key = request.session_id or uid
-            container_name, _dh_created = ensure_session_container(_session_key, mode=_mode)
+            container_name, _dh_created = ensure_session_container(
+                _session_key,
+                mode=_mode,
+                workspace_path=_desktop_workspace,
+            )
 
             # Clone into the container only once, right after it's first
             # created — ensure_session_container's idempotency means later
