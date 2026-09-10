@@ -2431,12 +2431,21 @@ async def chat_completions(request: ChatRequest, http_request: Request):
         last_msg = _gauntlet_prompt(last_msg, request.gauntlet_bar or "")
         if request.gauntlet_handoff:
             contract = request.gauntlet_handoff
+            clarifications = contract.get("clarifications")
+            clarification_block = ""
+            if isinstance(clarifications, list):
+                durable_notes = [str(note).strip() for note in clarifications if str(note).strip()]
+                if durable_notes:
+                    clarification_block = "\nResumption clarifications:\n" + "\n".join(
+                        f"- {note}" for note in durable_notes
+                    )
             last_msg += (
                 "\n\n[DESKTOP GAUNTLET CONTRACT — immutable]\n"
                 f"Checkpoint: {contract.get('id', '')}\n"
                 f"Original goal: {contract.get('goal', '')}\n"
                 f"Quality bar: {contract.get('qualityBar', request.gauntlet_bar or '')}\n"
                 f"Effort policy: {contract.get('effort', {})}\n"
+                f"{clarification_block}"
                 "Do not replace this contract with the latest shorthand user message."
             )
     
