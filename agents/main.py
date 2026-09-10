@@ -1871,7 +1871,7 @@ async def _dev_harness_stream(
     from dev_harness.loop import DevHarness
     from dev_harness.router import ModelRouter
     from dev_harness.permissions import PermissionGate
-    from dev_harness.activity import tool_activity_events
+    from dev_harness.activity import completed_activity_event, initial_activity_events, tool_activity_events
     from dev_harness.workspace import session_workspace_spec
     from event_contract import stable_event
 
@@ -2144,11 +2144,8 @@ async def _dev_harness_stream(
         # This is an observable harness state, not private model reasoning.
         # It makes an otherwise silent first provider call legible in Detailed
         # activity mode before the first tool is selected.
-        yield _event_sse({
-            "type": "thought",
-            "content": "Reviewing the request and preparing the first safe action.",
-            "agent_name": "Code agent",
-        })
+        for activity in initial_activity_events():
+            yield _event_sse(activity)
         stream = DevHarness().run(
             history, DEV_TOOL_DEFINITIONS, _tool_executor, router,
             approval=_Approval(gate), gate=gate, checkpoint=_checkpoint,
@@ -2156,6 +2153,7 @@ async def _dev_harness_stream(
         pending_chunk = _asyncio.ensure_future(stream.__anext__())
         waited_seconds = 0
         wait_notices = {15, 45, 90, 180}
+        stream_failed = False
         while True:
             # Do not cancel the in-flight model/tool call when the timeout
             # elapses.  Instead, keep the public SSE response alive until its
@@ -2179,6 +2177,7 @@ async def _dev_harness_stream(
             except StopAsyncIteration:
                 break
             pending_chunk = _asyncio.ensure_future(stream.__anext__())
+            stream_failed = stream_failed or chunk.type == "error"
             delta: dict = {"type": chunk.type, "content": chunk.content}
             if chunk.tool_name:
                 delta["tool_name"] = chunk.tool_name
@@ -2206,6 +2205,8 @@ async def _dev_harness_stream(
                 for activity in tool_activity_events(chunk.tool_name, "result"):
                     yield _event_sse(activity)
             yield _event_sse(delta)
+        if not stream_failed:
+            yield _event_sse(completed_activity_event())
     except Exception as e:
         logger.error(f"[dev_harness] stream error: {e}", exc_info=True)
         try:

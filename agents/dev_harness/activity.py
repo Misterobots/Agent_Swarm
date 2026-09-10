@@ -24,7 +24,32 @@ _TOOL_ACTIONS = {
 }
 
 
-def tool_activity_events(tool_name: str | None, phase: str) -> list[dict[str, str]]:
+def initial_activity_events() -> list[dict[str, object]]:
+    """Start one durable Code-agent presence and a safe work narrative."""
+    return [
+        {
+            "type": "agent_event", "worker_id": "code-agent",
+            "agent_name": "Code agent", "role": "coding agent",
+            "task": "Reviewing the selected workspace", "event_type": "status",
+            "content": "Code agent started the workspace review.",
+        },
+        {
+            "type": "thought", "agent_name": "Code agent", "safe_summary": True,
+            "content": "I’m reviewing the selected workspace before making changes.",
+        },
+        {"type": "status", "content": "Planning the first verifiable step."},
+    ]
+
+
+def completed_activity_event() -> dict[str, object]:
+    return {
+        "type": "agent_event", "worker_id": "code-agent",
+        "agent_name": "Code agent", "role": "coding agent",
+        "event_type": "completed", "content": "Code agent completed this turn.",
+    }
+
+
+def tool_activity_events(tool_name: str | None, phase: str) -> list[dict[str, object]]:
     """Return small, user-readable lifecycle events for one tool call.
 
     ``phase`` is ``start`` or ``result``. Unknown tools retain their name so
@@ -34,7 +59,7 @@ def tool_activity_events(tool_name: str | None, phase: str) -> list[dict[str, st
     action = _TOOL_ACTIONS.get(name, name.replace("_", " "))
     if phase == "start":
         return [
-            {"type": "thought", "content": f"Next, I’ll {action}."},
+            {"type": "thought", "safe_summary": True, "content": f"Next, I’ll {action}."},
             {"type": "status", "content": f"Working: {action}."},
         ]
     if phase == "result":
