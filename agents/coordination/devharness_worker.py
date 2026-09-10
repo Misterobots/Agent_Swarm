@@ -138,7 +138,8 @@ def _brief(obj, n: int = _BRIEF_LEN) -> str:
 def _chunk_to_dict(ch) -> dict | None:
     """Convert a StreamChunk to the dict format the orchestrator SSE pipeline expects.
 
-    Returns None for chunk types that should not be forwarded (content, tool_start, etc.).
+    Worker telemetry must be forwarded while the worker is active.  The desktop
+    renderer owns presentation; this bridge preserves the structured lifecycle.
     The returned dict is placed directly into session.file_change_queue and yielded
     by _drain_file_changes() into the SSE stream.
     """
@@ -153,6 +154,13 @@ def _chunk_to_dict(ch) -> dict | None:
         return d
     if ch.type == "todo":
         return {"type": "todo", "content": ch.data or {"todos": []}}
+    if ch.type in {"status", "thought", "tool_start", "tool_result"}:
+        event = {"type": ch.type, "content": ch.content or ""}
+        if ch.tool_name:
+            event["tool_name"] = ch.tool_name
+        if ch.tool_input is not None:
+            event["tool_input"] = ch.tool_input
+        return event
     return None
 
 
@@ -269,6 +277,19 @@ async def _run_async(
          "agent_name": agent_name,
          "event_type": "status"},
     ]
+    def _emit(event: dict) -> None:
+        """Make a worker update visible immediately, not after model return."""
+        emitted_dicts.append(event)
+        try:
+            file_change_queue.put_nowait(event)
+        except Exception:
+            pass
+
+    for event in emitted_dicts[:]:
+        try:
+            file_change_queue.put_nowait(event)
+        except Exception:
+            pass
     parts: list[str] = []
 
     async def _exec(cid: str, tname: str, targs: dict):
@@ -297,7 +318,7 @@ async def _run_async(
             else:
                 d = _chunk_to_dict(ch)
                 if d is not None:
-                    emitted_dicts.append(d)
+                    _emit(d)
     except Exception as e:
         logger.error(f"[devharness_worker] {role} worker failed: {e}", exc_info=True)
         emitted_dicts.append({
@@ -379,14 +400,8 @@ def run_devharness_worker(
             container_name=container_name,
         ))
 
-        # Push non-file_change events (agent_event, todo) collected during the run.
-        # file_change events were already pushed into the queue inside _exec_sandbox.
-        for d in event_dicts:
-            if d.get("type") != "file_change":
-                try:
-                    session.file_change_queue.put_nowait(d)
-                except Exception:
-                    pass
+        # Events are pushed by _run_async as they occur.  Keep event_dicts only
+        # for worker result accounting and file-change evidence below.
 
         worker.result = summary
         # A Code/Gauntlet implementation turn that only returns a plan or a
