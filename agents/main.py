@@ -1871,6 +1871,7 @@ async def _dev_harness_stream(
     from dev_harness.loop import DevHarness
     from dev_harness.router import ModelRouter
     from dev_harness.permissions import PermissionGate
+    from dev_harness.activity import tool_activity_events
     from event_contract import stable_event
 
     stream_run_id = f"dev-{uuid.uuid4().hex}"
@@ -2129,6 +2130,14 @@ async def _dev_harness_stream(
             "type": "status",
             "content": f"Workspace ready. Waiting for {request.model}…",
         })
+        # This is an observable harness state, not private model reasoning.
+        # It makes an otherwise silent first provider call legible in Detailed
+        # activity mode before the first tool is selected.
+        yield _event_sse({
+            "type": "thought",
+            "content": "Reviewing the request and preparing the first safe action.",
+            "agent_name": "Code agent",
+        })
         stream = DevHarness().run(
             history, DEV_TOOL_DEFINITIONS, _tool_executor, router,
             approval=_Approval(gate), gate=gate, checkpoint=_checkpoint,
@@ -2174,6 +2183,17 @@ async def _dev_harness_stream(
                 delta["event_type"] = chunk.event_type
             if chunk.data is not None:
                 delta["content"] = chunk.data  # structured payload (e.g. todo)
+            # DevHarness naturally emits tool lifecycle chunks, but without a
+            # coordinator that left Code users with a stream of raw calls and
+            # no conversational intent or progress. Add concise, truthful
+            # narration around the observable action; never serialize the
+            # tool output into the narrative.
+            if chunk.type == "tool_start":
+                for activity in tool_activity_events(chunk.tool_name, "start"):
+                    yield _event_sse(activity)
+            elif chunk.type == "tool_result":
+                for activity in tool_activity_events(chunk.tool_name, "result"):
+                    yield _event_sse(activity)
             yield _event_sse(delta)
     except Exception as e:
         logger.error(f"[dev_harness] stream error: {e}", exc_info=True)
