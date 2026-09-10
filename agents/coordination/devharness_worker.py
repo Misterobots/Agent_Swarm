@@ -290,6 +290,11 @@ async def _run_async(
             file_change_queue.put_nowait(event)
         except Exception:
             pass
+
+    def _model_progress(message: str) -> None:
+        _emit({"type": "status", "content": message, "agent_name": agent_name})
+
+    primary.on_progress = _model_progress
     parts: list[str] = []
 
     async def _exec(cid: str, tname: str, targs: dict):

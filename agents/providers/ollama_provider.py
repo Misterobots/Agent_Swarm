@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Callable
 
 import requests
 
@@ -36,19 +37,41 @@ class OllamaProvider:
         self.host = (host or OLLAMA_HOST).rstrip("/")
         self.timeout = timeout
         self.temperature = temperature
+        self.on_progress: Callable[[str], None] | None = None
 
     def chat_with_tools(self, history: History, tools: list[dict]) -> ProviderResult:
         payload = {
             "model": self.model,
             "messages": history.to_openai_messages(args_as_string=False),
             "tools": tools,
-            "stream": False,
+            "stream": bool(self.on_progress),
             # low temp for coding; num_ctx from CONTEXT_WINDOWS via get_ollama_options
             "options": get_ollama_options(self.model, temperature=self.temperature),
         }
-        resp = requests.post(f"{self.host}/api/chat", json=payload, timeout=self.timeout)
+        resp = requests.post(f"{self.host}/api/chat", json=payload, timeout=self.timeout, stream=bool(self.on_progress))
         resp.raise_for_status()
-        body = resp.json()
+        if self.on_progress:
+            import json
+            content: list[str] = []
+            final: dict = {}
+            self.on_progress("Model is processing the worker context.")
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                delta = json.loads(line)
+                message = delta.get("message", {}) or {}
+                if message.get("content"):
+                    content.append(message["content"])
+                    self.on_progress("Model is generating the next worker decision.")
+                if message.get("tool_calls"):
+                    final["tool_calls"] = message["tool_calls"]
+                if delta.get("done"):
+                    final.update(delta)
+                    break
+            body = final
+            body["message"] = {"content": "".join(content), "tool_calls": final.get("tool_calls", [])}
+        else:
+            body = resp.json()
 
         message = body.get("message", {}) or {}
         text = message.get("content") or ""
