@@ -39,6 +39,21 @@ class Gate:
         return True, ""
 
 
+class ToolBudgetRouter:
+    """Consumes the whole active budget, then writes a final response."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def complete(self, _history, tools, _state):
+        self.calls += 1
+        if tools:
+            return ProviderResult(
+                tool_calls=[ToolCall(f"call-{self.calls}", "read_file", {"path": f"{self.calls}.txt"})],
+            ), []
+        return ProviderResult(text="I reviewed the available files and preserved the next steps."), []
+
+
 def test_approved_tool_checkpoint_resume_and_compaction_boundary():
     history = History(system="system")
     history.add_user("update the file")
@@ -87,3 +102,33 @@ def test_approved_tool_checkpoint_resume_and_compaction_boundary():
     assert restored.to_checkpoint() == history.to_checkpoint()
     assert compacted[0]["role"] == "system"
     assert compacted[-1]["content"] == "tail"
+
+
+def test_budget_exhaustion_synthesizes_instead_of_emitting_a_terminal_error():
+    history = History(system="system")
+    history.add_user("inspect the workspace")
+    checkpoints = []
+
+    async def checkpoint(status, turn, pending, error):
+        checkpoints.append((status, turn, pending, error))
+        return True
+
+    async def execute(_call_id, _name, _args):
+        return "read"
+
+    async def run():
+        return [
+            chunk async for chunk in DevHarness(max_iterations=3).run(
+                history, tools=[{"type": "function"}], tool_executor=execute,
+                router=ToolBudgetRouter(), checkpoint=checkpoint,
+            )
+        ]
+
+    chunks = asyncio.run(run())
+
+    assert [chunk.type for chunk in chunks].count("tool_start") == 3
+    assert any(chunk.content == "Tool-turn budget reached; preparing a progress summary." for chunk in chunks)
+    assert any("reviewed the available files" in chunk.content for chunk in chunks)
+    assert not any(chunk.type == "error" and "loop exceeded" in chunk.content for chunk in chunks)
+    assert checkpoints[-2][0] == "synthesizing"
+    assert checkpoints[-1][0] == "completed"

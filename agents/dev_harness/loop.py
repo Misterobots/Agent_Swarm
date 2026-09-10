@@ -62,7 +62,13 @@ ToolExecutor = Callable[[str, str, dict], Awaitable[str]]
 
 
 class DevHarness:
-    def __init__(self, max_iterations: int = 12):
+    # Twelve tool-bearing turns is enough for a small edit, but it is not
+    # enough for a real workspace investigation.  The desktop harness has a
+    # separate repeat/no-progress guard in ModelRouter, so this budget is not
+    # the mechanism that prevents a broken model from running forever.
+    DEFAULT_MAX_ITERATIONS = 24
+
+    def __init__(self, max_iterations: int = DEFAULT_MAX_ITERATIONS):
         self.max_iterations = max_iterations
 
     async def run(
@@ -233,13 +239,50 @@ class DevHarness:
                 )
                 return
 
-        # iteration budget exhausted
-        yield StreamChunk(
-            type="error",
-            content=f"Agentic loop exceeded {self.max_iterations} iterations — stopping.",
-        )
-        if checkpoint is not None:
-            await checkpoint(
-                "failed", self.max_iterations, [],
-                "Agentic loop iteration budget exhausted.",
+        # The last successful tool result is useful context.  Do not turn a
+        # productive run into an error before the model has one chance to
+        # synthesize that context for the user.  With no tools available this
+        # call cannot extend the side-effecting loop; it can only deliver a
+        # concise partial/final report and the appropriate next step.
+        if checkpoint is not None and not await checkpoint(
+            "synthesizing", self.max_iterations, [],
+            "Active tool-turn budget reached; preparing a progress summary.",
+        ):
+            yield StreamChunk(
+                type="error",
+                content="Durable checkpoint unavailable; unable to prepare the progress summary.",
             )
+            return
+        yield StreamChunk(
+            type="status",
+            content="Tool-turn budget reached; preparing a progress summary.",
+        )
+        try:
+            summary, notices = await event_loop.run_in_executor(
+                None, router.complete, history, [], state
+            )
+        except Exception as e:
+            logger.error("[dev_harness] summary call failed after %d turns: %s", state.turn, e, exc_info=True)
+            if checkpoint is not None:
+                await checkpoint("failed", self.max_iterations, [], str(e))
+            yield StreamChunk(
+                type="error",
+                content=f"Progress summary failed after {self.max_iterations} tool turns: {e}",
+            )
+            return
+        for notice in notices:
+            yield notice
+        history.add_assistant(summary.text, summary.tool_calls)
+        if summary.text:
+            for i in range(0, len(summary.text), _STREAM_CHUNK_SIZE):
+                yield StreamChunk(type="content", content=summary.text[i : i + _STREAM_CHUNK_SIZE])
+        elif summary.tool_calls:
+            yield StreamChunk(
+                type="content",
+                content=(
+                    f"I completed {self.max_iterations} tool turns and need another pass "
+                    "to continue safely. The completed work is preserved for the next request."
+                ),
+            )
+        if checkpoint is not None:
+            await checkpoint("completed", self.max_iterations, [], "")
