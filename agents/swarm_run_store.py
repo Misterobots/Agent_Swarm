@@ -241,19 +241,30 @@ def update_metadata(coordination_id: str, owner_id: str, *, title: str | None = 
 
 
 def reconcile_stale_runs(error: str = "agent_runtime restarted mid-run") -> int:
-    """Startup reconciliation: mark any run still 'running' or 'queued' from
-    before this process started as 'failed'. Without this, a crash mid-task
-    leaves a phantom row that never completes — and, once the task queue is
-    in play, a Redis lock nothing will ever release. Returns the row count
-    fixed (0 on error, fail-open — a stuck row is recoverable manually; a
-    startup crash here would not be)."""
+    """Reconcile work interrupted by a runtime restart.
+
+    Ordinary queued/running tasks cannot be replayed safely because their
+    in-memory dispatch arguments are gone, so they remain failed.  A Gauntlet
+    is different: its prompt, quality bar, critic history, and workspace
+    contract are persisted.  Preserve that work as ``needs_input`` so the
+    desktop can offer a truthful resume from the exact durable brief instead
+    of reporting an indistinguishable terminal failure.
+    """
     try:
         now = _now()
         with _db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    UPDATE swarm_runs SET status='failed', error=%s, ended_at=%s, updated_at=%s
+                    UPDATE swarm_runs
+                       SET status=CASE WHEN COALESCE(gauntlet_bar, '') <> ''
+                                       THEN 'needs_input' ELSE 'failed' END,
+                           error=CASE WHEN COALESCE(gauntlet_bar, '') <> ''
+                                      THEN 'Runtime restarted; resume from the preserved Gauntlet checkpoint.'
+                                      ELSE %s END,
+                           ended_at=CASE WHEN COALESCE(gauntlet_bar, '') <> ''
+                                         THEN NULL ELSE %s END,
+                           updated_at=%s
                     WHERE status IN ('running', 'queued')
                     """,
                     (error, now, now),
