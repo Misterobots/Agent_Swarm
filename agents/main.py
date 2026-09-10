@@ -2199,10 +2199,10 @@ async def _dev_harness_stream(
             # narration around the observable action; never serialize the
             # tool output into the narrative.
             if chunk.type == "tool_start":
-                for activity in tool_activity_events(chunk.tool_name, "start"):
+                for activity in tool_activity_events(chunk.tool_name, "start", chunk.tool_input):
                     yield _event_sse(activity)
             elif chunk.type == "tool_result":
-                for activity in tool_activity_events(chunk.tool_name, "result"):
+                for activity in tool_activity_events(chunk.tool_name, "result", output=chunk.content):
                     yield _event_sse(activity)
             yield _event_sse(delta)
         if not stream_failed:

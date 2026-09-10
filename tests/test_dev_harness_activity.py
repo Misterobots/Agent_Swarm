@@ -17,9 +17,21 @@ def test_tool_start_has_user_safe_intent_and_progress():
 
 
 def test_tool_result_reports_progress_without_exposing_output():
-    assert tool_activity_events("run_command", "result") == [
+    assert tool_activity_events("run_command", "result", output="[exit 127] bash: python: command not found") == [
+        {"type": "thought", "safe_summary": True, "content": "The requested executable is unavailable in this workspace. I’ll use the available project runtime."},
         {"type": "status", "content": "Completed run_command; reviewing the result."},
     ]
+
+
+def test_command_narration_explains_observable_setup_failures_without_echoing_output():
+    start = tool_activity_events("run_command", "start", {"command": "python3 -m archonkit.cli extract assets"})
+    module = tool_activity_events("run_command", "result", output="ModuleNotFoundError: No module named 'archonkit'")
+    managed = tool_activity_events("run_command", "result", output="error: externally-managed-environment")
+
+    assert start[0]["content"] == "Next, I’ll run the project’s Python tooling."
+    assert "missing a required project module" in module[0]["content"]
+    assert "project-local environment" in managed[0]["content"]
+    assert "archonkit" not in module[0]["content"]
 
 
 def test_unknown_tool_remains_legible():
