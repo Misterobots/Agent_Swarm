@@ -1,0 +1,16 @@
+{
+  "schema": "learning.v1",
+  "operations": {
+    "dry_run": true,
+    "create_job": false,
+    "get_job": true,
+    "events": true,
+    "controls": false,
+    "schedules": false,
+    "resource_admission": false,
+    "promotion": false
+  },
+  "compatibility": {
+    "legacy_training_routes": "not_adapted"
+  }
+}

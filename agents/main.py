@@ -424,6 +424,15 @@ except Exception as _e:
 try:
     from ops.routes import router as ops_router
     app.include_router(ops_router)
+
+    # The learning.v1 router is deliberately opt-in while OA-003 (schema
+    # ownership) and OA-001 (resource/GPU ownership) remain unresolved. The
+    # default keeps existing deployments unchanged; enabling it still exposes
+    # only the fail-closed foundation until live manifest/telemetry ownership
+    # checks are wired and verified.
+    if os.getenv("LEARNING_V1_ENABLED", "0").lower() in {"1", "true", "yes"}:
+        from learning.routes import router as learning_router
+        app.include_router(learning_router)
 except Exception as _e:
     import logging as _logging
     _logging.getLogger("main").warning(f"Ops router not loaded: {_e}")

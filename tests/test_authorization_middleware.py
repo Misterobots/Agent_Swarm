@@ -220,3 +220,43 @@ def test_user_owner_id_attached_to_request_state_from_token_claim():
         assert payload["agent_name"] == "UserAgent"
     finally:
         monkeypatch.undo()
+
+
+def test_learning_api_is_classified_as_user_endpoint():
+    middleware = AuthorizationMiddleware.__new__(AuthorizationMiddleware)
+    assert middleware._classify_endpoint("/api/v1/learning/jobs", "GET") == "user"
+
+
+def test_learning_scope_metadata_is_attached_after_validated_request(monkeypatch):
+    async def fake_validate(self, request, request_id, endpoint_class):
+        return EphemeralAgentCard(
+            template_id="code_developer",
+            template_version="1.0",
+            agent_name="UserAgent",
+            activated_capabilities=["file_read"],
+            security_level="L2_USER",
+            user_id="user_123",
+            session_id="user-session",
+            metadata={"learning_scope": {"workspace_id": "workspace-a"}},
+            expiry_hours=1,
+        )
+
+    monkeypatch.setattr(AuthorizationMiddleware, "_validate_request", fake_validate)
+    app = build_app("hard")
+
+    @app.get("/api/v1/learning/jobs")
+    async def learning_probe(request: Request):
+        return {
+            "owner_id": getattr(request.state, "owner_id", None),
+            "learning_scope": getattr(request.state, "learning_scope", None),
+        }
+
+    response = TestClient(app).get(
+        "/api/v1/learning/jobs",
+        headers={"Authorization": "Bearer fake-token"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "owner_id": "user_123",
+        "learning_scope": {"workspace_id": "workspace-a"},
+    }
