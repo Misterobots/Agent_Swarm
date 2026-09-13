@@ -26,6 +26,11 @@ Completed locally, feature-gated and not enabled in the default runtime:
   explicitly enabled; the default deployment surface is unchanged.
 - Pure contract/router tests and the existing event-contract regression tests
   pass.
+- The learning adapter now requires validated authorization middleware state,
+  receives scope only from trusted JWT metadata, returns the contract media
+  type, and has frozen capability/dry-run fixtures. An opt-in disposable
+  PostgreSQL concurrency/restart test is present but has not run without an
+  explicit `LEARNING_TEST_POSTGRES_DSN`.
 - `agents/learning_resources.py` now provides pure resource admission that
   rejects unknown/protected GPUs, host mismatches, stale telemetry,
   unallowlisted consumers, disabled lanes, and insufficient measured memory;

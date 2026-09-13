@@ -1,0 +1,15 @@
+{
+  "schema": "learning.dry_run.v1",
+  "ok": false,
+  "resource": {
+    "eligibility": "blocked",
+    "reason": "resource_admission_unimplemented"
+  },
+  "mutations": {
+    "job": false,
+    "lease": false,
+    "eviction": false,
+    "worker": false,
+    "outbox": false
+  }
+}

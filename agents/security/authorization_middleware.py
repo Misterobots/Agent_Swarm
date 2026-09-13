@@ -152,6 +152,10 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
             request.state.agent_name = agent_card.agent_name
             request.state.agent_id = agent_card.agent_instance_id
             request.state.owner_id = self._resolve_owner_id(agent_card, token_profile)
+            metadata = getattr(agent_card, "metadata", {}) or {}
+            learning_scope = metadata.get("learning_scope")
+            if isinstance(learning_scope, dict):
+                request.state.learning_scope = dict(learning_scope)
             request.state.request_id = request_id
             
             logger.info(
@@ -374,6 +378,9 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
 
         # MCP bridge is user-facing (CLI clients) and should accept user JWT tokens.
         if path.startswith("/api/v1/mcp/"):
+            return self.ENDPOINT_CLASS_USER
+
+        if path.startswith("/api/v1/learning/"):
             return self.ENDPOINT_CLASS_USER
 
         if path.startswith("/api/v1/"):

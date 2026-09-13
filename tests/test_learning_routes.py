@@ -18,6 +18,15 @@ import learning.routes as routes  # noqa: E402
 @pytest.fixture()
 def client():
     app = FastAPI()
+
+    @app.middleware("http")
+    async def trusted_test_auth(request, call_next):
+        # Test-only stand-in for AuthorizationMiddleware's validated state.
+        owner = request.headers.get("X-test-owner")
+        if owner:
+            request.state.owner_id = owner
+        return await call_next(request)
+
     app.include_router(routes.router)
     return TestClient(app)
 
@@ -37,6 +46,7 @@ def _body(**overrides):
 def test_capabilities_advertise_fail_closed_resource_state(client):
     response = client.get("/api/v1/learning/capabilities")
     assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/vnd.memex.learning+json")
     body = response.json()
     assert body["schema"] == "learning.v1"
     assert body["operations"]["resource_admission"] is False
@@ -56,9 +66,10 @@ def test_dry_run_is_non_mutating_and_blocks_unknown_resource_admission(client):
     response = client.post(
         "/api/v1/learning/jobs",
         json={**_body(), "dry_run": True},
-        headers={"X-authentik-username": "alice"},
+        headers={"X-test-owner": "alice"},
     )
     assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/vnd.memex.learning+json")
     body = response.json()
     assert body["ok"] is False
     assert body["resource"]["eligibility"] == "blocked"
@@ -75,14 +86,14 @@ def test_create_rejects_without_idempotency_and_resource_admission(client):
     response = client.post(
         "/api/v1/learning/jobs",
         json=_body(),
-        headers={"X-authentik-username": "alice"},
+        headers={"X-test-owner": "alice"},
     )
     assert response.status_code == 400
 
     response = client.post(
         "/api/v1/learning/jobs",
         json=_body(),
-        headers={"X-authentik-username": "alice", "Idempotency-Key": "k1"},
+        headers={"X-test-owner": "alice", "Idempotency-Key": "k1"},
     )
     assert response.status_code == 409
 
@@ -95,7 +106,7 @@ def test_client_cannot_self_authorize_resource_admission(client, monkeypatch):
     response = client.post(
         "/api/v1/learning/jobs",
         json=_body(resource={"eligibility": "eligible"}),
-        headers={"X-authentik-username": "alice", "Idempotency-Key": "k1"},
+        headers={"X-test-owner": "alice", "Idempotency-Key": "k1"},
     )
     assert response.status_code == 409
 
@@ -108,3 +119,24 @@ def test_unauthenticated_reads_return_401_without_store_access(client, monkeypat
     monkeypatch.setattr(routes, "_store", forbidden_store)
     response = client.get(f"/api/v1/learning/jobs/{uuid4()}{suffix}")
     assert response.status_code == 401
+
+
+def test_enabled_learning_requires_trusted_scope(client, monkeypatch):
+    monkeypatch.setenv("LEARNING_V1_ENABLED", "1")
+    response = client.post(
+        "/api/v1/learning/jobs",
+        json={**_body(), "dry_run": True},
+        headers={"X-test-owner": "alice"},
+    )
+    assert response.status_code == 503
+
+
+def test_enabled_learning_rejects_cross_scope_request(client, monkeypatch):
+    monkeypatch.setenv("LEARNING_V1_ENABLED", "1")
+    monkeypatch.setattr(routes, "_scope_values", lambda _request: {"workspace_id": "other-workspace"})
+    response = client.post(
+        "/api/v1/learning/jobs",
+        json={**_body(), "dry_run": True},
+        headers={"X-test-owner": "alice"},
+    )
+    assert response.status_code == 404

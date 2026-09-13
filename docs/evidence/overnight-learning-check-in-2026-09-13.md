@@ -15,6 +15,13 @@ included, creation returns 409 and capabilities advertise create_job=false.
 - Reject non-boolean GPU enablement values (including the string "false") and
   missing or malformed consumer inventories. A request cannot lower the
   manifest's minimum free-memory floor.
+- Learning routes now consume `request.state.owner_id` populated by validated
+  JWT authorization middleware; they do not trust raw Authentik headers.
+  `/api/v1/learning/*` is classified as a user endpoint, and trusted JWT
+  metadata is required for workspace/project/session scope when the feature is
+  enabled.
+- The vendor JSON media type is enforced for learning responses, and frozen
+  capabilities/dry-run fixtures cover the response shape.
 
 ## Findings addressed in this increment
 
@@ -34,37 +41,44 @@ These changes still need an isolated PostgreSQL integration test. The local
 tests exercise the contract, store conversions, and route boundary without
 opening a database.
 
+An opt-in integration module now covers concurrent idempotent creation and
+restart round-trip. It requires an explicit disposable
+`LEARNING_TEST_POSTGRES_DSN`, refuses `AGNO_DB_URL`, and was skipped in this
+workstation run because no such DSN was configured.
+
 ## Open findings before enablement
 
-1. **P1 deployment gate: authenticated identity and scope need integration.**
-   The adapter accepts Authentik identity headers without verifying their
-   origin itself. Before enabling read access to real data, prove that every
-   ingress strips/replaces client headers, or use verified authentication
-   middleware. Workspace/project/session authorization is also still missing.
-   Header-presence unit tests do not establish this trust boundary.
+1. **P1 deployment gate: authenticated identity and scope need deployment
+   verification.** The local route and middleware contract now requires
+   validated JWT state and trusted `learning_scope` metadata. Before enabling
+   read access to real data, verify the deployed ingress and token issuer
+   provide that state and scope for every learning request. Header-presence
+   unit tests do not establish this deployment boundary.
 
-2. **P2: proposed API contract differs from the adapter.** The specification
-   uses flat revision/resource-policy fields; the adapter uses nested objects
-   and default Pydantic handling can ignore unsupported fields. Stable error
-   envelopes, media types, snapshot schema/cursor, and revision validation
-   remain incomplete. Freeze a tested request/response fixture set before
-   desktop or legacy-route consumers depend on this version.
+2. **P2: proposed API contract still needs request validation alignment.** The
+   specification uses flat revision/resource-policy fields while the adapter
+   uses nested objects. Stable error envelopes and revision validation remain
+   incomplete. The capabilities and dry-run response shapes are fixture-tested;
+   freeze the mutating and snapshot/event fixture set before desktop or
+   legacy-route consumers depend on this version.
 
 ## Verification
 
 The focused run of test_learning_contract.py, test_learning_routes.py,
 test_learning_resources.py, test_learning_store_contract.py,
-test_backend_handoff_contract.py, and test_event_contract.py produced **41
-passed, 1 skipped**. Tests used local
-pure functions and FastAPI test clients. No Postgres integration, real
-authentication, GPU ownership, worker recovery, or overnight run was tested.
+test_learning_fixtures.py, test_authorization_middleware.py,
+test_backend_handoff_contract.py, test_event_contract.py, and the opt-in
+Postgres module produced **57 passed, 3 skipped**. Tests used local pure
+functions, FastAPI test clients, and middleware fixtures. No real Postgres
+integration, deployed authentication, GPU ownership, worker recovery, or
+overnight run was tested.
 
 No service, container, database, GPU, training job, or SaltMedia resource was
 changed during this check-in. Physical ownership and isolation (OA-001),
 schema/migration ownership (OA-003), workers/checkpoints/leases, MemPalace
 eligibility, evaluation, scheduling, and desktop qualification remain open.
 
-Next local increment: add isolated PostgreSQL concurrency and restart tests,
-freeze request/response fixtures, and verify trusted authentication and scope
-before wiring admission. Keep live execution disabled until the backlog's
+Next qualification step: run the opt-in PostgreSQL module against a disposable
+database, then verify the deployed JWT scope metadata and freeze the remaining
+request/snapshot fixtures. Keep live execution disabled until the backlog's
 qualification gates pass.
