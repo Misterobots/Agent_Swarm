@@ -163,26 +163,47 @@ ARCHETYPE_TRAINING_CONFIGS: dict[str, dict] = {
 # ---------------------------------------------------------------------------
 # Context Window Management
 # ---------------------------------------------------------------------------
+# MEASURED 2026-09-13 on Lovelace (2x RTX 5060 Ti).  The shared Ollama lane was returned to
+# count:all, so the pool is 29.7 GiB across both cards instead of one card's ~14.5 GiB.
+# Each value is ~80% of the model's measured ceiling in the "dense" zone (~28.3 GiB: Friday's
+# brain and voice-engine evicted, STT resident).  Method: load at num_ctx 8192 and 65536, read
+# /api/ps size, take the delta -> exact KV bytes/token and fixed overhead.
+#
+#   model              weights   KV/token   measured ceiling
+#   qwen3-coder:30b     17.28G     58 KiB    ~195K
+#   qwen3.6:27b         16.22G     53 KiB    ~132K
+#   gemma4:31b          18.50G     61 KiB    ~108K
+#   deepseek-r1:32b     18.49G    340 KiB     ~32K  (KV quantization is not engaging for it)
+#   qwen3:14b            8.64G     52 KiB    model-native 40960 binds before VRAM does
+#   qwen3:8b             4.87G     44 KiB    model-native 40960 binds before VRAM does
+#
+# A model at or above gpu_queue.LARGE_MODEL_BYTES (15 GiB) only fits these windows in the
+# "dense" zone, so its request_lock call site MUST pass model= — otherwise the swarm asks for a
+# window the normal lane (~17.9 GiB with the voice stack resident) cannot hold, and spills to CPU.
+#
+# Keep in sync with CODE_GATEWAY_NUM_CTX_MAP in execution_plane/docker-compose.yml — the same
+# table for OpenAI-speaking clients, which cannot send num_ctx themselves.
 CONTEXT_WINDOWS: dict[str, int] = {
     # Gemma
-    # 31B Q4 occupies ~13.7 GB on Lovelace's 16 GB GPU.  A 32K KV cache
-    # terminates the llama runner; keep the coordinator on its proven 4K
-    # loaded profile and let the task's coding workers use their own model.
-    "gemma4:31b": 4096,
-    "gemma4:26b": 32768,
+    # Was 4096: "a 32K KV cache terminates the llama runner" — true when this lane had ONE 16 GB
+    # card and the 18.5 GiB of weights already overflowed it.  With both cards, measured live at
+    # num_ctx 65536: 25.69 GiB, 100% on GPU.  The 4K workaround is obsolete.
+    "gemma4:31b": 81920,
+    "gemma4:26b": 32768,        # not measured
     # Qwen3 family
-    "qwen3-coder:30b": 32768,
-    "qwen3.6:27b": 32768,
-    "qwen3.5:9b": 16384,
-    "qwen3:14b": 16384,
-    "qwen3:8b": 16384,
+    "qwen3-coder:30b": 163840,
+    "qwen3.8:27b": 122880,      # capped by llama.cpp #27756's ~129,864-token EOS cliff, NOT VRAM
+    "qwen3.6:27b": 98304,
+    "qwen3.5:9b": 16384,        # not measured
+    "qwen3:14b": 40960,         # model-native
+    "qwen3:8b": 40960,          # model-native
     # Qwen2.5 family
     "qwen2.5-coder:14b": 16384,
     "qwen2.5-coder:14b-instruct-q4_k_m": 16384,
     "qwen2.5-coder:7b": 8192,
     # Reasoning / other
     "phi4-reasoning:14b": 16384,
-    "deepseek-r1:32b": 32768,
+    "deepseek-r1:32b": 32768,   # measured ceiling: 28.49 GiB at 32K, spills by 48K
     # Hugging Face catalog entries (native/deployment context advertised by
     # their model cards; they require a compatible remote serving backend).
     "IFM/K2-Horizon-32B": 524288,

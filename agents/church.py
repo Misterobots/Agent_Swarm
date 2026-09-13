@@ -1182,7 +1182,7 @@ def chat_swarm(
                 show_tool_calls=False,
             )
             try:
-                with request_lock(context="text"):
+                with request_lock(context="text", model=PLAN_MODEL):
                     yield _emit_stream_mode("responding")
                     plan_chunks = 0
                     start_time = time.time()

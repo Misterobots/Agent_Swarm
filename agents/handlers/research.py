@@ -65,7 +65,7 @@ def handle_research(user_input: str, ctx: dict):
         yield from pre_lock_status_events("text", resolved_model)
         with _langfuse_span("research_generation", "Librarian", resolved_model, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
-            with request_lock(context="text"):
+            with request_lock(context="text", model=resolved_model):
                 response_stream = researcher.run(final_input, stream=True)
                 yield {"type": "status", "content": "📚 Librarian Agent: Drafting response..."}
                 for chunk in response_stream:
@@ -148,7 +148,7 @@ def handle_documentation(user_input: str, ctx: dict):
         yield from pre_lock_status_events("text", TECH_MODEL)
         with _langfuse_span("documentation_generation", "TechnicalWriter", TECH_MODEL, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
-            with request_lock(context="text"):
+            with request_lock(context="text", model=TECH_MODEL):
                 response_stream = tech_writer.run(final_input, stream=True)
                 yield {"type": "status", "content": "Technical Writer: Generating document..."}
                 for chunk in response_stream:

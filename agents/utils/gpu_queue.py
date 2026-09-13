@@ -55,6 +55,10 @@ COMFYUI_HOST = os.getenv("COMFYUI_HOST", "http://comfyui_gpu:8188")
 KLEIN_HOST = os.getenv("KLEIN_HOST", "http://klein_service:8189")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
+# Friday's DEDICATED Ollama (container ollama_friday, pinned to GPU 1 by CUDA_VISIBLE_DEVICES).
+# evict_ollama() deliberately never touches this host — the whole point of that instance is that
+# the swarm cannot evict the voice lane. Only the "dense" zone may reclaim it, via evict_friday().
+FRIDAY_OLLAMA_HOST = os.getenv("FRIDAY_OLLAMA_HOST", "http://ollama_friday:11434")
 GAUNTLET_COORDINATOR_HOST = os.getenv("GAUNTLET_COORDINATOR_HOST", "")
 GAUNTLET_COORDINATOR_MODEL = os.getenv("GAUNTLET_COORDINATOR_MODEL", "qwen3:14b")
 # GPU peer lock: Turing's agent_runtime hosts the lock server on its own uvicorn port.
@@ -486,7 +490,17 @@ def get_redis_client():
     )
 
 LOCK_KEY = "swarm_gpu_lock"
-ZONE_KEY = "swarm_gpu_zone"  # Track whether VRAM is currently dedicated to "text", "image", or "training"
+ZONE_KEY = "swarm_gpu_zone"  # Track whether VRAM is currently dedicated to "text", "image", "dense" or "training"
+
+# Set while the "dense" zone holds Friday's VRAM. friday_brain reads this key and serves a
+# canned response instead of calling its brain, so a voice turn during a large dense load
+# fails fast and audibly rather than hanging on a model that isn't there.
+#
+# ALWAYS written with a TTL: if a dense job crashes between evict and restore, the key expires
+# on its own and Friday recovers without operator action. The TTL is the safety net, not the
+# normal path — _run_zone_switch clears it explicitly when leaving the zone.
+VOICE_SUSPENDED_KEY = "swarm_voice_suspended"
+VOICE_SUSPEND_TTL = int(os.getenv("VOICE_SUSPEND_TTL", "1800"))  # 30 min
 
 
 # ---------------------------------------------------------------------------
@@ -629,6 +643,41 @@ def evict_comfyui():
     else:
         logger.warning(f"[GPU Queue] ComfyUI /free endpoint returned status {response.status_code}.")
 
+def _container_action(name: str, action: str) -> bool:
+    """POST /containers/<name>/<action> over the Docker Unix socket. 204 = success.
+
+    `action` is "restart", "stop" or "start". The distinction matters for VRAM: a RESTART
+    reloads the service and its model, so it frees nothing for the duration — it is only useful
+    for dropping a stuck CUDA context (Klein/WDDM). To actually reclaim a persistent CUDA
+    process's VRAM for the length of a job you must STOP it and START it again afterwards.
+    """
+    import socket as _socket
+    try:
+        s = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+        s.settimeout(30)
+        s.connect("/var/run/docker.sock")
+        req = (f"POST /containers/{name}/{action} HTTP/1.1\r\nHost: localhost\r\n"
+               f"Content-Length: 0\r\nConnection: close\r\n\r\n")
+        s.sendall(req.encode())
+        resp = b""
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            resp += chunk
+        s.close()
+        status_line = resp.split(b"\r\n")[0].decode(errors="replace")
+        # 204 No Content = success. 304 Not Modified = already in that state, also fine.
+        if b"204" in resp[:50] or b"304" in resp[:50]:
+            logger.info(f"[GPU Queue] Container '{name}': {action} OK.")
+            return True
+        logger.warning(f"[GPU Queue] Container '{name}' {action} returned: {status_line}")
+        return False
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[GPU Queue] Could not {action} container '{name}': {e}")
+        return False
+
+
 def _restart_container(name: str) -> bool:
     """Restart a Docker container by name via the Docker Unix socket.
 
@@ -639,31 +688,7 @@ def _restart_container(name: str) -> bool:
 
     Returns True if the restart succeeded, False otherwise.
     """
-    import socket as _socket
-    try:
-        s = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
-        s.settimeout(15)
-        s.connect("/var/run/docker.sock")
-        req = f"POST /containers/{name}/restart HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-        s.sendall(req.encode())
-        resp = b""
-        while True:
-            chunk = s.recv(4096)
-            if not chunk:
-                break
-            resp += chunk
-        s.close()
-        status_line = resp.split(b"\r\n")[0].decode(errors="replace")
-        # 204 No Content = success; 404 = container not found
-        if b"204" in resp[:50]:
-            logger.info(f"[GPU Queue] Container '{name}' restarted (WDDM VRAM released).")
-            return True
-        else:
-            logger.warning(f"[GPU Queue] Container restart returned: {status_line}")
-            return False
-    except Exception as e:
-        logger.warning(f"[GPU Queue] Could not restart container '{name}': {e}")
-        return False
+    return _container_action(name, "restart")
 
 
 def evict_klein():
@@ -838,12 +863,202 @@ def evict_ollama():
         except Exception as e:
             logger.warning(f"[GPU Queue] Failed to evict Ollama VRAM on {host}: {e}")
 
+# ---------------------------------------------------------------------------
+# Friday's voice lane — reclaimed ONLY by the "dense" zone.
+#
+# Background: the shared Ollama runs on one 5060 Ti (~14.5 GiB usable). A dense 27B needs
+# ~20 GiB with a useful context, so it cannot fit without borrowing GPU 1. Friday's brain
+# (qwen3:8b, ~4.9 GiB) is the cheap half of that card to reclaim — unloading it is a
+# keep_alive=0 away and recovers in seconds, whereas voice-engine (Qwen3-TTS) is a persistent
+# CUDA process needing a container restart (~4 min). So we take the brain and LEAVE STT/TTS
+# resident: that is what lets the canned response actually be spoken.
+#
+# MoE models do not need this zone — qwen3-coder:30b is A3B and its experts spill to CPU
+# gracefully. Reserve "dense" for models where every token reads every weight.
+# ---------------------------------------------------------------------------
+FRIDAY_MODEL = os.getenv("FRIDAY_MODEL", os.getenv("BMO_MODEL", "qwen3:8b"))
+_WARM_FRIDAY_ON_RESTORE = os.getenv("WARM_FRIDAY_ON_RESTORE", "true").lower() in ("true", "1", "yes")
+
+
+def _set_voice_suspended(suspended: bool, reason: str = "") -> None:
+    """Flip the voice-suspension flag friday_brain reads. Best-effort: Redis being down must
+    never block a zone switch (same fail-open contract as request_lock)."""
+    try:
+        client = get_redis_client()
+        if suspended:
+            client.set(VOICE_SUSPENDED_KEY, reason or "dense", ex=VOICE_SUSPEND_TTL)
+            logger.info(f"[GPU Queue] Voice lane SUSPENDED (reason={reason}, ttl={VOICE_SUSPEND_TTL}s).")
+        else:
+            client.delete(VOICE_SUSPENDED_KEY)
+            logger.info("[GPU Queue] Voice lane RESUMED.")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[GPU Queue] Could not update {VOICE_SUSPENDED_KEY}: {e}. "
+                       "Friday will not know it is suspended; it may hang on a missing model.")
+
+
+def evict_friday():
+    """Unload Friday's brain from GPU 1 so a dense model can use the whole card.
+
+    Sets the suspension flag BEFORE unloading: a voice turn arriving mid-eviction must get the
+    canned response, not a request against a model that is being torn down. PROTECTED_OLLAMA_MODELS
+    is deliberately ignored here — protecting the voice lane is exactly what this zone overrides."""
+    _set_voice_suspended(True, "dense")
+    host = FRIDAY_OLLAMA_HOST
+    try:
+        ps_resp = requests.get(f"{host}/api/ps", timeout=5)
+        if ps_resp.status_code != 200:
+            logger.warning(f"[GPU Queue] Could not reach Friday's Ollama /api/ps on {host}, skipping.")
+            return
+        models = ps_resp.json().get("models", [])
+        if not models:
+            logger.info(f"[GPU Queue] Friday's Ollama has no resident models on {host}.")
+            return
+        for model in models:
+            name = model.get("name")
+            logger.info(f"[GPU Queue] Unloading Friday's {name} from {host} (dense zone).")
+            try:
+                requests.post(f"{host}/api/generate", json={"model": name, "keep_alive": 0}, timeout=10)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[GPU Queue] keep_alive=0 timed out for {name} on {host}: {e}")
+
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            time.sleep(2)
+            try:
+                check = requests.get(f"{host}/api/ps", timeout=3)
+                if check.status_code == 200 and not check.json().get("models", []):
+                    logger.info(f"[GPU Queue] Friday's VRAM freed on {host}.")
+                    return
+            except Exception:
+                break
+        logger.warning(f"[GPU Queue] Friday's VRAM may not be fully free on {host} after 20s — proceeding anyway.")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[GPU Queue] Failed to evict Friday's Ollama on {host}: {e}")
+
+
+def restore_friday():
+    """Clear the suspension flag and (optionally) pre-warm Friday's brain.
+
+    The warm runs on a daemon thread: a zone switch already holds the GPU lock, and making the
+    caller wait ~10s for a voice model it does not need would be a pure latency tax."""
+    _set_voice_suspended(False)
+    if not _WARM_FRIDAY_ON_RESTORE:
+        return
+
+    def _warm():
+        try:
+            requests.post(f"{FRIDAY_OLLAMA_HOST}/api/generate",
+                          json={"model": FRIDAY_MODEL, "prompt": "", "keep_alive": -1}, timeout=120)
+            logger.info(f"[GPU Queue] Re-warmed Friday's {FRIDAY_MODEL} on {FRIDAY_OLLAMA_HOST}.")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[GPU Queue] Could not re-warm Friday's brain: {e}. "
+                           "Next voice turn pays a cold load.")
+
+    threading.Thread(target=_warm, name="warm-friday", daemon=True).start()
+
+
+# voice-engine (Qwen3-TTS) is a persistent CUDA process with no /evict endpoint, so the only way
+# to reclaim its ~5.5 GiB is to STOP the container — a restart would reload the model and free
+# nothing. Cost: a cold TTS reload is ~4 min, which is why the suspension clips are PRE-RENDERED
+# (services/friday_brain/canned/) and served by friday_brain rather than synthesised on demand.
+# Without that, evicting TTS would make the "sorry, I'm busy" message itself unspeakable.
+VOICE_ENGINE_CONTAINER = os.getenv("VOICE_ENGINE_CONTAINER", "voice_engine_gpu")
+
+
+def _owns_containers() -> bool:
+    """Whether this process may stop/start local containers. Same gate Klein uses: only the
+    agent_runtime co-located with the services (Lovelace) has the docker socket."""
+    return os.getenv("EVICT_CONTAINER_RESTART", "false").lower() in ("true", "1", "yes")
+
+
+def evict_voice_engine():
+    """Stop voice-engine to reclaim its ~5.5 GiB for a large model."""
+    if not _owns_containers():
+        logger.info("[GPU Queue] Skipping voice-engine stop (EVICT_CONTAINER_RESTART not set).")
+        return
+    if _container_action(VOICE_ENGINE_CONTAINER, "stop"):
+        logger.info(f"[GPU Queue] voice-engine stopped; ~5.5 GiB reclaimed. Canned audio still "
+                    f"served by friday_brain (pre-rendered, needs no TTS).")
+
+
+def restore_voice_engine():
+    """Start voice-engine again. Returns immediately — the model load (~4 min) happens inside
+    the container, so the next few voice turns may still fall back to canned audio."""
+    if not _owns_containers():
+        return
+    if _container_action(VOICE_ENGINE_CONTAINER, "start"):
+        logger.info("[GPU Queue] voice-engine starting; TTS cold-loads for ~4 min.")
+
+
+# ---------------------------------------------------------------------------
+# Size-based zone selection.
+#
+# A model at or above this on-disk size cannot share the pool with Friday's voice lane and still
+# leave room for a useful KV cache. Measured 2026-09-13 on 29.7 GiB of usable VRAM across both
+# cards: with the full voice stack resident the lane drops to ~17.9 GiB, which is under the
+# WEIGHTS of gemma4:31b (18.50), deepseek-r1:32b (18.49) and leaves nothing for qwen3-coder:30b
+# (17.28). So anything this large requests "dense" and the voice lane yields for the duration.
+# ---------------------------------------------------------------------------
+# 15 GiB, not 16: Qwen3.8-27B Q4_K_M is 15.93 GiB and is DENSE (every token reads every
+# weight), so it needs the zone even though it sits just under a 16 GiB line. qwen3:14b
+# (8.64 GiB) stays well clear.
+LARGE_MODEL_BYTES = int(os.getenv("LARGE_MODEL_BYTES", str(15 * 1024 ** 3)))
+_model_size_cache: dict[str, int] = {}
+_model_size_cache_ts = 0.0
+_MODEL_SIZE_TTL = 300.0
+
+
+def _model_size_bytes(model_name: str) -> int:
+    """On-disk size of a model per Ollama's catalog; 0 when unknown (fails to 'not large')."""
+    global _model_size_cache, _model_size_cache_ts
+    if not model_name:
+        return 0
+    if time.time() - _model_size_cache_ts > _MODEL_SIZE_TTL:
+        try:
+            resp = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
+            if resp.status_code == 200:
+                _model_size_cache = {m["name"]: m.get("size", 0) for m in resp.json().get("models", [])}
+                _model_size_cache_ts = time.time()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[GPU Queue] Could not refresh model catalog: {e}")
+    if model_name in _model_size_cache:
+        return _model_size_cache[model_name]
+    # Tolerate ':latest' and bare-name spellings.
+    base = model_name.split(":")[0]
+    for name, size in _model_size_cache.items():
+        if name == f"{model_name}:latest" or name.split(":")[0] == base:
+            return size
+    return 0
+
+
+def resolve_zone(context: str, model: str | None = None) -> str:
+    """Upgrade a 'text' request to 'dense' when the model is too large to coexist with voice.
+
+    Only 'text' is upgraded: 'image'/'training' already evict what they need, and a caller that
+    asked for 'dense' explicitly is honoured as-is."""
+    if context != "text" or not model:
+        return context
+    size = _model_size_bytes(model)
+    if size >= LARGE_MODEL_BYTES:
+        logger.info(f"[GPU Queue] '{model}' is {size / 1024 ** 3:.1f} GiB "
+                    f"(>= {LARGE_MODEL_BYTES / 1024 ** 3:.0f} GiB) — upgrading zone text -> dense.")
+        return "dense"
+    return context
+
+
 def _run_zone_switch(context: str, current_zone):
     """Perform the eviction/warmup sequence for the requested zone."""
     if current_zone == context:
         logger.info(f"[GPU Queue] GPU is already in '{context}' zone. No eviction needed.")
         return
     logger.info(f"[GPU Queue] Context switch detected: '{current_zone}' -> '{context}'. Prepping VRAM...")
+
+    # Leaving "dense" — give Friday her card back before anything else claims it. This is the
+    # normal restore path; VOICE_SUSPEND_TTL only covers the case where a dense job dies here.
+    if current_zone == "dense" and context != "dense":
+        restore_friday()
+        restore_voice_engine()
+
     if context == "text":
         # Switching to text -> evict image backends so Ollama can use both GPUs.
         evict_comfyui()
@@ -861,8 +1076,25 @@ def _run_zone_switch(context: str, current_zone):
         # the shared Ollama endpoint, not Friday's separate Ollama service.
         evict_ollama()
         evict_klein()
+    elif context == "dense":
+        # A dense 27B+ (every token reads every weight) needs BOTH cards: the shared lane's
+        # ~14.5 GiB is not enough for weights + a useful KV cache, so we also borrow the ~4.9 GiB
+        # Friday's brain occupies on GPU 1. evict_friday() goes FIRST so the suspension flag is
+        # up — and Friday is answering from canned audio — before the slower evictions run.
+        # STT stays resident so a wake word still reaches friday_brain, which answers from
+        # PRE-RENDERED audio — that is what makes evicting TTS survivable.
+        #
+        # Budget on 29.7 GiB usable: full voice stack resident leaves ~17.9 GiB; evicting the
+        # brain gives ~22.8; also evicting voice-engine gives ~28.3, which is what a 27B+ with a
+        # large KV cache actually needs.
+        evict_friday()
+        evict_voice_engine()
+        evict_ollama()
+        evict_comfyui()
+        evict_klein()
     elif context == "training":
         # Training needs exclusive VRAM — evict everything
+        evict_friday()
         evict_ollama()
         evict_comfyui()
         evict_klein()
@@ -871,10 +1103,14 @@ def _run_zone_switch(context: str, current_zone):
 
 
 @contextmanager
-def request_lock(context: str, timeout: int = 300):
+def request_lock(context: str, timeout: int = 300, model: str | None = None):
     """
     Acquires a global Mutex lock for the GPU and handles VRAM eviction for context switching.
-    context must be one of "text", "image", "image_fast", or "training".
+    context must be one of "text", "image", "image_fast", "dense", or "training".
+
+    Pass `model` to let the zone be chosen by size: a "text" request for a model at or above
+    LARGE_MODEL_BYTES is upgraded to "dense", which yields Friday's voice lane for the duration.
+    Omitting `model` keeps the previous behaviour exactly, so existing call sites are unaffected.
 
     Two-layer locking:
       1. Cross-process: a Redis NX/EX mutex coordinates between agent_runtimes.
@@ -887,6 +1123,9 @@ def request_lock(context: str, timeout: int = 300):
     semaphore, increment gpu_lock_degraded_total, and set gpu_mutex_healthy=0
     so operators can alert on it.
     """
+    # Resolve before anything else so the zone recorded in Redis, the eviction sequence and the
+    # log line all agree on which zone this request is actually in.
+    context = resolve_zone(context, model)
     t_total_start = time.monotonic()
     client = None
     try:

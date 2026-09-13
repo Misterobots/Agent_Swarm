@@ -186,7 +186,7 @@ def handle_workshop(user_input: str, ctx: dict):
             "workshop_generation", "Workshop", resolved_model, final_input,
             langfuse=langfuse, use_langfuse=use_langfuse,
         ) as span_result:
-            with request_lock(context="text"):
+            with request_lock(context="text", model=resolved_model):
                 yield _emit_stream_mode("responding")
                 for chunk in workshop_agent.run(final_input, stream=True):
                     if chunk.content:

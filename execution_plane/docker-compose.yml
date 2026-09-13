@@ -60,15 +60,25 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama_gpu
-    # Shared Code/model lane: GPU 0 only.  GPU 1 is reserved for Friday's
-    # always-warm voice lane below, so a Code request cannot evict or contend
-    # with the speaker assistant.
+    # Shared Code/model lane: BOTH cards (2026-09-13).
+    #
+    # History: d2899ce2 (2026-08-15) pinned this to one card so a Code request could not contend
+    # with Friday's voice lane. Measured cost of that pin: qwen3-coder:30b needs 20.64 GiB at
+    # num_ctx=32768 but only 13.56 GiB fit, so 34% ran on CPU at 14.8 tok/s. Four models exceed
+    # the single card's ~14.5 GiB on weights alone (gemma4:31b, deepseek-r1:32b, qwen3-coder:30b,
+    # qwen3.6:27b).
+    #
+    # Contention is now arbitrated instead of prevented: gpu_queue.py's "dense" zone evicts
+    # Friday's brain and flags swarm_voice_suspended, and friday_brain answers from canned audio
+    # for the duration. NOTE: device_ids was always a no-op here — NVIDIA_VISIBLE_DEVICES=all
+    # means the container sees both cards regardless; CUDA_VISIBLE_DEVICES below is the only
+    # effective pin, and it is now absent so Ollama uses both.
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0']
+              count: all
               capabilities: [ gpu ]
         # Hard cap on system RAM for the Ollama container.
         # Model weights live in VRAM; this RAM budget covers the binary,
@@ -78,18 +88,55 @@ services:
         limits:
           memory: 6g
     environment:
-      # Keep shared Ollama off Friday's dedicated GPU 1.  GPU 0 is also the
-      # image card, so GPU-queue mediated image work must yield before a large
-      # Code model is loaded.
-      - CUDA_VISIBLE_DEVICES=GPU-0236956d-3c81-9ccd-d1f5-c12e0745366e
+      # No CUDA_VISIBLE_DEVICES: the shared lane spans both cards. Friday's instance keeps its
+      # own pin below, so the two do not overlap until the "dense" zone deliberately borrows GPU 1.
       - OLLAMA_FLASH_ATTENTION=1       # Flash attention = ~40% less KV cache memory
-      - OLLAMA_NUM_PARALLEL=1          # 1 slot: KV cache halved so 14B models (~14.2 GB) fit on a 16 GB GPU
+      - OLLAMA_KV_CACHE_TYPE=q8_0      # Halves KV vs f16; requires flash attention (above)
+      - OLLAMA_NUM_PARALLEL=1          # 1 slot: the whole context budget goes to one request
       - OLLAMA_KEEP_ALIVE=1h            # Unload after 1h idle; cold loads spike WSL2 RAM, keeping warm amortizes that cost
     volumes:
       - ollama_models:/root/.ollama
     ports:
       - "11434:11434"
     restart: always
+    networks:
+      - execution_net
+
+  # CODE GATEWAY — OpenAI-compatible front end over Ollama's native /api/chat (2026-09-13).
+  # Exists because OpenAI-speaking coding agents (Qwen Code et al.) cannot use Ollama's own
+  # /v1/chat/completions reliably: qwen-code #9438 drops the user turn after a tool call
+  # (Ollama answers 500 "no user query found in messages"), ollama #17825 then deadlocks the
+  # runner on the client's identical retry, ollama #14958 loses tool_calls on large system
+  # prompts, and think:false is ignored for Qwen3-family models on /v1.  Translating to
+  # /api/chat fixes all four AND lets us inject options.num_ctx, which /v1 cannot carry at all.
+  # No GPU of its own — it is a translator; the model runs in whichever Ollama it targets.
+  # Memex's own agents/ call /api/chat directly and do NOT need this service.
+  code-gateway:
+    build:
+      context: ../services/code_gateway
+      dockerfile: Dockerfile
+    container_name: code_gateway
+    ports:
+      - "8010:8000"
+    environment:
+      - CODE_GATEWAY_OLLAMA_URL=${CODE_GATEWAY_OLLAMA_URL:-http://ollama:11434}
+      # OpenAI clients cannot send num_ctx, so the window is set here or nowhere.
+      # Keep these under the ~129,864-token mark where llama.cpp #27756 makes Qwen3.8-27B
+      # emit an instant EOS with no error (48 Gated DeltaNet layers accumulate state error).
+      - CODE_GATEWAY_NUM_CTX=${CODE_GATEWAY_NUM_CTX:-32768}
+      # Mirrors agents/config.py CONTEXT_WINDOWS — values already proven on this box.
+      # Must stay in sync with each client's own contextWindowSize or prompts get packed
+      # past the server's window and silently truncated.
+      - CODE_GATEWAY_NUM_CTX_MAP=${CODE_GATEWAY_NUM_CTX_MAP:-{"qwen3-coder:30b":163840,"qwen3.6:27b":98304,"gemma4:31b":81920,"deepseek-r1:32b":32768,"qwen3:14b":40960,"qwen3:8b":40960,"qwen3.8:27b":122880}}
+      # Qwen3's reasoning cost Friday 3-16s/turn and once produced a hallucinated entity_id;
+      # think:false is the generation-control flag that actually suppresses it on /api/chat.
+      - CODE_GATEWAY_THINK=${CODE_GATEWAY_THINK:-false}
+      - CODE_GATEWAY_KEEP_ALIVE=${CODE_GATEWAY_KEEP_ALIVE:-1h}
+      - CODE_GATEWAY_TIMEOUT=${CODE_GATEWAY_TIMEOUT:-900}
+      - CODE_GATEWAY_POISON_TTL=${CODE_GATEWAY_POISON_TTL:-90}
+    depends_on:
+      - ollama
+    restart: unless-stopped
     networks:
       - execution_net
 
@@ -307,6 +354,9 @@ services:
       # Brain swap: "Hey Friday, brain swap" toggles the LLM between BMO_MODEL (default) and this
       # experimental model. Runtime-only (resets to default on restart). FRIDAY_BRAIN_SWAP=false disables.
       - FRIDAY_ALT_BRAIN=${FRIDAY_ALT_BRAIN:-goekdenizguelmez/JOSIEFIED-Qwen3:8b}
+      # Donut's personality has its own isolated memory/persona key. It shares qwen3:8b by default;
+      # set FRIDAY_DONUT_BRAIN to any model available in Ollama if Donut should use a different one.
+      - FRIDAY_DONUT_BRAIN=${FRIDAY_DONUT_BRAIN:-qwen3:8b}
       - FRIDAY_BRAIN_SWAP=${FRIDAY_BRAIN_SWAP:-true}
       # Per-brain persona + memory + visual-reference management. Each brain (default vs the
       # brain-swap alt) carries its own persona, its own isolated memory namespace, and its own
@@ -315,8 +365,20 @@ services:
       # FRIDAY_PERSONA_TOKEN guards the LAN editor + CRUD API; empty = open on the LAN (default).
       # Set a secret before exposing /personas externally via the Turing Traefik route (Phase B).
       - FRIDAY_PERSONA_TOKEN=${FRIDAY_PERSONA_TOKEN:-}
+      # Degraded mode: gpu_queue's "dense" zone sets swarm_voice_suspended here when it borrows
+      # Friday's GPU for a large dense model; friday_brain then answers from canned audio instead
+      # of calling a brain that has been unloaded. MUST be the same Redis agent_runtime writes to
+      # (Hopper), or the flag is set in one place and read from another and the feature silently
+      # does nothing. Missing/unreachable Redis fails OPEN — Friday behaves normally.
+      - REDIS_HOST=${REDIS_HOST:-192.168.2.102}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - FRIDAY_CANNED_DIR=/app/canned
     volumes:
       - bmo_brain_data:/app/data
+      # Pre-rendered suspension clips in Friday's own voice, versioned in git (see .gitignore).
+      # Read-only: they are a deployment asset, not runtime state.
+      - ../services/friday_brain/canned:/app/canned:ro
     restart: unless-stopped
     networks:
       # Keep bmo_brain/bmo-brain as network aliases so any container-DNS caller using the old
@@ -455,6 +517,11 @@ services:
       # reliability); without this the eviction-protection guarded the wrong model and Friday hit
       # 50-60s reload spikes ("stops at intent") when the swarm evicted her from the shared GPU.
       - PROTECTED_OLLAMA_MODELS=qwen3:8b
+      # Friday's dedicated Ollama. evict_ollama() never touches it — protection above is the
+      # whole point. Only gpu_queue's "dense" zone reclaims it, via evict_friday(), when a model
+      # where every token reads every weight needs more than the shared lane can give.
+      - FRIDAY_OLLAMA_HOST=${FRIDAY_OLLAMA_HOST:-http://ollama_friday:11434}
+      - VOICE_SUSPEND_TTL=${VOICE_SUSPEND_TTL:-1800}
       # BMO Weather location (Open-Meteo, no API key needed)
       - HOME_LAT=${HOME_LAT:-41.8781}
       - HOME_LON=${HOME_LON:--87.6298}

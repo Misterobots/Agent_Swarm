@@ -161,7 +161,7 @@ def handle_conversation(user_input: str, ctx: dict):
         yield from pre_lock_status_events("text", CONV_MODEL, uid=session_id)
         with _langfuse_span("conversation_generation", "Conversationalist", CONV_MODEL, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
-            with request_lock(context="text"):
+            with request_lock(context="text", model=CONV_MODEL):
                 response_stream = conversationalist.run(final_input, stream=True)
                 for chunk in response_stream:
                     if chunk.content:

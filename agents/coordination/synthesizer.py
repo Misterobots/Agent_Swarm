@@ -284,7 +284,7 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
         )
         trunc_prompt = prompt.replace(findings_text, findings_text_trunc)
 
-        with request_lock(context="text"):
+        with request_lock(context="text", model=COORDINATOR_MODEL):
             resp = client.chat(
                 model=COORDINATOR_MODEL,
                 messages=[{"role": "user", "content": trunc_prompt}],

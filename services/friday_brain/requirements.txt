@@ -10,3 +10,6 @@ anthropic>=0.69.0
 # Multipart form parsing for the persona editor's image-upload endpoint
 # (POST /api/personas/{model}/visual_ref uses FastAPI's UploadFile/File).
 python-multipart>=0.0.9
+# Degraded-mode flag (swarm_voice_suspended) written by agents/utils/gpu_queue.py.
+# Import is optional in main.py, but ship it so the check actually works.
+redis>=5.0

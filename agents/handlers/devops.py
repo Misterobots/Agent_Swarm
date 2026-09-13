@@ -79,7 +79,7 @@ def handle_devops(user_input: str, ctx: dict):
             yield from pre_lock_status_events("text", DEVOPS_MODEL, uid=uid or "")
             with _langfuse_span("devops_fast_generation", "DevOps", DEVOPS_MODEL, devops_input,
                                 langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
-                with request_lock(context="text"):
+                with request_lock(context="text", model=DEVOPS_MODEL):
                     yield _emit_stream_mode("responding")
                     for chunk in devops_agent.run(devops_input, stream=True):
                         if chunk.content:
@@ -120,7 +120,7 @@ def handle_devops(user_input: str, ctx: dict):
             yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": "DEVOPS", "model": DEVOPS_MODEL})
             # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
             yield from pre_lock_status_events("text", DEVOPS_MODEL, uid=uid or "")
-            with request_lock(context="text"):
+            with request_lock(context="text", model=DEVOPS_MODEL):
                 yield _emit_stream_mode("tool-use")
                 yield _emit_tool_progress(tool_call_id, "marsrl_loop", 25, "Initializing MarsRL loop")
                 for update in mars_loop_stream(devops_input, mars):
@@ -188,7 +188,7 @@ def handle_data(user_input: str, ctx: dict):
         yield from pre_lock_status_events("text", DATA_MODEL, uid=uid or "")
         with _langfuse_span("data_analysis_generation", "DataAnalyst", DATA_MODEL, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
-            with request_lock(context="text"):
+            with request_lock(context="text", model=DATA_MODEL):
                 response_stream = data_agent.run(final_input, stream=True)
                 yield {"type": "status", "content": "Data Analyst: Generating analysis..."}
                 for chunk in response_stream:

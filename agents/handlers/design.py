@@ -282,7 +282,7 @@ def handle_design(user_input: str, ctx: dict):
             "design_generation", "DesignStudio", resolved_model, final_input,
             langfuse=langfuse, use_langfuse=use_langfuse,
         ) as span_result:
-            with request_lock(context="text"):
+            with request_lock(context="text", model=resolved_model):
                 queue_wait_s = time.monotonic() - request_started_at
                 yield {
                     "type": "status",

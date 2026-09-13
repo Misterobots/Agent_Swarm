@@ -104,16 +104,29 @@ REPEAT_PENALTY_TOOLS = float(os.getenv("FRIDAY_REPEAT_PENALTY_TOOLS", "1.1"))
 _KA_RAW = os.getenv("BMO_KEEP_ALIVE", "-1").strip()
 KEEP_ALIVE = int(_KA_RAW) if _KA_RAW.lstrip("-").isdigit() else _KA_RAW
 
-# --- Brain swap: toggle Friday's LLM between the default and an experimental model by voice ----------
-# "Hey Friday, brain swap" flips _current_model between MODEL and FRIDAY_ALT_BRAIN. The two 8B brains
+# --- Brain swap: select Friday, Sable, or Donut by voice --------------------------------------------
+# "Hey Friday, brain swap" keeps the original Friday/Sable toggle. Named commands select a brain
 # can't co-reside on Friday's card alongside STT+TTS (~120 MB free), so a swap UNLOADS the current model
 # and warms the new one (~10-20s) in the background — the turn just acks. Runtime-only: resets to MODEL
 # on restart (safe default). FRIDAY_BRAIN_SWAP=false disables the whole feature.
 _ALT_BRAIN = os.getenv("FRIDAY_ALT_BRAIN", "goekdenizguelmez/JOSIEFIED-Qwen3:8b")
+_DONUT_BRAIN = os.getenv("FRIDAY_DONUT_BRAIN", MODEL)
 _BRAIN_SWAP_ENABLED = os.getenv("FRIDAY_BRAIN_SWAP", "true").lower() in ("1", "true", "yes")
-_current_model = MODEL   # the model _ollama_chat actually calls; mutated by the brain-swap gate
+_BRAIN_ALIASES = {"friday": MODEL, "sable": _ALT_BRAIN, "donut": "donut"}
+_BRAIN_BACKENDS = {MODEL: MODEL, _ALT_BRAIN: _ALT_BRAIN, "donut": _DONUT_BRAIN}
+_current_model = MODEL   # persona/brain key; _backend_model() resolves its Ollama model
 _BRAIN_SWAP_RE = re.compile(
     r"\b(brain\s*swap|swap\s+(?:your\s+|the\s+|my\s+)?brains?|switch\s+(?:your\s+|the\s+)?brains?)\b", re.I)
+_BRAIN_TARGET_RE = re.compile(r"\bbrain\s*swap(?:\s+(?:to\s+)?(friday|sable|donut))?\b", re.I)
+
+
+def _backend_model(brain: str) -> str:
+    return _BRAIN_BACKENDS.get(brain, brain)
+
+
+def _requested_brain(text: str) -> str | None:
+    match = _BRAIN_TARGET_RE.search(text or "")
+    return _BRAIN_ALIASES.get(match.group(1).lower()) if match and match.group(1) else None
 
 def _brain_name(m: str) -> str:
     """Spoken name for the swap confirmation. Derived from the active persona's display_name so
@@ -1129,7 +1142,7 @@ async def _ollama_chat(messages: list, tools=None):
     # keep_alive pins qwen3:8b resident in VRAM between calls (KEEP_ALIVE=-1 by default now that
     # ollama_friday's GPU is dedicated to Friday) so a voice turn never pays a cold reload.
     penalty = REPEAT_PENALTY_TOOLS if tools else REPEAT_PENALTY
-    payload = {"model": _current_model, "messages": messages, "stream": False, "keep_alive": KEEP_ALIVE,
+    payload = {"model": _backend_model(_current_model), "messages": messages, "stream": False, "keep_alive": KEEP_ALIVE,
                # think:false is Ollama's top-level generation-control flag (/api/chat only — the
                # /api/generate warm-up ping in _do_brain_swap ignores it, which is fine, that call's
                # output is discarded). Confirmed live 2026-08-11: this is what actually disables Qwen3's
@@ -1163,15 +1176,19 @@ async def _do_brain_swap(old_model: str, new_model: str) -> None:
     """Background half of a brain swap: unload the old model (free VRAM — two 8B brains can't co-reside
     with STT+TTS on Friday's card) then warm the new one, pinned. Fires after the swap gate acks; the
     next voice turn calls _current_model (already flipped)."""
+    old_backend, new_backend = _backend_model(old_model), _backend_model(new_model)
+    if old_backend == new_backend:
+        print(f"[bmo-brain] brain-swap: {new_model} shares backend {new_backend}; no model reload needed", flush=True)
+        return
     async with httpx.AsyncClient(timeout=180) as c:
         try:
-            await c.post(f"{OLLAMA_URL}/api/generate", json={"model": old_model, "keep_alive": 0})
-            print(f"[bmo-brain] brain-swap: unloaded {old_model}", flush=True)
+            await c.post(f"{OLLAMA_URL}/api/generate", json={"model": old_backend, "keep_alive": 0})
+            print(f"[bmo-brain] brain-swap: unloaded {old_backend}", flush=True)
         except Exception as e:  # noqa: BLE001
             print(f"[bmo-brain] brain-swap unload failed (non-fatal): {e}", flush=True)
         try:
             await c.post(f"{OLLAMA_URL}/api/generate", json={
-                "model": new_model, "prompt": "ok", "keep_alive": KEEP_ALIVE,
+                "model": new_backend, "prompt": "ok", "keep_alive": KEEP_ALIVE,
                 "options": {"num_ctx": NUM_CTX}})
             print(f"[bmo-brain] brain-swap: warmed {new_model}", flush=True)
         except Exception as e:  # noqa: BLE001
@@ -2171,6 +2188,42 @@ def _coerce_tool_call_args(tool_calls):
     return out
 
 
+def _normalize_tool_result_messages(messages):
+    """Make inbound tool-result turns valid for Ollama's native chat protocol.
+
+    Home Assistant can send OpenAI-shaped history, where a tool result identifies its
+    call with ``tool_call_id`` but does not include Ollama's ``tool_name`` field.
+    Ollama needs the function name on every ``role: tool`` message to associate a
+    result with the preceding call.  Without it, a follow-up model turn can ignore the
+    result and repeat the acknowledgement/tool call instead of producing Friday's
+    answer.
+
+    Match by call id where one is available and otherwise preserve the protocol's
+    FIFO ordering for batched calls.  The input is copied only where normalization is
+    needed, so request data is never mutated.
+    """
+    pending = []
+    for raw_message in messages or []:
+        message = raw_message
+        if message.get("role") == "assistant" and message.get("tool_calls"):
+            calls = _coerce_tool_call_args(message["tool_calls"])
+            message = {**message, "tool_calls": calls}
+            pending = list(calls)
+        elif message.get("role") == "tool" and pending:
+            result_id = message.get("tool_call_id")
+            call_index = None
+            if result_id:
+                call_index = next(
+                    (i for i, call in enumerate(pending) if call.get("id") == result_id),
+                    None,
+                )
+            call = pending.pop(call_index if call_index is not None else 0)
+            tool_name = (call.get("function") or {}).get("name")
+            if tool_name and not message.get("tool_name"):
+                message = {**message, "tool_name": tool_name}
+        yield message
+
+
 async def _answer(client_messages, tools=None, model: str = ""):
     """Recall vault context, build the BMO prompt, call the LLM, return (text, tool_calls).
 
@@ -2197,15 +2250,11 @@ async def _answer(client_messages, tools=None, model: str = ""):
     # HA retrying entity resolution after a failed target — carry forward instead of
     # silently resetting to the original prompt on every round.
     convo = []
-    for m in client_messages:
+    for m in _normalize_tool_result_messages(client_messages):
         if m.get("role") not in ("user", "assistant", "tool"):
             continue
         if not (m.get("content") or m.get("tool_calls")):
             continue
-        if m.get("role") == "assistant" and m.get("tool_calls"):
-            # Normalize any OpenAI-shaped (JSON-string) arguments to dicts so the turn is
-            # safe to forward to Ollama's /api/chat (see _coerce_tool_call_args).
-            m = {**m, "tool_calls": _coerce_tool_call_args(m["tool_calls"])}
         convo.append(m)
     last_user = next((m["content"] for m in reversed(convo) if m.get("role") == "user"), "")
     if last_user:
@@ -2368,12 +2417,16 @@ async def _answer(client_messages, tools=None, model: str = ""):
     if bare_media_text:
         return bare_media_text, None
 
-    # Brain swap: "Hey Friday, brain swap" toggles the LLM between the default and the experimental
-    # model (see _BRAIN_SWAP_RE). The unload+warm runs in the background — the two 8B brains can't
-    # co-reside on Friday's card — so this turn just flips _current_model and acks.
+    # Brain swap: named commands select a brain directly; the bare command keeps the original
+    # Friday/Sable toggle. The unload+warm runs in the background — the two 8B brains can't co-reside
+    # on Friday's card — so this turn just flips _current_model and acks.
     if _BRAIN_SWAP_ENABLED and last_user and _BRAIN_SWAP_RE.search(last_user):
         global _current_model
-        old, new = _current_model, (_ALT_BRAIN if _current_model == MODEL else MODEL)
+        old = _current_model
+        requested = _requested_brain(last_user)
+        new = requested or (_ALT_BRAIN if _current_model == MODEL else MODEL)
+        if new == old:
+            return _speechify(f"I'm already speaking as {_brain_name(new)}."), None
         _current_model = new
         _t = asyncio.create_task(_do_brain_swap(old, new))
         _bg_tasks.add(_t)
@@ -2716,11 +2769,17 @@ async def chat_completions(req: Request):
     created = int(time.time())
 
     tool_calls = None
-    try:
-        text, tool_calls = await _answer(client_messages, tools=tools, model=model)
-    except Exception as e:  # noqa: BLE001
-        text = f"(BMO brain error: {e})"
-        print(f"[bmo-brain] ERROR: {type(e).__name__}: {e}", flush=True)
+    suspend_reason = _voice_suspended()
+    if suspend_reason:
+        # Same short-circuit as /api/chat — see the degraded-mode block above.
+        text = _canned_text()
+        print(f"[bmo-brain] /v1/chat/completions SUSPENDED ({suspend_reason}) — canned reply", flush=True)
+    else:
+        try:
+            text, tool_calls = await _answer(client_messages, tools=tools, model=model)
+        except Exception as e:  # noqa: BLE001
+            text = f"(BMO brain error: {e})"
+            print(f"[bmo-brain] ERROR: {type(e).__name__}: {e}", flush=True)
 
     # Ollama's tool_calls.function.arguments is a parsed object; OpenAI's is a JSON string.
     openai_tool_calls = None
@@ -2814,6 +2873,109 @@ async def ollama_show(req: Request):
     }
 
 
+# ---------------------------------------------------------------------------
+# Degraded mode — the swarm has borrowed Friday's GPU for a large dense model.
+#
+# agents/utils/gpu_queue.py's "dense" zone unloads Friday's brain from GPU 1 to free ~4.9 GiB,
+# because a dense 27B needs more VRAM than the shared card alone provides. While that holds,
+# there is no brain to call: without this short-circuit every voice turn would block until
+# LLM_TIMEOUT and then speak an error.
+#
+# STT and voice-engine are deliberately left resident by that zone, so the canned reply can
+# actually be spoken. The audio is pre-rendered (services/friday_brain/canned/, versioned) so
+# it works even if TTS is ever evicted too.
+#
+# Fail-open: if Redis is unreachable we report NOT suspended. A Redis outage must never mute
+# Friday — the worst case then is the pre-existing behaviour.
+# ---------------------------------------------------------------------------
+try:
+    import redis as _redis
+except ImportError:  # pragma: no cover — service still boots without the dep
+    _redis = None
+
+VOICE_SUSPENDED_KEY = os.getenv("VOICE_SUSPENDED_KEY", "swarm_voice_suspended")
+CANNED_DIR = os.getenv("FRIDAY_CANNED_DIR", "/app/canned")
+_REDIS_HOST = os.getenv("REDIS_HOST", "redis_queue")
+_REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+_REDIS_PASSWORD = os.getenv("REDIS_PASSWORD") or None
+
+# Spoken variants, chosen at random so a suspended Friday doesn't loop one identical line.
+# Keep these in step with the rendered WAVs in CANNED_DIR.
+_CANNED_TEXTS = [
+    "I'm offline right now. The swarm is using my hardware for a large model. Back in a few minutes.",
+    "Sorry, I can't help just yet. A large model has my GPU. Try me again in a few minutes.",
+]
+
+_suspend_cache: tuple[float, str | None] = (0.0, None)
+_SUSPEND_CACHE_TTL = 2.0  # HA polls /api/voice_state; don't hammer Redis per poll.
+
+
+def _voice_suspended() -> str | None:
+    """Return the suspension reason, or None when Friday is available."""
+    global _suspend_cache
+    now = time.time()
+    ts, cached = _suspend_cache
+    if now - ts < _SUSPEND_CACHE_TTL:
+        return cached
+    reason = None
+    if _redis is not None:
+        try:
+            client = _redis.Redis(host=_REDIS_HOST, port=_REDIS_PORT, db=0,
+                                  password=_REDIS_PASSWORD, decode_responses=True,
+                                  socket_timeout=2, socket_connect_timeout=2)
+            reason = client.get(VOICE_SUSPENDED_KEY)
+        except Exception as e:  # noqa: BLE001
+            print(f"[bmo-brain] voice-suspension check failed ({e}); assuming available", flush=True)
+            reason = None
+    _suspend_cache = (now, reason)
+    return reason
+
+
+def _canned_text() -> str:
+    return random.choice(_CANNED_TEXTS)
+
+
+def _canned_audio_files() -> list[str]:
+    try:
+        return sorted(f for f in os.listdir(CANNED_DIR)
+                      if f.startswith("friday_suspended_") and f.endswith(".wav"))
+    except OSError:
+        return []
+
+
+@app.get("/api/voice_state")
+async def voice_state():
+    """Polled by Home Assistant to drive a template sensor: when suspended, an automation can
+    intercept the wake word and play canned audio instead of running the full Assist pipeline."""
+    reason = _voice_suspended()
+    return {
+        "suspended": reason is not None,
+        "reason": reason,
+        "canned_audio": _canned_audio_files(),
+        "canned_url": "/api/canned",
+    }
+
+
+@app.get("/api/canned")
+async def canned_random():
+    """Serve a RANDOM canned clip. HA's media_player can point straight at this URL — each
+    wake-word trigger during a suspension gets a different line."""
+    files = _canned_audio_files()
+    if not files:
+        return JSONResponse({"detail": f"no canned audio in {CANNED_DIR}"}, status_code=503)
+    return FileResponse(os.path.join(CANNED_DIR, random.choice(files)), media_type="audio/wav")
+
+
+@app.get("/api/canned/{name}")
+async def canned_named(name: str):
+    """Serve one specific clip. Basename-only to keep the path traversal-proof."""
+    safe = os.path.basename(name)
+    path = os.path.join(CANNED_DIR, safe)
+    if safe not in _canned_audio_files() or not os.path.exists(path):
+        return JSONResponse({"detail": f"unknown canned clip {safe!r}"}, status_code=404)
+    return FileResponse(path, media_type="audio/wav")
+
+
 @app.post("/api/chat")
 async def ollama_chat(req: Request):
     body = await req.json()
@@ -2823,22 +2985,38 @@ async def ollama_chat(req: Request):
     tools = body.get("tools")
     now = _now_iso()
     tool_calls = None
-    try:
-        text, tool_calls = await _answer(messages, tools=tools, model=model)
-    except Exception as e:  # noqa: BLE001
-        text = f"(BMO brain error: {e})"
-        print(f"[bmo-brain] /api/chat ERROR: {type(e).__name__}: {e}", flush=True)
+    suspend_reason = _voice_suspended()
+    if suspend_reason:
+        # gpu_queue's "dense" zone has unloaded the brain — there is nothing to call. Answer
+        # instantly with a canned line rather than blocking for LLM_TIMEOUT on a missing model.
+        # No tool_calls: device control is equally unavailable while suspended.
+        text = _canned_text()
+        print(f"[bmo-brain] /api/chat SUSPENDED ({suspend_reason}) — canned reply", flush=True)
+    else:
+        try:
+            text, tool_calls = await _answer(messages, tools=tools, model=model)
+        except Exception as e:  # noqa: BLE001
+            text = f"(BMO brain error: {e})"
+            print(f"[bmo-brain] /api/chat ERROR: {type(e).__name__}: {e}", flush=True)
 
     if tool_calls:
         print(f"[bmo-brain] /api/chat emitting tool_calls="
               f"{[(tc.get('function', {}).get('name'), tc.get('function', {}).get('arguments')) for tc in tool_calls]}",
               flush=True)
 
-    # Ollama's native tool_calls shape is passed through verbatim — HA's native Ollama
-    # integration talks to this endpoint directly, so no translation is needed.
-    message_body = {"role": "assistant", "content": text}
+    # A tool-call response is an intermediate protocol turn, not speech for the user.
+    # Models often place a friendly acknowledgement ("Let me check that for you") in
+    # `text` beside a call.  Passing it through makes HA speak it as the final response
+    # and end the Assist turn before returning the tool result.  Keep the assistant
+    # content empty until the result has been supplied in the next request.
+    #
+    # Ollama's native tool_calls shape is otherwise passed through verbatim — HA's native
+    # Ollama integration talks to this endpoint directly, so no translation is needed.
+    message_body = {"role": "assistant", "content": "" if tool_calls else text}
     if tool_calls:
         message_body["tool_calls"] = tool_calls
+
+    done_reason = "tool_calls" if tool_calls else "stop"
 
     if stream:
         async def gen():
@@ -2846,9 +3024,9 @@ async def ollama_chat(req: Request):
                               "message": message_body, "done": False}) + "\n"
             yield json.dumps({"model": model, "created_at": _now_iso(),
                               "message": {"role": "assistant", "content": ""},
-                              "done": True, "done_reason": "stop"}) + "\n"
+                              "done": True, "done_reason": done_reason}) + "\n"
         return StreamingResponse(gen(), media_type="application/x-ndjson")
 
     return JSONResponse({"model": model, "created_at": now,
                          "message": message_body,
-                         "done": True, "done_reason": "stop"})
+                         "done": True, "done_reason": done_reason})

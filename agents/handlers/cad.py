@@ -506,7 +506,7 @@ def _handle_cad_review(user_input: str, stl_path: str, stl_name: str, ctx: dict)
 
     yield {"type": "status", "content": f"🔍 CAD Studio: Generating FDM review..."}
     try:
-        with request_lock(context="text"):
+        with request_lock(context="text", model=model):
             for chunk in _stream_review(stl_name, stats, user_input, model, host):
                 yield {"type": "message", "content": chunk}
     except Exception as e:
@@ -535,7 +535,7 @@ def _handle_cad_modify(user_input: str, stl_path: str, stl_name: str,
     yield {"type": "status", "content": f"📐 CAD Studio: Generating {mode_label} script..."}
     scad_source = ""
     try:
-        with request_lock(context="text"):
+        with request_lock(context="text", model=model):
             yield _emit_stream_mode("responding")
             scad_source = _generate_scad_with_stl(
                 stl_path, stl_name, user_input, mode, model, host, history, stats
@@ -651,7 +651,7 @@ def handle_cad(user_input: str, ctx: dict):
     # ── Generate SCAD source ────────────────────────────────────────────────
     scad_source = ""
     try:
-        with request_lock(context="text"):
+        with request_lock(context="text", model=model):
             yield _emit_stream_mode("responding")
             scad_source = _generate_scad(prompt, model, host, history)
     except Exception as e:

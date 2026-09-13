@@ -72,6 +72,10 @@ migration_backup_*/
 *.mp4
 *.wav
 !services/voice_engine/bmo_ref.wav
+# Friday's canned degraded-mode audio: a runtime fallback that MUST exist on a fresh
+# checkout (it plays when the voice lane is suspended and TTS may itself be evicted),
+# so it is versioned rather than treated as generated media.
+!services/friday_brain/canned/*.wav
 *.png
 !docs/screenshots/*.png
 !docs/assets/screenshots/*.png

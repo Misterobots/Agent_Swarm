@@ -99,7 +99,7 @@ def handle_architect(user_input: str, ctx: dict):
             yield from pre_lock_status_events("text", ARCH_MODEL, uid=uid or "")
             with _langfuse_span("architect_fast_generation", "Architect", ARCH_MODEL, final_input,
                                 langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
-                with request_lock(context="text"):
+                with request_lock(context="text", model=ARCH_MODEL):
                     yield _emit_stream_mode("responding")
                     for chunk in fast_agent.run(final_input, stream=True):
                         if chunk.content:
@@ -147,7 +147,7 @@ def handle_architect(user_input: str, ctx: dict):
             yield _emit_tool_start(tool_call_id, "marsrl_loop", {"intent": intent})
             # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
             yield from pre_lock_status_events("text", ARCH_MODEL, uid=uid or "")
-            with request_lock(context="text"):
+            with request_lock(context="text", model=ARCH_MODEL):
                 yield _emit_stream_mode("tool-use")
                 yield _emit_tool_progress(tool_call_id, "marsrl_loop", 20, "Solver started")
                 for update in mars_loop_stream(final_input, mars):

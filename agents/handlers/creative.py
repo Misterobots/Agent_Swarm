@@ -71,7 +71,7 @@ def handle_creative(user_input: str, ctx: dict):
         yield from pre_lock_status_events("text", resolved_model)
         with _langfuse_span("creative_generation", "CreativeWriter", resolved_model, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
-            with request_lock(context="text"):
+            with request_lock(context="text", model=resolved_model):
                 response_stream = writer.run(final_input, stream=True)
                 yield {"type": "status", "content": "Creative Writer: Writing..."}
                 for chunk in response_stream:
