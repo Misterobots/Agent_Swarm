@@ -409,6 +409,9 @@ services:
     environment:
       # Primary: Lovelace (2x RTX 5060Ti, 32GB) — task models (qwen3:14b).
       # Secondary: Turing (RTX 3070Ti, 8GB) — safety (llama-guard3:8b) + embeddings (nomic-embed-text).
+      # Keep the deployed Turing variant aligned with the canonical compose
+      # file. Set this to false in network.env for an emergency rollback.
+      - TASKS_DIRECT_CREATE_ENABLED=${TASKS_DIRECT_CREATE_ENABLED:-true}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://${LOVELACE_IP:-192.168.2.101}:11434}
       - SECONDARY_OLLAMA_HOST=${SECONDARY_OLLAMA_HOST:-http://192.168.2.103:11434}
       - PYTHONPATH=/app

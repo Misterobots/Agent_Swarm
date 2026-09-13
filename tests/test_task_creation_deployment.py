@@ -3,9 +3,10 @@
 from pathlib import Path
 
 
-def test_canonical_compose_enables_direct_task_creation_with_override():
-    compose = (
-        Path(__file__).parents[1] / "turing_gateway" / "docker-compose.yml"
-    ).read_text(encoding="utf-8")
+def test_both_turing_compose_variants_enable_direct_task_creation_with_override():
+    root = Path(__file__).parents[1] / "turing_gateway"
+    expected = "TASKS_DIRECT_CREATE_ENABLED=${TASKS_DIRECT_CREATE_ENABLED:-true}"
 
-    assert "TASKS_DIRECT_CREATE_ENABLED=${TASKS_DIRECT_CREATE_ENABLED:-true}" in compose
+    for name in ("docker-compose.yml", "docker-compose-Justin-PC.yml"):
+        compose = (root / name).read_text(encoding="utf-8")
+        assert expected in compose, name
