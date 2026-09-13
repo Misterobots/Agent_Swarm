@@ -40,6 +40,7 @@ it is specified.
   "kind": "sft|preference|rl|harness_adaptation|dataset_prepare|evaluation|export",
   "status": "queued",
   "phase": "queued",
+  "event_cursor": 0,
   "attempt": {"attempt_id": "uuid", "number": 1, "status": "pending"},
   "recipe": {"revision": "sha256:...", "method": "verified_sft"},
   "model": {"base_revision": "sha256:...", "tokenizer_revision": "sha256:..."},

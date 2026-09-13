@@ -36,6 +36,7 @@ from learning_contract import (
     make_event,
     require_scope,
     require_uuid,
+    validate_budgets,
     validate_job_spec,
     validate_transition,
 )
@@ -49,6 +50,11 @@ class LearningStoreError(RuntimeError):
 
 class LearningStore:
     """Postgres-backed store; construction has no network side effects."""
+
+    MUTABLE_SNAPSHOT_FIELDS = frozenset({
+        "worker_id", "resource", "budgets", "progress", "checkpoint", "retry",
+        "freshness", "blocking_reason", "provenance", "evaluation", "candidate",
+    })
 
     def __init__(self, dsn: str | None = None):
         self.dsn = dsn or AGNO_DB_URL
@@ -91,9 +97,11 @@ class LearningStore:
                         status TEXT NOT NULL,
                         phase TEXT NOT NULL,
                         state_version BIGINT NOT NULL DEFAULT 0,
+                        event_cursor BIGINT NOT NULL DEFAULT -1,
                         recipe JSONB NOT NULL DEFAULT '{}'::jsonb,
                         model JSONB NOT NULL DEFAULT '{}'::jsonb,
                         dataset JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        budgets JSONB NOT NULL DEFAULT '{}'::jsonb,
                         schedule JSONB NOT NULL DEFAULT '{}'::jsonb,
                         resource JSONB NOT NULL DEFAULT '{}'::jsonb,
                         progress JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -132,6 +140,7 @@ class LearningStore:
                         owner_id TEXT NOT NULL,
                         event_seq BIGINT NOT NULL,
                         event_id TEXT NOT NULL UNIQUE,
+                        experiment_id TEXT,
                         attempt_id TEXT,
                         kind TEXT NOT NULL,
                         phase TEXT NOT NULL,
@@ -150,6 +159,29 @@ class LearningStore:
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         PRIMARY KEY (owner_id, idempotency_key)
                     )
+                """)
+                # These are additive changes to the new learning tables only;
+                # legacy swarm tables remain outside this explicit initializer.
+                cur.execute("""
+                    ALTER TABLE learning_jobs
+                    ADD COLUMN IF NOT EXISTS event_cursor BIGINT NOT NULL DEFAULT -1
+                """)
+                cur.execute("""
+                    ALTER TABLE learning_jobs
+                    ADD COLUMN IF NOT EXISTS budgets JSONB NOT NULL DEFAULT '{}'::jsonb
+                """)
+                cur.execute("""
+                    ALTER TABLE learning_events
+                    ADD COLUMN IF NOT EXISTS experiment_id TEXT
+                """)
+                cur.execute("""
+                    UPDATE learning_jobs AS jobs
+                    SET event_cursor = COALESCE(
+                        (SELECT MAX(events.event_seq)
+                         FROM learning_events AS events
+                         WHERE events.job_id = jobs.job_id
+                           AND events.owner_id = jobs.owner_id), -1)
+                    WHERE jobs.event_cursor = -1
                 """)
                 cur.execute("""
                     CREATE INDEX IF NOT EXISTS idx_learning_jobs_owner_updated
@@ -187,32 +219,49 @@ class LearningStore:
         with self._db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    """SELECT request_fingerprint, response
-                       FROM learning_idempotency
-                       WHERE owner_id=%s AND idempotency_key=%s
-                       FOR UPDATE""",
-                    (owner_id, key),
+                    """INSERT INTO learning_idempotency
+                           (owner_id, idempotency_key, request_fingerprint, response)
+                       VALUES (%s, %s, %s, %s)
+                       ON CONFLICT (owner_id, idempotency_key) DO NOTHING
+                       RETURNING owner_id""",
+                    (owner_id, key, fingerprint, psycopg2.extras.Json({"_pending": True})),
                 )
-                prior = cur.fetchone()
-                if prior:
+                reserved = cur.fetchone() is not None
+                if not reserved:
+                    cur.execute(
+                        """SELECT request_fingerprint, response
+                           FROM learning_idempotency
+                           WHERE owner_id=%s AND idempotency_key=%s
+                           FOR UPDATE""",
+                        (owner_id, key),
+                    )
+                    prior = cur.fetchone()
+                    if not prior:
+                        raise LearningStoreError("idempotency reservation disappeared")
                     if prior["request_fingerprint"] != fingerprint:
                         raise IdempotencyConflict("idempotency key reused with a different request")
-                    return dict(prior["response"]), True
+                    response = dict(prior["response"])
+                    if response.get("_pending"):
+                        raise LearningStoreError("idempotency reservation is incomplete")
+                    return response, True
 
                 snapshot = self._snapshot_defaults(normalized)
+                snapshot["event_cursor"] = 0
                 cur.execute(
                     """INSERT INTO learning_jobs (
                            job_id, experiment_id, owner_id, workspace_id,
                            project_id, session_id, parent_id, worker_id, kind,
-                           status, phase, state_version, recipe, model, dataset,
-                           schedule, resource, progress, checkpoint, retry,
+                           status, phase, state_version, event_cursor, recipe,
+                           model, dataset, budgets, schedule, resource, progress,
+                           checkpoint, retry,
                            freshness, blocking_reason, provenance, evaluation,
                            candidate)
                        VALUES (%(job_id)s, %(experiment_id)s, %(owner_id)s,
                            %(workspace_id)s, %(project_id)s, %(session_id)s,
                            %(parent_id)s, %(worker_id)s, %(kind)s, %(status)s,
-                           %(phase)s, %(state_version)s, %(recipe)s, %(model)s,
-                           %(dataset)s, %(schedule)s, %(resource)s,
+                           %(phase)s, %(state_version)s, %(event_cursor)s,
+                           %(recipe)s, %(model)s, %(dataset)s, %(budgets)s,
+                           %(schedule)s, %(resource)s,
                            %(progress)s, %(checkpoint)s, %(retry)s,
                            %(freshness)s, %(blocking_reason)s, %(provenance)s,
                            %(evaluation)s, %(candidate)s)""",
@@ -222,10 +271,10 @@ class LearningStore:
                 self._insert_event(cur, snapshot, event)
                 response = {"job": snapshot, "event": event}
                 cur.execute(
-                    """INSERT INTO learning_idempotency
-                       (owner_id, idempotency_key, request_fingerprint, job_id, response)
-                       VALUES (%s, %s, %s, %s, %s)""",
-                    (owner_id, key, fingerprint, snapshot["job_id"], psycopg2.extras.Json(response)),
+                    """UPDATE learning_idempotency
+                       SET job_id=%s, response=%s
+                       WHERE owner_id=%s AND idempotency_key=%s""",
+                    (snapshot["job_id"], psycopg2.extras.Json(response), owner_id, key),
                 )
                 return response, False
 
@@ -255,8 +304,8 @@ class LearningStore:
         with self._db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    """SELECT event_id, job_id, owner_id, event_seq, attempt_id,
-                              kind, phase, payload, occurred_at
+                    """SELECT event_id, job_id, owner_id, event_seq, experiment_id,
+                              attempt_id, kind, phase, payload, occurred_at
                        FROM learning_events
                        WHERE job_id=%s AND owner_id=%s AND event_seq>%s
                        ORDER BY event_seq ASC LIMIT %s""",
@@ -287,6 +336,13 @@ class LearningStore:
             raise LearningContractError(f"unsupported learning phase: {phase}")
 
         patch = dict(patch or {})
+        unknown_patch = set(patch) - self.MUTABLE_SNAPSHOT_FIELDS
+        if unknown_patch:
+            raise LearningContractError(
+                "unsupported learning snapshot fields: " + ", ".join(sorted(unknown_patch))
+            )
+        if "budgets" in patch:
+            patch["budgets"] = validate_budgets(patch["budgets"])
         with self._db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
@@ -312,10 +368,14 @@ class LearningStore:
                     "state_version": new_version,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 })
+                next_seq = self._next_event_seq(cur, job_id, owner_id)
+                snapshot["event_cursor"] = next_seq
                 params = self._job_params(snapshot)
                 cur.execute(
                     """UPDATE learning_jobs SET status=%(status)s, phase=%(phase)s,
-                           state_version=%(state_version)s, worker_id=%(worker_id)s,
+                           state_version=%(state_version)s, event_cursor=%(event_cursor)s,
+                           worker_id=%(worker_id)s, resource=%(resource)s,
+                           budgets=%(budgets)s,
                            progress=%(progress)s, checkpoint=%(checkpoint)s,
                            retry=%(retry)s, freshness=%(freshness)s,
                            blocking_reason=%(blocking_reason)s,
@@ -325,7 +385,7 @@ class LearningStore:
                     params,
                 )
                 event = self._event_for_snapshot(
-                    snapshot, self._next_event_seq(cur, job_id, owner_id),
+                    snapshot, next_seq,
                     event_kind, phase, {"status": status, "state_version": new_version},
                 )
                 self._insert_event(cur, snapshot, event)
@@ -340,9 +400,11 @@ class LearningStore:
         snapshot.setdefault("session_id", None)
         snapshot.setdefault("parent_id", None)
         snapshot.setdefault("worker_id", None)
+        snapshot.setdefault("event_cursor", -1)
         snapshot.setdefault("recipe", {})
         snapshot.setdefault("model", {})
         snapshot.setdefault("dataset", {})
+        snapshot["budgets"] = validate_budgets(snapshot.get("budgets", {}))
         snapshot.setdefault("schedule", {})
         snapshot.setdefault("resource", {"eligibility": "pending", "lease_generation": 0})
         snapshot.setdefault("progress", {"unit": "step", "current": 0, "total": None})
@@ -360,14 +422,14 @@ class LearningStore:
     @staticmethod
     def _job_params(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         params = dict(snapshot)
-        for field in ("recipe", "model", "dataset", "schedule", "resource", "progress", "checkpoint", "retry", "freshness", "provenance", "evaluation", "candidate"):
+        for field in ("recipe", "model", "dataset", "budgets", "schedule", "resource", "progress", "checkpoint", "retry", "freshness", "provenance", "evaluation", "candidate"):
             params[field] = psycopg2.extras.Json(snapshot.get(field) or {})
         return params
 
     @staticmethod
     def _row_to_snapshot(row: Mapping[str, Any]) -> dict[str, Any]:
         result = dict(row)
-        for field in ("recipe", "model", "dataset", "schedule", "resource", "progress", "checkpoint", "retry", "freshness", "provenance", "evaluation", "candidate"):
+        for field in ("recipe", "model", "dataset", "budgets", "schedule", "resource", "progress", "checkpoint", "retry", "freshness", "provenance", "evaluation", "candidate"):
             value = result.get(field)
             if isinstance(value, str):
                 try:
@@ -397,13 +459,14 @@ class LearningStore:
     def _insert_event(cur: Any, snapshot: Mapping[str, Any], event: Mapping[str, Any]) -> None:
         cur.execute(
             """INSERT INTO learning_events
-               (job_id, owner_id, event_seq, event_id, attempt_id, kind, phase, payload, occurred_at)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+               (job_id, owner_id, event_seq, event_id, experiment_id, attempt_id,
+                kind, phase, payload, occurred_at)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (
                 snapshot["job_id"], snapshot["owner_id"], event["event_seq"],
-                event["event_id"], event.get("attempt_id"), event["kind"],
-                event["phase"], psycopg2.extras.Json(event["payload"]),
-                event["occurred_at"],
+                event["event_id"], event.get("experiment_id"),
+                event.get("attempt_id"), event["kind"], event["phase"],
+                psycopg2.extras.Json(event["payload"]), event["occurred_at"],
             ),
         )
 
@@ -427,6 +490,7 @@ class LearningStore:
             "schema": "learning.event.v1",
             "event_id": row["event_id"],
             "job_id": row["job_id"],
+            "experiment_id": row.get("experiment_id"),
             "attempt_id": row.get("attempt_id"),
             "event_seq": int(row["event_seq"]),
             "kind": row["kind"],

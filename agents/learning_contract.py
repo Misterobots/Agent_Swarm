@@ -128,7 +128,45 @@ def validate_job_spec(spec: Mapping[str, Any]) -> dict[str, Any]:
         raise LearningContractError(f"unsupported learning phase: {phase}")
     normalized["status"] = status
     normalized["phase"] = phase
+    normalized["budgets"] = validate_budgets(normalized.get("budgets", {}))
     return normalized
+
+
+def validate_budgets(value: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Validate the bounded execution budget carried by a durable job."""
+
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise LearningContractError("budgets must be an object")
+
+    result = dict(value)
+    timezone_name = result.get("window_timezone")
+    if timezone_name is not None and not str(timezone_name).strip():
+        raise LearningContractError("budgets.window_timezone must be non-empty")
+
+    for field in ("max_wall_clock_sec", "checkpoint_target_sec"):
+        if field in result and result[field] is not None:
+            raw = result[field]
+            if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw <= 0:
+                raise LearningContractError(f"budgets.{field} must be positive")
+            result[field] = int(raw)
+
+    if "max_retries" in result and result["max_retries"] is not None:
+        raw = result["max_retries"]
+        if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+            raise LearningContractError("budgets.max_retries must be non-negative")
+
+    deadline = result.get("deadline_at")
+    if deadline is not None:
+        if not isinstance(deadline, str) or not deadline.strip():
+            raise LearningContractError("budgets.deadline_at must be RFC3339")
+        try:
+            datetime.fromisoformat(deadline.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise LearningContractError("budgets.deadline_at must be RFC3339") from exc
+
+    return result
 
 
 def validate_transition(current: str, target: str) -> None:

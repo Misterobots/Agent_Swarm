@@ -18,6 +18,7 @@ from learning_contract import (  # noqa: E402
     request_fingerprint,
     require_scope,
     require_uuid,
+    validate_budgets,
     validate_job_spec,
     validate_transition,
 )
@@ -99,3 +100,22 @@ def test_event_rejects_negative_cursor_and_unknown_phase():
 
 def test_idempotency_conflict_is_a_distinct_contract_error():
     assert issubclass(IdempotencyConflict, LearningContractError)
+
+
+def test_budgets_are_normalized_and_bounded():
+    value = validate_budgets({
+        "window_timezone": "America/Chicago",
+        "max_wall_clock_sec": 60.0,
+        "checkpoint_target_sec": 30,
+        "max_retries": 2,
+        "deadline_at": "2026-09-14T06:00:00Z",
+    })
+    assert value["max_wall_clock_sec"] == 60
+    assert value["checkpoint_target_sec"] == 30
+
+    with pytest.raises(LearningContractError):
+        validate_budgets({"max_wall_clock_sec": True})
+    with pytest.raises(LearningContractError):
+        validate_budgets({"max_retries": -1})
+    with pytest.raises(LearningContractError):
+        validate_budgets({"deadline_at": "tomorrow"})
