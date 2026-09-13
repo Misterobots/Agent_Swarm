@@ -3538,6 +3538,7 @@ def _schedule_direct_task(*, prompt: str, owner_id: str, repo_context: dict | No
     swarm_run_store.create_run(
         coordination_id, session_id, owner_id, title=prompt, scope=None,
         started_at=int(time.time()), status=status, prompt=prompt,
+        ultraplan_mode=ultraplan_mode, research_mode=research_mode,
     )
     if status == "running":
         _dispatch_task_now(coordination_id, dispatch_kwargs)
@@ -3654,6 +3655,8 @@ async def retry_task(coordination_id: str, request: Request):
     new_id = _schedule_direct_task(
         prompt=prompt, owner_id=owner_id, repo_context=repo_context,
         session_mode=session_mode,
+        ultraplan_mode=bool(run.get("ultraplan_mode", False)),
+        research_mode=bool(run.get("research_mode", False)),
     )
     swarm_run_store.record_event(coordination_id, "retry", {
         "retry_coordination_id": new_id,

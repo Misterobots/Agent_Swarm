@@ -92,6 +92,14 @@ def init_table() -> None:
                     "ON swarm_runs (owner_id, started_at DESC)"
                 )
                 cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS prompt TEXT")
+                cur.execute(
+                    "ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS "
+                    "ultraplan_mode BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+                cur.execute(
+                    "ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS "
+                    "research_mode BOOLEAN NOT NULL DEFAULT FALSE"
+                )
                 cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS stop_requested BOOLEAN NOT NULL DEFAULT FALSE")
                 cur.execute("ALTER TABLE swarm_runs ADD COLUMN IF NOT EXISTS stop_reason TEXT")
                 cur.execute("""
@@ -144,7 +152,8 @@ def init_table() -> None:
 
 def create_run(coordination_id: str, session_id: str, owner_id: str,
                title: str | None, scope: str | None, started_at: int,
-               status: str = "running", prompt: str | None = None) -> None:
+               status: str = "running", prompt: str | None = None,
+               ultraplan_mode: bool = False, research_mode: bool = False) -> None:
     """Record a run at dispatch. Idempotent on coordination_id.
 
     status defaults to "running" (the original, still-typical case: a run
@@ -163,12 +172,14 @@ def create_run(coordination_id: str, session_id: str, owner_id: str,
                     """
                     INSERT INTO swarm_runs
                         (coordination_id, session_id, owner_id, title, scope,
-                         prompt, status, started_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         prompt, ultraplan_mode, research_mode, status,
+                         started_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (coordination_id) DO NOTHING
                     """,
                     (coordination_id, session_id, owner_id,
-                     (title or "")[:200], scope, (prompt or "")[:8000], status,
+                     (title or "")[:200], scope, (prompt or "")[:8000],
+                     bool(ultraplan_mode), bool(research_mode), status,
                      int(started_at or now), now),
                 )
                 inserted = cur.rowcount > 0
@@ -380,7 +391,8 @@ def set_approval(coordination_id: str, owner_id: str, approval_state: str) -> bo
 _RUN_LIST_COLS = (
     "coordination_id, session_id, title, status, phase, phase_name, "
     "workers_total, workers_completed, workers_failed, scope, approval_state, "
-    "preview_url, prompt, stop_requested, stop_reason, started_at, updated_at, ended_at, "
+    "preview_url, prompt, ultraplan_mode, research_mode, stop_requested, stop_reason, "
+    "started_at, updated_at, ended_at, "
     "(diff_text IS NOT NULL) AS has_diff"
 )
 
