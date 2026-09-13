@@ -6,13 +6,20 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "agents"))
+pytest.importorskip("prometheus_client")
 
 from dev_harness.approval_service import arguments_hash, request_approval
 from dev_harness.loop import _call_category
 from dev_harness.permissions import PermissionGate
 from dev_harness.replay_policy import public_call, validate_next
 from coordination.workspace_lifecycle import _safe
-from mcp.server import MCPBridgeServer
+
+# tests/conftest.py deliberately keeps the external FastMCP namespace loaded
+# for MemPalace tests. Import the bridge type through the application instance
+# instead of resolving the ambiguous top-level ``mcp.server`` name directly.
+import main
+
+MCPBridgeServer = type(main.mcp_server)
 
 
 def test_permission_mode_matrix_is_fail_closed():
