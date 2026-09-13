@@ -127,7 +127,7 @@ services:
       # Mirrors agents/config.py CONTEXT_WINDOWS — values already proven on this box.
       # Must stay in sync with each client's own contextWindowSize or prompts get packed
       # past the server's window and silently truncated.
-      - CODE_GATEWAY_NUM_CTX_MAP=${CODE_GATEWAY_NUM_CTX_MAP:-{"qwen3-coder:30b":163840,"qwen3.6:27b":98304,"gemma4:31b":81920,"deepseek-r1:32b":32768,"qwen3:14b":40960,"qwen3:8b":40960,"qwen3.8:27b":122880}}
+      - CODE_GATEWAY_NUM_CTX_MAP=${CODE_GATEWAY_NUM_CTX_MAP:-{"qwen3-coder:30b":163840,"qwen3.6:27b":98304,"gemma4:31b":81920,"deepseek-r1:32b":32768,"qwen3:14b":40960,"qwen3:8b":40960,"qwen3.8:27b":65536}}
       # Qwen3's reasoning cost Friday 3-16s/turn and once produced a hallucinated entity_id;
       # think:false is the generation-control flag that actually suppresses it on /api/chat.
       - CODE_GATEWAY_THINK=${CODE_GATEWAY_THINK:-false}
