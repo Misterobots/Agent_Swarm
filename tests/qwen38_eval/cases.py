@@ -6,7 +6,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from .fixtures import (EXPECTED_FINDINGS, HIDDEN_BUILD_ASSERTIONS, REVIEW_FILES,
-                       image_fixture, long_context_fixture,
+                       chart_fixture, image_fixture, long_context_fixture,
+                       screenshot_fixture,
                        seed_build_fixture, seed_review_fixture)
 from .harness import (MODEL, PROVIDER, DeterministicProvider, FixtureRuntime,
                       Observation, Provider, RunIdentity, assert_exact_model,
@@ -73,6 +74,11 @@ def approvals_case(provider: Provider, mode: str = "mock"):
         read = runtime.read_file(identity_a, root, "readme.txt")
         runtime.write_file(identity_a, root, "denied.txt", "must not exist", approved=False)
         denied_command = runtime.run_command(identity_a, root, ["python", "-m", "pytest"], approved=False)
+        first_mutation = runtime.write_file(identity_a, root, "resume.txt", "once", approved=True,
+                                            mutation_id="resume-call-1")
+        replay_mutation = runtime.write_file(identity_a, root, "resume.txt", "twice", approved=True,
+                                             mutation_id="resume-call-1")
+        resume_content = (root / "resume.txt").read_text(encoding="utf-8")
         try:
             runtime.read_file(identity_b, root, "readme.txt")
             cross_owner_denied = False
@@ -89,6 +95,7 @@ def approvals_case(provider: Provider, mode: str = "mock"):
         "approved_read_executed": read == "fixture",
         "cross_owner_isolation": cross_owner_denied,
         "approval_time_separate": approval_wait_ms > 0,
+        "resume_no_duplicate_mutation": first_mutation and not replay_mutation and resume_content == "once",
     }
     obs = Observation(actual_model=MODEL, provider=PROVIDER, owner_id=identity_a.owner_id,
                       session_id=identity_a.session_id, project_id=identity_a.project_id,
@@ -104,6 +111,17 @@ def approvals_case(provider: Provider, mode: str = "mock"):
 def vision_case(provider: Provider, mode: str = "mock"):
     identity = RunIdentity.unique("vision")
     runtime = FixtureRuntime(provider)
+    chart_text, chart_obs = runtime.complete(prompt="CHART: describe the fixed chart", profile="chat",
+                                              identity=identity, image=chart_fixture())
+    chart_code_text, chart_code_obs = runtime.complete(prompt="CHART: describe the fixed chart in Code",
+                                                       profile="project", identity=identity,
+                                                       image=chart_fixture())
+    screenshot_text, screenshot_obs = runtime.complete(prompt="SCREENSHOT: describe the fixed screenshot",
+                                                       profile="project", identity=identity,
+                                                       image=screenshot_fixture())
+    screenshot_chat_text, screenshot_chat_obs = runtime.complete(prompt="SCREENSHOT: describe the fixed screenshot in chat",
+                                                                  profile="chat", identity=identity,
+                                                                  image=screenshot_fixture())
     text, obs = runtime.complete(prompt="VISION: describe the fixed image", profile="chat",
                                  identity=identity, image=image_fixture())
     assertions = {
@@ -111,6 +129,10 @@ def vision_case(provider: Provider, mode: str = "mock"):
         "labels_recovered": all(label in text for label in ("ALPHA", "BETA", "GAMMA")),
         "values_recovered": all(value in text for value in ("10", "20", "30")),
         "attachment_sent": bool(provider.calls[-1].get("image_bytes")),
+        "chart_chat_hidden_check": assert_exact_model(chart_obs) and all(x in chart_text for x in ("Q1", "Q2", "Q3", "40")),
+        "chart_code_hidden_check": assert_exact_model(chart_code_obs) and all(x in chart_code_text for x in ("Q1", "Q2", "Q3", "40")),
+        "screenshot_code_hidden_check": assert_exact_model(screenshot_obs) and all(x in screenshot_text for x in ("Qwen 3.8 Local Heavy", "approval required", "fixture-alpha")),
+        "screenshot_chat_hidden_check": assert_exact_model(screenshot_chat_obs) and all(x in screenshot_chat_text for x in ("Qwen 3.8 Local Heavy", "approval required", "fixture-alpha")),
     }
     return result("vision", mode, identity, assertions, observation=obs,
                   details={"fixture": "deterministic PPM", "fallback_is_failure": True,

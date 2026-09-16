@@ -10,6 +10,7 @@ from typing import Any, Callable, Iterable, Protocol
 
 MODEL = "qwen3.8:27b"
 PROVIDER = "ollama"
+BASELINE_MODEL = "qwen3:14b"
 PROFILES = {"chat": 32768, "project": 65536, "long": 122880}
 CASE_DEADLINES_SECONDS = {"review": 600, "build": 1200, "approvals": 600,
                           "vision": 600, "long_context": 1200, "recovery": 600}
@@ -107,6 +108,10 @@ class DeterministicProvider:
             text = "FINDING src/auth.py:18 missing issuer validation; FINDING src/cache.py:42 stale key; FINDING src/api.py:77 unchecked status."
         elif prompt.startswith("VISION:"):
             text = "The image contains labels ALPHA, BETA, GAMMA and the plotted values 10, 20, 30."
+        elif prompt.startswith("CHART:"):
+            text = "The chart is Quarterly latency chart with Q1 Q2 Q3 Q4 and values 10 20 30 40."
+        elif prompt.startswith("SCREENSHOT:"):
+            text = "The screenshot shows Memex project dashboard, Qwen 3.8 Local Heavy, Context: project 65536, approval required, fixture-alpha."
         elif prompt.startswith("LONG:"):
             text = "FACT-A=violet; FACT-B=quartz; FACT-C=17; FACT-D=harbor; cross-file relation=FACT-A maps to FACT-D."
         elif prompt.startswith("RECOVER:"):
@@ -123,6 +128,10 @@ def assert_exact_model(obs: Observation) -> bool:
     return obs.actual_model == MODEL and obs.provider == PROVIDER and not obs.fallback
 
 
+def assert_model(obs: Observation, expected_model: str) -> bool:
+    return obs.actual_model == expected_model and obs.provider == PROVIDER and not obs.fallback
+
+
 class FixtureRuntime:
     """Local runtime for end-to-end fixture execution.
 
@@ -135,6 +144,7 @@ class FixtureRuntime:
         self.provider = provider
         self.projects: dict[str, tuple[str, Path]] = {}
         self.events: list[dict[str, Any]] = []
+        self.applied_mutations: set[str] = set()
 
     def register_project(self, identity: RunIdentity, root: Path) -> None:
         self.projects[identity.owner_id] = (identity.project_id, root.resolve())
@@ -154,17 +164,23 @@ class FixtureRuntime:
         return target.read_text(encoding="utf-8")
 
     def write_file(self, identity: RunIdentity, root: Path, relative: str, content: str,
-                   *, approved: bool) -> None:
+                   *, approved: bool, mutation_id: str | None = None) -> bool:
         base = self._root(identity, root)
         if not approved:
             self.events.append({"type": "approval_denied", "tool": "write_file"})
-            return
+            return False
+        if mutation_id and mutation_id in self.applied_mutations:
+            self.events.append({"type": "mutation_replayed", "mutation_id": mutation_id})
+            return False
         target = (base / relative).resolve()
         if base not in target.parents:
             raise PermissionError("path escapes fixture project")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
+        if mutation_id:
+            self.applied_mutations.add(mutation_id)
         self.events.append({"type": "tool", "tool": "write_file", "project_id": identity.project_id})
+        return True
 
     def run_command(self, identity: RunIdentity, root: Path, command: list[str],
                     *, approved: bool) -> subprocess.CompletedProcess[str] | None:
