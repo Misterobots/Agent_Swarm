@@ -77,6 +77,8 @@ def test_ollama_image_transport_normalizes_data_url():
 
 
 def test_ollama_rejects_external_or_malformed_images():
+    with pytest.raises(ValueError, match="invalid base64|recognized image"):
+        OllamaProvider._normalize_image("ABC123")
     with pytest.raises(ValueError):
         OllamaProvider._messages_for_ollama([{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": "https://example.invalid/a.png"}},
