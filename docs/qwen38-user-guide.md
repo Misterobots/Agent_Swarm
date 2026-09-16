@@ -14,13 +14,17 @@ Use Chat Settings to choose the request budget:
 
 | Profile | Effective context | Use |
 | --- | ---: | --- |
+| Auto | Task-derived | Chat/vision uses Chat; Code/swarm uses Project |
 | Chat | 32,768 tokens | Ordinary chat and image analysis |
 | Project | 65,536 tokens | Code workspace and swarm project work |
 | Long | 122,880 tokens | Explicit long repository or document analysis |
 
-The selected profile is sent with chat, Code, and swarm requests. The response
-metadata reports the server's effective token budget; that value is authoritative
-when it differs from a model catalog maximum.
+**Auto** is the default selection. It omits `context_profile` from the request
+so the backend policy derives `chat` for ordinary chat and vision, or `project`
+for Code and swarm work. You can explicitly choose Chat, Project, or Long when
+you need to override that task default; Long is never selected implicitly. The
+response metadata reports the server's effective token budget; that value is
+authoritative when it differs from a model catalog maximum.
 
 ## Project safety and status
 
