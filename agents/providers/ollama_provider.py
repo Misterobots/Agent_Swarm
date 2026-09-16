@@ -29,6 +29,7 @@ from providers.qwen_context import (
     decode_image_payload,
     ensure_context_headroom,
     estimate_messages_tokens,
+    estimate_serialized_tokens,
     resolve_qwen_context,
 )
 

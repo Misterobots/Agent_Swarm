@@ -172,12 +172,21 @@ class LiveMemexAdapter(Provider):
                 except json.JSONDecodeError:
                     continue
                 events.append(event)
-                for source in (event, event.get("metadata", {}), event.get("delta", {})):
-                    if isinstance(source, dict):
-                        for key in ("requested_model", "actual_model", "provider", "fallback",
-                                    "context_profile", "effective_context_tokens"):
-                            if key in source:
-                                metadata[key] = source[key]
+                # The runtime merges runtime_metadata into the chunk delta
+                # (choices[0].delta), not the top level. Check every place it
+                # could appear. Skip None so an early "not yet populated" event
+                # (provider built after the first status) doesn't clobber a
+                # later real value.
+                sources = [event]
+                for candidate in (event.get("metadata"), event.get("delta"),
+                                  (event.get("choices") or [{}])[0].get("delta")):
+                    if isinstance(candidate, dict):
+                        sources.append(candidate)
+                for source in sources:
+                    for key in ("requested_model", "actual_model", "provider", "fallback",
+                                "context_profile", "effective_context_tokens"):
+                        if source.get(key) is not None:
+                            metadata[key] = source[key]
                 if event.get("type") == "tool_approval_needed":
                     call_id = event.get("call_id") or event.get("tool_call_id")
                     if call_id:
