@@ -22,6 +22,7 @@ subagents (depth cap = 1, same rule as existing _run_subagent).
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 
@@ -241,6 +242,8 @@ async def _run_async(
     prompt: str,
     pioneer: dict | None = None,
     container_name: str | None = None,
+    context_profile: str | None = None,
+    task_mode: str = "project",
 ):
     """Async core: runs the DevHarness loop and returns (summary_text, [dict_events])."""
     from dev_harness.history import History, UserMessage, StreamChunk
@@ -254,7 +257,18 @@ async def _run_async(
             + system_prompt
         )
     history = History(system=system_prompt, turns=[UserMessage(prompt)])
-    primary = OllamaProvider(model=model)
+    provider_kwargs = {
+        "model": model,
+        # B's provider helper will consume these when integrated.  Signature
+        # filtering keeps this branch compatible with the pre-helper provider.
+        "task_mode": task_mode,
+        "context_profile": context_profile,
+    }
+    accepted = inspect.signature(OllamaProvider).parameters
+    primary = OllamaProvider(**{
+        key: value for key, value in provider_kwargs.items()
+        if key in accepted and (value is not None or key == "task_mode")
+    })
     # Workers don't escalate — the coordinator assigns their model, not the harness.
     router = ModelRouter(primary=primary, escalation_targets=[], enabled=False)
 
@@ -322,6 +336,9 @@ def run_devharness_worker(
     prompt: str,
     all_tool_defs: list,
     container_name: str | None = None,
+    model_name: str | None = None,
+    context_profile: str | None = None,
+    task_mode: str = "project",
 ) -> str:
     """Synchronous worker runner — matches the phidata _run_worker return contract.
 
@@ -348,7 +365,7 @@ def run_devharness_worker(
         pass
 
     role_lower = role.lower()
-    model = _ROLE_MODELS.get(role_lower, SWARM_ARCHITECT_MODEL)
+    model = model_name or _ROLE_MODELS.get(role_lower, SWARM_ARCHITECT_MODEL)
     system_prompt = _ROLE_SYSTEM.get(role_lower, _ROLE_SYSTEM["coder"])
     allowed = _ROLE_ALLOWED_TOOLS.get(role_lower, _ROLE_ALLOWED_TOOLS["coder"])
     tool_defs = [t for t in all_tool_defs if t["function"]["name"] in allowed]
@@ -373,6 +390,8 @@ def run_devharness_worker(
             prompt,
             pioneer=worker.pioneer,
             container_name=container_name,
+            context_profile=context_profile,
+            task_mode=task_mode,
         ))
 
         # Push non-file_change events (agent_event, todo) collected during the run.

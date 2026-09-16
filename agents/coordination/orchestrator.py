@@ -165,6 +165,7 @@ def coordinate_task(
     repo_context: Optional[dict] = None,
     session_mode: Optional[str] = None,
     coordination_id: Optional[str] = None,
+    context_profile: Optional[str] = None,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
@@ -192,7 +193,10 @@ def coordinate_task(
     drained on a background thread). Leave unset for every other caller —
     CoordinatorSession generates its usual random id.
     """
-    session = CoordinatorSession(session_id, owner_id, coordination_id=coordination_id)
+    session = CoordinatorSession(
+        session_id, owner_id, coordination_id=coordination_id,
+        context_profile=context_profile,
+    )
     # Record the run for the mobile task board (fire-and-forget; no-ops if the
     # caller has no resolvable owner so anonymous runs never appear on a board).
     swarm_run_store.create_run(
@@ -306,7 +310,10 @@ def coordinate_task(
         except Exception as _e:
             logger.warning(f"[Coordinator] GPU zone check skipped (non-fatal): {_e}")
 
-        plan = _decompose_task(user_input, history_context, already_steered=already_steered)
+        plan = _decompose_task(
+            user_input, history_context, already_steered=already_steered,
+            model_name=session.model_for_role("coordinator"),
+        )
         summary = plan.get("summary", user_input[:200])
         research_tasks = plan.get("research_tasks", [])
         impl_tasks = plan.get("implementation_tasks", [])
@@ -611,7 +618,9 @@ def coordinate_task(
 
         if research_mode and not _use_perspective_mode and not _is_creative_task:
             yield {"type": "thought", "content": "→ Checking if topic is multi-faceted for perspective mode..."}
-            _perspective_probe = _decompose_task_perspectives(user_input, history_context)
+            _perspective_probe = _decompose_task_perspectives(
+                user_input, history_context, model_name=session.model_for_role("coordinator")
+            )
             _use_perspective_mode = _perspective_probe.get("is_multifaceted", False)
             if _use_perspective_mode:
                 yield {"type": "thought", "content": "→ Multi-faceted topic detected — activating Perspective Research Mode"}
@@ -621,7 +630,9 @@ def coordinate_task(
 
         if _use_perspective_mode:
             if not _perspective_probe:
-                _perspective_probe = _decompose_task_perspectives(user_input, history_context)
+                _perspective_probe = _decompose_task_perspectives(
+                    user_input, history_context, model_name=session.model_for_role("coordinator")
+                )
 
             perspectives = _perspective_probe.get("perspectives", [])
             if not perspectives:
@@ -673,7 +684,10 @@ def coordinate_task(
                         persp_prompt += f"\n\n[Context]:\n{extracted_context}"
 
                     worker_id = session.register_worker(role, task_text, "research")
-                    agent = _get_agent_for_role("researcher", session_id=session_id, scope="research")
+                    agent = _get_agent_for_role(
+                        "researcher", session_id=session_id, scope="research",
+                        model_name=session.model_for_role("researcher"),
+                    )
                     child_token = _derive_worker_token(ace_token, role, task_text)
 
                     future = pool.submit(
@@ -686,6 +700,7 @@ def coordinate_task(
                         "type": "swarm_worker_created",
                         "worker_id": worker_id,
                         "role": role,
+                        "model": session.model_metadata_for_role("researcher"),
                         "pioneer_name": pioneer["name"],
                         "pioneer_full_name": pioneer["full_name"],
                         "pioneer_motto": pioneer["motto"],
@@ -742,7 +757,10 @@ def coordinate_task(
             yield {"type": "status", "content": "🧠 Building Perspective Matrix..."}
             yield {"type": "thought", "content": "→ Phase 3/4: Perspective Matrix synthesis"}
 
-            persp_matrix = _synthesize_perspective_matrix(findings_by_perspective, user_input)
+            persp_matrix = _synthesize_perspective_matrix(
+                findings_by_perspective, user_input,
+                model_name=session.model_for_role("coordinator"),
+            )
             matrix_md = persp_matrix.get("matrix_md", "")
 
             session.write_to_scratchpad("01_perspective_matrix.md", matrix_md)
@@ -804,7 +822,10 @@ def coordinate_task(
                     task_text = task_def.get("task", "")
 
                     worker_id = session.register_worker(role, task_text, "research")
-                    agent = _get_agent_for_role(role, session_id=session_id, scope=scope)
+                    agent = _get_agent_for_role(
+                        role, session_id=session_id, scope=scope,
+                        model_name=session.model_for_role(role),
+                    )
                     child_token = _derive_worker_token(ace_token, role, task_text)
 
                     worker_prompt = (
@@ -823,6 +844,7 @@ def coordinate_task(
                         "type": "swarm_worker_created",
                         "worker_id": worker_id,
                         "role": role,
+                        "model": session.model_metadata_for_role(role),
                         "pioneer_name": pioneer["name"],
                         "pioneer_full_name": pioneer["full_name"],
                         "pioneer_motto": pioneer["motto"],
@@ -965,7 +987,10 @@ def coordinate_task(
                 "content": f"🧠 Synthesis pass {synth_pass}/{max_synth_passes}: reading all findings...",
             }
             with request_lock(context="text"):
-                synth_result = _synthesize_findings(all_findings, user_input)
+                synth_result = _synthesize_findings(
+                    all_findings, user_input,
+                    model_name=session.model_for_role("coordinator"),
+                )
             synthesis = synth_result["plan"]
             synth_confidence = synth_result["confidence"]
             synth_ambiguity = synth_result["ambiguity"]
@@ -1149,19 +1174,26 @@ def coordinate_task(
             try:
                 if execute_code and role in ("architect", "coder", "devops"):
                     from leibniz_agent import get_architect_agent
-                    agent = get_architect_agent(session_id=session_id)
+                    agent = get_architect_agent(
+                        session_id=session_id,
+                        model_name=session.model_for_role(role),
+                    )
                 else:
-                    agent = _get_agent_for_role(role, session_id=session_id, scope=scope)
+                    agent = _get_agent_for_role(
+                        role, session_id=session_id, scope=scope,
+                        model_name=session.model_for_role(role),
+                    )
             except Exception as _agent_err:
                 logger.warning(
                     f"[Coordinator] Agent init failed for role '{role}' (falling back to simple agent): {_agent_err}"
                 )
-                _fb_host = get_swarm_worker_host(ARCHITECT_MODEL)
+                _fb_model = session.model_for_role(role)
+                _fb_host = get_swarm_worker_host(_fb_model)
                 from agno.agent import Agent as _Agent
                 from agno.models.ollama import Ollama as _Ollama
                 agent = _Agent(
                     name=f"{role.capitalize()} Worker",
-                    model=_Ollama(id=ARCHITECT_MODEL, host=_fb_host, client_kwargs={"timeout": 300.0}),
+                    model=_Ollama(id=_fb_model, host=_fb_host, client_kwargs={"timeout": 300.0}),
                     instructions=[
                         f"You are a {role} worker producing a detailed plan.",
                         "Produce written plans, designs, and documentation only.",
@@ -1174,6 +1206,7 @@ def coordinate_task(
                 "type": "swarm_worker_created",
                 "worker_id": worker_id,
                 "role": role,
+                "model": session.model_metadata_for_role(role),
                 "pioneer_name": _impl_pioneer["name"],
                 "pioneer_full_name": _impl_pioneer["full_name"],
                 "pioneer_motto": _impl_pioneer["motto"],
@@ -1343,6 +1376,7 @@ def coordinate_task(
             "type": "swarm_worker_created",
             "worker_id": verify_worker_id,
             "role": "verifier",
+            "model": session.model_metadata_for_role("verifier"),
             "pioneer_name": _verify_pioneer["name"],
             "pioneer_full_name": _verify_pioneer["full_name"],
             "pioneer_motto": _verify_pioneer["motto"],
@@ -1350,7 +1384,9 @@ def coordinate_task(
             "phase": "verification",
             "content": f"Spawned {_verify_pioneer['name']} (verifier)",
         }
-        verifier = _get_agent_for_role("verifier")
+        verifier = _get_agent_for_role(
+            "verifier", model_name=session.model_for_role("verifier"), scope=scope,
+        )
         verify_result = _run_worker(
             session, verify_worker_id, verifier, verify_prompt,
             child_token=_derive_worker_token(ace_token, "verifier", "Final verification"),
@@ -1401,7 +1437,10 @@ def coordinate_task(
                     f"{_existing_project_context}"
                 )
                 retry_worker_id = session.register_worker(role, task_text, "implementation")
-                retry_agent = _get_agent_for_role(role, session_id=session_id, scope="codebase")
+                retry_agent = _get_agent_for_role(
+                    role, session_id=session_id, scope="codebase",
+                    model_name=session.model_for_role(role),
+                )
                 retry_result = _run_worker(
                     session, retry_worker_id, retry_agent, retry_prompt,
                     child_token=_derive_worker_token(ace_token, role, task_text),

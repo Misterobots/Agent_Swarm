@@ -99,7 +99,7 @@ def validate_team_config(config: Dict[str, str]) -> Tuple[bool, List[str], List[
         errors.append(f"'{r}' is not a valid role. Valid roles: {', '.join(sorted(VALID_ROLES))}.")
 
     # 2 & 3. Per-role model validation
-    large_vram_total = 0.0
+    large_models: Dict[str, float] = {}
     for role, model_name in config.items():
         if role in invalid_roles:
             continue
@@ -114,19 +114,15 @@ def validate_team_config(config: Dict[str, str]) -> Tuple[bool, List[str], List[
 
         spec = get_model(model_name)
         if spec and spec.vram_gb > LARGE_MODEL_VRAM_THRESHOLD_GB:
-            large_vram_total += spec.vram_gb
+            large_models[model_name] = spec.vram_gb
 
     # 4. VRAM budget advisory (Lovelace has 32 GB total)
     # Two different large models can't be loaded simultaneously if their combined
     # VRAM > 28 GB. We warn rather than block — the queue system handles runtime
     # contention, but this helps users understand why they may see queuing.
-    if large_vram_total > 28.0:
-        unique_large = {
-            m for r, m in config.items()
-            if r not in invalid_roles
-            and get_model(m) is not None
-            and get_model(m).vram_gb > LARGE_MODEL_VRAM_THRESHOLD_GB
-        }
+    unique_large_vram_total = sum(large_models.values())
+    if unique_large_vram_total > 28.0:
+        unique_large = set(large_models)
         if len(unique_large) > 1:
             warnings.append(
                 f"Your team uses multiple large models that can't all fit in VRAM "

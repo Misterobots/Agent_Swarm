@@ -15,13 +15,14 @@ from coordination.pioneers import PERSPECTIVE_TAXONOMY
 logger = setup_logger("Lamport")
 
 
-def _decompose_task(user_input: str, history_context: str = "", already_steered: bool = False) -> dict:
+def _decompose_task(user_input: str, history_context: str = "", already_steered: bool = False,
+                    model_name: str | None = None) -> dict:
     """
     Use LLM to decompose a complex task into subtasks.
     Returns dict with research_tasks, implementation_tasks, verification_criteria.
     """
     from config import ROUTER_MODEL as _ROUTER_MODEL
-    _preferred = os.getenv("COORDINATOR_MODEL", COORDINATOR_MODEL)
+    _preferred = model_name or os.getenv("COORDINATOR_MODEL", COORDINATOR_MODEL)
     _fallback = os.getenv("ROUTER_MODEL", _ROUTER_MODEL)
     # We resolve model+host once here for prompt-shaping logs etc., but the
     # actual call below uses call_with_model_fallback so it can re-select
@@ -235,7 +236,8 @@ def _decompose_task(user_input: str, history_context: str = "", already_steered:
     }
 
 
-def _decompose_task_perspectives(user_input: str, history_context: str = "") -> dict:
+def _decompose_task_perspectives(user_input: str, history_context: str = "",
+                                 model_name: str | None = None) -> dict:
     """
     Ask the LLM whether a topic is multi-faceted and, if so, which perspectives apply.
 
@@ -249,7 +251,8 @@ def _decompose_task_perspectives(user_input: str, history_context: str = "") -> 
           "summary": str,
         }
     """
-    _host = get_swarm_worker_host(COORDINATOR_MODEL)
+    _model = model_name or COORDINATOR_MODEL
+    _host = get_swarm_worker_host(_model)
     # Pass timeout to the Client constructor — the ollama Python client does not
     # accept timeout as a keyword argument on individual chat/generate calls.
     # 120s gives large models (gemma4:31b, qwen3.6:27b) enough time for a cold VRAM load.
@@ -298,7 +301,7 @@ def _decompose_task_perspectives(user_input: str, history_context: str = "") -> 
 
     try:
         resp = client.chat(
-            model=COORDINATOR_MODEL,
+            model=_model,
             messages=[{"role": "user", "content": prompt}],
             format=schema,
             options={"temperature": 0.2, "num_predict": 1200},

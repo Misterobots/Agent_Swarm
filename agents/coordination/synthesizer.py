@@ -19,14 +19,14 @@ from utils.gpu_queue import (
 logger = setup_logger("Lamport")
 
 
-def _synthesize_findings(findings: str, original_task: str) -> dict:
+def _synthesize_findings(findings: str, original_task: str, model_name: str | None = None) -> dict:
     """
     LLM synthesis step: read all research findings and produce an implementation plan.
     Returns dict: {"plan", "confidence", "ambiguity", "ambiguous_points",
                    "clarification_question", "suggested_answers"}
     """
     from config import COORDINATOR_MODEL as _COORD_MODEL, ROUTER_MODEL as _ROUTER_MODEL
-    _preferred = os.getenv("COORDINATOR_MODEL", _COORD_MODEL)
+    _preferred = model_name or os.getenv("COORDINATOR_MODEL", _COORD_MODEL)
     _fallback = os.getenv("ROUTER_MODEL", _ROUTER_MODEL)
     # Resolve once for context-window / log purposes. The inference call
     # below uses call_with_model_fallback to retry against the chain.
@@ -208,7 +208,8 @@ def _generate_followups(synthesis: str, impl_tasks: list) -> str:
     return "\n".join(lines)
 
 
-def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], original_task: str) -> dict:
+def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], original_task: str,
+                                   model_name: str | None = None) -> dict:
     """
     Merge per-perspective findings into a Perspective Matrix with convergent and divergent highlights.
 
@@ -221,7 +222,8 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
           "synthesis_narrative": str,
         }
     """
-    _host = get_swarm_worker_host(COORDINATOR_MODEL)
+    _model = model_name or COORDINATOR_MODEL
+    _host = get_swarm_worker_host(_model)
     # timeout on Client constructor — ollama Python client does not accept timeout
     # as a kwarg on individual .chat() calls (raises TypeError in recent versions).
     # 300s accommodates gemma4:31b / qwen3.6:27b cold VRAM load + 8k token generation.
@@ -286,7 +288,7 @@ def _synthesize_perspective_matrix(findings_by_perspective: dict[str, str], orig
 
         with request_lock(context="text"):
             resp = client.chat(
-                model=COORDINATOR_MODEL,
+                model=_model,
                 messages=[{"role": "user", "content": trunc_prompt}],
                 format=schema,
                 options={"temperature": 0.3, "num_predict": 8192},

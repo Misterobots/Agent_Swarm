@@ -5,11 +5,15 @@ import threading
 import time
 import uuid
 import weakref
+import json
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 
 from coordination.pioneers import _pioneer_for_role, _pick_unique_pioneer
+from role_model_resolver import (
+    RoleModelBinding, RoleModelSnapshot, canonical_role, snapshot_role_models,
+)
 
 SCRATCHPAD_ROOT = Path(__file__).parent.parent / "scratchpad"
 
@@ -34,12 +38,14 @@ class WorkerState(Enum):
 class WorkerInfo:
     """Tracks a single worker's lifecycle."""
 
-    def __init__(self, worker_id: str, role: str, task: str, phase: str, pioneer: dict | None = None):
+    def __init__(self, worker_id: str, role: str, task: str, phase: str,
+                 pioneer: dict | None = None, model_binding: RoleModelBinding | None = None):
         self.worker_id = worker_id
         self.role = role
         self.task = task
         self.phase = phase
         self.pioneer: dict = pioneer or _pioneer_for_role(role)
+        self.model_binding = model_binding
         self.state = WorkerState.PENDING
         self.result: Optional[str] = None
         self.error: Optional[str] = None
@@ -55,9 +61,11 @@ class WorkerInfo:
 class CoordinatorSession:
     """Manages a single coordination session with scratchpad and worker registry."""
 
-    def __init__(self, session_id: str, owner_id: str = None, coordination_id: str = None):
+    def __init__(self, session_id: str, owner_id: str = None, coordination_id: str = None,
+                 context_profile: str | None = None):
         self.session_id = session_id
         self.owner_id = owner_id
+        self.context_profile = context_profile
         # Direct task creation (POST /v1/tasks) generates this up front so it
         # can return the id to the caller before the generator has run at all;
         # every other caller leaves it unset and gets the usual random id.
@@ -70,6 +78,7 @@ class CoordinatorSession:
         self.scratchpad_dir = SCRATCHPAD_ROOT / session_id / self.coordination_id
         self.scratchpad_dir.mkdir(parents=True, exist_ok=True)
         self.created_at = time.time()
+        self.role_snapshot = self._load_or_create_role_snapshot()
         # Thread-safe queue for file_change events emitted by worker threads.
         # The SSE generator drains this between future-wait timeouts so chips
         # appear in the UI as files are written, not just at the end of a phase.
@@ -88,11 +97,45 @@ class CoordinatorSession:
         except Exception:
             pass
 
+    def _load_or_create_role_snapshot(self) -> RoleModelSnapshot:
+        """Restore a checkpointed role map, or capture it exactly once."""
+        path = self.scratchpad_dir / "00_role_model_snapshot.json"
+        try:
+            if path.exists():
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                restored = RoleModelSnapshot.from_dict(payload)
+                if restored.models:
+                    return restored
+        except Exception:
+            # A corrupt optional checkpoint must not prevent a run from starting.
+            pass
+        snapshot = snapshot_role_models(self.owner_id)
+        try:
+            path.write_text(json.dumps(snapshot.to_dict(), indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        return snapshot
+
+    def model_binding_for_role(self, role: str):
+        return self.role_snapshot.for_role(role)
+
+    def model_for_role(self, role: str, default: str | None = None) -> str:
+        # This is the requested model used to start a stage.  Provider fallback
+        # metadata is carried separately so a resumed run never turns a prior
+        # fallback into its new preset.
+        return self.role_snapshot.for_role(role, default=default).requested_model
+
+    def model_metadata_for_role(self, role: str) -> dict[str, object]:
+        return self.role_snapshot.for_role(role).to_dict()
+
     def register_worker(self, role: str, task: str, phase: str) -> str:
         worker_id = f"w-{uuid.uuid4().hex[:6]}"
         used_names = {w.pioneer["name"] for w in self.workers.values()}
         pioneer = _pick_unique_pioneer(role, used_names)
-        self.workers[worker_id] = WorkerInfo(worker_id, role, task, phase, pioneer=pioneer)
+        binding = self.model_binding_for_role(canonical_role(role))
+        self.workers[worker_id] = WorkerInfo(
+            worker_id, role, task, phase, pioneer=pioneer, model_binding=binding,
+        )
         return worker_id
 
     def cancel(self) -> None:
@@ -145,6 +188,7 @@ def _serialize_worker(w: "WorkerInfo", now: float) -> dict:
         "task": (w.task or "")[:160],
         "elapsed_s": elapsed,
         "error": w.error or None,
+        "model": w.model_binding.to_dict() if w.model_binding else None,
     }
 
 

@@ -89,6 +89,9 @@ def _run_worker(
             return run_devharness_worker(
                 session, worker_id, dh_role, scope or "unknown", prompt, DEV_TOOL_DEFINITIONS,
                 container_name=getattr(session, "container_name", None),
+                model_name=session.model_for_role(dh_role),
+                context_profile=getattr(session, "context_profile", None),
+                task_mode="project",
             )
 
     worker.state = WorkerState.RUNNING
@@ -181,7 +184,8 @@ def _run_worker(
             pass
 
 
-def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown") -> Agent:
+def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown",
+                        model_name: str | None = None) -> Agent:
     """
     Factory: map coordinator roles to Agent_Swarm team agents.
 
@@ -189,17 +193,18 @@ def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown
     For external/research scope they use a plain LLM agent.
     """
     role_lower = role.lower()
+    selected_model = model_name or ARCHITECT_MODEL
     OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
     if role_lower in ("architect", "coder", "devops"):
         if scope == "codebase":
             from leibniz_agent import get_architect_agent
-            return get_architect_agent(session_id=session_id)
+            return get_architect_agent(session_id=session_id, model_name=selected_model)
         else:
-            host = get_swarm_worker_host(ARCHITECT_MODEL)
+            host = get_swarm_worker_host(selected_model)
             return Agent(
                 name=f"{role.title()} Worker",
-                model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
+                model=Ollama(id=selected_model, host=host, client_kwargs={"timeout": 300.0}),
                 instructions=[
                     f"You are a {role_lower} expert. Analyse the problem and produce a clear, actionable plan.",
                     "Do NOT attempt to access files or execute commands.",
@@ -209,19 +214,19 @@ def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown
             )
 
     elif role_lower == "analyst":
-        host = get_swarm_worker_host(ARCHITECT_MODEL)
+        host = get_swarm_worker_host(selected_model)
         return Agent(
             name="Data Analyst Worker",
-            model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
+            model=Ollama(id=selected_model, host=host, client_kwargs={"timeout": 300.0}),
             instructions=["You are a data analyst. Provide thorough analysis with supporting evidence."],
             show_tool_calls=False,
         )
 
     elif role_lower == "researcher":
-        host = get_swarm_worker_host(ARCHITECT_MODEL)
+        host = get_swarm_worker_host(selected_model)
         return Agent(
             name="Research Worker",
-            model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
+            model=Ollama(id=selected_model, host=host, client_kwargs={"timeout": 300.0}),
             instructions=[
                 "You are a research worker. Investigate the given question thoroughly.",
                 "Provide factual, well-structured findings.",
@@ -232,10 +237,10 @@ def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown
         )
 
     elif role_lower == "verifier":
-        host = get_swarm_worker_host(ARCHITECT_MODEL)
+        host = get_swarm_worker_host(selected_model)
         return Agent(
             name="Verification Worker",
-            model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
+            model=Ollama(id=selected_model, host=host, client_kwargs={"timeout": 300.0}),
             instructions=[
                 "You are a verification worker with fresh eyes.",
                 "Review the work product against the verification criteria.",
@@ -250,10 +255,10 @@ def _get_agent_for_role(role: str, session_id: str = None, scope: str = "unknown
         # with SWARM_DEVHARNESS_WORKERS=True is a bug (DevHarness would have
         # handled it).  With DevHarness off, return a minimal text-only agent
         # so the worker fails loudly rather than silently gaining file access.
-        host = get_swarm_worker_host(ARCHITECT_MODEL)
+        host = get_swarm_worker_host(selected_model)
         return Agent(
             name=f"{role.title()} Worker (unknown role)",
-            model=Ollama(id=ARCHITECT_MODEL, host=host, client_kwargs={"timeout": 300.0}),
+            model=Ollama(id=selected_model, host=host, client_kwargs={"timeout": 300.0}),
             instructions=[
                 f"You are a {role_lower} worker. Produce a detailed written analysis.",
                 "Do NOT attempt to access files or execute commands.",

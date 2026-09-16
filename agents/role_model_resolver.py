@@ -14,13 +14,16 @@ Usage in church.py:
 """
 
 import os
-from typing import Optional
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Mapping, Optional
 
 from logger_setup import setup_logger
 from config import (
     ARCHITECT_MODEL, CODER_MODEL, DEVOPS_MODEL, RESEARCHER_MODEL,
     ANALYST_MODEL, VERIFIER_MODEL, COORDINATOR_MODEL
 )
+from config import SWARM_ARCHITECT_MODEL
 
 logger = setup_logger("role_model_resolver")
 
@@ -34,6 +37,108 @@ _ROLE_ENV_MAP = {
     "analyst": ANALYST_MODEL,
     "verifier": VERIFIER_MODEL,
 }
+
+_SWARM_ROLE_ENV_MAP = {
+    **_ROLE_ENV_MAP,
+    # The swarm architect is a planning role.  Keep it separate from the
+    # code-solver ARCHITECT_MODEL used by ordinary code requests.
+    "architect": SWARM_ARCHITECT_MODEL,
+}
+
+_ROLE_ALIASES = {
+    "technical": "researcher",
+    "ethical": "researcher",
+    "economic": "analyst",
+    "scientific": "researcher",
+    "regulatory": "researcher",
+    "end_user": "analyst",
+    "historical": "researcher",
+    "policy": "researcher",
+    "environmental": "researcher",
+    "social": "researcher",
+}
+
+
+def canonical_role(role: str) -> str:
+    role_lower = (role or "").lower()
+    return _ROLE_ALIASES.get(role_lower, role_lower)
+
+
+@dataclass(frozen=True)
+class RoleModelBinding:
+    """The model identity assigned to one role for one coordination run."""
+
+    requested_model: str
+    actual_model: str
+    provider: str = "ollama"
+    fallback: bool = False
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "requested_model": self.requested_model,
+            "actual_model": self.actual_model,
+            "provider": self.provider,
+            "fallback": self.fallback,
+        }
+
+
+@dataclass(frozen=True)
+class RoleModelSnapshot:
+    """Immutable owner-scoped role map captured once at run start."""
+
+    owner_id: Optional[str]
+    models: Mapping[str, RoleModelBinding]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "models", MappingProxyType(dict(self.models)))
+
+    def for_role(self, role: str, default: Optional[str] = None) -> RoleModelBinding:
+        role_lower = canonical_role(role)
+        binding = self.models.get(role_lower)
+        if binding:
+            return binding
+        model = default or _SWARM_ROLE_ENV_MAP.get(role_lower) or ARCHITECT_MODEL
+        return RoleModelBinding(model, model)
+
+    def with_actual_model(
+        self,
+        role: str,
+        actual_model: str,
+        provider: str = "ollama",
+        fallback: bool = False,
+    ) -> "RoleModelSnapshot":
+        """Return a new snapshot after a provider reports its actual model."""
+        role_lower = canonical_role(role)
+        current = self.for_role(role_lower)
+        updated = dict(self.models)
+        updated[role_lower] = RoleModelBinding(
+            requested_model=current.requested_model,
+            actual_model=actual_model,
+            provider=provider,
+            fallback=fallback,
+        )
+        return RoleModelSnapshot(self.owner_id, updated)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "owner_id": self.owner_id,
+            "models": {role: binding.to_dict() for role, binding in self.models.items()},
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, object]) -> "RoleModelSnapshot":
+        models = {}
+        for role, raw in (payload.get("models") or {}).items():
+            if not isinstance(raw, dict) or not raw.get("requested_model"):
+                continue
+            requested = str(raw["requested_model"])
+            models[canonical_role(str(role))] = RoleModelBinding(
+                requested_model=requested,
+                actual_model=str(raw.get("actual_model") or requested),
+                provider=str(raw.get("provider") or "ollama"),
+                fallback=bool(raw.get("fallback", False)),
+            )
+        return cls(payload.get("owner_id"), models)
 
 
 def get_model_for_role(
@@ -85,3 +190,21 @@ def get_model_for_role(
     # Step 4: Ultimate fallback
     logger.debug(f"[RoleResolver] role={role_lower} → ultimate fallback: {ARCHITECT_MODEL}")
     return ARCHITECT_MODEL
+
+
+def snapshot_role_models(uid: Optional[str]) -> RoleModelSnapshot:
+    """Resolve all swarm roles once for a coordination run.
+
+    Team Builder values win over defaults.  When no Team Builder value exists,
+    the swarm architect keeps its dedicated SWARM_ARCHITECT_MODEL default while
+    all other roles retain their existing config defaults.
+    """
+    models: dict[str, RoleModelBinding] = {}
+    for role in (
+        "coordinator", "architect", "coder", "devops",
+        "researcher", "analyst", "verifier",
+    ):
+        default = _SWARM_ROLE_ENV_MAP.get(role)
+        requested = get_model_for_role(uid, role, default=default)
+        models[role] = RoleModelBinding(requested, requested)
+    return RoleModelSnapshot(uid, models)
