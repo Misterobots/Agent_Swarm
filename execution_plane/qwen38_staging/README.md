@@ -30,9 +30,13 @@ provider, public router, outpost, policy, DNS or tunnel was modified.
 OAuth2 Proxy validates issuer/signature, state, nonce and PKCE S256. A fresh,
 one-hour HttpOnly SameSite=Lax cookie belongs to loopback staging; Secure=false
 is limited to this HTTP loopback origin. Public cookies are never transferred.
+The local account's email claim is unverified and is deliberately not requested,
+accepted, or forwarded. The proxy session uses Authentik's `preferred_username`;
+authorization remains the exact active `misterobots` application binding and
+the signed OIDC subject is retained as the UID. No insecure OIDC checks are set.
 Nginx auth_request requires a validated session; upstream client headers are
-discarded and an explicit allowlist supplies verified username, subject, email
-and groups. Incoming Authorization and identity headers are not forwarded.
+discarded and an explicit allowlist supplies the username, signed subject, and
+groups. Incoming Authorization and identity headers are not forwarded.
 The private Docker network and loopback binding form the trust boundary; a user
 with Docker administration access remains trusted. Do not attach other workloads.
 
@@ -78,10 +82,10 @@ loopback callback above.
 Current evidence: 20 protected anonymous/forged-header/forged-cookie probes
 return401; actual container ports and network membership pass the boundary
 check. SSO start returns302 to auth.shivelymedia.com/application/o/authorize/.
-Authenticated owner proof is PENDING USER: D's independent in-app browser was
-unavailable. The user must open the login entry in their in-app browser, complete
-normal SSO (and any existing MFA/consent), and observe /dev plus the identity
-endpoints. No session was copied and no authenticated success is claimed.
+Authenticated owner proof remains pending after selecting the non-email identity
+claim. The browser must repeat normal SSO and observe /dev plus the identity
+endpoints. No session is copied and no authenticated success is claimed until
+that independent check passes.
 
 ## Rollback
 
