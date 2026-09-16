@@ -11,18 +11,31 @@ if str(ROOT) not in sys.path:
 
 from tests.qwen38_eval.cases import all_cases
 from tests.qwen38_eval.harness import DeterministicProvider, write_json_report
+from scripts.qwen38_eval.live_adapter import LiveAdapterError, LiveMemexAdapter
+from scripts.qwen38_eval.live_cases import live_cases
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the deterministic Qwen 3.8 qualification suite.")
     parser.add_argument("--mode", choices=("mock", "live"), default="mock",
-                        help="mock is offline and safe; live is reserved for the parent integration adapter")
+                        help="mock is offline; live calls the configured Memex dev runtime")
+    parser.add_argument("--live", action="store_true",
+                        help="required acknowledgement before making live requests")
+    parser.add_argument("--base-url", default="http://127.0.0.1:8009")
+    parser.add_argument("--interactive", action="store_true",
+                        help="allow human approval prerequisites where supported")
     parser.add_argument("--report", type=Path, default=Path("artifacts/qwen38-evaluation.json"))
     args = parser.parse_args(argv)
+    if args.mode == "live" and not args.live:
+        raise SystemExit("live mode requires --live; no live request was made")
     if args.mode == "live":
-        raise SystemExit("live mode is intentionally blocked until the lead delivers the integration contract")
-    provider = DeterministicProvider()
-    results = all_cases(provider, mode=args.mode)
+        try:
+            adapter = LiveMemexAdapter(base_url=args.base_url)
+            results = live_cases(adapter, interactive=args.interactive)
+        except LiveAdapterError as exc:
+            raise SystemExit(f"live evaluation blocked before requests: {exc}") from exc
+    else:
+        results = all_cases(DeterministicProvider(), mode=args.mode)
     write_json_report(args.report, mode=args.mode, results=results)
     print(json.dumps({"mode": args.mode, "passed": sum(r.passed for r in results),
                       "total": len(results), "report": str(args.report)}, indent=2))

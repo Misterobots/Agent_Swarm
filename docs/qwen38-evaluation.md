@@ -9,11 +9,13 @@ This suite qualifies the opt-in `qwen3.8:27b` Memex profile in six cases:
 5. long-context fact recovery;
 6. provider recovery and contention behavior.
 
-The suite has two modes. `mock` is offline and deterministic. It validates the
-runner, evidence schema, fixture isolation, hidden assertions, and failure
-accounting. Mock output is never evidence that the live model, GPU queue,
-browser authentication, or Memex tools work. `live` is reserved for the parent
-integrator's adapter contract and currently exits before making requests.
+The suite has two modes. `mock` is offline and deterministic, but it executes
+real temporary-project flows: files are created and read, approved writes are
+performed, denied writes and commands are blocked, and the build case runs a
+hidden pytest command. Mock output is never evidence that the live model, GPU
+queue, browser authentication, or Memex tools work. `live` uses the existing
+Memex dev API after the caller supplies authentication and explicitly passes
+`--live`.
 
 Every result records the requested model, actual model, provider, configured
 context maximum, effective context budget, measured input size, owner/session/
@@ -41,14 +43,50 @@ The generated report is an artifact and is intentionally not part of the owned
 source directories. The report should be attached to the agent handoff, along
 with the commit and exact command output.
 
-## Live qualification prerequisites
+## Live adapter and qualification prerequisites
 
-The parent integrator must provide the live adapter contract before enabling
-live mode. It must identify the actual Memex endpoint and auth headers, create
-isolated test projects, stream progress without a short client timeout, expose
-approval decisions, and return actual model/provider/context metadata. It must
-also provide a safe contention test that observes GPU queue state without
-disruptive Friday requests.
+The live adapter targets `http://127.0.0.1:8009` by default and implements:
+
+- blank project creation/deletion at `/v1/dev/projects`;
+- session creation at `/v1/dev/sessions`;
+- tree, read, and write operations at `/v1/dev/files`;
+- streamed `/v1/chat/completions` with `context_profile`, project/session
+  identity, attachments, and contract metadata extraction;
+- approval calls at `/api/v1/dev/approve/{call_id}` and
+  `/api/v1/dev/deny/{call_id}`;
+- Qwen-tokenizer measurement for the long case when
+  `QWEN38_TOKENIZER_PATH` points to a local tokenizer.
+
+Credentials must be supplied by the caller through either
+`QWEN38_EVAL_HEADERS_JSON` or `QWEN38_EVAL_BEARER_TOKEN`. The adapter never
+creates an `X-authentik-*` identity, and reports only `auth_source` from the
+configured caller credentials. A synthesized header or successful HTTP status
+is not browser authentication proof.
+
+Run only after the integrator has completed the development integration:
+
+```powershell
+$env:QWEN38_EVAL_HEADERS_JSON = Get-Content .\caller-headers.json -Raw
+python scripts/qwen38_eval/runner.py --mode live --live --base-url http://127.0.0.1:8009 --report artifacts/qwen38-live.json
+```
+
+The live runner creates and deletes unique blank projects. It does not touch a
+live repository. Build approval requires an authenticated human approval
+callback; without that callback the case is reported as blocked. Recovery and
+contention remain blocked until the lead supplies a safe transport-fault and
+queue-observation hook. The long case is blocked when the actual Qwen tokenizer
+is unavailable, rather than treating a configured context maximum as a success.
+
+Authentication requirements by case:
+
+| Case | Direct API credentials | Browser/user authentication for UI proof |
+|---|---|---|
+| Review | caller credentials | required for UI workflow proof |
+| Build | caller credentials plus human approval callback | required |
+| Approvals/isolation | caller credentials plus human approval/denial | required |
+| Vision | caller credentials | required for attachment UI proof |
+| Long context | caller credentials and local Qwen tokenizer | required for context-selector UI proof |
+| Recovery/contention | caller credentials plus lead fault/queue hooks | optional for API, required for UI status proof |
 
 Before live cases, capture model identity and digest, Ollama/provider version,
 configured context map, effective context for each request, GPU residency, and
@@ -57,4 +95,3 @@ as browser authentication proof. Do not claim long-context success from the
 configured 122,880-token maximum; the long case must recover facts from a real
 large input. Any fallback, cloud escalation, or wrong model identity invalidates
 that case as Qwen evidence while remaining evidence for recovery behavior.
-
