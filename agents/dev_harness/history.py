@@ -53,6 +53,7 @@ class ToolResult:
 @dataclass
 class UserMessage:
     content: str
+    images: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -171,8 +172,24 @@ class History:
                     if cid:
                         pending_call_names[cid] = name
                 turns.append(AssistantMessage(content if isinstance(content, str) else "", calls))
-            else:  # user (or unknown) -> treat as user text
-                turns.append(UserMessage(content if isinstance(content, str) else json.dumps(content)))
+            else:  # user (or unknown) -> preserve text plus image parts
+                images: list[str] = []
+                if isinstance(content, list):
+                    text_parts: list[str] = []
+                    for part in content:
+                        if not isinstance(part, dict):
+                            continue
+                        if part.get("type") == "text" and isinstance(part.get("text"), str):
+                            text_parts.append(part["text"])
+                        elif part.get("type") == "image_url":
+                            image_url = part.get("image_url")
+                            if isinstance(image_url, dict):
+                                image_url = image_url.get("url")
+                            if isinstance(image_url, str) and image_url:
+                                images.append(image_url)
+                    turns.append(UserMessage("\n".join(text_parts), images))
+                else:
+                    turns.append(UserMessage(content if isinstance(content, str) else json.dumps(content)))
 
         _flush_results()
         return cls(system="\n\n".join(p for p in sys_parts if p), turns=turns)
@@ -189,7 +206,14 @@ class History:
             out.append({"role": "system", "content": self.system})
         for turn in self.turns:
             if isinstance(turn, UserMessage):
-                out.append({"role": "user", "content": turn.content})
+                if turn.images:
+                    parts: list[dict[str, Any]] = []
+                    if turn.content:
+                        parts.append({"type": "text", "text": turn.content})
+                    parts.extend({"type": "image_url", "image_url": {"url": image}} for image in turn.images)
+                    out.append({"role": "user", "content": parts})
+                else:
+                    out.append({"role": "user", "content": turn.content})
             elif isinstance(turn, AssistantMessage):
                 msg: dict[str, Any] = {"role": "assistant", "content": turn.content or ""}
                 if turn.tool_calls:
@@ -218,7 +242,14 @@ class History:
         out: list[dict[str, Any]] = []
         for turn in self.turns:
             if isinstance(turn, UserMessage):
-                out.append({"role": "user", "content": turn.content})
+                if turn.images:
+                    blocks: list[dict[str, Any]] = []
+                    if turn.content:
+                        blocks.append({"type": "text", "text": turn.content})
+                    blocks.extend({"type": "image_url", "source": {"type": "url", "url": image}} for image in turn.images)
+                    out.append({"role": "user", "content": blocks})
+                else:
+                    out.append({"role": "user", "content": turn.content})
             elif isinstance(turn, AssistantMessage):
                 blocks: list[dict[str, Any]] = []
                 if turn.content:
@@ -264,7 +295,7 @@ class History:
         turns: list[dict[str, Any]] = []
         for turn in self.turns:
             if isinstance(turn, UserMessage):
-                turns.append({"type": "user", "content": turn.content})
+                turns.append({"type": "user", "content": turn.content, "images": list(turn.images)})
             elif isinstance(turn, AssistantMessage):
                 turns.append({
                     "type": "assistant",
@@ -310,7 +341,10 @@ class History:
             if kind == "user":
                 if not isinstance(raw.get("content"), str):
                     raise ValueError("invalid user checkpoint turn")
-                turns.append(UserMessage(raw["content"]))
+                images = raw.get("images", [])
+                if not isinstance(images, list) or not all(isinstance(image, str) and image for image in images):
+                    raise ValueError("invalid user checkpoint images")
+                turns.append(UserMessage(raw["content"], images))
             elif kind == "assistant":
                 calls: list[ToolCall] = []
                 for call in raw.get("tool_calls", []):

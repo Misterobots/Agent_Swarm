@@ -42,7 +42,7 @@ if "/app/agents" not in sys.path:
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional
+from typing import Any, List, Literal, Optional
 import uvicorn
 from contextlib import asynccontextmanager
 from metrics import AGENT_STATE
@@ -646,7 +646,7 @@ async def submit_task(request: TaskRequest):
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="allow")
     role: str
-    content: str
+    content: str | list[dict[str, Any]]
 
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -684,6 +684,42 @@ class ChatRequest(BaseModel):
     solving_corrector_max_time: Optional[int] = None    # Per-call corrector wall-clock (seconds)
     current_project_id: Optional[str] = None            # Active dev project ID (injects .memex/notes.md into system prompt)
     active_file: Optional[str] = None                   # Currently open file path in the dev workspace editor
+    context_profile: Optional[Literal["chat", "project", "long"]] = None
+
+
+def _message_text(content: str | list[dict[str, Any]] | None) -> str:
+    """Extract text from text-only or multimodal OpenAI message content."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            part.get("text", "") for part in content
+            if isinstance(part, dict) and part.get("type") == "text" and isinstance(part.get("text"), str)
+        )
+    return ""
+
+
+def _attachment_data_uri(attachment: dict) -> str | None:
+    mime = str(attachment.get("mimeType") or "").strip()
+    data = attachment.get("data")
+    if not mime.startswith("image/") or not isinstance(data, str) or not data:
+        return None
+    return data if data.startswith("data:") else f"data:{mime};base64,{data}"
+
+
+def _history_messages(request: ChatRequest) -> list[dict[str, Any]]:
+    """Build OpenAI-shaped messages and preserve image attachments for History."""
+    messages = [{"role": message.role, "content": message.content} for message in request.messages]
+    images = [uri for attachment in (request.attachments or []) if (uri := _attachment_data_uri(attachment))]
+    if images:
+        for message in reversed(messages):
+            if message.get("role") == "user":
+                text = _message_text(message.get("content"))
+                message["content"] = ([{"type": "text", "text": text}] if text else []) + [
+                    {"type": "image_url", "image_url": {"url": image}} for image in images
+                ]
+                break
+    return messages
 
 
 # Model choice is available to authenticated users, but the submitted value
@@ -1803,7 +1839,7 @@ def _try_make_dev_anthropic(model: str | None):
         return None
 
 
-def _build_dev_providers(model: str, uid: str):
+def _build_dev_providers(model: str, uid: str, *, context_profile: str | None = None):
     """Resolve (primary, [escalation_targets]) for a dev request.
 
     Primary follows the selected model: a GitHub/Anthropic model selects that
@@ -1823,7 +1859,11 @@ def _build_dev_providers(model: str, uid: str):
         return anthropic, [t for t in (github,) if t]
 
     from providers.ollama_provider import OllamaProvider
-    primary = OllamaProvider(model=model)
+    primary = OllamaProvider(
+        model=model,
+        context_profile=context_profile,
+        task_mode="project",
+    )
     return primary, [t for t in (github, anthropic) if t]
 
 
@@ -1840,11 +1880,20 @@ async def _dev_harness_stream(
 
     stream_run_id = f"dev-{uuid.uuid4().hex}"
     stream_seq = 0
+    runtime_metadata = {
+        "requested_model": request.model,
+        "actual_model": request.model,
+        "provider": "unknown",
+        "fallback": False,
+        "context_profile": request.context_profile or ("project" if request.dev_mode else "chat"),
+        "effective_context_tokens": None,
+    }
 
     def _event_sse(delta: dict) -> str:
         """Add the canonical event envelope while retaining legacy SSE fields."""
         nonlocal stream_seq
         event_type = str(delta.get("type") or "status")
+        delta = {**runtime_metadata, **delta}
         event = stable_event(stream_run_id, stream_seq, event_type, delta)
         stream_seq += 1
         enriched = dict(delta)
@@ -1885,7 +1934,7 @@ async def _dev_harness_stream(
     # Slash command: /plan in the latest user message activates plan mode for
     # this turn (strip the prefix before the model sees it).
     perm_mode = request.dev_permission_mode or stored_checkpoint_data.get("permission_mode") or "default"
-    msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+    msgs = _history_messages(request)
     if not request.dev_resume and msgs and msgs[-1].get("role") == "user":
         _last = (msgs[-1].get("content") or "").lstrip()
         if _last.startswith("/plan"):
@@ -1913,12 +1962,51 @@ async def _dev_harness_stream(
         history = History.from_openai_messages(msgs, system=HIVECODE_SYSTEM_PROMPT)
 
     try:
-        primary, targets = _build_dev_providers(request.model, uid)
+        primary, targets = _build_dev_providers(
+            request.model, uid, context_profile=request.context_profile
+        )
     except Exception as e:
         logger.error(f"[dev_harness] provider init failed: {e}", exc_info=True)
         yield _event_sse({"type": "error", "content": f"Dev harness init failed: {e}"})
         yield "data: [DONE]\n\n"
         return
+
+    runtime_metadata.update({
+        "actual_model": getattr(primary, "model", request.model),
+        "provider": getattr(primary, "name", "unknown"),
+    })
+    provider_metadata = getattr(primary, "metadata", None)
+    if isinstance(provider_metadata, dict):
+        runtime_metadata.update(provider_metadata)
+    else:
+        try:
+            from providers.qwen_context import resolve_qwen_context
+            context = resolve_qwen_context(
+                request.model,
+                request.context_profile,
+                task_mode="project" if request.dev_mode else "chat",
+            )
+            runtime_metadata["context_profile"] = context.profile
+            runtime_metadata["effective_context_tokens"] = context.effective_tokens
+        except (ImportError, AttributeError):
+            runtime_metadata["effective_context_tokens"] = (
+                32768 if runtime_metadata["context_profile"] == "chat" else 65536
+            )
+
+    validate_headroom = getattr(primary, "validate_context_headroom", None)
+    if callable(validate_headroom):
+        serialized = json.dumps(history.to_openai_messages(args_as_string=False), ensure_ascii=False)
+        tool_schema = json.dumps(DEV_TOOL_DEFINITIONS, ensure_ascii=False)
+        try:
+            validate_headroom(
+                input_tokens=max(1, len(serialized) // 4),
+                tool_tokens=len(tool_schema) // 4,
+                output_tokens=4096,
+            )
+        except ValueError as exc:
+            yield _event_sse({"type": "error", "content": f"Context limit: {exc}"})
+            yield "data: [DONE]\n\n"
+            return
 
     router = ModelRouter(primary=primary, escalation_targets=targets)
     logger.info(
@@ -2059,6 +2147,12 @@ async def _dev_harness_stream(
             "version": 1,
             "session_id": checkpoint_session_id,
             "model": request.model,
+            "context_profile": runtime_metadata["context_profile"],
+            "effective_context_tokens": runtime_metadata["effective_context_tokens"],
+            "requested_model": runtime_metadata["requested_model"],
+            "actual_model": runtime_metadata["actual_model"],
+            "provider": runtime_metadata["provider"],
+            "fallback": runtime_metadata["fallback"],
             "permission_mode": perm_mode,
             "container_name": container_name,
             "history": history.to_checkpoint(),
@@ -2160,7 +2254,7 @@ _RICH_EVENT_TYPES = frozenset({
     "clarification_request", "clarification_card", "media_attachment",
     "set_preview_url", "preview_unavailable", "design_artifact", "cad_artifact",
     "suggested_followups", "workshop_questions", "workflow_next_steps",
-    "agent_event", "file_change",
+    "agent_event", "file_change", "model_metadata",
     # queue/VRAM status, tool lifecycle, and DevHarness todos — the UI already
     # parses and renders these; they were previously dropped here at the allowlist.
     "model_queue_status", "tool_start", "tool_progress", "tool_result", "todo",
@@ -2341,9 +2435,9 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             }
 
     # Extract history (all but the last message), convert Pydantic models to dicts
-    history = [{"role": m.role, "content": m.content} for m in request.messages[:-1]]
+    history = [{"role": m.role, "content": _message_text(m.content)} for m in request.messages[:-1]]
     # Extract latest prompt
-    last_msg = request.messages[-1].content
+    last_msg = _message_text(request.messages[-1].content)
     
     # Check for "Standard Mode" (OpenAI Compatibility)
     # Suppresses internal logs/status updates
@@ -2387,6 +2481,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     solving_corrector_max_time=request.solving_corrector_max_time,
                     current_project_id=request.current_project_id,
                     active_file=request.active_file,
+                    context_profile=request.context_profile,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -2707,6 +2802,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             swarm_mode=request.swarm_mode,
             design_mode=request.design_mode,
             dev_mode=request.dev_mode,
+            context_profile=request.context_profile,
         )
         full_resp = ""
         for update in gen:

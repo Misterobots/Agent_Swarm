@@ -460,6 +460,7 @@ def chat_swarm(
     solving_corrector_max_time: int | None = None,
     current_project_id: str | None = None,
     active_file: str | None = None,
+    context_profile: str | None = None,
 ):
     """Generator: yield status/message/error events for the UI."""
     AGENT_STATE.labels(agent_name="Router").set(2)
@@ -1259,6 +1260,11 @@ def chat_swarm(
             "uid": uid,
             "turn_id": turn_id,
             "history": history,
+            "attachments": attachments or [],
+            "image_attachments": [
+                attachment for attachment in (attachments or [])
+                if str(attachment.get("mimeType", "")).startswith("image/")
+            ],
             "history_context": history_context,
             "constraint_context": constraint_context,
             "extracted_context": extracted_context,
@@ -1290,7 +1296,30 @@ def chat_swarm(
             "solving_corrector_n_passes": solving_corrector_n_passes,
             "solving_corrector_max_time": solving_corrector_max_time,
             "swarm_mode": swarm_mode,
+            "context_profile": context_profile,
         }
+
+        _actual_model = _handler_model or model or "auto"
+        _context_metadata = {
+            "requested_model": model or "auto",
+            "actual_model": _actual_model,
+            "provider": "ollama" if ":" in _actual_model else "router",
+            "fallback": False,
+            "context_profile": context_profile,
+            "effective_context_tokens": None,
+        }
+        try:
+            from providers.qwen_context import resolve_qwen_context
+            _qwen_context = resolve_qwen_context(
+                _actual_model,
+                context_profile,
+                task_mode="project" if (dev_mode or swarm_mode) else "chat",
+            )
+            _context_metadata["context_profile"] = _qwen_context.profile
+            _context_metadata["effective_context_tokens"] = _qwen_context.effective_tokens
+        except (ImportError, ValueError):
+            pass
+        yield {"type": "model_metadata", **_context_metadata}
 
         # ---------------------------------------------------------------------------
         # Handler dispatch

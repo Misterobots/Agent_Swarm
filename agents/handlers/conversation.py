@@ -66,6 +66,18 @@ def handle_conversation(user_input: str, ctx: dict):
             os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:8b")),
         )
     OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
+    _model_options = get_ollama_options(CONV_MODEL)
+    try:
+        from providers.qwen_context import resolve_qwen_context
+        _context = resolve_qwen_context(
+            CONV_MODEL,
+            ctx.get("context_profile"),
+            task_mode="project" if dev_mode else "chat",
+        )
+        if _context.effective_tokens:
+            _model_options["num_ctx"] = _context.effective_tokens
+    except (ImportError, ValueError):
+        pass
 
     if is_admin:
         from tools.file_ops import read_file, write_file, list_dir
@@ -135,7 +147,7 @@ def handle_conversation(user_input: str, ctx: dict):
 
     conversationalist = Agent(
         name="Hive Mind",
-        model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}, options=get_ollama_options(CONV_MODEL)),
+        model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}, options=_model_options),
         storage=conv_storage,
         session_id=session_id,
         add_history_to_messages=True,
