@@ -1,11 +1,17 @@
-"""handlers/vision.py — VISION intent handler (VLM image analysis via moondream)."""
+"""VISION intent handler with opt-in Qwen 3.8 routing."""
 
-import re
+import logging
 import requests
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
-from utils.gpu_queue import get_best_host_for_model
+from utils.gpu_queue import get_best_host_for_model, request_lock
 from handlers.base import _emit_stream_mode, _emit_turn_metadata, _score_trace
+from handlers.qwen_vision import (
+    build_vision_payload,
+    context_tokens,
+    extract_image_data,
+    select_vision_model,
+)
 
 
 def handle_vision(user_input: str, ctx: dict):
@@ -22,27 +28,17 @@ def handle_vision(user_input: str, ctx: dict):
     yield {"type": "status", "content": "👁️ Vision Analyst: Analyzing image..."}
     AGENT_STATE.labels(agent_name="VisionAnalyst").set(2)
 
-    # Prefer purpose-built vision models; fall back to any available multimodal.
-    # Pull order of preference: minicpm-v (compact, strong UI analysis),
-    # llava:13b (general vision), llava:7b, moondream (tiny, fast).
-    _VISION_CANDIDATES = [
-        "minicpm-v:latest",
-        "llava:13b",
-        "llava:7b",
-        "llava:latest",
-        "moondream:latest",
-        "gemma4:31b",   # multimodal if the pulled variant supports vision
-    ]
-    from utils.gpu_queue import get_best_host_for_model as _best_host
-    VISION_MODEL = None
-    VISION_HOST = None
-    for _candidate in _VISION_CANDIDATES:
-        _host = _best_host(_candidate)
-        if _host:
-            VISION_MODEL = _candidate
-            VISION_HOST = _host
-            break
-    if not VISION_MODEL:
+    requested_model = ctx.get("requested_model") or ctx.get("selected_model") or ctx.get("model")
+    try:
+        context_profile, context_budget = context_tokens(ctx.get("context_profile"))
+    except ValueError as exc:
+        yield {"type": "error", "content": f"Vision request rejected: {exc}"}
+        AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
+        return
+
+    vision_host = get_best_host_for_model("qwen3.8:27b")
+    vision_model, fallback, requested_qwen = select_vision_model(vision_host, ctx)
+    if not vision_model:
         yield {"type": "response", "content": (
             "👁️ **Vision Analyst**\n\n"
             "No vision model is installed. Pull one first:\n"
@@ -52,14 +48,19 @@ def handle_vision(user_input: str, ctx: dict):
         AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
         return
 
+    requested_model = requested_qwen or requested_model
+    yield {
+        "type": "model_metadata",
+        "requested_model": requested_model,
+        "actual_model": vision_model,
+        "provider": "ollama",
+        "fallback": bool(fallback),
+        "context_profile": context_profile,
+        "effective_context_tokens": context_budget,
+    }
+
     try:
-        image_data = None
-        if extracted_context:
-            b64_match = re.search(r'data:image/[^;]+;base64,([A-Za-z0-9+/=]+)', extracted_context)
-            if b64_match:
-                image_data = b64_match.group(1)
-            elif extracted_context.startswith("/9j/") or extracted_context.startswith("iVBOR"):
-                image_data = extracted_context
+        image_data = extract_image_data(extracted_context, ctx.get("attachments"))
 
         if not image_data:
             yield {"type": "response", "content": (
@@ -75,25 +76,20 @@ def handle_vision(user_input: str, ctx: dict):
         if history_context:
             vlm_prompt = f"{history_context}\n\n{vlm_prompt}"
 
-        payload = {
-            "model": VISION_MODEL,
-            "prompt": vlm_prompt,
-            "images": [image_data],
-            "stream": False,
-        }
+        payload = build_vision_payload(vision_model, vlm_prompt, image_data, context_budget)
 
         yield _emit_stream_mode("responding")
-        res = requests.post(f"{VISION_HOST}/api/generate", json=payload, timeout=120)
-        if res.status_code == 200:
-            analysis = res.json().get("response", "No analysis returned.")
-            yield {"type": "response", "content": f"👁️ **Vision Analyst**\n\n{analysis}"}
-            _score_trace(lf_trace, langfuse, 0.9, output=analysis, use_langfuse=use_langfuse)
-        else:
-            yield {"type": "error", "content": f"Vision model returned status {res.status_code}"}
-            _score_trace(lf_trace, langfuse, 0.0, use_langfuse=use_langfuse)
+        with request_lock("vision"):
+            res = requests.post(f"{vision_host}/api/generate", json=payload, timeout=120)
+            if res.status_code == 200:
+                analysis = res.json().get("response", "No analysis returned.")
+                yield {"type": "response", "content": f"👁️ **Vision Analyst**\n\n{analysis}"}
+                _score_trace(lf_trace, langfuse, 0.9, output=analysis, use_langfuse=use_langfuse)
+            else:
+                yield {"type": "error", "content": f"Vision model returned status {res.status_code}"}
+                _score_trace(lf_trace, langfuse, 0.0, use_langfuse=use_langfuse)
 
     except Exception as e:
-        import logging
         logging.getLogger("Router").error("[Vision] Analysis failed: %s", e, exc_info=True)
         yield {"type": "error", "content": f"Vision analysis failed: {e}"}
         _score_trace(lf_trace, langfuse, 0.0, use_langfuse=use_langfuse)
