@@ -63,6 +63,18 @@ checks syntax. Normal login must redirect to the existing Authentik site and
 return to loopback. Independent browser verification must inspect /dev,
 /api/auth/me and /api/backend/api/v1/identity for the real owner.
 
+The redirect regression check requires this exact chain:
+
+1. `/api/auth/login` -> `http://127.0.0.1:3319/oauth2/start?rd=/dev`
+2. OAuth start -> `https://auth.shivelymedia.com/application/o/authorize/`
+3. OIDC `redirect_uri` -> `http://127.0.0.1:3319/oauth2/callback`
+4. Valid callback session -> relative `/dev`
+
+Nginx never derives a browser-visible URL from its private port 8080. The login
+target and post-auth target are fixed; caller-provided redirect destinations are
+not used. Authentik's only staging redirect allowlist entry remains the exact
+loopback callback above.
+
 Current evidence: 20 protected anonymous/forged-header/forged-cookie probes
 return401; actual container ports and network membership pass the boundary
 check. SSO start returns302 to auth.shivelymedia.com/application/o/authorize/.

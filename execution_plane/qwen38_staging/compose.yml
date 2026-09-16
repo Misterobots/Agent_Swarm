@@ -55,6 +55,7 @@ services:
       - --insecure-oidc-skip-nonce=false
       - --set-xauthrequest=true
       - --reverse-proxy=true
+      - --relative-redirect-url=true
       - --cookie-name=memex_qwen38_staging
       - --cookie-secure=false
       - --cookie-httponly=true
