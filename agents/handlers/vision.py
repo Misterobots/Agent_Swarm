@@ -28,16 +28,10 @@ def handle_vision(user_input: str, ctx: dict):
     yield {"type": "status", "content": "👁️ Vision Analyst: Analyzing image..."}
     AGENT_STATE.labels(agent_name="VisionAnalyst").set(2)
 
-    requested_model = ctx.get("requested_model") or ctx.get("selected_model") or ctx.get("model")
-    try:
-        context_profile, context_budget = context_tokens(ctx.get("context_profile"))
-    except ValueError as exc:
-        yield {"type": "error", "content": f"Vision request rejected: {exc}"}
-        AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
-        return
-
     vision_host = get_best_host_for_model("qwen3.8:27b")
-    vision_model, fallback, requested_qwen = select_vision_model(vision_host, ctx)
+    vision_model, fallback, requested_qwen, vision_host = select_vision_model(
+        vision_host, ctx, host_resolver=get_best_host_for_model
+    )
     if not vision_model:
         yield {"type": "response", "content": (
             "👁️ **Vision Analyst**\n\n"
@@ -48,7 +42,15 @@ def handle_vision(user_input: str, ctx: dict):
         AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
         return
 
-    requested_model = requested_qwen or requested_model
+    requested_model = requested_qwen
+    try:
+        context_profile, context_budget = context_tokens(
+            vision_model, ctx.get("context_profile")
+        )
+    except ValueError as exc:
+        yield {"type": "error", "content": f"Vision request rejected: {exc}"}
+        AGENT_STATE.labels(agent_name="VisionAnalyst").set(1)
+        return
     yield {
         "type": "model_metadata",
         "requested_model": requested_model,
@@ -60,7 +62,9 @@ def handle_vision(user_input: str, ctx: dict):
     }
 
     try:
-        image_data = extract_image_data(extracted_context, ctx.get("attachments"))
+        image_data = extract_image_data(
+            extracted_context, ctx.get("image_attachments")
+        )
 
         if not image_data:
             yield {"type": "response", "content": (

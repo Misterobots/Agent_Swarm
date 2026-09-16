@@ -11,17 +11,13 @@ from __future__ import annotations
 import base64
 import re
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import requests
+from providers.qwen_context import QWEN_MODEL, resolve_qwen_context
 
 
 QWEN_VISION_MODEL = "qwen3.8:27b"
-CONTEXT_TOKENS = {
-    "chat": 32768,
-    "project": 65536,
-    "long": 122880,
-}
 
 # Preserve the established lightweight order.  Each model still has to pass
 # both the tag and capability checks before it becomes a fallback.
@@ -49,14 +45,14 @@ class VisionSelection:
     effective_context_tokens: int
 
 
-def context_tokens(context_profile: str | None) -> tuple[str, int]:
-    """Return the validated profile and token budget for a vision request."""
-    profile = context_profile or "chat"
-    if profile not in CONTEXT_TOKENS:
-        raise ValueError(
-            f"Invalid context profile {profile!r}; expected chat, project, or long."
-        )
-    return profile, CONTEXT_TOKENS[profile]
+def context_tokens(model: str, context_profile: str | None) -> tuple[str | None, int | None]:
+    """Resolve context through the shared provider policy.
+
+    Non-Qwen models deliberately return no Qwen profile or override so their
+    existing provider options remain unchanged.
+    """
+    context = resolve_qwen_context(model, context_profile=context_profile, task_mode="vision")
+    return context.context_profile, context.effective_context_tokens
 
 
 def extract_image_data(extracted_context: str, attachments: Any = None) -> str | None:
@@ -82,6 +78,8 @@ def extract_image_data(extracted_context: str, attachments: Any = None) -> str |
         value = candidate.strip()
         match = _DATA_URI_RE.fullmatch(value)
         encoded = match.group("data") if match else value
+        if match and match.group("media").lower() not in {"png", "jpeg", "jpg", "webp", "gif"}:
+            continue
         if not _RAW_IMAGE_RE.match(encoded):
             # Raw data is allowed only for the two formats already supported by
             # the legacy handler.  Other text must never become an image payload.
@@ -110,8 +108,16 @@ def requested_qwen_model(ctx: Mapping[str, Any]) -> str | None:
     def contains_complete_profile(value: Any) -> bool:
         if isinstance(value, Mapping):
             normalized = {str(k).lower(): v for k, v in value.items()}
+            def role_model(role: str) -> Any:
+                role_value = normalized.get(role)
+                if isinstance(role_value, Mapping):
+                    for model_key in ("model", "model_id", "selected_model"):
+                        if model_key in role_value:
+                            return role_value[model_key]
+                return role_value
+
             if required_roles.issubset(normalized) and all(
-                normalized[role] == QWEN_VISION_MODEL for role in required_roles
+                role_model(role) == QWEN_VISION_MODEL for role in required_roles
             ):
                 return True
             return any(contains_complete_profile(child) for child in value.values())
@@ -162,27 +168,38 @@ def select_vision_model(
     ctx: Mapping[str, Any],
     *,
     inventory: Mapping[str, Any] | None = None,
-) -> tuple[str | None, bool, str | None]:
+    host_resolver: Callable[[str], str] | None = None,
+) -> tuple[str | None, bool, str | None, str | None]:
     """Select Qwen when opted in, otherwise use verified legacy candidates."""
     requested = requested_qwen_model(ctx)
-    try:
-        inventory = inventory if inventory is not None else _model_inventory(host)
-    except (requests.RequestException, ValueError, TypeError):
-        return None, False, requested
-
     candidates = ([QWEN_VISION_MODEL] if requested else []) + list(VISION_FALLBACKS)
+    inventories: dict[str, Mapping[str, Any]] = {}
     for candidate in candidates:
-        if model_supports_vision(host, candidate, inventory):
-            return candidate, candidate != requested, requested
-    return None, False, requested
+        candidate_host = host_resolver(candidate) if host_resolver else host
+        try:
+            candidate_inventory = inventory if inventory is not None and candidate_host == host else inventories.get(candidate_host)
+            if candidate_inventory is None:
+                candidate_inventory = _model_inventory(candidate_host)
+                inventories[candidate_host] = candidate_inventory
+        except (requests.RequestException, ValueError, TypeError):
+            continue
+        if model_supports_vision(candidate_host, candidate, candidate_inventory):
+            # A normal non-Qwen request is ordinary vision, not a Qwen fallback.
+            fallback = bool(requested and candidate != requested)
+            return candidate, fallback, requested, candidate_host
+    return None, False, requested, None
 
 
-def build_vision_payload(model: str, prompt: str, image_data: str, tokens: int) -> dict[str, Any]:
+def build_vision_payload(
+    model: str, prompt: str, image_data: str, tokens: int | None
+) -> dict[str, Any]:
     """Build the native Ollama image request, including the context budget."""
-    return {
+    payload = {
         "model": model,
         "prompt": prompt,
         "images": [image_data],
         "stream": False,
-        "options": {"num_ctx": tokens},
     }
+    if tokens is not None:
+        payload["options"] = {"num_ctx": tokens}
+    return payload

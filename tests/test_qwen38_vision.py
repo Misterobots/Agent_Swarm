@@ -7,6 +7,30 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+try:
+    from providers.qwen_context import resolve_qwen_context  # noqa: F401
+except ImportError:
+    import types
+
+    context_module = types.ModuleType("providers.qwen_context")
+
+    class _TestContext:
+        def __init__(self, profile, tokens):
+            self.context_profile = profile
+            self.effective_context_tokens = tokens
+
+    def _test_resolve(model, context_profile=None, *, task_mode="chat"):
+        if model != "qwen3.8:27b":
+            return _TestContext(None, None)
+        if context_profile is not None and context_profile not in {"chat", "project", "long"}:
+            raise ValueError("Invalid Qwen context profile")
+        profile = context_profile or ("project" if task_mode in {"code", "coding", "project", "swarm"} else "chat")
+        return _TestContext(profile, {"chat": 32768, "project": 65536, "long": 122880}[profile])
+
+    context_module.QWEN_MODEL = "qwen3.8:27b"
+    context_module.resolve_qwen_context = _test_resolve
+    sys.modules["providers.qwen_context"] = context_module
+
 sys.path.insert(0, "agents")
 
 
@@ -54,11 +78,12 @@ def test_malformed_attachment_is_rejected():
 
 
 def test_context_profiles_are_exact():
-    assert context_tokens("chat") == ("chat", 32768)
-    assert context_tokens("project") == ("project", 65536)
-    assert context_tokens("long") == ("long", 122880)
+    assert context_tokens(QWEN_VISION_MODEL, "chat") == ("chat", 32768)
+    assert context_tokens(QWEN_VISION_MODEL, "project") == ("project", 65536)
+    assert context_tokens(QWEN_VISION_MODEL, "long") == ("long", 122880)
     with pytest.raises(ValueError):
-        context_tokens("huge")
+        context_tokens(QWEN_VISION_MODEL, "huge")
+    assert context_tokens("minicpm-v:latest", "long") == (None, None)
 
 
 def test_complete_saved_qwen_profile_enables_qwen_vision():
@@ -86,13 +111,38 @@ def test_unavailable_qwen_falls_back_only_to_verified_lightweight_model():
         "handlers.qwen_vision.requests.post",
         return_value=_response({"capabilities": ["vision"]}),
     ) as show:
-        selected, fallback, requested = select_vision_model(
+        selected, fallback, requested, selected_host = select_vision_model(
             "http://ollama", {"requested_model": QWEN_VISION_MODEL}, inventory=inventory
         )
     assert selected == "minicpm-v:latest"
     assert fallback is True
     assert requested == QWEN_VISION_MODEL
+    assert selected_host == "http://ollama"
     assert show.call_count == 1
+
+
+def test_fallback_capability_is_checked_on_candidate_host():
+    hosts = {QWEN_VISION_MODEL: "http://lovelace", "minicpm-v:latest": "http://turing"}
+    inventories = {
+        "http://lovelace": {},
+        "http://turing": {"minicpm-v:latest": {"name": "minicpm-v:latest"}},
+    }
+
+    def get(url, **_kwargs):
+        host = url.removesuffix("/api/tags")
+        return _response({"models": list(inventories[host].values())})
+
+    with patch("handlers.qwen_vision.requests.get", side_effect=get), \
+         patch("handlers.qwen_vision.requests.post", return_value=_response({"capabilities": ["vision"]})):
+        selected, fallback, requested, selected_host = select_vision_model(
+            "http://lovelace",
+            {"requested_model": QWEN_VISION_MODEL},
+            host_resolver=lambda model: hosts[model],
+        )
+
+    assert (selected, fallback, requested, selected_host) == (
+        "minicpm-v:latest", True, QWEN_VISION_MODEL, "http://turing"
+    )
 
 
 def test_native_payload_contains_image_and_profile_context():
@@ -112,6 +162,7 @@ def test_handler_reports_selected_qwen_and_uses_native_image_payload():
         "use_langfuse": False,
         "requested_model": QWEN_VISION_MODEL,
         "context_profile": "project",
+        "image_attachments": [],
     }
 
     def post(url, **kwargs):
@@ -154,6 +205,7 @@ def test_handler_reports_actual_model_when_qwen_falls_back():
         "use_langfuse": False,
         "requested_model": QWEN_VISION_MODEL,
         "context_profile": "chat",
+        "image_attachments": [],
     }
 
     def post(url, **kwargs):
