@@ -117,6 +117,10 @@ class DevHarness:
             for notice in notices:
                 yield notice
 
+            metadata = getattr(result, "provider_metadata", {}) or {}
+            if metadata:
+                yield StreamChunk(type="model_metadata", data=metadata)
+
             # Record the assistant turn (text + any tool calls) on the neutral history.
             history.add_assistant(result.text, result.tool_calls)
 

@@ -25,6 +25,7 @@ class ProviderResult:
     # True when a tool-arg payload failed to parse cleanly and we fell back to
     # repair/empty.  The router counts this toward escalation.
     malformed_args: bool = False
+    provider_metadata: dict[str, object] = field(default_factory=dict)
 
 
 @runtime_checkable

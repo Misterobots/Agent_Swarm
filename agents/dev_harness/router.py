@@ -98,6 +98,16 @@ class ModelRouter:
             else:
                 raise
 
+        metadata = dict(getattr(result, "provider_metadata", {}) or {})
+        primary_model = getattr(self.primary, "model", "")
+        actual_model = getattr(provider, "model", primary_model)
+        metadata.update({
+            "requested_model": metadata.get("requested_model") or primary_model,
+            "actual_model": metadata.get("actual_model") or actual_model,
+            "provider": metadata.get("provider") or getattr(provider, "name", "unknown"),
+            "fallback": bool(metadata.get("fallback", provider is not self.primary)),
+        })
+        result.provider_metadata = metadata
         self._update_state(state, result)
         return result, notices
 
