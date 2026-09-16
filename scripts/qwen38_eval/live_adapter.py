@@ -186,7 +186,9 @@ class LiveMemexAdapter(Provider):
                             approval_handler(str(call_id), event)
                 delta = event.get("choices", [{}])[0].get("delta", {}) if event.get("choices") else {}
                 content = delta.get("content") if isinstance(delta, dict) else None
-                if content:
+                # Some events carry a structured (dict) content — tool calls,
+                # metadata — not response text. Only string deltas are text.
+                if isinstance(content, str) and content:
                     chunks.append(content)
         finally:
             response.close()
