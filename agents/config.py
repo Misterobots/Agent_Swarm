@@ -170,6 +170,7 @@ CONTEXT_WINDOWS: dict[str, int] = {
     # Qwen3 family
     "qwen3-coder:30b": 32768,
     "qwen3.6:27b": 32768,
+    "qwen3.8:27b": 32768,
     "qwen3.5:9b": 16384,
     "qwen3:14b": 16384,
     "qwen3:8b": 16384,

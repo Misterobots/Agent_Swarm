@@ -16,6 +16,7 @@ const MODEL_WINDOWS: Record<string, number> = {
   // Qwen3 family (current production models)
   "qwen3-coder:30b": 32768,
   "qwen3.6:27b": 32768,
+  "qwen3.8:27b": 32768,
   "qwen3:14b": 16384,
   "qwen3:8b": 16384,
   "qwen3:4b": 8192,

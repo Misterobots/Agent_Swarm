@@ -122,6 +122,18 @@ MODELS: dict[str, ModelSpec] = {
         alternatives=["gemma4:26b", "qwen3:14b"],
         available=True,
     ),
+    "qwen3.8:27b": ModelSpec(
+        name="qwen3.8:27b",
+        # Catalog estimate: 22 decimal GB resident at the observed workload;
+        # this is a tier/queue estimate, not a reserved GPU allocation.
+        vram_gb=22.0,
+        capabilities=["text", "vision", "code", "reasoning"],
+        roles=_ALL_ROLES,
+        recommended_for_roles=["coder", "researcher", "architect"],
+        description="Qwen 3.8 27B — installed Ollama build with native vision, tools, and thinking support.",
+        alternatives=["qwen3.6:27b", "qwen3-coder:30b"],
+        available=True,
+    ),
     "qwen3.8-27b-fp8": ModelSpec(
         name="qwen3.8-27b-fp8",
         vram_gb=30.9,
