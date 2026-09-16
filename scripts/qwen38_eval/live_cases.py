@@ -177,8 +177,6 @@ def live_approvals(adapter: LiveMemexAdapter, *, fixture_approval: bool = False)
                          observation=obs,
                          details={"status": "blocked", "browser_auth_required_for_api": False,
                                "browser_auth_required_for_ui": True,
-                               "vision_route": adapter.vision_route,
-                               "observed_actual_models": sorted({item.observation.actual_model for item in (chart, chart_code, screenshot, screenshot_chat)}),
                                   "prerequisite": "pass --fixture-approval to exercise the authorized caller approval API; no synthetic identity is generated"})
         blocked.status = "blocked"
         return blocked
