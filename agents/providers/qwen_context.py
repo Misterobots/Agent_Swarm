@@ -8,8 +8,12 @@ request profile through the shared API and run context.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import base64
+from io import BytesIO
 import json
 import math
+import re
+import warnings
 from typing import Any
 
 
@@ -18,6 +22,8 @@ QWEN_OUTPUT_RESERVE = 4_096
 # Ollama vision tokenization depends on the loaded model and image dimensions.
 # This is an intentionally unverified safety allowance, not a tokenizer result.
 QWEN_IMAGE_TOKEN_ALLOWANCE = 2_048
+MAX_IMAGE_BYTES = 16 * 1024 * 1024
+MAX_IMAGE_DIMENSION = 8_192
 QWEN_CONTEXT_TOKENS = {
     "chat": 32_768,
     "project": 65_536,
@@ -127,3 +133,59 @@ def estimate_messages_tokens(messages: list[dict[str, Any]]) -> int:
             copy["content"] = parts
         sanitized.append(copy)
     return estimate_serialized_tokens(sanitized) + image_count * QWEN_IMAGE_TOKEN_ALLOWANCE
+
+
+def decode_image_payload(value: str) -> str:
+    """Validate and normalize one bounded Ollama image payload.
+
+    Pillow performs the actual container/decompression validation.  The byte
+    and dimension limits run before/around decode to prevent oversized or
+    decompression-bomb inputs.  This function returns raw base64 for Ollama;
+    it does not claim to calculate model image tokens.
+    """
+    if not isinstance(value, str) or not value:
+        raise ValueError("Ollama image payload must be non-empty base64")
+    match = re.fullmatch(
+        r"data:(?P<mime>image/(?:png|jpeg|jpg|webp|gif));base64,(?P<data>[A-Za-z0-9+/]*={0,2})",
+        value,
+    )
+    encoded = match.group("data") if match else value
+    if not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", encoded):
+        raise ValueError("Ollama image payload must be strict base64 or data:image/*")
+    try:
+        decoded = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError):
+        raise ValueError("Ollama image payload contains invalid base64") from None
+    if not decoded:
+        raise ValueError("Ollama image payload must not be empty")
+    if len(decoded) > MAX_IMAGE_BYTES:
+        raise ValueError(f"Ollama image payload exceeds {MAX_IMAGE_BYTES} byte limit")
+
+    try:
+        from PIL import Image
+
+        expected_formats = {
+            "image/png": "PNG",
+            "image/jpeg": "JPEG",
+            "image/jpg": "JPEG",
+            "image/gif": "GIF",
+            "image/webp": "WEBP",
+        }
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(decoded)) as image:
+                if image.width > MAX_IMAGE_DIMENSION or image.height > MAX_IMAGE_DIMENSION:
+                    raise ValueError("Ollama image dimensions exceed safety limit")
+                image_format = (image.format or "").upper()
+                mime = match.group("mime") if match else None
+                if mime and image_format != expected_formats[mime]:
+                    raise ValueError("Ollama image MIME does not match decoded image")
+                image.verify()
+            # verify() checks the container; load() checks actual pixel decode.
+            with Image.open(BytesIO(decoded)) as image:
+                image.load()
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"Ollama image payload failed decode: {exc}") from None
+    return encoded

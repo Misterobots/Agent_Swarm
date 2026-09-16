@@ -1,4 +1,5 @@
 import base64
+from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from providers.ollama_provider import OllamaProvider
 from providers.qwen_context import (
     QwenContext,
+    decode_image_payload,
     ensure_context_headroom,
     estimate_messages_tokens,
     resolve_qwen_context,
@@ -83,7 +85,7 @@ def test_ollama_image_transport_normalizes_data_url():
 
 
 def test_ollama_rejects_external_or_malformed_images():
-    with pytest.raises(ValueError, match="invalid base64|recognized image"):
+    with pytest.raises(ValueError, match="invalid base64|decode"):
         OllamaProvider._normalize_image("ABC123")
     with pytest.raises(ValueError):
         OllamaProvider._messages_for_ollama([{"role": "user", "content": [
@@ -97,6 +99,9 @@ def test_ollama_rejects_external_or_malformed_images():
         OllamaProvider._messages_for_ollama([{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": "data:image/png;base64,"}},
         ]}])
+    corrupted = base64.b64encode(b"\x89PNG\r\n\x1a\ncorrupted").decode()
+    with pytest.raises(ValueError, match="decode|cannot identify|cannot read"):
+        decode_image_payload(corrupted)
 
 
 def test_qwen_dispatch_rejects_over_budget_before_post_and_attaches_metadata():
@@ -140,7 +145,17 @@ def test_history_to_ollama_dispatch_converts_image_and_posts_valid_payload():
 
 
 def test_large_legitimate_image_uses_fixed_allowance_not_base64_text_size():
-    large_image = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\0" * 100_000).decode()
+    from PIL import Image
+
+    image = Image.new("RGB", (1024, 1024))
+    pixels = image.load()
+    for y in range(1024):
+        for x in range(1024):
+            value = (x * 37 + y * 17) % 256
+            pixels[x, y] = (value, (value * 3) % 256, (value * 7) % 256)
+    raw = BytesIO()
+    image.save(raw, format="PNG", compress_level=0)
+    large_image = base64.b64encode(raw.getvalue()).decode()
     messages = [{"role": "user", "content": "describe", "images": [large_image]}]
     assert estimate_messages_tokens(messages) < 10_000
 

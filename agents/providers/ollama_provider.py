@@ -14,8 +14,6 @@ Context window comes from config.get_ollama_options (num_ctx per model).
 from __future__ import annotations
 
 import logging
-import base64
-import re
 import uuid
 
 import requests
@@ -28,6 +26,7 @@ from dev_harness.qwen_toolparse import extract_text_tool_calls
 from providers.qwen_context import (
     QWEN_MODEL,
     QWEN_OUTPUT_RESERVE,
+    decode_image_payload,
     ensure_context_headroom,
     estimate_messages_tokens,
     resolve_qwen_context,
@@ -134,23 +133,8 @@ class OllamaProvider:
 
     @staticmethod
     def _normalize_image(value: str) -> str:
-        """Accept strict base64 or a data:image/* base64 URL only."""
-        if not isinstance(value, str) or not value:
-            raise ValueError("Ollama image payload must be non-empty base64")
-        match = re.fullmatch(
-            r"data:image/[A-Za-z0-9.+-]+;base64,(?P<data>[A-Za-z0-9+/]*={0,2})",
-            value,
-        )
-        encoded = match.group("data") if match else value
-        if not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", encoded):
-            raise ValueError("Ollama image payload must be strict base64 or data:image/*")
-        try:
-            decoded = base64.b64decode(encoded, validate=True)
-        except (ValueError, TypeError):
-            raise ValueError("Ollama image payload contains invalid base64") from None
-        if not decoded:
-            raise ValueError("Ollama image payload must not be empty")
-        return encoded
+        """Decode and normalize a bounded valid image for Ollama."""
+        return decode_image_payload(value)
 
     def _validate_dispatch_headroom(self, messages: list[dict], tools: list[dict]) -> None:
         if self.model != QWEN_MODEL:
