@@ -8,7 +8,6 @@ declared capabilities before it is used.
 
 from __future__ import annotations
 
-import base64
 import re
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
@@ -17,6 +16,7 @@ import requests
 from providers.qwen_context import (
     QWEN_MODEL,
     QWEN_OUTPUT_RESERVE,
+    decode_image_payload,
     ensure_context_headroom,
     estimate_messages_tokens,
     resolve_qwen_context,
@@ -82,20 +82,10 @@ def extract_image_data(extracted_context: str, attachments: Any = None) -> str |
 
     for candidate in candidates:
         value = candidate.strip()
-        match = _DATA_URI_RE.fullmatch(value)
-        encoded = match.group("data") if match else value
-        if match and match.group("media").lower() not in {"png", "jpeg", "jpg", "webp", "gif"}:
-            continue
-        if not _RAW_IMAGE_RE.match(encoded):
-            # Raw data is allowed only for the two formats already supported by
-            # the legacy handler.  Other text must never become an image payload.
-            if not match:
-                continue
         try:
-            base64.b64decode(encoded, validate=True)
+            return decode_image_payload(value)
         except (ValueError, TypeError):
             continue
-        return encoded
     return None
 
 

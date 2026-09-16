@@ -1,6 +1,5 @@
 """Focused, no-GPU tests for Qwen 3.8 vision routing."""
 
-import base64
 import sys
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -70,7 +69,10 @@ from handlers.qwen_vision import (  # noqa: E402
 from handlers.vision import handle_vision  # noqa: E402
 
 
-PNG_B64 = base64.b64encode(b"fake-png").decode()
+PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUB"
+    "AScY42YAAAAASUVORK5CYII="
+)
 
 
 def _response(payload, status=200):
