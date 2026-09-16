@@ -6,6 +6,7 @@ import time
 import uuid
 import weakref
 import json
+import hashlib
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -65,7 +66,6 @@ class CoordinatorSession:
                  context_profile: str | None = None):
         self.session_id = session_id
         self.owner_id = owner_id
-        self.context_profile = context_profile
         # Direct task creation (POST /v1/tasks) generates this up front so it
         # can return the id to the caller before the generator has run at all;
         # every other caller leaves it unset and gets the usual random id.
@@ -78,7 +78,7 @@ class CoordinatorSession:
         self.scratchpad_dir = SCRATCHPAD_ROOT / session_id / self.coordination_id
         self.scratchpad_dir.mkdir(parents=True, exist_ok=True)
         self.created_at = time.time()
-        self.role_snapshot = self._load_or_create_role_snapshot()
+        self.role_snapshot, self.context_profile = self._load_or_create_role_snapshot(context_profile)
         # Thread-safe queue for file_change events emitted by worker threads.
         # The SSE generator drains this between future-wait timeouts so chips
         # appear in the UI as files are written, not just at the end of a phase.
@@ -97,24 +97,34 @@ class CoordinatorSession:
         except Exception:
             pass
 
-    def _load_or_create_role_snapshot(self) -> RoleModelSnapshot:
+    def _role_snapshot_path(self) -> Path:
+        """Return an owner-keyed checkpoint path within this run's scratchpad."""
+        owner_key = str(self.owner_id) if self.owner_id is not None else "anonymous"
+        digest = hashlib.sha256(owner_key.encode("utf-8")).hexdigest()[:16]
+        return self.scratchpad_dir / f"00_role_model_snapshot_{digest}.json"
+
+    def _load_or_create_role_snapshot(
+        self, requested_context_profile: str | None,
+    ) -> tuple[RoleModelSnapshot, str | None]:
         """Restore a checkpointed role map, or capture it exactly once."""
-        path = self.scratchpad_dir / "00_role_model_snapshot.json"
+        path = self._role_snapshot_path()
         try:
             if path.exists():
                 payload = json.loads(path.read_text(encoding="utf-8"))
                 restored = RoleModelSnapshot.from_dict(payload)
-                if restored.models:
-                    return restored
+                # The coordination id is not an owner boundary.  A caller
+                # supplying another owner's id must never inherit its map.
+                if restored.owner_id == self.owner_id and restored.models:
+                    return restored, restored.context_profile
         except Exception:
             # A corrupt optional checkpoint must not prevent a run from starting.
             pass
-        snapshot = snapshot_role_models(self.owner_id)
+        snapshot = snapshot_role_models(self.owner_id, requested_context_profile)
         try:
             path.write_text(json.dumps(snapshot.to_dict(), indent=2), encoding="utf-8")
         except Exception:
             pass
-        return snapshot
+        return snapshot, snapshot.context_profile
 
     def model_binding_for_role(self, role: str):
         return self.role_snapshot.for_role(role)

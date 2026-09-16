@@ -88,6 +88,7 @@ class RoleModelSnapshot:
 
     owner_id: Optional[str]
     models: Mapping[str, RoleModelBinding]
+    context_profile: Optional[str] = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "models", MappingProxyType(dict(self.models)))
@@ -117,12 +118,13 @@ class RoleModelSnapshot:
             provider=provider,
             fallback=fallback,
         )
-        return RoleModelSnapshot(self.owner_id, updated)
+        return RoleModelSnapshot(self.owner_id, updated, self.context_profile)
 
     def to_dict(self) -> dict[str, object]:
         return {
             "owner_id": self.owner_id,
             "models": {role: binding.to_dict() for role, binding in self.models.items()},
+            "context_profile": self.context_profile,
         }
 
     @classmethod
@@ -138,7 +140,7 @@ class RoleModelSnapshot:
                 provider=str(raw.get("provider") or "ollama"),
                 fallback=bool(raw.get("fallback", False)),
             )
-        return cls(payload.get("owner_id"), models)
+        return cls(payload.get("owner_id"), models, payload.get("context_profile"))
 
 
 def get_model_for_role(
@@ -192,7 +194,7 @@ def get_model_for_role(
     return ARCHITECT_MODEL
 
 
-def snapshot_role_models(uid: Optional[str]) -> RoleModelSnapshot:
+def snapshot_role_models(uid: Optional[str], context_profile: Optional[str] = None) -> RoleModelSnapshot:
     """Resolve all swarm roles once for a coordination run.
 
     Team Builder values win over defaults.  When no Team Builder value exists,
@@ -207,4 +209,4 @@ def snapshot_role_models(uid: Optional[str]) -> RoleModelSnapshot:
         default = _SWARM_ROLE_ENV_MAP.get(role)
         requested = get_model_for_role(uid, role, default=default)
         models[role] = RoleModelBinding(requested, requested)
-    return RoleModelSnapshot(uid, models)
+    return RoleModelSnapshot(uid, models, context_profile)
