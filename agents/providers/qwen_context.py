@@ -15,6 +15,9 @@ from typing import Any
 
 QWEN_MODEL = "qwen3.8:27b"
 QWEN_OUTPUT_RESERVE = 4_096
+# Ollama vision tokenization depends on the loaded model and image dimensions.
+# This is an intentionally unverified safety allowance, not a tokenizer result.
+QWEN_IMAGE_TOKEN_ALLOWANCE = 2_048
 QWEN_CONTEXT_TOKENS = {
     "chat": 32_768,
     "project": 65_536,
@@ -90,6 +93,37 @@ def ensure_context_headroom(
 
 
 def estimate_serialized_tokens(value: Any) -> int:
-    """Conservatively estimate tokens for a JSON-serializable wire value."""
+    """Estimate text/schema tokens from serialized JSON, not a real tokenizer."""
     serialized = json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str)
     return max(1, math.ceil(len(serialized) / 4))
+
+
+def estimate_messages_tokens(messages: list[dict[str, Any]]) -> int:
+    """Estimate text plus a fixed image allowance without counting image bytes.
+
+    The base64 image bytes are replaced with a marker before the wire-size
+    estimate.  Each image then receives QWEN_IMAGE_TOKEN_ALLOWANCE.  The
+    allowance is conservative policy, not verified Qwen/Ollama tokenization;
+    the lead-owned tokenizer measurement must supersede this estimate when it
+    is available.
+    """
+    sanitized: list[dict[str, Any]] = []
+    image_count = 0
+    for message in messages:
+        copy = dict(message)
+        images = copy.get("images")
+        if isinstance(images, list):
+            image_count += len(images)
+            copy["images"] = ["<image>"] * len(images)
+        content = copy.get("content")
+        if isinstance(content, list):
+            parts = []
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "image_url":
+                    image_count += 1
+                    parts.append({"type": "image_url", "image_url": {"url": "<image>"}})
+                else:
+                    parts.append(part)
+            copy["content"] = parts
+        sanitized.append(copy)
+    return estimate_serialized_tokens(sanitized) + image_count * QWEN_IMAGE_TOKEN_ALLOWANCE

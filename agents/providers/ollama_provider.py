@@ -29,7 +29,7 @@ from providers.qwen_context import (
     QWEN_MODEL,
     QWEN_OUTPUT_RESERVE,
     ensure_context_headroom,
-    estimate_serialized_tokens,
+    estimate_messages_tokens,
     resolve_qwen_context,
 )
 
@@ -100,14 +100,19 @@ class OllamaProvider:
         normalized: list[dict] = []
         for message in messages:
             content = message.get("content")
-            if not isinstance(content, list):
-                normalized.append(message)
-                continue
-            text_parts: list[str] = []
             raw_images = message.get("images") or []
             if not isinstance(raw_images, list):
                 raise ValueError("Ollama image payload must be a list")
             images: list[str] = [OllamaProvider._normalize_image(value) for value in raw_images]
+            if not isinstance(content, list):
+                if not images:
+                    normalized.append(message)
+                else:
+                    converted = dict(message)
+                    converted["images"] = images
+                    normalized.append(converted)
+                continue
+            text_parts: list[str] = []
             for part in content:
                 if not isinstance(part, dict):
                     continue
@@ -150,7 +155,7 @@ class OllamaProvider:
     def _validate_dispatch_headroom(self, messages: list[dict], tools: list[dict]) -> None:
         if self.model != QWEN_MODEL:
             return
-        input_tokens = estimate_serialized_tokens(messages)
+        input_tokens = estimate_messages_tokens(messages)
         tool_tokens = estimate_serialized_tokens(tools) if tools else 0
         self.validate_context_headroom(
             input_tokens=input_tokens,

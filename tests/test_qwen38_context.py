@@ -1,9 +1,15 @@
+import base64
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from providers.ollama_provider import OllamaProvider
-from providers.qwen_context import QwenContext, ensure_context_headroom, resolve_qwen_context
+from providers.qwen_context import (
+    QwenContext,
+    ensure_context_headroom,
+    estimate_messages_tokens,
+    resolve_qwen_context,
+)
 
 
 PNG_B64 = (
@@ -131,3 +137,18 @@ def test_history_to_ollama_dispatch_converts_image_and_posts_valid_payload():
     sent = post.call_args.kwargs["json"]["messages"][0]
     assert sent["content"] == "describe this"
     assert sent["images"] == [PNG_B64]
+
+
+def test_large_legitimate_image_uses_fixed_allowance_not_base64_text_size():
+    large_image = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\0" * 100_000).decode()
+    messages = [{"role": "user", "content": "describe", "images": [large_image]}]
+    assert estimate_messages_tokens(messages) < 10_000
+
+    response = MagicMock()
+    response.json.return_value = {"message": {"content": "ok"}}
+    response.raise_for_status.return_value = None
+    history = MagicMock()
+    history.to_openai_messages.return_value = messages
+    with patch("providers.ollama_provider.requests.post", return_value=response) as post:
+        OllamaProvider("qwen3.8:27b", context_profile="chat").chat_with_tools(history, [])
+    assert post.called
