@@ -8,9 +8,13 @@ request profile through the shared API and run context.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import math
+from typing import Any
 
 
 QWEN_MODEL = "qwen3.8:27b"
+QWEN_OUTPUT_RESERVE = 4_096
 QWEN_CONTEXT_TOKENS = {
     "chat": 32_768,
     "project": 65_536,
@@ -83,3 +87,9 @@ def ensure_context_headroom(
             f"Context budget exceeded: input={input_tokens}, tools={tool_tokens}, "
             f"output={output_tokens}, limit={effective_tokens}"
         )
+
+
+def estimate_serialized_tokens(value: Any) -> int:
+    """Conservatively estimate tokens for a JSON-serializable wire value."""
+    serialized = json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str)
+    return max(1, math.ceil(len(serialized) / 4))

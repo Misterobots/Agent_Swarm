@@ -14,6 +14,8 @@ Context window comes from config.get_ollama_options (num_ctx per model).
 from __future__ import annotations
 
 import logging
+import base64
+import re
 import uuid
 
 import requests
@@ -25,7 +27,9 @@ from dev_harness.history import History, ToolCall
 from dev_harness.qwen_toolparse import extract_text_tool_calls
 from providers.qwen_context import (
     QWEN_MODEL,
+    QWEN_OUTPUT_RESERVE,
     ensure_context_headroom,
+    estimate_serialized_tokens,
     resolve_qwen_context,
 )
 
@@ -100,7 +104,10 @@ class OllamaProvider:
                 normalized.append(message)
                 continue
             text_parts: list[str] = []
-            images: list[str] = list(message.get("images") or [])
+            raw_images = message.get("images") or []
+            if not isinstance(raw_images, list):
+                raise ValueError("Ollama image payload must be a list")
+            images: list[str] = [OllamaProvider._normalize_image(value) for value in raw_images]
             for part in content:
                 if not isinstance(part, dict):
                     continue
@@ -110,7 +117,9 @@ class OllamaProvider:
                     image_url = part.get("image_url") or {}
                     url = image_url.get("url") if isinstance(image_url, dict) else image_url
                     if isinstance(url, str):
-                        images.append(url.split(",", 1)[1] if url.startswith("data:") and "," in url else url)
+                        images.append(OllamaProvider._normalize_image(url))
+                    else:
+                        raise ValueError("Ollama image_url must contain a string URL")
             converted = dict(message)
             converted["content"] = "\n".join(text_parts)
             if images:
@@ -118,12 +127,45 @@ class OllamaProvider:
             normalized.append(converted)
         return normalized
 
+    @staticmethod
+    def _normalize_image(value: str) -> str:
+        """Accept strict base64 or a data:image/* base64 URL only."""
+        if not isinstance(value, str) or not value:
+            raise ValueError("Ollama image payload must be non-empty base64")
+        match = re.fullmatch(
+            r"data:image/[A-Za-z0-9.+-]+;base64,(?P<data>[A-Za-z0-9+/]*={0,2})",
+            value,
+        )
+        encoded = match.group("data") if match else value
+        if not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", encoded):
+            raise ValueError("Ollama image payload must be strict base64 or data:image/*")
+        try:
+            decoded = base64.b64decode(encoded, validate=True)
+        except (ValueError, TypeError):
+            raise ValueError("Ollama image payload contains invalid base64") from None
+        if not decoded:
+            raise ValueError("Ollama image payload must not be empty")
+        return encoded
+
+    def _validate_dispatch_headroom(self, messages: list[dict], tools: list[dict]) -> None:
+        if self.model != QWEN_MODEL:
+            return
+        input_tokens = estimate_serialized_tokens(messages)
+        tool_tokens = estimate_serialized_tokens(tools) if tools else 0
+        self.validate_context_headroom(
+            input_tokens=input_tokens,
+            tool_tokens=tool_tokens,
+            output_tokens=QWEN_OUTPUT_RESERVE,
+        )
+
     def chat_with_tools(self, history: History, tools: list[dict]) -> ProviderResult:
+        messages = self._messages_for_ollama(
+            history.to_openai_messages(args_as_string=False)
+        )
+        self._validate_dispatch_headroom(messages, tools)
         payload = {
             "model": self.model,
-            "messages": self._messages_for_ollama(
-                history.to_openai_messages(args_as_string=False)
-            ),
+            "messages": messages,
             "tools": tools,
             "stream": False,
             # low temp for coding; num_ctx from CONTEXT_WINDOWS via get_ollama_options
@@ -168,4 +210,9 @@ class OllamaProvider:
                 logger.info("[ollama] recovered %d text-format tool call(s) for %s",
                             len(text_calls), self.model)
 
-        return ProviderResult(text=text, tool_calls=calls, malformed_args=malformed)
+        result = ProviderResult(text=text, tool_calls=calls, malformed_args=malformed)
+        # ProviderResult predates the Qwen metadata contract.  Attach the
+        # optional field dynamically to preserve compatibility with all other
+        # provider adapters until the shared base type is updated by the lead.
+        result.provider_metadata = self.metadata
+        return result

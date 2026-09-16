@@ -3,10 +3,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from providers.ollama_provider import OllamaProvider
-from providers.qwen_context import (
-    QwenContext,
-    ensure_context_headroom,
-    resolve_qwen_context,
+from providers.qwen_context import QwenContext, ensure_context_headroom, resolve_qwen_context
+
+
+PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUB"
+    "AScY42YAAAAASUVORK5CYII="
 )
 
 
@@ -64,11 +66,66 @@ def test_ollama_image_transport_normalizes_data_url():
         "role": "user",
         "content": [
             {"type": "text", "text": "describe this"},
-            {"type": "image_url", "image_url": {"url": "data:image/png;base64,ABC123"}},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{PNG_B64}"}},
         ],
     }]
     assert OllamaProvider._messages_for_ollama(messages) == [{
         "role": "user",
         "content": "describe this",
-        "images": ["ABC123"],
+        "images": [PNG_B64],
     }]
+
+
+def test_ollama_rejects_external_or_malformed_images():
+    with pytest.raises(ValueError):
+        OllamaProvider._messages_for_ollama([{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": "https://example.invalid/a.png"}},
+        ]}])
+    with pytest.raises(ValueError):
+        OllamaProvider._messages_for_ollama([{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,%%%"}},
+        ]}])
+    with pytest.raises(ValueError):
+        OllamaProvider._messages_for_ollama([{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,"}},
+        ]}])
+
+
+def test_qwen_dispatch_rejects_over_budget_before_post_and_attaches_metadata():
+    history = MagicMock()
+    history.to_openai_messages.return_value = [{"role": "user", "content": "x" * 130000}]
+    with patch("providers.ollama_provider.requests.post") as post:
+        with pytest.raises(ValueError, match="Context budget exceeded"):
+            OllamaProvider("qwen3.8:27b", context_profile="chat").chat_with_tools(history, [])
+    post.assert_not_called()
+
+
+def test_qwen_result_contains_provider_metadata():
+    history = MagicMock()
+    history.to_openai_messages.return_value = [{"role": "user", "content": "hello"}]
+    response = MagicMock()
+    response.json.return_value = {"message": {"content": "ok"}}
+    response.raise_for_status.return_value = None
+    with patch("providers.ollama_provider.requests.post", return_value=response):
+        result = OllamaProvider("qwen3.8:27b", context_profile="project").chat_with_tools(history, [])
+    assert result.provider_metadata["actual_model"] == "qwen3.8:27b"
+    assert result.provider_metadata["effective_context_tokens"] == 65536
+
+
+def test_history_to_ollama_dispatch_converts_image_and_posts_valid_payload():
+    history = MagicMock()
+    history.to_openai_messages.return_value = [{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "describe this"},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{PNG_B64}"}},
+        ],
+    }]
+    response = MagicMock()
+    response.json.return_value = {"message": {"content": "ok"}}
+    response.raise_for_status.return_value = None
+    with patch("providers.ollama_provider.requests.post", return_value=response) as post:
+        OllamaProvider("qwen3.8:27b", context_profile="chat").chat_with_tools(history, [])
+    sent = post.call_args.kwargs["json"]["messages"][0]
+    assert sent["content"] == "describe this"
+    assert sent["images"] == [PNG_B64]
