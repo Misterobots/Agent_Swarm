@@ -63,7 +63,7 @@ def _get_project(project_id: str, uid: str) -> Optional[dict]:
                 cur.execute(
                     """
                     SELECT id, uid, name, created_at
-                    FROM swarm.dev_projects
+                    FROM dev_projects
                     WHERE id = %s AND uid = %s
                     """,
                     (project_id, uid),
