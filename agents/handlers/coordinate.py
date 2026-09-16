@@ -114,6 +114,7 @@ def handle_coordinate(user_input: str, ctx: dict):
             plan_mode=ultraplan_mode,
             research_mode=research_mode,
             already_steered=already_steered,
+            context_profile=ctx.get("context_profile"),
         ):
             yield update
             # Mirror key events as structured agent_event so the UI can render
