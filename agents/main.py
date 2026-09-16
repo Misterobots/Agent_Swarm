@@ -687,49 +687,6 @@ class ChatRequest(BaseModel):
     context_profile: Optional[Literal["chat", "project", "long"]] = None
 
 
-_qwen38_smoke_lock = threading.Lock()
-_qwen38_smoke_consumed = False
-_QWEN38_SMOKE_PROMPT = "Reply with exactly: QWEN38_SMOKE_OK"
-
-
-def _enforce_qwen38_single_smoke(request: ChatRequest, http_request: Request) -> None:
-    """Fail-closed one-shot guard used only by the isolated staging runtime."""
-    owner = os.getenv("QWEN38_SINGLE_SMOKE_OWNER", "").strip()
-    if not owner:
-        return
-
-    actual_owner = http_request.headers.get("X-authentik-username", "").strip()
-    forbidden_modes = (
-        request.dev_mode, request.research_mode, request.ultraplan_mode,
-        request.ultrathink_mode, request.swarm_mode, request.design_mode,
-        request.workshop_mode, request.grounding_web, request.grounding_docs,
-        request.grounding_file, request.memory_enabled,
-    )
-    valid = (
-        actual_owner == owner
-        and request.model == "qwen3.8:27b"
-        and request.stream is True
-        and request.context_profile in (None, "chat")
-        and request.skill in (None, "general")
-        and request.attachments in (None, [])
-        and request.current_project_id is None
-        and request.active_file is None
-        and not any(forbidden_modes)
-        and len(request.messages) == 1
-        and request.messages[0].role == "user"
-        and request.messages[0].content == _QWEN38_SMOKE_PROMPT
-    )
-    if not valid:
-        raise HTTPException(status_code=403, detail="Staging permits only the approved Qwen3.8 smoke request.")
-
-    global _qwen38_smoke_consumed
-    with _qwen38_smoke_lock:
-        if _qwen38_smoke_consumed:
-            raise HTTPException(status_code=403, detail="The staging Qwen3.8 smoke request has already been consumed.")
-        _qwen38_smoke_consumed = True
-    logger.info("[qwen38_smoke_gate] consumed owner=%s model=%s context=chat", actual_owner, request.model)
-
-
 def _message_text(content: str | list[dict[str, Any]] | None) -> str:
     """Extract text from text-only or multimodal OpenAI message content."""
     if isinstance(content, str):
@@ -2320,7 +2277,6 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     import json
     import asyncio
 
-    _enforce_qwen38_single_smoke(request, http_request)
     _enforce_chat_features(request, http_request)
     _apply_model_policy(request, http_request)
 

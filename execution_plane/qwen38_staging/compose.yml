@@ -13,7 +13,6 @@ services:
       SWARM_DEVHARNESS_WORKERS: "true"
       GITHUB_PUSH_ENABLED: "false"
       TASKS_DIRECT_CREATE_ENABLED: "false"
-      QWEN38_SINGLE_SMOKE_OWNER: misterobots
       REDIS_HOST: 127.0.0.1
       MEMPALACE_API_URL: http://127.0.0.1:8200
       AGNO_DB_URL: postgresql://unconfigured:unconfigured@127.0.0.1:5432/staging
