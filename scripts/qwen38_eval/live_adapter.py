@@ -13,7 +13,7 @@ import os
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Iterator
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -61,15 +61,22 @@ class StreamResult:
 
 class LiveMemexAdapter(Provider):
     def __init__(self, *, base_url: str = "http://127.0.0.1:8009", auth: AuthContext | None = None,
-                 timeout_seconds: int = 1200):
+                 timeout_seconds: int = 1200, model: str = MODEL,
+                 send_context_profile: bool = True,
+                 vision_route: str = "qwen",
+                 legacy_vision_models: tuple[str, ...] = ("minicpm-v:latest", "llava:13b", "llava:7b", "llava:latest", "moondream:latest")):
         self.base_url = base_url.rstrip("/")
         self.auth = auth or AuthContext.from_environment()
         self.timeout_seconds = timeout_seconds
+        self.model = model
+        self.send_context_profile = send_context_profile
+        self.vision_route = vision_route
+        self.legacy_vision_models = legacy_vision_models
         self.calls: list[dict[str, Any]] = []
 
     def _request(self, method: str, path: str, *, body: dict[str, Any] | None = None,
                  query: dict[str, str] | None = None, stream: bool = False):
-        url = f"{self.base_url}{path}"
+        url = path if path.startswith(("http://", "https://")) else f"{self.base_url}{path}"
         if query:
             url += "?" + urlencode(query)
         headers = {"Accept": "text/event-stream" if stream else "application/json",
@@ -123,20 +130,27 @@ class LiveMemexAdapter(Provider):
 
     def chat_stream(self, *, prompt: str, identity: RunIdentity, profile: str = "project",
                     session_id: str | None = None, permission_mode: str = "plan",
-                    attachments: list[dict[str, Any]] | None = None) -> StreamResult:
+                    code: bool = True,
+                    attachments: list[dict[str, Any]] | None = None,
+                    approval_handler: Callable[[str, dict[str, Any]], None] | None = None) -> StreamResult:
         if profile not in PROFILES:
             raise ValueError(f"invalid context profile: {profile}")
-        requested_model = MODEL
+        requested_model = self.model
+        if attachments and self.vision_route == "legacy":
+            # Let the existing vision handler select and report its actual
+            # installed VLM. Never force the text baseline into an image call.
+            requested_model = "default"
         body: dict[str, Any] = {
             "model": requested_model,
             "messages": [{"role": "user", "content": prompt}],
             "stream": True,
             "session_id": session_id or identity.session_id,
-            "current_project_id": identity.project_id,
-            "dev_mode": True,
-            "dev_permission_mode": permission_mode,
-            "context_profile": profile,
         }
+        if self.send_context_profile:
+            body["context_profile"] = profile
+        if code:
+            body.update({"current_project_id": identity.project_id,
+                         "dev_mode": True, "dev_permission_mode": permission_mode})
         if attachments:
             body["attachments"] = attachments
         started = time.monotonic()
@@ -168,6 +182,8 @@ class LiveMemexAdapter(Provider):
                     call_id = event.get("call_id") or event.get("tool_call_id")
                     if call_id:
                         approvals.append(str(call_id))
+                        if approval_handler is not None:
+                            approval_handler(str(call_id), event)
                 delta = event.get("choices", [{}])[0].get("delta", {}) if event.get("choices") else {}
                 content = delta.get("content") if isinstance(delta, dict) else None
                 if content:
@@ -213,6 +229,21 @@ class LiveMemexAdapter(Provider):
     def deny(self, call_id: str) -> dict[str, Any]:
         return self._json("POST", f"/api/v1/dev/deny/{call_id}")
 
+    def fault_inject(self, *, kind: str, identity: RunIdentity) -> dict[str, Any]:
+        """Call the lead-provided isolated fault hook; unset means blocked."""
+        endpoint = os.getenv("QWEN38_FAULT_HOOK_URL", "").strip()
+        if not endpoint:
+            raise LiveAdapterError("recovery blocked: QWEN38_FAULT_HOOK_URL is not configured")
+        return self._json("POST", endpoint, body={"kind": kind, "session_id": identity.session_id,
+                                                  "project_id": identity.project_id})
+
+    def queue_status(self) -> dict[str, Any]:
+        """Read lead-provided queue status; unset means contention is blocked."""
+        endpoint = os.getenv("QWEN38_QUEUE_STATUS_URL", "").strip()
+        if not endpoint:
+            raise LiveAdapterError("contention blocked: QWEN38_QUEUE_STATUS_URL is not configured")
+        return self._json("GET", endpoint)
+
 
 def measure_qwen_tokens(text: str) -> int:
     """Measure with the Qwen tokenizer; fail explicitly if it is unavailable."""
@@ -225,3 +256,23 @@ def measure_qwen_tokens(text: str) -> int:
         return len(tokenizer.encode(text, add_special_tokens=True))
     except Exception as exc:
         raise LiveAdapterError(f"long-context case blocked: Qwen tokenizer unavailable: {exc}") from exc
+
+
+def make_context_probe(profile: str, ratio: float) -> tuple[str, int]:
+    """Build a deterministic input near 70% or 90% of a usable profile."""
+    if profile not in PROFILES or ratio not in (0.7, 0.9):
+        raise ValueError("context probes require chat/project/long and ratio 0.7 or 0.9")
+    tokenizer_path = os.getenv("QWEN38_TOKENIZER_PATH", "").strip()
+    if not tokenizer_path:
+        raise LiveAdapterError("context probe blocked: QWEN38_TOKENIZER_PATH is not configured")
+    try:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, local_files_only=True)
+        target = int(PROFILES[profile] * ratio)
+        filler = "stable context probe token sequence; "
+        ids = tokenizer.encode(filler, add_special_tokens=False)
+        repeated = (ids * ((target // max(1, len(ids))) + 2))[:target]
+        text = tokenizer.decode(repeated, skip_special_tokens=True)
+        return text, len(tokenizer.encode(text, add_special_tokens=True))
+    except Exception as exc:
+        raise LiveAdapterError(f"context probe blocked: Qwen tokenizer unavailable: {exc}") from exc
