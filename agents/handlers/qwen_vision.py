@@ -14,7 +14,13 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 import requests
-from providers.qwen_context import QWEN_MODEL, resolve_qwen_context
+from providers.qwen_context import (
+    QWEN_MODEL,
+    QWEN_OUTPUT_RESERVE,
+    ensure_context_headroom,
+    estimate_messages_tokens,
+    resolve_qwen_context,
+)
 
 
 QWEN_VISION_MODEL = "qwen3.8:27b"
@@ -193,7 +199,7 @@ def select_vision_model(
 def build_vision_payload(
     model: str, prompt: str, image_data: str, tokens: int | None
 ) -> dict[str, Any]:
-    """Build the native Ollama image request, including the context budget."""
+    """Build the native Ollama image request with bounded Qwen output."""
     payload = {
         "model": model,
         "prompt": prompt,
@@ -201,5 +207,25 @@ def build_vision_payload(
         "stream": False,
     }
     if tokens is not None:
-        payload["options"] = {"num_ctx": tokens}
+        payload["options"] = {
+            "num_ctx": tokens,
+            "num_predict": QWEN_OUTPUT_RESERVE,
+        }
     return payload
+
+
+def validate_vision_headroom(
+    model: str, prompt: str, image_data: str, effective_tokens: int | None
+) -> None:
+    """Fail closed for Qwen image requests before acquiring the GPU lease."""
+    if model != QWEN_MODEL or effective_tokens is None:
+        return
+    input_tokens = estimate_messages_tokens(
+        [{"role": "user", "content": prompt, "images": [image_data]}]
+    )
+    ensure_context_headroom(
+        input_tokens=input_tokens,
+        output_tokens=QWEN_OUTPUT_RESERVE,
+        tool_tokens=0,
+        effective_tokens=effective_tokens,
+    )

@@ -11,6 +11,7 @@ from handlers.qwen_vision import (
     context_tokens,
     extract_image_data,
     select_vision_model,
+    validate_vision_headroom,
 )
 
 
@@ -80,10 +81,13 @@ def handle_vision(user_input: str, ctx: dict):
         if history_context:
             vlm_prompt = f"{history_context}\n\n{vlm_prompt}"
 
+        validate_vision_headroom(
+            vision_model, vlm_prompt, image_data, context_budget
+        )
         payload = build_vision_payload(vision_model, vlm_prompt, image_data, context_budget)
 
         yield _emit_stream_mode("responding")
-        with request_lock("vision"):
+        with request_lock("text"):
             res = requests.post(f"{vision_host}/api/generate", json=payload, timeout=120)
             if res.status_code == 200:
                 analysis = res.json().get("response", "No analysis returned.")
