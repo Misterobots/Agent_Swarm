@@ -16,7 +16,7 @@ import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useAccess } from "@/lib/hooks/use-access";
-import type { ContextProfile } from "@/types/chat";
+import type { ContextProfileSelection } from "@/lib/api/chat-context-profile";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -138,9 +138,10 @@ export function ChatSettingsMenu() {
         <select
           id="context-profile"
           value={contextProfile}
-          onChange={(e) => setContextProfile(e.target.value as ContextProfile)}
+          onChange={(e) => setContextProfile(e.target.value as ContextProfileSelection)}
           className="w-full rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1.5 text-[11px] text-[var(--chat-text)]"
         >
+          <option value="auto">Auto · task default</option>
           <option value="chat">Chat · 32K</option>
           <option value="project">Project · 64K</option>
           <option value="long">Long · 122K</option>

@@ -10,6 +10,8 @@ import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useDevStore } from "@/lib/stores/dev-store";
 import { useDevProjectStore } from "@/lib/stores/dev-project-store";
 import { desktop } from "@/lib/desktop";
+import { requestContextProfile, resolveContextProfile } from "@/lib/api/chat-context-profile";
+import { mergeModelMetadata, resetTurnMetadata } from "@/lib/api/model-metadata-state";
 
 const MODEL_WINDOWS: Record<string, number> = {
   // Gemma4
@@ -135,9 +137,9 @@ export function useChatStream(options?: {
   useEffect(() => {
     const conv = activeConversation();
     const convModel = conv?.model || model;
-    const usage = getTokenUsage(conv?.messages || [], convModel, contextProfile);
+    const usage = getTokenUsage(conv?.messages || [], convModel, resolveContextProfile(contextProfile, options?.experience, swarmMode));
     setTokenUsage(usage);
-  }, [conversations, activeConversation, model, contextProfile]);
+  }, [conversations, activeConversation, model, contextProfile, options?.experience, swarmMode]);
 
   const compactConversation = useCallback(
     async (conversationId?: string) => {
@@ -260,6 +262,8 @@ export function useChatStream(options?: {
       setStatusMessage(null);
       setLatestThought(null);
       setStreamMode(null);
+      setSessionUsage(null);
+      setTokenUsage(getTokenUsage(apiMessages, model, resolveContextProfile(contextProfile, options?.experience, _swarmMode)));
 
       // Clear any prior swarm theater at the start of EVERY turn. Otherwise a
       // completed swarm from a previous turn lingers — its panel stays open and
@@ -280,7 +284,7 @@ export function useChatStream(options?: {
       toolResultsRef.current = [];
       pendingApprovalsRef.current = [];
       streamModesRef.current = [];
-      turnMetadataRef.current = null;
+      turnMetadataRef.current = resetTurnMetadata();
       continuationHintRef.current = null;
       mediaAttachmentsRef.current = [];
       agentTraceRef.current = [];
@@ -299,7 +303,7 @@ export function useChatStream(options?: {
             const _devProjectState = useDevProjectStore.getState();
             const _currentProjectId = _devProjectState.currentProjectId ?? undefined;
             const _activeFile = useDevStore.getState().activeFile ?? undefined;
-            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, _researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, _swarmMode, solvingMaxIter, solvingMaxTime, _designMode, _workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile, contextProfile)) {
+            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, _researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, _swarmMode, solvingMaxIter, solvingMaxTime, _designMode, _workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile, requestContextProfile(contextProfile))) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
@@ -461,23 +465,7 @@ export function useChatStream(options?: {
           } else if (event.type === "model_metadata") {
             const metadata = event.modelMetadata;
             if (metadata) {
-              const previous = turnMetadataRef.current;
-              turnMetadataRef.current = {
-                turnId: previous?.turnId || turnId,
-                agentName: previous?.agentName,
-                streamModes: streamModesRef.current,
-                toolsInvoked: previous?.toolsInvoked || [],
-                continuable: previous?.continuable ?? true,
-                inContextTokens: previous?.inContextTokens,
-                resumeToken: previous?.resumeToken,
-                traceId: previous?.traceId,
-                requestedModel: metadata.requestedModel ?? previous?.requestedModel,
-                actualModel: metadata.actualModel ?? previous?.actualModel,
-                provider: metadata.provider ?? previous?.provider,
-                fallback: metadata.fallback ?? previous?.fallback,
-                contextProfile: metadata.contextProfile ?? previous?.contextProfile,
-                effectiveContextTokens: metadata.effectiveContextTokens ?? previous?.effectiveContextTokens,
-              };
+              turnMetadataRef.current = mergeModelMetadata(turnMetadataRef.current, metadata, turnId, streamModesRef.current);
               if (metadata.effectiveContextTokens) {
                 setTokenUsage((prev) => ({
                   ...prev,
