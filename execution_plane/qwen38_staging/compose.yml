@@ -1,0 +1,79 @@
+name: memex-qwen38-staging
+services:
+  backend:
+    image: home-ai-lab/agent-runtime:latest
+    container_name: memex_qwen38_dev_20260915
+    restart: "no"
+    environment:
+      PYTHONPATH: /app
+      OLLAMA_HOST: http://host.docker.internal:11434
+      PRIMARY_MODEL: qwen3:14b
+      ROUTER_MODEL: qwen3:8b
+      COORDINATOR_MODEL: qwen3:14b
+      SWARM_DEVHARNESS_WORKERS: "true"
+      GITHUB_PUSH_ENABLED: "false"
+      TASKS_DIRECT_CREATE_ENABLED: "false"
+      REDIS_HOST: 127.0.0.1
+      MEMPALACE_API_URL: http://127.0.0.1:8200
+      AGNO_DB_URL: postgresql://unconfigured:unconfigured@127.0.0.1:5432/staging
+      TEMPLATE_DB_URL: postgresql://unconfigured:unconfigured@127.0.0.1:5432/staging
+    volumes:
+      - ../../agents:/app/agents:ro
+      - ../../:/workspace:ro
+    command: [uvicorn, agents.main:app, --host, 0.0.0.0, --port, "8000"]
+    networks: [staging]
+  ui:
+    image: memex-qwen38-ui:authenticated-staging
+    build:
+      context: ../../ui
+      args:
+        API_BASE_URL: http://backend:8000
+        NEXT_PUBLIC_GATEWAY_URL: ""
+    container_name: memex_qwen38_ui_20260915
+    restart: "no"
+    environment:
+      API_BASE_URL: http://backend:8000
+      NODE_ENV: production
+    networks: [staging]
+  oauth:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1@sha256:d62e2d81c6f5048f652f67c302083be1272c181b971fad80e5a30ebe2b8b75d8
+    container_name: memex_qwen38_oauth
+    restart: "no"
+    environment:
+      OAUTH2_PROXY_CLIENT_SECRET: ${QWEN_STAGING_CLIENT_SECRET:?set in process environment}
+      OAUTH2_PROXY_COOKIE_SECRET: ${QWEN_STAGING_COOKIE_SECRET:?set in process environment}
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=https://auth.shivelymedia.com/application/o/memex-qwen38-staging/
+      - --client-id=memex-qwen38-staging
+      - --redirect-url=http://127.0.0.1:3319/oauth2/callback
+      - --http-address=0.0.0.0:4180
+      - --upstream=static://202
+      - --scope=openid profile email
+      - --email-domain=*
+      - --code-challenge-method=S256
+      - --insecure-oidc-skip-nonce=false
+      - --set-xauthrequest=true
+      - --reverse-proxy=true
+      - --cookie-name=memex_qwen38_staging
+      - --cookie-secure=false
+      - --cookie-httponly=true
+      - --cookie-samesite=lax
+      - --cookie-expire=1h
+      - --skip-provider-button=true
+      - --request-logging=false
+      - --auth-logging=false
+    networks: [staging]
+  proxy:
+    image: nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    container_name: memex_qwen38_proxy
+    restart: "no"
+    ports: ["127.0.0.1:3319:8080"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./verified-headers.conf:/etc/nginx/verified-headers.conf:ro
+    depends_on: [ui, backend, oauth]
+    networks: [staging]
+networks:
+  staging:
+    name: memex_qwen38_private
