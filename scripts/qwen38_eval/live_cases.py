@@ -127,10 +127,12 @@ def live_long_context(adapter: LiveMemexAdapter):
     except LiveAdapterError as exc:
         obs = Observation(owner_id=identity.owner_id, session_id=identity.session_id,
                           project_id=identity.project_id, status="blocked")
-        return result("long_context", "live", identity, {"qwen_tokenizer_available": False},
-                      observation=obs, details={"status": "blocked", "reason": str(exc),
-                                                "browser_auth_required_for_api": False,
-                                                "browser_auth_required_for_ui": True})
+        blocked = result("long_context", "live", identity, {"qwen_tokenizer_available": False},
+                         observation=obs, details={"status": "blocked", "reason": str(exc),
+                                                   "browser_auth_required_for_api": False,
+                                                   "browser_auth_required_for_ui": True})
+        blocked.status = "blocked"
+        return blocked
     finally:
         _cleanup(adapter, identity)
 
@@ -140,11 +142,13 @@ def live_approvals(adapter: LiveMemexAdapter):
     obs = Observation(owner_id=identity.owner_id, session_id=identity.session_id,
                       project_id=identity.project_id, status="blocked")
     _cleanup(adapter, identity)
-    return result("approvals", "live", identity, {"human_approval_callback_configured": False},
-                  observation=obs,
-                  details={"status": "blocked", "browser_auth_required_for_api": False,
-                           "browser_auth_required_for_ui": True,
-                           "prerequisite": "authenticated human approval/denial callback is required; no synthetic approval is generated"})
+    blocked = result("approvals", "live", identity, {"human_approval_callback_configured": False},
+                    observation=obs,
+                    details={"status": "blocked", "browser_auth_required_for_api": False,
+                             "browser_auth_required_for_ui": True,
+                             "prerequisite": "authenticated human approval/denial callback is required; no synthetic approval is generated"})
+    blocked.status = "blocked"
+    return blocked
 
 
 def live_recovery(adapter: LiveMemexAdapter):
@@ -152,14 +156,16 @@ def live_recovery(adapter: LiveMemexAdapter):
     try:
         stream = adapter.chat_stream(prompt="Return a short recovery probe.", identity=identity,
                                      profile="project", permission_mode="plan")
-        return result("recovery", "live", identity,
-                      {"exact_model_provider": assert_exact_model(stream.observation),
-                       "no_fallback_as_qwen": not stream.observation.fallback,
-                       "transport_fault_injection_available": False},
-                      observation=stream.observation,
-                      details={"status": "blocked", "browser_auth_required_for_api": False,
-                               "browser_auth_required_for_ui": False,
-                               "prerequisite": "lead must provide a safe fault-injection hook before recovery/contention passes"})
+        blocked = result("recovery", "live", identity,
+                        {"exact_model_provider": assert_exact_model(stream.observation),
+                         "no_fallback_as_qwen": not stream.observation.fallback,
+                         "transport_fault_injection_available": False},
+                        observation=stream.observation,
+                        details={"status": "blocked", "browser_auth_required_for_api": False,
+                                 "browser_auth_required_for_ui": False,
+                                 "prerequisite": "lead must provide a safe fault-injection hook before recovery/contention passes"})
+        blocked.status = "blocked"
+        return blocked
     finally:
         _cleanup(adapter, identity)
 
@@ -168,4 +174,3 @@ def live_cases(adapter: LiveMemexAdapter, *, interactive: bool = False):
     return [live_review(adapter), live_build(adapter, interactive=interactive),
             live_approvals(adapter), live_vision(adapter), live_long_context(adapter),
             live_recovery(adapter)]
-

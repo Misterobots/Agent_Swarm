@@ -37,9 +37,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         results = all_cases(DeterministicProvider(), mode=args.mode)
     write_json_report(args.report, mode=args.mode, results=results)
+    blocked = sum(r.status == "blocked" for r in results)
+    failed = sum(r.status == "failed" for r in results)
     print(json.dumps({"mode": args.mode, "passed": sum(r.passed for r in results),
-                      "total": len(results), "report": str(args.report)}, indent=2))
-    return 0 if all(r.passed for r in results) else 1
+                      "blocked": blocked, "failed": failed, "total": len(results),
+                      "report": str(args.report)}, indent=2))
+    return 2 if blocked else (1 if failed else 0)
 
 
 if __name__ == "__main__":
