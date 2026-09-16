@@ -328,6 +328,9 @@ export function ChatView({ showDevContext = false, experience: experienceProp, a
             <span className="truncate max-w-[120px]">
               {currentProject?.name ?? "Working on project"}
             </span>
+            {currentProject?.source === "git_url" && (
+              <span className="text-[10px] text-amber-300" title="This project is backed by a live repository">LIVE REPO</span>
+            )}
             <button
               onClick={() => useDevProjectStore.getState().setCurrentProjectId(null)}
               className="ml-0.5 hover:text-[var(--chat-text)] transition-colors leading-none"

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Skill, Style } from "@/types/chat";
+import type { ContextProfile, Skill, Style } from "@/types/chat";
 
 /**
  * The retired 8-theme set is still typed for legacy migration. New installs
@@ -32,6 +32,7 @@ export type ThemeMode = "system" | "dark" | "light";
 interface SettingsState {
   mode: "standard" | "developer";
   model: string;
+  contextProfile: ContextProfile;
   theme: ChatTheme;
   themeMode: ThemeMode;
   skill: Skill;
@@ -74,6 +75,7 @@ interface SettingsState {
   setThemePickerMode: (mode: "popover" | "gallery") => void;
   setMode: (mode: "standard" | "developer") => void;
   setModel: (model: string) => void;
+  setContextProfile: (profile: ContextProfile) => void;
   setTheme: (theme: ChatTheme) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setSkill: (skill: Skill) => void;
@@ -111,6 +113,7 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       mode: "standard",
       model: "Home-AI-Swarm",
+      contextProfile: "chat",
       theme: "memex",
       themeMode: "system",
       skill: "general",
@@ -147,6 +150,7 @@ export const useSettingsStore = create<SettingsState>()(
       setThemePickerMode: (themePickerMode) => set({ themePickerMode }),
       setMode: (mode) => set({ mode }),
       setModel: (model) => set({ model }),
+      setContextProfile: (contextProfile) => set({ contextProfile }),
       setTheme: (theme) => set({ theme }),
       setThemeMode: (themeMode) => set({ themeMode }),
       setSkill: (skill) => set({ skill }),

@@ -12,6 +12,7 @@ export interface DevProject {
   name: string;
   repoUrl?: string;
   localPath?: string;
+  source?: "blank" | "git_url";
 }
 
 export interface DevProjectState {

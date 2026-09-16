@@ -333,6 +333,16 @@ export function MessageBubble({ message, userPrompt, isStreaming, isLatest, onEd
                 message.turnMetadata.streamModes ?? []
               )}
             </span>
+            {(message.turnMetadata.actualModel || message.turnMetadata.provider || message.turnMetadata.fallback !== undefined || message.turnMetadata.effectiveContextTokens) && (
+              <div className="mt-1 flex flex-wrap items-center gap-1 text-[9px] font-mono" style={{ color: "var(--chat-muted)", opacity: 0.75 }}>
+                {message.turnMetadata.actualModel && <span>model={message.turnMetadata.actualModel}</span>}
+                {message.turnMetadata.requestedModel && <span>requested={message.turnMetadata.requestedModel}</span>}
+                {message.turnMetadata.provider && <span>provider={message.turnMetadata.provider}</span>}
+                {message.turnMetadata.fallback && <span className="text-amber-300">fallback</span>}
+                {message.turnMetadata.contextProfile && <span>profile={message.turnMetadata.contextProfile}</span>}
+                {message.turnMetadata.effectiveContextTokens && <span>ctx={message.turnMetadata.effectiveContextTokens.toLocaleString()}</span>}
+              </div>
+            )}
             {/* Tiny "trace" toggle — only visible on hover */}
             <button
               type="button"

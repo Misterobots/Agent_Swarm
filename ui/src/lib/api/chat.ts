@@ -1,4 +1,4 @@
-import type { ChatMessage, FileAttachment, Model, NodeHealth, Skill, StreamEvent, Style } from "@/types/chat";
+import type { ChatMessage, ContextProfile, FileAttachment, Model, NodeHealth, Skill, StreamEvent, Style } from "@/types/chat";
 import { streamSSE } from "@/lib/utils/sse-parser";
 
 const API_BASE = "/api/backend";
@@ -30,6 +30,7 @@ export interface ChatStreamOptions {
   solvingCorrectorMaxTime?: number;
   currentProjectId?: string;
   activeFile?: string;
+  contextProfile?: ContextProfile;
 }
 
 export async function* sendChatStream(
@@ -61,6 +62,7 @@ export async function* sendChatStream(
   solvingCorrectorMaxTime?: number,
   currentProjectId?: string,
   activeFile?: string,
+  contextProfile?: ContextProfile,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const body: Record<string, unknown> = {
     model,
@@ -92,6 +94,7 @@ export async function* sendChatStream(
   if (solvingCorrectorMaxTime !== undefined) body.solving_corrector_max_time = solvingCorrectorMaxTime;
   if (currentProjectId) body.current_project_id = currentProjectId;
   if (activeFile) body.active_file = activeFile;
+  if (contextProfile) body.context_profile = contextProfile;
 
   const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: "POST",

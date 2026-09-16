@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { compactChat, saveSessionSummary, sendChatStream, summarizeSession } from "@/lib/api/chat";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { CONTEXT_PROFILE_TOKENS } from "@/types/chat";
 import type { AgentTraceEvent, ConversationExperience, ThoughtEvent, ToolCallEvent, ToolLifecycleEvent, ToolResult, ToolApprovalEvent, TurnMetadata, StreamMode, FileAttachment, MediaAttachment } from "@/types/chat";
 import { useSwarmStore } from "@/lib/stores/swarm-store";
 import { useDevStore } from "@/lib/stores/dev-store";
@@ -46,9 +47,11 @@ function messageTokenEstimate(messages: Array<{ content: string }>): number {
   return messages.reduce((acc, m) => acc + tokenEstimate(m.content || "") + 4, 0);
 }
 
-function getTokenUsage(messages: Array<{ content: string }>, model: string) {
+function getTokenUsage(messages: Array<{ content: string }>, model: string, contextProfile?: keyof typeof CONTEXT_PROFILE_TOKENS) {
   const used = messageTokenEstimate(messages);
-  const total = MODEL_WINDOWS[model] ?? MODEL_WINDOWS.default;
+  const total = model === "qwen3.8:27b" && contextProfile
+    ? CONTEXT_PROFILE_TOKENS[contextProfile]
+    : MODEL_WINDOWS[model] ?? MODEL_WINDOWS.default;
   return { used, total, pct: total > 0 ? used / total : 0 };
 }
 
@@ -109,6 +112,7 @@ export function useChatStream(options?: {
   } = useChatStore();
 
   const model = useSettingsStore((s) => s.model);
+  const contextProfile = useSettingsStore((s) => s.contextProfile);
   const skill = useSettingsStore((s) => s.skill);
   const style = useSettingsStore((s) => s.style);
   const researchMode = useSettingsStore((s) => s.researchMode);
@@ -131,9 +135,9 @@ export function useChatStream(options?: {
   useEffect(() => {
     const conv = activeConversation();
     const convModel = conv?.model || model;
-    const usage = getTokenUsage(conv?.messages || [], convModel);
+    const usage = getTokenUsage(conv?.messages || [], convModel, contextProfile);
     setTokenUsage(usage);
-  }, [conversations, activeConversation, model]);
+  }, [conversations, activeConversation, model, contextProfile]);
 
   const compactConversation = useCallback(
     async (conversationId?: string) => {
@@ -295,7 +299,7 @@ export function useChatStream(options?: {
             const _devProjectState = useDevProjectStore.getState();
             const _currentProjectId = _devProjectState.currentProjectId ?? undefined;
             const _activeFile = useDevStore.getState().activeFile ?? undefined;
-            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, _researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, _swarmMode, solvingMaxIter, solvingMaxTime, _designMode, _workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile)) {
+            for await (const event of sendChatStream(apiMessages, model, controller.signal, convId, memoryEnabled, skill, style, _researchMode, attachments, ultraplanMode, ultrathinkMode, options?.devMode, groundingWeb, groundingDocs, groundingFile, _swarmMode, solvingMaxIter, solvingMaxTime, _designMode, _workshopMode, solvingSolverNDrafts, solvingSolverMaxTime, solvingVerifierNRuns, solvingVerifierMaxTime, solvingCorrectorNPasses, solvingCorrectorMaxTime, _currentProjectId, _activeFile, contextProfile)) {
           if (event.type === "status") {
             setStatusMessage(event.content || null);
           } else if (event.type === "thought") {
@@ -454,6 +458,34 @@ export function useChatStream(options?: {
             if (event.queueStatus) {
               setMessageQueueStatus(convId!, assistantId, event.queueStatus);
             }
+          } else if (event.type === "model_metadata") {
+            const metadata = event.modelMetadata;
+            if (metadata) {
+              const previous = turnMetadataRef.current;
+              turnMetadataRef.current = {
+                turnId: previous?.turnId || turnId,
+                agentName: previous?.agentName,
+                streamModes: streamModesRef.current,
+                toolsInvoked: previous?.toolsInvoked || [],
+                continuable: previous?.continuable ?? true,
+                inContextTokens: previous?.inContextTokens,
+                resumeToken: previous?.resumeToken,
+                traceId: previous?.traceId,
+                requestedModel: metadata.requestedModel ?? previous?.requestedModel,
+                actualModel: metadata.actualModel ?? previous?.actualModel,
+                provider: metadata.provider ?? previous?.provider,
+                fallback: metadata.fallback ?? previous?.fallback,
+                contextProfile: metadata.contextProfile ?? previous?.contextProfile,
+                effectiveContextTokens: metadata.effectiveContextTokens ?? previous?.effectiveContextTokens,
+              };
+              if (metadata.effectiveContextTokens) {
+                setTokenUsage((prev) => ({
+                  ...prev,
+                  total: metadata.effectiveContextTokens!,
+                  pct: prev.used / metadata.effectiveContextTokens!,
+                }));
+              }
+            }
           } else if (event.type === "stream_mode") {
             const mode = event.streamMode || "responding";
             setStreamMode(mode);
@@ -472,9 +504,22 @@ export function useChatStream(options?: {
                 toolsInvoked: incoming.toolsInvoked || snap.toolsInvoked || [],
                 continuable: incoming.continuable !== undefined ? incoming.continuable !== false : (snap.continuable ?? true),
                 inContextTokens: incoming.inContextTokens ?? snap.inContextTokens,
+                requestedModel: incoming.requestedModel || snap.requestedModel,
+                actualModel: incoming.actualModel || snap.actualModel,
+                provider: incoming.provider || snap.provider,
+                fallback: incoming.fallback ?? snap.fallback,
+                contextProfile: incoming.contextProfile || snap.contextProfile,
+                effectiveContextTokens: incoming.effectiveContextTokens ?? snap.effectiveContextTokens,
                 resumeToken: incoming.resumeToken || snap.resumeToken,
                 traceId: incoming.traceId || snap.traceId,
               };
+              if (incoming.effectiveContextTokens) {
+                setTokenUsage((prev) => ({
+                  ...prev,
+                  total: incoming.effectiveContextTokens!,
+                  pct: prev.used / incoming.effectiveContextTokens!,
+                }));
+              }
             }
           } else if (event.type === "swarm_phase") {
             const { setSwarmPhase } = useSwarmStore.getState();
@@ -641,6 +686,7 @@ export function useChatStream(options?: {
       addMessage,
       appendToMessage,
       model,
+      contextProfile,
       skill,
       style,
       researchMode,

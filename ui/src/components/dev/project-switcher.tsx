@@ -27,6 +27,7 @@ function toStoreProject(p: ApiProject): DevProject {
     name: p.name,
     repoUrl: p.git_url,
     localPath: p.local_path,
+    source: p.source,
   };
 }
 

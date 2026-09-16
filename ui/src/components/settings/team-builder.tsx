@@ -116,6 +116,19 @@ const PRESET_PROFILES = [
       verifier: "qwen3:8b",
     },
   },
+  {
+    id: "qwen38-local-heavy",
+    label: "Qwen 3.8 Local Heavy (Opt-in)",
+    config: {
+      coordinator: "qwen3.8:27b",
+      architect: "qwen3.8:27b",
+      coder: "qwen3.8:27b",
+      devops: "qwen3.8:27b",
+      researcher: "qwen3.8:27b",
+      analyst: "qwen3.8:27b",
+      verifier: "qwen3.8:27b",
+    },
+  },
 ];
 
 export function TeamBuilderSettings() {
@@ -218,7 +231,7 @@ export function TeamBuilderSettings() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="team-builder-settings">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -243,6 +256,9 @@ export function TeamBuilderSettings() {
       <p className="text-xs text-[var(--chat-muted)] leading-relaxed">
         Configure which model each agent role uses in coordinator mode and dev mode.
         Different models can be optimized for different types of work (code, devops, research, etc.).
+      </p>
+      <p className="text-[11px] text-[var(--chat-subtle)]">
+        Presets only change the editor. Nothing is persisted until you press Save Config.
       </p>
 
       {/* Status Message */}

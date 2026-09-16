@@ -6,6 +6,7 @@ import type {
   DesignArtifact,
   FileChange,
   MediaAttachment,
+  ModelMetadata,
   QueueStatus,
   StreamEvent,
   SuggestedFollowup,
@@ -25,7 +26,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "cad_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "todo" | "usage";
+      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "model_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "cad_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "todo" | "usage";
       // Swarm theater fields
       phase_num?: number;
       phase_name?: string;
@@ -45,6 +46,12 @@ export interface ChatCompletionChunk {
       streamMode?: "thinking" | "responding" | "tool-use" | "requesting" | "compacting";
       turnId?: string;
       turnMetadata?: Record<string, unknown>;
+      requested_model?: string;
+      actual_model?: string;
+      provider?: string;
+      fallback?: boolean;
+      context_profile?: string;
+      effective_context_tokens?: number;
       continuationHint?: "auto_continue" | "await_user" | "compacting";
       resumeToken?: string;
       artifacts?: Array<Record<string, unknown>>;
@@ -174,12 +181,44 @@ function deltaToStreamEvent(
     };
   }
   if (delta.type === "turn_metadata") {
+    const rawMetadata = delta.turnMetadata as (Partial<TurnMetadata> & Record<string, unknown>) | undefined;
+    const metadata = rawMetadata
+      ? {
+          ...rawMetadata,
+          requestedModel: rawMetadata.requestedModel ?? rawMetadata.requested_model,
+          actualModel: rawMetadata.actualModel ?? rawMetadata.actual_model,
+          provider: rawMetadata.provider,
+          fallback: rawMetadata.fallback,
+          contextProfile: rawMetadata.contextProfile ?? rawMetadata.context_profile,
+          effectiveContextTokens: rawMetadata.effectiveContextTokens ?? rawMetadata.effective_context_tokens,
+        } as Partial<TurnMetadata>
+      : undefined;
     return {
       type: "turn_metadata",
       content: delta.content || "Turn metadata",
       turnId: delta.turnId,
-      turnMetadata: delta.turnMetadata as TurnMetadata | undefined,
+      turnMetadata: metadata as TurnMetadata | undefined,
+      requestedModel: metadata?.requestedModel,
+      actualModel: metadata?.actualModel,
+      provider: metadata?.provider,
+      fallback: metadata?.fallback,
+      contextProfile: metadata?.contextProfile,
+      effectiveContextTokens: metadata?.effectiveContextTokens,
     };
+  }
+  if (delta.type === "model_metadata") {
+    const raw = typeof structured.content === "object" && structured.content !== null
+      ? structured.content as Record<string, unknown>
+      : structured as unknown as Record<string, unknown>;
+    const modelMetadata: ModelMetadata = {
+      requestedModel: (raw.requested_model ?? raw.requestedModel) as string | undefined,
+      actualModel: (raw.actual_model ?? raw.actualModel) as string | undefined,
+      provider: raw.provider as string | undefined,
+      fallback: raw.fallback as boolean | undefined,
+      contextProfile: (raw.context_profile ?? raw.contextProfile) as ModelMetadata["contextProfile"],
+      effectiveContextTokens: (raw.effective_context_tokens ?? raw.effectiveContextTokens) as number | undefined,
+    };
+    return { type: "model_metadata", content: "", modelMetadata };
   }
   if (delta.type === "continuation") {
     return {

@@ -58,7 +58,7 @@ export function ModelQueueCard({ status, onUseAlternative, onDismiss }: ModelQue
         <div className="flex items-center gap-2">
           {/* Spinner */}
           <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
-          <span className="font-medium text-amber-200">Model Loading</span>
+          <span className="font-medium text-amber-200">{status.is_loaded ? "Model Busy" : "Model Loading"}</span>
           <span className="rounded bg-amber-900/50 px-1.5 py-0.5 text-xs font-mono text-amber-300/80">
             {status.model}
           </span>
@@ -84,7 +84,7 @@ export function ModelQueueCard({ status, onUseAlternative, onDismiss }: ModelQue
         {/* VRAM info */}
         <p className="text-xs text-amber-300/50">
           {status.is_loaded
-            ? "Model is resident in VRAM — waiting for prior requests to finish."
+            ? "Model is resident in VRAM — waiting for the current request slot."
             : `Model is on disk. Loading ~${status.estimated_wait_s}s to VRAM (20 GB).`}
         </p>
 

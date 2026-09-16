@@ -10,6 +10,14 @@ export type Skill = "general" | "code" | "devops" | "data" | "creative" | "resea
 /** Response style modifier injected into the system prompt. */
 export type Style = "default" | "concise" | "explanatory" | "formal" | "technical" | "casual";
 
+export type ContextProfile = "chat" | "project" | "long";
+
+export const CONTEXT_PROFILE_TOKENS: Record<ContextProfile, number> = {
+  chat: 32768,
+  project: 65536,
+  long: 122880,
+};
+
 /** A file attached to a chat message (base64-encoded). */
 export interface FileAttachment {
   name: string;
@@ -32,6 +40,21 @@ export interface TurnMetadata {
   continuable: boolean;
   resumeToken?: string;
   traceId?: string;
+  requestedModel?: string;
+  actualModel?: string;
+  provider?: string;
+  fallback?: boolean;
+  contextProfile?: ContextProfile;
+  effectiveContextTokens?: number;
+}
+
+export interface ModelMetadata {
+  requestedModel?: string;
+  actualModel?: string;
+  provider?: string;
+  fallback?: boolean;
+  contextProfile?: ContextProfile;
+  effectiveContextTokens?: number;
 }
 
 /**
@@ -221,7 +244,7 @@ export interface FlaggedFollowup {
 }
 
 export interface StreamEvent {
-  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "cad_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps" | "agent_event" | "set_preview_url" | "preview_unavailable" | "heartbeat" | "file_change" | "todo" | "usage";
+  type: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "model_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "model_queue_status" | "design_artifact" | "cad_artifact" | "suggested_followups" | "workshop_questions" | "workflow_next_steps" | "agent_event" | "set_preview_url" | "preview_unavailable" | "heartbeat" | "file_change" | "todo" | "usage";
   content?: string;
   // Swarm theater
   phase_num?: number;
@@ -300,6 +323,13 @@ export interface StreamEvent {
     prompt_chars?:      number;
     completion_chars?:  number;
   };
+  requestedModel?: string;
+  actualModel?: string;
+  provider?: string;
+  fallback?: boolean;
+  contextProfile?: ContextProfile;
+  effectiveContextTokens?: number;
+  modelMetadata?: ModelMetadata;
 }
 
 /**

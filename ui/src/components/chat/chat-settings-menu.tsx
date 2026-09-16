@@ -16,6 +16,7 @@ import { QualitySettingsPanel } from "./quality-settings-panel";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useAccess } from "@/lib/hooks/use-access";
+import type { ContextProfile } from "@/types/chat";
 
 export function ChatSettingsMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -38,6 +39,8 @@ export function ChatSettingsMenu() {
   const anyModeActive = researchMode || ultraplanMode || ultrathinkMode || swarmMode || groundingWeb || groundingDocs || groundingFile;
   const agentTransparency = useSettingsStore((s) => s.agentTransparency);
   const setAgentTransparency = useSettingsStore((s) => s.setAgentTransparency);
+  const contextProfile = useSettingsStore((s) => s.contextProfile);
+  const setContextProfile = useSettingsStore((s) => s.setContextProfile);
 
   const updatePos = useCallback(() => {
     if (!btnRef.current) return;
@@ -128,6 +131,21 @@ export function ChatSettingsMenu() {
       <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
         <label className="text-xs text-[var(--chat-muted)]">Quality & Effort</label>
         <QualitySettingsPanel />
+      </div>
+
+      <div className="space-y-1 pt-1.5 border-t border-[var(--chat-border)]">
+        <label htmlFor="context-profile" className="text-xs text-[var(--chat-muted)]">Context profile</label>
+        <select
+          id="context-profile"
+          value={contextProfile}
+          onChange={(e) => setContextProfile(e.target.value as ContextProfile)}
+          className="w-full rounded-md border border-[var(--chat-border)] bg-[var(--chat-panel)] px-2 py-1.5 text-[11px] text-[var(--chat-text)]"
+        >
+          <option value="chat">Chat · 32K</option>
+          <option value="project">Project · 64K</option>
+          <option value="long">Long · 122K</option>
+        </select>
+        <p className="text-[10px] text-[var(--chat-subtle)]">Applied to chat, Code, and swarm requests. The server reports the effective budget.</p>
       </div>
 
       {/* Agent Transparency */}
