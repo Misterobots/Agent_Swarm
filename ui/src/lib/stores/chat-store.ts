@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   AgentTraceEvent,
   ChatMessage,
@@ -59,6 +59,56 @@ interface ChatState {
   setMessageAgentTrace: (conversationId: string, messageId: string, events: AgentTraceEvent[]) => void;
   appendFileChange: (conversationId: string, messageId: string, change: FileChange) => void;
   setMessageTodos: (conversationId: string, messageId: string, todos: import("@/types/chat").TodoItem[]) => void;
+}
+
+const safeLocalStorage = {
+  getItem: (name: string): string | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      return window.localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(name, value);
+    } catch (err) {
+      console.warn(`[chat-store] Storage quota exceeded for "${name}". Evicting local cache to preserve app function.`, err);
+      try {
+        window.localStorage.removeItem(name);
+      } catch {}
+    }
+  },
+  removeItem: (name: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(name);
+    } catch {}
+  },
+};
+
+function pruneForLocalStorage(conversations: Conversation[]): Conversation[] {
+  if (!Array.isArray(conversations)) return [];
+  // Keep only the 10 most recently updated conversations in local browser storage.
+  // Full conversation history is persistently saved to the backend database.
+  const sorted = [...conversations].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return sorted.slice(0, 10).map((c) => ({
+    ...c,
+    // Keep only the latest 20 messages for each conversation in local preview
+    messages: c.messages.slice(-20).map((m) => ({
+      ...m,
+      // Strip any massive base64 image data strings from localStorage
+      mediaAttachments: m.mediaAttachments?.map((a) => ({
+        ...a,
+        url: a.url?.startsWith("data:") ? "" : a.url,
+      })),
+      // Omit bulky thought traces and tool outputs from local cache
+      thoughts: undefined,
+      toolResults: undefined,
+    })),
+  }));
 }
 
 export const useChatStore = create<ChatState>()(
@@ -487,6 +537,15 @@ export const useChatStore = create<ChatState>()(
           }),
         })),
     }),
-    { name: "memex-chats" }
+    {
+      name: "memex-chats",
+      storage: createJSONStorage(() => safeLocalStorage),
+      partialize: (state) => ({
+        activeConversationId: state.activeConversationId,
+        activeExperience: state.activeExperience,
+        activeConversationIds: state.activeConversationIds,
+        conversations: pruneForLocalStorage(state.conversations),
+      }),
+    }
   )
 );
