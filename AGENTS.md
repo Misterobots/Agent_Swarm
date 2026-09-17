@@ -63,7 +63,7 @@ authentik         running   (SSO)
 | Service | Host Port | Notes |
 |---------|-----------|-------|
 | Docker Desktop | local | Run `docker` commands directly — no remote API needed |
-| Ollama | 11434 | GPU-backed (2× RTX 5060Ti, 32GB) — **primary model host**: all heavy models (27–31B: `qwen3.6:27b`, `gemma4:31b`, `qwen3-coder:30b`, `deepseek-r1:32b`, etc.) plus mid-size (`qwen3:14b`). This is `OLLAMA_HOST` for both Lovelace and Turing agent_runtime containers. |
+| Ollama | 11434 | GPU-backed (2× RTX 5060Ti, 32GB) — **primary model host**: all heavy models (27–31B: `qwen3.8:27b`, `qwen3.6:27b`, `gemma4:31b`, `qwen3-coder:30b`, `deepseek-r1:32b`, etc.) plus mid-size (`qwen3:14b`). This is `OLLAMA_HOST` for both Lovelace and Turing agent_runtime containers. |
 | Open Design daemon | 7456 | OD v0.5.0; requires caller-supplied `id` UUID in POST /api/projects |
 | Authentik | 9000 | SSO |
 | `agent_runtime` (prod) | **8008** | internal 8000 → host 8008 |
@@ -290,7 +290,9 @@ Invoke-RestMethod -Uri "http://127.0.0.1:2375/containers/agent_runtime/logs?stdo
 
 ---
 
-## 📦 Pending Tasks (as of 2026-07-06)
+## 📦 Pending Tasks (as of 2026-09-16)
+
+- [x] **Qwen 3.8 opt-in integration** — all backend code merged to `main`: role snapshots (`role_model_resolver.py`, `session.py`), context profiles (`qwen_context.py`, 32K/64K/122K), vision routing (`qwen_vision.py`), Team Builder preset, and 6-case evaluation suite. 28 unit tests pass; mock eval 6/6. Dev runtime metadata propagation verified (`provider=ollama`, `effective_context_tokens=32768` in SSE deltas). 6 `codex/qwen38-*` worktrees and branches removed. Desktop (`memex-desktop`) updated: `EvalBenchView` defaults → `qwen3.8:27b`, `local-llm.ts` adds 24GB+ VRAM tier recommendation. Live exhaustive evaluation and primary-model promotion decision remain separate (2026-09-16).
 
 - [x] **Retired BMO voice-model note** — BMO was removed and this item is obsolete. It is not Friday: Friday remains the separate `friday-brain` path; no Friday model or deployment setting was changed (2026-08-27).
 - [x] **Turing small-model latency verified (generic fast path, not Friday)** — rechecked 2026-08-27: `llama3.2:3b` cold-loaded in 5.29s and returned in 35ms warm, with the model resident in `/api/ps` and 2.8 GiB of 8 GiB visible on the RTX 3070 Ti. No routing or Friday setting was changed.

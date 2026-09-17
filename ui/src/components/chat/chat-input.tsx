@@ -31,14 +31,42 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
 
   // Claude Code commands (local handling) + Memex workflow commands (passed to backend)
   const commands = [
-    // Local: chat & model management
-    "/clear", "/model", "/compact", "/memory", "/help",
+    // Agent Flows
+    { cmd: "/flow-blockout", label: "Blockout Flow", category: "Flow", description: "Rough, rapid first-pass draft of nonexistent structure (schemas, folder layouts, configs)." },
+    { cmd: "/flow-batch-edit", label: "Batch Edit Flow", category: "Flow", description: "Apply one mechanical change across N existing files matching a predicate. Reversible." },
+    { cmd: "/flow-audit", label: "Audit Flow", category: "Flow", description: "Read-only sweep checking a large set against explicit rules (dead links, broken exports). Never mutates." },
+    { cmd: "/flow-scaffold", label: "Scaffold Flow", category: "Flow", description: "Generate boilerplate skeleton for one new unit (component, service, route) with empty logic." },
+    { cmd: "/flow-variants", label: "Variants Flow", category: "Flow", description: "Generate N named derivatives from one parent template plus a parameter table." },
+    { cmd: "/agent-flows", label: "Agent Flows Guide", category: "Flow", description: "Routing guide and 3-part selection gate for picking the right agent flow." },
+
     // Backend: Memex workflows
-    "/workshop", "/grill", "/design", "/build", "/swarm", "/plan", "/research", "/think",
+    { cmd: "/build", label: "Collective Build", category: "Workflow", description: "Multi-agent swarm coordination to plan, write, and verify code across files." },
+    { cmd: "/swarm", label: "Swarm Mode", category: "Workflow", description: "Alias for Collective build: coordinate specialists to execute project tasks." },
+    { cmd: "/plan", label: "Plan Mode", category: "Workflow", description: "Explicit planning and exploration phase with ultraplan before modifying files." },
+    { cmd: "/workshop", label: "Product Workshop", category: "Workflow", description: "Two-phase discovery: interactive grill-me questions → Product Brief → pipeline actions." },
+    { cmd: "/grill", label: "Grill Me", category: "Workflow", description: "Deep discovery interview to align on requirements and eliminate ambiguity." },
+    { cmd: "/design", label: "Design Studio", category: "Workflow", description: "Generate self-contained UI/HTML mockups and Open Design projects." },
+    { cmd: "/research", label: "Deep Research", category: "Workflow", description: "Deep web and documentation research with perspective synthesis." },
+    { cmd: "/think", label: "Extended Thinking", category: "Workflow", description: "Extended step-by-step reasoning for difficult problems before responding." },
+    { cmd: "/cad", label: "CAD Modeling", category: "Workflow", description: "Generate OpenSCAD 3D models with 2D preview renders and STL export." },
+
+    // Local: chat & model management
+    { cmd: "/compact", label: "Compact Context", category: "Utility", description: "Summarize earlier conversation turns to reclaim token budget." },
+    { cmd: "/clear", label: "Clear Thread", category: "Utility", description: "Clear active conversation messages and reset thread state." },
+    { cmd: "/model", label: "Model Info / Switch", category: "Utility", description: "Show active model and context window or switch model." },
+    { cmd: "/memory", label: "MemPalace Memory", category: "Utility", description: "Inspect or search persistent long-term memory." },
+    { cmd: "/help", label: "Help", category: "Utility", description: "List all available slash commands, workflows, and shortcuts." },
   ];
-  const isSlash = input.trimStart().startsWith("/");
-  const commandQuery = input.trimStart().slice(1).toLowerCase();
-  const matches = commands.filter((c) => c.slice(1).startsWith(commandQuery));
+  const [slashIndex, setSlashIndex] = useState(0);
+  const isSlash = input.startsWith("/") && !input.trimStart().includes(" ");
+  const commandQuery = isSlash ? input.trimStart().slice(1).toLowerCase() : "";
+  const matches = isSlash
+    ? commands.filter((c) => c.cmd.slice(1).toLowerCase().startsWith(commandQuery) || c.label.toLowerCase().includes(commandQuery))
+    : [];
+
+  useEffect(() => {
+    setSlashIndex(0);
+  }, [commandQuery]);
 
   const executeSlash = useCallback(
     (raw: string): boolean => {
@@ -66,12 +94,16 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
         return true;
       }
       if (cmd === "/help") {
-        onSend("**Local commands:** /clear, /model <id>, /compact, /memory, /help\n**Memex workflows:** /workshop [idea], /grill [idea], /design [prompt], /build [task], /swarm [task], /plan [task], /research [query], /think [question]");
+        onSend("**Local commands:** /clear, /model <id>, /compact, /memory, /help\n**Memex workflows:** /workshop [idea], /grill [idea], /design [prompt], /build [task], /swarm [task], /plan [task], /research [query], /think [question], /cad [prompt]\n**Agent flows:** /flow-blockout [desc], /flow-batch-edit [desc], /flow-audit [desc], /flow-scaffold [desc], /flow-variants [desc], /agent-flows");
         setInput("");
         return true;
       }
-      // Pass through to backend: Claude Code + Memex workflow commands
-      if (["/compact", "/plan", "/memory", "/workshop", "/grill", "/design", "/build", "/swarm", "/research", "/think"].includes(cmd)) {
+      // Pass through to backend: Claude Code + Memex workflow commands + Agent Flows
+      if ([
+        "/compact", "/plan", "/memory", "/workshop", "/grill", "/design",
+        "/build", "/swarm", "/research", "/think", "/cad",
+        "/flow-blockout", "/flow-batch-edit", "/flow-audit", "/flow-scaffold", "/flow-variants", "/agent-flows"
+      ].includes(cmd)) {
         onSend(raw);
         setInput("");
         return true;
@@ -94,12 +126,38 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
     }
   }, [executeSlash, input, isStreaming, onSend]);
 
-  // Keep the vim hook's submit ref in sync with the real handleSend
   useEffect(() => {
     vimHandleSendRef.current = handleSend;
   }, [handleSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (isSlash && matches.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSlashIndex((i) => (i + 1) % matches.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSlashIndex((i) => (i - 1 + matches.length) % matches.length);
+        return;
+      }
+      if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+        e.preventDefault();
+        const selected = matches[slashIndex];
+        if (selected) {
+          setInput(selected.cmd + " ");
+          if (textareaRef.current) textareaRef.current.focus();
+        }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setInput("");
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -108,13 +166,11 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    // Auto-resize
     const el = e.target;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   };
 
-  // Listen for prefill events (e.g. from EmptyChatState starter chips)
   useEffect(() => {
     const onPrefill = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
@@ -138,22 +194,54 @@ export function ChatInput({ onSend, onStop, isStreaming, placeholder }: ChatInpu
       <div className="relative flex items-end gap-2 max-w-5xl mx-auto">
         {isSlash && matches.length > 0 && (
           <div
-            className="absolute bottom-full mb-2 left-0 right-12 rounded-md border border-[var(--chat-border)] bg-[var(--chat-elevated)] overflow-hidden z-20"
+            className="absolute bottom-full mb-2 left-0 right-12 max-h-72 overflow-y-auto rounded-xl border border-[var(--chat-border)] bg-[var(--chat-elevated)] shadow-2xl z-20 py-1 divide-y divide-[var(--chat-border)]/30 backdrop-blur-md"
             style={{ boxShadow: "var(--elev-2)" }}
+            role="listbox"
+            aria-label="Slash commands"
           >
-            {matches.map((c) => (
+            {matches.map((c, idx) => (
               <button
-                key={c}
+                key={c.cmd}
                 type="button"
-                onClick={() => setInput(c + " ")}
-                className="w-full text-left px-3 py-2 text-xs text-[var(--chat-text)] hover:bg-[var(--hover-tint)]"
+                role="option"
+                aria-selected={idx === slashIndex}
+                onMouseEnter={() => setSlashIndex(idx)}
+                onClick={() => {
+                  setInput(c.cmd + " ");
+                  if (textareaRef.current) textareaRef.current.focus();
+                }}
+                className={cn(
+                  "w-full text-left px-3.5 py-2 text-xs transition-colors flex items-start gap-2.5 group",
+                  idx === slashIndex ? "bg-[var(--hover-tint)] text-[var(--chat-text)]" : "text-[var(--chat-text)]/85 hover:bg-[var(--hover-tint)]"
+                )}
+                title={c.description}
               >
-                {c}
+                <span className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-semibold text-[var(--chat-accent)]">{c.cmd}</span>
+                    <span className="font-medium text-[var(--chat-text)]/90">{c.label}</span>
+                    <span className={cn(
+                      "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                      c.category === "Flow"
+                        ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
+                        : c.category === "Workflow"
+                        ? "bg-accent/15 text-accent border border-accent/30"
+                        : "bg-[var(--chat-surface)] text-[var(--chat-muted)] border border-[var(--chat-border)]"
+                    )}>
+                      {c.category}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-[var(--chat-muted)] leading-relaxed line-clamp-2">
+                    {c.description}
+                  </p>
+                </span>
+                <span className="text-[10px] font-mono text-[var(--chat-muted)]/60 px-1.5 py-0.5 rounded bg-[var(--chat-surface)] mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Tab ↹
+                </span>
               </button>
             ))}
           </div>
         )}
-        {/* Vim mode indicator */}
         {vimMode && (
           <div className="absolute bottom-full left-0 mb-1 px-2 py-0.5 text-[10px] font-mono rounded bg-[var(--chat-surface)] border border-[var(--chat-border)] text-[var(--chat-accent)]">
             -- {vim.mode.toUpperCase()} --

@@ -901,6 +901,13 @@ def chat_swarm(
             ("/research",   None,              "research"),
             ("/think",      None,              "think"),
             ("/cad",        None,              "cad"),
+            # Agent Flows
+            ("/flow-blockout",   "swarm_mode", "flow_blockout"),
+            ("/flow-batch-edit", None,         "flow_batch_edit"),
+            ("/flow-audit",      "swarm_mode", "flow_audit"),
+            ("/flow-scaffold",   "swarm_mode", "flow_scaffold"),
+            ("/flow-variants",   None,         "flow_variants"),
+            ("/agent-flows",     None,         "agent_flows"),
         ]
         for _sc_cmd, _sc_flag, _sc_extra in _SLASH_TABLE:
             if _scl.startswith(_sc_cmd + " ") or _scl == _sc_cmd:
@@ -912,6 +919,19 @@ def chat_swarm(
                 if _sc_extra == "think":         ultrathink_mode  = True
                 if _sc_extra == "research":      _research_slash  = True; research_mode = True
                 if _sc_extra == "cad":           intent = "CAD";  confidence = 1.0; reasoning = "Slash command: /cad"
+                if _sc_extra == "flow_blockout":
+                    ultraplan_mode = True
+                    user_input = f"[Flow: flow-blockout — Rough, rapid draft of nonexistent structure (schemas, directory trees, configs)]\n{user_input}"
+                elif _sc_extra == "flow_batch_edit":
+                    user_input = f"[Flow: flow-batch-edit — Reversible mechanical edit across N existing items; state rollback first]\n{user_input}"
+                elif _sc_extra == "flow_audit":
+                    user_input = f"[Flow: flow-audit — Read-only sweep checking a large set against explicit rules; never mutate]\n{user_input}"
+                elif _sc_extra == "flow_scaffold":
+                    user_input = f"[Flow: flow-scaffold — Generate boilerplate skeleton for one new unit; structure only, no logic]\n{user_input}"
+                elif _sc_extra == "flow_variants":
+                    user_input = f"[Flow: flow-variants — Generate N named derivatives from parent template + parameter table]\n{user_input}"
+                elif _sc_extra == "agent_flows":
+                    user_input = f"[Flow Guide: agent-flows — Routing map and 3-part selection gate]\n{user_input}"
                 break
 
         # ---------------------------------------------------------------------------

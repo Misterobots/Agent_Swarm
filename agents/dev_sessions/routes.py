@@ -29,11 +29,11 @@ router = APIRouter(prefix="/v1/dev/sessions", tags=["dev-sessions"])
 # ---------------------------------------------------------------------------
 
 def _owner(request: Request) -> str:
-    """Extract uid from Authentik forward-auth headers. Returns '' if absent."""
+    """Pull owner uid from Authentik forward-auth headers, falling back to 'local'."""
     return (
-        request.headers.get("x-authentik-uid")
-        or request.headers.get("x-authentik-username")
-        or ""
+        request.headers.get("x-authentik-username")
+        or request.headers.get("x-authentik-uid")
+        or "local"
     )
 
 

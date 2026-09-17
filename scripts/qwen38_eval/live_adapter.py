@@ -187,13 +187,17 @@ class LiveMemexAdapter(Provider):
                                 "context_profile", "effective_context_tokens"):
                         if source.get(key) is not None:
                             metadata[key] = source[key]
-                if event.get("type") == "tool_approval_needed":
-                    call_id = event.get("call_id") or event.get("tool_call_id")
-                    if call_id:
-                        approvals.append(str(call_id))
-                        if approval_handler is not None:
-                            approval_handler(str(call_id), event)
-                delta = event.get("choices", [{}])[0].get("delta", {}) if event.get("choices") else {}
+                for source in sources:
+                    if source.get("type") == "tool_approval_needed":
+                        call_id = source.get("call_id") or source.get("tool_call_id")
+                        if call_id:
+                            cid = str(call_id)
+                            if cid not in approvals:
+                                approvals.append(cid)
+                            if approval_handler is not None:
+                                approval_handler(cid, source)
+                        break
+                delta = (event.get("choices") or [{}])[0].get("delta") if event.get("choices") else (event.get("delta") or event)
                 content = delta.get("content") if isinstance(delta, dict) else None
                 # Some events carry a structured (dict) content — tool calls,
                 # metadata — not response text. Only string deltas are text.

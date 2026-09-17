@@ -73,9 +73,23 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"live evaluation blocked before requests: {exc}") from exc
     else:
         results = all_cases(DeterministicProvider(), mode=args.mode)
-    write_json_report(args.report, mode=args.mode, results=results)
     blocked = sum(r.status == "blocked" for r in results)
     failed = sum(r.status == "failed" for r in results)
+    extra = {}
+    if args.mode == "live" and args.stage == "exhaustive":
+        extra = {
+            "stage": args.stage,
+            "runs": args.runs,
+            "smoke_passed": args.smoke_passed,
+            "baseline_model": args.baseline_model,
+            "summary": {
+                "total_results": len(results),
+                "passed": sum(r.passed for r in results),
+                "blocked": blocked,
+                "failed": failed,
+            },
+        }
+    write_json_report(args.report, mode=args.mode, results=results, **extra)
     print(json.dumps({"mode": args.mode, "passed": sum(r.passed for r in results),
                       "blocked": blocked, "failed": failed, "total": len(results),
                       "report": str(args.report)}, indent=2))

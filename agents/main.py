@@ -1,4 +1,4 @@
-﻿
+
 import logging
 import sys
 import os
@@ -1074,7 +1074,11 @@ async def approve_tool_call(call_id: str, http_request: Request):
     auto_scope = body.get("auto", "none")
     tool_name = body.get("tool_name", "")
     workspace_key = body.get("workspace_key")
-    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    uid = (
+        http_request.headers.get("X-authentik-username", "").strip()
+        or http_request.headers.get("X-authentik-uid", "").strip()
+        or "default"
+    )
 
     pending_owner = _approval_owners.get(call_id)
     if pending_owner is None:
@@ -1083,7 +1087,7 @@ async def approve_tool_call(call_id: str, http_request: Request):
         logger.warning(f"[dev_approve] rejected cross-owner approval call_id={call_id} uid={uid}")
         raise HTTPException(status_code=403, detail="Approval request belongs to another owner")
 
-    if auto_scope != "none" and tool_name:
+    if auto_scope != "none" and (tool_name or auto_scope.startswith("all_")):
         _apply_auto_approve(uid, tool_name, auto_scope, workspace_key)
 
     _approval_decisions[call_id] = True
@@ -1107,7 +1111,11 @@ async def approve_tool_call(call_id: str, http_request: Request):
 @app.post("/api/v1/dev/deny/{call_id}")
 async def deny_tool_call(call_id: str, http_request: Request):
     """Deny a pending tool call from the AI agent."""
-    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    uid = (
+        http_request.headers.get("X-authentik-username", "").strip()
+        or http_request.headers.get("X-authentik-uid", "").strip()
+        or "default"
+    )
     pending_owner = _approval_owners.get(call_id)
     if pending_owner is None:
         raise HTTPException(status_code=404, detail="Approval request not found or expired")
@@ -1135,7 +1143,11 @@ async def deny_tool_call(call_id: str, http_request: Request):
 @app.get("/api/v1/dev/auto-approve")
 async def get_auto_approve_rules(http_request: Request):
     """Return the current auto-approve rules for the calling user."""
-    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    uid = (
+        http_request.headers.get("X-authentik-username", "").strip()
+        or http_request.headers.get("X-authentik-uid", "").strip()
+        or "default"
+    )
     workspace_key = http_request.query_params.get("workspace_key")
     workspace = _approval_workspace_key(workspace_key)
     session_rules = list(_session_auto_approve.get(uid, {}).get(workspace, set()))
@@ -1150,7 +1162,11 @@ async def get_auto_approve_rules(http_request: Request):
 @app.delete("/api/v1/dev/auto-approve")
 async def clear_auto_approve_rules(http_request: Request):
     """Clear all auto-approve rules for the calling user (session + workspace)."""
-    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    uid = (
+        http_request.headers.get("X-authentik-username", "").strip()
+        or http_request.headers.get("X-authentik-uid", "").strip()
+        or "default"
+    )
     _session_auto_approve.pop(uid, None)
     ws_data = _load_workspace_auto_approve()
     ws_data.pop(uid, None)
@@ -1197,7 +1213,11 @@ def _serialize_dev_replay(handler):
     """Serialize replay per owner/session so two requests cannot consume one call."""
     @functools.wraps(handler)
     async def wrapped(session_id, body, http_request):
-        uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+        uid = (
+            http_request.headers.get("X-authentik-username", "").strip()
+            or http_request.headers.get("X-authentik-uid", "").strip()
+            or "default"
+        )
         key = f"{uid}:{session_id}"
         with _DEV_REPLAY_LOCKS_GUARD:
             lock = _DEV_REPLAY_LOCKS.setdefault(key, threading.Lock())
@@ -1212,7 +1232,11 @@ def _serialize_dev_replay(handler):
 @app.get("/api/v1/dev/checkpoints")
 async def list_dev_checkpoints(http_request: Request):
     """List incomplete DevHarness checkpoints for the authenticated owner."""
-    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    uid = (
+        http_request.headers.get("X-authentik-username", "").strip()
+        or http_request.headers.get("X-authentik-uid", "").strip()
+        or "default"
+    )
     from dev_harness.checkpoints import list_recovery_required
     return {"checkpoints": [_checkpoint_public_view(row) for row in list_recovery_required(uid)]}
 
@@ -1220,7 +1244,11 @@ async def list_dev_checkpoints(http_request: Request):
 @app.get("/api/v1/dev/checkpoints/{session_id}")
 async def get_dev_checkpoint(session_id: str, http_request: Request):
     """Inspect one owner-scoped checkpoint without exposing other owners."""
-    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    uid = (
+        http_request.headers.get("X-authentik-username", "").strip()
+        or http_request.headers.get("X-authentik-uid", "").strip()
+        or "default"
+    )
     from dev_harness.checkpoints import get_checkpoint
     row = get_checkpoint(uid, session_id)
     if not row:
@@ -1245,7 +1273,11 @@ async def replay_dev_checkpoint_tool(
     if not body.confirm:
         raise HTTPException(status_code=400, detail="Set confirm=true to replay a tool call")
 
-    uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+    uid = (
+        http_request.headers.get("X-authentik-username", "").strip()
+        or http_request.headers.get("X-authentik-uid", "").strip()
+        or "default"
+    )
     from dev_harness.checkpoints import get_checkpoint, save_checkpoint
 
     row = get_checkpoint(uid, session_id)
@@ -1554,7 +1586,10 @@ async def list_ollama_models():
 @app.get("/v1/team-builder/config")
 async def team_builder_get_config(request: Request):
     """Load the authenticated user's team builder configuration."""
-    uid = request.headers.get("X-authentik-uid", "").strip()
+    uid = (
+        request.headers.get("X-authentik-username", "").strip()
+        or request.headers.get("X-authentik-uid", "").strip()
+    )
     if not uid:
         raise HTTPException(status_code=401, detail="Authentication required")
     from team_builder import get_team_config
@@ -1564,7 +1599,10 @@ async def team_builder_get_config(request: Request):
 @app.post("/v1/team-builder/config")
 async def team_builder_save_config(request: Request):
     """Save the authenticated user's team builder configuration."""
-    uid = request.headers.get("X-authentik-uid", "").strip()
+    uid = (
+        request.headers.get("X-authentik-username", "").strip()
+        or request.headers.get("X-authentik-uid", "").strip()
+    )
     if not uid:
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
@@ -1582,7 +1620,10 @@ async def team_builder_save_config(request: Request):
 @app.delete("/v1/team-builder/config")
 async def team_builder_delete_config(request: Request):
     """Reset the authenticated user's team builder configuration to defaults."""
-    uid = request.headers.get("X-authentik-uid", "").strip()
+    uid = (
+        request.headers.get("X-authentik-username", "").strip()
+        or request.headers.get("X-authentik-uid", "").strip()
+    )
     if not uid:
         raise HTTPException(status_code=401, detail="Authentication required")
     from team_builder import clear_team_config
@@ -1880,13 +1921,30 @@ async def _dev_harness_stream(
 
     stream_run_id = f"dev-{uuid.uuid4().hex}"
     stream_seq = 0
+    from providers.registry import provider_for
+    _initial_p = provider_for(request.model)
+    _initial_provider = _initial_p or "ollama"
+    _initial_profile = request.context_profile or ("project" if request.dev_mode else "chat")
+    _initial_tokens = None
+    try:
+        from providers.qwen_context import resolve_qwen_context
+        _ctx = resolve_qwen_context(
+            request.model,
+            request.context_profile,
+            task_mode="project" if request.dev_mode else "chat",
+        )
+        _initial_profile = _ctx.profile
+        _initial_tokens = _ctx.effective_tokens
+    except (ImportError, AttributeError, ValueError):
+        _initial_tokens = 32768 if _initial_profile == "chat" else 65536
+
     runtime_metadata = {
         "requested_model": request.model,
         "actual_model": request.model,
-        "provider": "unknown",
+        "provider": _initial_provider,
         "fallback": False,
-        "context_profile": request.context_profile or ("project" if request.dev_mode else "chat"),
-        "effective_context_tokens": None,
+        "context_profile": _initial_profile,
+        "effective_context_tokens": _initial_tokens,
     }
 
     def _event_sse(delta: dict) -> str:
@@ -2285,7 +2343,11 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     # to provider=None and would otherwise fall through to the swarm path, never
     # reaching the coding loop.  DevHarness picks Ollama/GitHub/Anthropic itself.
     if request.dev_mode and request.stream:
-        _dev_uid = http_request.headers.get("X-authentik-uid", "").strip() or "default"
+        _dev_uid = (
+            http_request.headers.get("X-authentik-username", "").strip()
+            or http_request.headers.get("X-authentik-uid", "").strip()
+            or "default"
+        )
         return StreamingResponse(
             _dev_harness_stream(
                 request,
@@ -3209,7 +3271,11 @@ async def trigger_create(req: TriggerCreateRequest, request: Request):
     kind creatable over the API, and the only kind that survives a restart."""
     from trigger_scheduler import get_trigger_scheduler
     sched = get_trigger_scheduler()
-    uid = request.headers.get("X-authentik-uid", "").strip() or None
+    uid = (
+        request.headers.get("X-authentik-username", "").strip()
+        or request.headers.get("X-authentik-uid", "").strip()
+        or None
+    )
     task_config = req.task_config.model_dump()
     # owner_id defaults to the caller so scheduled runs are attributed correctly
     task_config.setdefault("owner_id", uid)
@@ -4183,7 +4249,7 @@ async def push_status(coordination_id: str, request: Request):
 @app.get("/v1/conversations")
 async def conv_list(request: Request):
     """Return all conversations for the authenticated user."""
-    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    owner_id = _permission_owner(request)
     try:
         from conversation_store import list_conversations
         return {"conversations": list_conversations(owner_id)}
@@ -4195,7 +4261,7 @@ async def conv_list(request: Request):
 @app.put("/v1/conversations/{conv_id}")
 async def conv_upsert(conv_id: str, request: Request):
     """Save (create or update) a conversation for the authenticated user."""
-    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    owner_id = _permission_owner(request)
     try:
         body = await request.json()
         if body.get("id") != conv_id:
@@ -4211,7 +4277,7 @@ async def conv_upsert(conv_id: str, request: Request):
 @app.delete("/v1/conversations/{conv_id}")
 async def conv_delete(conv_id: str, request: Request):
     """Delete a conversation for the authenticated user."""
-    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    owner_id = _permission_owner(request)
     try:
         from conversation_store import delete_conversation
         delete_conversation(owner_id, conv_id)
@@ -4228,7 +4294,7 @@ async def conv_delete(conv_id: str, request: Request):
 @app.get("/v1/prefs/onboarding")
 async def prefs_onboarding_get(request: Request):
     """Return the feature-callout keys this user has dismissed."""
-    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    owner_id = _permission_owner(request)
     try:
         from prefs_store import get_prefs
         data = get_prefs(owner_id, "onboarding")
@@ -4241,7 +4307,7 @@ async def prefs_onboarding_get(request: Request):
 @app.put("/v1/prefs/onboarding")
 async def prefs_onboarding_put(request: Request):
     """Union the incoming seen set with the stored one (monotonic, never shrinks)."""
-    owner_id = request.headers.get("X-authentik-username", "anonymous")
+    owner_id = _permission_owner(request)
     try:
         import time
         from prefs_store import get_prefs, save_prefs

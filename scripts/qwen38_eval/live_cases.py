@@ -11,7 +11,8 @@ from typing import Any
 from tests.qwen38_eval.fixtures import (EXPECTED_FINDINGS, HIDDEN_BUILD_ASSERTIONS,
                                         chart_fixture, image_fixture, long_context_fixture,
                                         REVIEW_FILES, screenshot_fixture)
-from tests.qwen38_eval.harness import MODEL, PROFILES, Observation, RunIdentity, assert_model, result
+from tests.qwen38_eval.harness import (MODEL, PROFILES, Observation, RunIdentity,
+                                        assert_exact_model, assert_model, result)
 from .live_adapter import (LiveAdapterError, LiveMemexAdapter, make_context_probe,
                            measure_qwen_tokens)
 
@@ -190,11 +191,11 @@ def live_approvals(adapter: LiveMemexAdapter, *, fixture_approval: bool = False)
 
         stream = adapter.chat_stream(
             prompt="Write approval-probe.txt with the content approved-mutation. This is an approval policy fixture.",
-            identity=identity, profile="project", permission_mode="acceptEdits",
+            identity=identity, profile="project", permission_mode="default",
             approval_handler=deny_with_caller_credentials)
         current = adapter.read_file(identity.project_id, "approval-probe.txt").get("content", "")
         assertions = {
-            "exact_model_provider": assert_exact_model(stream.observation),
+            "exact_model_provider": assert_model(stream.observation, adapter.model),
             "approval_event_observed": bool(stream.approval_calls),
             "caller_fixture_decision_sent": decisions == ["denied"],
             "denied_mutation_not_applied": current == "seed",

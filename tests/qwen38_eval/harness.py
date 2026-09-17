@@ -212,13 +212,14 @@ def result(name: str, mode: str, identity: RunIdentity, assertions: dict[str, bo
     return CaseResult(name, status, mode, authority, obs, assertions, details or {})
 
 
-def write_json_report(path: Path, *, mode: str, results: Iterable[CaseResult]) -> None:
+def write_json_report(path: Path, *, mode: str, results: Iterable[CaseResult], **kwargs: Any) -> None:
     payload = {
         "suite": "qwen38-evaluation",
         "mode": mode,
         "model": MODEL,
         "provider": PROVIDER,
         "case_deadlines_seconds": CASE_DEADLINES_SECONDS,
+        **kwargs,
         "results": [asdict(item) for item in results],
     }
     path.parent.mkdir(parents=True, exist_ok=True)
