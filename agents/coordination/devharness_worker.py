@@ -154,6 +154,21 @@ def _chunk_to_dict(ch) -> dict | None:
         return d
     if ch.type == "todo":
         return {"type": "todo", "content": ch.data or {"todos": []}}
+        
+    if ch.type in ("tool_start", "tool_progress", "tool_result", "tool_approval_needed"):
+        d = {"type": ch.type, "content": ch.content or ""}
+        if ch.tool_name is not None:
+            d["tool_name"] = ch.tool_name
+        if ch.tool_call_id is not None:
+            d["tool_call_id"] = ch.tool_call_id
+        if ch.tool_input is not None:
+            d["tool_input"] = ch.tool_input
+        if getattr(ch, "tool_progress", None) is not None:
+            d["tool_progress"] = ch.tool_progress
+        if getattr(ch, "artifacts", None) is not None:
+            d["artifacts"] = ch.artifacts
+        return d
+
     return None
 
 

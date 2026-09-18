@@ -10,7 +10,7 @@ from phi.model.ollama import Ollama
 # instead of phidata Agents on host /workspace.
 # OFF by default — flip to "true" after Phase B (substrate reconciliation)
 # repoints the artifacts cache and Android build pipeline to the sandbox.
-SWARM_DEVHARNESS_WORKERS = os.getenv("SWARM_DEVHARNESS_WORKERS", "").lower() in ("1", "true", "yes")
+SWARM_DEVHARNESS_WORKERS = os.getenv("SWARM_DEVHARNESS_WORKERS", "true").lower() in ("1", "true", "yes")
 
 from coordination.devharness_worker import DEVHARNESS_ELIGIBLE_ROLES
 
