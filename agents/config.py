@@ -1,4 +1,4 @@
-﻿"""
+"""
 Centralized Network Configuration for the Agentic Hive.
 
 All IP addresses and derived connection strings are loaded from
@@ -34,8 +34,11 @@ def _load_network_env():
                         continue
                     if "=" in line:
                         key, _, value = line.partition("=")
-                        # setdefault: real env vars always win
-                        os.environ.setdefault(key.strip(), value.strip())
+                        k = key.strip()
+                        v = value.strip()
+                        # Overwrite if missing or empty string (e.g. injected blank by compose)
+                        if not os.environ.get(k):
+                            os.environ[k] = v
             return
     # If network.env doesn't exist, rely on environment variables already set
 
@@ -44,22 +47,22 @@ _load_network_env()
 # ---------------------------------------------------------------------------
 # Node IPs
 # ---------------------------------------------------------------------------
-HOME_ASSISTANT_IP = os.getenv("HOME_ASSISTANT_IP", "192.168.2.100")
-LOVELACE_IP  = os.getenv("LOVELACE_IP", os.getenv("LOVELACE_IP", "192.168.2.101"))
-HOPPER_IP    = os.getenv("HOPPER_IP",    "192.168.2.102")
-TURING_IP    = os.getenv("TURING_IP",  os.getenv("TURING_IP", "192.168.2.103"))
-BMO_IP       = os.getenv("BMO_IP", "192.168.2.106")
-IDRAC_IP     = os.getenv("IDRAC_IP",   "192.168.2.104")
+HOME_ASSISTANT_IP = os.getenv("HOME_ASSISTANT_IP") or "192.168.2.100"
+LOVELACE_IP  = os.getenv("LOVELACE_IP") or "192.168.2.101"
+HOPPER_IP    = os.getenv("HOPPER_IP") or "192.168.2.102"
+TURING_IP    = os.getenv("TURING_IP") or "192.168.2.103"
+BMO_IP       = os.getenv("BMO_IP") or "192.168.2.106"
+IDRAC_IP     = os.getenv("IDRAC_IP") or "192.168.2.104"
 
 # ---------------------------------------------------------------------------
 # Derived Connection Strings
 # ---------------------------------------------------------------------------
-AGNO_DB_URL          = os.getenv("AGNO_DB_URL",          f"postgresql://agno:agno_password@{HOPPER_IP}:5432/agno_memory")
-LANGFUSE_HOST        = os.getenv("LANGFUSE_HOST",        f"http://{HOPPER_IP}:3000")
-MEMPALACE_URL        = os.getenv("MEMPALACE_URL",        f"http://{HOPPER_IP}:8200")
-HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL",   f"http://{HOME_ASSISTANT_IP}:8123")
-SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST", f"http://{TURING_IP}:11434")
-OLLAMA_HOST          = os.getenv("OLLAMA_HOST",          "http://localhost:11434")
+AGNO_DB_URL          = os.getenv("AGNO_DB_URL") or f"postgresql://agno:1I0GUDTY4eTbjJ70m9639JYoiQEpScNjOBsUnzUl@{HOPPER_IP}:5432/agno_memory"
+LANGFUSE_HOST        = os.getenv("LANGFUSE_HOST") or f"http://{HOPPER_IP}:3000"
+MEMPALACE_URL        = os.getenv("MEMPALACE_URL") or f"http://{HOPPER_IP}:8200"
+HOME_ASSISTANT_URL   = os.getenv("HOME_ASSISTANT_URL") or f"http://{HOME_ASSISTANT_IP}:8123"
+SECONDARY_OLLAMA_HOST = os.getenv("SECONDARY_OLLAMA_HOST") or f"http://{TURING_IP}:11434"
+OLLAMA_HOST          = os.getenv("OLLAMA_HOST") or "http://localhost:11434"
 # GPU peer lock server — Lovelace hosts this on its agent_runtime port (8001).
 # Turing sets GPU_LOCK_HOST=http://192.168.2.101:8001 in its docker env.
 # GPU_LOCK_SECRET should be the same value on all nodes (optional but recommended).
