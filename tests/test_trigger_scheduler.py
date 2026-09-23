@@ -265,6 +265,35 @@ class TestTriggerSingleton(unittest.TestCase):
         self.assertIs(a, b)
 
 
+class TestTaskConfigDispatch(unittest.TestCase):
+    """_run_task_config must hand chat_swarm every mode the run was created with."""
+
+    def _captured_kwargs(self, task_config):
+        import types
+
+        captured = {}
+
+        def fake_chat_swarm(**kwargs):
+            captured.update(kwargs)
+            return iter(())
+
+        fake_church = types.ModuleType("church")
+        fake_church.chat_swarm = fake_chat_swarm
+        with patch.dict(sys.modules, {"church": fake_church}):
+            from trigger_scheduler import _run_task_config
+            _run_task_config("t-modes", task_config)
+        return captured
+
+    def test_scheduled_collective_keeps_research_mode(self):
+        kwargs = self._captured_kwargs(
+            {"prompt": "survey X", "swarm_mode": True, "research_mode": True})
+        self.assertTrue(kwargs["research_mode"])
+        self.assertTrue(kwargs["swarm_mode"])
+
+    def test_research_mode_defaults_off_when_absent(self):
+        self.assertFalse(self._captured_kwargs({"prompt": "x"})["research_mode"])
+
+
 if __name__ == "__main__":
     unittest.main()
 

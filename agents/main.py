@@ -3490,6 +3490,7 @@ class TriggerTaskConfig(BaseModel):
     swarm_mode: bool = False
     dev_mode: bool = False
     ultraplan_mode: bool = False
+    research_mode: bool = False
 
 class TriggerCreateRequest(BaseModel):
     name: str

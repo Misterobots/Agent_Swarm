@@ -164,6 +164,9 @@ def _run_task_config(trigger_id: str, task_config: dict) -> None:
             swarm_mode=bool(task_config.get("swarm_mode", False)),
             dev_mode=bool(task_config.get("dev_mode", False)),
             ultraplan_mode=bool(task_config.get("ultraplan_mode", False)),
+            # Without this a scheduled Collective silently loses its perspective mode:
+            # church.py only engages it when research_mode arrives on the call.
+            research_mode=bool(task_config.get("research_mode", False)),
         ):
             events += 1  # drain the generator — nothing is listening live, so events aren't kept
         logger.info(f"[Scheduler] Trigger {trigger_id} task run complete ({events} events)")

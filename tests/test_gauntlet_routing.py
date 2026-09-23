@@ -210,3 +210,9 @@ def test_checkpoint_id_is_forwarded_as_the_coordination_id():
 
     source = Path(main.__file__).read_text(encoding="utf-8")
     assert 'coordination_id=(str((request.gauntlet_handoff or {}).get("id") or "").strip() or None)' in source
+
+
+def test_scheduled_triggers_can_carry_research_mode():
+    cfg = main.TriggerTaskConfig(prompt="survey X", swarm_mode=True, research_mode=True)
+    assert cfg.research_mode is True
+    assert main.TriggerTaskConfig(prompt="x").research_mode is False
