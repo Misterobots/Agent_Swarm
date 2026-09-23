@@ -26,7 +26,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string;
       role?: string;
-      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "model_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "cad_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "todo" | "usage";
+      type?: "content" | "status" | "thought" | "plan" | "log" | "tool_call" | "tool_start" | "tool_progress" | "tool_result" | "tool_approval_needed" | "stream_mode" | "turn_boundary" | "turn_metadata" | "model_metadata" | "continuation" | "error" | "swarm_phase" | "swarm_worker_created" | "swarm_task_list" | "clarification_card" | "media_attachment" | "design_artifact" | "cad_artifact" | "workshop_questions" | "workflow_next_steps" | "suggested_followups" | "agent_event" | "set_preview_url" | "model_queue_status" | "preview_unavailable" | "heartbeat" | "file_change" | "gauntlet_critic_verdict" | "todo" | "usage";
       // Swarm theater fields
       phase_num?: number;
       phase_name?: string;
@@ -341,6 +341,14 @@ function deltaToStreamEvent(
       errorCode: delta.errorCode,
       errorDetails: delta.errorDetails,
     };
+  }
+  // Gauntlet's independent critic verdict. The web UI has no Gauntlet surface, but it
+  // must not reach the content branch below — a machine verdict rendered as assistant
+  // prose reads as the model claiming its own success, which is the thing Gauntlet
+  // exists to prevent. Surfacing it as system status keeps it visible and correctly
+  // attributed; a verdict badge would need a store field and a card.
+  if (delta.type === "gauntlet_critic_verdict") {
+    return { type: "status", content: delta.content || "Gauntlet critic verdict" };
   }
   // Standard content/status/thought/plan/log (backward compatible)
   if (delta.content) {
