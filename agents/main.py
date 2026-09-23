@@ -671,6 +671,7 @@ class ChatRequest(BaseModel):
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
     already_steered: bool = False     # skip nuance gate (True when user has already answered a steering question)
     swarm_mode: bool = False          # route through Lamport multi-agent coordinator
+    gauntlet_mode: bool = False       # route through Gauntlet quality review / collective
     design_mode: bool = False         # route through Open Design Studio
     workshop_mode: bool = False       # route through Product Workshop (Grill Me)
     solving_max_iter: Optional[int] = None  # MarsRL max iterations (0 = unlimited, overrides config)
@@ -726,7 +727,7 @@ def _history_messages(request: ChatRequest) -> list[dict[str, Any]]:
 # must still be one of the curated, user-facing models.  The browser picker is
 # a convenience only; API callers can otherwise submit arbitrary model IDs.
 _DEFAULT_CHAT_MODEL = os.getenv("MEMEX_DEFAULT_MODEL", "qwen3:14b")
-_DEFAULT_MODEL_ALIASES = {"", "default", "memex-default", "Home-AI-Swarm", "swarm-standard"}
+_DEFAULT_MODEL_ALIASES = {"", "default", "memex-default", "Home-AI-Swarm", "swarm-standard", "swarm", "auto"}
 
 
 def _authentik_groups(request: Request) -> list[str]:
@@ -1740,9 +1741,30 @@ async def _run_subagent(uid: str, model: str, description: str, prompt: str,
     from dev_harness.history import History, UserMessage, StreamChunk
     from dev_harness.loop import DevHarness
     from dev_harness.router import ModelRouter
+    from coordination.pioneers import find_pioneer
 
     sub_type = subagent_type or "general"
-    sys = _SUBAGENT_SYSTEM.format(subagent_type=sub_type)
+    pinfo = find_pioneer(sub_type)
+    if not pinfo:
+        pinfo = {
+            "name": sub_type.title() if sub_type else "General",
+            "full_name": sub_type.title() if sub_type else "General Assistant",
+            "motto": "Simplicity and precision in execution.",
+            "role": sub_type or "general",
+        }
+    p_name = pinfo["name"]
+    p_full = pinfo["full_name"]
+    p_motto = pinfo.get("motto", "")
+    p_role = pinfo.get("role", "general")
+
+    sys = (
+        f"You are {p_full} ({p_role}), a specialized autonomous Pioneer subagent in the Memex Collective.\n"
+        f'Motto: "{p_motto}"\n\n'
+        f"You are operating directly in the project workspace (/workspace). You have sandbox tools "
+        f"(read_file, write_file, edit_file, list_directory, glob, grep, run_command, git, TodoWrite). "
+        f"Complete the delegated task autonomously, then end with a concise summary of what you did and any findings "
+        f"the parent agent needs. You cannot spawn further subagents."
+    )
     child_history = History(system=sys, turns=[UserMessage(prompt or description or "")])
 
     try:
@@ -1763,10 +1785,23 @@ async def _run_subagent(uid: str, model: str, description: str, prompt: str,
             return result, [StreamChunk(type="file_change", data=e["content"]) for e in fcs]
         return result
 
-    agent = f"subagent:{sub_type}"
+    agent = f"{p_name} ({p_role})"
+    worker_id = f"subagent_{p_name.lower().replace(' ', '_')}_{int(time.time() * 1000) % 10000}"
     emitted: list = [StreamChunk(type="agent_event",
                                  content=f"Started: {_brief(description or prompt, 120)}",
-                                 agent_name=agent, event_type="status")]
+                                 agent_name=agent,
+                                 pioneer_name=p_name,
+                                 event_type="status",
+                                 data={
+                                     "worker_id": worker_id,
+                                     "pioneer_name": p_name,
+                                     "pioneer_full_name": p_full,
+                                     "pioneer_motto": p_motto,
+                                     "role": p_role,
+                                     "task": description or prompt,
+                                     "status": "running",
+                                     "parent_worker_id": "lead_agent",
+                                 })]
     parts: list[str] = []
     try:
         async for ch in DevHarness(max_iterations=_MAX_SUBAGENT_ITERS).run(
@@ -1777,10 +1812,26 @@ async def _run_subagent(uid: str, model: str, description: str, prompt: str,
             elif ch.type == "tool_start":
                 emitted.append(StreamChunk(type="agent_event",
                                            content=f"{ch.tool_name}({_brief(ch.tool_input)})",
-                                           agent_name=agent, event_type="tool"))
+                                           agent_name=agent,
+                                           pioneer_name=p_name,
+                                           event_type="tool",
+                                           data={
+                                               "worker_id": worker_id,
+                                               "pioneer_name": p_name,
+                                               "role": p_role,
+                                               "status": "running",
+                                           }))
             elif ch.type == "tool_result":
                 emitted.append(StreamChunk(type="agent_event", content=_brief(ch.content, 200),
-                                           agent_name=agent, event_type="tool_result"))
+                                           agent_name=agent,
+                                           pioneer_name=p_name,
+                                           event_type="tool_result",
+                                           data={
+                                               "worker_id": worker_id,
+                                               "pioneer_name": p_name,
+                                               "role": p_role,
+                                               "status": "running",
+                                           }))
             elif ch.type == "file_change":
                 emitted.append(ch)  # forward edits so diffs/chips render in parent
             elif ch.type == "agent_event":
@@ -1788,12 +1839,29 @@ async def _run_subagent(uid: str, model: str, description: str, prompt: str,
     except Exception as e:
         logger.error(f"[dev_harness] subagent failed: {e}", exc_info=True)
         emitted.append(StreamChunk(type="agent_event", content=f"Subagent error: {e}",
-                                   agent_name=agent, event_type="error"))
-        return f"Subagent ({sub_type}) failed: {e}", emitted
+                                   agent_name=agent,
+                                   pioneer_name=p_name,
+                                   event_type="error",
+                                   data={
+                                       "worker_id": worker_id,
+                                       "pioneer_name": p_name,
+                                       "role": p_role,
+                                       "status": "failed",
+                                   }))
+        return f"Subagent ({p_name}) failed: {e}", emitted
 
     summary = "".join(parts).strip() or "(subagent produced no summary)"
-    emitted.append(StreamChunk(type="agent_event", content="Finished.",
-                               agent_name=agent, event_type="status"))
+    emitted.append(StreamChunk(type="agent_event", content=f"Finished: {_brief(summary, 120)}",
+                               agent_name=agent,
+                               pioneer_name=p_name,
+                               event_type="status",
+                               data={
+                                   "worker_id": worker_id,
+                                   "pioneer_name": p_name,
+                                   "role": p_role,
+                                   "status": "completed",
+                                   "output": summary,
+                               }))
     return summary, emitted
 
 
@@ -2143,17 +2211,26 @@ async def _dev_harness_stream(
             from coordination.workspace_ops import checkout_repo_branch
 
             _project = None
-            if request.current_project_id:
-                _project = _dev_projects_store.get_project(request.current_project_id, uid)
-            if not _project:
-                # No project selected — same default as pre-redesign behavior,
-                # now backed by an isolated per-session live_repo container
-                # instead of the shared one.
-                _project = _dev_projects_store.get_or_create_live_repo_project(uid)
+            _host_path = None
+            for candidate in (request.current_project_id, request.workspace_key):
+                if candidate and (re.match(r"^[A-Za-z]:[/\\]", candidate.strip()) or candidate.strip().startswith(("/mnt/", "\\\\", "//"))):
+                    _host_path = candidate.strip()
+                    break
 
-            _mode = "live_repo" if _project.get("source") == "live_repo" else "ephemeral"
+            if _host_path:
+                _mode = "host_dir"
+            else:
+                if request.current_project_id:
+                    _project = _dev_projects_store.get_project(request.current_project_id, uid)
+                if not _project:
+                    # No project selected — same default as pre-redesign behavior,
+                    # now backed by an isolated per-session live_repo container
+                    # instead of the shared one.
+                    _project = _dev_projects_store.get_or_create_live_repo_project(uid)
+                _mode = "live_repo" if _project.get("source") == "live_repo" else "ephemeral"
+
             _session_key = request.session_id or uid
-            container_name, _dh_created = ensure_session_container(_session_key, mode=_mode)
+            container_name, _dh_created = ensure_session_container(_session_key, mode=_mode, host_path=_host_path)
 
             # Clone into the container only once, right after it's first
             # created — ensure_session_container's idempotency means later
@@ -2289,8 +2366,16 @@ async def _dev_harness_stream(
                 delta["agent_name"] = chunk.agent_name
             if chunk.event_type:
                 delta["event_type"] = chunk.event_type
+            if getattr(chunk, "pioneer_name", None):
+                delta["pioneer_name"] = chunk.pioneer_name
             if chunk.data is not None:
-                delta["content"] = chunk.data  # structured payload (e.g. todo)
+                if isinstance(chunk.data, dict):
+                    if "pioneer_name" in chunk.data and "pioneer_name" not in delta:
+                        delta["pioneer_name"] = chunk.data["pioneer_name"]
+                    delta["data"] = chunk.data
+                    delta["content"] = chunk.data
+                else:
+                    delta["content"] = chunk.data  # structured payload (e.g. todo)
             yield _event_sse(delta)
     except Exception as e:
         logger.error(f"[dev_harness] stream error: {e}", exc_info=True)
@@ -2342,7 +2427,22 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     # Must precede the provider_for() dispatch below: local Ollama models resolve
     # to provider=None and would otherwise fall through to the swarm path, never
     # reaching the coding loop.  DevHarness picks Ollama/GitHub/Anthropic itself.
-    if request.dev_mode and request.stream:
+    _last_msg_text = ""
+    if request.messages:
+        _last_m = request.messages[-1]
+        _last_msg_text = (_last_m.content if hasattr(_last_m, "content") else _last_m.get("content", "")) or ""
+        if not isinstance(_last_msg_text, str):
+            _last_msg_text = str(_last_msg_text)
+        _last_msg_text = _last_msg_text.strip()
+
+    _is_swarm_turn = bool(
+        request.swarm_mode
+        or request.gauntlet_mode
+        or (request.model and request.model.lower() == "swarm")
+        or _last_msg_text.startswith(("/swarm", "/build", "/plan", "/collective"))
+    )
+
+    if request.dev_mode and request.stream and not _is_swarm_turn:
         _dev_uid = (
             http_request.headers.get("X-authentik-username", "").strip()
             or http_request.headers.get("X-authentik-uid", "").strip()
@@ -2529,7 +2629,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     grounding_docs=request.grounding_docs,
                     grounding_file=request.grounding_file,
                     already_steered=request.already_steered,
-                    swarm_mode=request.swarm_mode,
+                    swarm_mode=(request.swarm_mode or (request.model and request.model.lower() == "swarm") or _is_swarm_turn),
                     design_mode=request.design_mode,
                     workshop_mode=request.workshop_mode,
                     dev_mode=request.dev_mode,
@@ -2544,6 +2644,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     current_project_id=request.current_project_id,
                     active_file=request.active_file,
                     context_profile=request.context_profile,
+                    workspace_key=request.workspace_key,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")

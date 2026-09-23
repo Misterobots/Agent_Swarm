@@ -26,9 +26,9 @@ from utils.gpu_queue import request_lock
 from coordination.decomposer import _decompose_task, _decompose_task_perspectives
 from coordination.executor import _derive_worker_token, _get_agent_for_role, _run_worker
 from coordination.palace import (
-    _palace_project_lookup, _palace_project_save, _team_store, _team_clear,
+    _palace_project_lookup, _palace_project_save, _team_store, _team_clear, _team_recall,
 )
-from coordination.session import CoordinatorSession, WorkerState
+from coordination.session import CoordinatorSession, WorkerState, SCRATCHPAD_ROOT
 from coordination.synthesizer import (
     _generate_followups, _synthesize_findings, _synthesize_perspective_matrix,
 )
@@ -108,6 +108,174 @@ def _build_run_diff(changes: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+def _slug_key(text: str) -> str:
+    """Filesystem-/store-key-safe form of a perspective label."""
+    return re.sub(r"[^a-z0-9]+", "_", str(text).lower()).strip("_")[:60] or "label"
+
+
+def _perspective_finding_key(label: str) -> str:
+    return f"perspective_finding__{_slug_key(label)}"
+
+
+def _recall_prior_run(parent_coordination_id: str, session_id: str) -> dict:
+    """Recover a completed perspective run's roster, findings and matrix.
+
+    MemPalace team memory is the primary source because it is keyed by
+    coordination_id rather than by this process's lifetime. The originating run's
+    scratchpad dir is tried second — it survives locally even when the palace is
+    unreachable, and is the only place the untruncated roster is guaranteed.
+
+    Returns ``{"roster": [...], "findings": {label: text}, "matrix": str,
+    "topic": str, "source": str}`` with empty defaults on a total miss.
+    """
+    out = {"roster": [], "findings": {}, "matrix": "", "topic": "", "source": ""}
+    if not parent_coordination_id:
+        return out
+
+    team = _team_recall(parent_coordination_id)
+    if team:
+        out["source"] = "palace"
+        raw_roster = team.get("perspective_roster")
+        if raw_roster:
+            try:
+                parsed = json.loads(raw_roster)
+                out["roster"] = parsed.get("roster", []) if isinstance(parsed, dict) else []
+                out["topic"] = str(parsed.get("topic", "")) if isinstance(parsed, dict) else ""
+            except Exception:
+                out["roster"] = []
+        for key, value in team.items():
+            if key.startswith("perspective_finding__"):
+                out["findings"][key[len("perspective_finding__"):]] = value
+        out["matrix"] = team.get("perspective_matrix", "")
+
+    pad_dir = SCRATCHPAD_ROOT / session_id / parent_coordination_id
+    roster_file = pad_dir / "02_perspectives.json"
+    if not out["roster"] and roster_file.exists():
+        out["source"] = out["source"] or "scratchpad"
+        try:
+            parsed = json.loads(roster_file.read_text(encoding="utf-8"))
+            out["roster"] = parsed.get("roster", [])
+            out["topic"] = str(parsed.get("topic", "")) or out["topic"]
+        except Exception as e:
+            logger.warning(f"[Coordinator] Prior roster unreadable at {roster_file}: {e}")
+    matrix_file = pad_dir / "01_perspective_matrix.md"
+    if not out["matrix"] and matrix_file.exists():
+        out["matrix"] = matrix_file.read_text(encoding="utf-8")
+    for entry in out["roster"]:
+        label = entry.get("label", "")
+        slug = _slug_key(label)
+        if label and not out["findings"].get(slug):
+            found = pad_dir / f"03_findings_{slug}.md"
+            if found.exists():
+                out["findings"][slug] = found.read_text(encoding="utf-8")
+    if out["roster"] and not out["findings"]:
+        out["findings"] = {
+            _slug_key(e.get("label", "")): str(e.get("findings_preview", ""))
+            for e in out["roster"] if e.get("label")
+        }
+    return out
+
+
+def _run_debate_stage(*, session, user_input: str, parent_coordination_id: str | None,
+                      debate_focus: str, model_name: str | None,
+                      rounds: int | None = None) -> Generator[dict, None, None]:
+    """Drive the framework-debate stage over a previous perspective run."""
+    from coordination.debate import run_debate
+
+    _ensure_not_cancelled(session)
+    yield {"type": "swarm_phase", "phase_num": 1, "phase_name": "Recall", "total_phases": 2}
+    yield {"type": "status", "content": "🔎 Recovering perspective findings from the previous run..."}
+
+    prior = _recall_prior_run(parent_coordination_id or "", session.session_id)
+    roster = prior["roster"]
+    if not roster:
+        logger.warning(
+            f"[Coordinator] Debate requested but no findings recoverable for "
+            f"parent_coordination_id={parent_coordination_id!r}"
+        )
+        yield {
+            "type": "response",
+            "content": (
+                "⚠️ **Debate unavailable** — I could not recover the perspective findings from "
+                "the earlier research run"
+                + (f" (`{parent_coordination_id}`)" if parent_coordination_id else "")
+                + ".\n\nThe debate stage needs each perspective's *full* findings, not just the "
+                  "summary matrix, and neither team memory nor the run's scratchpad had them. "
+                  "Re-run the research (a `/swarm` or research-mode request on the same topic) "
+                  "and choose **Debate it out** when the matrix comes back."
+            ),
+        }
+        swarm_run_store.finish_run(
+            session.coordination_id, status="completed", ended_at=int(time.time()),
+        )
+        return
+
+    agents = []
+    for entry in roster:
+        label = entry.get("label", "")
+        slug = _slug_key(label)
+        agents.append({
+            "label": label,
+            "role": entry.get("role", "researcher"),
+            "task": entry.get("task", user_input),
+            "pioneer_name": entry.get("pioneer_name") or label,
+            "pioneer_full_name": entry.get("pioneer_full_name", ""),
+            "pioneer_motto": entry.get("pioneer_motto", ""),
+            "findings": prior["findings"].get(slug, ""),
+        })
+    agents = [a for a in agents if a["findings"]] or agents
+    topic = prior["topic"] or user_input
+
+    yield {"type": "thought", "content": f"→ Recalled {len(agents)} perspective findings from run {parent_coordination_id}"}
+    yield {"type": "swarm_phase", "phase_num": 2, "phase_name": "Debate", "total_phases": 2}
+
+    _rounds = rounds or int(os.getenv("DEBATE_ROUNDS", "3"))
+    sink: dict = {}
+    yield from run_debate(
+        topic=topic, focus=debate_focus, roster=agents, matrix_md=prior["matrix"],
+        model_name=model_name, coordination_id=session.coordination_id,
+        rounds=_rounds, cancel_check=lambda: _ensure_not_cancelled(session), sink=sink,
+    )
+
+    markdown = sink.get("markdown", "")
+    if markdown:
+        session.write_to_scratchpad("04_debate.md", markdown)
+        roster_out = {
+            "topic": topic,
+            "focus": debate_focus,
+            "parent_coordination_id": parent_coordination_id,
+            "assignments": sink.get("assignments", []),
+            "emergent": sink.get("emergent"),
+            "concessions": sink.get("concessions", []),
+            "audit_failures": sink.get("violations", []),
+        }
+        session.write_to_scratchpad("05_debate_meta.json", json.dumps(roster_out, indent=2))
+        _team_store(session.coordination_id, "debate_markdown", markdown)
+        _team_store(session.coordination_id, "debate_meta", json.dumps(roster_out))
+        if sink.get("transcript"):
+            _team_store(session.coordination_id, "debate_transcript",
+                        json.dumps(sink["transcript"]))
+
+    _n_conc = len(sink.get("concessions", []) or [])
+    _n_fail = len(sink.get("violations", []) or [])
+    swarm_run_store.finish_run(
+        session.coordination_id, status="completed", workers_total=len(agents),
+        ended_at=int(time.time()),
+    )
+    yield {
+        "type": "message",
+        "content": (
+            f"---\n**⚔️ Debate Summary**\n"
+            f"- Agents: {len(agents)} | Rounds: {_rounds}\n"
+            f"- Concessions extracted: {_n_conc}\n"
+            f"- Framework audit failures: {_n_fail}\n"
+            f"- Emergent framework: "
+            f"{('`' + sink['emergent']['id'] + '` (candidate)') if sink.get('emergent') else 'none qualified'}\n\n"
+        ),
+    }
+    yield {"type": "response", "content": markdown}
+
+
 def coordinate_project_onboarding(
     original_prompt: str,
     session_id: str = "default_session",
@@ -166,10 +334,22 @@ def coordinate_task(
     session_mode: Optional[str] = None,
     coordination_id: Optional[str] = None,
     context_profile: Optional[str] = None,
+    host_path: Optional[str] = None,
+    debate_mode: bool = False,
+    parent_coordination_id: Optional[str] = None,
+    debate_focus: Optional[str] = None,
+    debate_rounds: Optional[int] = None,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
     matching the chat_swarm() yield contract.
+
+    debate_mode: re-enter the coordinator to run the framework-debate stage over
+    a *previous* perspective run instead of decomposing a new task. Requires
+    parent_coordination_id — the perspective findings live in that run's team
+    scratchpad, and CoordinatorSession keys its scratchpad by coordination_id, so
+    a fresh run cannot see them without being told which run to recall from.
+    debate_focus is the user-supplied topic/question for the debate.
 
     repo_context (New Task composer path only): {"git_url", "branch",
     "base_branch"?, "dev_project_id"?}. When set, the session's sandbox
@@ -182,11 +362,11 @@ def coordinate_task(
     already IS the live repo via bind mount.
 
     session_mode: which coordination/session_sandbox.py container mode this
-    run gets — "ephemeral" (isolated, no host mount) or "live_repo" (the one
-    distinguished project that bind-mounts the live Agent_Swarm repo). Leave
-    unset (None) for a caller with no linked project at all; if repo_context
-    is set but session_mode isn't, it defaults to "ephemeral" for backward
-    compatibility with callers that predate this parameter.
+    run gets — "ephemeral" (isolated, no host mount), "live_repo" (the one
+    distinguished project that bind-mounts the live Agent_Swarm repo), or
+    "host_dir" (bind-mounts host_path). Leave unset (None) for a caller with
+    no linked project at all; if repo_context is set but session_mode isn't,
+    it defaults to "ephemeral". If host_path is set, it defaults to "host_dir".
 
     coordination_id: pre-generated id (POST /v1/tasks needs to return the id
     to the caller before this generator has been iterated at all, since it's
@@ -216,13 +396,15 @@ def coordinate_task(
     # incident happened on). _session_container_owned tracks whether release
     # is our responsibility in the finally below, independent of whether
     # resolution actually succeeded.
-    _resolved_mode = session_mode or ("ephemeral" if repo_context else None)
+    _resolved_mode = session_mode or ("host_dir" if host_path else ("ephemeral" if repo_context else None))
     _session_container_owned = False
     if SESSION_SANDBOX_ENABLED and _resolved_mode:
         try:
             from coordination.session_sandbox import ensure_session_container
             from coordination.sandbox_identity import set_current_container
-            session.container_name, _ = ensure_session_container(session.coordination_id, mode=_resolved_mode)
+            session.container_name, _ = ensure_session_container(
+                session.coordination_id, mode=_resolved_mode, host_path=host_path
+            )
             set_current_container(session.container_name)
             _session_container_owned = True
             logger.info(f"[Coordinator] Session container ready ({_resolved_mode}): {session.container_name}")
@@ -236,6 +418,19 @@ def coordinate_task(
             return
 
     try:
+        # -----------------------------------------------------------------------
+        # FRAMEWORK DEBATE (re-entry from a completed perspective run)
+        # -----------------------------------------------------------------------
+        if debate_mode:
+            yield from _run_debate_stage(
+                session=session, user_input=user_input,
+                parent_coordination_id=parent_coordination_id,
+                debate_focus=debate_focus or user_input,
+                model_name=session.model_for_role("coordinator"),
+                rounds=debate_rounds,
+            )
+            return
+
         # === PHASE 0: WORKSPACE PREP (New Task composer path only) ===
         _ensure_not_cancelled(session)
         if repo_context and repo_context.get("local_path"):
@@ -658,6 +853,17 @@ def coordinate_task(
             }
 
             findings_by_perspective: dict[str, str] = {}
+            # Carries each perspective's persona into the later debate stage, so the
+            # user debates the same voices that produced the matrix rather than new ones.
+            perspective_roster: list[dict] = [
+                {
+                    "label": p.get("perspective_label", p.get("role", "")),
+                    "role": p.get("role", "researcher"),
+                    "task": p.get("task", user_input),
+                    "lens_description": p.get("lens_description", ""),
+                }
+                for p in perspectives
+            ]
             max_workers_p = min(len(perspectives), 3)
 
             with ThreadPoolExecutor(max_workers=max_workers_p) as pool:
@@ -696,6 +902,15 @@ def coordinate_task(
                     )
                     futures_p[future] = (worker_id, role, label)
                     pioneer = session.workers[worker_id].pioneer
+                    for entry in perspective_roster:
+                        if entry["label"] == label:
+                            entry.update({
+                                "worker_id": worker_id,
+                                "pioneer_name": pioneer["name"],
+                                "pioneer_full_name": pioneer["full_name"],
+                                "pioneer_motto": pioneer["motto"],
+                            })
+                            break
                     yield {
                         "type": "swarm_worker_created",
                         "worker_id": worker_id,
@@ -731,11 +946,17 @@ def coordinate_task(
                                 "type": "message",
                                 "content": f"✅ **{pioneer['name']}** ({label}) completed in {elapsed:.1f}s\n\n",
                             }
+                            # Store the FULL finding, not a 2 KB excerpt: the debate stage
+                            # has to attack each perspective's actual reasoning, and a
+                            # truncated lens produces a debate about a summary.
                             _team_store(
                                 session.coordination_id,
-                                f"perspective_{label}_{worker_id}",
-                                result[:2000] if result else "",
+                                _perspective_finding_key(label),
+                                result or "",
                                 author=role,
+                            )
+                            session.write_to_scratchpad(
+                                f"03_findings_{_slug_key(label)}.md", result or ""
                             )
                             # Drain any file_change events emitted by this perspective worker
                             for _fc in _drain_file_changes(session):
@@ -765,6 +986,11 @@ def coordinate_task(
 
             session.write_to_scratchpad("01_perspective_matrix.md", matrix_md)
             _team_store(session.coordination_id, "perspective_matrix", matrix_md)
+            _roster_blob = json.dumps(
+                {"topic": user_input, "roster": perspective_roster}, indent=2,
+            )
+            session.write_to_scratchpad("02_perspectives.json", _roster_blob)
+            _team_store(session.coordination_id, "perspective_roster", _roster_blob)
 
             yield {"type": "message", "content": "**🧠 Perspective Matrix Complete** ✓\n\n"}
 
@@ -789,8 +1015,58 @@ def coordinate_task(
                 ),
             }
 
-            followup_section = _generate_followups(persp_matrix.get("synthesis_narrative", ""), [])
-            yield {"type": "response", "content": f"{matrix_md}{followup_section}"}
+            yield {"type": "response", "content": matrix_md}
+
+            _divergent = [
+                str(d) for d in (persp_matrix.get("divergent_points") or []) if str(d).strip()
+            ]
+            _options = [{
+                "label": "Debate it out",
+                "value": "Debate it out — resolve the contested points below",
+                "description": "Each lens gets a thinking framework and they attack each other",
+            }]
+            _options += [{
+                "label": f"Debate: {d[:70]}",
+                "value": f"Debate this specific question: {d}",
+                "description": "Focus the exchange on one divergent point",
+            } for d in _divergent[:3]]
+            _options.append({
+                "label": "Not now",
+                "value": "not_now",
+                "description": "Keep the matrix; no debate",
+            })
+
+            try:
+                from brooks import save_pending_context as _save_debate_ctx
+                _save_debate_ctx(
+                    {
+                        "type": "swarm_debate",
+                        "prompt": user_input,
+                        "coordination_id": session.coordination_id,
+                        "question": "Which question should the agents debate?",
+                    },
+                    session_id=session_id,
+                    owner_id=owner_id,
+                )
+            except Exception as _de:
+                logger.warning(f"[Coordinator] Could not save debate context: {_de}")
+
+            yield {
+                "type": "clarification_card",
+                "clarification": {
+                    "question": "Where the lenses disagree, should they argue it out?",
+                    "context": (
+                        f"{len(_divergent)} divergent point(s) and a controversy level of "
+                        f"**{persp_matrix.get('controversy_level', 'unknown')}**. Each agent keeps "
+                        f"its own persona and research, and is assigned a thinking framework — a "
+                        f"licensed move set plus mandates it is audited against — chosen so the "
+                        f"frameworks collide."
+                    ),
+                    "options": _options,
+                    "allow_freetext": True,
+                    "card_type": "perspective_next",
+                },
+            }
             logger.info(
                 f"[Coordinator] Perspective research {session.coordination_id} complete: "
                 f"{completed}/{total_workers} workers, {total_time:.1f}s, "

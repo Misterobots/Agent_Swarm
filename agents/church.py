@@ -461,6 +461,8 @@ def chat_swarm(
     current_project_id: str | None = None,
     active_file: str | None = None,
     context_profile: str | None = None,
+    workspace_key: str | None = None,
+    host_path: str | None = None,
 ):
     """Generator: yield status/message/error events for the UI."""
     AGENT_STATE.labels(agent_name="Router").set(2)
@@ -584,6 +586,12 @@ def chat_swarm(
     from brooks import get_pending_context, clear_context, save_pending_image_clarification
     pending_ctx = get_pending_context(session_id=session_id, owner_id=owner_id)
 
+    # Debate re-entry flags, resolved by the gate dispatch below. Initialised here
+    # because the intent override reads them even when there is no pending context.
+    _debate_mode = False
+    _parent_coordination_id = None
+    _debate_focus = None
+
     if pending_ctx:
         from routing.gates import handle_pending_context
         _pending_result = {"handled": False, "user_input": user_input}
@@ -604,6 +612,9 @@ def chat_swarm(
         # Carry the already_steered flag forward so coordinate_task skips the
         # nuance gate on the re-entry after a swarm steering answer.
         _already_steered = _pending_result.get("already_steered", False)
+        _debate_mode = _pending_result.get("debate_mode", False)
+        _parent_coordination_id = _pending_result.get("parent_coordination_id")
+        _debate_focus = _pending_result.get("debate_focus")
 
     try:
         from handlers.base import _emit_turn_metadata, _emit_stream_mode, _emit_turn_boundary, _emit_continuation_hint
@@ -1157,6 +1168,12 @@ def chat_swarm(
             intent = "RESEARCH"; yield _t("→ Research mode activated: forcing RESEARCH intent")
         if swarm_mode and intent not in ("IMAGE", "3D", "ACTION_FIGURE", "DESIGN", "TRAIN"):
             intent = "COORDINATE"; yield _t("→ Swarm Mode: routing to multi-agent coordinator")
+        # A debate re-entry is unambiguous by construction — the user clicked it on the
+        # coordinator's own card. Classifying its free-text focus would risk sending a
+        # phrasing like "should we regulate this?" to RESEARCH or CONVERSATION instead.
+        if _debate_mode:
+            intent = "COORDINATE"
+            yield _t("→ Debate stage: routing to the coordinator's framework debate")
 
         # UltraPlan mode (plan only)
         if ultraplan_mode:
@@ -1305,6 +1322,9 @@ def chat_swarm(
             "conv_storage": _get_conv_storage(),
             "is_admin": is_admin,
             "already_steered": _already_steered,
+            "debate_mode": _debate_mode,
+            "parent_coordination_id": _parent_coordination_id,
+            "debate_focus": _debate_focus,
             "intent": intent,
             "routing_decision": routing_decision,
             "solving_max_iter": solving_max_iter,
@@ -1317,6 +1337,19 @@ def chat_swarm(
             "solving_corrector_max_time": solving_corrector_max_time,
             "swarm_mode": swarm_mode,
             "context_profile": context_profile,
+            "current_project_id": current_project_id,
+            "workspace_key": workspace_key,
+            "host_path": (
+                host_path
+                or next(
+                    (
+                        c.strip()
+                        for c in (current_project_id, workspace_key)
+                        if c and (re.match(r"^[A-Za-z]:[/\\]", c.strip()) or c.strip().startswith(("/mnt/", "\\\\", "//")))
+                    ),
+                    None,
+                )
+            ),
         }
 
         _actual_model = _handler_model or model or "auto"
