@@ -97,12 +97,33 @@ def test_research_only_turn_is_not_forced_into_swarm_mode():
     assert main._swarm_turn(request) is False
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Known gap, deliberately not widened by this change: a '/research' typed in a dev "
-    "workspace carries no research_mode flag, so it is still swallowed by DevHarness and "
-    "never reaches church.py's slash table. The desktop sends flags, not this prefix."))
-def test_research_slash_prefix_still_reaches_the_router():
-    assert main._routes_to_dev_harness(slash("/research a topic", dev_mode=True)) is False
+# A slash command is the user naming a mode explicitly. dev_mode riding along only
+# means a workspace is attached, so it must not downgrade the request into the code
+# loop — church.py's table runs after this decision and would never see the command.
+@pytest.mark.parametrize("cmd", [
+    "/research", "/think", "/cad", "/workshop", "/grill", "/design",
+    "/flow-batch-edit", "/flow-variants", "/agent-flows",
+])
+def test_non_swarm_slash_commands_escape_the_dev_harness(cmd):
+    request = slash(f"{cmd} a topic", dev_mode=True)
+    assert main._routes_to_dev_harness(request) is False
+    # Escaping DevHarness must not silently promote them to a coordinator turn:
+    # _swarm_turn feeds swarm_mode downstream, which would force COORDINATE.
+    assert main._swarm_turn(request) is False
+
+
+def test_bare_slash_command_with_no_payload_still_escapes():
+    assert main._routes_to_dev_harness(slash("/cad", dev_mode=True)) is False
+
+
+def test_unrecognized_slash_text_still_uses_the_code_loop():
+    assert main._routes_to_dev_harness(slash("/notes list my tasks", dev_mode=True)) is True
+
+
+def test_legacy_collective_prefix_still_means_coordinator():
+    request = slash("/collective build x", dev_mode=True)
+    assert main._swarm_turn(request) is True
+    assert main._routes_to_dev_harness(request) is False
 
 
 # --- legacy wire values must keep working ----------------------------------

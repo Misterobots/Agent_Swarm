@@ -426,6 +426,46 @@ def _audit_security_event(event_type: str, context: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Slash command table — the single source of truth for explicit mode requests.
+# main.py consults it through slash_command_of(): a slash command is the user
+# naming a mode, and this dispatch runs AFTER the DevHarness routing decision, so
+# a request already handed to the code loop never gets here to be recognized.
+# ---------------------------------------------------------------------------
+_SLASH_TABLE = [
+    # (prefix,       mode_flag,      extra)
+    ("/workshop",   "workshop_mode",   None),
+    ("/grill",      "workshop_mode",   None),
+    ("/design",     "design_mode",     None),
+    ("/build",      "swarm_mode",      None),
+    ("/swarm",      "swarm_mode",      None),
+    ("/plan",       "swarm_mode",      "ultraplan"),
+    ("/research",   None,              "research"),
+    ("/think",      None,              "think"),
+    ("/cad",        None,              "cad"),
+    # Agent Flows
+    ("/flow-blockout",   "swarm_mode", "flow_blockout"),
+    ("/flow-batch-edit", None,         "flow_batch_edit"),
+    ("/flow-audit",      "swarm_mode", "flow_audit"),
+    ("/flow-scaffold",   "swarm_mode", "flow_scaffold"),
+    ("/flow-variants",   None,         "flow_variants"),
+    ("/agent-flows",     None,         "agent_flows"),
+]
+
+
+def slash_command_of(text: str) -> str | None:
+    """The recognized slash command opening this message, else None.
+
+    Matching is exact or prefix-plus-space, so "/planning" is not "/plan" — the
+    same rule the dispatch loop below applies.
+    """
+    lowered = str(text or "").strip().lower()
+    for _cmd, _flag, _extra in _SLASH_TABLE:
+        if lowered == _cmd or lowered.startswith(_cmd + " "):
+            return _cmd
+    return None
+
+
+# ---------------------------------------------------------------------------
 # chat_swarm — main dispatch generator
 # ---------------------------------------------------------------------------
 
@@ -903,25 +943,6 @@ def chat_swarm(
         _sc = user_input.strip()
         _scl = _sc.lower()
         _research_slash = False  # sentinel: /research explicitly requested
-        _SLASH_TABLE = [
-            # (prefix,       mode_flag,      extra)
-            ("/workshop",   "workshop_mode",   None),
-            ("/grill",      "workshop_mode",   None),
-            ("/design",     "design_mode",     None),
-            ("/build",      "swarm_mode",      None),
-            ("/swarm",      "swarm_mode",      None),
-            ("/plan",       "swarm_mode",      "ultraplan"),
-            ("/research",   None,              "research"),
-            ("/think",      None,              "think"),
-            ("/cad",        None,              "cad"),
-            # Agent Flows
-            ("/flow-blockout",   "swarm_mode", "flow_blockout"),
-            ("/flow-batch-edit", None,         "flow_batch_edit"),
-            ("/flow-audit",      "swarm_mode", "flow_audit"),
-            ("/flow-scaffold",   "swarm_mode", "flow_scaffold"),
-            ("/flow-variants",   None,         "flow_variants"),
-            ("/agent-flows",     None,         "agent_flows"),
-        ]
         for _sc_cmd, _sc_flag, _sc_extra in _SLASH_TABLE:
             if _scl.startswith(_sc_cmd + " ") or _scl == _sc_cmd:
                 user_input = _sc[len(_sc_cmd):].strip()

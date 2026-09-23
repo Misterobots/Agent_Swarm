@@ -2442,6 +2442,12 @@ _NONSTANDARD_SIGNAL_TYPES = frozenset({
 })
 
 
+def _last_message_text(request: "ChatRequest") -> str:
+    if not request.messages:
+        return ""
+    return _message_text(request.messages[-1].content).strip()
+
+
 def _swarm_turn(request: "ChatRequest") -> bool:
     """Whether this turn asked for the multi-agent coordinator.
 
@@ -2449,42 +2455,47 @@ def _swarm_turn(request: "ChatRequest") -> bool:
     sentinel, and the slash prefixes clients still store and label as Collective.
     ``gauntlet_mode`` counts because Gauntlet is a coordinator feature.
     """
-    last_msg = ""
-    if request.messages:
-        last_msg = _message_text(request.messages[-1].content).strip()
     return bool(
         request.swarm_mode
         or request.gauntlet_mode
         or (request.model and request.model.lower() == "swarm")
-        or last_msg.startswith(("/swarm", "/build", "/plan", "/collective"))
+        or _last_message_text(request).startswith(("/swarm", "/build", "/plan", "/collective"))
     )
 
 
 def _routes_to_dev_harness(request: "ChatRequest") -> bool:
     """Whether this turn is served by the single-agent DevHarness coding loop.
 
-    Two requests outrank it because they explicitly asked for orchestration:
+    Three kinds of request outrank it because they explicitly asked for something
+    other than the code loop:
 
       * a coordinator turn (see _swarm_turn) — Gauntlet especially, since it needs
         the coordinator's durable checkpoint, Pioneer roles and critic loop; letting
         dev_mode intercept it leaves no record to resume after a stream failure;
       * research_mode — this is how the desktop's Collective arrives with a project
         attached. dev_mode has to stay set or the run loses its workspace, so the
-        flag is the only signal that orchestration was requested.
+        flag is the only signal that orchestration was requested;
+      * any slash command church.py recognizes — a typed "/cad", "/grill" or
+        "/research" is the user naming a mode, and dev_mode riding along with it
+        only means a workspace happens to be attached.
 
-    church.py cannot recover from either mistake: its router and slash table run
+    church.py cannot recover from any of these: its router and slash table run
     after this decision, so a request already handed to DevHarness never reaches
     them and the degradation is invisible in the transcript.
 
-    research_mode stays out of _swarm_turn on purpose. That predicate also feeds
-    the downstream swarm_mode argument, and a research-only turn must resolve to
-    RESEARCH rather than be overwritten to COORDINATE by church.py's swarm branch.
+    research_mode and the slash table stay out of _swarm_turn on purpose. That
+    predicate also feeds the downstream swarm_mode argument, and a non-coordinator
+    turn must resolve to its own intent rather than be overwritten to COORDINATE by
+    church.py's swarm branch.
     """
+    from church import slash_command_of
+
     return bool(
         request.dev_mode
         and request.stream
         and not _swarm_turn(request)
         and not request.research_mode
+        and slash_command_of(_last_message_text(request)) is None
     )
 
 
