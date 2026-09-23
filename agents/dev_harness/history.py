@@ -90,6 +90,8 @@ class StreamChunk:
     # whose delta.content carries {"todos": [...]}).  When set, the SSE
     # serialiser uses this as delta["content"] instead of the string content.
     data: Any = None
+    pioneer_name: str | None = None
+
 
 
 # ---------------------------------------------------------------------------

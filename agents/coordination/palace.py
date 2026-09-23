@@ -24,6 +24,34 @@ def _team_store(team_id: str, key: str, value: str, author: str = "lamport"):
         logger.debug(f"[Coordinator] Team memory store failed (non-fatal): {e}")
 
 
+def _team_recall(team_id: str) -> dict[str, str]:
+    """Read a team's whole scratchpad via GET /v1/team/{team_id} as {key: value}.
+
+    Used by a later stage (e.g. the framework debate) that runs as its own
+    coordination and therefore cannot see the originating run's scratchpad dir.
+    Returns {} on any failure — an unreachable service degrades to "no prior
+    findings", never to a raised error inside coordination.
+    """
+    if not team_id:
+        return {}
+    try:
+        resp = requests.get(
+            f"{_MEMPALACE_URL}/v1/team/{team_id}",
+            timeout=_MEMPALACE_TIMEOUT,
+        )
+        if resp.status_code != 200:
+            logger.debug(f"[Coordinator] Team recall HTTP {resp.status_code}: {resp.text[:200]}")
+            return {}
+        rows = resp.json() or []
+        return {
+            str(r.get("key")): str(r.get("value") or "")
+            for r in rows if isinstance(r, dict) and r.get("key")
+        }
+    except Exception as e:
+        logger.debug(f"[Coordinator] Team recall failed (non-fatal): {e}")
+        return {}
+
+
 def _team_clear(team_id: str):
     """Clear a team's scratchpad via DELETE /v1/team/{team_id}."""
     try:

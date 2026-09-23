@@ -206,7 +206,11 @@ def _resolve_own_workspace_mount(client) -> str:
     )
 
 
-def ensure_session_container(coordination_id: str, mode: str = "ephemeral") -> tuple[str, bool]:
+def ensure_session_container(
+    coordination_id: str,
+    mode: str = "ephemeral",
+    host_path: str | None = None,
+) -> tuple[str, bool]:
     """Idempotently ensure a per-session Docker container exists for
     `coordination_id`, and return (name, created).
 
@@ -247,13 +251,16 @@ def ensure_session_container(coordination_id: str, mode: str = "ephemeral") -> t
     only), since two containers legitimately sharing one host path can still
     race each other on git operations even though each has its own container.
 
+    mode="host_dir": bind-mounts a specific local host path (e.g. a Windows
+    project directory selected in memex-desktop) into /workspace.
+
     Raises:
         ValueError    — empty coordination_id, or an unrecognized mode
         RuntimeError  — Docker unreachable, or container creation failed
     """
     if not coordination_id:
         raise ValueError("coordination_id must not be empty")
-    if mode not in ("ephemeral", "local", "live_repo"):
+    if mode not in ("ephemeral", "local", "live_repo", "host_dir"):
         raise ValueError(f"Unknown session container mode: {mode!r}")
 
     name = _container_name(coordination_id)
@@ -261,8 +268,27 @@ def ensure_session_container(coordination_id: str, mode: str = "ephemeral") -> t
 
     try:
         existing = client.containers.get(name)
-        logger.info(f"[SessionSandbox] Reusing existing session container '{name}'.")
-        return existing.name, False
+        # Verify mount matches if host_dir is requested
+        if mode == "host_dir" and host_path:
+            mounts = existing.attrs.get("Mounts", [])
+            has_matching_mount = any(
+                m.get("Destination") == "/workspace"
+                and os.path.normcase(os.path.normpath(str(m.get("Source", "")))) == os.path.normcase(os.path.normpath(str(host_path)))
+                for m in mounts
+            )
+            if not has_matching_mount:
+                logger.info(
+                    f"[SessionSandbox] Existing container '{name}' does not match requested host_path '{host_path}'; recreating."
+                )
+                try:
+                    existing.stop(timeout=2)
+                    existing.remove(force=True)
+                except Exception as _e:
+                    logger.warning(f"[SessionSandbox] Failed to stop/remove mismatched container '{name}': {_e}")
+                existing = None
+        if existing:
+            logger.info(f"[SessionSandbox] Reusing existing session container '{name}'.")
+            return existing.name, False
     except docker.errors.NotFound:
         pass
     except Exception as exc:
@@ -293,6 +319,12 @@ def ensure_session_container(coordination_id: str, mode: str = "ephemeral") -> t
         logger.info(
             f"[SessionSandbox] Creating live_repo session container '{name}' "
             f"(image={SESSION_IMAGE}, network={primary_network}, mount={host_workspace})."
+        )
+    elif mode == "host_dir" and host_path:
+        run_kwargs["volumes"] = {host_path: {"bind": "/workspace", "mode": "rw"}}
+        logger.info(
+            f"[SessionSandbox] Creating host_dir session container '{name}' "
+            f"(image={SESSION_IMAGE}, network={primary_network}, mount={host_path})."
         )
     else:
         # ephemeral/local: deliberately NO `volumes=` key at all — see module

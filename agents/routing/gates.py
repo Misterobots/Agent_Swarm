@@ -1,8 +1,9 @@
 """
 routing/gates.py — Pending context dispatch for chat_swarm().
 
-handle_pending_context() processes the 8 pending_ctx types that may be saved
-from a previous turn (clarifications, onboarding steps, intent gates).
+handle_pending_context() processes the 9 pending_ctx types that may be saved
+from a previous turn (clarifications, onboarding steps, intent gates, the
+perspective-matrix debate hand-off).
 
 Usage in chat_swarm():
 
@@ -111,6 +112,48 @@ def handle_pending_context(
         result["already_steered"] = True
         yield {"type": "log", "content": f"[Context Manager] Swarm steering resolved → '{user_input}'. Launching coordinator..."}
         from brooks import clear_context
+        clear_context(session_id=session_id, owner_id=owner_id)
+        return  # fall through to coordinate handler
+
+    # -----------------------------------------------------------------------
+    # 3c. swarm_debate (perspective matrix → framework debate)
+    # -----------------------------------------------------------------------
+    # The perspective research flow offers a "Debate it out" card once its matrix
+    # is delivered, saving the originating run's coordination_id with the pending
+    # context. The debate runs as its OWN coordination, so that id is the only
+    # bridge back to the per-perspective findings — CoordinatorSession keys its
+    # scratchpad by coordination_id, and a new run gets a new one.
+    if ctx_type == "swarm_debate":
+        from brooks import clear_context
+        parent_coord = pending_ctx.get("coordination_id", "")
+        original = pending_ctx.get("prompt", "")
+        answer = (user_input or "").strip()
+
+        if answer.lower() in ("not_now", "not now", "no", "skip", "later"):
+            clear_context(session_id=session_id, owner_id=owner_id)
+            result["handled"] = True
+            yield {"type": "log",
+                   "content": "[Context Manager] Debate declined — keeping the perspective matrix."}
+            yield {
+                "type": "response",
+                "content": (
+                    "Understood — the matrix stands as delivered. Ask me to dig deeper on any "
+                    "one lens, or say **debate it out** later in this session and I'll pick the "
+                    "research back up."
+                ),
+            }
+            return
+
+        logger.info(
+            "[Router] Resolving Swarm Debate. Parent coord=%s | Focus: '%s'",
+            parent_coord[:24], answer[:80],
+        )
+        result["user_input"] = original or answer
+        result["debate_mode"] = True
+        result["parent_coordination_id"] = parent_coord
+        result["debate_focus"] = answer or original
+        yield {"type": "log",
+               "content": "[Context Manager] Debate requested — recalling perspective findings..."}
         clear_context(session_id=session_id, owner_id=owner_id)
         return  # fall through to coordinate handler
 

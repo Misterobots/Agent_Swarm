@@ -207,7 +207,16 @@ DEV_TOOL_DEFINITIONS = [
                 "properties": {
                     "description": {"type": "string", "description": "Short label for the sub-task"},
                     "prompt": {"type": "string", "description": "The full, self-contained instruction for the subagent"},
-                    "subagent_type": {"type": "string", "description": "Kind of subagent, e.g. 'general', 'researcher', 'coder'"},
+                    "subagent_type": {
+                        "type": "string",
+                        "description": (
+                            "Kind of subagent or Pioneer persona. Roles: 'coder', 'researcher', 'architect', 'verifier'. "
+                            "Pioneer personas: 'lovelace' (algorithm & architecture), 'turing' (logic & verification), "
+                            "'hamilton' (resilience & fault tolerance), 'hopper' (tooling, build & debugging), "
+                            "'curie' (empirical research & methodology), 'dijkstra' (algorithmic correctness), "
+                            "'liskov' (data abstraction & interface contracts)."
+                        ),
+                    },
                 },
                 "required": ["description", "prompt"],
             },

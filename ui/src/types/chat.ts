@@ -196,7 +196,7 @@ export interface ClarificationCard {
   context?: string;
   options: ClarificationOption[];
   allow_freetext: boolean;
-  card_type: "ambiguity" | "dev_project" | "onboarding" | "dev_mode_gate" | "art_direction";
+  card_type: "ambiguity" | "dev_project" | "onboarding" | "dev_mode_gate" | "art_direction" | "perspective_next";
 }
 
 export interface QueueStatus {

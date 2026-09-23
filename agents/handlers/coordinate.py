@@ -29,6 +29,9 @@ def handle_coordinate(user_input: str, ctx: dict):
     langfuse = ctx["langfuse"]
     use_langfuse = ctx["use_langfuse"]
     already_steered = ctx.get("already_steered", False)
+    debate_mode = ctx.get("debate_mode", False)
+    parent_coordination_id = ctx.get("parent_coordination_id")
+    debate_focus = ctx.get("debate_focus")
 
     # --- DEV MODE GATE ---
     # Intercept build/project requests when dev_mode is off and not in research/plan mode.
@@ -40,7 +43,9 @@ def handle_coordinate(user_input: str, ctx: dict):
         "program ", "app", "game", "website", "web app", "tool",
     )
     _is_build_request = any(kw in user_input.lower() for kw in _build_keywords)
-    _research_only = research_mode or ultraplan_mode
+    # A debate turn writes no files however the topic is phrased, so the build gate
+    # must not intercept it.
+    _research_only = research_mode or ultraplan_mode or debate_mode
 
     if not dev_mode and _is_build_request and not _research_only and not swarm_mode:
         logger.info("[Router] Coding/project request detected in standard mode — showing dev mode gate.")
@@ -115,6 +120,10 @@ def handle_coordinate(user_input: str, ctx: dict):
             research_mode=research_mode,
             already_steered=already_steered,
             context_profile=ctx.get("context_profile"),
+            host_path=ctx.get("host_path"),
+            debate_mode=debate_mode,
+            parent_coordination_id=parent_coordination_id,
+            debate_focus=debate_focus,
         ):
             yield update
             # Mirror key events as structured agent_event so the UI can render

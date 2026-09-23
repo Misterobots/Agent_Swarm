@@ -107,3 +107,23 @@ def _pick_unique_pioneer(role: str, used_names: set[str]) -> dict:
     base = pool[0] if pool else {"name": role.title(), "full_name": role.title(), "motto": ""}
     suffix = len([n for n in used_names if n.startswith(base["name"])]) + 1
     return {**base, "name": f"{base['name']}-{suffix}", "full_name": f"{base['full_name']} ({suffix})"}
+
+
+def find_pioneer(identifier: str) -> dict | None:
+    """Find a pioneer persona dict by name, full_name, or role key."""
+    if not identifier:
+        return None
+    ident = str(identifier).strip().lower()
+
+    # 1. Direct role match
+    if ident in WORKER_PIONEERS and WORKER_PIONEERS[ident]:
+        return {**WORKER_PIONEERS[ident][0], "role": ident}
+
+    # 2. Match by pioneer short name or full name
+    for role, plist in WORKER_PIONEERS.items():
+        for p in plist:
+            if ident == p["name"].lower() or ident in p["full_name"].lower() or p["name"].lower() in ident:
+                return {**p, "role": role}
+
+    return None
+

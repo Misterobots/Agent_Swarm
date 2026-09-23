@@ -42,6 +42,8 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
       ? "bg-blue-950/30 border-blue-700/40"
       : card.card_type === "onboarding"
       ? "bg-emerald-950/30 border-emerald-700/40"
+      : card.card_type === "perspective_next"
+      ? "bg-violet-950/30 border-violet-700/40"
       : "bg-amber-950/30 border-amber-700/40";
 
   const headerText =
@@ -51,6 +53,8 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
       ? "text-blue-200"
       : card.card_type === "onboarding"
       ? "text-emerald-200"
+      : card.card_type === "perspective_next"
+      ? "text-violet-200"
       : "text-amber-200";
 
   const headerBorder =
@@ -60,6 +64,8 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
       ? "border-blue-700/50"
       : card.card_type === "onboarding"
       ? "border-emerald-700/50"
+      : card.card_type === "perspective_next"
+      ? "border-violet-700/50"
       : "border-amber-700/50";
 
   const optionHover =
@@ -69,6 +75,8 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
       ? "hover:border-blue-600 hover:text-blue-300"
       : card.card_type === "onboarding"
       ? "hover:border-emerald-600 hover:text-emerald-300"
+      : card.card_type === "perspective_next"
+      ? "hover:border-violet-600 hover:text-violet-300"
       : "hover:border-amber-600 hover:text-amber-300";
 
   const selectedStyle =
@@ -78,6 +86,8 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
       ? "border-blue-600 text-blue-300 bg-blue-900/20"
       : card.card_type === "onboarding"
       ? "border-emerald-600 text-emerald-300 bg-emerald-900/20"
+      : card.card_type === "perspective_next"
+      ? "border-violet-600 text-violet-300 bg-violet-900/20"
       : "border-amber-600 text-amber-300 bg-amber-900/20";
 
   return (
@@ -91,6 +101,8 @@ export function ClarificationCard({ card, onSelect, disabled }: ClarificationCar
             ? "🛠️ Project Setup"
             : card.card_type === "onboarding"
             ? "🚀 New Project"
+            : card.card_type === "perspective_next"
+            ? "⚔️ Debate Stage"
             : "🤔 Clarification Needed"}
         </span>
       </div>
