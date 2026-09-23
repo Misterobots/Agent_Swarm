@@ -671,7 +671,13 @@ class ChatRequest(BaseModel):
     grounding_file: bool = False      # inject local workspace file content (requires governance permission)
     already_steered: bool = False     # skip nuance gate (True when user has already answered a steering question)
     swarm_mode: bool = False          # route through Lamport multi-agent coordinator
-    gauntlet_mode: bool = False       # route through Gauntlet quality review / collective
+    gauntlet_mode: bool = False       # Pioneer-backed builder/critic loop against a supplied quality bar
+    gauntlet_bar: Optional[str] = None  # named, fetchable reference used by the independent critic
+    # Desktop-owned contract. `id` is deliberately used as the coordinator's
+    # durable task ID so reconnect/status reads never depend on an ephemeral
+    # SSE stream ID. The remaining fields stay available to the coordinator
+    # as explicit context rather than being inferred from "please resume".
+    gauntlet_handoff: Optional[dict] = None
     design_mode: bool = False         # route through Open Design Studio
     workshop_mode: bool = False       # route through Product Workshop (Grill Me)
     solving_max_iter: Optional[int] = None  # MarsRL max iterations (0 = unlimited, overrides config)
@@ -686,6 +692,29 @@ class ChatRequest(BaseModel):
     current_project_id: Optional[str] = None            # Active dev project ID (injects .memex/notes.md into system prompt)
     active_file: Optional[str] = None                   # Currently open file path in the dev workspace editor
     context_profile: Optional[Literal["chat", "project", "long"]] = None
+
+
+def _gauntlet_prompt(goal: str, bar: str) -> str:
+    """Frame a Collective run as a measurable builder-versus-critic loop.
+
+    Pioneer assignment remains the coordinator's responsibility: it selects
+    distinct personas for the builder, researcher, and verifier roles and
+    streams their identities to the client.
+    """
+    return f"""[GAUNTLET LOOP]
+Goal: {goal}
+
+Quality bar: {bar}
+
+First obtain the named bar and verify it is fetchable and comparable. Break the
+goal into the smallest independently judgeable pieces. For each piece, use
+separate Pioneer-backed builder and critic/verifier workers with fresh context.
+The critic must inspect the actual output beside the real bar with labels
+removed, choose the stronger result, and state one concrete remaining gap. Do
+not let a builder judge its own work. Iterate until the critic selects ours, or
+the user stops the run. Keep the live activity trace current with the Pioneer,
+phase, comparison result, and next gap. Do not stop after an arbitrary round
+count."""
 
 
 def _message_text(content: str | list[dict[str, Any]] | None) -> str:
@@ -2398,6 +2427,9 @@ _RICH_EVENT_TYPES = frozenset({
     "set_preview_url", "preview_unavailable", "design_artifact", "cad_artifact",
     "suggested_followups", "workshop_questions", "workflow_next_steps",
     "agent_event", "file_change", "model_metadata",
+    # Gauntlet's independent critic verdict — the client's completion record is
+    # only truthful if the verdict that produced it actually reaches the stream.
+    "gauntlet_critic_verdict",
     # queue/VRAM status, tool lifecycle, and DevHarness todos — the UI already
     # parses and renders these; they were previously dropped here at the allowlist.
     "model_queue_status", "tool_start", "tool_progress", "tool_result", "todo",
@@ -2408,6 +2440,75 @@ _NONSTANDARD_SIGNAL_TYPES = frozenset({
     "status", "thought", "log", "plan",
     "turn_boundary", "turn_metadata", "continuation", "stream_mode",
 })
+
+
+def _swarm_turn(request: "ChatRequest") -> bool:
+    """Whether this turn asked for the multi-agent coordinator.
+
+    Carries the legacy wire values: the ``swarm_mode`` flag, the ``swarm`` model
+    sentinel, and the slash prefixes clients still store and label as Collective.
+    ``gauntlet_mode`` counts because Gauntlet is a coordinator feature.
+    """
+    last_msg = ""
+    if request.messages:
+        last_msg = _message_text(request.messages[-1].content).strip()
+    return bool(
+        request.swarm_mode
+        or request.gauntlet_mode
+        or (request.model and request.model.lower() == "swarm")
+        or last_msg.startswith(("/swarm", "/build", "/plan", "/collective"))
+    )
+
+
+def _routes_to_dev_harness(request: "ChatRequest") -> bool:
+    """Whether this turn is served by the single-agent DevHarness coding loop.
+
+    Two requests outrank it because they explicitly asked for orchestration:
+
+      * a coordinator turn (see _swarm_turn) — Gauntlet especially, since it needs
+        the coordinator's durable checkpoint, Pioneer roles and critic loop; letting
+        dev_mode intercept it leaves no record to resume after a stream failure;
+      * research_mode — this is how the desktop's Collective arrives with a project
+        attached. dev_mode has to stay set or the run loses its workspace, so the
+        flag is the only signal that orchestration was requested.
+
+    church.py cannot recover from either mistake: its router and slash table run
+    after this decision, so a request already handed to DevHarness never reaches
+    them and the degradation is invisible in the transcript.
+
+    research_mode stays out of _swarm_turn on purpose. That predicate also feeds
+    the downstream swarm_mode argument, and a research-only turn must resolve to
+    RESEARCH rather than be overwritten to COORDINATE by church.py's swarm branch.
+    """
+    return bool(
+        request.dev_mode
+        and request.stream
+        and not _swarm_turn(request)
+        and not request.research_mode
+    )
+
+
+def _validate_gauntlet_request(request: "ChatRequest") -> None:
+    """Gauntlet's preconditions, enforced at the boundary.
+
+    Without a named, fetchable bar there is nothing for the independent critic to
+    compare against, so the run would degrade into an ordinary Collective while
+    still reporting a quality verdict. Reject that up front instead of discovering
+    it after the build.
+    """
+    if not request.gauntlet_mode:
+        return
+    bar = (request.gauntlet_bar or "").strip()
+    if not bar:
+        raise HTTPException(
+            status_code=422,
+            detail="Gauntlet mode requires a named, fetchable quality bar (URL, product, repository, or publication).",
+        )
+    request.gauntlet_bar = bar
+    request.swarm_mode = True
+    handoff_id = str((request.gauntlet_handoff or {}).get("id") or "").strip()
+    if handoff_id and not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", handoff_id):
+        raise HTTPException(status_code=422, detail="Invalid Gauntlet handoff id")
 
 
 @app.post("/v1/chat/completions")
@@ -2423,26 +2524,15 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     _enforce_chat_features(request, http_request)
     _apply_model_policy(request, http_request)
 
+    # Gauntlet's bar requirement and handoff-id shape are enforced before anything
+    # downstream can silently reinterpret the request as an ordinary Collective.
+    _validate_gauntlet_request(request)
+
     # --- Dev workspace agentic harness (handles dev_mode for ANY model) ---
     # Must precede the provider_for() dispatch below: local Ollama models resolve
     # to provider=None and would otherwise fall through to the swarm path, never
     # reaching the coding loop.  DevHarness picks Ollama/GitHub/Anthropic itself.
-    _last_msg_text = ""
-    if request.messages:
-        _last_m = request.messages[-1]
-        _last_msg_text = (_last_m.content if hasattr(_last_m, "content") else _last_m.get("content", "")) or ""
-        if not isinstance(_last_msg_text, str):
-            _last_msg_text = str(_last_msg_text)
-        _last_msg_text = _last_msg_text.strip()
-
-    _is_swarm_turn = bool(
-        request.swarm_mode
-        or request.gauntlet_mode
-        or (request.model and request.model.lower() == "swarm")
-        or _last_msg_text.startswith(("/swarm", "/build", "/plan", "/collective"))
-    )
-
-    if request.dev_mode and request.stream and not _is_swarm_turn:
+    if _routes_to_dev_harness(request):
         _dev_uid = (
             http_request.headers.get("X-authentik-username", "").strip()
             or http_request.headers.get("X-authentik-uid", "").strip()
@@ -2600,12 +2690,54 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     history = [{"role": m.role, "content": _message_text(m.content)} for m in request.messages[:-1]]
     # Extract latest prompt
     last_msg = _message_text(request.messages[-1].content)
-    
+    if request.gauntlet_mode:
+        last_msg = _gauntlet_prompt(last_msg, request.gauntlet_bar or "")
+        if request.gauntlet_handoff:
+            contract = request.gauntlet_handoff
+            clarifications = contract.get("clarifications")
+            clarification_block = ""
+            if isinstance(clarifications, list):
+                durable_notes = [str(note).strip() for note in clarifications if str(note).strip()]
+                if durable_notes:
+                    clarification_block = "\nResumption clarifications:\n" + "\n".join(
+                        f"- {note}" for note in durable_notes
+                    )
+            last_msg += (
+                "\n\n[DESKTOP GAUNTLET CONTRACT — immutable]\n"
+                f"Checkpoint: {contract.get('id', '')}\n"
+                f"Original goal: {contract.get('goal', '')}\n"
+                f"Quality bar: {contract.get('qualityBar', request.gauntlet_bar or '')}\n"
+                f"Effort policy: {contract.get('effort', {})}\n"
+                f"{clarification_block}"
+                "Do not replace this contract with the latest shorthand user message."
+            )
+
     # Check for "Standard Mode" (OpenAI Compatibility)
     # Suppresses internal logs/status updates
     is_standard_mode = request.model.startswith("swarm-") or request.model == "default"
     owner_id = _resolve_owner_id(request.user_id, http_request)
-    
+
+    # The desktop checkpoint must become observable before any model or router work
+    # begins.  Waiting for coordinate_task() to enter meant a queue failure, early router
+    # exit, or severed stream could leave the UI with a locally preserved checkpoint but
+    # no remote task to inspect or resume.  create_run is idempotent, so the coordinator
+    # can safely create/update the same record once it starts doing useful work.
+    if request.gauntlet_mode and request.gauntlet_handoff:
+        checkpoint_id = str(request.gauntlet_handoff.get("id") or "").strip()
+        if checkpoint_id:
+            try:
+                import swarm_run_store
+                swarm_run_store.create_run(
+                    checkpoint_id,
+                    request.session_id or "default_session",
+                    owner_id,
+                    title=str(request.gauntlet_handoff.get("goal") or _message_text(request.messages[-1].content)),
+                    scope="gauntlet",
+                    started_at=int(time.time()),
+                )
+            except Exception as exc:
+                logger.warning("[Gauntlet] checkpoint persistence failed: %s", exc)
+
     if request.stream:
         async def stream_generator():
             # Get generator from the swarm router
@@ -2622,6 +2754,8 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     skill=request.skill,
                     style=request.style,
                     research_mode=request.research_mode,
+                    gauntlet_bar=request.gauntlet_bar,
+                    coordination_id=(str((request.gauntlet_handoff or {}).get("id") or "").strip() or None),
                     ultraplan_mode=request.ultraplan_mode,
                     ultrathink_mode=request.ultrathink_mode,
                     attachments=request.attachments,
@@ -2629,7 +2763,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     grounding_docs=request.grounding_docs,
                     grounding_file=request.grounding_file,
                     already_steered=request.already_steered,
-                    swarm_mode=(request.swarm_mode or (request.model and request.model.lower() == "swarm") or _is_swarm_turn),
+                    swarm_mode=_swarm_turn(request),
                     design_mode=request.design_mode,
                     workshop_mode=request.workshop_mode,
                     dev_mode=request.dev_mode,
@@ -2956,6 +3090,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             skill=request.skill,
             style=request.style,
             research_mode=request.research_mode,
+            gauntlet_bar=request.gauntlet_bar,
             ultraplan_mode=request.ultraplan_mode,
             ultrathink_mode=request.ultrathink_mode,
             attachments=request.attachments,

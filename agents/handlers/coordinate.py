@@ -32,6 +32,8 @@ def handle_coordinate(user_input: str, ctx: dict):
     debate_mode = ctx.get("debate_mode", False)
     parent_coordination_id = ctx.get("parent_coordination_id")
     debate_focus = ctx.get("debate_focus")
+    coordination_id = ctx.get("coordination_id")
+    gauntlet_bar = str(ctx.get("gauntlet_bar") or "").strip()
 
     # --- DEV MODE GATE ---
     # Intercept build/project requests when dev_mode is off and not in research/plan mode.
@@ -124,6 +126,8 @@ def handle_coordinate(user_input: str, ctx: dict):
             debate_mode=debate_mode,
             parent_coordination_id=parent_coordination_id,
             debate_focus=debate_focus,
+            coordination_id=coordination_id,
+            gauntlet_bar=gauntlet_bar or None,
         ):
             yield update
             # Mirror key events as structured agent_event so the UI can render

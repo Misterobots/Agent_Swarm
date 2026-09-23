@@ -48,6 +48,15 @@ logger = setup_logger("Lamport")
 # flagging convention as executor.py's SWARM_DEVHARNESS_WORKERS.
 SESSION_SANDBOX_ENABLED = os.getenv("SESSION_SANDBOX_ENABLED", "true").lower() in ("1", "true", "yes")
 
+# The pass marker has to begin a line: critic prose that merely mentions a verdict
+# ("there is no VERDICT: PASS here yet") must not clear a completion gate.
+_GAUNTLET_PASS_RE = re.compile(r"(?:^|\n)[ \t]*VERDICT:[ \t]*PASS\b", re.IGNORECASE)
+
+
+def _gauntlet_passed(critic_output: str | None) -> bool:
+    """Whether the independent critic recorded a line-initial PASS verdict."""
+    return bool(_GAUNTLET_PASS_RE.search(critic_output or ""))
+
 
 class CoordinationCancelled(Exception):
     """Internal control flow used when the task owner requests a stop."""
@@ -328,6 +337,7 @@ def coordinate_task(
     dev_mode: bool = False,
     plan_mode: bool = False,
     research_mode: bool = False,
+    gauntlet_bar: Optional[str] = None,
     skip_project_gate: bool = False,
     already_steered: bool = False,
     repo_context: Optional[dict] = None,
@@ -1645,6 +1655,13 @@ def coordinate_task(
             f"Verification Criteria:\n{criteria_text}\n\n"
             f"Work Product:\n{all_work}"
         )
+        if gauntlet_bar:
+            verify_prompt += (
+                f"\n\n[GAUNTLET INDEPENDENT CRITIC]\nQuality bar: {gauntlet_bar}\n"
+                "You are independent from the builders. Inspect the actual work against the named bar. "
+                "End with exactly `VERDICT: PASS` only when it meets the bar, otherwise `VERDICT: FAIL`, "
+                "followed by `GAP: <one concrete remaining gap>`."
+            )
 
         verify_worker_id = session.register_worker("verifier", "Final verification", "verification")
         _verify_pioneer = session.workers[verify_worker_id].pioneer
@@ -1689,6 +1706,112 @@ def coordinate_task(
         }
 
         yield {"type": "message", "content": f"**🔍 Verification**\n\n{verify_result}\n\n"}
+
+        if gauntlet_bar:
+            # A Gauntlet's completion claim is only as good as the independent critic
+            # behind it, so this is a hard gate rather than an aspirational prompt: the
+            # verdict is persisted before any completion reaches the client. The pattern
+            # anchors to a line start so prose that merely mentions a pass cannot clear it.
+            _gauntlet_pass = _gauntlet_passed(verify_result)
+            _gauntlet_verdict = "pass" if _gauntlet_pass else "fail"
+            swarm_run_store.record_gauntlet_review(
+                session.coordination_id, gauntlet_bar, _gauntlet_verdict, verify_result,
+            )
+            yield {
+                "type": "gauntlet_critic_verdict",
+                "verdict": _gauntlet_verdict,
+                "quality_bar": gauntlet_bar,
+                "content": f"Gauntlet critic verdict: {_gauntlet_verdict.upper()}",
+            }
+            if not _gauntlet_pass:
+                # A critic failure is work to do, not a user-facing dead end. Keep the run
+                # alive, dispatch one bounded repair worker carrying the recorded gap, and
+                # ask the critic again. A second non-pass stays durable and resumable with
+                # its evidence intact instead of being reported as a completed build.
+                yield {"type": "status", "content": "Gauntlet critic found a gap; starting an automatic repair pass…"}
+                repair_task = "Repair the critic's concrete gap and produce verifiable workspace changes"
+                repair_worker_id = session.register_worker("coder", repair_task, "repair")
+                repair_pioneer = session.workers[repair_worker_id].pioneer
+                yield {
+                    "type": "swarm_worker_created", "worker_id": repair_worker_id,
+                    "role": "coder", "model": session.model_metadata_for_role("coder"),
+                    "pioneer_name": repair_pioneer["name"],
+                    "pioneer_full_name": repair_pioneer["full_name"],
+                    "pioneer_motto": repair_pioneer["motto"],
+                    "task": repair_task, "phase": "repair",
+                    "content": f"Spawned {repair_pioneer['name']} (Gauntlet repair)",
+                }
+                repair_prompt = (
+                    f"[GAUNTLET REPAIR — EXECUTION REQUIRED]\nQuality bar: {gauntlet_bar}\n"
+                    f"Original goal: {user_input}\n\nIndependent critic finding:\n{verify_result}\n\n"
+                    "Work directly in the selected workspace. Do not return a plan or TodoWrite-only answer. "
+                    "Create or modify the concrete files needed to close the gap, then run the most relevant available check "
+                    "and report the changed paths and result."
+                )
+                repair_agent = _get_agent_for_role(
+                    "coder", session_id=session_id, scope=scope,
+                    model_name=session.model_for_role("coder"),
+                )
+                _run_worker(
+                    session, repair_worker_id, repair_agent, repair_prompt,
+                    child_token=_derive_worker_token(ace_token, "coder", repair_task),
+                    role="coder", scope=scope,
+                )
+                yield {"type": "swarm_task_list", "content": "Gauntlet repair pass complete", "workers": [{
+                    "worker_id": repair_worker_id, "pioneer_name": repair_pioneer["name"], "role": "coder",
+                    "task": repair_task, "state": session.workers[repair_worker_id].state.value,
+                }]}
+                repair_work = session.get_all_scratchpad_content()
+                if len(repair_work) > _MAX_VERIFY_CHARS:
+                    repair_work = repair_work[:_MAX_VERIFY_CHARS] + "\n\n[...work product truncated for context window...]"
+                recheck_prompt = (
+                    verify_prompt.replace(all_work, repair_work)
+                    + "\n\nThis is the post-repair recheck; inspect actual changed paths and test evidence."
+                )
+                recheck_id = session.register_worker("verifier", "Gauntlet repair verification", "verification")
+                recheck_pioneer = session.workers[recheck_id].pioneer
+                yield {
+                    "type": "swarm_worker_created", "worker_id": recheck_id, "role": "verifier",
+                    "model": session.model_metadata_for_role("verifier"),
+                    "pioneer_name": recheck_pioneer["name"],
+                    "pioneer_full_name": recheck_pioneer["full_name"],
+                    "pioneer_motto": recheck_pioneer["motto"], "task": "Gauntlet repair verification",
+                    "phase": "verification",
+                    "content": f"Spawned {recheck_pioneer['name']} (repair critic)",
+                }
+                recheck_result = _run_worker(
+                    session, recheck_id,
+                    _get_agent_for_role(
+                        "verifier", model_name=session.model_for_role("verifier"), scope=scope,
+                    ),
+                    recheck_prompt,
+                    child_token=_derive_worker_token(ace_token, "verifier", "Gauntlet repair verification"),
+                    role="verifier", scope=scope,
+                )
+                _recheck_pass = _gauntlet_passed(recheck_result)
+                swarm_run_store.record_gauntlet_review(
+                    session.coordination_id, gauntlet_bar,
+                    "pass" if _recheck_pass else "fail", recheck_result,
+                )
+                yield {
+                    "type": "gauntlet_critic_verdict",
+                    "verdict": "pass" if _recheck_pass else "fail",
+                    "quality_bar": gauntlet_bar,
+                    "content": f"Gauntlet repair critic verdict: {'PASS' if _recheck_pass else 'FAIL'}",
+                }
+                if not _recheck_pass:
+                    swarm_run_store.finish_run(
+                        session.coordination_id, status="needs_input",
+                        workers_total=len(session.workers),
+                        workers_completed=sum(1 for w in session.workers.values() if w.state == WorkerState.COMPLETED),
+                        workers_failed=sum(1 for w in session.workers.values() if w.state == WorkerState.FAILED),
+                        error="Gauntlet repair pass did not meet the quality bar.", ended_at=int(time.time()),
+                    )
+                    yield {
+                        "type": "status",
+                        "content": "Gauntlet repair pass did not meet the bar; critic evidence is preserved for resume.",
+                    }
+                    return
 
         # Auto-retry if verification failed on plan-only
         _verify_lower = verify_result.lower()
