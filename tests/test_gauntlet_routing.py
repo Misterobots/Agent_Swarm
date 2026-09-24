@@ -26,6 +26,8 @@ from fastapi import HTTPException
 # can never be tested against a silently hollow import.
 _ALLOWED_ABSENT = frozenset({
     "pynvml",
+    "ollama",  # coordination/decomposer.py imports `from ollama import Client`
+    "prometheus_client",  # agents/metrics.py, reached via main
     "phi", "phi.agent", "phi.model", "phi.model.ollama", "phi.knowledge",
     "phi.knowledge.combined", "phi.vectordb", "phi.vectordb.pgvector",
     "phi.storage", "phi.storage.agent", "phi.storage.agent.postgres",
