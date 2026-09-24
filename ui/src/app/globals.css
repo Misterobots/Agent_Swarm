@@ -2474,3 +2474,638 @@ main, .main-content {
   background-image: radial-gradient(ellipse 1000px 500px at 50% 0%, rgba(180,130,40,0.13), transparent 60%),
                     radial-gradient(ellipse 800px 600px at 50% 100%, rgba(120,80,20,0.08), transparent 60%);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LANDING PAGE — scoped under .landing so nothing here leaks into the rest
+   of the app, which stays on the system-font stack. Uses the existing Memex
+   theme tokens (--chat-bg, --chat-accent, --chat-accent-2) rather than a
+   competing palette — this page shares a site with every admin surface.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.landing {
+  --landing-display: "Space Grotesk", var(--chat-font);
+  --landing-body: "IBM Plex Sans", var(--chat-font);
+  --landing-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* 0 (top of page) → 1 (bottom). Written by useScrollIntensity directly on
+     this element's style, not through React state — every effect below that
+     reads it (background glow, circuit grid, panel charge) is plain CSS, so
+     the ramp costs nothing per frame beyond the one property write. */
+  --intensity: 0;
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  background: var(--chat-bg);
+  background-image: var(--backdrop-glow);
+  color: var(--chat-text);
+  font-family: var(--landing-body);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Rising charge glow — the page visibly "powers up" as you scroll toward the
+   bottom, reinforcing the instrument-panel language everywhere else. */
+.landing::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: var(--intensity);
+  background:
+    radial-gradient(ellipse 1000px 700px at 50% 100%, color-mix(in srgb, var(--chat-accent) 18%, transparent), transparent 65%),
+    radial-gradient(ellipse 700px 500px at 85% 60%, color-mix(in srgb, var(--chat-accent-2) 14%, transparent), transparent 70%);
+}
+
+/* Faint schematic grid, same rising opacity. */
+.landing-circuit-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: calc(var(--intensity) * 0.5);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--chat-accent) 16%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--chat-accent) 16%, transparent) 1px, transparent 1px);
+  background-size: 46px 46px;
+}
+
+.landing-header-inner,
+.landing-hero,
+.landing-panels,
+.landing-engines,
+.landing-footer {
+  max-width: 1120px;
+  margin: 0 auto;
+  width: 100%;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  box-sizing: border-box;
+}
+
+.landing-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.landing-wordmark {
+  font-family: var(--landing-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-family: var(--landing-mono);
+  font-size: 0.8rem;
+}
+
+.landing-nav a {
+  color: var(--chat-muted);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.landing-nav a:hover,
+.landing-nav a:focus-visible { color: var(--chat-text); }
+.landing-nav a:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 3px; border-radius: 2px; }
+
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 2rem;
+  padding-top: 3rem;
+  padding-bottom: 4rem;
+}
+/* Single demonstration of the framework (the app showcase below), not two —
+   the hero stays text-only so it isn't a redundant second diagram. Keep the
+   shared 1120px/margin-auto container so this still left-aligns with the
+   header above it; only the copy's line length is constrained. */
+.landing-hero--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.landing-hero--single .landing-hero-copy {
+  max-width: 640px;
+}
+
+.landing-eyebrow {
+  font-family: var(--landing-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--chat-accent);
+  margin: 0 0 1rem;
+}
+
+.landing-headline {
+  font-family: var(--landing-display);
+  font-weight: 700;
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0 0 1.25rem;
+}
+
+.landing-subhead {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--chat-muted);
+  max-width: 42ch;
+  margin: 0 0 2rem;
+}
+
+.landing-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.landing-cta-primary,
+.landing-cta-secondary {
+  font-family: var(--landing-mono);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.75rem 1.3rem;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+}
+
+.landing-cta-primary {
+  background: var(--chat-accent);
+  color: #05110d;
+  border: 1px solid var(--chat-accent);
+}
+.landing-cta-primary:hover { transform: translateY(-1px); background: var(--chat-accent-strong); }
+.landing-cta-primary:focus-visible { outline: 2px solid var(--chat-accent-strong); outline-offset: 3px; }
+
+.landing-cta-secondary {
+  background: transparent;
+  color: var(--chat-text);
+  border: 1px solid var(--chat-border);
+}
+.landing-cta-secondary:hover { border-color: var(--chat-accent-2); color: var(--chat-accent-2); }
+.landing-cta-secondary:focus-visible { outline: 2px solid var(--chat-accent-2); outline-offset: 3px; }
+
+.landing-platform-note {
+  font-family: var(--landing-mono);
+  font-size: 0.75rem;
+  color: var(--chat-subtle);
+  margin: 0;
+}
+
+.landing-hero-graph {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.landing-graph-frame {
+  width: 100%;
+  aspect-ratio: 600 / 560;
+}
+
+.landing-graph {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.landing-coordinator-node {
+  fill: color-mix(in srgb, var(--chat-accent) 22%, transparent);
+  stroke: var(--chat-accent-strong);
+  stroke-width: 2;
+  animation: landing-pulse 3.2s ease-in-out infinite;
+  transform-origin: 300px 300px;
+}
+
+.landing-pioneer-node {
+  fill: color-mix(in srgb, var(--chat-accent-2) 20%, transparent);
+  stroke: var(--chat-accent-2);
+  stroke-width: 1.5;
+}
+
+.landing-node-group { cursor: default; }
+.landing-node-group:hover .landing-pioneer-node,
+.landing-node-group:focus-within .landing-pioneer-node {
+  fill: color-mix(in srgb, var(--chat-accent-2) 45%, transparent);
+}
+
+.landing-node-label {
+  font-family: var(--landing-mono);
+  font-size: 13px;
+  fill: var(--chat-muted);
+  letter-spacing: 0.02em;
+}
+.landing-node-label--center {
+  fill: var(--chat-text);
+  font-size: 12px;
+}
+
+.landing-edge {
+  stroke: var(--chat-accent-2);
+  stroke-width: 1;
+  opacity: 0.35;
+  stroke-dasharray: 4 7;
+  animation: landing-flow 5s linear infinite;
+}
+
+@keyframes landing-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.06); opacity: 0.85; }
+}
+
+@keyframes landing-flow {
+  to { stroke-dashoffset: -110; }
+}
+
+/* ── App showcase — a real recreation of the Desktop app's chrome, not a
+   screenshot. Same structure/vocabulary as the actual product (Coordinator/
+   Pioneer roles, WORKING status, Collective + model chips on the input bar). */
+.landing-showcase {
+  padding-top: 1rem;
+  padding-bottom: 4rem;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+}
+.landing-showcase.is-visible { opacity: 1; transform: translateY(0); }
+
+.landing-app-frame {
+  border: 1px solid var(--chat-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--chat-surface);
+  box-shadow: 0 0 calc(12px + var(--intensity, 0) * 28px) color-mix(in srgb, var(--chat-accent) calc(6% + var(--intensity, 0) * 16%), transparent),
+    var(--elev-3);
+  transition: box-shadow 0.15s linear;
+}
+
+.landing-app-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--chat-border);
+  background: var(--chat-panel);
+}
+.landing-app-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chat-border);
+}
+.landing-app-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-left: 0.75rem;
+  font-family: var(--landing-mono);
+  font-size: 0.72rem;
+  color: var(--chat-subtle);
+}
+.landing-app-tabs .is-active { color: var(--chat-text); }
+
+.landing-app-frame--compact { max-width: 760px; }
+
+.landing-app-roster {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0;
+}
+.landing-app-roster-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.1rem 0.5rem;
+  border-right: 1px solid var(--chat-border);
+}
+.landing-app-roster-card:last-child { border-right: none; }
+.landing-app-roster-card img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--chat-border);
+}
+.landing-app-roster-name {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--chat-text);
+}
+.landing-app-roster-role {
+  font-family: var(--landing-mono);
+  font-size: 0.62rem;
+  color: var(--chat-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.landing-showcase-features {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1.5rem;
+  max-width: 760px;
+}
+.landing-showcase-features li {
+  font-size: 0.85rem;
+  color: var(--chat-muted);
+  padding-left: 1rem;
+  position: relative;
+}
+.landing-showcase-features li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--chat-accent);
+}
+
+.landing-panels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  padding-bottom: 4rem;
+}
+
+.landing-panel {
+  position: relative;
+  border: 1px solid var(--chat-border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  background: color-mix(in srgb, var(--chat-panel) 70%, transparent);
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out), border-color 0.4s var(--ease-out);
+}
+/* A one-time charge on reveal, not a continuous scroll-driven recompute —
+   box-shadow/color-mix on every scroll frame across several cards was
+   expensive to repaint (see useScrollIntensity's comment). The background
+   glow layers carry the "ramps as you scroll" feeling instead. */
+.landing-panel.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  border-color: color-mix(in srgb, var(--chat-accent) 30%, var(--chat-border));
+}
+.landing-panels > .landing-panel:nth-child(2) { transition-delay: 0.1s; }
+.landing-panels > .landing-panel:nth-child(3) { transition-delay: 0.2s; }
+
+/* Instrument-panel corner brackets — a schematic device, not decoration. */
+.landing-panel::before,
+.landing-panel::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--chat-accent);
+  opacity: 0.6;
+}
+.landing-panel::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+.landing-panel::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+.landing-panel h2 {
+  font-family: var(--landing-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.65rem;
+}
+
+.landing-panel p {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--chat-muted);
+  margin: 0;
+}
+
+.landing-engines {
+  padding-top: 1rem;
+  padding-bottom: 5rem;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+}
+.landing-engines.is-visible { opacity: 1; transform: translateY(0); }
+
+.landing-section-title {
+  font-family: var(--landing-display);
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  font-weight: 600;
+  margin: 0.4rem 0 2rem;
+  max-width: 30ch;
+}
+
+.landing-engine-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.landing-engine-card {
+  border: 1px solid var(--chat-border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  background: color-mix(in srgb, var(--chat-panel) 55%, transparent);
+}
+
+.landing-engine-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--chat-border);
+}
+.landing-engine-name {
+  font-family: var(--landing-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.landing-engine-tag {
+  font-family: var(--landing-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chat-accent);
+}
+
+.landing-engine-card ul {
+  list-style: none;
+  margin: 0 0 1.1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.landing-engine-card li {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.87rem;
+  line-height: 1.5;
+  color: var(--chat-muted);
+}
+.landing-engine-card li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--chat-accent-2);
+}
+
+.landing-engine-fit {
+  margin: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--chat-border);
+  font-size: 0.85rem;
+  color: var(--chat-text);
+}
+.landing-engine-fit strong {
+  font-family: var(--landing-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chat-subtle);
+  font-weight: 500;
+  margin-right: 0.4rem;
+}
+
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1.5rem;
+  padding-bottom: 2rem;
+  font-family: var(--landing-mono);
+  font-size: 0.78rem;
+  color: var(--chat-subtle);
+  border-top: 1px solid var(--chat-border);
+  margin-top: auto;
+}
+
+.landing-footer-links { display: flex; gap: 1.25rem; }
+.landing-footer-links a { color: var(--chat-subtle); text-decoration: none; }
+.landing-footer-links a:hover,
+.landing-footer-links a:focus-visible { color: var(--chat-text); }
+
+@media (max-width: 860px) {
+  .landing-hero { grid-template-columns: 1fr; padding-top: 2rem; }
+  .landing-panels { grid-template-columns: 1fr; }
+  .landing-hero-graph { order: -1; max-width: 360px; margin: 0 auto; }
+  .landing-engine-grid { grid-template-columns: 1fr; }
+  .landing-app-roster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .landing-app-roster-card:nth-child(3) { border-right: none; }
+  .landing-app-roster-card:nth-child(n+4) { border-top: 1px solid var(--chat-border); }
+  .landing-showcase-features { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .landing-header-inner { flex-wrap: wrap; gap: 0.75rem; }
+  .landing-nav { gap: 1rem; font-size: 0.75rem; }
+}
+
+/* Orchestrated sweep — the graph plays out an actual Collective run: the
+   Coordinator (ambient pulse above) dispatches each Pioneer in turn. Same
+   keyframe shape reused per node/edge via a staggered animation-delay set
+   from PIONEERS' index in page.tsx, so this stays in lockstep with the
+   Coordinator → Pioneer order shown elsewhere on the page. */
+@keyframes landing-sweep-node {
+  0%, 14%, 100% { opacity: 0.55; transform: scale(1); }
+  6%            { opacity: 1;    transform: scale(1.22); }
+}
+@keyframes landing-sweep-edge {
+  0%, 14%, 100% { opacity: 0.25; stroke: var(--chat-accent-2); }
+  6%            { opacity: 0.95; stroke: var(--chat-accent); }
+}
+.landing-sweep-node { animation-name: landing-sweep-node; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+.landing-sweep-edge { animation-name: landing-sweep-edge; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+
+/* Console readout — a real bordered instrument panel, not a floating caption.
+   Sits directly under the graph it's reporting on. */
+.landing-console {
+  border: 1px solid var(--chat-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--chat-panel) 65%, transparent);
+  padding: 0.75rem 0.9rem;
+  box-shadow: 0 0 calc(6px + var(--intensity, 0) * 22px) color-mix(in srgb, var(--chat-accent) calc(8% + var(--intensity, 0) * 22%), transparent);
+  transition: box-shadow 0.15s linear;
+}
+.landing-console-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--landing-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chat-subtle);
+  margin-bottom: 0.5rem;
+}
+.landing-ticker-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--chat-accent);
+  flex-shrink: 0;
+  animation: landing-ticker-blink 1.8s ease-in-out infinite;
+}
+.landing-ticker-line {
+  display: block;
+  font-family: var(--landing-mono);
+  font-size: 0.92rem;
+  color: var(--chat-text);
+  min-height: 1.4em;
+  animation: landing-ticker-fade 2.2s ease-in-out;
+}
+@keyframes landing-ticker-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+@keyframes landing-ticker-fade {
+  0%   { opacity: 0; transform: translateY(2px); }
+  15%  { opacity: 1; transform: translateY(0); }
+  85%  { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-coordinator-node,
+  .landing-edge,
+  .landing-sweep-node,
+  .landing-sweep-edge,
+  .landing-ticker-dot,
+  .landing-ticker-line {
+    animation: none !important;
+  }
+  .landing-panel,
+  .landing-engines,
+  .landing-showcase {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

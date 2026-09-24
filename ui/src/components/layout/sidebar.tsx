@@ -15,8 +15,7 @@ import {
 } from "@/lib/config/navigation";
 import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, MessageSquare, Search, X, LogOut, LogIn, User, PanelLeftClose, Volume2, VolumeX, Link2 } from "lucide-react";
-import { BuddyWidget } from "@/components/buddy/buddy-widget";
-import { ThemeSelector } from "@/components/chat/theme-selector";
+import { ThemeSelector } from "@/components/theme/theme-selector";
 import { useAccess } from "@/lib/hooks/use-access";
 import { useConversationSync } from "@/lib/hooks/use-conversation-sync";
 import { LCARSDataStream } from "@/components/theme/lcars-data-stream";
@@ -310,9 +309,6 @@ export function Sidebar({ onCollapse, slim = false, onExpand }: { onCollapse?: (
           </>
         ) : null}
       </div>
-
-      {/* Buddy companion */}
-      <BuddyWidget />
 
       {/* User & status footer */}
       <div className="px-4 py-3 relative space-y-2">

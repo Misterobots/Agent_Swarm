@@ -11,9 +11,19 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ServiceWorkerRegistration } from "./sw-register";
 import { useChatStore } from "@/lib/stores/chat-store";
 import type { Conversation } from "@/types/chat";
+
+// Routes with no app chrome at all — the public landing page and its
+// children render full-bleed, with no sidebar and no session/conversation
+// fetch (there's nothing to resume for an anonymous visitor).
+const CHROMELESS_PREFIXES = ["/download"];
+function isChromeless(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === "/" || CHROMELESS_PREFIXES.some((p) => pathname.startsWith(p));
+}
 
 const AppShell = dynamic(
   () => import("@/components/layout/app-shell").then((m) => m.AppShell),
@@ -54,13 +64,18 @@ async function resumeSession(replaceConversations: (c: Conversation[]) => void):
 }
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const chromeless = isChromeless(pathname);
   const replaceConversations = useChatStore((s) => s.replaceConversations);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(chromeless);
 
   useEffect(() => {
+    if (chromeless) return;
     resumeSession(replaceConversations).finally(() => setReady(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [chromeless]);
+
+  if (chromeless) return <>{children}</>;
 
   return (
     <>

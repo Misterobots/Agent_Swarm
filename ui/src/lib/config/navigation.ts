@@ -3,23 +3,12 @@ import {
   Activity,
   BarChart3,
   BookOpen,
-  Castle,
-  CalendarClock,
-  Code2,
   FileText,
-  GraduationCap,
-  Hammer,
   HeartPulse,
-  ImagePlus,
   LayoutDashboard,
-  MessageSquare,
-  Mic2,
   Network,
-  Paintbrush,
   Radar,
-  Search,
   Settings,
-  Sparkles,
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -31,76 +20,16 @@ export interface NavigationItem {
   adminOnly?: boolean;
 }
 
+// Product surfaces (chat, research, routines, design/art-studio, code, palace)
+// moved to the Desktop app — see plans/peppy-orbiting-honey.md. The remaining
+// primary nav is the standalone Memory/Codebase Graph viewer, kept as-is
+// pending its own split decision; everything else here is now admin-only.
 export const primaryNavigation: NavigationItem[] = [
   {
-    label: "Chat",
-    href: "/chat",
-    icon: MessageSquare,
-    matchPrefixes: ["/chat"],
-  },
-  {
-    label: "Research",
-    href: "/research",
-    icon: Search,
-    matchPrefixes: ["/research"],
-  },
-  {
-    label: "Routines",
-    href: "/routines",
-    icon: CalendarClock,
-    matchPrefixes: ["/routines"],
-  },
-  {
-    label: "Design",
-    href: "/art-studio",
-    icon: Paintbrush,
-    matchPrefixes: ["/media", "/art-studio"],
-    children: [
-      {
-        label: "Studio",
-        href: "/art-studio",
-        icon: ImagePlus,
-        matchPrefixes: ["/art-studio", "/media/images"],
-      },
-      {
-        label: "Action Figure",
-        href: "/media/action-figure",
-        icon: Sparkles,
-        matchPrefixes: ["/media/action-figure"],
-      },
-      {
-        label: "Creature Forge",
-        href: "/media/creature-forge",
-        icon: Hammer,
-        matchPrefixes: ["/media/creature-forge"],
-      },
-      {
-        label: "Voice",
-        href: "/media/voice",
-        icon: Mic2,
-        matchPrefixes: ["/media/voice"],
-      },
-    ],
-  },
-  {
-    label: "Palace",
-    href: "/palace",
-    icon: Castle,
-    matchPrefixes: ["/palace", "/graph"],
-    children: [
-      {
-        label: "Memory Graph",
-        href: "/graph",
-        icon: Network,
-        matchPrefixes: ["/graph"],
-      },
-    ],
-  },
-  {
-    label: "Code",
-    href: "/dev",
-    icon: Code2,
-    matchPrefixes: ["/dev"],
+    label: "Graph",
+    href: "/graph",
+    icon: Network,
+    matchPrefixes: ["/graph"],
     adminOnly: true,
   },
 ];
@@ -165,13 +94,6 @@ export const secondaryNavigation: NavigationItem[] = [
       },
     ],
   },
-  {
-    label: "Training",
-    href: "/training",
-    icon: GraduationCap,
-    matchPrefixes: ["/training"],
-    adminOnly: true,
-  },
 ];
 
 export const utilityNavigation: NavigationItem[] = [
@@ -189,16 +111,18 @@ export const utilityNavigation: NavigationItem[] = [
   },
 ];
 
-export function isConversationRoute(pathname: string | null | undefined): boolean {
-  if (!pathname) return false;
-  return pathname === "/chat" || pathname.startsWith("/dev") || pathname.startsWith("/research") || pathname.startsWith("/routines");
+// Chat/dev/research/routines all moved to the Desktop app (see
+// plans/peppy-orbiting-honey.md) — the website has no conversation route left,
+// so this always reports false. Kept (rather than removed) so the sidebar/
+// mobile-drawer/top-bar chrome that gates on it doesn't need a parallel rewrite.
+export function isConversationRoute(_pathname: string | null | undefined): boolean {
+  return false;
 }
 
-export function conversationExperienceForPath(pathname: string | null | undefined) {
-  if (pathname?.startsWith("/dev")) return "code" as const;
-  if (pathname?.startsWith("/research")) return "research" as const;
-  if (pathname?.startsWith("/routines")) return "routines" as const;
-  return "chat" as const;
+export function conversationExperienceForPath(
+  _pathname: string | null | undefined,
+): "chat" | "code" | "research" | "routines" {
+  return "chat";
 }
 
 export function isNavigationItemActive(item: NavigationItem, pathname: string | null | undefined): boolean {

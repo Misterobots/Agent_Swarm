@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ModelSelector } from "@/components/chat/model-selector";
-import { ThemeSelector } from "@/components/chat/theme-selector";
+import { ModelSelector } from "@/components/settings/model-selector";
+import { ThemeSelector } from "@/components/theme/theme-selector";
 import { GitHubConnect } from "@/components/settings/github-connect";
 import { ProviderKeysConnect } from "@/components/settings/provider-keys-connect";
 import { useToolsStore } from "@/lib/stores/tools-store";
