@@ -49,7 +49,7 @@ def test_role_snapshot_checkpoint_survives_team_builder_change(monkeypatch, tmp_
     calls = iter([first, second])
     monkeypatch.setattr(
         session_module, "snapshot_role_models",
-        lambda uid, context_profile=None: next(calls),
+        lambda uid, context_profile=None, selected_model=None, team_builder_roles=False: next(calls),
     )
 
     session1 = CoordinatorSession(
@@ -81,7 +81,10 @@ def test_same_coordination_id_cannot_restore_another_owner_checkpoint(monkeypatc
         "chat",
     )
     snapshots = iter([owner_a, owner_b])
-    monkeypatch.setattr(session_module, "snapshot_role_models", lambda uid, context_profile=None: next(snapshots))
+    monkeypatch.setattr(
+        session_module, "snapshot_role_models",
+        lambda uid, context_profile=None, selected_model=None, team_builder_roles=False: next(snapshots),
+    )
 
     first = CoordinatorSession("session-a", "owner-a", coordination_id="shared-id", context_profile="long")
     second = CoordinatorSession("session-a", "owner-b", coordination_id="shared-id", context_profile=None)

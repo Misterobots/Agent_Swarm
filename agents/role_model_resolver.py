@@ -1,10 +1,10 @@
 """
-role_model_resolver.py — Team Builder integration for church.py
+role_model_resolver.py â Team Builder integration for church.py
 
 Helper functions to resolve which model to use for a given role, considering:
 1. User's team builder configuration (highest priority)
 2. Environment variables (CODER_MODEL, DEVOPS_MODEL, etc.)
-3. Default fallbacks (ARCHITECT_MODEL → PRIMARY_MODEL)
+3. Default fallbacks (ARCHITECT_MODEL â PRIMARY_MODEL)
 
 Usage in church.py:
     from role_model_resolver import get_model_for_role
@@ -64,6 +64,21 @@ def canonical_role(role: str) -> str:
     return _ROLE_ALIASES.get(role_lower, role_lower)
 
 
+# Roles a coordination run may bind a model to. Kept as a constant because the
+# single-model path must bind *every* one of them: a role left out of the map
+# falls through to _SWARM_ROLE_ENV_MAP in for_role() and reloads the fan-out
+# under a model the user never selected.
+_SWARM_ROLES = (
+    "coordinator", "architect", "coder", "devops",
+    "researcher", "analyst", "verifier",
+)
+
+# How a snapshot's role map was produced. SINGLE binds every role to the model
+# the user picked; TEAM_BUILDER keeps the per-role assignments.
+SNAPSHOT_SOURCE_SINGLE = "single"
+SNAPSHOT_SOURCE_TEAM_BUILDER = "team_builder"
+
+
 @dataclass(frozen=True)
 class RoleModelBinding:
     """The model identity assigned to one role for one coordination run."""
@@ -84,11 +99,19 @@ class RoleModelBinding:
 
 @dataclass(frozen=True)
 class RoleModelSnapshot:
-    """Immutable owner-scoped role map captured once at run start."""
+    """Immutable owner-scoped role map captured once at run start.
+
+    ``source`` records *why* the map looks the way it does, and is part of the
+    checkpoint contract: a restored map must have been built under the same
+    source and selected model as the run asking for it, or the user's per-run
+    choice is silently overridden by the previous run's file.
+    """
 
     owner_id: Optional[str]
     models: Mapping[str, RoleModelBinding]
     context_profile: Optional[str] = None
+    source: str = SNAPSHOT_SOURCE_TEAM_BUILDER
+    selected_model: Optional[str] = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "models", MappingProxyType(dict(self.models)))
@@ -118,13 +141,18 @@ class RoleModelSnapshot:
             provider=provider,
             fallback=fallback,
         )
-        return RoleModelSnapshot(self.owner_id, updated, self.context_profile)
+        return RoleModelSnapshot(
+            self.owner_id, updated, self.context_profile,
+            source=self.source, selected_model=self.selected_model,
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {
             "owner_id": self.owner_id,
             "models": {role: binding.to_dict() for role, binding in self.models.items()},
             "context_profile": self.context_profile,
+            "source": self.source,
+            "selected_model": self.selected_model,
         }
 
     @classmethod
@@ -140,7 +168,14 @@ class RoleModelSnapshot:
                 provider=str(raw.get("provider") or "ollama"),
                 fallback=bool(raw.get("fallback", False)),
             )
-        return cls(payload.get("owner_id"), models, payload.get("context_profile"))
+        source = str(payload.get("source") or SNAPSHOT_SOURCE_TEAM_BUILDER)
+        selected = payload.get("selected_model")
+        return cls(
+            payload.get("owner_id"), models, payload.get("context_profile"),
+            source=source if source in (SNAPSHOT_SOURCE_SINGLE, SNAPSHOT_SOURCE_TEAM_BUILDER)
+            else SNAPSHOT_SOURCE_TEAM_BUILDER,
+            selected_model=str(selected) if selected else None,
+        )
 
 
 def get_model_for_role(
@@ -173,7 +208,7 @@ def get_model_for_role(
             from team_builder import get_model_for_role as get_team_model
             team_model = get_team_model(uid, role_lower, default=None)
             if team_model:
-                logger.debug(f"[RoleResolver] User {uid} role={role_lower} → team config: {team_model}")
+                logger.debug(f"[RoleResolver] User {uid} role={role_lower} â team config: {team_model}")
                 return team_model
         except Exception as e:
             logger.debug(f"[RoleResolver] Failed to load team config for {uid}: {e}")
@@ -181,32 +216,57 @@ def get_model_for_role(
     # Step 2: Check environment variable for role
     env_model = _ROLE_ENV_MAP.get(role_lower)
     if env_model:
-        logger.debug(f"[RoleResolver] role={role_lower} → env var: {env_model}")
+        logger.debug(f"[RoleResolver] role={role_lower} â env var: {env_model}")
         return env_model
     
     # Step 3: Use provided default
     if default:
-        logger.debug(f"[RoleResolver] role={role_lower} → provided default: {default}")
+        logger.debug(f"[RoleResolver] role={role_lower} â provided default: {default}")
         return default
     
     # Step 4: Ultimate fallback
-    logger.debug(f"[RoleResolver] role={role_lower} → ultimate fallback: {ARCHITECT_MODEL}")
+    logger.debug(f"[RoleResolver] role={role_lower} â ultimate fallback: {ARCHITECT_MODEL}")
     return ARCHITECT_MODEL
 
 
-def snapshot_role_models(uid: Optional[str], context_profile: Optional[str] = None) -> RoleModelSnapshot:
+def snapshot_role_models(
+    uid: Optional[str],
+    context_profile: Optional[str] = None,
+    selected_model: Optional[str] = None,
+    team_builder_roles: bool = False,
+) -> RoleModelSnapshot:
     """Resolve all swarm roles once for a coordination run.
 
-    Team Builder values win over defaults.  When no Team Builder value exists,
-    the swarm architect keeps its dedicated SWARM_ARCHITECT_MODEL default while
-    all other roles retain their existing config defaults.
+    Two sources, chosen by the caller (which is chosen by the user, per run):
+
+    * **single** (the default) â every role binds to ``selected_model``, so the
+      run loads one model. This is what keeps a Collective from fanning out into
+      coordinator/researcher/analyst/verifier and evicting other users' resident
+      models to do it.
+    * **team_builder** â Team Builder values win over defaults. When no Team
+      Builder value exists, the swarm architect keeps its dedicated
+      SWARM_ARCHITECT_MODEL default while all other roles retain their existing
+      config defaults.
+
+    With no ``selected_model`` there is nothing to bind, so the run falls back to
+    team-builder resolution rather than inventing a model â ``church.py`` passes
+    ``None`` for UI tier labels like ``Home-AI-Swarm`` that are not Ollama ids.
     """
+    if not team_builder_roles and selected_model:
+        binding = RoleModelBinding(selected_model, selected_model)
+        return RoleModelSnapshot(
+            uid,
+            {role: binding for role in _SWARM_ROLES},
+            context_profile,
+            source=SNAPSHOT_SOURCE_SINGLE,
+            selected_model=selected_model,
+        )
+
     models: dict[str, RoleModelBinding] = {}
-    for role in (
-        "coordinator", "architect", "coder", "devops",
-        "researcher", "analyst", "verifier",
-    ):
+    for role in _SWARM_ROLES:
         default = _SWARM_ROLE_ENV_MAP.get(role)
         requested = get_model_for_role(uid, role, default=default)
         models[role] = RoleModelBinding(requested, requested)
-    return RoleModelSnapshot(uid, models, context_profile)
+    return RoleModelSnapshot(
+        uid, models, context_profile, source=SNAPSHOT_SOURCE_TEAM_BUILDER,
+    )

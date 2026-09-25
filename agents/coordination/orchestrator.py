@@ -349,10 +349,19 @@ def coordinate_task(
     parent_coordination_id: Optional[str] = None,
     debate_focus: Optional[str] = None,
     debate_rounds: Optional[int] = None,
+    selected_model: Optional[str] = None,
+    team_builder_roles: bool = False,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
     matching the chat_swarm() yield contract.
+
+    selected_model: the model the caller picked for this run (e.g. from the
+    desktop's model picker). Binds every role to this one model, same as
+    snapshot_role_models()'s SNAPSHOT_SOURCE_SINGLE — keeps a Collective from
+    fanning out into per-role env defaults the caller never chose. None falls
+    back to team-builder/env resolution. team_builder_roles=True keeps the
+    owner's Team Builder per-role assignments even when selected_model is set.
 
     debate_mode: re-enter the coordinator to run the framework-debate stage over
     a *previous* perspective run instead of decomposing a new task. Requires
@@ -386,6 +395,7 @@ def coordinate_task(
     session = CoordinatorSession(
         session_id, owner_id, coordination_id=coordination_id,
         context_profile=context_profile,
+        selected_model=selected_model, team_builder_roles=team_builder_roles,
     )
     # Record the run for the mobile task board (fire-and-forget; no-ops if the
     # caller has no resolvable owner so anonymous runs never appear on a board).
