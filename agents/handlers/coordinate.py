@@ -129,7 +129,7 @@ def handle_coordinate(user_input: str, ctx: dict):
             coordination_id=coordination_id,
             gauntlet_bar=gauntlet_bar or None,
             selected_model=ctx.get("model"),
-            team_builder_roles=ctx.get("team_builder_roles", False),
+            role_models=ctx.get("role_models"),
         ):
             yield update
             # Mirror key events as structured agent_event so the UI can render

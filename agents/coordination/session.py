@@ -64,7 +64,7 @@ class CoordinatorSession:
 
     def __init__(self, session_id: str, owner_id: str = None, coordination_id: str = None,
                  context_profile: str | None = None, selected_model: str | None = None,
-                 team_builder_roles: bool = False):
+                 team_builder_roles: bool = False, role_models: dict | None = None):
         self.session_id = session_id
         self.owner_id = owner_id
         # Per-run model source, decided by the user at send time. False (the
@@ -73,6 +73,9 @@ class CoordinatorSession:
         # back the same choice it started with.
         self.selected_model = selected_model
         self.team_builder_roles = bool(team_builder_roles)
+        # Explicit role→model map from the desktop's routing table. Wins over
+        # both sources above when the request carries one.
+        self.role_models = dict(role_models) if role_models else {}
         # Direct task creation (POST /v1/tasks) generates this up front so it
         # can return the id to the caller before the generator has run at all;
         # every other caller leaves it unset and gets the usual random id.
@@ -129,6 +132,7 @@ class CoordinatorSession:
         snapshot = snapshot_role_models(
             self.owner_id, requested_context_profile,
             selected_model=self.selected_model, team_builder_roles=self.team_builder_roles,
+            role_models=self.role_models,
         )
         try:
             path.write_text(json.dumps(snapshot.to_dict(), indent=2), encoding="utf-8")

@@ -351,6 +351,7 @@ def coordinate_task(
     debate_rounds: Optional[int] = None,
     selected_model: Optional[str] = None,
     team_builder_roles: bool = False,
+    role_models: Optional[dict] = None,
 ) -> Generator[dict, None, None]:
     """
     Main coordinator generator. Yields status/progress/response dicts
@@ -362,6 +363,11 @@ def coordinate_task(
     fanning out into per-role env defaults the caller never chose. None falls
     back to team-builder/env resolution. team_builder_roles=True keeps the
     owner's Team Builder per-role assignments even when selected_model is set.
+
+    role_models: an explicit role->model map resolved by the desktop harness
+    from its own routing table, e.g. {"coder": "qwen3-coder:30b"}. Roles it
+    names outrank both sources above; roles it omits keep theirs. The snapshot
+    records source "desktop" so a resumed run can tell where its map came from.
 
     debate_mode: re-enter the coordinator to run the framework-debate stage over
     a *previous* perspective run instead of decomposing a new task. Requires
@@ -396,6 +402,7 @@ def coordinate_task(
         session_id, owner_id, coordination_id=coordination_id,
         context_profile=context_profile,
         selected_model=selected_model, team_builder_roles=team_builder_roles,
+        role_models=role_models,
     )
     # Record the run for the mobile task board (fire-and-forget; no-ops if the
     # caller has no resolvable owner so anonymous runs never appear on a board).

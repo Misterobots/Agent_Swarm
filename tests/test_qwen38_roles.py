@@ -49,7 +49,8 @@ def test_role_snapshot_checkpoint_survives_team_builder_change(monkeypatch, tmp_
     calls = iter([first, second])
     monkeypatch.setattr(
         session_module, "snapshot_role_models",
-        lambda uid, context_profile=None, selected_model=None, team_builder_roles=False: next(calls),
+        lambda uid, context_profile=None, selected_model=None, team_builder_roles=False,
+               role_models=None: next(calls),
     )
 
     session1 = CoordinatorSession(
@@ -83,7 +84,8 @@ def test_same_coordination_id_cannot_restore_another_owner_checkpoint(monkeypatc
     snapshots = iter([owner_a, owner_b])
     monkeypatch.setattr(
         session_module, "snapshot_role_models",
-        lambda uid, context_profile=None, selected_model=None, team_builder_roles=False: next(snapshots),
+        lambda uid, context_profile=None, selected_model=None, team_builder_roles=False,
+               role_models=None: next(snapshots),
     )
 
     first = CoordinatorSession("session-a", "owner-a", coordination_id="shared-id", context_profile="long")
@@ -139,3 +141,83 @@ def test_team_vram_advisory_counts_unique_large_models(monkeypatch):
     two_models["verifier"] = "gemma4:31b"
     _, _, warnings = team_builder.validate_team_config(two_models)
     assert any("multiple large models" in warning for warning in warnings)
+
+
+def test_desktop_role_map_overrides_the_pin_only_for_named_roles():
+    snapshot = resolver.snapshot_role_models(
+        "owner-a",
+        selected_model="qwen3.8:27b",
+        role_models={"coder": "qwen3-coder:30b"},
+    )
+
+    assert snapshot.source == resolver.SNAPSHOT_SOURCE_DESKTOP
+    assert snapshot.for_role("coder").requested_model == "qwen3-coder:30b"
+    # A role the harness did not name keeps the run's single-model binding, so a
+    # partial map can never fan the run back out into per-role env defaults.
+    assert snapshot.for_role("researcher").requested_model == "qwen3.8:27b"
+
+
+def test_desktop_role_map_canonicalises_aliases_and_drops_unusable_entries(monkeypatch):
+    monkeypatch.setattr(
+        resolver, "get_model_for_role", lambda uid, role, default=None: default,
+    )
+    snapshot = resolver.snapshot_role_models(
+        "owner-a",
+        role_models={
+            "technical": "qwen3:14b",
+            "not_a_swarm_role": "qwen3:8b",
+            "verifier": "   ",
+        },
+    )
+
+    assert snapshot.for_role("researcher").requested_model == "qwen3:14b"
+    assert "not_a_swarm_role" not in snapshot.models
+    assert snapshot.for_role("verifier").requested_model == resolver.VERIFIER_MODEL
+    assert snapshot.source == resolver.SNAPSHOT_SOURCE_DESKTOP
+
+
+def test_unusable_desktop_map_falls_back_without_claiming_the_source():
+    snapshot = resolver.snapshot_role_models(
+        "owner-a", selected_model="qwen3.8:27b",
+        role_models={"not_a_swarm_role": "qwen3:8b", "coder": ""},
+    )
+
+    assert snapshot.source == resolver.SNAPSHOT_SOURCE_SINGLE
+    assert snapshot.for_role("coder").requested_model == "qwen3.8:27b"
+
+
+def test_desktop_source_survives_the_checkpoint_round_trip():
+    snapshot = resolver.snapshot_role_models(
+        "owner-a",
+        selected_model="qwen3.8:27b",
+        role_models={"coder": "qwen3-coder:30b"},
+    )
+    restored = resolver.RoleModelSnapshot.from_dict(snapshot.to_dict())
+
+    # A source the restore path could not name used to collapse silently to
+    # team_builder, handing the next stage a map the user never assigned.
+    assert restored.source == resolver.SNAPSHOT_SOURCE_DESKTOP
+    assert restored.for_role("coder").requested_model == "qwen3-coder:30b"
+    assert restored.selected_model == "qwen3.8:27b"
+
+
+def test_session_forwards_the_desktop_map_into_the_snapshot(monkeypatch, tmp_path):
+    monkeypatch.setattr(session_module, "SCRATCHPAD_ROOT", tmp_path)
+    captured = {}
+
+    def fake_snapshot(uid, context_profile=None, selected_model=None,
+                      team_builder_roles=False, role_models=None):
+        captured["role_models"] = role_models
+        return resolver.RoleModelSnapshot(
+            "owner-a",
+            {"coder": resolver.RoleModelBinding("qwen3-coder:30b", "qwen3-coder:30b")},
+            context_profile,
+        )
+
+    monkeypatch.setattr(session_module, "snapshot_role_models", fake_snapshot)
+    CoordinatorSession(
+        "session-a", "owner-a", coordination_id="coord-map",
+        role_models={"coder": "qwen3-coder:30b"},
+    )
+
+    assert captured["role_models"] == {"coder": "qwen3-coder:30b"}

@@ -692,6 +692,11 @@ class ChatRequest(BaseModel):
     current_project_id: Optional[str] = None            # Active dev project ID (injects .memex/notes.md into system prompt)
     active_file: Optional[str] = None                   # Currently open file path in the dev workspace editor
     context_profile: Optional[Literal["chat", "project", "long"]] = None
+    # Desktop-owned routing table resolved to a concrete model id per swarm
+    # role (coordinator/architect/coder/devops/researcher/analyst/verifier).
+    # Named roles outrank the pinned `model` and Team Builder in resolution;
+    # roles left out keep the other sources. See role_model_resolver.
+    role_models: Optional[dict[str, str]] = None
 
 
 def _gauntlet_prompt(goal: str, bar: str) -> str:
@@ -2790,6 +2795,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                     active_file=request.active_file,
                     context_profile=request.context_profile,
                     workspace_key=request.workspace_key,
+                    role_models=request.role_models,
                 )
             except Exception as e:
                 logger.error(f"[Stream] chat_swarm init failed: {e}")
@@ -3112,6 +3118,7 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             design_mode=request.design_mode,
             dev_mode=request.dev_mode,
             context_profile=request.context_profile,
+            role_models=request.role_models,
         )
         full_resp = ""
         for update in gen:

@@ -77,6 +77,16 @@ _SWARM_ROLES = (
 # the user picked; TEAM_BUILDER keeps the per-role assignments.
 SNAPSHOT_SOURCE_SINGLE = "single"
 SNAPSHOT_SOURCE_TEAM_BUILDER = "team_builder"
+# The desktop harness resolved its own routing table and sent a concrete
+# model per role. It outranks both sources above: it is the only one where the
+# user assigned each role deliberately, in the app that owns routing.
+SNAPSHOT_SOURCE_DESKTOP = "desktop"
+
+_SNAPSHOT_SOURCES = (
+    SNAPSHOT_SOURCE_SINGLE,
+    SNAPSHOT_SOURCE_TEAM_BUILDER,
+    SNAPSHOT_SOURCE_DESKTOP,
+)
 
 
 @dataclass(frozen=True)
@@ -172,8 +182,7 @@ class RoleModelSnapshot:
         selected = payload.get("selected_model")
         return cls(
             payload.get("owner_id"), models, payload.get("context_profile"),
-            source=source if source in (SNAPSHOT_SOURCE_SINGLE, SNAPSHOT_SOURCE_TEAM_BUILDER)
-            else SNAPSHOT_SOURCE_TEAM_BUILDER,
+            source=source if source in _SNAPSHOT_SOURCES else SNAPSHOT_SOURCE_TEAM_BUILDER,
             selected_model=str(selected) if selected else None,
         )
 
@@ -229,15 +238,39 @@ def get_model_for_role(
     return ARCHITECT_MODEL
 
 
+def _normalise_desktop_role_models(
+    role_models: Optional[Mapping[str, str]],
+) -> dict[str, RoleModelBinding]:
+    """Normalise a caller-supplied role->model map into bindings.
+
+    Role names go through the same alias table the swarm uses, so a harness
+    sending "technical" lands on "researcher". Anything that is not a swarm
+    role, and any empty model id, is dropped rather than guessed at: an empty
+    result means the map carried nothing usable, and the run keeps whatever
+    the other sources resolved.
+    """
+    bound: dict[str, RoleModelBinding] = {}
+    if not isinstance(role_models, dict):
+        return bound
+    for raw_role, raw_model in role_models.items():
+        role = canonical_role(str(raw_role))
+        model = str(raw_model or "").strip()
+        if role not in _SWARM_ROLES or not model:
+            continue
+        bound[role] = RoleModelBinding(model, model)
+    return bound
+
+
 def snapshot_role_models(
     uid: Optional[str],
     context_profile: Optional[str] = None,
     selected_model: Optional[str] = None,
     team_builder_roles: bool = False,
+    role_models: Optional[Mapping[str, str]] = None,
 ) -> RoleModelSnapshot:
     """Resolve all swarm roles once for a coordination run.
 
-    Two sources, chosen by the caller (which is chosen by the user, per run):
+    Two sources decide the base map; a third overrides roles inside it:
 
     * **single** (the default) â every role binds to ``selected_model``, so the
       run loads one model. This is what keeps a Collective from fanning out into
@@ -248,17 +281,23 @@ def snapshot_role_models(
       SWARM_ARCHITECT_MODEL default while all other roles retain their existing
       config defaults.
 
+    * **desktop** - the request carried an explicit role->model map, so every
+      role it names binds to that model and the snapshot records this as its
+      source. A role the map omits keeps whatever single or team_builder
+      resolved for it, so a partial map is a targeted override, not a hole.
+
     With no ``selected_model`` there is nothing to bind, so the run falls back to
     team-builder resolution rather than inventing a model â ``church.py`` passes
     ``None`` for UI tier labels like ``Home-AI-Swarm`` that are not Ollama ids.
     """
+    desktop = _normalise_desktop_role_models(role_models)
     if not team_builder_roles and selected_model:
         binding = RoleModelBinding(selected_model, selected_model)
+        models = {role: binding for role in _SWARM_ROLES}
+        models.update(desktop)
         return RoleModelSnapshot(
-            uid,
-            {role: binding for role in _SWARM_ROLES},
-            context_profile,
-            source=SNAPSHOT_SOURCE_SINGLE,
+            uid, models, context_profile,
+            source=SNAPSHOT_SOURCE_DESKTOP if desktop else SNAPSHOT_SOURCE_SINGLE,
             selected_model=selected_model,
         )
 
@@ -267,6 +306,9 @@ def snapshot_role_models(
         default = _SWARM_ROLE_ENV_MAP.get(role)
         requested = get_model_for_role(uid, role, default=default)
         models[role] = RoleModelBinding(requested, requested)
+    models.update(desktop)
     return RoleModelSnapshot(
-        uid, models, context_profile, source=SNAPSHOT_SOURCE_TEAM_BUILDER,
+        uid, models, context_profile,
+        source=SNAPSHOT_SOURCE_DESKTOP if desktop else SNAPSHOT_SOURCE_TEAM_BUILDER,
+        selected_model=selected_model,
     )
