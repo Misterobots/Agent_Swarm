@@ -12,23 +12,115 @@ Usage:
         ...
 """
 
+import os
 import time
+import shutil
 import logging
+import subprocess
 import requests
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 30
 CHECK_TIMEOUT_SECONDS = 3
 
+# Node capacity comes from the deployment, not from a literal in this file. A
+# runtime container normally has no GPU access at all, so it cannot measure the
+# card it is reporting on; see _measure_visible_vram_mb for what it can do.
+VRAM_ENV_BY_NAME = {"Lovelace": "LOVELACE_VRAM_MB", "Turing": "TURING_VRAM_MB"}
+
+_VRAM_MEASURED: Optional[int] = None
+_VRAM_MEASURED_ATTEMPTED = False
+
+
+def _measure_visible_vram_mb() -> Optional[int]:
+    """Total VRAM of the GPUs *this process* can see, or None if it sees none.
+
+    Tries NVML first, then the nvidia-smi CLI. agent_runtime on Lovelace has
+    neither the NVML shared library nor /dev/nvidia* nodes, so there this always
+    returns None and only an explicit LOVELACE_VRAM_MB makes the number real.
+    Cached because the answer cannot change within a process lifetime.
+    """
+    global _VRAM_MEASURED, _VRAM_MEASURED_ATTEMPTED
+    if _VRAM_MEASURED_ATTEMPTED:
+        return _VRAM_MEASURED
+    _VRAM_MEASURED_ATTEMPTED = True
+
+    try:
+        import pynvml
+        pynvml.nvmlInit()
+        total_bytes = sum(
+            pynvml.nvmlDeviceGetMemoryInfo(
+                pynvml.nvmlDeviceGetHandleByIndex(i)
+            ).total
+            for i in range(pynvml.nvmlDeviceGetCount())
+        )
+        if total_bytes > 0:
+            _VRAM_MEASURED = int(total_bytes // (1024 * 1024))
+            logger.debug(f"[NodeHealth] NVML measured {_VRAM_MEASURED} MiB")
+            return _VRAM_MEASURED
+    except Exception:
+        pass
+
+    smi = shutil.which("nvidia-smi")
+    if smi:
+        try:
+            out = subprocess.run(
+                [smi, "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=CHECK_TIMEOUT_SECONDS,
+            ).stdout
+            per_gpu = [int(line.strip()) for line in out.splitlines() if line.strip().isdigit()]
+            if per_gpu:
+                _VRAM_MEASURED = sum(per_gpu)
+                logger.debug(f"[NodeHealth] nvidia-smi measured {_VRAM_MEASURED} MiB")
+                return _VRAM_MEASURED
+        except Exception:
+            pass
+
+    logger.debug("[NodeHealth] no GPU visible to this process; capacity must be configured")
+    return None
+
+
+def _host_is_local(host: str) -> bool:
+    """True only for a loopback Ollama — the sole case where this process's own
+    GPUs are the GPUs being reported on. A sibling container on the same machine
+    (e.g. http://ollama:11434) is deliberately excluded: nothing here can prove
+    it shares the card, so measuring for it would be a guess."""
+    try:
+        hostname = (urlparse(host).hostname or "").lower()
+    except Exception:
+        return False
+    return hostname in ("localhost", "::1", "0.0.0.0") or hostname.startswith("127.")
+
+
+def _resolve_node_vram(name: str, host: str) -> Tuple[Optional[int], str]:
+    """(vram_mb, source) for a node: configured capacity wins, then a real
+    measurement when the node is loopback-local, else unknown.
+
+    Unknown is reported as None rather than a plausible default — a wrong integer
+    here is indistinguishable from a right one downstream, which is how the old
+    hardcoded single-card sizes came to be read as the box's real limit.
+    """
+    env_key = VRAM_ENV_BY_NAME.get(name)
+    configured = ((os.getenv(env_key) or "").strip()) if env_key else ""
+    if configured.isdigit() and int(configured) > 0:
+        return int(configured), "configured"
+    if _host_is_local(host):
+        measured = _measure_visible_vram_mb()
+        if measured:
+            return measured, "measured"
+    return None, "unknown"
+
 
 @dataclass
 class NodeStatus:
     host: str
     name: str
-    vram_mb: int
+    vram_mb: Optional[int] = None
+    vram_source: str = "unknown"  # configured | measured | unknown
     healthy: bool = False
     loaded_models: List[str] = field(default_factory=list)
     available_models: List[str] = field(default_factory=list)
@@ -48,26 +140,26 @@ class NodeHealthMonitor:
             self.nodes = self._build_default_nodes()
 
     def _build_default_nodes(self) -> Dict[str, NodeStatus]:
-        import os
         ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         secondary_host = os.getenv("SECONDARY_OLLAMA_HOST", "http://192.168.2.103:11434")
 
-        nodes = {
-            ollama_host: NodeStatus(
-                host=ollama_host, name="Lovelace", vram_mb=16384
-            ),
-        }
+        def build(host: str, name: str) -> NodeStatus:
+            vram_mb, vram_source = _resolve_node_vram(name, host)
+            return NodeStatus(host=host, name=name, vram_mb=vram_mb,
+                              vram_source=vram_source)
+
+        nodes = {ollama_host: build(ollama_host, "Lovelace")}
         if secondary_host and secondary_host != ollama_host:
-            nodes[secondary_host] = NodeStatus(
-                host=secondary_host, name="Turing", vram_mb=8192
-            )
+            nodes[secondary_host] = build(secondary_host, "Turing")
         return nodes
 
     def check_node(self, host: str) -> NodeStatus:
         """Ping an Ollama node and update its cached status."""
         status = self.nodes.get(host)
         if not status:
-            status = NodeStatus(host=host, name="unknown", vram_mb=0)
+            vram_mb, vram_source = _resolve_node_vram("unknown", host)
+            status = NodeStatus(host=host, name="unknown", vram_mb=vram_mb,
+                                vram_source=vram_source)
             self.nodes[host] = status
 
         now = time.time()
@@ -151,6 +243,7 @@ class NodeHealthMonitor:
                 "host": s.host,
                 "healthy": s.healthy,
                 "vram_mb": s.vram_mb,
+                "vram_source": s.vram_source,
                 "loaded_models": s.loaded_models,
                 "available_models": s.available_models,
                 "last_checked": s.last_checked,
