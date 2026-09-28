@@ -1,0 +1,101 @@
+# Line endings, declared instead of inherited.
+#
+# Why this file exists: the Git for Windows *system* config
+# (C:\Program Files\Git\etc\gitconfig) sets core.autocrlf=true, and this repo has
+# no repo-level or user-level override. autocrlf decides per-commit, per-file, based
+# on what heuristics find, so the stored form drifted: some blobs hold LF, some hold
+# CRLF. The observable cost landed on 2026-09-28 in e94964e - four capacity lines plus
+# a GPU-lane edit in execution_plane/docker-compose.yml produced "1217 insertions,
+# 1161 deletions", because that file's blob held 1161 CRLF lines and the commit
+# normalised all of them. Nothing was wrong with the edit; the history it left is
+# unreadable, and every other CRLF-stored file in here will pay the same tax once, on
+# whichever commit happens to touch it.
+#
+# With these rules the answer is the same on every clone and every OS, and a diff
+# shows content again.
+#
+# Scope note: `text=auto` + the rules below do NOT rewrite existing blobs. The
+# stored form changes only when a file is next added, which is why the companion
+# step is a single deliberate renormalisation commit (see .git-blame-ignore-revs).
+
+* text=auto eol=lf
+
+# This deployment runs in Linux containers, so the checked-out form matches the
+# stored form: no surprise conversion on clone.
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+Dockerfile* text eol=lf
+Makefile text eol=lf
+Procfile text eol=lf
+*.service text eol=lf
+*.conf text eol=lf
+*.env text eol=lf
+.env* text eol=lf
+
+# cmd.exe parses batch files line by line and LF can misbehave interactively, so
+# these two keep CRLF on checkout while still storing LF. PowerShell and bash read
+# LF happily, so *.ps1 stays on the default above.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary is a correctness rule, not a style rule: a "normalised" binary is corrupt
+# and the damage is silent. Extend this list for new asset types; do not rely on
+# the auto heuristic, which has mistaken model weights and dumps for text before.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.mp4 binary
+*.mov binary
+*.stl binary
+*.3mf binary
+*.gcode binary
+*.glb binary
+*.gltf binary
+*.obj binary
+*.fbx binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.tar binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.lib binary
+*.pdb binary
+*.pyd binary
+*.pyc binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.bin binary
+*.onnx binary
+*.pt binary
+*.pth binary
+*.safetensors binary
+*.gguf binary
+*.ckpt binary
+*.lora_weights binary
+
+# Generated / vendored tree that should never be diffed for review.
+# graphify-out/ is tracked here and rewrites itself: `graphify update .` regenerates
+# graph.json and GRAPH_REPORT.md, and deletes the committed graph.html once the graph
+# passes the 5000-node visualiser limit. Marked -diff so a rebuild does not bury the
+# real change in review. Deliberately NOT given merge=binary: that would change how
+# conflicts resolve, which is a decision to make knowingly or not at all.
+graphify-out/** -diff
+
+# Git LFS is installed on this box (filter "lfs" is configured in the system and
+# global configs) but NOTHING here declares `filter=lfs`, so no file is in LFS and
+# none is being pointer-rewritten. If large assets ever do move to LFS, add the
+# `filter=lfs` lines here deliberately - and expect a large migration commit.

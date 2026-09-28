@@ -1,0 +1,26 @@
+# Commits whose diffs are format noise rather than authorship.
+#
+# Enable per clone (this file is the data, the config line is the switch):
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Then `git blame` and `git log -p` skip these revisions automatically. GitHub's
+# web blame honours the same file once it is named in
+#     Settings -> Repository -> Blame ignore revisions
+# which is a repo-admin setting, so the local config alone only fixes this machine.
+#
+# Add one full-hash line per wholesale-formatting commit, at the time you make it.
+# Do not add commits that carry real change mixed with noise unless you also intend
+# to lose their authorship - list the noise-only commits, and keep future
+# renormalisations separate from feature work for exactly that reason.
+
+# 2026-09-28 - execution_plane/docker-compose.yml stored form normalised CRLF -> LF.
+# Real content: four VRAM capacity lines and the retirement of Friday's dedicated GPU
+# lane. Noise: 1161 of the commit's 1217 added lines are the rest of that file's lines,
+# re-added because only LF differs. Blaming that file through this revision attributes
+# every line to this commit instead of to whoever wrote it.
+#
+# This is 721e36a, the amended form of e94964e: the entry named the pre-amend hash
+# until 8d77f3e, and an amended commit is a different object, so the old value ignored
+# nothing at all.
+721e36a8d76e0902b9ad8428aa341f497acd989a
