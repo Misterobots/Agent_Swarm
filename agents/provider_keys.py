@@ -70,6 +70,22 @@ PROVIDERS: dict[str, dict] = {
         "validate_url": "https://integrate.api.nvidia.com/v1/models",
         "key_prefix": "nvapi-",
     },
+    "openrouter": {
+        "label": "OpenRouter",
+        # Empty on purpose, and `live_models` is what makes that readable rather
+        # than a bug: the list comes from providers/openrouter_catalogue.py, which
+        # fetches it from upstream. Transcribing a gateway's catalogue would hide
+        # every model it adds after the commit that wrote the copy.
+        #
+        # Ordering matters: this entry is last so a curated id above it is never
+        # claimed by the gateway list. `mistralai/mistral-nemotron` and
+        # `deepseek-ai/deepseek-v4-pro` are NVIDIA-catalogued and OpenRouter carries
+        # same-publisher ids, so `providers/registry.py` keeps the first binding.
+        "models": [],
+        "live_models": True,
+        "validate_url": "https://openrouter.ai/api/v1/models",
+        "key_prefix": "sk-or-",
+    },
 }
 
 

@@ -2614,6 +2614,67 @@ async def chat_completions(request: ChatRequest, http_request: Request):
                 "choices": [{"index": 0, "message": {"role": "assistant", "content": chunk.content}, "finish_reason": "stop"}],
             }
 
+    # Route OpenRouter requests to the OpenRouterProvider. Reached by catalogue
+    # membership (providers/registry.py), never by an `openai/`-style prefix, because
+    # publisher prefixes collide with the NVIDIA entries below.
+    if _provider == "openrouter":
+        uid = http_request.headers.get("X-authentik-uid", "").strip()
+        if not uid:
+            raise HTTPException(status_code=401, detail="OpenRouter requires an authenticated session")
+        try:
+            from providers.openrouter_provider import OpenRouterProvider
+        except ImportError as e:
+            raise HTTPException(status_code=503, detail=f"OpenRouter provider unavailable: {e}")
+
+        # Say "not connected" here rather than letting the provider's missing-key
+        # RuntimeError surface as a 500 with no instruction in it.
+        try:
+            from provider_keys import get_key as _pk_get_key
+            _has_key = bool(_pk_get_key(uid, "openrouter"))
+        except Exception as e:
+            logger.warning(f"openrouter key lookup failed: {e}")
+            _has_key = False
+        if not _has_key:
+            raise HTTPException(
+                status_code=400,
+                detail="No OpenRouter API key is connected for this user. "
+                       "Add it in Settings → Model providers.",
+            )
+
+        msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+        provider = OpenRouterProvider(user_id=uid, model=request.model)
+
+        if request.stream:
+            async def openrouter_stream():
+                import time
+                from event_contract import enrich_delta
+                stream_run_id = f"chat-{uuid.uuid4().hex}"
+                for stream_seq, chunk in enumerate(provider.generate_stream(msgs)):
+                    delta = enrich_delta(
+                        stream_run_id,
+                        stream_seq,
+                        {"content": chunk.content, "type": chunk.type},
+                    )
+                    sse = {
+                        "id": "chatcmpl-openrouter",
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": request.model,
+                        "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
+                    }
+                    yield f"data: {json.dumps(sse)}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(openrouter_stream(), media_type="text/event-stream")
+        else:
+            chunk = provider.generate(msgs)
+            return {
+                "id": "chatcmpl-openrouter",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": chunk.content}, "finish_reason": "stop"}],
+            }
+
     # Route NVIDIA NIM requests directly to the NvidiaProvider
     if _provider == "nvidia":
         uid = http_request.headers.get("X-authentik-uid", "").strip()
@@ -7721,13 +7782,44 @@ async def provider_keys_catalog():
     try:
         from provider_keys import PROVIDERS
         # Don't expose internal fields like key_prefix
-        return {
-            provider_id: {
-                "label": info["label"],
-                "models": info.get("models", []),
-            }
-            for provider_id, info in PROVIDERS.items()
-        }
+        out: dict[str, dict] = {}
+        for provider_id, info in PROVIDERS.items():
+            entry: dict = {"label": info["label"], "models": info.get("models", [])}
+            if info.get("live_models"):
+                # The list for this provider is fetched, not declared, so the response
+                # also says how fresh it is: a client that sees `stale: true` renders
+                # fewer models rather than concluding the provider has none.
+                try:
+                    from providers.openrouter_catalogue import (
+                        models as _live_models,
+                        refresh as _live_refresh,
+                        status as _live_status,
+                    )
+                    from providers.registry import provider_for as _provider_for
+                    # A gateway id some curated provider already owns routes *there*,
+                    # because registry indexes the declared lists first and the first
+                    # binding wins. GitHub's list owns every `openai/*` spelling, which
+                    # is most of what a user would reach for on OpenRouter. Neither
+                    # hiding those (a quiet, unexplainable gap) nor offering them as a
+                    # normal pick (a turn that misroutes) is acceptable, so each model
+                    # carries the answer: `routes_here`.
+                    entry["models"] = [
+                        {**m, "routes_here": _provider_for(m["id"]) == provider_id}
+                        for m in _live_models()
+                    ]
+                    entry["catalog"] = _live_status()
+                    entry["catalog"]["shadowed"] = sum(
+                        1 for m in entry["models"] if not m.get("routes_here")
+                    )
+                    if entry["catalog"]["stale"]:
+                        # Refresh off the request path — a cold cache costs a slow
+                        # second read, not a hung first one.
+                        import threading
+                        threading.Thread(target=_live_refresh, daemon=True).start()
+                except Exception as e:
+                    logger.warning(f"provider_keys_catalog: live merge failed for {provider_id}: {e}")
+            out[provider_id] = entry
+        return out
     except Exception as e:
         logger.error(f"provider_keys_catalog error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -7767,6 +7859,15 @@ async def provider_keys_connect(body: _ProviderKeyRequest, http_request: Request
                 _nv_invalidate(uid)
             except Exception:
                 pass
+        if body.provider == "openrouter":
+            # Populate the dispatch index now. A model the user just connected has to
+            # be routable on the very next turn, not after some later catalogue read,
+            # and `provider_for` answers from that index rather than from the key.
+            try:
+                from providers.openrouter_catalogue import refresh as _or_refresh
+                _or_refresh(force=True, api_key=body.api_key)
+            except Exception as e:
+                logger.warning(f"openrouter catalogue refresh after connect failed: {e}")
         return {"status": "connected", "provider": body.provider}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

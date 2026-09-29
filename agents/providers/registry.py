@@ -28,6 +28,16 @@ def _build_index() -> dict[str, str]:
                 index[m["id"]] = provider_id
     except Exception:
         pass
+    # OpenRouter's catalogue is fetched rather than declared, so it is merged last and
+    # with setdefault: a gateway that carries `mistralai/mistral-nemotron` must not
+    # take an id NVIDIA's curated list already owns — the collision this module's
+    # docstring warns about, arriving from the data instead of the prefix.
+    try:
+        from providers.openrouter_catalogue import known_ids
+        for mid in known_ids():
+            index.setdefault(mid, "openrouter")
+    except Exception:
+        pass
     return index
 
 
