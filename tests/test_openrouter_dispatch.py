@@ -129,3 +129,30 @@ def test_the_floor_holds_only_ids_that_actually_route_here():
     # some curated provider owns would advertise a model that can never arrive.
     for mid in cat.FALLBACK:
         assert reg.provider_for(mid) == "openrouter", mid
+
+
+def test_key_connectivity_fails_closed(monkeypatch):
+    # This is the entitlement behind the model gate. If a database outage read as
+    # "connected", every provider id would pass the gate without a key.
+    import provider_keys as pk
+
+    def boom(uid, provider):
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(pk, "get_key", boom)
+    assert reg.provider_key_connected("openrouter", "desktop") is False
+
+
+def test_key_connectivity_needs_both_an_identity_and_a_provider():
+    assert reg.provider_key_connected("", "desktop") is False
+    assert reg.provider_key_connected("openrouter", "") is False
+
+
+def test_key_connectivity_is_true_only_for_the_record_that_exists(monkeypatch):
+    import provider_keys as pk
+    records = {("desktop", "openrouter"): object()}
+    monkeypatch.setattr(pk, "get_key", lambda uid, provider: records.get((uid, provider)))
+
+    assert reg.provider_key_connected("openrouter", "desktop") is True
+    assert reg.provider_key_connected("anthropic", "desktop") is False
+    assert reg.provider_key_connected("openrouter", "someone-else") is False

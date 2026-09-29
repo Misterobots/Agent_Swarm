@@ -837,6 +837,26 @@ def _apply_model_policy(request: ChatRequest, http_request: Request) -> None:
     from model_registry import get_model
     spec = get_model(requested)
     if not spec or not spec.roles:
+        # Before refusing, ask the other question: is this a model some provider
+        # serves? model_registry describes locally loadable models and lists no
+        # provider id at all, so without this branch every provider-backed turn —
+        # OpenRouter, NVIDIA, Anthropic, Google, GitHub — is rejected here, 26 lines
+        # before provider_for() gets a chance to route it. The entitlement is the
+        # caller's own connected key; the admin allowlist is still applied below.
+        from providers.registry import provider_for, provider_key_connected
+        provider = provider_for(requested)
+        if provider:
+            uid = http_request.headers.get("X-authentik-uid", "").strip()
+            if not provider_key_connected(provider, uid):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{requested} is served by {provider}, which has no API key "
+                           "connected for this user. Add it in Settings → Model providers.",
+                )
+            if not user_permissions.model_allowed(owner, requested):
+                raise HTTPException(status_code=403, detail="This model is not available to this user.")
+            request.model = requested
+            return
         raise HTTPException(status_code=400, detail="Selected model is not available for chat.")
     if not spec.available:
         raise HTTPException(
@@ -1529,6 +1549,25 @@ async def list_models(request: Request):
                         if not rec:
                             continue
                         catalog = provider_info.get("models", [])
+
+                        # A live-catalogue provider declares no static list on purpose —
+                        # the point of a gateway is that it gains models without a
+                        # commit — so reading `models` above yields [] and the loop below
+                        # would add nothing. For these providers the list comes from the
+                        # fetched catalogue instead. Resolved by name because provider_id
+                        # is a key of our own PROVIDERS dict, never caller input, which
+                        # keeps this loop as data-driven as its docstring claims.
+                        if provider_info.get("live_models"):
+                            try:
+                                import importlib
+                                _live = importlib.import_module(f"providers.{provider_id}_catalogue")
+                                _live.refresh(api_key=rec.get_api_key())
+                                catalog = _live.models()
+                            except Exception as _ce:
+                                logger.warning(
+                                    f"list_models: live catalogue for {provider_id} failed: {_ce}"
+                                )
+                                catalog = []
 
                         # NVIDIA: filter to models the user's key is entitled
                         # to call (NVIDIA returns 404 for un-entitled models,
@@ -2627,14 +2666,11 @@ async def chat_completions(request: ChatRequest, http_request: Request):
             raise HTTPException(status_code=503, detail=f"OpenRouter provider unavailable: {e}")
 
         # Say "not connected" here rather than letting the provider's missing-key
-        # RuntimeError surface as a 500 with no instruction in it.
-        try:
-            from provider_keys import get_key as _pk_get_key
-            _has_key = bool(_pk_get_key(uid, "openrouter"))
-        except Exception as e:
-            logger.warning(f"openrouter key lookup failed: {e}")
-            _has_key = False
-        if not _has_key:
+        # RuntimeError surface as a 500 with no instruction in it. The gate above
+        # already checks this; it is checked again because this branch can be
+        # reached from routes that do not pass through the gate.
+        from providers.registry import provider_key_connected as _key_connected
+        if not _key_connected("openrouter", uid):
             raise HTTPException(
                 status_code=400,
                 detail="No OpenRouter API key is connected for this user. "

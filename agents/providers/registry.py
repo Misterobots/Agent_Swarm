@@ -43,3 +43,21 @@ def _build_index() -> dict[str, str]:
 
 def provider_for(model_id: str) -> Optional[str]:
     return _build_index().get(model_id)
+
+
+def provider_key_connected(provider: str, uid: str) -> bool:
+    """Does this user hold a key that makes `provider` usable right now?
+
+    Lives here rather than at the call site because the answer is what turns a
+    catalogue entry into an entitlement, and two callers need it identically: the
+    model gate in main.py and the picker list. Keys are stored per X-authentik-uid,
+    so that is the identity used — not the permission owner, which prefers a
+    username when one is present.
+    """
+    if not provider or not uid:
+        return False
+    try:
+        from provider_keys import get_key
+        return bool(get_key(uid, provider))
+    except Exception:
+        return False
