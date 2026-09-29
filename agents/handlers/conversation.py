@@ -7,7 +7,8 @@ import re
 import requests
 
 from phi.agent import Agent
-from phi.model.ollama import Ollama
+
+from providers.model_client import ProviderNotServed, is_honourable_pick, model_client, provider_of
 
 from metrics import AGENT_STATE, WORKFLOW_STEPS
 from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
@@ -20,7 +21,13 @@ logger = logging.getLogger("Router")
 
 
 def handle_conversation(user_input: str, ctx: dict):
-    """Generator — Hive Mind conversationalist with 3-tier access control."""
+    """Generator — the Memex conversationalist, with 3-tier access control.
+
+    "Hive Mind" was the name this agent introduced itself by. The owner's ruling on
+    2026-09-29 is that the assistant is Memex; the name stays here rather than being read
+    from config because a turn has to say who is answering even when the store cannot be
+    reached. `Hive Mind Architect` in handlers/architect.py is a *role* and was left alone.
+    """
     session_id = ctx["session_id"]
     owner_id = ctx["owner_id"]
     turn_id = ctx["turn_id"]
@@ -40,44 +47,78 @@ def handle_conversation(user_input: str, ctx: dict):
     import os
     from config import ARCHITECT_MODEL, get_ollama_options
 
-    yield _emit_turn_metadata(turn_id, "Hive Mind", ["thinking", "responding"])
+    yield _emit_turn_metadata(turn_id, "Memex", ["thinking", "responding"])
     yield _emit_stream_mode("thinking")
-    yield {"type": "status", "content": "💬 Hive Mind: Thinking..."}
+    yield {"type": "status", "content": "💬 Memex: Thinking..."}
     AGENT_STATE.labels(agent_name="Conversationalist").set(2)
 
-    # Model resolution:
-    # 1. fast_mode (model="hive-fast") forces the small ROUTER_MODEL — already
+    # Model resolution. Three cases, in this order:
+    #
+    # 1. fast_mode (the "hive-fast" sentinel) forces the small ROUTER_MODEL — already
     #    hot in VRAM from the intent classifier. No GPU eviction, fastest path.
-    # 2. Otherwise, _resolve_model_for_intent reads from the template registry.
-    #    The CONVERSATION template default is qwen3:8b (same hot model).
-    # 3. Explicit ctx["model"] override wins last (unless it's the sentinel
-    #    "hive-fast", which we treat as a *flag* not a real model name).
+    # 2. The client named a model, and that name is honoured. It used to be refused
+    #    outright, because the frontend also sends UI *tier* names like "Home-AI-Swarm"
+    #    that are not Ollama identifiers — but discarding every named model to guard
+    #    against the tier case is what made the picker decide nothing on a local turn
+    #    while a gateway turn honoured it. Two meanings for one control. The tier names
+    #    are a short closed list, so `is_honourable_pick` separates the two cases.
+    #    (Owner's ruling 2026-09-29: honour the pick, per session — plan D8(d), D9.)
+    # 3. Nothing honourable was named: the template registry decides, default qwen3:8b.
+    requested_model = (ctx.get("model") or "").strip()
     if fast_mode:
         CONV_MODEL = os.getenv("ROUTER_MODEL", "qwen3:8b")
         yield {"type": "thought", "content": f"→ Hive Fast: conversation on {CONV_MODEL} (router model, already hot)"}
+    elif is_honourable_pick(requested_model):
+        CONV_MODEL = requested_model
     else:
-        # Trust the template registry (CONVERSATION default is qwen3:8b).
-        # NOTE: we deliberately do NOT honor ctx["model"] here — the frontend
-        # often sends UI tier names like "Home-AI-Swarm" that aren't real
-        # Ollama identifiers. If you want to force a specific model, set the
-        # CONV_MODEL env var or update the template registry default.
         CONV_MODEL = _resolve_model_for_intent(
             "CONVERSATION",
             os.getenv("CONV_MODEL", os.getenv("PRIMARY_MODEL", "qwen3:8b")),
         )
-    OLLAMA_HOST = get_best_host_for_model(CONV_MODEL)
-    _model_options = get_ollama_options(CONV_MODEL)
+        if requested_model:
+            # A name was sent and is being set aside. Said rather than done quietly —
+            # silently substituting the model is the behaviour this block used to have
+            # on every single turn.
+            yield {
+                "type": "thought",
+                "content": f"→ {requested_model} is a UI tier name, not a model; answering on {CONV_MODEL}",
+            }
+
+    # Who serves the id is decided in one place, before any Ollama-specific option is
+    # computed. Doing it in the other order is what made a gateway tag look like a local
+    # model: `get_best_host_for_model` will happily name a machine that has never heard
+    # of the id it was asked about.
+    _provider_backed = provider_of(CONV_MODEL, owner_id) is not None
+    _model_options: dict = {}
+    if not _provider_backed:
+        _model_options = get_ollama_options(CONV_MODEL)
+        try:
+            from providers.qwen_context import resolve_qwen_context
+            _context = resolve_qwen_context(
+                CONV_MODEL,
+                ctx.get("context_profile"),
+                task_mode="project" if dev_mode else "chat",
+            )
+            if _context.effective_tokens:
+                _model_options["num_ctx"] = _context.effective_tokens
+        except (ImportError, ValueError):
+            pass
+
     try:
-        from providers.qwen_context import resolve_qwen_context
-        _context = resolve_qwen_context(
-            CONV_MODEL,
-            ctx.get("context_profile"),
-            task_mode="project" if dev_mode else "chat",
-        )
-        if _context.effective_tokens:
-            _model_options["num_ctx"] = _context.effective_tokens
-    except (ImportError, ValueError):
-        pass
+        MODEL_CLIENT = model_client(CONV_MODEL, uid=owner_id, options=_model_options or None)
+    except ProviderNotServed as exc:
+        # Refused by name rather than answered by whatever else is warm. A key lookup
+        # that fails is also the one case where printing `exc` could not leak anything:
+        # the exception text names the provider, never the credential.
+        yield {"type": "log", "content": f"[Conversationalist] {exc}"}
+        yield {"type": "error", "content": str(exc)}
+        AGENT_STATE.labels(agent_name="Conversationalist").set(1)
+        return
+
+    # The follow-up generator below runs on ROUTER_MODEL, not on the conversation model,
+    # so its host has to be resolved from the model it actually uses. It was resolved
+    # from CONV_MODEL, which only looked correct while every model was an Ollama tag.
+    OLLAMA_HOST = get_best_host_for_model(os.getenv("ROUTER_MODEL", "qwen3:8b"))
 
     if is_admin:
         from tools.file_ops import read_file, write_file, list_dir
@@ -91,7 +132,7 @@ def handle_conversation(user_input: str, ctx: dict):
             git_status, git_checkout, git_commit, git_push, git_pull, git_branch_list,
         ]
         instructions = (
-            "You are Hive Mind, the AI assistant for the Agent Swarm infrastructure.\n\n"
+            "You are Memex, the AI assistant for the Agent Swarm infrastructure.\n\n"
             "ADMIN MODE ACTIVE - Full System Access:\n\n"
             "YOUR CAPABILITIES:\n"
             "1. **Workspace Files**: read_file, write_file, list_dir (sandbox: /workspace/)\n"
@@ -109,7 +150,7 @@ def handle_conversation(user_input: str, ctx: dict):
 
         agent_tools = [read_file, write_file, list_dir, run_command]
         instructions = (
-            "You are Hive Mind, a friendly AI coding assistant.\n\n"
+            "You are Memex, a friendly AI coding assistant.\n\n"
             "DEVELOPER MODE ACTIVE - Workspace Access:\n\n"
             "YOUR CAPABILITIES:\n"
             "1. **Workspace Files**: read_file, write_file, list_dir (restricted to /workspace/ only)\n"
@@ -125,7 +166,7 @@ def handle_conversation(user_input: str, ctx: dict):
     else:
         agent_tools = None
         instructions = (
-            "You are Hive Mind, a friendly AI assistant.\n\n"
+            "You are Memex, a friendly AI assistant.\n\n"
             "YOUR CAPABILITIES:\n"
             "- Answer questions and explain concepts clearly\n"
             "- Provide research and analysis\n"
@@ -146,8 +187,12 @@ def handle_conversation(user_input: str, ctx: dict):
         yield {"type": "log", "content": "[Conversationalist] Regular user mode - conversation only"}
 
     conversationalist = Agent(
-        name="Hive Mind",
-        model=Ollama(id=CONV_MODEL, host=OLLAMA_HOST, client_kwargs={"timeout": 120.0}, options=_model_options),
+        name="Memex",
+        # Built by providers.model_client, which is the only thing that decides whether an
+        # id is served by a GPU in this room or by a provider key the runtime holds. The
+        # Agent itself is unchanged — same storage, history, tools and instructions — which
+        # is the whole point: a gateway model gets the assistant, not a bare completion.
+        model=MODEL_CLIENT,
         storage=conv_storage,
         session_id=session_id,
         add_history_to_messages=True,

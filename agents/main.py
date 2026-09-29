@@ -2711,7 +2711,17 @@ async def chat_completions(request: ChatRequest, http_request: Request):
     # Route OpenRouter requests to the OpenRouterProvider. Reached by catalogue
     # membership (providers/registry.py), never by an `openai/`-style prefix, because
     # publisher prefixes collide with the NVIDIA entries below.
-    if _provider == "openrouter":
+    #
+    # Streaming turns are deliberately NOT served here. A raw completion carries the
+    # client's messages and nothing else — no instructions, no stored history, no memory,
+    # no tools — so a desktop chat turn on a selected gateway model came back introduced
+    # itself as its base weights and described a set of capabilities that is wrong about
+    # Memex. Falling through to the router instead reaches handlers/conversation.py,
+    # which builds the same Agent it builds for a local model and asks
+    # providers.model_client who should serve the id. Non-streaming callers keep the
+    # direct path: they post their own messages and expect an answer for exactly those.
+    # Plan D8.
+    if _provider == "openrouter" and not request.stream:
         uid = http_request.headers.get("X-authentik-uid", "").strip()
         if not uid:
             raise HTTPException(status_code=401, detail="OpenRouter requires an authenticated session")
