@@ -843,15 +843,27 @@ def _apply_model_policy(request: ChatRequest, http_request: Request) -> None:
         # OpenRouter, NVIDIA, Anthropic, Google, GitHub — is rejected here, 26 lines
         # before provider_for() gets a chance to route it. The entitlement is the
         # caller's own connected key; the admin allowlist is still applied below.
-        from providers.registry import provider_for, provider_key_connected
+        from providers.registry import provider_for, provider_selection
         provider = provider_for(requested)
         if provider:
             uid = http_request.headers.get("X-authentik-uid", "").strip()
-            if not provider_key_connected(provider, uid):
+            selection = provider_selection(uid, provider)
+            if selection is None:
                 raise HTTPException(
                     status_code=400,
                     detail=f"{requested} is served by {provider}, which has no API key "
                            "connected for this user. Add it in Settings → Model providers.",
+                )
+            # D7: for a gateway, holding a key is not permission to use any model it
+            # lists — the user chose a subset, so a model outside it is refused with
+            # the control that would add it rather than a bare 403 into nowhere.
+            from provider_keys import PROVIDERS as _PK_PROVIDERS
+            _live = bool((_PK_PROVIDERS.get(provider) or {}).get("live_models"))
+            if _live and requested not in selection:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{requested} is not in your {provider} selection. Choose it "
+                           f"under Settings → Model providers → {provider}.",
                 )
             if not user_permissions.model_allowed(owner, requested):
                 raise HTTPException(status_code=403, detail="This model is not available to this user.")
@@ -917,6 +929,42 @@ async def permission_catalog(request: Request):
     from user_permissions import FEATURES
     models = [{"id": "Home-AI-Swarm", "label": "Memex default", "available": True}]
     models.extend({"id": s.name, "label": s.name, "description": s.description, "available": s.available} for s in get_user_selectable_models())
+    # D7: provider models were absent from this list entirely, which made the
+    # "explicit allowlist" unusable for them — `allowed_models` denies everything not
+    # in it once non-null, so the first allowlist set for any reason turned off every
+    # provider model with a 403 that named nothing. A model that cannot be listed
+    # cannot be permitted, so the allowlist has to be able to see them.
+    #
+    # Scoped to the requesting admin's own connected keys, because this endpoint takes
+    # no owner parameter; a per-owner catalogue is the honest generalisation and is
+    # recorded as a known limit rather than papered over.
+    uid = request.headers.get("X-authentik-uid", "").strip()
+    if uid:
+        try:
+            from provider_keys import get_key as _pk_get, PROVIDERS as _PK_PROVIDERS
+            for provider_id, info in _PK_PROVIDERS.items():
+                rec = _pk_get(uid, provider_id)
+                if not rec:
+                    continue
+                if info.get("live_models"):
+                    chosen = set(rec.get_selection())
+                    try:
+                        import importlib
+                        cat = importlib.import_module(f"providers.{provider_id}_catalogue").models()
+                    except Exception:
+                        cat = []
+                    rows = [m for m in cat if m["id"] in chosen]
+                else:
+                    rows = info.get("models", [])
+                for m in rows:
+                    models.append({
+                        "id": m["id"],
+                        "label": m.get("label") or m["id"],
+                        "description": f"{info.get('label', provider_id)} · {m['id']}",
+                        "available": True,
+                    })
+        except Exception as e:
+            logger.warning(f"permission_catalog: provider models error: {e}")
     return {"models": models, "features": FEATURES}
 
 
@@ -1568,6 +1616,13 @@ async def list_models(request: Request):
                                     f"list_models: live catalogue for {provider_id} failed: {_ce}"
                                 )
                                 catalog = []
+                            # D7: a gateway's models are offered only for the ids this
+                            # user opted into, so connecting one changes the picker by
+                            # zero rows until they choose. An empty selection is the
+                            # default, not an error state — and curated providers never
+                            # reach here, so their all-or-nothing behaviour is untouched.
+                            _chosen = set(rec.get_selection())
+                            catalog = [m for m in catalog if m["id"] in _chosen]
 
                         # NVIDIA: filter to models the user's key is entitled
                         # to call (NVIDIA returns 404 for un-entitled models,
@@ -7930,6 +7985,42 @@ async def provider_keys_disconnect(provider: str, http_request: Request):
         return {"disconnected": deleted, "provider": provider}
     except Exception as e:
         logger.error(f"provider_keys_disconnect error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class _ProviderSelectionRequest(BaseModel):
+    models: list[str] = []
+
+
+@app.put("/api/v1/provider-keys/{provider}/selection")
+async def provider_keys_set_selection(provider: str, body: _ProviderSelectionRequest, http_request: Request):
+    """Choose which of a provider's models this user is offered (plan D7).
+
+    Empty is a valid answer and means *offer none* — for a gateway that is the state
+    right after connecting, so adding a credential never rewrites the picker by
+    surprise. Refused when no key is connected: a selection with nothing to select
+    against is an orphan the UI could not explain.
+    """
+    uid = http_request.headers.get("X-authentik-uid", "").strip()
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        from provider_keys import set_selection, normalize_selection, PROVIDERS
+        if provider not in PROVIDERS:
+            raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
+        chosen = normalize_selection(body.models)
+        if not set_selection(uid, provider, chosen):
+            raise HTTPException(
+                status_code=400,
+                detail=f"No {provider} key is connected, so there is nothing to select against.",
+            )
+        return {"status": "updated", "provider": provider, "selected": chosen}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"provider_keys_set_selection error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

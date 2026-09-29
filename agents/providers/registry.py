@@ -61,3 +61,21 @@ def provider_key_connected(provider: str, uid: str) -> bool:
         return bool(get_key(uid, provider))
     except Exception:
         return False
+
+
+def provider_selection(uid: str, provider: str) -> Optional[list[str]]:
+    """The models this user opted into, or None when no key is connected.
+
+    The two states are distinct on purpose and callers must not collapse them:
+    None means "cannot serve this provider at all", an empty list means
+    "connected, nothing chosen yet" — which for a live-catalogue provider offers
+    zero models rather than all of them.
+    """
+    if not provider or not uid:
+        return None
+    try:
+        from provider_keys import get_key
+        record = get_key(uid, provider)
+        return record.get_selection() if record else None
+    except Exception:
+        return None

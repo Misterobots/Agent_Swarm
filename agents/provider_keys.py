@@ -159,6 +159,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS provider_api_keys_user_provider_idx
     ON swarm.provider_api_keys(user_id, provider);
 """
 
+# D7: which of a provider's models this user has opted into. Stored on the key row
+# deliberately — the selection is meaningless without the credential and this makes
+# disconnecting clear both together, so the two can never drift apart.
+#
+# Empty means "nothing chosen", which is NOT the same state as "no column": for a
+# live-catalogue provider (a gateway with hundreds of models) an empty selection
+# offers zero models. Curated providers ignore the column entirely and keep the
+# all-or-nothing behaviour they shipped with.
+_DDL_SELECTED = """
+ALTER TABLE swarm.provider_api_keys
+    ADD COLUMN IF NOT EXISTS selected_models TEXT[] NOT NULL DEFAULT ARRAY[]::text[];
+"""
+
 
 def _get_conn():
     import psycopg2
@@ -169,6 +182,7 @@ def _get_conn():
     cur.execute(_DDL_DEDUP)
     cur.execute(_DDL_KEY_ID_DEFAULT)
     cur.execute(_DDL_UNIQUE)
+    cur.execute(_DDL_SELECTED)
     conn.commit()
     cur.close()
     return conn
@@ -186,9 +200,16 @@ class ProviderKey:
     created_at: datetime
     updated_at: datetime
     _encrypted: bytes = b""
+    # D7: the models this user opted into. `None` and `[]` both mean "nothing chosen";
+    # the column has a non-null default, so None only appears for a record built
+    # without it (an older row read before the migration, or a test fixture).
+    selected_models: Optional[list] = None
 
     def get_api_key(self) -> str:
         return _decrypt(self._encrypted)
+
+    def get_selection(self) -> list[str]:
+        return [str(m) for m in (self.selected_models or [])]
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +253,7 @@ def get_key(user_id: str, provider: str) -> Optional[ProviderKey]:
         conn = _get_conn()
         cur = conn.cursor()
         cur.execute(
-            "SELECT user_id, provider, api_key, label, created_at, updated_at "
+            "SELECT user_id, provider, api_key, label, created_at, updated_at, selected_models "
             "FROM swarm.provider_api_keys WHERE user_id = %s AND provider = %s",
             (user_id, provider),
         )
@@ -248,6 +269,7 @@ def get_key(user_id: str, provider: str) -> Optional[ProviderKey]:
             created_at=row[4],
             updated_at=row[5],
             _encrypted=bytes(row[2]),
+            selected_models=list(row[6]) if row[6] else [],
         )
     except Exception as e:
         logger.error(f"provider_keys: get_key failed for user_id={user_id} provider={provider}: {e}", exc_info=True)
@@ -260,14 +282,17 @@ def list_connected(user_id: str) -> list[dict]:
         conn = _get_conn()
         cur = conn.cursor()
         cur.execute(
-            "SELECT provider, label, created_at FROM swarm.provider_api_keys WHERE user_id = %s",
+            "SELECT provider, label, created_at, selected_models FROM swarm.provider_api_keys WHERE user_id = %s",
             (user_id,),
         )
         rows = cur.fetchall()
         cur.close()
         conn.close()
         return [
-            {"provider": r[0], "label": r[1] or PROVIDERS.get(r[0], {}).get("label", r[0]), "connected_at": r[2].isoformat() if r[2] else None}
+            {"provider": r[0], "label": r[1] or PROVIDERS.get(r[0], {}).get("label", r[0]), "connected_at": r[2].isoformat() if r[2] else None,
+             # D7: the client needs the current selection to render checkboxes as
+             # already-checked rather than as an empty offer it did not choose.
+             "selected_models": list(r[3]) if r[3] else []}
             for r in rows
         ]
     except Exception as e:
@@ -299,3 +324,61 @@ def get_user_anthropic_key(user_id: str) -> Optional[str]:
     """Convenience: return the user's Anthropic API key plaintext, or None."""
     record = get_key(user_id, "anthropic")
     return record.get_api_key() if record else None
+
+
+def normalize_selection(models) -> list[str]:
+    """Trim, drop blanks, de-duplicate and sort a selection.
+
+    Extracted because it is the part with observable behaviour: two different orders
+    or a repeated id must produce identical stored state, and the route and the
+    setter have to agree on what "the same selection" means.
+
+    Non-strings are dropped rather than stringified. A test pointed at this: `str(None)`
+    is `"None"`, which is truthy, so a null in the request body would otherwise have
+    been stored as a model id called None and offered back to the user as a choice.
+    """
+    kept = set()
+    for entry in (models or []):
+        if isinstance(entry, str) and entry.strip():
+            kept.add(entry.strip())
+    return sorted(kept)
+
+
+def set_selection(user_id: str, provider: str, models: list) -> bool:
+    """Replace the models this user opted into for a provider.
+
+    Returns True only when a row was updated: a selection with no key is meaningless,
+    so this refuses to create one rather than leaving an orphan the UI cannot explain.
+
+    An empty list is a valid answer and means *offer nothing* — which is the D7 default
+    for a live-catalogue provider, so connecting a gateway changes the user's model list
+    by zero rows until they choose.
+    """
+    if provider not in PROVIDERS:
+        raise ValueError(f"Unknown provider: {provider}. Supported: {list(PROVIDERS.keys())}")
+    cleaned = normalize_selection(models)
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE swarm.provider_api_keys SET selected_models = %s, updated_at = NOW() "
+            "WHERE user_id = %s AND provider = %s",
+            (cleaned, user_id, provider),
+        )
+        updated = cur.rowcount > 0
+        conn.commit()
+        cur.close()
+        logger.info(
+            f"provider_keys: selection set for {provider} user_id={user_id} "
+            f"models={len(cleaned)} updated={updated}"
+        )
+        return updated
+    except Exception as e:
+        conn.rollback()
+        logger.error(
+            f"provider_keys: set_selection failed for user_id={user_id} provider={provider}: {e}",
+            exc_info=True,
+        )
+        raise
+    finally:
+        conn.close()
