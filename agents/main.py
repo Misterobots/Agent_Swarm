@@ -843,10 +843,19 @@ def _apply_model_policy(request: ChatRequest, http_request: Request) -> None:
         # OpenRouter, NVIDIA, Anthropic, Google, GitHub — is rejected here, 26 lines
         # before provider_for() gets a chance to route it. The entitlement is the
         # caller's own connected key; the admin allowlist is still applied below.
-        from providers.registry import provider_for, provider_selection
-        provider = provider_for(requested)
+        #
+        # `provider_of` rather than `provider_for`, deliberately: the registry index is
+        # only as good as this process's fetched-catalogue cache, and a freshly restarted
+        # runtime knows the four fallback ids rather than the 464 the server will end up
+        # holding. Asking it alone answers "no provider serves this" about a model the
+        # user selected and saved, so the very first turn after a restart would be
+        # refused until something else happened to warm the cache. provider_of falls back
+        # to that user's stored selection, which is a Postgres row.
+        from providers.model_client import provider_of
+        from providers.registry import provider_selection
+        uid = http_request.headers.get("X-authentik-uid", "").strip()
+        provider = provider_of(requested, uid)
         if provider:
-            uid = http_request.headers.get("X-authentik-uid", "").strip()
             selection = provider_selection(uid, provider)
             if selection is None:
                 raise HTTPException(
