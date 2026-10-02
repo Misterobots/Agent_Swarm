@@ -11,7 +11,16 @@ WORKSPACE_ROOT = Path("/workspace").resolve()
 
 
 def _resolve_in_workspace(path: str) -> Path:
-    candidate = (WORKSPACE_ROOT / path.lstrip("/")).resolve()
+    # An absolute path that already names the sandbox resolves as itself. Before this, every
+    # path was joined under WORKSPACE_ROOT, so a model told "sandbox: /workspace/" — which the
+    # admin instructions do say — and passing that back verbatim got /workspace/workspace/: a
+    # directory that exists and is empty. The tool returned an honest nothing, and the model
+    # narrated plausible entries over it. Anything still landing outside the sandbox raises
+    # below, as it did before.
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        candidate = WORKSPACE_ROOT / candidate
+    candidate = candidate.resolve()
     if candidate != WORKSPACE_ROOT and WORKSPACE_ROOT not in candidate.parents:
         raise PermissionError("Path traversal detected")
     return candidate
@@ -54,6 +63,11 @@ def list_dir(path: str = ".") -> str:
     try:
         full_path = _resolve_in_workspace(path)
         items = os.listdir(full_path)
+        if not items:
+            # Spelled out rather than returned as an empty string: a blank result is what a
+            # model invented entries on top of, because "" reads as "nothing to report" and
+            # not as "this directory has no contents" — the two are different answers.
+            return f"(the directory {path} is empty)"
         return "\n".join(items)
     except PermissionError as e:
         return f"Security error listing directory {path}: {str(e)}"

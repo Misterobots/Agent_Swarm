@@ -96,3 +96,28 @@ def test_a_chunk_carrying_no_tool_list_is_not_an_error():
     assert list(tool_events_from_chunk(SimpleNamespace(), starts, results)) == []
     assert list(tool_events_from_chunk(SimpleNamespace(tools=None), starts, results)) == []
     assert list(tool_events_from_chunk(_chunk("not a dict"), starts, results)) == []
+
+
+def test_an_empty_result_is_marked_because_blank_and_absent_are_otherwise_identical():
+    # D8(f). A model named three entries in a directory the tool had reported as empty, and
+    # nothing on the wire distinguished "" from a missing field.
+    starts, results = _fresh()
+    events = list(tool_events_from_chunk(_chunk(_done(output="")), starts, results))
+
+    assert len(events) == 2
+    assert events[1]["type"] == "tool_result"
+    assert events[1]["empty_result"] is True
+
+
+def test_a_real_result_is_not_marked_empty():
+    starts, results = _fresh()
+    events = list(tool_events_from_chunk(_chunk(_done(output=".agents\n.claude")), starts, results))
+
+    assert events[1]["empty_result"] is False
+
+
+def test_whitespace_only_output_counts_as_empty():
+    starts, results = _fresh()
+    events = list(tool_events_from_chunk(_chunk(_done(output="\n  \n")), starts, results))
+
+    assert events[1]["empty_result"] is True

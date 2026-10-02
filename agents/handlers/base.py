@@ -112,8 +112,13 @@ def tool_events_from_chunk(chunk, seen_starts: set, seen_results: set):
             yield _emit_tool_start(tcid, name, tc.get("tool_args") or {})
         if "tool_call_error" in tc and tcid not in seen_results:
             seen_results.add(tcid)
-            yield _emit_tool_result(tcid, name, str(tc.get("content") or ""),
-                                    success=not tc.get("tool_call_error"))
+            output = str(tc.get("content") or "")
+            event = _emit_tool_result(tcid, name, output, success=not tc.get("tool_call_error"))
+            # D8(f): an empty output and an absent one are the same bytes on the wire, and
+            # that indistinction is how a model got away with naming three entries in a
+            # directory the tool reported as empty. Say which one it was.
+            event["empty_result"] = not output.strip()
+            yield event
 
 
 def _emit_continuation_hint(hint_type: str = "auto_continue", reason: str = "") -> dict:
