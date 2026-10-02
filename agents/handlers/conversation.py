@@ -14,7 +14,7 @@ from metrics import AGENT_STATE, WORKFLOW_STEPS
 from utils.gpu_queue import request_lock, get_best_host_for_model, pre_lock_status_events
 from handlers.base import (
     _emit_stream_mode, _emit_turn_metadata, _score_trace, _langfuse_span,
-    _emit_suggested_followups,
+    _emit_suggested_followups, tool_events_from_chunk,
 )
 
 logger = logging.getLogger("Router")
@@ -213,14 +213,40 @@ def handle_conversation(user_input: str, ctx: dict):
         final_input = f"{final_input}\n\n[Attached Document Context]:\n{extracted_context}"
 
     full_content = ""
+    # Owned per turn: the Agent re-yields its accumulated tool list on every step, so these
+    # are what stop one call being announced to the desktop twice.
+    _seen_tool_starts = set()
+    _seen_tool_results = set()
     try:
         # Fix 3+5: emit GPU zone/queue status BEFORE potentially blocking on the lock
         yield from pre_lock_status_events("text", CONV_MODEL, uid=session_id)
         with _langfuse_span("conversation_generation", "Conversationalist", CONV_MODEL, final_input,
                             langfuse=langfuse, use_langfuse=use_langfuse) as span_result:
             with request_lock(context="text"):
-                response_stream = conversationalist.run(final_input, stream=True)
+                # The flag belongs on the *call*, not the Agent. `run()` takes its own
+                # `stream_intermediate_steps` (default False) and `_run` assigns it over the
+                # instance attribute before anything is yielded, so a constructor value is
+                # silently discarded — measured, not inferred: with it set on the Agent only,
+                # a turn on `qwen/qwen3.8-27b` ran `list_dir` (the answer carried the real
+                # directory entries) and surfaced zero tool events.
+                # With it on the call, every step shares this one stream, which is why the
+                # loop below routes on event name rather than on the presence of content.
+                response_stream = conversationalist.run(final_input, stream=True,
+                                                         stream_intermediate_steps=True)
                 for chunk in response_stream:
+                    # `stream_intermediate_steps` shares this stream with the Agent's own
+                    # step markers, so the event name — not the presence of content — has
+                    # to decide what counts as the answer. "Run started" and "Updating
+                    # memory" carry literal labels, and the closing run_completed carries
+                    # the *entire* answer again; reading content alone would splice all
+                    # three into the reply.
+                    event = getattr(chunk, "event", None) or "RunResponse"
+                    if event in ("ToolCallStarted", "ToolCallCompleted"):
+                        for tool_event in tool_events_from_chunk(chunk, _seen_tool_starts, _seen_tool_results):
+                            yield tool_event
+                        continue
+                    if event != "RunResponse":
+                        continue
                     if chunk.content:
                         yield _emit_stream_mode("responding")
                         full_content += chunk.content

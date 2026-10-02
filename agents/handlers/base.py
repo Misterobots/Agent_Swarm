@@ -89,6 +89,33 @@ def _emit_tool_result(tool_call_id: str, tool_name: str, output: str, success: b
     }
 
 
+def tool_events_from_chunk(chunk, seen_starts: set, seen_results: set):
+    """Translate a phidata tool chunk into the desktop's tool_start/tool_result contract.
+
+    Two properties of the upstream stream make the ``seen`` sets necessary rather than
+    defensive: the Agent yields its *whole accumulated* ``run_response.tools`` on every
+    step, and a completed call **replaces** the entry its start created instead of
+    appending one. So the same call is visible on several chunks, and the only way to
+    tell a start from a completion is that the completion shape carries result fields
+    (``content``/``tool_call_error``) which the start shape does not have at all.
+
+    The caller owns the two sets; passing fresh ones re-announces everything, which is
+    correct for a new turn and wrong within one.
+    """
+    for tc in (getattr(chunk, "tools", None) or []):
+        if not isinstance(tc, dict):
+            continue
+        tcid = str(tc.get("tool_call_id") or "")
+        name = str(tc.get("tool_name") or "")
+        if tcid not in seen_starts:
+            seen_starts.add(tcid)
+            yield _emit_tool_start(tcid, name, tc.get("tool_args") or {})
+        if "tool_call_error" in tc and tcid not in seen_results:
+            seen_results.add(tcid)
+            yield _emit_tool_result(tcid, name, str(tc.get("content") or ""),
+                                    success=not tc.get("tool_call_error"))
+
+
 def _emit_continuation_hint(hint_type: str = "auto_continue", reason: str = "") -> dict:
     return {
         "type": "continuation",
